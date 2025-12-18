@@ -24,10 +24,12 @@ import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
 import { ProfileCustomizationDialog } from "@/components/profile/ProfileCustomizationDialog";
 import { ProfileMusicPlayer } from "@/components/profile/ProfileMusicPlayer";
+import { ProfileEffects, HolographicCard, CyberpunkProgressBar, NeonText } from "@/components/profile/ProfileEffects";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useProfileCustomization } from "@/hooks/useProfileCustomization";
+import { THEME_PRESETS, ThemePreset } from "@/lib/profileThemes";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -108,6 +110,12 @@ const Profile = () => {
   const city = profile?.city || 'Location not set';
   const avatarUrl = profile?.avatar_url;
 
+  // Get theme preset
+  const themePreset = (customization?.theme_preset as ThemePreset) || 'clean_modern';
+  const theme = THEME_PRESETS[themePreset];
+  const isCyberpunk = themePreset === 'cyberpunk';
+  const isRetro = themePreset === 'retro_spacehey';
+
   // Determine background styles based on customization
   const getBackgroundStyle = () => {
     if (!customization) {
@@ -125,27 +133,83 @@ const Profile = () => {
   };
 
   const backgroundImageStyle = customization?.background_type === 'image' 
-    ? { backgroundImage: `url(${customization.background_value})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : {};
+    ? { 
+        backgroundImage: `url(${customization.background_value})`, 
+        backgroundSize: 'cover', 
+        backgroundPosition: 'center',
+        filter: customization.background_blur ? `blur(${customization.background_blur}px)` : undefined,
+        opacity: customization.background_opacity ?? 1,
+      }
+    : {
+        opacity: customization?.background_opacity ?? 1,
+      };
+
+  // Get theme-specific card styles
+  const getCardStyle = () => {
+    if (isCyberpunk) return "bg-black/90 border border-cyan-500/30 rounded-none";
+    if (isRetro) return "bg-black/80 border-2 border-pink-500/50 rounded-lg";
+    return "glass-strong rounded-xl";
+  };
+
+  // Get theme-specific text styles
+  const getHeadingStyle = () => {
+    if (customization?.custom_font) {
+      return { fontFamily: customization.custom_font };
+    }
+    return {};
+  };
+
+  // Get accent color
+  const accentColor = customization?.accent_color_override || theme.primaryAccent;
 
   return (
     <PageLayout>
-      <div className="min-h-screen">
-        {/* Cover Image */}
+      <div 
+        className="min-h-screen relative"
+        style={getHeadingStyle()}
+      >
+        {/* Cover Image / Background */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6 }}
-          className={cn("relative h-48 sm:h-64", getBackgroundStyle())}
-          style={backgroundImageStyle}
+          className={cn("relative h-48 sm:h-64 overflow-hidden", getBackgroundStyle())}
         >
+          {/* Background with opacity/blur */}
+          {customization?.background_type === 'image' && customization.background_value && (
+            <div 
+              className="absolute inset-0"
+              style={backgroundImageStyle}
+            />
+          )}
+
+          {/* Overlay Tint */}
+          {customization?.overlay_tint && (
+            <div 
+              className="absolute inset-0"
+              style={{ 
+                backgroundColor: customization.overlay_tint,
+                opacity: customization.overlay_opacity ?? 0.3,
+              }}
+            />
+          )}
+
+          {/* Theme Effects */}
+          <ProfileEffects
+            grain={customization?.effect_grain}
+            scanlines={customization?.effect_scanlines}
+            neonGlow={customization?.effect_neon_glow}
+            holographic={customization?.effect_holographic}
+            motionGradient={customization?.effect_motion_gradient}
+          />
+
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
           
           {/* Settings Button */}
           <Button
             variant="glass"
             size="icon"
-            className="absolute top-4 right-4 w-10 h-10"
+            className="absolute top-4 right-4 w-10 h-10 z-10"
             onClick={() => navigate('/settings')}
           >
             <Settings className="w-5 h-5" />
@@ -155,7 +219,7 @@ const Profile = () => {
           <Button
             variant="glass"
             size="icon"
-            className="absolute top-4 right-16 w-10 h-10"
+            className="absolute top-4 right-16 w-10 h-10 z-10"
             onClick={() => setShowCustomizationDialog(true)}
           >
             <Sparkles className="w-5 h-5" />
@@ -226,27 +290,64 @@ const Profile = () => {
             transition={{ delay: 0.3 }}
             className="grid grid-cols-3 gap-4 mb-8"
           >
-            <div className="glass-strong rounded-xl p-4 text-center">
-              <div className="flex items-center justify-center gap-1 mb-1">
-                <Coins className="w-4 h-4 text-primary" />
-                <span className="font-display text-xl font-medium text-foreground">
-                  {credits?.balance || 0}
-                </span>
-              </div>
-              <span className="text-xs text-muted-foreground">LC Credits</span>
-            </div>
-            <div className="glass-strong rounded-xl p-4 text-center">
-              <span className="font-display text-xl font-medium text-foreground block mb-1">
-                0
-              </span>
-              <span className="text-xs text-muted-foreground">Projects</span>
-            </div>
-            <div className="glass-strong rounded-xl p-4 text-center">
-              <span className="font-display text-xl font-medium text-foreground block mb-1">
-                0
-              </span>
-              <span className="text-xs text-muted-foreground">Events</span>
-            </div>
+            {isCyberpunk ? (
+              <>
+                <HolographicCard className={cn(getCardStyle(), "p-4 text-center")}>
+                  <div className="flex items-center justify-center gap-1 mb-1">
+                    <Coins className="w-4 h-4" style={{ color: accentColor }} />
+                    <NeonText color={accentColor} className="font-mono text-xl font-bold">
+                      {credits?.balance || 0}
+                    </NeonText>
+                  </div>
+                  <span className="text-xs text-cyan-400/70">LC Credits</span>
+                </HolographicCard>
+                <HolographicCard className={cn(getCardStyle(), "p-4 text-center")}>
+                  <NeonText color={accentColor} className="font-mono text-xl font-bold block mb-1">
+                    0
+                  </NeonText>
+                  <span className="text-xs text-cyan-400/70">Projects</span>
+                </HolographicCard>
+                <HolographicCard className={cn(getCardStyle(), "p-4 text-center")}>
+                  <NeonText color={accentColor} className="font-mono text-xl font-bold block mb-1">
+                    0
+                  </NeonText>
+                  <span className="text-xs text-cyan-400/70">Events</span>
+                </HolographicCard>
+              </>
+            ) : (
+              <>
+                <div className={cn(getCardStyle(), "p-4 text-center")}>
+                  <div className="flex items-center justify-center gap-1 mb-1">
+                    <Coins className="w-4 h-4" style={{ color: isRetro ? '#ff69b4' : undefined }} />
+                    <span 
+                      className="font-display text-xl font-medium"
+                      style={{ color: isRetro ? '#ff69b4' : undefined }}
+                    >
+                      {credits?.balance || 0}
+                    </span>
+                  </div>
+                  <span className={cn("text-xs", isRetro ? "text-pink-300" : "text-muted-foreground")}>LC Credits</span>
+                </div>
+                <div className={cn(getCardStyle(), "p-4 text-center")}>
+                  <span 
+                    className="font-display text-xl font-medium block mb-1"
+                    style={{ color: isRetro ? '#00ffff' : undefined }}
+                  >
+                    0
+                  </span>
+                  <span className={cn("text-xs", isRetro ? "text-cyan-300" : "text-muted-foreground")}>Projects</span>
+                </div>
+                <div className={cn(getCardStyle(), "p-4 text-center")}>
+                  <span 
+                    className="font-display text-xl font-medium block mb-1"
+                    style={{ color: isRetro ? '#ff69b4' : undefined }}
+                  >
+                    0
+                  </span>
+                  <span className={cn("text-xs", isRetro ? "text-pink-300" : "text-muted-foreground")}>Events</span>
+                </div>
+              </>
+            )}
           </motion.div>
 
           {/* Bio */}
