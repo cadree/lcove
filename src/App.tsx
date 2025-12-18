@@ -24,6 +24,12 @@ import Live from "./pages/Live";
 import Settings from "./pages/Settings";
 import BookOfLcove from "./pages/BookOfLcove";
 import NotFound from "./pages/NotFound";
+import Cinema from "./pages/Cinema";
+import NetworkPage from "./pages/NetworkPage";
+import NetworkManage from "./pages/NetworkManage";
+import Partners from "./pages/Partners";
+import Admin from "./pages/Admin";
+import Community from "./pages/Community";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -61,6 +67,12 @@ const App = () => (
             <Route path="/membership" element={<Membership />} />
             <Route path="/live" element={<Live />} />
             <Route path="/book" element={<BookOfLcove />} />
+            <Route path="/cinema" element={<Cinema />} />
+            <Route path="/cinema/network/:networkId" element={<NetworkPage />} />
+            <Route path="/cinema/manage/:networkId" element={<NetworkManage />} />
+            <Route path="/partners" element={<Partners />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/community" element={<Community />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
