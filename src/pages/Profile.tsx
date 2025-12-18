@@ -13,6 +13,7 @@ import {
   Store,
   Coins,
   Edit,
+  BookOpen,
   Heart,
   Crown,
   Camera,
@@ -246,6 +247,10 @@ const Profile = () => {
             <Link to="/membership" className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors">
               <Crown className="w-6 h-6 text-amber-400 mb-2" />
               <span className="text-sm text-muted-foreground">Membership</span>
+            </Link>
+            <Link to="/book" className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors col-span-2">
+              <BookOpen className="w-6 h-6 text-foreground mb-2" />
+              <span className="text-sm text-muted-foreground">The Book of LCOVE</span>
             </Link>
           </motion.div>
 
