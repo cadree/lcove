@@ -570,51 +570,62 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
         </Badge>
       </div>
 
-      {/* Controls */}
+      {/* Controls - Mobile-first stacked layout */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-full px-4 py-2 z-20"
+        className="absolute bottom-0 left-0 right-0 z-20 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
       >
-        {!isStreaming ? (
-          <Button 
-            onClick={startStream} 
-            className="gap-2 bg-red-500 hover:bg-red-600"
-            disabled={cameraState !== 'ready' || isGoingLive}
-          >
-            {isGoingLive ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+        <div className="bg-background/90 backdrop-blur-sm rounded-2xl p-3 max-w-md mx-auto">
+          {/* Row 1: Camera + Mic toggles (always visible when camera ready) */}
+          {cameraState === 'ready' && (
+            <div className="flex items-center justify-center gap-3 mb-3">
+              <Button
+                variant={videoEnabled ? 'secondary' : 'destructive'}
+                size="icon"
+                onClick={toggleVideo}
+                className="h-11 w-11 min-h-[44px] min-w-[44px]"
+              >
+                {videoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+              </Button>
+
+              <Button
+                variant={audioEnabled ? 'secondary' : 'destructive'}
+                size="icon"
+                onClick={toggleAudio}
+                className="h-11 w-11 min-h-[44px] min-w-[44px]"
+              >
+                {audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+              </Button>
+            </div>
+          )}
+
+          {/* Row 2: Start/End Stream button (full width) */}
+          <div className="w-full">
+            {!isStreaming ? (
+              <Button 
+                onClick={startStream} 
+                className="w-full gap-2 bg-red-500 hover:bg-red-600 h-11 min-h-[44px] text-base font-medium"
+                disabled={cameraState !== 'ready' || isGoingLive}
+              >
+                {isGoingLive ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Radio className="h-5 w-5" />
+                )}
+                Go Live
+              </Button>
             ) : (
-              <Radio className="h-4 w-4" />
+              <Button
+                variant="destructive"
+                onClick={handleEndStream}
+                className="w-full h-11 min-h-[44px] text-base font-medium"
+              >
+                End Stream
+              </Button>
             )}
-            Go Live
-          </Button>
-        ) : (
-          <>
-            <Button
-              variant={videoEnabled ? 'secondary' : 'destructive'}
-              size="icon"
-              onClick={toggleVideo}
-            >
-              {videoEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
-            </Button>
-
-            <Button
-              variant={audioEnabled ? 'secondary' : 'destructive'}
-              size="icon"
-              onClick={toggleAudio}
-            >
-              {audioEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-            </Button>
-
-            <Button
-              variant="destructive"
-              onClick={handleEndStream}
-            >
-              End Stream
-            </Button>
-          </>
-        )}
+          </div>
+        </div>
       </motion.div>
 
       {/* End Stream Dialog */}
