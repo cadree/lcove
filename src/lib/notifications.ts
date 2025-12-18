@@ -122,3 +122,13 @@ export const notifyLiveStream = (userId: string, streamerName: string, streamId:
     data: { stream_id: streamId },
   });
 };
+
+export const notifyNetworkPremiere = (userId: string, networkName: string, contentTitle: string, networkId: string) => {
+  return createNotification({
+    userId,
+    type: 'live_stream',
+    title: `New on ${networkName}`,
+    body: `"${contentTitle}" is now streaming`,
+    data: { network_id: networkId },
+  });
+};
