@@ -14,6 +14,7 @@ import {
   Bell,
   Save,
   Loader2,
+  Lock,
 } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,7 +22,7 @@ import { useNotificationPreferences } from "@/hooks/useNotifications";
 import { toast } from "sonner";
 
 const Settings = () => {
-  const { user } = useAuth();
+  const { user, updatePassword } = useAuth();
   const navigate = useNavigate();
   const { profile, loading, updateProfile } = useProfile();
   const { preferences, isLoading: prefsLoading, updatePreferences } = useNotificationPreferences();
@@ -30,6 +31,11 @@ const Settings = () => {
   const [bio, setBio] = useState("");
   const [city, setCity] = useState("");
   const [saving, setSaving] = useState(false);
+  
+  // Password change state
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   // Initialize form with profile data
   useEffect(() => {
@@ -62,6 +68,31 @@ const Settings = () => {
   const handleNotificationToggle = (key: string, value: boolean) => {
     updatePreferences({ [key]: value });
     toast.success("Preferences updated");
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    
+    setChangingPassword(true);
+    try {
+      const { error } = await updatePassword(newPassword);
+      if (error) throw error;
+      toast.success("Password updated successfully!");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error: any) {
+      console.error("Error updating password:", error);
+      toast.error(error.message || "Failed to update password");
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   if (!user) {
@@ -174,6 +205,68 @@ const Settings = () => {
                 <>
                   <Save className="w-4 h-4 mr-2" />
                   Save Changes
+                </>
+              )}
+            </Button>
+          </div>
+        </motion.section>
+
+        {/* Security Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="glass-strong rounded-2xl p-6 mb-6"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Lock className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-medium text-foreground">Security</h2>
+              <p className="text-sm text-muted-foreground">Update your password</p>
+            </div>
+          </div>
+
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">New Password</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                placeholder="Enter new password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="bg-background/50"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="bg-background/50"
+              />
+            </div>
+
+            <Button 
+              onClick={handleChangePassword} 
+              disabled={changingPassword || !newPassword || !confirmPassword}
+              className="w-full sm:w-auto"
+            >
+              {changingPassword ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <Lock className="w-4 h-4 mr-2" />
+                  Update Password
                 </>
               )}
             </Button>
