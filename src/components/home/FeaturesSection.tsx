@@ -1,5 +1,7 @@
 import { motion } from "framer-motion";
-import { Users, FolderKanban, Calendar, Coins, Store, Music } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Users, FolderKanban, Calendar, Coins, Store, Music, Heart, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const features = [
   {
@@ -77,6 +79,54 @@ const FeaturesSection = () => {
             </motion.div>
           ))}
         </div>
+
+        {/* Community Fund Highlight Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+          className="mt-12"
+        >
+          <Link to="/fund" className="block">
+            <div className="glass-strong rounded-2xl p-8 bg-gradient-to-br from-primary/10 via-transparent to-ether-tan/10 hover:from-primary/15 hover:to-ether-tan/15 transition-all duration-300 group">
+              <div className="flex flex-col md:flex-row items-center gap-6">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center flex-shrink-0">
+                  <Heart className="w-8 h-8 text-primary-foreground fill-primary-foreground" />
+                </div>
+                <div className="flex-1 text-center md:text-left">
+                  <h3 className="font-display text-2xl font-medium text-foreground mb-2">
+                    Community Fund
+                  </h3>
+                  <p className="text-muted-foreground max-w-xl">
+                    100% transparent. Every dollar, every decision, fully visible. See how member contributions 
+                    fund grants, events, and creative opportunities.
+                  </p>
+                </div>
+                <Button variant="outline" className="group-hover:bg-primary group-hover:text-primary-foreground transition-all">
+                  View Fund
+                  <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </div>
+              
+              {/* Mini Stats */}
+              <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-border/50">
+                <div className="text-center">
+                  <p className="text-2xl font-display font-medium text-foreground">$245K+</p>
+                  <p className="text-xs text-muted-foreground">Raised</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-display font-medium text-foreground">47</p>
+                  <p className="text-xs text-muted-foreground">Grants Awarded</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-display font-medium text-foreground">312</p>
+                  <p className="text-xs text-muted-foreground">Creators Supported</p>
+                </div>
+              </div>
+            </div>
+          </Link>
+        </motion.div>
       </div>
     </section>
   );
