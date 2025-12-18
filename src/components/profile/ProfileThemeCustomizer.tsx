@@ -487,28 +487,43 @@ export const ProfileThemeCustomizer = ({
                 Drag to reorder your profile sections (coming soon)
               </p>
               <div className="space-y-2">
-                {PROFILE_SECTIONS.map((section) => (
-                  <div
-                    key={section.id}
-                    className={cn(
-                      "flex items-center gap-3 p-3 rounded-lg border transition-all",
-                      state.sectionOrder.includes(section.id)
-                        ? "border-primary/50 bg-primary/5"
-                        : "border-border/50 bg-card/30"
-                    )}
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
-                      {section.icon === 'User' && '👤'}
-                      {section.icon === 'Music' && '🎵'}
-                      {section.icon === 'BarChart' && '📊'}
-                      {section.icon === 'Link' && '🔗'}
-                      {section.icon === 'Briefcase' && '💼'}
-                      {section.icon === 'Store' && '🏪'}
-                      {section.icon === 'Calendar' && '📅'}
-                    </div>
-                    <span className="text-sm font-medium text-foreground">{section.name}</span>
-                  </div>
-                ))}
+                {PROFILE_SECTIONS.map((section) => {
+                  const isActive = state.sectionOrder.includes(section.id);
+                  return (
+                    <button
+                      key={section.id}
+                      type="button"
+                      onClick={() => {
+                        const newOrder = isActive
+                          ? state.sectionOrder.filter(id => id !== section.id)
+                          : [...state.sectionOrder, section.id];
+                        onChange({ sectionOrder: newOrder });
+                      }}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg border transition-all w-full text-left",
+                        "hover:scale-[1.01] active:scale-[0.99]",
+                        isActive
+                          ? "border-primary/50 bg-primary/5"
+                          : "border-border/50 bg-card/30 opacity-60"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center",
+                        isActive ? "bg-primary/20" : "bg-muted"
+                      )}>
+                        {section.icon === 'User' && '👤'}
+                        {section.icon === 'Music' && '🎵'}
+                        {section.icon === 'BarChart' && '📊'}
+                        {section.icon === 'Link' && '🔗'}
+                        {section.icon === 'Briefcase' && '💼'}
+                        {section.icon === 'Store' && '🏪'}
+                        {section.icon === 'Calendar' && '📅'}
+                      </div>
+                      <span className="text-sm font-medium text-foreground flex-1">{section.name}</span>
+                      {isActive && <Check className="w-4 h-4 text-primary" />}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
