@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, Users, Calendar, GraduationCap, Building2, Briefcase, Sparkles, Heart } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { TrendingUp, Users, Calendar, GraduationCap, Building2, Briefcase, Sparkles, Heart, Crown, ArrowRight } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 
 const ALLOCATION_DATA = [
@@ -30,12 +32,16 @@ const FUND_STATS = {
     totalDistributed: 218400,
     grantsAwarded: 47,
     creatorsSupported: 312,
+    membershipRevenue: 98400,
+    memberCount: 412,
   },
   monthly: {
     totalCollected: 28400,
     totalDistributed: 25600,
     grantsAwarded: 8,
     creatorsSupported: 42,
+    membershipRevenue: 8200,
+    memberCount: 52,
   },
 };
 
@@ -341,6 +347,40 @@ export default function FundDashboard() {
                       </motion.div>
                     );
                   })}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Membership CTA Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="mt-8"
+          >
+            <Card className="bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border-primary/30 overflow-hidden">
+              <CardContent className="p-6 md:p-8">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
+                      <Crown className="w-8 h-8 text-primary-foreground" />
+                    </div>
+                    <div>
+                      <h3 className="font-display text-xl font-medium text-foreground mb-1">
+                        Join {stats.memberCount}+ Members
+                      </h3>
+                      <p className="text-muted-foreground">
+                        {formatCurrency(stats.membershipRevenue)} contributed {view === "lifetime" ? "all time" : "this month"} through memberships
+                      </p>
+                    </div>
+                  </div>
+                  <Link to="/membership">
+                    <Button size="lg" className="group">
+                      Become a Member
+                      <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>

@@ -304,6 +304,98 @@ export type Database = {
         }
         Relationships: []
       }
+      membership_contributions: {
+        Row: {
+          allocated_to: Json | null
+          amount: number
+          created_at: string
+          id: string
+          membership_id: string | null
+          period_end: string
+          period_start: string
+          stripe_invoice_id: string | null
+          user_id: string
+        }
+        Insert: {
+          allocated_to?: Json | null
+          amount: number
+          created_at?: string
+          id?: string
+          membership_id?: string | null
+          period_end: string
+          period_start: string
+          stripe_invoice_id?: string | null
+          user_id: string
+        }
+        Update: {
+          allocated_to?: Json | null
+          amount?: number
+          created_at?: string
+          id?: string
+          membership_id?: string | null
+          period_end?: string
+          period_start?: string
+          stripe_invoice_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_contributions_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      memberships: {
+        Row: {
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          grant_eligible: boolean | null
+          id: string
+          lifetime_contribution: number | null
+          monthly_amount: number | null
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          tier: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          grant_eligible?: boolean | null
+          id?: string
+          lifetime_contribution?: number | null
+          monthly_amount?: number | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          grant_eligible?: boolean | null
+          id?: string
+          lifetime_contribution?: number | null
+          monthly_amount?: number | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       message_read_receipts: {
         Row: {
           id: string
