@@ -6,10 +6,12 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, Users, Calendar, GraduationCap, Building2, Briefcase, Sparkles, Heart, Crown, ArrowRight, Wallet, CheckCircle2 } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { useMembership } from "@/hooks/useMembership";
 import { useAuth } from "@/contexts/AuthContext";
+import { useFundStats } from "@/hooks/useFundStats";
 
 const ALLOCATION_DATA = [
   { name: "Community Grants", value: 40, color: "hsl(330, 100%, 71%)", icon: Users, description: "Direct support for creative projects and artist grants" },
@@ -18,34 +20,6 @@ const ALLOCATION_DATA = [
   { name: "Infrastructure", value: 15, color: "hsl(30, 30%, 40%)", icon: Building2, description: "Platform development, tools, and creative spaces" },
   { name: "Operations", value: 10, color: "hsl(30, 20%, 55%)", icon: Briefcase, description: "Team compensation and community operations" },
 ];
-
-const MONTHLY_DATA = [
-  { month: "Jul", collected: 12400, distributed: 10200 },
-  { month: "Aug", collected: 15600, distributed: 13800 },
-  { month: "Sep", collected: 18200, distributed: 16400 },
-  { month: "Oct", collected: 21500, distributed: 19200 },
-  { month: "Nov", collected: 24800, distributed: 22100 },
-  { month: "Dec", collected: 28400, distributed: 25600 },
-];
-
-const FUND_STATS = {
-  lifetime: {
-    totalCollected: 245800,
-    totalDistributed: 218400,
-    grantsAwarded: 47,
-    creatorsSupported: 312,
-    membershipRevenue: 98400,
-    memberCount: 412,
-  },
-  monthly: {
-    totalCollected: 28400,
-    totalDistributed: 25600,
-    grantsAwarded: 8,
-    creatorsSupported: 42,
-    membershipRevenue: 8200,
-    memberCount: 52,
-  },
-};
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('en-US', {
@@ -102,8 +76,9 @@ export default function FundDashboard() {
   const [view, setView] = useState<"lifetime" | "monthly">("lifetime");
   const { user } = useAuth();
   const { membership, isLoading: membershipLoading } = useMembership();
-  const stats = view === "lifetime" ? FUND_STATS.lifetime : FUND_STATS.monthly;
+  const { data: fundStats, isLoading: fundLoading } = useFundStats();
   
+  const stats = view === "lifetime" ? fundStats?.lifetime : fundStats?.monthly;
   const isMember = membership?.subscribed;
 
   return (
@@ -155,9 +130,13 @@ export default function FundDashboard() {
               <div className="absolute top-0 right-0 w-20 h-20 bg-primary/10 rounded-full -translate-y-1/2 translate-x-1/2" />
               <CardContent className="p-5">
                 <p className="text-sm text-muted-foreground mb-1">Total Collected</p>
-                <p className="text-2xl md:text-3xl font-bold text-foreground">
-                  <AnimatedNumber value={stats.totalCollected} prefix="$" />
-                </p>
+                {fundLoading ? (
+                  <Skeleton className="h-8 w-24" />
+                ) : (
+                  <p className="text-2xl md:text-3xl font-bold text-foreground">
+                    <AnimatedNumber value={stats?.totalCollected || 0} prefix="$" />
+                  </p>
+                )}
               </CardContent>
             </Card>
 
@@ -165,9 +144,13 @@ export default function FundDashboard() {
               <div className="absolute top-0 right-0 w-20 h-20 bg-secondary/20 rounded-full -translate-y-1/2 translate-x-1/2" />
               <CardContent className="p-5">
                 <p className="text-sm text-muted-foreground mb-1">Distributed</p>
-                <p className="text-2xl md:text-3xl font-bold text-foreground">
-                  <AnimatedNumber value={stats.totalDistributed} prefix="$" />
-                </p>
+                {fundLoading ? (
+                  <Skeleton className="h-8 w-24" />
+                ) : (
+                  <p className="text-2xl md:text-3xl font-bold text-foreground">
+                    <AnimatedNumber value={stats?.totalDistributed || 0} prefix="$" />
+                  </p>
+                )}
               </CardContent>
             </Card>
 
@@ -175,19 +158,27 @@ export default function FundDashboard() {
               <div className="absolute top-0 right-0 w-20 h-20 bg-secondary/20 rounded-full -translate-y-1/2 translate-x-1/2" />
               <CardContent className="p-5">
                 <p className="text-sm text-muted-foreground mb-1">Grants Awarded</p>
-                <p className="text-2xl md:text-3xl font-bold text-foreground">
-                  <AnimatedNumber value={stats.grantsAwarded} />
-                </p>
+                {fundLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <p className="text-2xl md:text-3xl font-bold text-foreground">
+                    <AnimatedNumber value={stats?.grantsAwarded || 0} />
+                  </p>
+                )}
               </CardContent>
             </Card>
 
             <Card className="bg-card/50 backdrop-blur-sm border-border overflow-hidden relative">
               <CardContent className="p-5">
                 <p className="text-sm text-muted-foreground mb-1">Creators Supported</p>
-                <p className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
-                  <AnimatedNumber value={stats.creatorsSupported} />
-                  <Heart className="w-5 h-5 text-primary fill-primary" />
-                </p>
+                {fundLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <p className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
+                    <AnimatedNumber value={stats?.creatorsSupported || 0} />
+                    <Heart className="w-5 h-5 text-primary fill-primary" />
+                  </p>
+                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -253,41 +244,47 @@ export default function FundDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={MONTHLY_DATA} barGap={8}>
-                        <XAxis 
-                          dataKey="month" 
-                          axisLine={false} 
-                          tickLine={false}
-                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                        />
-                        <YAxis 
-                          axisLine={false} 
-                          tickLine={false}
-                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                          tickFormatter={(value) => `$${value / 1000}k`}
-                        />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend 
-                          wrapperStyle={{ paddingTop: 20 }}
-                          formatter={(value) => <span className="text-muted-foreground text-sm">{value}</span>}
-                        />
-                        <Bar 
-                          dataKey="collected" 
-                          name="Collected"
-                          fill="hsl(330, 100%, 71%)" 
-                          radius={[4, 4, 0, 0]}
-                          animationDuration={1000}
-                        />
-                        <Bar 
-                          dataKey="distributed" 
-                          name="Distributed"
-                          fill="hsl(30, 30%, 50%)" 
-                          radius={[4, 4, 0, 0]}
-                          animationDuration={1000}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    {fundLoading ? (
+                      <div className="flex items-center justify-center h-full">
+                        <Skeleton className="h-full w-full" />
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={fundStats?.monthlyTrend || []} barGap={8}>
+                          <XAxis 
+                            dataKey="month" 
+                            axisLine={false} 
+                            tickLine={false}
+                            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                          />
+                          <YAxis 
+                            axisLine={false} 
+                            tickLine={false}
+                            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                            tickFormatter={(value) => `$${value / 1000}k`}
+                          />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Legend 
+                            wrapperStyle={{ paddingTop: 20 }}
+                            formatter={(value) => <span className="text-muted-foreground text-sm">{value}</span>}
+                          />
+                          <Bar 
+                            dataKey="collected" 
+                            name="Collected"
+                            fill="hsl(330, 100%, 71%)" 
+                            radius={[4, 4, 0, 0]}
+                            animationDuration={1000}
+                          />
+                          <Bar 
+                            dataKey="distributed" 
+                            name="Distributed"
+                            fill="hsl(30, 30%, 50%)" 
+                            radius={[4, 4, 0, 0]}
+                            animationDuration={1000}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -308,9 +305,7 @@ export default function FundDashboard() {
                 <div className="grid gap-4">
                   {ALLOCATION_DATA.map((item, index) => {
                     const Icon = item.icon;
-                    const amount = view === "lifetime" 
-                      ? (FUND_STATS.lifetime.totalDistributed * item.value / 100)
-                      : (FUND_STATS.monthly.totalDistributed * item.value / 100);
+                    const amount = (stats?.totalDistributed || 0) * item.value / 100;
                     
                     return (
                       <motion.div
@@ -336,8 +331,14 @@ export default function FundDashboard() {
                           <p className="text-sm text-muted-foreground truncate">{item.description}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-foreground">{formatCurrency(amount)}</p>
-                          <p className="text-xs text-muted-foreground">{view === "lifetime" ? "all time" : "this month"}</p>
+                          {fundLoading ? (
+                            <Skeleton className="h-6 w-20" />
+                          ) : (
+                            <>
+                              <p className="font-bold text-foreground">{formatCurrency(amount)}</p>
+                              <p className="text-xs text-muted-foreground">{view === "lifetime" ? "all time" : "this month"}</p>
+                            </>
+                          )}
                         </div>
                         <div className="hidden md:block w-32">
                           <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -410,7 +411,7 @@ export default function FundDashboard() {
                   <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <Heart className="w-4 h-4 text-primary fill-primary" />
-                      You're part of {stats.memberCount}+ members building this community
+                      You're part of {stats?.memberCount || 0}+ members building this community
                     </span>
                     {membership?.grant_eligible && (
                       <Badge variant="secondary" className="bg-primary/10 text-primary border-0">
@@ -434,7 +435,7 @@ export default function FundDashboard() {
                           Support the Community
                         </h3>
                         <p className="text-muted-foreground max-w-md">
-                          Join {stats.memberCount}+ members funding grants, events, and creative opportunities. 
+                          Join {fundStats?.lifetime.memberCount || 0}+ members funding grants, events, and creative opportunities. 
                           Starting at $5/month.
                         </p>
                       </div>
