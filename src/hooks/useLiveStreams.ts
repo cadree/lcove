@@ -9,7 +9,7 @@ export interface LiveStream {
   host_id: string;
   title: string;
   description: string | null;
-  stream_type: 'webrtc' | 'youtube' | 'twitch' | 'soundcloud';
+  stream_type: 'webrtc' | 'youtube' | 'twitch' | 'soundcloud' | 'opus';
   external_url: string | null;
   thumbnail_url: string | null;
   is_live: boolean;
@@ -166,7 +166,7 @@ export const useCreateStream = () => {
     mutationFn: async (data: {
       title: string;
       description?: string;
-      stream_type: 'webrtc' | 'youtube' | 'twitch' | 'soundcloud';
+      stream_type: 'webrtc' | 'youtube' | 'twitch' | 'soundcloud' | 'opus';
       external_url?: string;
       thumbnail_url?: string;
     }) => {

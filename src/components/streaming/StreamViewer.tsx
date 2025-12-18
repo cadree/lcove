@@ -9,6 +9,8 @@ import { LiveStream, useStream, useStreamReactions, useSendReaction, useTipStrea
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { WebRTCStreamViewer } from './WebRTCStreamViewer';
+import { WebRTCStreamHost } from './WebRTCStreamHost';
 
 interface StreamViewerProps {
   streamId: string;
@@ -32,12 +34,14 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   const [showTipInput, setShowTipInput] = useState(false);
   const [floatingReactions, setFloatingReactions] = useState<{ id: string; emoji: string }[]>([]);
 
+  const isHost = user?.id === stream?.host_id;
+
   // Join stream on mount
   useEffect(() => {
-    if (open && user) {
+    if (open && user && !isHost) {
       joinStream.mutate(streamId);
     }
-  }, [open, user, streamId]);
+  }, [open, user, streamId, isHost]);
 
   // Show floating reactions
   useEffect(() => {
@@ -67,6 +71,27 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   const renderEmbed = () => {
     if (!stream) return null;
 
+    // WebRTC streaming (P2P with OPUS audio)
+    if (stream.stream_type === 'webrtc') {
+      if (isHost) {
+        return (
+          <WebRTCStreamHost 
+            streamId={streamId} 
+            onEnd={onClose}
+          />
+        );
+      }
+      return (
+        <WebRTCStreamViewer 
+          streamId={streamId}
+          hostId={stream.host_id}
+          isLive={stream.is_live}
+          viewerCount={stream.viewer_count}
+        />
+      );
+    }
+
+    // YouTube embed
     if (stream.stream_type === 'youtube' && stream.external_url) {
       const videoId = stream.external_url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
       if (videoId) {
@@ -81,6 +106,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
       }
     }
 
+    // Twitch embed
     if (stream.stream_type === 'twitch' && stream.external_url) {
       const channel = stream.external_url.match(/twitch\.tv\/(\w+)/)?.[1];
       if (channel) {
@@ -94,6 +120,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
       }
     }
 
+    // SoundCloud embed
     if (stream.stream_type === 'soundcloud' && stream.external_url) {
       return (
         <iframe
@@ -106,13 +133,40 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
       );
     }
 
-    // WebRTC placeholder
+    // OPUS.audio embed (external streaming platform)
+    if (stream.stream_type === 'opus' && stream.external_url) {
+      // OPUS.audio uses iframe embeds
+      const opusMatch = stream.external_url.match(/opus\.audio\/(?:embed\/)?([a-zA-Z0-9-]+)/);
+      const streamKey = opusMatch?.[1];
+      
+      if (streamKey) {
+        return (
+          <iframe
+            className="w-full h-full"
+            src={`https://opus.audio/embed/${streamKey}?autoplay=true`}
+            allow="autoplay; encrypted-media"
+            allowFullScreen
+          />
+        );
+      }
+      
+      // Fallback for direct URL
+      return (
+        <iframe
+          className="w-full h-full"
+          src={stream.external_url}
+          allow="autoplay; encrypted-media"
+          allowFullScreen
+        />
+      );
+    }
+
+    // Default placeholder for unrecognized stream types
     return (
       <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
         <div className="text-center">
           <Radio className="h-16 w-16 text-primary mx-auto mb-4 animate-pulse" />
-          <p className="text-muted-foreground">WebRTC Stream</p>
-          <p className="text-sm text-muted-foreground/60">P2P connection in progress...</p>
+          <p className="text-muted-foreground">Stream loading...</p>
         </div>
       </div>
     );
@@ -145,25 +199,27 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
             ))}
           </AnimatePresence>
 
-          {/* Live Badge & Stats */}
-          <div className="absolute top-4 left-4 flex gap-2">
-            {stream.is_live && (
-              <Badge className="bg-red-500 animate-pulse">
-                <Radio className="h-3 w-3 mr-1" />
-                LIVE
+          {/* Live Badge & Stats (only for non-WebRTC, as WebRTC has its own) */}
+          {stream.stream_type !== 'webrtc' && (
+            <div className="absolute top-4 left-4 flex gap-2">
+              {stream.is_live && (
+                <Badge className="bg-red-500 animate-pulse">
+                  <Radio className="h-3 w-3 mr-1" />
+                  LIVE
+                </Badge>
+              )}
+              <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
+                <Users className="h-3 w-3 mr-1" />
+                {stream.viewer_count}
               </Badge>
-            )}
-            <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
-              <Users className="h-3 w-3 mr-1" />
-              {stream.viewer_count}
-            </Badge>
-          </div>
+            </div>
+          )}
 
           {/* Close Button */}
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-4 right-4 bg-background/50 backdrop-blur-sm"
+            className="absolute top-4 right-4 bg-background/50 backdrop-blur-sm z-10"
             onClick={onClose}
           >
             <X className="h-4 w-4" />

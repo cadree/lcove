@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Radio, Youtube, Music2 } from 'lucide-react';
+import { Radio, Youtube, Music2, Headphones } from 'lucide-react';
 import { useCreateStream } from '@/hooks/useLiveStreams';
 
 interface CreateStreamDialogProps {
@@ -13,11 +13,13 @@ interface CreateStreamDialogProps {
   onClose: () => void;
 }
 
+type StreamType = 'webrtc' | 'youtube' | 'twitch' | 'soundcloud' | 'opus';
+
 export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, onClose }) => {
   const createStream = useCreateStream();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [streamType, setStreamType] = useState<'webrtc' | 'youtube' | 'twitch' | 'soundcloud'>('youtube');
+  const [streamType, setStreamType] = useState<StreamType>('webrtc');
   const [externalUrl, setExternalUrl] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,8 +35,28 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
     onClose();
     setTitle('');
     setDescription('');
-    setStreamType('youtube');
+    setStreamType('webrtc');
     setExternalUrl('');
+  };
+
+  const getUrlPlaceholder = () => {
+    switch (streamType) {
+      case 'youtube': return 'https://youtube.com/watch?v=...';
+      case 'twitch': return 'https://twitch.tv/channel';
+      case 'soundcloud': return 'https://soundcloud.com/artist/track';
+      case 'opus': return 'https://opus.audio/stream/your-stream-id';
+      default: return '';
+    }
+  };
+
+  const getUrlLabel = () => {
+    switch (streamType) {
+      case 'youtube': return 'YouTube Video URL';
+      case 'twitch': return 'Twitch Channel URL';
+      case 'soundcloud': return 'SoundCloud Track URL';
+      case 'opus': return 'OPUS Stream URL';
+      default: return '';
+    }
   };
 
   return (
@@ -68,7 +90,7 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
             <Label>Stream Type</Label>
             <RadioGroup
               value={streamType}
-              onValueChange={(v) => setStreamType(v as any)}
+              onValueChange={(v) => setStreamType(v as StreamType)}
               className="grid grid-cols-2 gap-2"
             >
               <Label
@@ -79,7 +101,24 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
               >
                 <RadioGroupItem value="webrtc" id="webrtc" />
                 <Radio className="h-4 w-4" />
-                <span className="text-sm">P2P WebRTC</span>
+                <div className="text-sm">
+                  <span className="font-medium">Camera/Mic</span>
+                  <p className="text-xs text-muted-foreground">P2P with OPUS</p>
+                </div>
+              </Label>
+              
+              <Label
+                htmlFor="opus"
+                className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                  streamType === 'opus' ? 'border-primary bg-primary/10' : 'border-border'
+                }`}
+              >
+                <RadioGroupItem value="opus" id="opus" />
+                <Headphones className="h-4 w-4" />
+                <div className="text-sm">
+                  <span className="font-medium">OPUS</span>
+                  <p className="text-xs text-muted-foreground">opus.audio</p>
+                </div>
               </Label>
               
               <Label
@@ -108,7 +147,7 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
               
               <Label
                 htmlFor="soundcloud"
-                className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors col-span-2 ${
                   streamType === 'soundcloud' ? 'border-primary bg-primary/10' : 'border-border'
                 }`}
               >
@@ -121,19 +160,11 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
 
           {streamType !== 'webrtc' && (
             <div className="space-y-2">
-              <Label>
-                {streamType === 'youtube' && 'YouTube Video URL'}
-                {streamType === 'twitch' && 'Twitch Channel URL'}
-                {streamType === 'soundcloud' && 'SoundCloud Track URL'}
-              </Label>
+              <Label>{getUrlLabel()}</Label>
               <Input
                 value={externalUrl}
                 onChange={(e) => setExternalUrl(e.target.value)}
-                placeholder={
-                  streamType === 'youtube' ? 'https://youtube.com/watch?v=...' :
-                  streamType === 'twitch' ? 'https://twitch.tv/channel' :
-                  'https://soundcloud.com/artist/track'
-                }
+                placeholder={getUrlPlaceholder()}
                 required
               />
             </div>
@@ -141,7 +172,19 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
 
           {streamType === 'webrtc' && (
             <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
-              <p>WebRTC streaming allows direct peer-to-peer connection with your viewers (up to ~50 concurrent viewers).</p>
+              <p className="font-medium text-foreground mb-1">📹 Camera & Mic Streaming</p>
+              <p>Stream directly from your device using WebRTC with OPUS audio codec for high-quality, low-latency audio.</p>
+              <p className="mt-2 text-xs">• Supports up to ~50 concurrent viewers</p>
+              <p className="text-xs">• Browser will ask for camera/mic permission</p>
+            </div>
+          )}
+
+          {streamType === 'opus' && (
+            <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
+              <p className="font-medium text-foreground mb-1">🎧 OPUS.audio Streaming</p>
+              <p>Connect your OPUS.audio stream to broadcast to LC members.</p>
+              <p className="mt-2 text-xs">• Professional DJ streaming platform</p>
+              <p className="text-xs">• High-quality audio streaming</p>
             </div>
           )}
 
@@ -150,7 +193,7 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
               Cancel
             </Button>
             <Button type="submit" className="flex-1" disabled={createStream.isPending}>
-              Create Stream
+              {streamType === 'webrtc' ? 'Setup Stream' : 'Create Stream'}
             </Button>
           </div>
         </form>
