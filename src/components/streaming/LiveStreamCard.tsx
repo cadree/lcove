@@ -13,9 +13,9 @@ interface LiveStreamCardProps {
 
 // Stream status helper
 type StreamStatus = 'draft' | 'live' | 'ended';
-const getStreamStatus = (stream: { is_live: boolean; ended_at: string | null }): StreamStatus => {
-  if (stream.is_live) return 'live';
-  if (stream.ended_at) return 'ended';
+const getStreamStatus = (stream: { is_live: boolean | null; started_at: string | null; ended_at: string | null }): StreamStatus => {
+  if (stream.is_live === true) return 'live';
+  if (stream.started_at && stream.ended_at) return 'ended';
   return 'draft';
 };
 

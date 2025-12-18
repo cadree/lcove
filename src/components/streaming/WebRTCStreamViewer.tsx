@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Radio, Users, Loader2, WifiOff } from 'lucide-react';
-import { SignalingChannel, WebRTCPeer } from '@/utils/WebRTCStream';
+import { Button } from '@/components/ui/button';
+import { Radio, Users, Loader2, WifiOff, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -10,87 +10,205 @@ interface WebRTCStreamViewerProps {
   hostId: string;
   isLive: boolean;
   viewerCount: number;
+  thumbnailUrl?: string | null;
 }
 
 export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({ 
   streamId, 
   hostId,
   isLive,
-  viewerCount 
+  viewerCount,
+  thumbnailUrl
 }) => {
   const { user } = useAuth();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const signalingRef = useRef<SignalingChannel | null>(null);
-  const peerRef = useRef<WebRTCPeer | null>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const [isConnecting, setIsConnecting] = useState(true);
   const [connectionState, setConnectionState] = useState<string>('connecting');
   const [hasVideo, setHasVideo] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const connect = useCallback(async () => {
     if (!user || !isLive) return;
+    
+    setIsConnecting(true);
+    setError(null);
+    setConnectionState('connecting');
 
-    const connect = async () => {
-      try {
-        // Set up signaling
-        signalingRef.current = new SignalingChannel(supabase, streamId, user.id);
-        peerRef.current = new WebRTCPeer(signalingRef.current);
+    try {
+      console.log('Viewer connecting to stream:', streamId);
+      
+      // Create peer connection
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+        ],
+      });
+      peerConnectionRef.current = pc;
 
-        // Handle remote stream
-        peerRef.current.onRemoteStream((stream) => {
-          console.log('Got remote stream');
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            setHasVideo(true);
-          }
+      // Handle incoming tracks
+      pc.ontrack = (event) => {
+        console.log('Viewer received track:', event.track.kind);
+        if (videoRef.current && event.streams[0]) {
+          videoRef.current.srcObject = event.streams[0];
+          setHasVideo(true);
           setIsConnecting(false);
           setConnectionState('connected');
-        });
+        }
+      };
 
-        // Request to join the stream
-        await peerRef.current.createOffer();
-
-      } catch (error) {
-        console.error('Error connecting to stream:', error);
-        setConnectionState('failed');
-        setIsConnecting(false);
-      }
-    };
-
-    connect();
-
-    // Poll connection state
-    const interval = setInterval(() => {
-      if (peerRef.current) {
-        const state = peerRef.current.getConnectionState();
-        setConnectionState(state);
-        if (state === 'connected') {
+      // Monitor connection state
+      pc.onconnectionstatechange = () => {
+        console.log('Viewer connection state:', pc.connectionState);
+        setConnectionState(pc.connectionState);
+        if (pc.connectionState === 'connected') {
+          setIsConnecting(false);
+        } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+          setError('Connection lost');
           setIsConnecting(false);
         }
-      }
-    }, 1000);
+      };
+
+      pc.oniceconnectionstatechange = () => {
+        console.log('Viewer ICE state:', pc.iceConnectionState);
+      };
+
+      // Set up signaling channel
+      const channel = supabase.channel(`stream-signaling-${streamId}`);
+      channelRef.current = channel;
+
+      // Listen for answer from host
+      channel.on('broadcast', { event: 'answer' }, async ({ payload }: any) => {
+        console.log('Viewer received answer');
+        if (payload.senderId !== user.id && pc.signalingState !== 'stable') {
+          try {
+            await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
+            console.log('Viewer set remote description');
+          } catch (err) {
+            console.error('Error setting remote description:', err);
+          }
+        }
+      });
+
+      // Listen for ICE candidates from host
+      channel.on('broadcast', { event: 'ice-candidate' }, async ({ payload }: any) => {
+        if (payload.senderId !== user.id) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+            console.log('Viewer added ICE candidate');
+          } catch (err) {
+            console.error('Error adding ICE candidate:', err);
+          }
+        }
+      });
+
+      await channel.subscribe();
+
+      // Send ICE candidates to host
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          channel.send({
+            type: 'broadcast',
+            event: 'ice-candidate',
+            payload: { candidate: event.candidate.toJSON(), senderId: user.id },
+          });
+        }
+      };
+
+      // Add a transceiver to receive video/audio
+      pc.addTransceiver('video', { direction: 'recvonly' });
+      pc.addTransceiver('audio', { direction: 'recvonly' });
+
+      // Create and send offer
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      
+      console.log('Viewer sending offer');
+      await channel.send({
+        type: 'broadcast',
+        event: 'offer',
+        payload: { offer, senderId: user.id },
+      });
+
+      // Timeout for connection
+      setTimeout(() => {
+        if (peerConnectionRef.current?.connectionState !== 'connected') {
+          console.log('Connection timeout, still trying...');
+        }
+      }, 10000);
+
+    } catch (err: any) {
+      console.error('Error connecting to stream:', err);
+      setError(err.message || 'Failed to connect');
+      setConnectionState('failed');
+      setIsConnecting(false);
+    }
+  }, [streamId, user, isLive]);
+
+  useEffect(() => {
+    if (isLive && user) {
+      connect();
+    }
 
     return () => {
-      clearInterval(interval);
-      peerRef.current?.close();
-      signalingRef.current?.close();
+      peerConnectionRef.current?.close();
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
     };
-  }, [streamId, user, isLive]);
+  }, [isLive, user, connect]);
+
+  const handleRetry = () => {
+    peerConnectionRef.current?.close();
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+    connect();
+  };
 
   if (!isLive) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
-        <div className="text-center">
-          <WifiOff className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">Stream is offline</p>
-          <p className="text-sm text-muted-foreground/60">Check back when the host goes live</p>
-        </div>
+        {thumbnailUrl ? (
+          <div className="relative w-full h-full">
+            <img 
+              src={thumbnailUrl} 
+              alt="Stream thumbnail" 
+              className="w-full h-full object-cover opacity-50"
+            />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center bg-background/80 backdrop-blur-sm p-6 rounded-lg">
+                <WifiOff className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-foreground font-medium">Stream is offline</p>
+                <p className="text-sm text-muted-foreground">Check back when the host goes live</p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center">
+            <WifiOff className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">Stream is offline</p>
+            <p className="text-sm text-muted-foreground/60">Check back when the host goes live</p>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="relative w-full h-full bg-black">
+      {/* Thumbnail background while connecting */}
+      {thumbnailUrl && isConnecting && (
+        <img 
+          src={thumbnailUrl} 
+          alt="Stream thumbnail" 
+          className="absolute inset-0 w-full h-full object-cover opacity-30"
+        />
+      )}
+      
       {/* Video */}
       <video
         ref={videoRef}
@@ -100,20 +218,35 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       />
 
       {/* Connecting overlay */}
-      {isConnecting && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
+      {isConnecting && !error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-background/80">
           <div className="text-center">
             <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
-            <p className="text-muted-foreground">Connecting to stream...</p>
-            <p className="text-sm text-muted-foreground/60 mt-1">
-              Using P2P WebRTC with OPUS audio
+            <p className="text-foreground font-medium">Connecting to live stream...</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Establishing P2P connection
             </p>
           </div>
         </div>
       )}
 
+      {/* Error state */}
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-destructive/10 to-background">
+          <div className="text-center">
+            <WifiOff className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <p className="text-foreground font-medium mb-2">Connection Error</p>
+            <p className="text-sm text-muted-foreground mb-4">{error}</p>
+            <Button onClick={handleRetry} variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry Connection
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* No video placeholder */}
-      {!isConnecting && !hasVideo && (
+      {!isConnecting && !hasVideo && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
           <div className="text-center">
             <Radio className="h-16 w-16 text-primary mx-auto mb-4 animate-pulse" />
@@ -123,7 +256,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       )}
 
       {/* Status badges */}
-      <div className="absolute top-4 left-4 flex gap-2">
+      <div className="absolute top-4 left-4 flex gap-2 z-10">
         {isLive && (
           <Badge className="bg-red-500 animate-pulse">
             <Radio className="h-3 w-3 mr-1" />
@@ -134,9 +267,11 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
           <Users className="h-3 w-3 mr-1" />
           {viewerCount}
         </Badge>
-        <Badge variant="outline" className="bg-background/80 backdrop-blur-sm text-xs">
-          {connectionState}
-        </Badge>
+        {connectionState !== 'connected' && connectionState !== 'connecting' && (
+          <Badge variant="outline" className="bg-background/80 backdrop-blur-sm text-xs">
+            {connectionState}
+          </Badge>
+        )}
       </div>
     </div>
   );
