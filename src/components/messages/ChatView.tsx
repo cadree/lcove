@@ -11,6 +11,7 @@ import { useConversations } from '@/hooks/useConversations';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import MessageComposer from './MessageComposer';
+import { toast } from 'sonner';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -128,10 +129,30 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
         </div>
 
         <div className="flex gap-1">
-          <Button variant="ghost" size="icon" className="text-muted-foreground">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-muted-foreground hover:text-primary"
+            onClick={() => {
+              toast.info(`Calling ${getConversationName()}...`, {
+                description: 'Voice calls are coming soon! Stay tuned for this feature.',
+                duration: 3000,
+              });
+            }}
+          >
             <Phone className="w-5 h-5" />
           </Button>
-          <Button variant="ghost" size="icon" className="text-muted-foreground">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-muted-foreground hover:text-primary"
+            onClick={() => {
+              toast.info(`Video calling ${getConversationName()}...`, {
+                description: 'Video calls are coming soon! Stay tuned for this feature.',
+                duration: 3000,
+              });
+            }}
+          >
             <Video className="w-5 h-5" />
           </Button>
           <DropdownMenu>
