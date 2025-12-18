@@ -2,22 +2,24 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
-
 const CTASection = () => {
-  return (
-    <section className="py-32 px-6 relative overflow-hidden">
+  return <section className="py-32 px-6 relative overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/15 rounded-full blur-[150px]" />
+        
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.7 }}
-        className="relative z-10 max-w-3xl mx-auto text-center"
-      >
+      <motion.div initial={{
+      opacity: 0,
+      y: 30
+    }} whileInView={{
+      opacity: 1,
+      y: 0
+    }} viewport={{
+      once: true
+    }} transition={{
+      duration: 0.7
+    }} className="relative z-10 max-w-3xl mx-auto text-center">
         <h2 className="font-display text-4xl sm:text-5xl md:text-6xl font-medium text-foreground mb-6">
           Ready to Build <span className="text-gradient-pink">Together?</span>
         </h2>
@@ -39,8 +41,6 @@ const CTASection = () => {
           </Link>
         </div>
       </motion.div>
-    </section>
-  );
+    </section>;
 };
-
 export default CTASection;
