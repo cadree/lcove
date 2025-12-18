@@ -1,0 +1,281 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+
+export type AppRole = 'admin' | 'moderator' | 'user';
+
+export interface UserRole {
+  id: string;
+  user_id: string;
+  role: AppRole;
+  created_at: string;
+  granted_by: string | null;
+}
+
+export interface AdminAction {
+  id: string;
+  admin_id: string;
+  action_type: string;
+  target_user_id: string;
+  reason: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export function useUserRoles() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['user-roles', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('*')
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+      return data as UserRole[];
+    },
+    enabled: !!user,
+  });
+}
+
+export function useIsAdmin() {
+  const { data: roles, isLoading } = useUserRoles();
+  const isAdmin = roles?.some(r => r.role === 'admin') ?? false;
+  return { isAdmin, isLoading };
+}
+
+export function useIsModerator() {
+  const { data: roles, isLoading } = useUserRoles();
+  const isModerator = roles?.some(r => r.role === 'admin' || r.role === 'moderator') ?? false;
+  return { isModerator, isLoading };
+}
+
+export function useAllUsers() {
+  const { isAdmin } = useIsAdmin();
+
+  return useQuery({
+    queryKey: ['admin-users'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: isAdmin,
+  });
+}
+
+export function usePendingOnboarding() {
+  const { isAdmin } = useIsAdmin();
+
+  return useQuery({
+    queryKey: ['pending-onboarding'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('onboarding_completed', false)
+        .not('onboarding_score', 'is', null)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: isAdmin,
+  });
+}
+
+export function useAdminActions() {
+  const { isAdmin } = useIsAdmin();
+
+  return useQuery({
+    queryKey: ['admin-actions'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('admin_actions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      return data as AdminAction[];
+    },
+    enabled: isAdmin,
+  });
+}
+
+export function useSuspendUser() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (data: { userId: string; reason: string }) => {
+      // Update profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          is_suspended: true,
+          suspended_at: new Date().toISOString(),
+          suspension_reason: data.reason,
+        })
+        .eq('user_id', data.userId);
+
+      if (profileError) throw profileError;
+
+      // Log action
+      const { error: actionError } = await supabase
+        .from('admin_actions')
+        .insert({
+          admin_id: user?.id,
+          action_type: 'suspend',
+          target_user_id: data.userId,
+          reason: data.reason,
+        });
+
+      if (actionError) throw actionError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
+      toast.success('User suspended');
+    },
+    onError: () => {
+      toast.error('Failed to suspend user');
+    },
+  });
+}
+
+export function useUnsuspendUser() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          is_suspended: false,
+          suspended_at: null,
+          suspension_reason: null,
+        })
+        .eq('user_id', userId);
+
+      if (profileError) throw profileError;
+
+      const { error: actionError } = await supabase
+        .from('admin_actions')
+        .insert({
+          admin_id: user?.id,
+          action_type: 'unsuspend',
+          target_user_id: userId,
+        });
+
+      if (actionError) throw actionError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
+      toast.success('User unsuspended');
+    },
+  });
+}
+
+export function useApproveOnboarding() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (data: { userId: string; level: number }) => {
+      const accessLevel = data.level === 3 ? 'level_3' : data.level === 2 ? 'level_2' : 'level_1';
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          onboarding_completed: true,
+          onboarding_level: data.level,
+          access_level: accessLevel,
+        })
+        .eq('user_id', data.userId);
+
+      if (profileError) throw profileError;
+
+      const { error: actionError } = await supabase
+        .from('admin_actions')
+        .insert({
+          admin_id: user?.id,
+          action_type: 'approve_onboarding',
+          target_user_id: data.userId,
+          metadata: { level: data.level },
+        });
+
+      if (actionError) throw actionError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-onboarding'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
+      toast.success('Onboarding approved');
+    },
+  });
+}
+
+export function useDenyOnboarding() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (data: { userId: string; reason: string }) => {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          access_level: 'level_1' as const,
+        })
+        .eq('user_id', data.userId);
+
+      if (profileError) throw profileError;
+
+      const { error: actionError } = await supabase
+        .from('admin_actions')
+        .insert({
+          admin_id: user?.id,
+          action_type: 'deny_onboarding',
+          target_user_id: data.userId,
+          reason: data.reason,
+        });
+
+      if (actionError) throw actionError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-onboarding'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
+      toast.success('Onboarding denied');
+    },
+  });
+}
+
+export function useLowReputationUsers() {
+  const { isAdmin } = useIsAdmin();
+
+  return useQuery({
+    queryKey: ['low-reputation-users'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('reputation_scores')
+        .select(`
+          *,
+          profile:profiles!user_id(display_name, avatar_url, user_id)
+        `)
+        .lt('overall_score', 2)
+        .order('overall_score', { ascending: true });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: isAdmin,
+  });
+}
