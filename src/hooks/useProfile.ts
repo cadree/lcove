@@ -16,28 +16,30 @@ export interface Profile {
   updated_at: string;
 }
 
-export const useProfile = () => {
+export const useProfile = (userId?: string) => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const targetUserId = userId || user?.id;
+
   useEffect(() => {
-    if (user) {
+    if (targetUserId) {
       fetchProfile();
     } else {
       setProfile(null);
       setLoading(false);
     }
-  }, [user]);
+  }, [targetUserId]);
 
   const fetchProfile = async () => {
-    if (!user) return;
+    if (!targetUserId) return;
     
     setLoading(true);
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', targetUserId)
       .single();
 
     if (!error && data) {
