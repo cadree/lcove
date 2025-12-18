@@ -1,84 +1,66 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import { Search, MapPin, Briefcase, Filter, Users } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Search, MapPin, Briefcase, Users, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
-const creatives = [
-  {
-    id: 1,
-    name: "Maya Chen",
-    role: "Digital Artist",
-    city: "Los Angeles",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop",
-    skills: ["3D Art", "Motion Design", "Illustration"],
-    available: true,
-  },
-  {
-    id: 2,
-    name: "James Wright",
-    role: "Photographer",
-    city: "New York",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop",
-    skills: ["Portrait", "Editorial", "Fashion"],
-    available: true,
-  },
-  {
-    id: 3,
-    name: "Luna Rodriguez",
-    role: "Music Producer",
-    city: "Miami",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop",
-    skills: ["Mixing", "Sound Design", "Vocals"],
-    available: false,
-  },
-  {
-    id: 4,
-    name: "Alex Kim",
-    role: "Brand Designer",
-    city: "San Francisco",
-    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
-    skills: ["Branding", "Typography", "Strategy"],
-    available: true,
-  },
-  {
-    id: 5,
-    name: "Sofia Martinez",
-    role: "Filmmaker",
-    city: "Austin",
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop",
-    skills: ["Documentary", "Music Videos", "Direction"],
-    available: true,
-  },
-  {
-    id: 6,
-    name: "Jordan Cole",
-    role: "Musician",
-    city: "Chicago",
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop",
-    skills: ["Production", "Guitar", "Songwriting"],
-    available: false,
-  },
-];
+interface Profile {
+  id: string;
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  city: string | null;
+  bio: string | null;
+}
 
 const Directory = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCity, setSelectedCity] = useState("All Cities");
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [cities, setCities] = useState<string[]>(["All Cities"]);
 
-  const filteredCreatives = creatives.filter((creative) => {
-    const matchesSearch = creative.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      creative.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      creative.skills.some(skill => skill.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesCity = selectedCity === "All Cities" || creative.city === selectedCity;
+  useEffect(() => {
+    fetchProfiles();
+  }, []);
+
+  const fetchProfiles = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, user_id, display_name, avatar_url, city, bio')
+      .eq('onboarding_completed', true)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setProfiles(data);
+      const uniqueCities = [...new Set(data.map(p => p.city).filter(Boolean))] as string[];
+      setCities(["All Cities", ...uniqueCities]);
+    }
+    setLoading(false);
+  };
+
+  const filteredProfiles = profiles.filter((profile) => {
+    const matchesSearch = 
+      profile.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      profile.bio?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      profile.city?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCity = selectedCity === "All Cities" || profile.city === selectedCity;
     return matchesSearch && matchesCity;
   });
 
-  const cities = ["All Cities", ...new Set(creatives.map(c => c.city))];
+  const handleProfileClick = (userId: string) => {
+    navigate(`/profile/${userId}`);
+  };
 
   return (
     <PageLayout>
-      <div className="px-6 pt-8">
+      <div className="px-6 pt-8 pb-24">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -86,7 +68,7 @@ const Directory = () => {
           className="mb-8"
         >
           <h1 className="font-display text-3xl font-medium text-foreground mb-2">Directory</h1>
-          <p className="text-muted-foreground">Find creatives by skill, city, or role</p>
+          <p className="text-muted-foreground">Find creatives by name, city, or interests</p>
         </motion.div>
 
         {/* Search Bar */}
@@ -99,7 +81,7 @@ const Directory = () => {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search by name, role, or skill..."
+            placeholder="Search by name, city, or bio..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full h-14 pl-12 pr-4 rounded-xl bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
@@ -127,61 +109,59 @@ const Directory = () => {
           ))}
         </motion.div>
 
-        {/* Results Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredCreatives.map((creative, index) => (
-            <motion.div
-              key={creative.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: index * 0.1 }}
-              className="glass-strong rounded-2xl p-5 hover:bg-accent/20 transition-all duration-300 cursor-pointer group"
-            >
-              <div className="flex items-start gap-4">
-                {/* Avatar */}
-                <div
-                  className="w-16 h-16 rounded-xl bg-cover bg-center flex-shrink-0 border-2 border-border group-hover:border-primary/50 transition-colors"
-                  style={{ backgroundImage: `url(${creative.avatar})` }}
-                />
+        {/* Loading State */}
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        )}
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-display text-lg font-medium text-foreground truncate">
-                      {creative.name}
+        {/* Results Grid */}
+        {!loading && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredProfiles.map((profile, index) => (
+              <motion.div
+                key={profile.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: index * 0.05 }}
+                onClick={() => handleProfileClick(profile.user_id)}
+                className="glass-strong rounded-2xl p-5 hover:bg-accent/20 transition-all duration-300 cursor-pointer group"
+              >
+                <div className="flex items-start gap-4">
+                  {/* Avatar */}
+                  <Avatar className="w-16 h-16 rounded-xl border-2 border-border group-hover:border-primary/50 transition-colors">
+                    <AvatarImage src={profile.avatar_url || undefined} />
+                    <AvatarFallback className="bg-muted text-muted-foreground text-xl font-medium rounded-xl">
+                      {profile.display_name?.charAt(0).toUpperCase() || '?'}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-display text-lg font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                      {profile.display_name || 'Anonymous'}
                     </h3>
-                    {creative.available && (
-                      <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                    {profile.city && (
+                      <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />
+                        {profile.city}
+                      </p>
+                    )}
+                    {profile.bio && (
+                      <p className="text-xs text-muted-foreground/70 line-clamp-2">
+                        {profile.bio}
+                      </p>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
-                    <Briefcase className="w-3 h-3" />
-                    {creative.role}
-                  </p>
-                  <p className="text-xs text-muted-foreground/70 flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />
-                    {creative.city}
-                  </p>
                 </div>
-              </div>
-
-              {/* Skills */}
-              <div className="flex flex-wrap gap-2 mt-4">
-                {creative.skills.slice(0, 3).map((skill) => (
-                  <span
-                    key={skill}
-                    className="px-2 py-1 rounded-md bg-accent/50 text-xs text-accent-foreground"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
-            </motion.div>
-          ))}
-        </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
 
         {/* Empty State */}
-        {filteredCreatives.length === 0 && (
+        {!loading && filteredProfiles.length === 0 && (
           <EmptyState
             icon={Users}
             title="No creatives found"
