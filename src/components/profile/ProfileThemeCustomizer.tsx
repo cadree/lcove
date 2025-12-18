@@ -7,15 +7,12 @@ import {
   LayoutGrid, 
   RotateCcw,
   Check,
-  Eye,
   Music,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
 import { 
   THEME_PRESETS, 
   APPROVED_FONTS, 
@@ -51,6 +48,16 @@ interface ProfileThemeCustomizerProps {
   onReset: () => void;
   onPreview: () => void;
 }
+
+type TabId = 'themes' | 'background' | 'effects' | 'style' | 'layout';
+
+const TABS: { id: TabId; icon: typeof Sparkles; label: string }[] = [
+  { id: 'themes', icon: Sparkles, label: 'Themes' },
+  { id: 'background', icon: Image, label: 'Background' },
+  { id: 'effects', icon: Wand2, label: 'Effects' },
+  { id: 'style', icon: Palette, label: 'Style' },
+  { id: 'layout', icon: LayoutGrid, label: 'Layout' },
+];
 
 const PRESET_GRADIENTS = [
   { name: 'Default', value: 'from-primary/30 via-background to-accent/20' },
@@ -91,10 +98,10 @@ export const ProfileThemeCustomizer = ({
   onReset,
   onPreview,
 }: ProfileThemeCustomizerProps) => {
-  const [activeTab, setActiveTab] = useState("themes");
-  const selectedTheme = THEME_PRESETS[state.themePreset];
+  const [activeTab, setActiveTab] = useState<TabId>('themes');
 
   const handleThemeSelect = (preset: ThemePreset) => {
+    console.log('Theme selected:', preset); // Debug log
     const theme = THEME_PRESETS[preset];
     onChange({
       themePreset: preset,
@@ -112,75 +119,85 @@ export const ProfileThemeCustomizer = ({
 
   return (
     <div className="space-y-4">
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5 h-auto p-1">
-          <TabsTrigger value="themes" className="flex flex-col gap-1 py-2 px-1 text-xs">
-            <Sparkles className="w-4 h-4" />
-            <span className="hidden sm:inline">Themes</span>
-          </TabsTrigger>
-          <TabsTrigger value="background" className="flex flex-col gap-1 py-2 px-1 text-xs">
-            <Image className="w-4 h-4" />
-            <span className="hidden sm:inline">Background</span>
-          </TabsTrigger>
-          <TabsTrigger value="effects" className="flex flex-col gap-1 py-2 px-1 text-xs">
-            <Wand2 className="w-4 h-4" />
-            <span className="hidden sm:inline">Effects</span>
-          </TabsTrigger>
-          <TabsTrigger value="style" className="flex flex-col gap-1 py-2 px-1 text-xs">
-            <Palette className="w-4 h-4" />
-            <span className="hidden sm:inline">Style</span>
-          </TabsTrigger>
-          <TabsTrigger value="layout" className="flex flex-col gap-1 py-2 px-1 text-xs">
-            <LayoutGrid className="w-4 h-4" />
-            <span className="hidden sm:inline">Layout</span>
-          </TabsTrigger>
-        </TabsList>
+      {/* Custom Tab Buttons - No nested Tabs component */}
+      <div className="grid w-full grid-cols-5 h-auto p-1 bg-muted/50 rounded-lg gap-1">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={cn(
+              "flex flex-col items-center gap-1 py-2 px-1 text-xs rounded-md transition-all",
+              activeTab === tab.id
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+            )}
+          >
+            <tab.icon className="w-4 h-4" />
+            <span className="hidden sm:inline">{tab.label}</span>
+          </button>
+        ))}
+      </div>
 
-        <div className="h-[400px] mt-4 overflow-y-auto pr-2">
-          {/* THEMES TAB */}
-          <TabsContent value="themes" className="space-y-4 mt-0">
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">Choose Your Vibe</Label>
-              <div className="grid gap-3">
-                {Object.values(THEME_PRESETS).map((theme) => (
-                  <button
-                    key={theme.id}
-                    type="button"
-                    onClick={() => handleThemeSelect(theme.id)}
-                    className={cn(
-                      "relative p-4 rounded-xl border-2 transition-all text-left cursor-pointer hover:scale-[1.01] active:scale-[0.99]",
-                      state.themePreset === theme.id
-                        ? "border-primary bg-primary/10"
-                        : "border-border/50 hover:border-border"
-                    )}
-                  >
-                    {state.themePreset === theme.id && (
-                      <div className="absolute top-3 right-3">
-                        <Check className="w-5 h-5 text-primary" />
-                      </div>
-                    )}
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{theme.icon}</span>
-                      <div>
-                        <p className="font-medium">{theme.name}</p>
-                        <p className="text-xs text-muted-foreground">{theme.description}</p>
-                      </div>
+      {/* Content Area */}
+      <div className="h-[350px] overflow-y-auto pr-2 scrollbar-thin">
+        {/* THEMES TAB */}
+        {activeTab === 'themes' && (
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Choose Your Vibe</Label>
+            <div className="grid gap-3">
+              {Object.values(THEME_PRESETS).map((theme) => (
+                <button
+                  key={theme.id}
+                  type="button"
+                  onClick={() => handleThemeSelect(theme.id)}
+                  className={cn(
+                    "relative p-4 rounded-xl border-2 transition-all text-left w-full",
+                    "hover:scale-[1.01] active:scale-[0.99]",
+                    state.themePreset === theme.id
+                      ? "border-primary bg-primary/10"
+                      : "border-border/50 hover:border-border bg-card/50"
+                  )}
+                >
+                  {state.themePreset === theme.id && (
+                    <div className="absolute top-3 right-3">
+                      <Check className="w-5 h-5 text-primary" />
                     </div>
-                    {/* Preview bar */}
-                    <div 
-                      className="mt-3 h-2 rounded-full overflow-hidden"
-                      style={{
-                        background: `linear-gradient(90deg, ${theme.primaryAccent}, ${theme.secondaryAccent})`,
-                      }}
-                    />
-                  </button>
-                ))}
-              </div>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{theme.icon}</span>
+                    <div>
+                      <p className="font-medium text-foreground">{theme.name}</p>
+                      <p className="text-xs text-muted-foreground">{theme.description}</p>
+                    </div>
+                  </div>
+                  {/* Preview bar */}
+                  <div 
+                    className="mt-3 h-2 rounded-full overflow-hidden"
+                    style={{
+                      background: `linear-gradient(90deg, ${theme.primaryAccent}, ${theme.secondaryAccent})`,
+                    }}
+                  />
+                </button>
+              ))}
             </div>
-          </TabsContent>
+            
+            {/* Reset Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onReset}
+              className="w-full mt-4"
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Reset to Default
+            </Button>
+          </div>
+        )}
 
-          {/* BACKGROUND TAB */}
-          <TabsContent value="background" className="space-y-6 mt-0">
+        {/* BACKGROUND TAB */}
+        {activeTab === 'background' && (
+          <div className="space-y-6">
             {/* Background Type */}
             <div className="space-y-3">
               <Label className="text-sm font-medium">Background Type</Label>
@@ -188,12 +205,13 @@ export const ProfileThemeCustomizer = ({
                 {(['color', 'gradient', 'image'] as const).map((type) => (
                   <button
                     key={type}
+                    type="button"
                     onClick={() => onChange({ backgroundType: type })}
                     className={cn(
                       "p-3 rounded-lg border text-sm capitalize transition-all",
                       state.backgroundType === type
-                        ? "border-primary bg-primary/10"
-                        : "border-border/50 hover:border-border"
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border/50 hover:border-border text-muted-foreground"
                     )}
                   >
                     {type}
@@ -210,6 +228,7 @@ export const ProfileThemeCustomizer = ({
                   {PRESET_GRADIENTS.map((g) => (
                     <button
                       key={g.name}
+                      type="button"
                       onClick={() => onChange({ backgroundValue: g.value })}
                       className={cn(
                         "h-14 rounded-lg bg-gradient-to-br transition-all",
@@ -233,6 +252,7 @@ export const ProfileThemeCustomizer = ({
                   {PRESET_COLORS.map((c) => (
                     <button
                       key={c.name}
+                      type="button"
                       onClick={() => onChange({ backgroundValue: c.value })}
                       className={cn(
                         "h-12 rounded-lg transition-all border border-border/30",
@@ -285,6 +305,7 @@ export const ProfileThemeCustomizer = ({
                 {OVERLAY_TINTS.map((t) => (
                   <button
                     key={t.id}
+                    type="button"
                     onClick={() => onChange({ overlayTint: t.value })}
                     className={cn(
                       "h-10 rounded-lg border transition-all",
@@ -314,18 +335,20 @@ export const ProfileThemeCustomizer = ({
                 />
               </div>
             )}
-          </TabsContent>
+          </div>
+        )}
 
-          {/* EFFECTS TAB */}
-          <TabsContent value="effects" className="space-y-4 mt-0">
+        {/* EFFECTS TAB */}
+        {activeTab === 'effects' && (
+          <div className="space-y-4">
             <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
               <p className="text-xs text-muted-foreground">
                 Effects adapt to your chosen theme. Some effects may be disabled if "Reduce Motion" is enabled in your system settings.
               </p>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-card/50 border border-border/30">
                 <div>
                   <Label className="text-sm font-medium">Film Grain</Label>
                   <p className="text-xs text-muted-foreground">Subtle texture overlay</p>
@@ -336,7 +359,7 @@ export const ProfileThemeCustomizer = ({
                 />
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-card/50 border border-border/30">
                 <div>
                   <Label className="text-sm font-medium">CRT Scanlines</Label>
                   <p className="text-xs text-muted-foreground">Retro monitor effect</p>
@@ -347,7 +370,7 @@ export const ProfileThemeCustomizer = ({
                 />
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-card/50 border border-border/30">
                 <div>
                   <Label className="text-sm font-medium">Neon Glow</Label>
                   <p className="text-xs text-muted-foreground">Pulsing neon edges</p>
@@ -358,7 +381,7 @@ export const ProfileThemeCustomizer = ({
                 />
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-card/50 border border-border/30">
                 <div>
                   <Label className="text-sm font-medium">Holographic</Label>
                   <p className="text-xs text-muted-foreground">Rainbow shimmer effect</p>
@@ -369,7 +392,7 @@ export const ProfileThemeCustomizer = ({
                 />
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-card/50 border border-border/30">
                 <div>
                   <Label className="text-sm font-medium">Motion Gradient</Label>
                   <p className="text-xs text-muted-foreground">Animated background colors</p>
@@ -380,7 +403,7 @@ export const ProfileThemeCustomizer = ({
                 />
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-card/50 border border-border/30">
                 <div className="flex items-center gap-2">
                   <Music className="w-4 h-4 text-primary" />
                   <div>
@@ -394,10 +417,12 @@ export const ProfileThemeCustomizer = ({
                 />
               </div>
             </div>
-          </TabsContent>
+          </div>
+        )}
 
-          {/* STYLE TAB */}
-          <TabsContent value="style" className="space-y-6 mt-0">
+        {/* STYLE TAB */}
+        {activeTab === 'style' && (
+          <div className="space-y-6">
             {/* Font Selection */}
             <div className="space-y-3">
               <Label className="text-sm font-medium">Custom Font</Label>
@@ -405,12 +430,13 @@ export const ProfileThemeCustomizer = ({
                 {APPROVED_FONTS.map((font) => (
                   <button
                     key={font.id}
+                    type="button"
                     onClick={() => onChange({ customFont: font.id === 'default' ? null : font.value })}
                     className={cn(
                       "p-3 rounded-lg border text-sm transition-all text-left",
                       (state.customFont === font.value || (!state.customFont && font.id === 'default'))
-                        ? "border-primary bg-primary/10"
-                        : "border-border/50 hover:border-border"
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border/50 hover:border-border text-muted-foreground"
                     )}
                     style={{ fontFamily: font.value }}
                   >
@@ -427,84 +453,78 @@ export const ProfileThemeCustomizer = ({
                 {ACCENT_COLORS.map((color) => (
                   <button
                     key={color.name}
+                    type="button"
                     onClick={() => onChange({ accentColorOverride: color.value })}
                     className={cn(
                       "h-10 rounded-lg border-2 transition-all flex items-center justify-center",
                       state.accentColorOverride === color.value
-                        ? "border-foreground"
-                        : "border-border/30 hover:border-border"
+                        ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                        : "hover:scale-105"
                     )}
-                    style={{ backgroundColor: color.value || 'transparent' }}
+                    style={{ 
+                      backgroundColor: color.value || 'hsl(var(--primary))',
+                      borderColor: color.value || 'hsl(var(--primary))',
+                    }}
                     title={color.name}
                   >
-                    {!color.value && (
-                      <span className="text-xs text-muted-foreground">Auto</span>
+                    {state.accentColorOverride === color.value && (
+                      <Check className="w-4 h-4 text-white drop-shadow" />
                     )}
                   </button>
                 ))}
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Retro-specific: Top Friends */}
-            {state.themePreset === 'retro_spacehey' && (
-              <div className="flex items-center justify-between p-3 rounded-lg bg-pink-500/10 border border-pink-500/30">
-                <div>
-                  <Label className="text-sm font-medium">Top Friends Section</Label>
-                  <p className="text-xs text-muted-foreground">Show your favorite creators</p>
-                </div>
-                <Switch
-                  checked={state.showTopFriends}
-                  onCheckedChange={(v) => onChange({ showTopFriends: v })}
-                />
-              </div>
-            )}
-          </TabsContent>
-
-          {/* LAYOUT TAB */}
-          <TabsContent value="layout" className="space-y-4 mt-0">
-            <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+        {/* LAYOUT TAB */}
+        {activeTab === 'layout' && (
+          <div className="space-y-6">
+            {/* Section Order */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Profile Sections</Label>
               <p className="text-xs text-muted-foreground">
-                Drag sections to reorder how they appear on your profile. (Coming soon)
+                Drag to reorder your profile sections (coming soon)
               </p>
-            </div>
-
-            <div className="space-y-2">
-              {PROFILE_SECTIONS.map((section, idx) => (
-                <div
-                  key={section.id}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/30"
-                >
-                  <div className="w-6 h-6 rounded bg-primary/20 flex items-center justify-center text-xs font-medium">
-                    {idx + 1}
+              <div className="space-y-2">
+                {PROFILE_SECTIONS.map((section) => (
+                  <div
+                    key={section.id}
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-lg border transition-all",
+                      state.sectionOrder.includes(section.id)
+                        ? "border-primary/50 bg-primary/5"
+                        : "border-border/50 bg-card/30"
+                    )}
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
+                      {section.icon === 'User' && '👤'}
+                      {section.icon === 'Music' && '🎵'}
+                      {section.icon === 'BarChart' && '📊'}
+                      {section.icon === 'Link' && '🔗'}
+                      {section.icon === 'Briefcase' && '💼'}
+                      {section.icon === 'Store' && '🏪'}
+                      {section.icon === 'Calendar' && '📅'}
+                    </div>
+                    <span className="text-sm font-medium text-foreground">{section.name}</span>
                   </div>
-                  <span className="text-sm">{section.name}</span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </TabsContent>
-        </div>
-      </Tabs>
 
-      {/* Action Buttons */}
-      <div className="flex gap-2 pt-4 border-t border-border/50">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onReset}
-          className="flex-1"
-        >
-          <RotateCcw className="w-4 h-4 mr-2" />
-          Reset
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={onPreview}
-          className="flex-1"
-        >
-          <Eye className="w-4 h-4 mr-2" />
-          Preview
-        </Button>
+            {/* Top Friends */}
+            <div className="flex items-center justify-between p-3 rounded-lg bg-card/50 border border-border/30">
+              <div>
+                <Label className="text-sm font-medium">Show Top Friends</Label>
+                <p className="text-xs text-muted-foreground">Display your favorite connections</p>
+              </div>
+              <Switch
+                checked={state.showTopFriends}
+                onCheckedChange={(v) => onChange({ showTopFriends: v })}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

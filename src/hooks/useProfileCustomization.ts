@@ -90,7 +90,12 @@ export const useProfileCustomization = (userId?: string) => {
 
   const saveCustomization = useMutation({
     mutationFn: async (customizationData: Partial<ProfileCustomization>) => {
-      if (!user) throw new Error("Not authenticated");
+      if (!user) {
+        console.warn('[ProfileCustomization] Save failed: User not authenticated');
+        throw new Error("Not authenticated");
+      }
+
+      console.log('[ProfileCustomization] Saving customization:', customizationData);
 
       const { data: existing } = await supabase
         .from("profile_customizations")
@@ -106,7 +111,11 @@ export const useProfileCustomization = (userId?: string) => {
             updated_at: new Date().toISOString(),
           })
           .eq("user_id", user.id);
-        if (error) throw error;
+        if (error) {
+          console.error('[ProfileCustomization] Update failed:', error);
+          throw error;
+        }
+        console.log('[ProfileCustomization] Updated successfully');
       } else {
         const { error } = await supabase
           .from("profile_customizations")
@@ -114,7 +123,11 @@ export const useProfileCustomization = (userId?: string) => {
             user_id: user.id,
             ...customizationData,
           });
-        if (error) throw error;
+        if (error) {
+          console.error('[ProfileCustomization] Insert failed:', error);
+          throw error;
+        }
+        console.log('[ProfileCustomization] Inserted successfully');
       }
     },
     onSuccess: () => {
@@ -122,8 +135,8 @@ export const useProfileCustomization = (userId?: string) => {
       toast.success("Profile customization saved!");
     },
     onError: (error) => {
+      console.error('[ProfileCustomization] Mutation error:', error);
       toast.error("Failed to save customization");
-      console.error(error);
     },
   });
 
