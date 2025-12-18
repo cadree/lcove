@@ -32,10 +32,13 @@ const REACTIONS = ['❤️', '🔥', '⭐', '👏', '🎵', '🎧'];
 
 // Stream status helper - single source of truth
 type StreamStatus = 'draft' | 'live' | 'ended';
-const getStreamStatus = (stream: { is_live: boolean; started_at: string | null; ended_at: string | null }): StreamStatus => {
-  if (stream.is_live) return 'live';
-  if (stream.ended_at) return 'ended';
-  return 'draft'; // Never went live yet
+const getStreamStatus = (stream: { is_live: boolean | null; started_at: string | null; ended_at: string | null }): StreamStatus => {
+  // If currently live, it's live
+  if (stream.is_live === true) return 'live';
+  // Only ended if it was started AND then ended
+  if (stream.started_at && stream.ended_at) return 'ended';
+  // Otherwise it's still a draft (even if ended_at somehow got set without started_at)
+  return 'draft';
 };
 
 export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onClose }) => {
