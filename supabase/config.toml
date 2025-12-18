@@ -35,3 +35,9 @@ verify_jwt = true
 
 [functions.send-notification-email]
 verify_jwt = false
+
+[functions.create-network-subscription]
+verify_jwt = true
+
+[functions.check-network-subscription]
+verify_jwt = true

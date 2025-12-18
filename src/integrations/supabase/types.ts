@@ -303,6 +303,101 @@ export type Database = {
           },
         ]
       }
+      content_genres: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      content_submissions: {
+        Row: {
+          cast_members: string[] | null
+          content_type: Database["public"]["Enums"]["network_content_type"]
+          cover_art_url: string | null
+          created_at: string
+          credits: Json | null
+          description: string | null
+          director: string | null
+          external_video_url: string | null
+          id: string
+          network_id: string
+          pitch_notes: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          runtime_minutes: number | null
+          status: Database["public"]["Enums"]["submission_status"]
+          submitter_id: string
+          title: string
+          trailer_url: string | null
+          video_url: string | null
+        }
+        Insert: {
+          cast_members?: string[] | null
+          content_type: Database["public"]["Enums"]["network_content_type"]
+          cover_art_url?: string | null
+          created_at?: string
+          credits?: Json | null
+          description?: string | null
+          director?: string | null
+          external_video_url?: string | null
+          id?: string
+          network_id: string
+          pitch_notes?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          runtime_minutes?: number | null
+          status?: Database["public"]["Enums"]["submission_status"]
+          submitter_id: string
+          title: string
+          trailer_url?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          cast_members?: string[] | null
+          content_type?: Database["public"]["Enums"]["network_content_type"]
+          cover_art_url?: string | null
+          created_at?: string
+          credits?: Json | null
+          description?: string | null
+          director?: string | null
+          external_video_url?: string | null
+          id?: string
+          network_id?: string
+          pitch_notes?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          runtime_minutes?: number | null
+          status?: Database["public"]["Enums"]["submission_status"]
+          submitter_id?: string
+          title?: string
+          trailer_url?: string | null
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_submissions_network_id_fkey"
+            columns: ["network_id"]
+            isOneToOne: false
+            referencedRelation: "networks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_participants: {
         Row: {
           conversation_id: string
@@ -959,6 +1054,187 @@ export type Database = {
           top_tracks?: Json | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      network_content: {
+        Row: {
+          cast_members: string[] | null
+          content_type: Database["public"]["Enums"]["network_content_type"]
+          cover_art_url: string | null
+          created_at: string
+          creator_id: string
+          credits: Json | null
+          description: string | null
+          director: string | null
+          external_video_url: string | null
+          genre_tags: string[] | null
+          id: string
+          is_featured: boolean | null
+          is_published: boolean | null
+          network_id: string
+          release_date: string | null
+          runtime_minutes: number | null
+          title: string
+          trailer_url: string | null
+          updated_at: string
+          video_url: string | null
+          view_count: number | null
+        }
+        Insert: {
+          cast_members?: string[] | null
+          content_type: Database["public"]["Enums"]["network_content_type"]
+          cover_art_url?: string | null
+          created_at?: string
+          creator_id: string
+          credits?: Json | null
+          description?: string | null
+          director?: string | null
+          external_video_url?: string | null
+          genre_tags?: string[] | null
+          id?: string
+          is_featured?: boolean | null
+          is_published?: boolean | null
+          network_id: string
+          release_date?: string | null
+          runtime_minutes?: number | null
+          title: string
+          trailer_url?: string | null
+          updated_at?: string
+          video_url?: string | null
+          view_count?: number | null
+        }
+        Update: {
+          cast_members?: string[] | null
+          content_type?: Database["public"]["Enums"]["network_content_type"]
+          cover_art_url?: string | null
+          created_at?: string
+          creator_id?: string
+          credits?: Json | null
+          description?: string | null
+          director?: string | null
+          external_video_url?: string | null
+          genre_tags?: string[] | null
+          id?: string
+          is_featured?: boolean | null
+          is_published?: boolean | null
+          network_id?: string
+          release_date?: string | null
+          runtime_minutes?: number | null
+          title?: string
+          trailer_url?: string | null
+          updated_at?: string
+          video_url?: string | null
+          view_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "network_content_network_id_fkey"
+            columns: ["network_id"]
+            isOneToOne: false
+            referencedRelation: "networks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      network_subscriptions: {
+        Row: {
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          network_id: string
+          status: string
+          stripe_subscription_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          network_id: string
+          status?: string
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          network_id?: string
+          status?: string
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "network_subscriptions_network_id_fkey"
+            columns: ["network_id"]
+            isOneToOne: false
+            referencedRelation: "networks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      networks: {
+        Row: {
+          banner_url: string | null
+          created_at: string
+          description: string | null
+          genre: string | null
+          id: string
+          is_paid: boolean
+          is_public: boolean
+          logo_url: string | null
+          name: string
+          owner_id: string
+          stripe_price_id: string | null
+          stripe_product_id: string | null
+          subscriber_count: number | null
+          subscription_price: number | null
+          total_views: number | null
+          updated_at: string
+        }
+        Insert: {
+          banner_url?: string | null
+          created_at?: string
+          description?: string | null
+          genre?: string | null
+          id?: string
+          is_paid?: boolean
+          is_public?: boolean
+          logo_url?: string | null
+          name: string
+          owner_id: string
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          subscriber_count?: number | null
+          subscription_price?: number | null
+          total_views?: number | null
+          updated_at?: string
+        }
+        Update: {
+          banner_url?: string | null
+          created_at?: string
+          description?: string | null
+          genre?: string | null
+          id?: string
+          is_paid?: boolean
+          is_public?: boolean
+          logo_url?: string | null
+          name?: string
+          owner_id?: string
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          subscriber_count?: number | null
+          subscription_price?: number | null
+          total_views?: number | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -2436,6 +2712,91 @@ export type Database = {
         }
         Relationships: []
       }
+      tv_episodes: {
+        Row: {
+          created_at: string
+          description: string | null
+          episode_number: number
+          external_video_url: string | null
+          id: string
+          runtime_minutes: number | null
+          season_id: string
+          thumbnail_url: string | null
+          title: string
+          video_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          episode_number: number
+          external_video_url?: string | null
+          id?: string
+          runtime_minutes?: number | null
+          season_id: string
+          thumbnail_url?: string | null
+          title: string
+          video_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          episode_number?: number
+          external_video_url?: string | null
+          id?: string
+          runtime_minutes?: number | null
+          season_id?: string
+          thumbnail_url?: string | null
+          title?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tv_episodes_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "tv_seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tv_seasons: {
+        Row: {
+          content_id: string
+          cover_art_url: string | null
+          created_at: string
+          description: string | null
+          id: string
+          season_number: number
+          title: string | null
+        }
+        Insert: {
+          content_id: string
+          cover_art_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          season_number: number
+          title?: string | null
+        }
+        Update: {
+          content_id?: string
+          cover_art_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          season_number?: number
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tv_seasons_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "network_content"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       typing_indicators: {
         Row: {
           conversation_id: string
@@ -2603,6 +2964,57 @@ export type Database = {
           },
         ]
       }
+      watch_history: {
+        Row: {
+          completed: boolean | null
+          content_id: string | null
+          created_at: string
+          duration_seconds: number | null
+          episode_id: string | null
+          id: string
+          last_watched_at: string
+          progress_seconds: number | null
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          content_id?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          episode_id?: string | null
+          id?: string
+          last_watched_at?: string
+          progress_seconds?: number | null
+          user_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          content_id?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          episode_id?: string | null
+          id?: string
+          last_watched_at?: string
+          progress_seconds?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "watch_history_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "network_content"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "watch_history_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "tv_episodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -2623,6 +3035,8 @@ export type Database = {
     }
     Enums: {
       access_level: "level_1" | "level_2" | "level_3"
+      network_content_type: "short_film" | "feature_film" | "tv_show"
+      submission_status: "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2751,6 +3165,8 @@ export const Constants = {
   public: {
     Enums: {
       access_level: ["level_1", "level_2", "level_3"],
+      network_content_type: ["short_film", "feature_film", "tv_show"],
+      submission_status: ["pending", "approved", "rejected"],
     },
   },
 } as const
