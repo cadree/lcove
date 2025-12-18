@@ -78,6 +78,21 @@ const Profile = () => {
     );
   }
 
+  // If no user is logged in, show a message
+  if (!user) {
+    return (
+      <PageLayout>
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
+          <h2 className="font-display text-2xl text-foreground">Sign in to view your profile</h2>
+          <p className="text-muted-foreground text-center">Create an account or sign in to customize your profile and connect with the community.</p>
+          <Button asChild>
+            <Link to="/auth">Sign In</Link>
+          </Button>
+        </div>
+      </PageLayout>
+    );
+  }
+
   // Default values for display
   const displayName = profile?.display_name || 'Creative';
   const bio = profile?.bio || 'Welcome to my profile!';
