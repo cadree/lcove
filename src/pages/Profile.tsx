@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
@@ -23,7 +23,7 @@ import {
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
 import { ProfileCustomizationDialog } from "@/components/profile/ProfileCustomizationDialog";
-import { ProfileMusicPlayer } from "@/components/profile/ProfileMusicPlayer";
+import { ProfileRecordPlayer } from "@/components/profile/ProfileRecordPlayer";
 import { ProfileEffects, HolographicCard, CyberpunkProgressBar, NeonText } from "@/components/profile/ProfileEffects";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
@@ -39,11 +39,22 @@ const Profile = () => {
   const navigate = useNavigate();
   const { profile, loading, updateProfile } = useProfile();
   const { credits } = useCredits();
-  const { customization, isOwner } = useProfileCustomization();
+  const { customization, isOwner, saveCustomization } = useProfileCustomization();
   const [showMusicDialog, setShowMusicDialog] = useState(false);
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const volumeSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced volume save
+  const handleVolumeChange = useCallback((volume: number) => {
+    if (volumeSaveTimeoutRef.current) {
+      clearTimeout(volumeSaveTimeoutRef.current);
+    }
+    volumeSaveTimeoutRef.current = setTimeout(() => {
+      saveCustomization.mutate({ profile_music_volume: volume });
+    }, 500);
+  }, [saveCustomization]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -361,6 +372,22 @@ const Profile = () => {
             <p className="text-muted-foreground leading-relaxed">{bio}</p>
           </motion.div>
 
+          {/* Profile Music Record Player - shows when music is enabled */}
+          {customization?.profile_music_enabled && (customization?.profile_music_url || customization?.profile_music_preview_url) && (
+            <ProfileRecordPlayer
+              musicUrl={customization.profile_music_url}
+              previewUrl={customization.profile_music_preview_url}
+              title={customization.profile_music_title}
+              artist={customization.profile_music_artist}
+              albumArtUrl={customization.profile_music_album_art_url}
+              source={customization.profile_music_source as 'spotify' | 'apple_music' | 'upload' | null}
+              externalId={customization.profile_music_external_id}
+              defaultVolume={customization.profile_music_volume ?? 0.5}
+              isOwner={isOwner}
+              onVolumeChange={handleVolumeChange}
+            />
+          )}
+
           {/* Music Block */}
           <MusicProfileBlock onConnectClick={() => setShowMusicDialog(true)} />
 
@@ -402,20 +429,6 @@ const Profile = () => {
             onOpenChange={setShowCustomizationDialog} 
           />
         </div>
-
-        {/* Profile Music Player - shows when music is enabled */}
-        {customization?.profile_music_enabled && (customization?.profile_music_url || customization?.profile_music_preview_url) && (
-          <ProfileMusicPlayer
-            musicUrl={customization.profile_music_url}
-            previewUrl={customization.profile_music_preview_url}
-            title={customization.profile_music_title}
-            artist={customization.profile_music_artist}
-            albumArtUrl={customization.profile_music_album_art_url}
-            albumName={customization.profile_music_album_name}
-            source={customization.profile_music_source as 'spotify' | 'apple_music' | 'upload' | null}
-            externalId={customization.profile_music_external_id}
-          />
-        )}
       </div>
     </PageLayout>
   );
