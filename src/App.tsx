@@ -18,6 +18,7 @@ import Notifications from "./pages/Notifications";
 import Wallet from "./pages/Wallet";
 import Store from "./pages/Store";
 import Mall from "./pages/Mall";
+import FundDashboard from "./pages/FundDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -50,6 +51,7 @@ const App = () => (
             <Route path="/wallet" element={<Wallet />} />
             <Route path="/store" element={<Store />} />
             <Route path="/mall" element={<Mall />} />
+            <Route path="/fund" element={<FundDashboard />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
