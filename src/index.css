@@ -197,6 +197,19 @@
     left: 50%;
     transform: translateX(-50%);
     z-index: 100;
+    width: 100%;
+    max-width: calc(100% - 24px);
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+    /* iOS safe area support */
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-left: env(safe-area-inset-left, 0);
+    padding-right: env(safe-area-inset-right, 0);
+  }
+
+  .nav-floating > * {
+    pointer-events: auto;
   }
 
   /* Premium Input */
