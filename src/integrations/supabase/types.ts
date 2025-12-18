@@ -14,6 +14,61 @@ export type Database = {
   }
   public: {
     Tables: {
+      calendar_reminders: {
+        Row: {
+          created_at: string
+          event_id: string | null
+          id: string
+          personal_item_id: string | null
+          project_id: string | null
+          reminder_time: string
+          sent: boolean | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          personal_item_id?: string | null
+          project_id?: string | null
+          reminder_time: string
+          sent?: boolean | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          personal_item_id?: string | null
+          project_id?: string | null
+          reminder_time?: string
+          sent?: boolean | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_reminders_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_reminders_personal_item_id_fkey"
+            columns: ["personal_item_id"]
+            isOneToOne: false
+            referencedRelation: "personal_calendar_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_reminders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_participants: {
         Row: {
           conversation_id: string
@@ -133,6 +188,119 @@ export type Database = {
           reference_type?: string | null
           type?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      event_rsvps: {
+        Row: {
+          created_at: string
+          credits_spent: number | null
+          event_id: string
+          id: string
+          reminder_enabled: boolean | null
+          status: string
+          stripe_payment_id: string | null
+          ticket_purchased: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_spent?: number | null
+          event_id: string
+          id?: string
+          reminder_enabled?: boolean | null
+          status?: string
+          stripe_payment_id?: string | null
+          ticket_purchased?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_spent?: number | null
+          event_id?: string
+          id?: string
+          reminder_enabled?: boolean | null
+          status?: string
+          stripe_payment_id?: string | null
+          ticket_purchased?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_rsvps_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          address: string | null
+          capacity: number | null
+          city: string
+          country: string | null
+          created_at: string
+          creator_id: string
+          credits_price: number | null
+          description: string | null
+          end_date: string | null
+          id: string
+          image_url: string | null
+          is_public: boolean | null
+          start_date: string
+          state: string | null
+          ticket_price: number | null
+          ticket_type: string
+          title: string
+          updated_at: string
+          venue: string | null
+        }
+        Insert: {
+          address?: string | null
+          capacity?: number | null
+          city: string
+          country?: string | null
+          created_at?: string
+          creator_id: string
+          credits_price?: number | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          image_url?: string | null
+          is_public?: boolean | null
+          start_date: string
+          state?: string | null
+          ticket_price?: number | null
+          ticket_type?: string
+          title: string
+          updated_at?: string
+          venue?: string | null
+        }
+        Update: {
+          address?: string | null
+          capacity?: number | null
+          city?: string
+          country?: string | null
+          created_at?: string
+          creator_id?: string
+          credits_price?: number | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          image_url?: string | null
+          is_public?: boolean | null
+          start_date?: string
+          state?: string | null
+          ticket_price?: number | null
+          ticket_type?: string
+          title?: string
+          updated_at?: string
+          venue?: string | null
         }
         Relationships: []
       }
@@ -419,6 +587,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      personal_calendar_items: {
+        Row: {
+          all_day: boolean | null
+          color: string | null
+          created_at: string
+          description: string | null
+          end_date: string | null
+          id: string
+          location: string | null
+          reminder_minutes: number | null
+          start_date: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          all_day?: boolean | null
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          location?: string | null
+          reminder_minutes?: number | null
+          start_date: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          all_day?: boolean | null
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          location?: string | null
+          reminder_minutes?: number | null
+          start_date?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       post_comments: {
         Row: {
