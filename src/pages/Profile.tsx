@@ -49,16 +49,17 @@ const Profile = () => {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
+          transition={{ duration: 0.6 }}
           className="relative h-48 sm:h-64 bg-cover bg-center"
           style={{ backgroundImage: `url(${profileData.coverImage})` }}
         >
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
           
           {/* Settings Button */}
           <Button
             variant="glass"
             size="icon"
-            className="absolute top-4 right-4"
+            className="absolute top-4 right-4 w-10 h-10"
           >
             <Settings className="w-5 h-5" />
           </Button>
