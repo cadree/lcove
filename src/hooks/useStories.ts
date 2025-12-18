@@ -101,6 +101,31 @@ export function useStories() {
     },
   });
 
+  // Set up realtime subscription for story views
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('story-views-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'story_views',
+        },
+        (payload) => {
+          // Invalidate stories query to refresh view counts
+          queryClient.invalidateQueries({ queryKey: ['stories'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, queryClient]);
+
   const uploadStory = useMutation({
     mutationFn: async ({ file, mediaType }: { file: File; mediaType: 'photo' | 'video' }) => {
       if (!user) throw new Error('Must be logged in');
@@ -142,15 +167,29 @@ export function useStories() {
     mutationFn: async (storyId: string) => {
       if (!user) return;
       
-      await supabase
+      // Use insert with onConflict to handle duplicates
+      const { error } = await supabase
         .from('story_views')
         .upsert({
           story_id: storyId,
           viewer_id: user.id,
-        }, { onConflict: 'story_id,viewer_id' });
+          viewed_at: new Date().toISOString(),
+        }, { 
+          onConflict: 'story_id,viewer_id',
+          ignoreDuplicates: true 
+        });
+
+      if (error) {
+        console.error('Failed to record view:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
+      // Immediately invalidate to update view counts
       queryClient.invalidateQueries({ queryKey: ['stories'] });
+    },
+    onError: (error) => {
+      console.error('Record view error:', error);
     },
   });
 

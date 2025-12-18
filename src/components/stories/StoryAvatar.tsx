@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { Star } from 'lucide-react';
 
 interface StoryAvatarProps {
   userId: string;
@@ -6,6 +7,8 @@ interface StoryAvatarProps {
   avatarUrl: string | null;
   isLive?: boolean;
   hasUnviewed?: boolean;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
   onClick: () => void;
   index: number;
 }
@@ -16,9 +19,16 @@ const StoryAvatar = ({
   avatarUrl,
   isLive = false,
   hasUnviewed = true,
+  isFavorite = false,
+  onToggleFavorite,
   onClick,
   index,
 }: StoryAvatarProps) => {
+  const handleFavoriteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleFavorite?.();
+  };
+
   return (
     <motion.button
       initial={{ opacity: 0, scale: 0.8 }}
@@ -61,6 +71,22 @@ const StoryAvatar = ({
             </div>
           </div>
         </div>
+
+        {/* Favorite indicator */}
+        {onToggleFavorite && (
+          <motion.button
+            onClick={handleFavoriteClick}
+            whileHover={{ scale: 1.2 }}
+            whileTap={{ scale: 0.9 }}
+            className={`absolute -top-0.5 -right-0.5 z-10 w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
+              isFavorite 
+                ? 'bg-primary text-primary-foreground' 
+                : 'bg-card/80 text-muted-foreground hover:text-foreground border border-border/50'
+            }`}
+          >
+            <Star className={`w-2.5 h-2.5 ${isFavorite ? 'fill-current' : ''}`} />
+          </motion.button>
+        )}
 
         {/* LIVE Badge */}
         {isLive && (

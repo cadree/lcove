@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, Eye, Send } from 'lucide-react';
 import { useStories } from '@/hooks/useStories';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface Story {
   id: string;
@@ -33,18 +35,68 @@ const EMOJIS = ['❤️', '🔥', '👏', '😍', '🎉', '💯'];
 const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [viewCount, setViewCount] = useState(0);
   const { recordView, addReaction } = useStories();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const recordedViewsRef = useRef<Set<string>>(new Set());
 
   const currentStory = stories[currentIndex];
   const isOwner = user?.id === currentStory?.user_id;
 
-  // Record view when story opens
+  // Fetch and subscribe to real-time view count for owner
   useEffect(() => {
-    if (currentStory && !currentStory.has_viewed && !isOwner) {
+    if (!currentStory || !isOwner) return;
+
+    // Initial fetch
+    const fetchViewCount = async () => {
+      const { count } = await supabase
+        .from('story_views')
+        .select('*', { count: 'exact', head: true })
+        .eq('story_id', currentStory.id);
+      setViewCount(count || 0);
+    };
+
+    fetchViewCount();
+
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel(`story-views-${currentStory.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'story_views',
+          filter: `story_id=eq.${currentStory.id}`,
+        },
+        () => {
+          // Increment view count on new view
+          setViewCount((prev) => prev + 1);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentStory?.id, isOwner]);
+
+  // Record view when story opens (only once per story)
+  useEffect(() => {
+    if (!currentStory || isOwner || !user) return;
+    
+    // Check if we already recorded this view in this session
+    if (recordedViewsRef.current.has(currentStory.id)) return;
+    
+    // Mark as recorded before making the call to prevent duplicates
+    recordedViewsRef.current.add(currentStory.id);
+    
+    // Only record if not already viewed
+    if (!currentStory.has_viewed) {
       recordView.mutate(currentStory.id);
     }
-  }, [currentStory?.id]);
+  }, [currentStory?.id, isOwner, user, currentStory?.has_viewed]);
 
   // Auto-progress timer
   useEffect(() => {
@@ -245,13 +297,18 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
           {/* Footer - Reactions or View Count */}
           <div className="absolute bottom-6 left-4 right-4 z-20">
             {isOwner ? (
-              // Owner sees view count
-              <div className="flex items-center gap-2 text-foreground/80">
+              // Owner sees view count (real-time updated)
+              <motion.div 
+                key={viewCount}
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+                className="flex items-center gap-2 text-foreground/80"
+              >
                 <Eye className="w-5 h-5" />
                 <span className="text-sm font-medium">
-                  {currentStory.view_count || 0} views
+                  {viewCount} {viewCount === 1 ? 'view' : 'views'}
                 </span>
-              </div>
+              </motion.div>
             ) : (
               // Viewers see reaction buttons
               <div className="flex items-center justify-center gap-2">
