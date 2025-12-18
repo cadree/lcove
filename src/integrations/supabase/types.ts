@@ -1302,6 +1302,48 @@ export type Database = {
         }
         Relationships: []
       }
+      profile_customizations: {
+        Row: {
+          background_type: string | null
+          background_value: string | null
+          created_at: string
+          id: string
+          profile_music_artist: string | null
+          profile_music_enabled: boolean | null
+          profile_music_title: string | null
+          profile_music_url: string | null
+          theme_accent_color: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          background_type?: string | null
+          background_value?: string | null
+          created_at?: string
+          id?: string
+          profile_music_artist?: string | null
+          profile_music_enabled?: boolean | null
+          profile_music_title?: string | null
+          profile_music_url?: string | null
+          theme_accent_color?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          background_type?: string | null
+          background_value?: string | null
+          created_at?: string
+          id?: string
+          profile_music_artist?: string | null
+          profile_music_enabled?: boolean | null
+          profile_music_title?: string | null
+          profile_music_url?: string | null
+          theme_accent_color?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           access_level: Database["public"]["Enums"]["access_level"] | null
