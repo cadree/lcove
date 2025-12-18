@@ -1,22 +1,34 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus } from 'lucide-react';
+import { Plus, Star, Filter } from 'lucide-react';
 import { useStories } from '@/hooks/useStories';
+import { useFavorites } from '@/hooks/useFavorites';
 import { useAuth } from '@/contexts/AuthContext';
 import StoryAvatar from './StoryAvatar';
 import StoryViewer from './StoryViewer';
 import StoryUpload from './StoryUpload';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const StoriesRow = () => {
   const { user } = useAuth();
   const { groupedStories, isLoading } = useStories();
+  const { favorites, isFavorite, toggleFavorite } = useFavorites();
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [showUpload, setShowUpload] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   const userStories = groupedStories[user?.id || ''] || [];
-  const otherUsersWithStories = Object.entries(groupedStories).filter(
-    ([userId]) => userId !== user?.id
-  );
+  
+  // Filter other users' stories based on favorites filter
+  const otherUsersWithStories = Object.entries(groupedStories)
+    .filter(([userId]) => userId !== user?.id)
+    .filter(([userId]) => !showFavoritesOnly || isFavorite(userId));
 
   const handleOpenStory = (userId: string) => {
     setSelectedUserId(userId);
@@ -52,6 +64,38 @@ const StoriesRow = () => {
 
   return (
     <>
+      <div className="flex items-center gap-2 px-1 pt-2">
+        {user && favorites.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className={`h-8 gap-1.5 text-xs ${showFavoritesOnly ? 'text-primary' : 'text-muted-foreground'}`}
+              >
+                <Filter className="w-3.5 h-3.5" />
+                {showFavoritesOnly ? 'Favorites' : 'All'}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-40">
+              <DropdownMenuCheckboxItem
+                checked={!showFavoritesOnly}
+                onCheckedChange={() => setShowFavoritesOnly(false)}
+              >
+                Show All
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={showFavoritesOnly}
+                onCheckedChange={() => setShowFavoritesOnly(true)}
+              >
+                <Star className="w-3.5 h-3.5 mr-1.5 fill-primary text-primary" />
+                Favorites Only
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -103,23 +147,36 @@ const StoriesRow = () => {
 
         {/* Other Users' Stories */}
         <AnimatePresence mode="popLayout">
-          {otherUsersWithStories.map(([userId, userStoryList], index) => {
-            const latestStory = userStoryList[0];
-            const hasUnviewed = userStoryList.some((s: any) => !s.has_viewed);
-            
-            return (
-              <StoryAvatar
-                key={userId}
-                userId={userId}
-                displayName={latestStory.profile?.display_name || 'User'}
-                avatarUrl={latestStory.profile?.avatar_url}
-                isLive={latestStory.is_live}
-                hasUnviewed={hasUnviewed}
-                onClick={() => handleOpenStory(userId)}
-                index={index}
-              />
-            );
-          })}
+          {otherUsersWithStories.length === 0 && showFavoritesOnly ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex items-center justify-center px-4 text-sm text-muted-foreground"
+            >
+              No stories from favorites
+            </motion.div>
+          ) : (
+            otherUsersWithStories.map(([userId, userStoryList], index) => {
+              const latestStory = userStoryList[0];
+              const hasUnviewed = userStoryList.some((s: any) => !s.has_viewed);
+              const isFav = isFavorite(userId);
+              
+              return (
+                <StoryAvatar
+                  key={userId}
+                  userId={userId}
+                  displayName={latestStory.profile?.display_name || 'User'}
+                  avatarUrl={latestStory.profile?.avatar_url}
+                  isLive={latestStory.is_live}
+                  hasUnviewed={hasUnviewed}
+                  isFavorite={isFav}
+                  onToggleFavorite={() => toggleFavorite(userId)}
+                  onClick={() => handleOpenStory(userId)}
+                  index={index}
+                />
+              );
+            })
+          )}
         </AnimatePresence>
       </motion.div>
 
