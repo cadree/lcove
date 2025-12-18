@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { CalendarItem } from "@/hooks/useCalendar";
 import { cn } from "@/lib/utils";
 import { format, isSameDay, isToday as checkIsToday } from "date-fns";
-import { MapPin, Calendar, Clock, Ticket, Coins, User } from "lucide-react";
+import { MapPin, Calendar, Clock, Ticket, Coins, User, Sparkles } from "lucide-react";
 
 interface CalendarAgendaViewProps {
   currentDate: Date;
@@ -60,13 +60,27 @@ export function CalendarAgendaView({
 
   if (groupedItems.length === 0) {
     return (
-      <div className="glass-strong rounded-2xl p-8 text-center">
-        <Calendar className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-        <p className="text-muted-foreground">No events this month</p>
-        <p className="text-sm text-muted-foreground/70 mt-1">
-          Try a different month or add a personal event
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4 }}
+        className="flex flex-col items-center justify-center py-16 px-6 text-center glass-strong rounded-2xl"
+      >
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-6"
+        >
+          <Sparkles className="w-10 h-10 text-primary/60" />
+        </motion.div>
+        <h3 className="font-display text-xl font-medium text-foreground mb-2">
+          Your month is wide open
+        </h3>
+        <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">
+          No events scheduled yet. Explore community happenings or add something personal to your calendar.
         </p>
-      </div>
+      </motion.div>
     );
   }
 

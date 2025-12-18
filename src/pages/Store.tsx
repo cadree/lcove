@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   Package,
   Wrench,
@@ -21,6 +22,7 @@ import {
   Store as StoreIcon,
   Settings,
   ShoppingBag,
+  Sparkles,
 } from 'lucide-react';
 
 const Store = () => {
@@ -182,38 +184,33 @@ const Store = () => {
                       ))}
                     </div>
                   ) : filteredItems.length === 0 ? (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="text-center py-20 glass-strong rounded-2xl"
-                    >
-                      <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-muted/30 flex items-center justify-center">
-                        {tabId === 'products' && <Package className="w-8 h-8 text-muted-foreground/50" />}
-                        {tabId === 'services' && <Wrench className="w-8 h-8 text-muted-foreground/50" />}
-                        {tabId === 'rentals' && <Building2 className="w-8 h-8 text-muted-foreground/50" />}
-                        {tabId === 'my-store' && <StoreIcon className="w-8 h-8 text-muted-foreground/50" />}
-                      </div>
-                      <h3 className="text-lg font-medium text-foreground mb-2">
-                        {tabId === 'my-store' 
-                          ? 'Your store is empty'
-                          : `No ${tabId} found`
-                        }
-                      </h3>
-                      <p className="text-muted-foreground mb-5 text-sm max-w-xs mx-auto">
-                        {tabId === 'my-store'
-                          ? 'Start adding items to your store to sell to the community.'
+                    <EmptyState
+                      icon={tabId === 'products' ? Package : tabId === 'services' ? Wrench : tabId === 'rentals' ? Building2 : Sparkles}
+                      title={
+                        tabId === 'my-store' 
+                          ? 'Your store is waiting'
+                          : tabId === 'products'
+                            ? 'No products yet'
+                            : tabId === 'services'
+                              ? 'No services available'
+                              : 'No studios listed'
+                      }
+                      description={
+                        tabId === 'my-store'
+                          ? 'Share your creations, offer your skills, or list your space. The community is eager to discover what you have to offer.'
                           : searchQuery
-                            ? 'Try adjusting your search.'
-                            : 'Check back later for new listings.'
-                        }
-                      </p>
-                      {tabId === 'my-store' && user && myStore && (
-                        <Button onClick={handleCreateNew}>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add Your First Item
-                        </Button>
-                      )}
-                    </motion.div>
+                            ? 'Try adjusting your search to find what you need.'
+                            : tabId === 'products'
+                              ? 'Physical and digital goods from creators will appear here.'
+                              : tabId === 'services'
+                                ? 'Freelance services from community members will show up here.'
+                                : 'Studio spaces and equipment rentals will be listed here.'
+                      }
+                      action={tabId === 'my-store' && user && myStore ? {
+                        label: 'Add Your First Item',
+                        onClick: handleCreateNew
+                      } : undefined}
+                    />
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                       {filteredItems.map((item, index) => (

@@ -4,8 +4,9 @@ import PageLayout from "@/components/layout/PageLayout";
 import StoriesRow from "@/components/stories/StoriesRow";
 import PostCreator from "@/components/feed/PostCreator";
 import FeedPost from "@/components/feed/FeedPost";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import { Filter, Shuffle, Loader2 } from "lucide-react";
+import { Filter, Shuffle, Loader2, Sparkles } from "lucide-react";
 import { usePosts } from "@/hooks/usePosts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -115,20 +116,15 @@ const Feed = () => {
 
             {/* Empty State */}
             {filteredPosts.length === 0 && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="text-center py-20 glass-strong rounded-2xl"
-              >
-                <p className="text-foreground text-lg font-medium mb-2">
-                  {activeCategory === "All" 
-                    ? "No posts yet" 
-                    : `No ${activeCategory.toLowerCase()} posts yet`}
-                </p>
-                <p className="text-muted-foreground text-sm">
-                  Be the first to share something with the community!
-                </p>
-              </motion.div>
+              <EmptyState
+                icon={Sparkles}
+                title={activeCategory === "All" ? "The feed is waiting for you" : `No ${activeCategory.toLowerCase()} posts yet`}
+                description="This is your space to share what you're creating, thinking, or discovering. Your voice matters here."
+                action={user ? {
+                  label: "Share Something",
+                  onClick: () => document.querySelector<HTMLTextAreaElement>('[placeholder*="Share"]')?.focus()
+                } : undefined}
+              />
             )}
           </div>
         )}

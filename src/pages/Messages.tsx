@@ -71,19 +71,25 @@ const Messages = () => {
           ) : (
             <div className="flex-1 flex items-center justify-center bg-background/50">
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-center"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4 }}
+                className="text-center px-6"
               >
-                <div className="w-20 h-20 rounded-2xl bg-muted/30 flex items-center justify-center mx-auto mb-5">
-                  <MessageCircle className="w-10 h-10 text-muted-foreground/40" />
-                </div>
-                <h3 className="font-display text-xl text-foreground mb-2">Your Messages</h3>
-                <p className="text-muted-foreground text-sm mb-5 max-w-xs">
-                  Select a conversation or start a new one
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.1 }}
+                  className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mx-auto mb-6"
+                >
+                  <MessageCircle className="w-10 h-10 text-primary/60" />
+                </motion.div>
+                <h3 className="font-display text-xl font-medium text-foreground mb-2">Your inbox awaits</h3>
+                <p className="text-muted-foreground text-sm mb-6 max-w-xs mx-auto">
+                  Start a conversation with someone who inspires you or continue where you left off.
                 </p>
                 <Button onClick={() => setShowNewChat(true)}>
-                  New Message
+                  Start a Conversation
                 </Button>
               </motion.div>
             </div>

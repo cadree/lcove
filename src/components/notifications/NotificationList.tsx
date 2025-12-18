@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { Bell, Check, Trash2 } from 'lucide-react';
 import { useNotifications, NotificationType } from '@/hooks/useNotifications';
 import { NotificationItem } from './NotificationItem';
@@ -133,11 +134,27 @@ export const NotificationList: React.FC = () => {
 
         <TabsContent value={activeTab} className="flex-1 overflow-y-auto mt-0">
           {filteredNotifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <Bell className="h-12 w-12 mb-4 opacity-30" />
-              <p className="text-sm">No notifications yet</p>
-              <p className="text-xs mt-1">We'll let you know when something happens</p>
-            </div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4 }}
+              className="flex flex-col items-center justify-center py-16 px-6 text-center"
+            >
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-6"
+              >
+                <Bell className="w-10 h-10 text-primary/60" />
+              </motion.div>
+              <h3 className="font-display text-xl font-medium text-foreground mb-2">
+                All caught up
+              </h3>
+              <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">
+                When something important happens — a message, collaboration invite, or community update — you'll find it here.
+              </p>
+            </motion.div>
           ) : (
             <div>
               {Object.entries(groupedNotifications).map(([date, items]) => (

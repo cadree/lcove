@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, FolderKanban, Filter } from 'lucide-react';
+import { Plus, FolderKanban, Filter, Rocket, Lightbulb } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PageLayout from '@/components/layout/PageLayout';
 import { useProjects, Project } from '@/hooks/useProjects';
@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ProjectCard } from '@/components/projects/ProjectCard';
 import { ProjectDetail } from '@/components/projects/ProjectDetail';
 import { CreateProjectDialog } from '@/components/projects/CreateProjectDialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -89,27 +90,15 @@ const Projects: React.FC = () => {
                   ))}
                 </div>
               ) : projects.length === 0 ? (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="flex flex-col items-center justify-center py-20 text-center glass-strong rounded-2xl"
-                >
-                  <div className="w-16 h-16 rounded-2xl bg-muted/30 flex items-center justify-center mb-5">
-                    <FolderKanban className="h-8 w-8 text-muted-foreground/50" />
-                  </div>
-                  <h3 className="text-lg font-medium mb-2 text-foreground">No projects found</h3>
-                  <p className="text-sm text-muted-foreground mb-5 max-w-xs">
-                    Be the first to create a project and find collaborators
-                  </p>
-                  {user && (
-                    <CreateProjectDialog>
-                      <Button>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Project
-                      </Button>
-                    </CreateProjectDialog>
-                  )}
-                </motion.div>
+                <EmptyState
+                  icon={Rocket}
+                  title="No projects yet"
+                  description="Great ideas need great teams. Start a project and find the collaborators who'll help bring your vision to life."
+                  action={user ? {
+                    label: "Start a Project",
+                    onClick: () => document.querySelector<HTMLButtonElement>('[data-create-project]')?.click()
+                  } : undefined}
+                />
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {projects.map((project, index) => (
@@ -132,25 +121,15 @@ const Projects: React.FC = () => {
             {user && (
               <TabsContent value="my-projects">
                 {myProjects.length === 0 ? (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="flex flex-col items-center justify-center py-20 text-center glass-strong rounded-2xl"
-                  >
-                    <div className="w-16 h-16 rounded-2xl bg-muted/30 flex items-center justify-center mb-5">
-                      <FolderKanban className="h-8 w-8 text-muted-foreground/50" />
-                    </div>
-                    <h3 className="text-lg font-medium mb-2 text-foreground">No projects yet</h3>
-                    <p className="text-sm text-muted-foreground mb-5 max-w-xs">
-                      Create your first project to start collaborating
-                    </p>
-                    <CreateProjectDialog>
-                      <Button>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Project
-                      </Button>
-                    </CreateProjectDialog>
-                  </motion.div>
+                  <EmptyState
+                    icon={Lightbulb}
+                    title="Your creative journey awaits"
+                    description="Every great project starts with an idea. Share yours and discover who wants to help make it real."
+                    action={{
+                      label: "Create Your First Project",
+                      onClick: () => document.querySelector<HTMLButtonElement>('[data-create-project]')?.click()
+                    }}
+                  />
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {myProjects.map((project, index) => (

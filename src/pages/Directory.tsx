@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import { Search, MapPin, Briefcase, Filter } from "lucide-react";
+import { Search, MapPin, Briefcase, Filter, Users } from "lucide-react";
 
 const creatives = [
   {
@@ -181,17 +182,20 @@ const Directory = () => {
 
         {/* Empty State */}
         {filteredCreatives.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-16"
-          >
-            <Search className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-            <p className="text-muted-foreground text-lg mb-2">No creatives found</p>
-            <p className="text-muted-foreground/70 text-sm">
-              Try adjusting your search or filters
-            </p>
-          </motion.div>
+          <EmptyState
+            icon={Users}
+            title="No creatives found"
+            description={searchQuery 
+              ? "Try adjusting your search or exploring a different city. The right connection might be just around the corner."
+              : "Be the first to join this creative community in your city."}
+            secondaryAction={searchQuery ? {
+              label: "Clear Search",
+              onClick: () => {
+                setSearchQuery("");
+                setSelectedCity("All Cities");
+              }
+            } : undefined}
+          />
         )}
       </div>
     </PageLayout>
