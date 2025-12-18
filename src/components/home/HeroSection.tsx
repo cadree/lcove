@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
+import lcBearLogo from "@/assets/lc-bear-logo.png";
+
 const HeroSection = () => {
   return <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden px-6">
       {/* Background Elements */}
@@ -11,6 +13,19 @@ const HeroSection = () => {
       </div>
 
       <div className="relative z-10 max-w-4xl mx-auto text-center">
+        {/* Main Logo */}
+        <motion.div initial={{
+        opacity: 0,
+        scale: 0.8
+      }} animate={{
+        opacity: 1,
+        scale: 1
+      }} transition={{
+        duration: 0.6
+      }} className="mb-6">
+          <img src={lcBearLogo} alt="LC Bear Logo" className="w-24 h-24 sm:w-32 sm:h-32 mx-auto object-contain" />
+        </motion.div>
+
         {/* Badge */}
         <motion.div initial={{
         opacity: 0,
@@ -19,7 +34,8 @@ const HeroSection = () => {
         opacity: 1,
         y: 0
       }} transition={{
-        duration: 0.6
+        duration: 0.6,
+        delay: 0.1
       }} className="inline-flex items-center gap-2 glass-strong px-4 py-2 rounded-full mb-8">
           <Sparkles className="w-4 h-4 text-primary" />
           <span className="text-sm text-muted-foreground">A Creative Operating System</span>
