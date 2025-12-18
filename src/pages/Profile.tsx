@@ -18,21 +18,28 @@ import {
   Crown,
   Camera,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
+import { ProfileCustomizationDialog } from "@/components/profile/ProfileCustomizationDialog";
+import { ProfileMusicPlayer } from "@/components/profile/ProfileMusicPlayer";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
+import { useProfileCustomization } from "@/hooks/useProfileCustomization";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const Profile = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { profile, loading, updateProfile } = useProfile();
   const { credits } = useCredits();
+  const { customization, isOwner } = useProfileCustomization();
   const [showMusicDialog, setShowMusicDialog] = useState(false);
+  const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
@@ -101,6 +108,26 @@ const Profile = () => {
   const city = profile?.city || 'Location not set';
   const avatarUrl = profile?.avatar_url;
 
+  // Determine background styles based on customization
+  const getBackgroundStyle = () => {
+    if (!customization) {
+      return "bg-gradient-to-br from-primary/30 via-background to-accent/20";
+    }
+    
+    if (customization.background_type === 'image') {
+      return "";
+    }
+    if (customization.background_type === 'color') {
+      return customization.background_value;
+    }
+    // gradient
+    return `bg-gradient-to-br ${customization.background_value}`;
+  };
+
+  const backgroundImageStyle = customization?.background_type === 'image' 
+    ? { backgroundImage: `url(${customization.background_value})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : {};
+
   return (
     <PageLayout>
       <div className="min-h-screen">
@@ -109,7 +136,8 @@ const Profile = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6 }}
-          className="relative h-48 sm:h-64 bg-gradient-to-br from-primary/30 via-background to-accent/20"
+          className={cn("relative h-48 sm:h-64", getBackgroundStyle())}
+          style={backgroundImageStyle}
         >
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
           
@@ -121,6 +149,16 @@ const Profile = () => {
             onClick={() => navigate('/settings')}
           >
             <Settings className="w-5 h-5" />
+          </Button>
+
+          {/* Customize Button */}
+          <Button
+            variant="glass"
+            size="icon"
+            className="absolute top-4 right-16 w-10 h-10"
+            onClick={() => setShowCustomizationDialog(true)}
+          >
+            <Sparkles className="w-5 h-5" />
           </Button>
         </motion.div>
 
@@ -256,7 +294,22 @@ const Profile = () => {
 
           {/* Music Dialog */}
           <ConnectMusicDialog open={showMusicDialog} onOpenChange={setShowMusicDialog} />
+          
+          {/* Customization Dialog */}
+          <ProfileCustomizationDialog 
+            open={showCustomizationDialog} 
+            onOpenChange={setShowCustomizationDialog} 
+          />
         </div>
+
+        {/* Profile Music Player - shows when music is enabled */}
+        {customization?.profile_music_enabled && customization?.profile_music_url && (
+          <ProfileMusicPlayer
+            musicUrl={customization.profile_music_url}
+            title={customization.profile_music_title}
+            artist={customization.profile_music_artist}
+          />
+        )}
       </div>
     </PageLayout>
   );
