@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import PageLayout from '@/components/layout/PageLayout';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Radio, Plus, Users } from 'lucide-react';
+import { Radio, Plus, Users, Mic } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLiveStreams, useGoLive } from '@/hooks/useLiveStreams';
 import { LiveStreamCard } from '@/components/streaming/LiveStreamCard';
@@ -100,17 +101,15 @@ const Live = () => {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12">
-                <Radio className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No streams yet</h3>
-                <p className="text-muted-foreground mb-4">Be the first to go live!</p>
-                {user && (
-                  <Button onClick={() => setShowCreate(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Start Streaming
-                  </Button>
-                )}
-              </div>
+              <EmptyState
+                icon={Radio}
+                title="The stage is yours"
+                description="No one's streaming right now. Be the first to share your sound with the community and set the vibe."
+                action={user ? {
+                  label: "Start Streaming",
+                  onClick: () => setShowCreate(true)
+                } : undefined}
+              />
             )}
           </TabsContent>
 
@@ -140,13 +139,15 @@ const Live = () => {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-4">You haven't created any streams yet</p>
-                  <Button onClick={() => setShowCreate(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Your First Stream
-                  </Button>
-                </div>
+                <EmptyState
+                  icon={Mic}
+                  title="Your streams will appear here"
+                  description="Once you create a stream, you can manage it, go live, and track your tips all from this spot."
+                  action={{
+                    label: "Create Your First Stream",
+                    onClick: () => setShowCreate(true)
+                  }}
+                />
               )}
             </TabsContent>
           )}

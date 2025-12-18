@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
-import { Search, Plus, Users, MoreVertical, BellOff, Bell } from 'lucide-react';
+import { Search, Plus, Users, MoreVertical, BellOff, Bell, MessageSquare } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConversations } from '@/hooks/useConversations';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -96,16 +96,35 @@ const ConversationList = ({ selectedId, onSelect, onNewChat }: ConversationListP
             ))}
           </div>
         ) : filteredConversations.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground">
-            <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p className="text-sm">
-              {search ? 'No conversations found' : 'No conversations yet'}
-            </p>
-            {!search && (
-              <Button variant="link" onClick={onNewChat} className="mt-2 text-primary">
-                Start a conversation
-              </Button>
-            )}
+          <div className="p-6">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4 }}
+              className="flex flex-col items-center justify-center py-12 px-4 text-center glass-strong rounded-2xl"
+            >
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-5"
+              >
+                <MessageSquare className="w-8 h-8 text-primary/60" />
+              </motion.div>
+              <h3 className="font-display text-lg font-medium text-foreground mb-2">
+                {search ? 'No conversations found' : 'Your conversations start here'}
+              </h3>
+              <p className="text-muted-foreground text-sm max-w-[200px] mb-5">
+                {search 
+                  ? 'Try a different search term' 
+                  : 'Reach out to someone you want to collaborate with or just say hello.'}
+              </p>
+              {!search && (
+                <Button onClick={onNewChat} size="sm">
+                  Start a Conversation
+                </Button>
+              )}
+            </motion.div>
           </div>
         ) : (
           <AnimatePresence>
