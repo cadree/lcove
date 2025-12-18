@@ -2,8 +2,24 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
+import { usePlatformStats } from "@/hooks/usePlatformStats";
+
+const formatStat = (value: number): string => {
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(1).replace(/\.0$/, '')}K+`;
+  }
+  return `${value}+`;
+};
 
 const HeroSection = () => {
+  const { data: stats, isLoading } = usePlatformStats();
+
+  const displayStats = [
+    { value: stats?.totalCreatives || 0, label: "Creatives" },
+    { value: stats?.totalProjects || 0, label: "Projects" },
+    { value: stats?.totalCities || 0, label: "Cities" },
+  ];
+
   return (
     <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden px-6">
       {/* Background Elements */}
@@ -76,14 +92,14 @@ const HeroSection = () => {
           transition={{ duration: 0.8, delay: 0.7 }}
           className="mt-16 grid grid-cols-3 gap-8 max-w-lg mx-auto"
         >
-          {[
-            { value: "10K+", label: "Creatives" },
-            { value: "500+", label: "Projects" },
-            { value: "50+", label: "Cities" },
-          ].map((stat) => (
+          {displayStats.map((stat) => (
             <div key={stat.label} className="text-center">
               <div className="text-2xl sm:text-3xl font-display font-medium text-foreground">
-                {stat.value}
+                {isLoading ? (
+                  <span className="animate-pulse">—</span>
+                ) : (
+                  formatStat(stat.value)
+                )}
               </div>
               <div className="text-sm text-muted-foreground">{stat.label}</div>
             </div>

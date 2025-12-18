@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Users, FolderKanban, Calendar, Coins, Store, Music, Heart, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useFundStats } from "@/hooks/useFundStats";
 
 const features = [
   {
@@ -36,7 +37,16 @@ const features = [
   },
 ];
 
+const formatCurrency = (value: number): string => {
+  if (value >= 1000) {
+    return `$${(value / 1000).toFixed(0)}K+`;
+  }
+  return `$${value}`;
+};
+
 const FeaturesSection = () => {
+  const { data: fundStats, isLoading } = useFundStats();
+
   return (
     <section className="py-24 px-6">
       <div className="max-w-6xl mx-auto">
@@ -109,18 +119,36 @@ const FeaturesSection = () => {
                 </Button>
               </div>
               
-              {/* Mini Stats */}
+              {/* Mini Stats - Real-time data */}
               <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-border/50">
                 <div className="text-center">
-                  <p className="text-2xl font-display font-medium text-foreground">$245K+</p>
+                  <p className="text-2xl font-display font-medium text-foreground">
+                    {isLoading ? (
+                      <span className="animate-pulse">—</span>
+                    ) : (
+                      formatCurrency(fundStats?.lifetime.totalCollected || 0)
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground">Raised</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-display font-medium text-foreground">47</p>
+                  <p className="text-2xl font-display font-medium text-foreground">
+                    {isLoading ? (
+                      <span className="animate-pulse">—</span>
+                    ) : (
+                      fundStats?.lifetime.grantsAwarded || 0
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground">Grants Awarded</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-display font-medium text-foreground">312</p>
+                  <p className="text-2xl font-display font-medium text-foreground">
+                    {isLoading ? (
+                      <span className="animate-pulse">—</span>
+                    ) : (
+                      fundStats?.lifetime.creatorsSupported || 0
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground">Creators Supported</p>
                 </div>
               </div>
