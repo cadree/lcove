@@ -13,7 +13,6 @@ import {
   Save,
   RefreshCw
 } from 'lucide-react';
-import { LocalStream, SignalingChannel, WebRTCPeer, checkMediaCapabilities } from '@/utils/WebRTCStream';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -41,8 +40,8 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
   const { user } = useAuth();
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const localStreamRef = useRef<LocalStream | null>(null);
-  const signalingRef = useRef<SignalingChannel | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
@@ -63,99 +62,187 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
     setErrorMessage('');
 
     try {
-      console.log('Checking media capabilities...');
-      const caps = await checkMediaCapabilities();
-      console.log('Media capabilities:', caps);
-
-      if (!caps.hasCamera && !caps.hasMicrophone) {
-        setCameraState('error');
-        setErrorMessage('No camera or microphone found. Please connect a media device.');
-        return;
-      }
-
-      console.log('Requesting camera access...');
-      localStreamRef.current = new LocalStream();
-      const stream = await localStreamRef.current.start({
-        video: caps.hasCamera,
-        audio: caps.hasMicrophone,
+      console.log('[Host] Requesting camera access...');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 },
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
-      console.log('Got media stream:', stream.id, 'tracks:', stream.getTracks().map(t => `${t.kind}:${t.label}`));
+      
+      console.log('[Host] Got media stream:', stream.id);
+      localStreamRef.current = stream;
 
-      // Attach to video element
       if (videoRef.current) {
-        console.log('Attaching stream to video element...');
         videoRef.current.srcObject = stream;
         videoRef.current.muted = true;
         videoRef.current.playsInline = true;
         
-        // Wait for video to be ready
         videoRef.current.onloadedmetadata = async () => {
-          console.log('Video metadata loaded, attempting play...');
           try {
             await videoRef.current?.play();
-            console.log('Video playing successfully');
+            console.log('[Host] Video preview playing');
             setCameraState('ready');
           } catch (playErr) {
-            console.log('Autoplay blocked, will show play button:', playErr);
-            setCameraState('ready'); // Still ready, just need user interaction
+            console.log('[Host] Autoplay blocked:', playErr);
+            setCameraState('ready');
           }
         };
-      } else {
-        console.error('Video ref not available');
-        setCameraState('error');
-        setErrorMessage('Video element not ready. Please try again.');
       }
     } catch (err: any) {
-      console.error('Camera init error:', err);
+      console.error('[Host] Camera init error:', err);
       
       if (err.name === 'NotAllowedError') {
         setCameraState('denied');
-        setErrorMessage('Camera access was denied. Please allow camera access in your browser settings and try again.');
+        setErrorMessage('Camera access was denied. Please allow camera access in your browser settings.');
       } else if (err.name === 'NotFoundError') {
         setCameraState('error');
         setErrorMessage('No camera or microphone found. Please connect a device.');
       } else if (err.name === 'NotReadableError') {
         setCameraState('error');
-        setErrorMessage('Camera is in use by another application. Please close other apps using the camera.');
-      } else if (err.name === 'OverconstrainedError') {
-        setCameraState('error');
-        setErrorMessage('Camera does not support the required settings. Try a different camera.');
+        setErrorMessage('Camera is in use by another application.');
       } else {
         setCameraState('error');
-        setErrorMessage(err.message || 'Failed to access camera. Please check your settings.');
+        setErrorMessage(err.message || 'Failed to access camera.');
       }
     }
   }, []);
 
-  // Start camera on mount
-  useEffect(() => {
-    initCamera();
+  // Create peer connection for a viewer
+  const createPeerConnection = useCallback((viewerId: string): RTCPeerConnection => {
+    console.log('[Host] Creating peer connection for viewer:', viewerId);
+    
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+      ],
+    });
 
-    return () => {
-      // Cleanup on unmount
-      if (localStreamRef.current) {
-        localStreamRef.current.stop();
-        localStreamRef.current = null;
+    // Add local stream tracks
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => {
+        console.log('[Host] Adding track to peer:', track.kind, track.label);
+        pc.addTrack(track, localStreamRef.current!);
+      });
+    }
+
+    // Send ICE candidates to this specific viewer
+    pc.onicecandidate = (event) => {
+      if (event.candidate && channelRef.current) {
+        console.log('[Host] Sending ICE candidate to viewer:', viewerId);
+        channelRef.current.send({
+          type: 'broadcast',
+          event: 'ice-candidate',
+          payload: { 
+            candidate: event.candidate.toJSON(), 
+            senderId: user?.id,
+            targetId: viewerId 
+          },
+        });
       }
-      if (signalingRef.current) {
-        signalingRef.current.close();
-        signalingRef.current = null;
-      }
-      peersRef.current.forEach(peer => peer.close());
-      peersRef.current.clear();
     };
-  }, [initCamera]);
+
+    pc.onconnectionstatechange = () => {
+      console.log('[Host] Peer connection state for', viewerId, ':', pc.connectionState);
+      if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
+        peersRef.current.delete(viewerId);
+        pc.close();
+      }
+    };
+
+    return pc;
+  }, [user]);
+
+  // Setup signaling channel for host
+  const setupSignaling = useCallback(() => {
+    if (!user) return;
+    
+    console.log('[Host] Setting up signaling channel for stream:', streamId);
+    
+    const channel = supabase.channel(`stream-signaling-${streamId}`, {
+      config: { broadcast: { self: false } }
+    });
+    channelRef.current = channel;
+
+    // Listen for offers from viewers
+    channel.on('broadcast', { event: 'offer' }, async ({ payload }: any) => {
+      const { offer, senderId } = payload;
+      if (!senderId || senderId === user.id) return;
+      
+      console.log('[Host] Received offer from viewer:', senderId);
+      
+      try {
+        // Create or get peer connection for this viewer
+        let pc = peersRef.current.get(senderId);
+        if (pc) {
+          pc.close();
+        }
+        pc = createPeerConnection(senderId);
+        peersRef.current.set(senderId, pc);
+
+        // Set remote description (viewer's offer)
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        
+        // Create and send answer
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        
+        console.log('[Host] Sending answer to viewer:', senderId);
+        await channel.send({
+          type: 'broadcast',
+          event: 'answer',
+          payload: { 
+            answer, 
+            senderId: user.id,
+            targetId: senderId 
+          },
+        });
+      } catch (err) {
+        console.error('[Host] Error handling offer:', err);
+      }
+    });
+
+    // Listen for ICE candidates from viewers
+    channel.on('broadcast', { event: 'ice-candidate' }, async ({ payload }: any) => {
+      const { candidate, senderId, targetId } = payload;
+      
+      // Only process candidates meant for us (host)
+      if (targetId && targetId !== user.id) return;
+      if (!senderId || senderId === user.id) return;
+      
+      console.log('[Host] Received ICE candidate from viewer:', senderId);
+      
+      const pc = peersRef.current.get(senderId);
+      if (pc && pc.remoteDescription) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+          console.error('[Host] Error adding ICE candidate:', err);
+        }
+      }
+    });
+
+    channel.subscribe((status) => {
+      console.log('[Host] Signaling channel status:', status);
+    });
+  }, [streamId, user, createPeerConnection]);
 
   // Start recording
   const startRecording = (stream: MediaStream) => {
     recordedChunksRef.current = [];
     
-    // Determine best supported mime type
     const mimeTypes = [
       'video/webm;codecs=vp9,opus',
       'video/webm;codecs=vp8,opus',
       'video/webm',
-      'video/mp4',
     ];
     
     let mimeType = '';
@@ -167,11 +254,11 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
     }
     
     if (!mimeType) {
-      console.warn('No supported video recording format found');
+      console.warn('[Host] No supported video recording format found');
       return;
     }
     
-    console.log('Starting recording with mimeType:', mimeType);
+    console.log('[Host] Starting recording with mimeType:', mimeType);
     
     try {
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
@@ -179,19 +266,13 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           recordedChunksRef.current.push(event.data);
-          console.log('Recorded chunk:', event.data.size, 'bytes');
         }
       };
       
-      mediaRecorder.onerror = (event) => {
-        console.error('MediaRecorder error:', event);
-      };
-      
-      mediaRecorder.start(1000); // Capture in 1-second chunks
+      mediaRecorder.start(1000);
       mediaRecorderRef.current = mediaRecorder;
-      console.log('Recording started');
     } catch (err) {
-      console.error('Failed to start recording:', err);
+      console.error('[Host] Failed to start recording:', err);
     }
   };
 
@@ -201,7 +282,6 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
       const mediaRecorder = mediaRecorderRef.current;
       
       if (!mediaRecorder || mediaRecorder.state === 'inactive') {
-        console.log('No active recording to stop');
         resolve(recordedChunksRef.current.length > 0 
           ? new Blob(recordedChunksRef.current, { type: 'video/webm' }) 
           : null);
@@ -209,11 +289,8 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
       }
       
       mediaRecorder.onstop = () => {
-        console.log('Recording stopped, chunks:', recordedChunksRef.current.length);
         if (recordedChunksRef.current.length > 0) {
-          const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
-          console.log('Created blob:', blob.size, 'bytes');
-          resolve(blob);
+          resolve(new Blob(recordedChunksRef.current, { type: 'video/webm' }));
         } else {
           resolve(null);
         }
@@ -223,91 +300,18 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
     });
   };
 
-  // Handle incoming viewer connections
-  const setupHostSignaling = useCallback(() => {
-    if (!signalingRef.current || !localStreamRef.current) return;
-    
-    const stream = localStreamRef.current.getStream();
-    if (!stream) return;
-    
-    console.log('Setting up host signaling to accept viewer connections...');
-    
-    // When a viewer sends an offer, create a peer connection and respond
-    signalingRef.current.onOffer(async (offer, viewerId) => {
-      console.log('Received offer from viewer:', viewerId);
-      
-      // Create a peer connection for this viewer
-      const peerConnection = new RTCPeerConnection({
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-        ],
-      });
-      
-      // Add our local stream tracks to the connection
-      stream.getTracks().forEach(track => {
-        console.log('Adding track to peer:', track.kind);
-        peerConnection.addTrack(track, stream);
-      });
-      
-      // Handle ICE candidates
-      peerConnection.onicecandidate = (event) => {
-        if (event.candidate && signalingRef.current) {
-          signalingRef.current.sendIceCandidate(event.candidate);
-        }
-      };
-      
-      peerConnection.onconnectionstatechange = () => {
-        console.log('Peer connection state:', peerConnection.connectionState);
-      };
-      
-      // Set the remote offer and create answer
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
-      
-      // Send answer back
-      if (signalingRef.current) {
-        await signalingRef.current.sendAnswer(answer);
-      }
-      
-      // Store peer connection
-      peersRef.current.set(viewerId, peerConnection as any);
-      console.log('Answered viewer:', viewerId, 'Total peers:', peersRef.current.size);
-    });
-    
-    // Handle ICE candidates from viewers
-    signalingRef.current.onIceCandidate(async (candidate, viewerId) => {
-      console.log('Received ICE candidate from viewer:', viewerId);
-      const peer = peersRef.current.get(viewerId);
-      if (peer) {
-        try {
-          await peer.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch (err) {
-          console.error('Error adding ICE candidate:', err);
-        }
-      }
-    });
-  }, []);
-
   // Go live
   const startStream = async () => {
-    if (!user || cameraState !== 'ready') return;
+    if (!user || cameraState !== 'ready' || !localStreamRef.current) return;
     
     setIsGoingLive(true);
 
     try {
-      // Set up signaling channel
-      signalingRef.current = new SignalingChannel(supabase, streamId, user.id);
-
-      // Get the media stream and start recording
-      const stream = localStreamRef.current?.getStream();
-      if (stream) {
-        startRecording(stream);
-      }
+      // Set up signaling channel FIRST
+      setupSignaling();
       
-      // Setup signaling to handle incoming viewer connections
-      setupHostSignaling();
+      // Start recording
+      startRecording(localStreamRef.current);
 
       // Update stream status in database
       const { error } = await supabase
@@ -323,7 +327,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
       setIsStreaming(true);
       toast({ title: 'You are now live!' });
     } catch (err: any) {
-      console.error('Error going live:', err);
+      console.error('[Host] Error going live:', err);
       toast({ 
         title: 'Failed to go live', 
         description: err.message,
@@ -346,16 +350,14 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
       
       let replayUrl: string | null = null;
       
-      // Stop recording and upload if saving replay
       if (saveAsReplay) {
         const blob = await stopRecording();
         
         if (blob && blob.size > 0 && user) {
-          console.log('Uploading replay, size:', blob.size);
+          console.log('[Host] Uploading replay, size:', blob.size);
           
-          // Upload to Supabase storage
           const fileName = `replays/${user.id}/${streamId}-${Date.now()}.webm`;
-          const { data: uploadData, error: uploadError } = await supabase.storage
+          const { error: uploadError } = await supabase.storage
             .from('media')
             .upload(fileName, blob, {
               contentType: 'video/webm',
@@ -363,24 +365,20 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
             });
           
           if (uploadError) {
-            console.error('Upload error:', uploadError);
+            console.error('[Host] Upload error:', uploadError);
             toast({ 
               title: 'Failed to save replay', 
               description: uploadError.message,
               variant: 'destructive' 
             });
           } else {
-            console.log('Upload successful:', uploadData);
-            // Get public URL
             const { data: urlData } = supabase.storage
               .from('media')
               .getPublicUrl(fileName);
             
             replayUrl = urlData.publicUrl;
-            console.log('Replay URL:', replayUrl);
           }
         } else {
-          console.log('No recording data to save');
           toast({ 
             title: 'No recording data', 
             description: 'The stream was too short to save.',
@@ -388,20 +386,21 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
           });
         }
       } else {
-        // Just stop recording without saving
         await stopRecording();
       }
 
       // Stop local stream
-      localStreamRef.current?.stop();
+      localStreamRef.current?.getTracks().forEach(track => track.stop());
       localStreamRef.current = null;
 
       // Close signaling
-      signalingRef.current?.close();
-      signalingRef.current = null;
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
 
       // Close all peer connections
-      peersRef.current.forEach(peer => peer.close());
+      peersRef.current.forEach(pc => pc.close());
       peersRef.current.clear();
 
       // Update database
@@ -421,15 +420,13 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
       
       if (saveAsReplay && replayUrl) {
         toast({ title: 'Stream ended & replay saved!' });
-      } else if (saveAsReplay) {
-        toast({ title: 'Stream ended', description: 'Replay could not be saved.' });
       } else {
         toast({ title: 'Stream ended' });
       }
       
       onEnd();
     } catch (err: any) {
-      console.error('Error ending stream:', err);
+      console.error('[Host] Error ending stream:', err);
       setIsSaving(false);
       toast({ title: 'Error ending stream', description: err.message, variant: 'destructive' });
     }
@@ -438,16 +435,36 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
   // Toggle video
   const toggleVideo = () => {
     const newState = !videoEnabled;
-    localStreamRef.current?.toggleVideo(newState);
+    localStreamRef.current?.getVideoTracks().forEach(track => {
+      track.enabled = newState;
+    });
     setVideoEnabled(newState);
   };
 
   // Toggle audio
   const toggleAudio = () => {
     const newState = !audioEnabled;
-    localStreamRef.current?.toggleAudio(newState);
+    localStreamRef.current?.getAudioTracks().forEach(track => {
+      track.enabled = newState;
+    });
     setAudioEnabled(newState);
   };
+
+  // Start camera on mount
+  useEffect(() => {
+    initCamera();
+
+    return () => {
+      localStreamRef.current?.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      peersRef.current.forEach(pc => pc.close());
+      peersRef.current.clear();
+    };
+  }, [initCamera]);
 
   // Subscribe to viewer count changes
   useEffect(() => {
@@ -491,17 +508,10 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
               <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
               <p className="text-foreground font-medium mb-2">Camera Access Denied</p>
               <p className="text-sm text-muted-foreground mb-4">{errorMessage}</p>
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">
-                  1. Click the camera icon in your browser's address bar<br/>
-                  2. Select "Allow" for camera and microphone<br/>
-                  3. Click the button below to try again
-                </p>
-                <Button onClick={initCamera} variant="outline" className="mt-4">
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Try Again
-                </Button>
-              </div>
+              <Button onClick={initCamera} variant="outline" className="mt-4">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
             </div>
           </div>
         );
@@ -528,17 +538,16 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
 
   return (
     <div className="relative w-full h-full bg-black rounded-lg overflow-hidden min-h-[300px]">
-      {/* Video Element - always rendered */}
+      {/* Video Element */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted
         className={`w-full h-full object-cover ${cameraState !== 'ready' || !videoEnabled ? 'opacity-0' : 'opacity-100'}`}
-        style={{ transform: 'scaleX(-1)' }} // Mirror for self-view
+        style={{ transform: 'scaleX(-1)' }}
       />
 
-      {/* Camera state overlays */}
       {renderCameraContent()}
 
       {/* Video disabled overlay */}
@@ -577,7 +586,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
         className="absolute bottom-0 left-0 right-0 z-20 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
       >
         <div className="bg-background/90 backdrop-blur-sm rounded-2xl p-3 max-w-md mx-auto">
-          {/* Row 1: Camera + Mic toggles (always visible when camera ready) */}
+          {/* Row 1: Camera + Mic toggles */}
           {cameraState === 'ready' && (
             <div className="flex items-center justify-center gap-3 mb-3">
               <Button
@@ -600,7 +609,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
             </div>
           )}
 
-          {/* Row 2: Start/End Stream button (full width) */}
+          {/* Row 2: Start/End Stream button */}
           <div className="w-full">
             {!isStreaming ? (
               <Button 
@@ -639,16 +648,10 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
               {isSaving ? (
                 <div className="flex items-center gap-3 py-4">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  <span>Uploading your stream recording. This may take a moment...</span>
+                  <span>Uploading your stream recording...</span>
                 </div>
               ) : (
-                <>
-                  Would you like to save this stream as a replay so viewers can watch it later?
-                  <br /><br />
-                  <span className="text-xs text-muted-foreground">
-                    Your stream will be saved and available for playback.
-                  </span>
-                </>
+                'Would you like to save this stream as a replay so viewers can watch it later?'
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>

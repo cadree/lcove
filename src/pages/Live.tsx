@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/layout/PageLayout';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -7,9 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Input } from '@/components/ui/input';
 import { 
   Radio, Plus, Users, Mic, ArrowLeft, Play, Pencil, 
-  Clock, Eye, Coins, PlayCircle, Video, Headphones 
+  Clock, Eye, Coins, PlayCircle, Video, Headphones, Search 
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLiveStreams, useGoLive, LiveStream } from '@/hooks/useLiveStreams';
@@ -237,10 +238,34 @@ const Live = () => {
   const [showCreate, setShowCreate] = useState(false);
   const [selectedStreamId, setSelectedStreamId] = useState<string | null>(null);
   const [editingStream, setEditingStream] = useState<LiveStream | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const myStreams = allStreams.filter(s => s.host_id === user?.id);
   const otherStreams = allStreams.filter(s => s.host_id !== user?.id);
   
+  // Filter streams by search query
+  const filteredBrowseStreams = useMemo(() => {
+    const streams = user ? otherStreams : allStreams;
+    if (!searchQuery.trim()) return streams;
+    
+    const query = searchQuery.toLowerCase();
+    return streams.filter(s => 
+      s.title.toLowerCase().includes(query) || 
+      (s.description && s.description.toLowerCase().includes(query))
+    );
+  }, [searchQuery, otherStreams, allStreams, user]);
+
+  const filteredReplays = useMemo(() => {
+    const replays = allStreams.filter(s => s.replay_available && s.replay_url);
+    if (!searchQuery.trim()) return replays;
+    
+    const query = searchQuery.toLowerCase();
+    return replays.filter(s => 
+      s.title.toLowerCase().includes(query) || 
+      (s.description && s.description.toLowerCase().includes(query))
+    );
+  }, [searchQuery, allStreams]);
+
   // Stats
   const totalLive = liveStreams.length;
   const totalReplays = allStreams.filter(s => s.replay_available && s.replay_url).length;
@@ -374,16 +399,27 @@ const Live = () => {
             )}
 
             {/* Browse Tab */}
-            <TabsContent value="all" className="mt-6">
+            <TabsContent value="all" className="mt-6 space-y-4">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search streams by title..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              
               {loadingAll ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[1, 2, 3].map((i) => (
                     <div key={i} className="h-64 bg-muted animate-pulse rounded-xl" />
                   ))}
                 </div>
-              ) : otherStreams.length > 0 || (!user && allStreams.length > 0) ? (
+              ) : filteredBrowseStreams.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {(user ? otherStreams : allStreams).map((stream) => (
+                  {filteredBrowseStreams.map((stream) => (
                     <LiveStreamCard 
                       key={stream.id} 
                       stream={stream}
@@ -391,6 +427,12 @@ const Live = () => {
                     />
                   ))}
                 </div>
+              ) : searchQuery.trim() ? (
+                <EmptyState
+                  icon={Search}
+                  title="No results found"
+                  description={`No streams match "${searchQuery}".`}
+                />
               ) : (
                 <EmptyState
                   icon={Headphones}
@@ -405,27 +447,40 @@ const Live = () => {
             </TabsContent>
 
             {/* Replays Tab */}
-            <TabsContent value="replays" className="mt-6">
-              {(() => {
-                const replays = allStreams.filter(s => s.replay_available && s.replay_url);
-                return replays.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {replays.map((stream) => (
-                      <LiveStreamCard 
-                        key={stream.id} 
-                        stream={stream}
-                        onClick={() => setSelectedStreamId(stream.id)}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState
-                    icon={PlayCircle}
-                    title="No replays available"
-                    description="Past streams with saved replays will appear here."
-                  />
-                );
-              })()}
+            <TabsContent value="replays" className="mt-6 space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search replays..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              
+              {filteredReplays.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredReplays.map((stream) => (
+                    <LiveStreamCard 
+                      key={stream.id} 
+                      stream={stream}
+                      onClick={() => setSelectedStreamId(stream.id)}
+                    />
+                  ))}
+                </div>
+              ) : searchQuery.trim() ? (
+                <EmptyState
+                  icon={Search}
+                  title="No results found"
+                  description={`No replays match "${searchQuery}".`}
+                />
+              ) : (
+                <EmptyState
+                  icon={PlayCircle}
+                  title="No replays available"
+                  description="Past streams with saved replays will appear here."
+                />
+              )}
             </TabsContent>
           </Tabs>
         </div>
