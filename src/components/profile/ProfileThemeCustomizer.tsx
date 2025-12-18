@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { 
   Sparkles, 
   Palette, 
@@ -16,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { 
   THEME_PRESETS, 
   APPROVED_FONTS, 
@@ -137,7 +136,7 @@ export const ProfileThemeCustomizer = ({
           </TabsTrigger>
         </TabsList>
 
-        <ScrollArea className="h-[400px] mt-4">
+        <div className="h-[400px] mt-4 overflow-y-auto pr-2">
           {/* THEMES TAB */}
           <TabsContent value="themes" className="space-y-4 mt-0">
             <div className="space-y-3">
@@ -483,7 +482,7 @@ export const ProfileThemeCustomizer = ({
               ))}
             </div>
           </TabsContent>
-        </ScrollArea>
+        </div>
       </Tabs>
 
       {/* Action Buttons */}
