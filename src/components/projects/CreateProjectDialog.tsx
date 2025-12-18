@@ -31,8 +31,10 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({ childr
   const [projectType, setProjectType] = useState<ProjectType>('volunteer');
   const [totalBudget, setTotalBudget] = useState('');
   const [creditsReward, setCreditsReward] = useState(25);
-  const [timelineStart, setTimelineStart] = useState('');
-  const [timelineEnd, setTimelineEnd] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [moodboardUrl, setMoodboardUrl] = useState('');
   const [isUploadingMoodboard, setIsUploadingMoodboard] = useState(false);
   const [roles, setRoles] = useState<RoleInput[]>([
@@ -106,12 +108,16 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({ childr
     
     const validRoles = roles.filter(r => r.role_name.trim());
     
+    // Combine date and time into ISO strings
+    const timelineStart = startDate ? `${startDate}${startTime ? `T${startTime}` : 'T00:00'}` : undefined;
+    const timelineEnd = endDate ? `${endDate}${endTime ? `T${endTime}` : 'T23:59'}` : undefined;
+    
     createProject({
       title,
       description,
       total_budget: projectType === 'volunteer' ? 0 : budgetNum,
-      timeline_start: timelineStart || undefined,
-      timeline_end: timelineEnd || undefined,
+      timeline_start: timelineStart,
+      timeline_end: timelineEnd,
       cover_image_url: moodboardUrl || undefined,
       roles: validRoles
     }, {
@@ -128,8 +134,10 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({ childr
     setProjectType('volunteer');
     setTotalBudget('');
     setCreditsReward(25);
-    setTimelineStart('');
-    setTimelineEnd('');
+    setStartDate('');
+    setStartTime('');
+    setEndDate('');
+    setEndTime('');
     setMoodboardUrl('');
     setRoles([{ role_name: '', description: '', payout_amount: 0, slots_available: 1 }]);
   };
@@ -337,25 +345,48 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({ childr
             </div>
           </div>
 
-          {/* Timeline with Time */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="start">Start Date & Time</Label>
-              <Input
-                id="start"
-                type="datetime-local"
-                value={timelineStart}
-                onChange={(e) => setTimelineStart(e.target.value)}
-              />
+          {/* Timeline */}
+          <div className="space-y-4">
+            <Label>Project Timeline</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="startDate" className="text-sm text-muted-foreground">Start Date</Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="startTime" className="text-sm text-muted-foreground">Start Time (optional)</Label>
+                <Input
+                  id="startTime"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="end">End Date & Time</Label>
-              <Input
-                id="end"
-                type="datetime-local"
-                value={timelineEnd}
-                onChange={(e) => setTimelineEnd(e.target.value)}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="endDate" className="text-sm text-muted-foreground">End Date</Label>
+                <Input
+                  id="endDate"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="endTime" className="text-sm text-muted-foreground">End Time (optional)</Label>
+                <Input
+                  id="endTime"
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 
