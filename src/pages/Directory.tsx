@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Search, MapPin, Briefcase, Users, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { NewMembersSection } from "@/components/directory/NewMembersSection";
 
 interface Profile {
   id: string;
@@ -15,6 +16,7 @@ interface Profile {
   avatar_url: string | null;
   city: string | null;
   bio: string | null;
+  created_at: string | null;
 }
 
 const Directory = () => {
@@ -33,7 +35,7 @@ const Directory = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, user_id, display_name, avatar_url, city, bio')
+      .select('id, user_id, display_name, avatar_url, city, bio, created_at')
       .eq('onboarding_completed', true)
       .order('created_at', { ascending: false });
 
@@ -108,6 +110,9 @@ const Directory = () => {
             </Button>
           ))}
         </motion.div>
+
+        {/* New Members Section */}
+        {!loading && <NewMembersSection profiles={profiles} />}
 
         {/* Loading State */}
         {loading && (
