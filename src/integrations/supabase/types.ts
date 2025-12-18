@@ -1308,8 +1308,13 @@ export type Database = {
           background_value: string | null
           created_at: string
           id: string
+          profile_music_album_art_url: string | null
+          profile_music_album_name: string | null
           profile_music_artist: string | null
           profile_music_enabled: boolean | null
+          profile_music_external_id: string | null
+          profile_music_preview_url: string | null
+          profile_music_source: string | null
           profile_music_title: string | null
           profile_music_url: string | null
           theme_accent_color: string | null
@@ -1321,8 +1326,13 @@ export type Database = {
           background_value?: string | null
           created_at?: string
           id?: string
+          profile_music_album_art_url?: string | null
+          profile_music_album_name?: string | null
           profile_music_artist?: string | null
           profile_music_enabled?: boolean | null
+          profile_music_external_id?: string | null
+          profile_music_preview_url?: string | null
+          profile_music_source?: string | null
           profile_music_title?: string | null
           profile_music_url?: string | null
           theme_accent_color?: string | null
@@ -1334,8 +1344,13 @@ export type Database = {
           background_value?: string | null
           created_at?: string
           id?: string
+          profile_music_album_art_url?: string | null
+          profile_music_album_name?: string | null
           profile_music_artist?: string | null
           profile_music_enabled?: boolean | null
+          profile_music_external_id?: string | null
+          profile_music_preview_url?: string | null
+          profile_music_source?: string | null
           profile_music_title?: string | null
           profile_music_url?: string | null
           theme_accent_color?: string | null
