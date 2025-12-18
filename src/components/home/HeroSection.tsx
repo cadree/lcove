@@ -86,7 +86,7 @@ const HeroSection = () => {
       }} transition={{
         duration: 0.8,
         delay: 0.7
-      }} className="mt-16 grid grid-cols-3 gap-8 max-w-lg mx-auto">
+      }} className="mt-12 sm:mt-16 grid grid-cols-3 gap-3 sm:gap-8 max-w-lg mx-auto px-2">
           {[{
           value: stats?.totalCreatives || 0,
           label: "Creatives"
@@ -97,10 +97,10 @@ const HeroSection = () => {
           value: stats?.totalCities || 0,
           label: "Cities"
         }].map(stat => <div key={stat.label} className="text-center">
-              <div className="text-2xl sm:text-3xl font-display font-medium text-foreground">
+              <div className="text-xl sm:text-2xl md:text-3xl font-display font-medium text-foreground">
                 {stat.value}
               </div>
-              <div className="text-sm text-muted-foreground">{stat.label}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">{stat.label}</div>
             </div>)}
         </motion.div>
       </div>
