@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { MapPin, Search, Filter, ExternalLink, Mail, Phone, Building2, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { MapPin, Search, Filter, ExternalLink, Mail, Phone, Building2, ChevronRight, ArrowLeft } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import { usePartners, usePartnerCategories, Partner, PartnerCategory } from '@/h
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Partners: React.FC = () => {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<PartnerCategory | 'all'>('all');
   const [cityFilter, setCityFilter] = useState('');
@@ -38,8 +40,13 @@ const Partners: React.FC = () => {
       <div className="min-h-screen pb-20">
         {/* Header */}
         <div className="bg-gradient-to-b from-primary/10 to-background px-4 pt-6 pb-8">
-          <h1 className="text-2xl font-bold mb-2">Partnerships</h1>
-          <p className="text-muted-foreground">
+          <div className="flex items-center gap-3 mb-2">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-2xl font-bold">Partnerships</h1>
+          </div>
+          <p className="text-muted-foreground ml-12">
             Exclusive benefits for LC members from our partner network
           </p>
         </div>

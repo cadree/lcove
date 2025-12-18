@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Shield, Users, AlertTriangle, CheckCircle, XCircle, Clock, History, Search } from 'lucide-react';
-import { Navigate } from 'react-router-dom';
+import { Shield, Users, AlertTriangle, CheckCircle, XCircle, Clock, History, Search, ArrowLeft } from 'lucide-react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/layout/PageLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,6 +27,7 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 
 const Admin: React.FC = () => {
+  const navigate = useNavigate();
   const { isAdmin, isLoading: checkingAdmin } = useIsAdmin();
   const [search, setSearch] = useState('');
   const [suspendDialog, setSuspendDialog] = useState<{ userId: string; name: string } | null>(null);
@@ -83,11 +84,14 @@ const Admin: React.FC = () => {
       <div className="min-h-screen pb-20">
         {/* Header */}
         <div className="bg-gradient-to-b from-primary/10 to-background px-4 pt-6 pb-8">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-3 mb-2">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
             <Shield className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>
           </div>
-          <p className="text-muted-foreground">Manage users, review onboarding, and maintain community integrity</p>
+          <p className="text-muted-foreground ml-12">Manage users, review onboarding, and maintain community integrity</p>
         </div>
 
         {/* Stats */}
