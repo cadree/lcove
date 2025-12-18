@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Radio, Users, Coins } from 'lucide-react';
+import { Radio, Users, Coins, PlayCircle } from 'lucide-react';
 import { LiveStream } from '@/hooks/useLiveStreams';
 import { useProfile } from '@/hooks/useProfile';
 
@@ -13,6 +13,7 @@ interface LiveStreamCardProps {
 
 export const LiveStreamCard: React.FC<LiveStreamCardProps> = ({ stream, onClick }) => {
   const { profile } = useProfile(stream.host_id);
+  const hasReplay = !stream.is_live && stream.replay_available;
 
   return (
     <Card 
@@ -32,12 +33,21 @@ export const LiveStreamCard: React.FC<LiveStreamCardProps> = ({ stream, onClick 
           </div>
         )}
         
-        {stream.is_live && (
+        {stream.is_live ? (
           <Badge className="absolute top-2 left-2 bg-red-500 animate-pulse">
             <Radio className="h-3 w-3 mr-1" />
             LIVE
           </Badge>
-        )}
+        ) : hasReplay ? (
+          <Badge className="absolute top-2 left-2 bg-primary">
+            <PlayCircle className="h-3 w-3 mr-1" />
+            REPLAY
+          </Badge>
+        ) : !stream.is_live && stream.ended_at ? (
+          <Badge variant="secondary" className="absolute top-2 left-2 bg-background/80">
+            ENDED
+          </Badge>
+        ) : null}
 
         <div className="absolute bottom-2 right-2 flex gap-2">
           <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
@@ -68,14 +78,21 @@ export const LiveStreamCard: React.FC<LiveStreamCardProps> = ({ stream, onClick 
           </span>
         </div>
 
-        <Badge variant="outline" className="mt-2 text-xs">
-          {stream.stream_type === 'webrtc' ? '📹 Camera/Mic' : 
-           stream.stream_type === 'opus' ? '🎧 OPUS' :
-           stream.stream_type === 'youtube' ? '▶️ YouTube' :
-           stream.stream_type === 'twitch' ? '🟣 Twitch' :
-           stream.stream_type === 'soundcloud' ? '🎵 SoundCloud' :
-           stream.stream_type}
-        </Badge>
+        <div className="flex gap-2 mt-2">
+          <Badge variant="outline" className="text-xs">
+            {stream.stream_type === 'webrtc' ? '📹 Camera/Mic' : 
+             stream.stream_type === 'opus' ? '🎧 OPUS' :
+             stream.stream_type === 'youtube' ? '▶️ YouTube' :
+             stream.stream_type === 'twitch' ? '🟣 Twitch' :
+             stream.stream_type === 'soundcloud' ? '🎵 SoundCloud' :
+             stream.stream_type}
+          </Badge>
+          {hasReplay && (
+            <Badge variant="outline" className="text-xs text-primary border-primary">
+              Watch Replay
+            </Badge>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

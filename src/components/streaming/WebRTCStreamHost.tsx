@@ -10,13 +10,25 @@ import {
   Users, 
   Settings,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Save
 } from 'lucide-react';
 import { LocalStream, SignalingChannel, WebRTCPeer, checkMediaCapabilities } from '@/utils/WebRTCStream';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useSaveReplay } from '@/hooks/useLiveStreams';
 import { motion } from 'framer-motion';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface WebRTCStreamHostProps {
   streamId: string;
@@ -26,6 +38,7 @@ interface WebRTCStreamHostProps {
 export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, onEnd }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const saveReplay = useSaveReplay();
   const videoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<LocalStream | null>(null);
   const signalingRef = useRef<SignalingChannel | null>(null);
@@ -41,6 +54,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
     hasCamera: boolean;
     hasMicrophone: boolean;
   } | null>(null);
+  const [showEndDialog, setShowEndDialog] = useState(false);
 
   const [previewActive, setPreviewActive] = useState(false);
 
@@ -133,8 +147,12 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
     }
   };
 
-  // Stop stream
-  const stopStream = async () => {
+  // Stop stream - show dialog asking to save replay
+  const handleEndStream = () => {
+    setShowEndDialog(true);
+  };
+
+  const stopStream = async (saveAsReplay: boolean) => {
     // Stop local stream
     localStreamRef.current?.stop();
     localStreamRef.current = null;
@@ -156,8 +174,14 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
       })
       .eq('id', streamId);
 
+    // Save replay if requested
+    if (saveAsReplay) {
+      await saveReplay.mutateAsync({ streamId });
+    }
+
     setIsStreaming(false);
-    toast({ title: 'Stream ended' });
+    setShowEndDialog(false);
+    toast({ title: saveAsReplay ? 'Stream ended & replay saved!' : 'Stream ended' });
     onEnd();
   };
 
@@ -314,13 +338,43 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
 
             <Button
               variant="destructive"
-              onClick={stopStream}
+              onClick={handleEndStream}
             >
               End Stream
             </Button>
           </>
         )}
       </motion.div>
+
+      {/* End Stream Dialog */}
+      <AlertDialog open={showEndDialog} onOpenChange={setShowEndDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>End your stream?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Would you like to save this stream as a replay so viewers can watch it later?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel onClick={() => setShowEndDialog(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => stopStream(false)}
+            >
+              End without saving
+            </Button>
+            <AlertDialogAction 
+              onClick={() => stopStream(true)}
+              className="bg-primary"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Save as replay
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

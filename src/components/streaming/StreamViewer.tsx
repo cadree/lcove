@@ -71,9 +71,12 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   const renderEmbed = () => {
     if (!stream) return null;
 
+    // Check if this is a replay
+    const isReplay = !stream.is_live && stream.replay_available;
+
     // WebRTC streaming (P2P with OPUS audio)
     if (stream.stream_type === 'webrtc') {
-      if (isHost) {
+      if (isHost && stream.is_live) {
         return (
           <WebRTCStreamHost 
             streamId={streamId} 
@@ -81,6 +84,46 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
           />
         );
       }
+      
+      // Show replay message or connect to live stream
+      if (isReplay) {
+        return (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
+            <div className="text-center p-6">
+              <Radio className="h-16 w-16 text-primary mx-auto mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Stream Replay</h3>
+              <p className="text-muted-foreground mb-4">
+                This stream has ended but was saved as a replay.
+              </p>
+              {stream.replay_url ? (
+                <video 
+                  src={stream.replay_url} 
+                  controls 
+                  className="w-full max-w-lg mx-auto rounded-lg"
+                  autoPlay
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Replay data is available for this session.
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      }
+      
+      if (!stream.is_live) {
+        return (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
+            <div className="text-center">
+              <Radio className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">This stream has ended</p>
+              <p className="text-sm text-muted-foreground/60 mt-2">No replay available</p>
+            </div>
+          </div>
+        );
+      }
+      
       return (
         <WebRTCStreamViewer 
           streamId={streamId}
