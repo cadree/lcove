@@ -19,21 +19,24 @@ const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'photo' | 'video'>('photo');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const { uploadStory } = useStories();
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'photo' | 'video') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const isVideo = file.type.startsWith('video/');
-    setMediaType(isVideo ? 'video' : 'photo');
+    setMediaType(type);
     setSelectedFile(file);
 
     // Create preview
     const reader = new FileReader();
     reader.onload = () => setPreview(reader.result as string);
     reader.readAsDataURL(file);
+    
+    // Reset input value so the same file can be selected again
+    e.target.value = '';
   };
 
   const handleUpload = async () => {
@@ -68,7 +71,7 @@ const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
               >
                 {/* Upload Area */}
                 <div
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => photoInputRef.current?.click()}
                   className="aspect-[9/16] max-h-[400px] rounded-2xl border-2 border-dashed border-border bg-muted/30 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-all"
                 >
                   <Upload className="w-10 h-10 text-muted-foreground mb-4" />
@@ -85,7 +88,7 @@ const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
                   <Button
                     variant="outline"
                     className="flex-1 gap-2"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => photoInputRef.current?.click()}
                   >
                     <Camera className="w-4 h-4" />
                     Photo
@@ -93,7 +96,7 @@ const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
                   <Button
                     variant="outline"
                     className="flex-1 gap-2"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => videoInputRef.current?.click()}
                   >
                     <Video className="w-4 h-4" />
                     Video
@@ -169,11 +172,19 @@ const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
             )}
           </AnimatePresence>
 
+          {/* Separate file inputs for photo and video */}
           <input
-            ref={fileInputRef}
+            ref={photoInputRef}
             type="file"
-            accept="image/*,video/*"
-            onChange={handleFileSelect}
+            accept="image/*"
+            onChange={(e) => handleFileSelect(e, 'photo')}
+            className="hidden"
+          />
+          <input
+            ref={videoInputRef}
+            type="file"
+            accept="video/*"
+            onChange={(e) => handleFileSelect(e, 'video')}
             className="hidden"
           />
         </div>

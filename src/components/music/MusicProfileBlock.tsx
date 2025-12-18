@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, forwardRef } from "react";
 import { motion } from "framer-motion";
 import { Music, Play, Pause, ExternalLink, Disc3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ interface MusicProfileBlockProps {
   onConnectClick?: () => void;
 }
 
-export const MusicProfileBlock = ({ userId, onConnectClick }: MusicProfileBlockProps) => {
+export const MusicProfileBlock = forwardRef<HTMLDivElement, MusicProfileBlockProps>(({ userId, onConnectClick }, ref) => {
   const { musicProfile, isLoading, isOwner } = useMusicProfile(userId);
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -178,7 +178,9 @@ export const MusicProfileBlock = ({ userId, onConnectClick }: MusicProfileBlockP
       )}
     </motion.div>
   );
-};
+});
+
+MusicProfileBlock.displayName = "MusicProfileBlock";
 
 interface TrackRowProps {
   track: MusicTrack;

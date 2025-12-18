@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Settings,
   MapPin,
@@ -12,38 +13,76 @@ import {
   Store,
   Coins,
   Edit,
-  Plus,
   Heart,
   Crown,
+  Camera,
+  Loader2,
 } from "lucide-react";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
-
-const profileData = {
-  name: "Maya Chen",
-  role: "Digital Artist & Motion Designer",
-  city: "Los Angeles",
-  avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300&h=300&fit=crop",
-  coverImage: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&h=400&fit=crop",
-  bio: "Creating immersive digital experiences at the intersection of art and technology. Focused on generative systems and interactive installations.",
-  credits: 450,
-  projectsCompleted: 23,
-  eventsHosted: 5,
-  links: {
-    website: "mayachen.art",
-    instagram: "@mayachen.art",
-  },
-  skills: ["3D Art", "Motion Design", "Creative Coding", "Illustration", "TouchDesigner"],
-  portfolio: [
-    "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&h=400&fit=crop",
-    "https://images.unsplash.com/photo-1633218388467-539651dcf81a?w=400&h=400&fit=crop",
-    "https://images.unsplash.com/photo-1634017839464-5c339bbe3c98?w=400&h=400&fit=crop",
-    "https://images.unsplash.com/photo-1635322966219-b75ed372eb01?w=400&h=400&fit=crop",
-  ],
-};
+import { useProfile } from "@/hooks/useProfile";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCredits } from "@/hooks/useCredits";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Profile = () => {
+  const { user } = useAuth();
+  const { profile, loading, updateProfile } = useProfile();
+  const { credits } = useCredits();
   const [showMusicDialog, setShowMusicDialog] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/avatar.${fileExt}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('media')
+        .getPublicUrl(fileName);
+
+      // Update profile
+      const { error: updateError } = await updateProfile({ avatar_url: publicUrl });
+      if (updateError) throw updateError;
+
+      toast.success('Profile picture updated!');
+    } catch (error) {
+      console.error('Avatar upload error:', error);
+      toast.error('Failed to upload profile picture');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <PageLayout>
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </PageLayout>
+    );
+  }
+
+  // Default values for display
+  const displayName = profile?.display_name || 'Creative';
+  const bio = profile?.bio || 'Welcome to my profile!';
+  const city = profile?.city || 'Location not set';
+  const avatarUrl = profile?.avatar_url;
 
   return (
     <PageLayout>
@@ -53,8 +92,7 @@ const Profile = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6 }}
-          className="relative h-48 sm:h-64 bg-cover bg-center"
-          style={{ backgroundImage: `url(${profileData.coverImage})` }}
+          className="relative h-48 sm:h-64 bg-gradient-to-br from-primary/30 via-background to-accent/20"
         >
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
           
@@ -76,21 +114,45 @@ const Profile = () => {
             transition={{ delay: 0.2 }}
             className="flex flex-col sm:flex-row items-start gap-4 mb-6"
           >
-            {/* Avatar */}
-            <div
-              className="w-28 h-28 rounded-2xl bg-cover bg-center border-4 border-background shadow-lg"
-              style={{ backgroundImage: `url(${profileData.avatar})` }}
-            />
+            {/* Avatar with upload */}
+            <div className="relative group">
+              <Avatar className="w-28 h-28 border-4 border-background shadow-lg">
+                <AvatarImage src={avatarUrl || undefined} />
+                <AvatarFallback className="bg-muted text-muted-foreground text-2xl">
+                  {displayName.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              
+              {/* Upload overlay */}
+              <button
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="absolute inset-0 rounded-full bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+              >
+                {uploadingAvatar ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-foreground" />
+                ) : (
+                  <Camera className="w-6 h-6 text-foreground" />
+                )}
+              </button>
+              
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                className="hidden"
+              />
+            </div>
 
             {/* Info */}
             <div className="flex-1 pt-2">
               <h1 className="font-display text-2xl sm:text-3xl font-medium text-foreground mb-1">
-                {profileData.name}
+                {displayName}
               </h1>
-              <p className="text-muted-foreground mb-2">{profileData.role}</p>
               <p className="text-sm text-muted-foreground/70 flex items-center gap-1">
                 <MapPin className="w-4 h-4" />
-                {profileData.city}
+                {city}
               </p>
             </div>
 
@@ -112,20 +174,20 @@ const Profile = () => {
               <div className="flex items-center justify-center gap-1 mb-1">
                 <Coins className="w-4 h-4 text-primary" />
                 <span className="font-display text-xl font-medium text-foreground">
-                  {profileData.credits}
+                  {credits?.balance || 0}
                 </span>
               </div>
               <span className="text-xs text-muted-foreground">LC Credits</span>
             </div>
             <div className="glass-strong rounded-xl p-4 text-center">
               <span className="font-display text-xl font-medium text-foreground block mb-1">
-                {profileData.projectsCompleted}
+                0
               </span>
               <span className="text-xs text-muted-foreground">Projects</span>
             </div>
             <div className="glass-strong rounded-xl p-4 text-center">
               <span className="font-display text-xl font-medium text-foreground block mb-1">
-                {profileData.eventsHosted}
+                0
               </span>
               <span className="text-xs text-muted-foreground">Events</span>
             </div>
@@ -139,68 +201,7 @@ const Profile = () => {
             className="mb-8"
           >
             <h2 className="font-display text-lg font-medium text-foreground mb-3">About</h2>
-            <p className="text-muted-foreground leading-relaxed">{profileData.bio}</p>
-          </motion.div>
-
-          {/* Links */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.45 }}
-            className="flex flex-wrap gap-3 mb-8"
-          >
-            <Button variant="glass" size="sm">
-              <LinkIcon className="w-4 h-4 mr-1" />
-              {profileData.links.website}
-            </Button>
-            <Button variant="glass" size="sm">
-              <Instagram className="w-4 h-4 mr-1" />
-              {profileData.links.instagram}
-            </Button>
-          </motion.div>
-
-          {/* Skills */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="mb-8"
-          >
-            <h2 className="font-display text-lg font-medium text-foreground mb-3">Skills</h2>
-            <div className="flex flex-wrap gap-2">
-              {profileData.skills.map((skill) => (
-                <span
-                  key={skill}
-                  className="px-3 py-1.5 rounded-lg bg-accent text-accent-foreground text-sm"
-                >
-                  {skill}
-                </span>
-              ))}
-            </div>
-          </motion.div>
-
-          {/* Profile Blocks (Modular) */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.55 }}
-            className="mb-8"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-lg font-medium text-foreground">Portfolio</h2>
-              <Button variant="ghost" size="sm">
-                View All
-              </Button>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {profileData.portfolio.map((image, index) => (
-                <div
-                  key={index}
-                  className="aspect-square rounded-xl bg-cover bg-center hover:opacity-80 transition-opacity cursor-pointer"
-                  style={{ backgroundImage: `url(${image})` }}
-                />
-              ))}
-            </div>
+            <p className="text-muted-foreground leading-relaxed">{bio}</p>
           </motion.div>
 
           {/* Music Block */}
@@ -211,7 +212,7 @@ const Profile = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
-            className="grid grid-cols-2 gap-4 mb-8"
+            className="grid grid-cols-2 gap-4 mb-8 mt-8"
           >
             <Link to="/store" className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors">
               <Store className="w-6 h-6 text-muted-foreground mb-2" />
