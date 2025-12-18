@@ -1304,10 +1304,22 @@ export type Database = {
       }
       profile_customizations: {
         Row: {
+          accent_color_override: string | null
+          background_blur: number | null
+          background_opacity: number | null
           background_type: string | null
           background_value: string | null
           created_at: string
+          custom_font: string | null
+          effect_grain: boolean | null
+          effect_holographic: boolean | null
+          effect_motion_gradient: boolean | null
+          effect_neon_glow: boolean | null
+          effect_scanlines: boolean | null
           id: string
+          music_visualizer_enabled: boolean | null
+          overlay_opacity: number | null
+          overlay_tint: string | null
           profile_music_album_art_url: string | null
           profile_music_album_name: string | null
           profile_music_artist: string | null
@@ -1317,15 +1329,30 @@ export type Database = {
           profile_music_source: string | null
           profile_music_title: string | null
           profile_music_url: string | null
+          section_order: string[] | null
+          show_top_friends: boolean | null
           theme_accent_color: string | null
+          theme_preset: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          accent_color_override?: string | null
+          background_blur?: number | null
+          background_opacity?: number | null
           background_type?: string | null
           background_value?: string | null
           created_at?: string
+          custom_font?: string | null
+          effect_grain?: boolean | null
+          effect_holographic?: boolean | null
+          effect_motion_gradient?: boolean | null
+          effect_neon_glow?: boolean | null
+          effect_scanlines?: boolean | null
           id?: string
+          music_visualizer_enabled?: boolean | null
+          overlay_opacity?: number | null
+          overlay_tint?: string | null
           profile_music_album_art_url?: string | null
           profile_music_album_name?: string | null
           profile_music_artist?: string | null
@@ -1335,15 +1362,30 @@ export type Database = {
           profile_music_source?: string | null
           profile_music_title?: string | null
           profile_music_url?: string | null
+          section_order?: string[] | null
+          show_top_friends?: boolean | null
           theme_accent_color?: string | null
+          theme_preset?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          accent_color_override?: string | null
+          background_blur?: number | null
+          background_opacity?: number | null
           background_type?: string | null
           background_value?: string | null
           created_at?: string
+          custom_font?: string | null
+          effect_grain?: boolean | null
+          effect_holographic?: boolean | null
+          effect_motion_gradient?: boolean | null
+          effect_neon_glow?: boolean | null
+          effect_scanlines?: boolean | null
           id?: string
+          music_visualizer_enabled?: boolean | null
+          overlay_opacity?: number | null
+          overlay_tint?: string | null
           profile_music_album_art_url?: string | null
           profile_music_album_name?: string | null
           profile_music_artist?: string | null
@@ -1353,7 +1395,10 @@ export type Database = {
           profile_music_source?: string | null
           profile_music_title?: string | null
           profile_music_url?: string | null
+          section_order?: string[] | null
+          show_top_friends?: boolean | null
           theme_accent_color?: string | null
+          theme_preset?: string | null
           updated_at?: string
           user_id?: string
         }
