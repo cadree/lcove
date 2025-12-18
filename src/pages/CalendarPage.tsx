@@ -2,201 +2,276 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, MapPin, Ticket, Coins } from "lucide-react";
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  Calendar as CalendarIcon,
+  List,
+  Grid3X3,
+  Plus
+} from "lucide-react";
+import { CalendarMonthView } from "@/components/calendar/CalendarMonthView";
+import { CalendarWeekView } from "@/components/calendar/CalendarWeekView";
+import { CalendarAgendaView } from "@/components/calendar/CalendarAgendaView";
+import { CalendarFilters } from "@/components/calendar/CalendarFilters";
+import { EventDetailDialog } from "@/components/calendar/EventDetailDialog";
+import { PersonalEventDialog } from "@/components/calendar/PersonalEventDialog";
+import { useCalendarItems, CalendarItem } from "@/hooks/useCalendar";
+import { useAuth } from "@/contexts/AuthContext";
+import { addMonths, subMonths, addWeeks, subWeeks, format } from "date-fns";
+import { cn } from "@/lib/utils";
 
-const events = [
-  {
-    id: 1,
-    title: "Creative Collective Meetup",
-    date: new Date(2025, 0, 5),
-    time: "7:00 PM",
-    venue: "The Warehouse Gallery",
-    city: "Los Angeles",
-    image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=300&fit=crop",
-    ticketType: "Free",
-    attendees: 45,
-  },
-  {
-    id: 2,
-    title: "Portfolio Review Night",
-    date: new Date(2025, 0, 12),
-    time: "6:30 PM",
-    venue: "Studio 54",
-    city: "New York",
-    image: "https://images.unsplash.com/photo-1528605105345-5344ea20e269?w=400&h=300&fit=crop",
-    ticketType: "Credits",
-    attendees: 28,
-  },
-  {
-    id: 3,
-    title: "Sound Design Workshop",
-    date: new Date(2025, 0, 18),
-    time: "2:00 PM",
-    venue: "Echo Studios",
-    city: "Austin",
-    image: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=400&h=300&fit=crop",
-    ticketType: "Paid",
-    attendees: 15,
-  },
-  {
-    id: 4,
-    title: "Film Screening & Q&A",
-    date: new Date(2025, 0, 25),
-    time: "8:00 PM",
-    venue: "Indie Cinema",
-    city: "Chicago",
-    image: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&h=300&fit=crop",
-    ticketType: "Paid",
-    attendees: 120,
-  },
+type ViewType = 'month' | 'week' | 'agenda';
+
+const US_STATES = [
+  'All States', 'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 
+  'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 
+  'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana',
+  'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi',
+  'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey',
+  'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma',
+  'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
+  'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
+  'West Virginia', 'Wisconsin', 'Wyoming'
+];
+
+const CITIES = [
+  'All Cities', 'Los Angeles', 'New York', 'Chicago', 'Houston', 'Phoenix',
+  'Philadelphia', 'San Antonio', 'San Diego', 'Dallas', 'Austin', 'San Jose',
+  'Jacksonville', 'Fort Worth', 'Columbus', 'Charlotte', 'Indianapolis',
+  'San Francisco', 'Seattle', 'Denver', 'Nashville', 'Portland', 'Las Vegas',
+  'Detroit', 'Memphis', 'Boston', 'Baltimore', 'Miami', 'Atlanta'
 ];
 
 const CalendarPage = () => {
-  const [currentMonth, setCurrentMonth] = useState(new Date(2025, 0, 1));
-  const [selectedCity, setSelectedCity] = useState("All Cities");
+  const { user } = useAuth();
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [view, setView] = useState<ViewType>('month');
+  const [selectedCity, setSelectedCity] = useState('All Cities');
+  const [selectedState, setSelectedState] = useState('All States');
+  const [selectedTypes, setSelectedTypes] = useState(['events', 'projects', 'personal']);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [eventDialogOpen, setEventDialogOpen] = useState(false);
+  const [personalEventOpen, setPersonalEventOpen] = useState(false);
+  const [selectedDateForNew, setSelectedDateForNew] = useState<Date | undefined>();
 
-  const cities = ["All Cities", "Los Angeles", "New York", "Austin", "Chicago"];
+  const calendarItems = useCalendarItems({
+    city: selectedCity,
+    state: selectedState,
+    types: selectedTypes,
+  });
 
-  const filteredEvents = selectedCity === "All Cities"
-    ? events
-    : events.filter(e => e.city === selectedCity);
+  const navigatePrevious = () => {
+    if (view === 'month' || view === 'agenda') {
+      setCurrentDate(prev => subMonths(prev, 1));
+    } else {
+      setCurrentDate(prev => subWeeks(prev, 1));
+    }
+  };
 
-  const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const navigateNext = () => {
+    if (view === 'month' || view === 'agenda') {
+      setCurrentDate(prev => addMonths(prev, 1));
+    } else {
+      setCurrentDate(prev => addWeeks(prev, 1));
+    }
+  };
 
-  const getTicketIcon = (type: string) => {
-    if (type === "Credits") return <Coins className="w-3 h-3" />;
-    return <Ticket className="w-3 h-3" />;
+  const goToToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  const handleItemClick = (item: CalendarItem) => {
+    if (item.type === 'event') {
+      setSelectedEventId(item.id);
+      setEventDialogOpen(true);
+    } else if (item.type === 'personal') {
+      // Could open edit dialog for personal items
+    }
+  };
+
+  const handleDateClick = (date: Date) => {
+    setSelectedDateForNew(date);
+    setPersonalEventOpen(true);
+  };
+
+  const getNavigationLabel = () => {
+    if (view === 'month' || view === 'agenda') {
+      return format(currentDate, 'MMMM yyyy');
+    }
+    return `Week of ${format(currentDate, 'MMM d, yyyy')}`;
   };
 
   return (
     <PageLayout>
-      <div className="px-6 pt-8">
+      <div className="px-4 sm:px-6 pt-6 pb-24">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-6"
         >
-          <h1 className="font-display text-3xl font-medium text-foreground mb-2">Calendar</h1>
-          <p className="text-muted-foreground">Community events, workshops, and gatherings</p>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="font-display text-2xl sm:text-3xl font-medium text-foreground">
+              Calendar
+            </h1>
+            {user && (
+              <Button 
+                size="sm" 
+                onClick={() => {
+                  setSelectedDateForNew(undefined);
+                  setPersonalEventOpen(true);
+                }}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add Event
+              </Button>
+            )}
+          </div>
+          <p className="text-muted-foreground text-sm">
+            Community events, projects, and personal schedule
+          </p>
         </motion.div>
 
-        {/* Month Navigation */}
+        {/* View Switcher & Navigation */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
-          className="flex items-center justify-between mb-6"
+          className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6"
         >
-          <Button
-            variant="glass"
-            size="icon"
-            onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </Button>
-          <h2 className="font-display text-xl font-medium text-foreground">{monthName}</h2>
-          <Button
-            variant="glass"
-            size="icon"
-            onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
-          >
-            <ChevronRight className="w-5 h-5" />
-          </Button>
+          {/* View Tabs */}
+          <div className="flex gap-1 glass-strong rounded-xl p-1">
+            <Button
+              variant={view === 'month' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setView('month')}
+              className="gap-2"
+            >
+              <Grid3X3 className="w-4 h-4" />
+              <span className="hidden sm:inline">Month</span>
+            </Button>
+            <Button
+              variant={view === 'week' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setView('week')}
+              className="gap-2"
+            >
+              <CalendarIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Week</span>
+            </Button>
+            <Button
+              variant={view === 'agenda' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setView('agenda')}
+              className="gap-2"
+            >
+              <List className="w-4 h-4" />
+              <span className="hidden sm:inline">Agenda</span>
+            </Button>
+          </div>
+
+          {/* Date Navigation */}
+          <div className="flex items-center gap-2 flex-1 justify-center sm:justify-start">
+            <Button variant="glass" size="icon" onClick={navigatePrevious}>
+              <ChevronLeft className="w-5 h-5" />
+            </Button>
+            <Button variant="glass" size="sm" onClick={goToToday}>
+              Today
+            </Button>
+            <h2 className="font-display text-lg font-medium text-foreground min-w-[160px] text-center">
+              {getNavigationLabel()}
+            </h2>
+            <Button variant="glass" size="icon" onClick={navigateNext}>
+              <ChevronRight className="w-5 h-5" />
+            </Button>
+          </div>
         </motion.div>
 
-        {/* City Filter */}
+        {/* Filters */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide"
+          className="mb-6"
         >
-          {cities.map((city) => (
-            <Button
-              key={city}
-              variant={selectedCity === city ? "default" : "glass"}
-              size="sm"
-              onClick={() => setSelectedCity(city)}
-              className="whitespace-nowrap"
-            >
-              <MapPin className="w-3 h-3 mr-1" />
-              {city}
-            </Button>
-          ))}
+          <CalendarFilters
+            selectedCity={selectedCity}
+            selectedState={selectedState}
+            selectedTypes={selectedTypes}
+            cities={CITIES}
+            states={US_STATES}
+            onCityChange={setSelectedCity}
+            onStateChange={setSelectedState}
+            onTypesChange={setSelectedTypes}
+          />
         </motion.div>
 
-        {/* Events Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {filteredEvents.map((event, index) => (
-            <motion.div
-              key={event.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: index * 0.1 }}
-              className="glass-strong rounded-2xl overflow-hidden hover:bg-accent/20 transition-all duration-300 cursor-pointer group"
-            >
-              {/* Event Image */}
-              <div
-                className="h-40 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                style={{ backgroundImage: `url(${event.image})` }}
-              />
+        {/* Calendar View */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          {view === 'month' && (
+            <CalendarMonthView
+              currentDate={currentDate}
+              items={calendarItems}
+              onItemClick={handleItemClick}
+              onDateClick={handleDateClick}
+            />
+          )}
+          {view === 'week' && (
+            <CalendarWeekView
+              currentDate={currentDate}
+              items={calendarItems}
+              onItemClick={handleItemClick}
+            />
+          )}
+          {view === 'agenda' && (
+            <CalendarAgendaView
+              currentDate={currentDate}
+              items={calendarItems}
+              onItemClick={handleItemClick}
+            />
+          )}
+        </motion.div>
 
-              {/* Event Info */}
-              <div className="p-5">
-                {/* Date Badge */}
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="flex flex-col items-center justify-center w-12 h-12 rounded-xl bg-primary/15 text-primary">
-                    <span className="text-xs font-medium">
-                      {event.date.toLocaleDateString('en-US', { month: 'short' })}
-                    </span>
-                    <span className="text-lg font-bold leading-none">
-                      {event.date.getDate()}
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="font-display text-lg font-medium text-foreground line-clamp-1">
-                      {event.title}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">{event.time}</p>
-                  </div>
-                </div>
-
-                {/* Venue & City */}
-                <p className="text-sm text-muted-foreground mb-3 flex items-center gap-1">
-                  <MapPin className="w-3 h-3" />
-                  {event.venue}, {event.city}
-                </p>
-
-                {/* Footer */}
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1 px-2 py-1 rounded-md bg-accent/50 text-xs text-accent-foreground">
-                    {getTicketIcon(event.ticketType)}
-                    {event.ticketType}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {event.attendees} attending
-                  </span>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Empty State */}
-        {filteredEvents.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-16"
-          >
-            <p className="text-muted-foreground text-lg mb-2">No events this month</p>
-            <p className="text-muted-foreground/70 text-sm">
-              Check back soon or try a different city
-            </p>
-          </motion.div>
-        )}
+        {/* Legend */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="mt-6 flex flex-wrap gap-4 text-sm text-muted-foreground"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded bg-primary" />
+            <span>Events</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded bg-accent" />
+            <span>Projects</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded bg-secondary" />
+            <span>Personal</span>
+          </div>
+        </motion.div>
       </div>
+
+      {/* Event Detail Dialog */}
+      <EventDetailDialog
+        eventId={selectedEventId}
+        open={eventDialogOpen}
+        onOpenChange={setEventDialogOpen}
+      />
+
+      {/* Personal Event Dialog */}
+      <PersonalEventDialog
+        open={personalEventOpen}
+        onOpenChange={setPersonalEventOpen}
+        defaultDate={selectedDateForNew}
+      />
     </PageLayout>
   );
 };
