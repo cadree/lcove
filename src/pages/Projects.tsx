@@ -40,7 +40,7 @@ const Projects: React.FC = () => {
           </div>
           {user && (
             <CreateProjectDialog>
-              <Button>
+              <Button data-create-project>
                 <Plus className="h-4 w-4 mr-2" />
                 New Project
               </Button>
