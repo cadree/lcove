@@ -32,3 +32,6 @@ verify_jwt = true
 
 [functions.verify-ticket-payment]
 verify_jwt = true
+
+[functions.send-notification-email]
+verify_jwt = false
