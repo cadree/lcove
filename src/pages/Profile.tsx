@@ -116,6 +116,7 @@ const Profile = () => {
             variant="glass"
             size="icon"
             className="absolute top-4 right-4 w-10 h-10"
+            onClick={() => toast.info('Profile settings coming soon!')}
           >
             <Settings className="w-5 h-5" />
           </Button>
