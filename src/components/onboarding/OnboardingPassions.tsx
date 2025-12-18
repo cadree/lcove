@@ -42,7 +42,7 @@ const OnboardingPassions = ({ data, updateData, onNext, onBack }: Props) => {
     const current = data.passions;
     if (current.includes(name)) {
       updateData({ passions: current.filter((p) => p !== name) });
-    } else if (current.length < 5) {
+    } else {
       updateData({ passions: [...current, name] });
     }
   };
@@ -67,7 +67,7 @@ const OnboardingPassions = ({ data, updateData, onNext, onBack }: Props) => {
             Your Passions
           </h1>
           <p className="text-muted-foreground">
-            Select up to 5 creative passions that define you
+            Select the creative passions that define you
           </p>
         </motion.div>
 
