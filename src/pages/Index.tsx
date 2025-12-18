@@ -7,10 +7,10 @@ import CTASection from "@/components/home/CTASection";
 const Index = () => {
   return (
     <PageLayout>
+      <CTASection />
       <HeroSection />
       <FeaturesSection />
       <FeedPreview />
-      <CTASection />
     </PageLayout>
   );
 };
