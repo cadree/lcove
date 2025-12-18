@@ -32,6 +32,7 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
   const [activeTab, setActiveTab] = useState("customize");
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const initializedRef = useRef(false);
 
   // Customization state
   const [customizationState, setCustomizationState] = useState<CustomizationState>({
@@ -58,9 +59,10 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
   const [profileMusicEnabled, setProfileMusicEnabled] = useState(false);
   const [musicData, setMusicData] = useState<MusicData | null>(null);
 
-  // Load existing customization
+  // Load existing customization - only once when data first arrives
   useEffect(() => {
-    if (customization) {
+    if (customization && !initializedRef.current) {
+      initializedRef.current = true;
       setCustomizationState({
         themePreset: (customization.theme_preset as ThemePreset) || 'clean_modern',
         backgroundType: customization.background_type as 'color' | 'gradient' | 'image',
@@ -97,6 +99,13 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
       }
     }
   }, [customization]);
+  
+  // Reset initialized flag when dialog closes
+  useEffect(() => {
+    if (!open) {
+      initializedRef.current = false;
+    }
+  }, [open]);
 
   const handleCustomizationChange = (changes: Partial<CustomizationState>) => {
     setCustomizationState(prev => ({ ...prev, ...changes }));
