@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, forwardRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,18 +18,20 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-// Icons for music services
-const SpotifyIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
+// Icons for music services - wrapped with forwardRef to prevent ref warnings
+const SpotifyIcon = forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>((props, ref) => (
+  <svg ref={ref} viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor" {...props}>
     <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
   </svg>
-);
+));
+SpotifyIcon.displayName = 'SpotifyIcon';
 
-const AppleMusicIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
+const AppleMusicIcon = forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>((props, ref) => (
+  <svg ref={ref} viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor" {...props}>
     <path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026-.747.043-1.49.123-2.193.4-1.336.53-2.3 1.452-2.865 2.78-.192.448-.292.925-.363 1.408-.056.392-.088.785-.1 1.18 0 .032-.007.062-.01.093v12.223c.01.14.017.283.027.424.05.815.154 1.624.497 2.373.65 1.42 1.738 2.353 3.234 2.801.42.127.856.187 1.293.228.555.053 1.11.06 1.667.06h11.03c.525 0 1.048-.034 1.57-.1.823-.106 1.597-.35 2.296-.81.84-.553 1.472-1.287 1.88-2.208.186-.42.293-.87.37-1.324.113-.675.138-1.358.137-2.04-.002-3.8 0-7.595-.003-11.393zm-6.423 3.99v5.712c0 .417-.058.827-.244 1.206-.29.59-.76.962-1.388 1.14-.35.1-.706.157-1.07.173-.95.042-1.785-.56-2.075-1.44-.313-.952.078-1.996 1.042-2.44.31-.143.644-.222.986-.298.424-.096.852-.168 1.273-.265.317-.073.544-.257.61-.596.014-.064.02-.13.02-.195v-3.43a.49.49 0 00-.04-.18c-.05-.12-.15-.184-.288-.17-.127.013-.25.04-.373.066l-4.68 1.015c-.035.008-.07.017-.104.028-.147.047-.207.132-.212.283-.003.053-.002.106-.002.16v6.212c0 .203-.01.406-.037.607-.07.49-.25.933-.59 1.3-.398.43-.897.652-1.475.728-.334.044-.67.054-1.003.026-.76-.063-1.418-.38-1.87-.99-.443-.596-.537-1.272-.373-1.984.17-.736.65-1.243 1.323-1.55.32-.146.664-.21 1.01-.27.474-.08.95-.15 1.42-.24.313-.06.535-.22.623-.536.026-.095.035-.197.035-.297V8.08c0-.083.006-.17.024-.25.062-.26.2-.4.47-.454.085-.017.17-.026.257-.04l5.373-1.14c.173-.037.348-.07.523-.1.094-.016.184.014.267.056.06.03.1.08.122.147.014.047.02.097.02.148v3.667h-.002z"/>
   </svg>
-);
+));
+AppleMusicIcon.displayName = 'AppleMusicIcon';
 
 export interface MusicData {
   source: 'spotify' | 'apple_music' | 'upload';
@@ -110,9 +112,7 @@ export const ProfileMusicSourceSelector = ({
     setIsProcessing(true);
     try {
       // Use Spotify embed API to get basic info
-      // The embed URL allows playback without full OAuth
       const embedUrl = `https://open.spotify.com/embed/track/${trackId}`;
-      const previewUrl = `https://p.scdn.co/mp3-preview/${trackId}`; // This won't work without API, but embed does
       
       const data: MusicData = {
         source: 'spotify',
@@ -120,15 +120,14 @@ export const ProfileMusicSourceSelector = ({
         previewUrl: embedUrl,
         externalId: trackId,
         title: "Spotify Track",
-        artist: "Loading...",
+        artist: "",
         albumName: "",
-        albumArtUrl: `https://i.scdn.co/image/${trackId}`, // Placeholder
+        albumArtUrl: null, // User can upload artwork
       };
 
-      // For better UX, let user edit the title/artist
       setMusicData(data);
       onMusicChange(data);
-      toast.success("Spotify track connected!");
+      toast.success("Spotify track connected! Add album artwork below.");
     } catch (err) {
       setError("Failed to process Spotify link. Please try again.");
     } finally {
@@ -156,14 +155,14 @@ export const ProfileMusicSourceSelector = ({
         previewUrl: embedUrl,
         externalId: trackId || albumId,
         title: "Apple Music Track",
-        artist: "Loading...",
+        artist: "",
         albumName: "",
-        albumArtUrl: null,
+        albumArtUrl: null, // User can upload artwork
       };
 
       setMusicData(data);
       onMusicChange(data);
-      toast.success("Apple Music track connected!");
+      toast.success("Apple Music track connected! Add album artwork below.");
     } catch (err) {
       setError("Failed to process Apple Music link. Please try again.");
     } finally {
@@ -338,23 +337,22 @@ export const ProfileMusicSourceSelector = ({
                 )}
               </div>
               
-              {musicData.source === 'upload' && (
-                <>
-                  <button
-                    onClick={() => artworkInputRef.current?.click()}
-                    className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg"
-                  >
-                    <ImageIcon className="w-5 h-5 text-white" />
-                  </button>
-                  <input
-                    ref={artworkInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleArtworkUpload}
-                    className="hidden"
-                  />
-                </>
-              )}
+              {/* Allow artwork upload for all sources */}
+              <>
+                <button
+                  onClick={() => artworkInputRef.current?.click()}
+                  className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg"
+                >
+                  <ImageIcon className="w-5 h-5 text-white" />
+                </button>
+                <input
+                  ref={artworkInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleArtworkUpload}
+                  className="hidden"
+                />
+              </>
             </div>
 
             {/* Track Info */}
@@ -417,25 +415,29 @@ export const ProfileMusicSourceSelector = ({
             />
           </div>
 
-          {musicData.source === 'upload' && (
-            <div className="space-y-1.5">
-              <Label className="text-xs">Album Artwork</Label>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => artworkInputRef.current?.click()}
-                disabled={isProcessing}
-                className="w-full"
-              >
-                {isProcessing ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <ImageIcon className="w-4 h-4 mr-2" />
-                )}
-                {musicData.albumArtUrl ? 'Change Artwork' : 'Upload Artwork'}
-              </Button>
-            </div>
-          )}
+          {/* Album artwork upload for all sources */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Album Artwork</Label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => artworkInputRef.current?.click()}
+              disabled={isProcessing}
+              className="w-full"
+            >
+              {isProcessing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <ImageIcon className="w-4 h-4 mr-2" />
+              )}
+              {musicData.albumArtUrl ? 'Change Artwork' : 'Upload Artwork'}
+            </Button>
+            {!musicData.albumArtUrl && (
+              <p className="text-xs text-muted-foreground">
+                Upload album art to display on your profile
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Preview Link */}
