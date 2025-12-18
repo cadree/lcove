@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Trash2, Play } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -35,6 +36,7 @@ interface Post {
 
 const FeedPost = ({ post }: { post: Post }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { deletePost } = usePosts();
   const {
     likesCount,
@@ -53,6 +55,10 @@ const FeedPost = ({ post }: { post: Post }) => {
   const [showComments, setShowComments] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const isOwner = user?.id === post.user_id;
+
+  const handleProfileClick = () => {
+    navigate(`/profile/${post.user_id}`);
+  };
 
   const handleShare = async () => {
     try {
@@ -93,14 +99,20 @@ const FeedPost = ({ post }: { post: Post }) => {
       {/* Header */}
       <header className="flex items-center justify-between p-4 sm:p-5">
         <div className="flex items-center gap-3">
-          <Avatar className="w-11 h-11">
+          <Avatar 
+            className="w-11 h-11 cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+            onClick={handleProfileClick}
+          >
             <AvatarImage src={post.profile?.avatar_url || undefined} />
             <AvatarFallback className="bg-muted text-muted-foreground font-medium">
               {post.profile?.display_name?.charAt(0).toUpperCase() || '?'}
             </AvatarFallback>
           </Avatar>
           <div>
-            <h3 className="text-sm font-semibold text-foreground">
+            <h3 
+              className="text-sm font-semibold text-foreground cursor-pointer hover:text-primary transition-colors"
+              onClick={handleProfileClick}
+            >
               {post.profile?.display_name || 'User'}
             </h3>
             <time className="text-xs text-muted-foreground">
