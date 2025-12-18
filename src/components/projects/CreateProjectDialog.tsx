@@ -80,7 +80,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({ childr
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto pb-8">
         <DialogHeader>
           <DialogTitle>Create New Project</DialogTitle>
         </DialogHeader>
@@ -246,7 +246,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({ childr
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t">
+          <div className="flex justify-end gap-3 pt-4 pb-4 border-t sticky bottom-0 bg-background">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
