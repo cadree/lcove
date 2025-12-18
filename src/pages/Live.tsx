@@ -47,70 +47,71 @@ const MyStreamCard: React.FC<{
       className="group"
     >
       <Card className="overflow-hidden bg-card/50 backdrop-blur-sm border-border/50 hover:border-primary/30 transition-all">
-        <div className="flex gap-4 p-4">
-          {/* Thumbnail */}
-          <div className="relative w-32 h-20 rounded-lg overflow-hidden bg-muted shrink-0">
-            {stream.thumbnail_url ? (
-              <img 
-                src={stream.thumbnail_url} 
-                alt={stream.title}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-                <Radio className="h-6 w-6 text-primary/50" />
-              </div>
-            )}
-            
-            {/* Status badge */}
-            {status === 'live' && (
-              <Badge className="absolute top-1 left-1 bg-red-500 text-[10px] px-1.5 py-0.5">
-                LIVE
-              </Badge>
-            )}
-            {hasReplay && (
-              <Badge className="absolute top-1 left-1 bg-primary text-[10px] px-1.5 py-0.5">
-                <PlayCircle className="h-2.5 w-2.5 mr-0.5" />
-                REPLAY
-              </Badge>
-            )}
-          </div>
-          
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <h3 className="font-medium truncate">{stream.title}</h3>
-            <p className="text-sm text-muted-foreground truncate mt-0.5">
-              {stream.description || 'No description'}
-            </p>
-            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Eye className="h-3 w-3" />
-                {stream.viewer_count}
-              </span>
-              {stream.total_tips > 0 && (
-                <span className="flex items-center gap-1">
-                  <Coins className="h-3 w-3" />
-                  {stream.total_tips}
-                </span>
+        {/* Mobile-first vertical stack layout */}
+        <div className="p-3 sm:p-4">
+          {/* Top row: Thumbnail + Info */}
+          <div className="flex gap-3 sm:gap-4">
+            {/* Thumbnail - fixed size */}
+            <div className="relative w-20 h-14 sm:w-28 sm:h-20 rounded-lg overflow-hidden bg-muted shrink-0">
+              {stream.thumbnail_url ? (
+                <img 
+                  src={stream.thumbnail_url} 
+                  alt={stream.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+                  <Radio className="h-5 w-5 sm:h-6 sm:w-6 text-primary/50" />
+                </div>
               )}
-              <Badge variant="outline" className="text-[10px]">
-                {stream.stream_type === 'webrtc' ? 'Camera' : stream.stream_type}
-              </Badge>
+              
+              {/* Status badge */}
+              {status === 'live' && (
+                <Badge className="absolute top-1 left-1 bg-red-500 text-[9px] sm:text-[10px] px-1 py-0.5">
+                  LIVE
+                </Badge>
+              )}
+              {hasReplay && (
+                <Badge className="absolute top-1 left-1 bg-primary text-[9px] sm:text-[10px] px-1 py-0.5">
+                  <PlayCircle className="h-2 w-2 sm:h-2.5 sm:w-2.5 mr-0.5" />
+                  REPLAY
+                </Badge>
+              )}
+            </div>
+            
+            {/* Info - allow text to wrap */}
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <h3 className="font-medium text-sm sm:text-base line-clamp-2 leading-tight">{stream.title}</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1 mt-0.5">
+                {stream.description || 'No description'}
+              </p>
+              <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground flex-wrap">
+                <span className="flex items-center gap-1">
+                  <Eye className="h-3 w-3" />
+                  {stream.viewer_count}
+                </span>
+                {stream.total_tips > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Coins className="h-3 w-3" />
+                    {stream.total_tips}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           
-          {/* Actions */}
-          <div className="flex flex-col gap-2 shrink-0">
+          {/* Bottom row: Actions - full width on mobile */}
+          <div className="flex gap-2 mt-3 pt-3 border-t border-border/30">
             <Button 
               size="sm" 
               variant="outline"
-              className="h-8"
+              className="flex-1 h-9 text-xs sm:text-sm"
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit();
               }}
             >
-              <Pencil className="h-3 w-3 mr-1" />
+              <Pencil className="h-3.5 w-3.5 mr-1.5" />
               Edit
             </Button>
             
@@ -118,38 +119,38 @@ const MyStreamCard: React.FC<{
               <Button 
                 size="sm" 
                 variant="destructive"
-                className="h-8"
+                className="flex-1 h-9 text-xs sm:text-sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   goLive.mutate({ streamId: stream.id, isLive: false });
                 }}
               >
-                End
+                End Stream
               </Button>
             ) : hasReplay ? (
               <Button 
                 size="sm" 
                 variant="default"
-                className="h-8"
+                className="flex-1 h-9 text-xs sm:text-sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   onWatch();
                 }}
               >
-                <Play className="h-3 w-3 mr-1" />
+                <Play className="h-3.5 w-3.5 mr-1.5" />
                 Watch
               </Button>
             ) : (
               <Button 
                 size="sm" 
                 variant="default"
-                className="h-8"
+                className="flex-1 h-9 text-xs sm:text-sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   onWatch();
                 }}
               >
-                <Play className="h-3 w-3 mr-1" />
+                <Play className="h-3.5 w-3.5 mr-1.5" />
                 Start
               </Button>
             )}

@@ -38,7 +38,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
     setConnectionState('connecting');
 
     try {
-      console.log('Viewer connecting to stream:', streamId);
+      console.log('[Viewer] Connecting to stream:', streamId, 'Host:', hostId);
       
       // Create peer connection
       const pc = new RTCPeerConnection({
@@ -49,9 +49,9 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       });
       peerConnectionRef.current = pc;
 
-      // Handle incoming tracks
+      // Handle incoming tracks from host
       pc.ontrack = (event) => {
-        console.log('Viewer received track:', event.track.kind);
+        console.log('[Viewer] Received track:', event.track.kind);
         if (videoRef.current && event.streams[0]) {
           videoRef.current.srcObject = event.streams[0];
           setHasVideo(true);
@@ -62,7 +62,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
 
       // Monitor connection state
       pc.onconnectionstatechange = () => {
-        console.log('Viewer connection state:', pc.connectionState);
+        console.log('[Viewer] Connection state:', pc.connectionState);
         setConnectionState(pc.connectionState);
         if (pc.connectionState === 'connected') {
           setIsConnecting(false);
@@ -73,43 +73,47 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       };
 
       pc.oniceconnectionstatechange = () => {
-        console.log('Viewer ICE state:', pc.iceConnectionState);
+        console.log('[Viewer] ICE state:', pc.iceConnectionState);
       };
 
-      // Set up signaling channel
+      // Set up signaling channel - use same channel name as host
       const channel = supabase.channel(`stream-signaling-${streamId}`);
       channelRef.current = channel;
 
-      // Listen for answer from host
+      // Listen for answer from host (host responds to our offer)
       channel.on('broadcast', { event: 'answer' }, async ({ payload }: any) => {
-        console.log('Viewer received answer');
-        if (payload.senderId !== user.id && pc.signalingState !== 'stable') {
+        console.log('[Viewer] Received answer from:', payload.senderId);
+        // Only process answers meant for us (from the host)
+        if (payload.senderId === hostId && pc.signalingState !== 'stable') {
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
-            console.log('Viewer set remote description');
+            console.log('[Viewer] Set remote description from answer');
           } catch (err) {
-            console.error('Error setting remote description:', err);
+            console.error('[Viewer] Error setting remote description:', err);
           }
         }
       });
 
       // Listen for ICE candidates from host
       channel.on('broadcast', { event: 'ice-candidate' }, async ({ payload }: any) => {
-        if (payload.senderId !== user.id) {
+        // Only accept candidates from the host
+        if (payload.senderId === hostId) {
           try {
             await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-            console.log('Viewer added ICE candidate');
+            console.log('[Viewer] Added ICE candidate from host');
           } catch (err) {
-            console.error('Error adding ICE candidate:', err);
+            console.error('[Viewer] Error adding ICE candidate:', err);
           }
         }
       });
 
       await channel.subscribe();
+      console.log('[Viewer] Subscribed to signaling channel');
 
-      // Send ICE candidates to host
+      // Send our ICE candidates to host
       pc.onicecandidate = (event) => {
         if (event.candidate) {
+          console.log('[Viewer] Sending ICE candidate');
           channel.send({
             type: 'broadcast',
             event: 'ice-candidate',
@@ -118,15 +122,15 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
         }
       };
 
-      // Add a transceiver to receive video/audio
+      // Add transceivers to receive video/audio
       pc.addTransceiver('video', { direction: 'recvonly' });
       pc.addTransceiver('audio', { direction: 'recvonly' });
 
-      // Create and send offer
+      // Create and send offer to host
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       
-      console.log('Viewer sending offer');
+      console.log('[Viewer] Sending offer to host');
       await channel.send({
         type: 'broadcast',
         event: 'offer',
@@ -136,17 +140,17 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       // Timeout for connection
       setTimeout(() => {
         if (peerConnectionRef.current?.connectionState !== 'connected') {
-          console.log('Connection timeout, still trying...');
+          console.log('[Viewer] Connection attempt still in progress...');
         }
       }, 10000);
 
     } catch (err: any) {
-      console.error('Error connecting to stream:', err);
+      console.error('[Viewer] Error connecting to stream:', err);
       setError(err.message || 'Failed to connect');
       setConnectionState('failed');
       setIsConnecting(false);
     }
-  }, [streamId, user, isLive]);
+  }, [streamId, hostId, user, isLive]);
 
   useEffect(() => {
     if (isLive && user) {
