@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Users, FolderKanban, Calendar, Coins, Store, Music, Heart, ArrowRight } from "lucide-react";
+import { Users, FolderKanban, Calendar, Coins, Store, Music, Heart, ArrowRight, Film, Handshake, Radio, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useFundStats } from "@/hooks/useFundStats";
 
@@ -18,10 +18,28 @@ const features = [
     link: "/projects",
   },
   {
+    icon: Film,
+    title: "Creator Networks",
+    description: "Launch your own streaming network. Share films, series, and content with subscribers.",
+    link: "/cinema",
+  },
+  {
     icon: Calendar,
     title: "Community Calendar",
     description: "Discover local events, workshops, and gatherings. City-first, always.",
     link: "/calendar",
+  },
+  {
+    icon: Radio,
+    title: "Live Streaming",
+    description: "Go live with DJ sets, art sessions, film premieres, and virtual events.",
+    link: "/live",
+  },
+  {
+    icon: Handshake,
+    title: "Partners",
+    description: "Studios, venues, and businesses offering exclusive benefits to LC members.",
+    link: "/partners",
   },
   {
     icon: Coins,
@@ -36,10 +54,10 @@ const features = [
     link: "/mall",
   },
   {
-    icon: Music,
-    title: "Artist Integration",
-    description: "Connect Spotify & Apple Music. Showcase your sound alongside your visual work.",
-    link: "/profile",
+    icon: Megaphone,
+    title: "Community Updates",
+    description: "Stay in the loop with announcements, spotlights, and fund transparency reports.",
+    link: "/community",
   },
 ];
 
