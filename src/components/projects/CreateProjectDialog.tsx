@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, DollarSign } from 'lucide-react';
+import { Plus, Trash2, DollarSign, Coins } from 'lucide-react';
 import { useProjects } from '@/hooks/useProjects';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
 
 interface RoleInput {
   role_name: string;
@@ -24,6 +25,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({ childr
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [totalBudget, setTotalBudget] = useState('');
+  const [creditsReward, setCreditsReward] = useState(25);
   const [timelineStart, setTimelineStart] = useState('');
   const [timelineEnd, setTimelineEnd] = useState('');
   const [roles, setRoles] = useState<RoleInput[]>([
@@ -72,6 +74,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({ childr
     setTitle('');
     setDescription('');
     setTotalBudget('');
+    setCreditsReward(25);
     setTimelineStart('');
     setTimelineEnd('');
     setRoles([{ role_name: '', description: '', payout_amount: 0, slots_available: 1 }]);
@@ -150,6 +153,34 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({ childr
                 </div>
               </div>
             )}
+          </div>
+
+          {/* LC Credits Reward */}
+          <div className="space-y-4">
+            <div>
+              <Label className="flex items-center gap-2">
+                <Coins className="h-4 w-4 text-primary" />
+                LC Credits Reward
+              </Label>
+              <p className="text-xs text-muted-foreground mt-1 mb-3">
+                Award LC Credits to collaborators based on project difficulty (max 100)
+              </p>
+              <div className="space-y-3">
+                <Slider
+                  value={[creditsReward]}
+                  onValueChange={(value) => setCreditsReward(value[0])}
+                  max={100}
+                  min={5}
+                  step={5}
+                  className="w-full"
+                />
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">5 (Simple)</span>
+                  <span className="font-medium text-primary">{creditsReward} LC</span>
+                  <span className="text-muted-foreground">100 (Complex)</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Timeline */}
