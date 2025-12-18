@@ -144,17 +144,16 @@ export const ProfileThemeCustomizer = ({
               <Label className="text-sm font-medium">Choose Your Vibe</Label>
               <div className="grid gap-3">
                 {Object.values(THEME_PRESETS).map((theme) => (
-                  <motion.button
+                  <button
                     key={theme.id}
+                    type="button"
                     onClick={() => handleThemeSelect(theme.id)}
                     className={cn(
-                      "relative p-4 rounded-xl border-2 transition-all text-left",
+                      "relative p-4 rounded-xl border-2 transition-all text-left cursor-pointer hover:scale-[1.01] active:scale-[0.99]",
                       state.themePreset === theme.id
                         ? "border-primary bg-primary/10"
                         : "border-border/50 hover:border-border"
                     )}
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.99 }}
                   >
                     {state.themePreset === theme.id && (
                       <div className="absolute top-3 right-3">
@@ -175,7 +174,7 @@ export const ProfileThemeCustomizer = ({
                         background: `linear-gradient(90deg, ${theme.primaryAccent}, ${theme.secondaryAccent})`,
                       }}
                     />
-                  </motion.button>
+                  </button>
                 ))}
               </div>
             </div>
