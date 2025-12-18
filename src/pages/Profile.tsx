@@ -4,11 +4,10 @@ import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Settings,
   MapPin,
-  Link as LinkIcon,
-  Instagram,
   Calendar,
   Store,
   Coins,
@@ -21,20 +20,28 @@ import {
   Sparkles,
   ArrowLeft,
   MessageCircle,
+  Plus,
+  Grid,
+  Bookmark,
 } from "lucide-react";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
 import { ProfileCustomizationDialog } from "@/components/profile/ProfileCustomizationDialog";
 import { ProfileRecordPlayer } from "@/components/profile/ProfileRecordPlayer";
-import { ProfileEffects, HolographicCard, CyberpunkProgressBar, NeonText } from "@/components/profile/ProfileEffects";
+import { ProfileEffects, HolographicCard, NeonText } from "@/components/profile/ProfileEffects";
+import { CreatePostDialog } from "@/components/profile/CreatePostDialog";
+import { ProfilePostsGrid } from "@/components/profile/ProfilePostsGrid";
+import { PostDetailModal } from "@/components/profile/PostDetailModal";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useProfileCustomization } from "@/hooks/useProfileCustomization";
+import { useProfilePosts } from "@/hooks/useProfilePosts";
 import { THEME_PRESETS, ThemePreset } from "@/lib/profileThemes";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ProfilePost } from "@/types/post";
 
 const Profile = () => {
   const { userId: urlUserId } = useParams<{ userId?: string }>();
@@ -48,8 +55,11 @@ const Profile = () => {
   const { profile, loading, updateProfile } = useProfile(targetUserId);
   const { credits } = useCredits();
   const { customization, isOwner, saveCustomization } = useProfileCustomization(targetUserId);
+  const { posts, isLoading: postsLoading, createPost, deletePost } = useProfilePosts(targetUserId);
   const [showMusicDialog, setShowMusicDialog] = useState(false);
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
+  const [showCreatePostDialog, setShowCreatePostDialog] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<ProfilePost | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const volumeSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -448,13 +458,58 @@ const Profile = () => {
             <MusicProfileBlock onConnectClick={() => setShowMusicDialog(true)} />
           )}
 
+          {/* Posts Grid Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="mt-8 mb-8"
+          >
+            <Tabs defaultValue="posts" className="w-full">
+              <TabsList className="w-full justify-center border-t border-border rounded-none bg-transparent h-auto py-0">
+                <TabsTrigger 
+                  value="posts" 
+                  className="flex-1 rounded-none border-t-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent py-3"
+                >
+                  <Grid className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Posts</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="saved" 
+                  className="flex-1 rounded-none border-t-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent py-3"
+                >
+                  <Bookmark className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Saved</span>
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="posts" className="mt-4">
+                <ProfilePostsGrid 
+                  posts={posts}
+                  onPostClick={(post) => setSelectedPost(post)}
+                  isLoading={postsLoading}
+                />
+              </TabsContent>
+              <TabsContent value="saved" className="mt-4">
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="w-20 h-20 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center mb-4">
+                    <Bookmark className="w-10 h-10 text-muted-foreground/50" />
+                  </div>
+                  <h3 className="text-xl font-medium text-foreground mb-2">Save</h3>
+                  <p className="text-muted-foreground text-sm max-w-[250px]">
+                    Save photos and videos that you want to see again.
+                  </p>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </motion.div>
+
           {/* Additional Blocks - only show for own profile */}
           {isOwnProfile && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6 }}
-              className="grid grid-cols-2 gap-4 mb-8 mt-8"
+              className="grid grid-cols-2 gap-4 mb-8"
             >
               <Link to="/store" className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors">
                 <Store className="w-6 h-6 text-muted-foreground mb-2" />
@@ -509,7 +564,50 @@ const Profile = () => {
               onOpenChange={setShowCustomizationDialog} 
             />
           )}
+
+          {/* Create Post Dialog - only for own profile */}
+          {isOwnProfile && (
+            <CreatePostDialog
+              open={showCreatePostDialog}
+              onOpenChange={setShowCreatePostDialog}
+              onCreatePost={async (data) => {
+                await createPost.mutateAsync(data);
+              }}
+              userAvatar={avatarUrl}
+              userName={displayName}
+            />
+          )}
+
+          {/* Post Detail Modal */}
+          <PostDetailModal
+            post={selectedPost}
+            open={!!selectedPost}
+            onOpenChange={(open) => !open && setSelectedPost(null)}
+            isOwner={isOwnProfile}
+            onDelete={(postId) => {
+              deletePost.mutate(postId);
+              setSelectedPost(null);
+            }}
+          />
         </div>
+
+        {/* Floating Create Post Button - only for own profile */}
+        {isOwnProfile && (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.8, type: "spring", stiffness: 200 }}
+            className="fixed bottom-24 right-4 sm:bottom-8 sm:right-8 z-50"
+          >
+            <Button
+              size="lg"
+              className="h-14 w-14 rounded-full shadow-lg"
+              onClick={() => setShowCreatePostDialog(true)}
+            >
+              <Plus className="w-6 h-6" />
+            </Button>
+          </motion.div>
+        )}
       </div>
     </PageLayout>
   );

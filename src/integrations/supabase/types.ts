@@ -1277,25 +1277,37 @@ export type Database = {
       }
       posts: {
         Row: {
+          alt_text: string | null
+          collaborators: string[] | null
+          comments_enabled: boolean | null
           content: string | null
           created_at: string
           id: string
+          location: string | null
           media_type: string | null
           media_url: string | null
           user_id: string
         }
         Insert: {
+          alt_text?: string | null
+          collaborators?: string[] | null
+          comments_enabled?: boolean | null
           content?: string | null
           created_at?: string
           id?: string
+          location?: string | null
           media_type?: string | null
           media_url?: string | null
           user_id: string
         }
         Update: {
+          alt_text?: string | null
+          collaborators?: string[] | null
+          comments_enabled?: boolean | null
           content?: string | null
           created_at?: string
           id?: string
+          location?: string | null
           media_type?: string | null
           media_url?: string | null
           user_id?: string
