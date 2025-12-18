@@ -20,7 +20,7 @@ const BottomNav = () => {
       transition={{ delay: 0.3, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       className="nav-floating"
     >
-    <div className="relative glass-strong rounded-2xl px-1.5 sm:px-2 py-2 flex items-center gap-0.5 sm:gap-1 shadow-elevated max-w-[calc(100vw-2rem)]">
+      <div className="relative glass-strong rounded-2xl px-2 sm:px-3 py-2 flex items-center gap-1 sm:gap-1.5 shadow-elevated overflow-hidden shrink-0">
         {/* Subtle top highlight */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-foreground/10 to-transparent rounded-t-2xl" />
         
