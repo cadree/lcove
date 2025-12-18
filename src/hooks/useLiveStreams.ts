@@ -18,6 +18,8 @@ export interface LiveStream {
   viewer_count: number;
   total_tips: number;
   created_at: string;
+  replay_available: boolean | null;
+  replay_url: string | null;
   host?: {
     display_name: string | null;
     avatar_url: string | null;
@@ -283,6 +285,32 @@ export const useJoinStream = () => {
         }, { onConflict: 'stream_id,viewer_id' });
 
       if (error) throw error;
+    },
+  });
+};
+
+export const useSaveReplay = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ streamId, replayUrl }: { streamId: string; replayUrl?: string }) => {
+      const { error } = await supabase
+        .from('live_streams')
+        .update({ 
+          replay_available: true,
+          replay_url: replayUrl || null,
+        })
+        .eq('id', streamId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['live-streams'] });
+      toast({ title: 'Replay saved!', description: 'Viewers can now watch your stream replay.' });
+    },
+    onError: (error) => {
+      toast({ title: 'Failed to save replay', description: error.message, variant: 'destructive' });
     },
   });
 };
