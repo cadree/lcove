@@ -14,6 +14,93 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_project_matches: {
+        Row: {
+          created_at: string
+          id: string
+          is_dismissed: boolean
+          match_reasons: Json | null
+          match_score: number
+          project_id: string
+          role_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_dismissed?: boolean
+          match_reasons?: Json | null
+          match_score?: number
+          project_id: string
+          role_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_dismissed?: boolean
+          match_reasons?: Json | null
+          match_score?: number
+          project_id?: string
+          role_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_project_matches_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_project_matches_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "project_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brand_partnerships: {
+        Row: {
+          brand_logo_url: string | null
+          brand_name: string
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          is_active: boolean
+          partnership_type: string
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          brand_logo_url?: string | null
+          brand_name: string
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          partnership_type?: string
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          brand_logo_url?: string | null
+          brand_name?: string
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          partnership_type?: string
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: []
+      }
       calendar_reminders: {
         Row: {
           created_at: string
@@ -155,6 +242,54 @@ export type Database = {
         }
         Relationships: []
       }
+      creator_verifications: {
+        Row: {
+          applied_at: string
+          badge_label: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          portfolio_urls: string[] | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          social_links: Json | null
+          status: string
+          updated_at: string
+          user_id: string
+          verification_type: string
+        }
+        Insert: {
+          applied_at?: string
+          badge_label?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          portfolio_urls?: string[] | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          social_links?: Json | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          verification_type?: string
+        }
+        Update: {
+          applied_at?: string
+          badge_label?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          portfolio_urls?: string[] | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          social_links?: Json | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          verification_type?: string
+        }
+        Relationships: []
+      }
       credit_ledger: {
         Row: {
           amount: number
@@ -190,6 +325,66 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      escrow_holdings: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          milestone_id: string | null
+          payee_id: string
+          payer_id: string
+          project_id: string
+          released_at: string | null
+          status: string
+          stripe_payment_intent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          milestone_id?: string | null
+          payee_id: string
+          payer_id: string
+          project_id: string
+          released_at?: string | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          milestone_id?: string | null
+          payee_id?: string
+          payer_id?: string
+          project_id?: string
+          released_at?: string | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escrow_holdings_milestone_id_fkey"
+            columns: ["milestone_id"]
+            isOneToOne: false
+            referencedRelation: "project_milestones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escrow_holdings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       event_rsvps: {
         Row: {
@@ -301,6 +496,48 @@ export type Database = {
           title?: string
           updated_at?: string
           venue?: string | null
+        }
+        Relationships: []
+      }
+      featured_creators: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string
+          description: string | null
+          display_order: number
+          end_date: string | null
+          feature_type: string
+          id: string
+          is_active: boolean
+          start_date: string
+          title: string | null
+          user_id: string
+        }
+        Insert: {
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          end_date?: string | null
+          feature_type?: string
+          id?: string
+          is_active?: boolean
+          start_date?: string
+          title?: string | null
+          user_id: string
+        }
+        Update: {
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          end_date?: string | null
+          feature_type?: string
+          id?: string
+          is_active?: boolean
+          start_date?: string
+          title?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -1050,6 +1287,78 @@ export type Database = {
           },
         ]
       }
+      project_milestones: {
+        Row: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          currency: string
+          description: string | null
+          due_date: string | null
+          id: string
+          paid_at: string | null
+          project_id: string
+          role_id: string | null
+          status: string
+          stripe_payment_intent_id: string | null
+          submitted_at: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          paid_at?: string | null
+          project_id: string
+          role_id?: string | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+          submitted_at?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          paid_at?: string | null
+          project_id?: string
+          role_id?: string | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+          submitted_at?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_milestones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_milestones_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "project_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_roles: {
         Row: {
           created_at: string
@@ -1203,6 +1512,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      reputation_scores: {
+        Row: {
+          completed_projects: number
+          created_at: string
+          id: string
+          last_calculated_at: string
+          on_time_delivery_rate: number
+          overall_score: number
+          response_rate: number
+          review_count: number
+          review_score: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_projects?: number
+          created_at?: string
+          id?: string
+          last_calculated_at?: string
+          on_time_delivery_rate?: number
+          overall_score?: number
+          response_rate?: number
+          review_count?: number
+          review_score?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_projects?: number
+          created_at?: string
+          id?: string
+          last_calculated_at?: string
+          on_time_delivery_rate?: number
+          overall_score?: number
+          response_rate?: number
+          review_count?: number
+          review_score?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       saved_posts: {
         Row: {
@@ -1993,6 +2344,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_reputation_score: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
       is_conversation_participant: {
         Args: { conv_id: string; uid: string }
         Returns: boolean

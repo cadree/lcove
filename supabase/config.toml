@@ -1,1 +1,34 @@
 project_id = "wjbyvlgsxscwukkolehg"
+
+[functions.ai-project-match]
+verify_jwt = true
+
+[functions.award-credits]
+verify_jwt = true
+
+[functions.check-membership]
+verify_jwt = true
+
+[functions.create-membership-checkout]
+verify_jwt = true
+
+[functions.customer-portal]
+verify_jwt = true
+
+[functions.process-payout]
+verify_jwt = true
+
+[functions.purchase-event-ticket]
+verify_jwt = true
+
+[functions.purchase-store-item]
+verify_jwt = true
+
+[functions.setup-payout-method]
+verify_jwt = true
+
+[functions.tip-stream]
+verify_jwt = true
+
+[functions.verify-ticket-payment]
+verify_jwt = true

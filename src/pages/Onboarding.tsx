@@ -12,6 +12,7 @@ import OnboardingCity from '@/components/onboarding/OnboardingCity';
 import OnboardingSkills from '@/components/onboarding/OnboardingSkills';
 import OnboardingRoles from '@/components/onboarding/OnboardingRoles';
 import OnboardingQuestionnaire from '@/components/onboarding/OnboardingQuestionnaire';
+import OnboardingConnections from '@/components/onboarding/OnboardingConnections';
 import OnboardingCompletion from '@/components/onboarding/OnboardingCompletion';
 import OnboardingDenied from '@/components/onboarding/OnboardingDenied';
 
@@ -133,7 +134,7 @@ const Onboarding = () => {
       if (level === 'level_1') {
         setCurrentStep(8); // Show denied screen
       } else {
-        setCurrentStep(7); // Show completion screen
+        setCurrentStep(6); // Show connections screen (optional step)
       }
     } catch (error) {
       toast({
@@ -170,6 +171,7 @@ const Onboarding = () => {
     <OnboardingSkills key="skills" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingRoles key="roles" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingQuestionnaire key="questionnaire" data={data} updateData={updateData} onComplete={handleComplete} onBack={prevStep} />,
+    <OnboardingConnections key="connections" onComplete={() => setCurrentStep(7)} onBack={prevStep} />,
     <OnboardingCompletion key="completion" accessLevel={accessLevel} />,
     <OnboardingDenied key="denied" />,
   ];
