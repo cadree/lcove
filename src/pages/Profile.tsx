@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
@@ -6,13 +7,14 @@ import {
   MapPin,
   Link as LinkIcon,
   Instagram,
-  Music,
   Calendar,
   Store,
   Coins,
   Edit,
   Plus,
 } from "lucide-react";
+import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
+import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
 
 const profileData = {
   name: "Maya Chen",
@@ -38,6 +40,8 @@ const profileData = {
 };
 
 const Profile = () => {
+  const [showMusicDialog, setShowMusicDialog] = useState(false);
+
   return (
     <PageLayout>
       <div className="min-h-screen">
@@ -195,6 +199,9 @@ const Profile = () => {
             </div>
           </motion.div>
 
+          {/* Music Block */}
+          <MusicProfileBlock onConnectClick={() => setShowMusicDialog(true)} />
+
           {/* Additional Blocks (Preview) */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -210,15 +217,14 @@ const Profile = () => {
               <Calendar className="w-6 h-6 text-muted-foreground mb-2" />
               <span className="text-sm text-muted-foreground">Add Events</span>
             </div>
-            <div className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors">
-              <Music className="w-6 h-6 text-muted-foreground mb-2" />
-              <span className="text-sm text-muted-foreground">Connect Music</span>
-            </div>
-            <div className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors">
+            <div className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors col-span-2">
               <Plus className="w-6 h-6 text-muted-foreground mb-2" />
-              <span className="text-sm text-muted-foreground">Add Block</span>
+              <span className="text-sm text-muted-foreground">Add Custom Block</span>
             </div>
           </motion.div>
+
+          {/* Music Dialog */}
+          <ConnectMusicDialog open={showMusicDialog} onOpenChange={setShowMusicDialog} />
         </div>
       </div>
     </PageLayout>
