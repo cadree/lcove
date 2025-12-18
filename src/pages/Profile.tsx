@@ -24,6 +24,9 @@ import {
   Grid,
   Bookmark,
   FileText,
+  FolderKanban,
+  Rocket,
+  ChevronRight,
 } from "lucide-react";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
@@ -443,6 +446,54 @@ const Profile = () => {
             <h2 className="font-display text-lg font-medium text-foreground mb-3">About</h2>
             <p className="text-muted-foreground leading-relaxed">{bio}</p>
           </motion.div>
+
+          {/* Quick Actions - Projects */}
+          {isOwnProfile && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45 }}
+              className="mb-8"
+            >
+              <h2 className="font-display text-lg font-medium text-foreground mb-3">Quick Actions</h2>
+              <div className="grid grid-cols-2 gap-3">
+                <Link 
+                  to="/projects"
+                  className={cn(
+                    getCardStyle(),
+                    "p-4 flex flex-col items-center gap-2 hover:scale-[1.02] transition-transform cursor-pointer"
+                  )}
+                >
+                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                    <FolderKanban className="w-5 h-5 text-primary" />
+                  </div>
+                  <span className="text-sm font-medium text-foreground">Browse Projects</span>
+                  <span className="text-xs text-muted-foreground text-center">Find collaborators</span>
+                </Link>
+                <Link 
+                  to="/projects"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate('/projects');
+                    // Small delay to let the page load, then trigger the create dialog
+                    setTimeout(() => {
+                      document.querySelector<HTMLButtonElement>('[data-create-project]')?.click();
+                    }, 100);
+                  }}
+                  className={cn(
+                    getCardStyle(),
+                    "p-4 flex flex-col items-center gap-2 hover:scale-[1.02] transition-transform cursor-pointer border-primary/30"
+                  )}
+                >
+                  <div className="w-10 h-10 rounded-full bg-accent/30 flex items-center justify-center">
+                    <Rocket className="w-5 h-5 text-accent-foreground" />
+                  </div>
+                  <span className="text-sm font-medium text-foreground">Post a Project</span>
+                  <span className="text-xs text-muted-foreground text-center">Need help? Ask the community</span>
+                </Link>
+              </div>
+            </motion.div>
+          )}
 
           {/* Profile Music Record Player - shows when music is enabled */}
           {customization?.profile_music_enabled && (customization?.profile_music_url || customization?.profile_music_preview_url) && (

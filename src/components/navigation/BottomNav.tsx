@@ -1,4 +1,4 @@
-import { Home, Compass, Search, User, MessageCircle, Bell } from "lucide-react";
+import { Home, Compass, Search, User, MessageCircle, FolderKanban } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
@@ -7,8 +7,8 @@ const navItems = [
   { icon: Home, label: "Home", path: "/" },
   { icon: Compass, label: "Feed", path: "/feed" },
   { icon: Search, label: "Directory", path: "/directory" },
+  { icon: FolderKanban, label: "Projects", path: "/projects" },
   { icon: MessageCircle, label: "Messages", path: "/messages" },
-  { icon: Bell, label: "Notifications", path: "/notifications" },
   { icon: User, label: "Profile", path: "/profile" },
 ];
 
