@@ -183,6 +183,84 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          comments_enabled: boolean | null
+          created_at: string
+          email_enabled: boolean | null
+          event_reminders_enabled: boolean | null
+          id: string
+          likes_enabled: boolean | null
+          live_streams_enabled: boolean | null
+          messages_enabled: boolean | null
+          project_invites_enabled: boolean | null
+          push_enabled: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comments_enabled?: boolean | null
+          created_at?: string
+          email_enabled?: boolean | null
+          event_reminders_enabled?: boolean | null
+          id?: string
+          likes_enabled?: boolean | null
+          live_streams_enabled?: boolean | null
+          messages_enabled?: boolean | null
+          project_invites_enabled?: boolean | null
+          push_enabled?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          comments_enabled?: boolean | null
+          created_at?: string
+          email_enabled?: boolean | null
+          event_reminders_enabled?: boolean | null
+          id?: string
+          likes_enabled?: boolean | null
+          live_streams_enabled?: boolean | null
+          messages_enabled?: boolean | null
+          project_invites_enabled?: boolean | null
+          push_enabled?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          data: Json | null
+          id: string
+          read_at: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          data?: Json | null
+          id?: string
+          read_at?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          data?: Json | null
+          id?: string
+          read_at?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       passions: {
         Row: {
           category: string | null
