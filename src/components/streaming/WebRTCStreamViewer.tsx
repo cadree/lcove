@@ -24,18 +24,44 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [isConnecting, setIsConnecting] = useState(true);
   const [connectionState, setConnectionState] = useState<string>('connecting');
   const [hasVideo, setHasVideo] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const cleanup = useCallback(() => {
+    console.log('[Viewer] Cleaning up...');
+    
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+    
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+  }, []);
+
   const connect = useCallback(async () => {
-    if (!user || !isLive) return;
+    if (!user || !isLive) {
+      console.log('[Viewer] Cannot connect - user:', !!user, 'isLive:', isLive);
+      return;
+    }
+    
+    cleanup();
     
     setIsConnecting(true);
     setError(null);
     setConnectionState('connecting');
+    setHasVideo(false);
 
     try {
       console.log('[Viewer] Connecting to stream:', streamId, 'Host:', hostId);
@@ -45,6 +71,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
         ],
       });
       peerConnectionRef.current = pc;
@@ -54,6 +81,9 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
         console.log('[Viewer] Received track:', event.track.kind);
         if (videoRef.current && event.streams[0]) {
           videoRef.current.srcObject = event.streams[0];
+          videoRef.current.play().catch(err => {
+            console.log('[Viewer] Autoplay blocked:', err);
+          });
           setHasVideo(true);
           setIsConnecting(false);
           setConnectionState('connected');
@@ -64,11 +94,21 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       pc.onconnectionstatechange = () => {
         console.log('[Viewer] Connection state:', pc.connectionState);
         setConnectionState(pc.connectionState);
+        
         if (pc.connectionState === 'connected') {
           setIsConnecting(false);
-        } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-          setError('Connection lost');
+          setError(null);
+        } else if (pc.connectionState === 'failed') {
+          setError('Connection failed');
           setIsConnecting(false);
+        } else if (pc.connectionState === 'disconnected') {
+          // Try to reconnect after a short delay
+          reconnectTimeoutRef.current = setTimeout(() => {
+            if (isLive) {
+              console.log('[Viewer] Attempting reconnect...');
+              connect();
+            }
+          }, 3000);
         }
       };
 
@@ -76,48 +116,75 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
         console.log('[Viewer] ICE state:', pc.iceConnectionState);
       };
 
-      // Set up signaling channel - use same channel name as host
-      const channel = supabase.channel(`stream-signaling-${streamId}`);
+      // Set up signaling channel
+      const channel = supabase.channel(`stream-signaling-${streamId}`, {
+        config: { broadcast: { self: false } }
+      });
       channelRef.current = channel;
 
-      // Listen for answer from host (host responds to our offer)
+      // Listen for answer from host
       channel.on('broadcast', { event: 'answer' }, async ({ payload }: any) => {
-        console.log('[Viewer] Received answer from:', payload.senderId);
-        // Only process answers meant for us (from the host)
-        if (payload.senderId === hostId && pc.signalingState !== 'stable') {
-          try {
-            await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
-            console.log('[Viewer] Set remote description from answer');
-          } catch (err) {
-            console.error('[Viewer] Error setting remote description:', err);
+        const { answer, senderId, targetId } = payload;
+        
+        // Only process answers meant for us from the host
+        if (senderId !== hostId) return;
+        if (targetId && targetId !== user.id) return;
+        
+        console.log('[Viewer] Received answer from host');
+        
+        try {
+          if (pc.signalingState === 'have-local-offer') {
+            await pc.setRemoteDescription(new RTCSessionDescription(answer));
+            console.log('[Viewer] Set remote description');
           }
+        } catch (err) {
+          console.error('[Viewer] Error setting remote description:', err);
         }
       });
 
       // Listen for ICE candidates from host
       channel.on('broadcast', { event: 'ice-candidate' }, async ({ payload }: any) => {
-        // Only accept candidates from the host
-        if (payload.senderId === hostId) {
-          try {
-            await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-            console.log('[Viewer] Added ICE candidate from host');
-          } catch (err) {
-            console.error('[Viewer] Error adding ICE candidate:', err);
+        const { candidate, senderId, targetId } = payload;
+        
+        // Only accept candidates from the host meant for us
+        if (senderId !== hostId) return;
+        if (targetId && targetId !== user.id) return;
+        
+        console.log('[Viewer] Received ICE candidate from host');
+        
+        try {
+          if (pc.remoteDescription) {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
           }
+        } catch (err) {
+          console.error('[Viewer] Error adding ICE candidate:', err);
         }
       });
 
-      await channel.subscribe();
-      console.log('[Viewer] Subscribed to signaling channel');
+      // Subscribe to channel
+      await new Promise<void>((resolve, reject) => {
+        channel.subscribe((status) => {
+          console.log('[Viewer] Signaling channel status:', status);
+          if (status === 'SUBSCRIBED') {
+            resolve();
+          } else if (status === 'CHANNEL_ERROR') {
+            reject(new Error('Failed to subscribe to signaling channel'));
+          }
+        });
+      });
 
       // Send our ICE candidates to host
       pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          console.log('[Viewer] Sending ICE candidate');
-          channel.send({
+        if (event.candidate && channelRef.current) {
+          console.log('[Viewer] Sending ICE candidate to host');
+          channelRef.current.send({
             type: 'broadcast',
             event: 'ice-candidate',
-            payload: { candidate: event.candidate.toJSON(), senderId: user.id },
+            payload: { 
+              candidate: event.candidate.toJSON(), 
+              senderId: user.id,
+              targetId: hostId 
+            },
           });
         }
       };
@@ -137,12 +204,12 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
         payload: { offer, senderId: user.id },
       });
 
-      // Timeout for connection
+      // Set timeout for connection
       setTimeout(() => {
-        if (peerConnectionRef.current?.connectionState !== 'connected') {
-          console.log('[Viewer] Connection attempt still in progress...');
+        if (peerConnectionRef.current?.connectionState !== 'connected' && !hasVideo) {
+          console.log('[Viewer] Connection timeout, still trying...');
         }
-      }, 10000);
+      }, 15000);
 
     } catch (err: any) {
       console.error('[Viewer] Error connecting to stream:', err);
@@ -150,26 +217,26 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       setConnectionState('failed');
       setIsConnecting(false);
     }
-  }, [streamId, hostId, user, isLive]);
+  }, [streamId, hostId, user, isLive, cleanup, hasVideo]);
 
   useEffect(() => {
     if (isLive && user) {
-      connect();
+      // Small delay to ensure host is ready
+      const timer = setTimeout(() => {
+        connect();
+      }, 500);
+      
+      return () => {
+        clearTimeout(timer);
+        cleanup();
+      };
     }
-
-    return () => {
-      peerConnectionRef.current?.close();
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-      }
-    };
-  }, [isLive, user, connect]);
+    
+    return cleanup;
+  }, [isLive, user, connect, cleanup]);
 
   const handleRetry = () => {
-    peerConnectionRef.current?.close();
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-    }
+    cleanup();
     connect();
   };
 
@@ -195,7 +262,6 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
           <div className="text-center">
             <WifiOff className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">Stream is offline</p>
-            <p className="text-sm text-muted-foreground/60">Check back when the host goes live</p>
           </div>
         )}
       </div>
@@ -228,7 +294,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
             <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
             <p className="text-foreground font-medium">Connecting to live stream...</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Establishing P2P connection
+              Establishing connection with host
             </p>
           </div>
         </div>
@@ -249,12 +315,12 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
         </div>
       )}
 
-      {/* No video placeholder */}
-      {!isConnecting && !hasVideo && !error && (
+      {/* Audio only / waiting for video */}
+      {!isConnecting && !hasVideo && !error && connectionState === 'connected' && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
           <div className="text-center">
             <Radio className="h-16 w-16 text-primary mx-auto mb-4 animate-pulse" />
-            <p className="text-muted-foreground">Audio only stream</p>
+            <p className="text-muted-foreground">Waiting for video...</p>
           </div>
         </div>
       )}
@@ -271,9 +337,9 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
           <Users className="h-3 w-3 mr-1" />
           {viewerCount}
         </Badge>
-        {connectionState !== 'connected' && connectionState !== 'connecting' && (
-          <Badge variant="outline" className="bg-background/80 backdrop-blur-sm text-xs">
-            {connectionState}
+        {connectionState === 'connected' && hasVideo && (
+          <Badge variant="outline" className="bg-green-500/20 text-green-500 border-green-500/30">
+            Connected
           </Badge>
         )}
       </div>
