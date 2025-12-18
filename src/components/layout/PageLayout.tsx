@@ -4,15 +4,16 @@ import BottomNav from "@/components/navigation/BottomNav";
 interface PageLayoutProps {
   children: ReactNode;
   className?: string;
+  hideNav?: boolean;
 }
 
-const PageLayout = ({ children, className = "" }: PageLayoutProps) => {
+const PageLayout = ({ children, className = "", hideNav = false }: PageLayoutProps) => {
   return (
     <div className="min-h-screen bg-background">
-      <main className={`pb-28 ${className}`}>
+      <main className={`${hideNav ? '' : 'pb-28'} ${className}`}>
         {children}
       </main>
-      <BottomNav />
+      {!hideNav && <BottomNav />}
     </div>
   );
 };
