@@ -1,169 +1,143 @@
-import { motion } from "framer-motion";
-import PageLayout from "@/components/layout/PageLayout";
-import { Button } from "@/components/ui/button";
-import { Plus, Users, Clock, MapPin, DollarSign, Coins } from "lucide-react";
+import React, { useState } from 'react';
+import { Plus, FolderKanban, Filter } from 'lucide-react';
+import PageLayout from '@/components/layout/PageLayout';
+import { useProjects, Project } from '@/hooks/useProjects';
+import { useAuth } from '@/contexts/AuthContext';
+import { ProjectCard } from '@/components/projects/ProjectCard';
+import { ProjectDetail } from '@/components/projects/ProjectDetail';
+import { CreateProjectDialog } from '@/components/projects/CreateProjectDialog';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const projects = [
-  {
-    id: 1,
-    title: "Music Video Production",
-    description: "Looking for a director and DP for an indie artist music video shoot in downtown LA.",
-    roles: ["Director", "DP", "Editor"],
-    location: "Los Angeles",
-    compensation: "Paid + Credits",
-    deadline: "Dec 30",
-    applicants: 12,
-    status: "open",
-  },
-  {
-    id: 2,
-    title: "Brand Identity Redesign",
-    description: "Sustainable fashion brand seeking full rebrand including logo, guidelines, and collateral.",
-    roles: ["Brand Designer", "Strategist"],
-    location: "Remote",
-    compensation: "Paid",
-    deadline: "Jan 15",
-    applicants: 8,
-    status: "open",
-  },
-  {
-    id: 3,
-    title: "Album Artwork Series",
-    description: "Creating visual artwork for a 12-track electronic album release.",
-    roles: ["Illustrator", "Motion Designer"],
-    location: "New York",
-    compensation: "Credits",
-    deadline: "Jan 5",
-    applicants: 23,
-    status: "open",
-  },
-  {
-    id: 4,
-    title: "Documentary Short",
-    description: "15-minute documentary about underground music scene. Need sound designer and colorist.",
-    roles: ["Sound Designer", "Colorist"],
-    location: "Chicago",
-    compensation: "Hybrid",
-    deadline: "Feb 1",
-    applicants: 6,
-    status: "open",
-  },
-];
+const Projects: React.FC = () => {
+  const { user } = useAuth();
+  const [statusFilter, setStatusFilter] = useState('all');
+  const { projects, myProjects, isLoading } = useProjects(statusFilter);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
-const Projects = () => {
+  const handleProjectClick = (project: Project) => {
+    setSelectedProject(project);
+    setDetailOpen(true);
+  };
+
   return (
     <PageLayout>
-      <div className="px-6 pt-8">
+      <div className="p-4 sm:p-6 pb-32">
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-start justify-between mb-8"
-        >
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="font-display text-3xl font-medium text-foreground mb-2">Projects</h1>
-            <p className="text-muted-foreground">Find collaborators or post your own project call</p>
+            <h1 className="text-2xl font-display font-bold">Projects</h1>
+            <p className="text-sm text-muted-foreground">Find collaborators, share budgets transparently</p>
           </div>
-          <Button variant="pink" size="lg" className="hidden sm:flex">
-            <Plus className="w-4 h-4" />
-            Post Project
-          </Button>
-        </motion.div>
-
-        {/* Mobile CTA */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="sm:hidden mb-6"
-        >
-          <Button variant="pink" className="w-full">
-            <Plus className="w-4 h-4" />
-            Post Project Call
-          </Button>
-        </motion.div>
-
-        {/* Projects List */}
-        <div className="space-y-4">
-          {projects.map((project, index) => (
-            <motion.div
-              key={project.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: index * 0.1 }}
-              className="glass-strong rounded-2xl p-6 hover:bg-accent/20 transition-all duration-300 cursor-pointer"
-            >
-              {/* Header */}
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="font-display text-xl font-medium text-foreground mb-2">
-                    {project.title}
-                  </h3>
-                  <p className="text-muted-foreground text-sm line-clamp-2">
-                    {project.description}
-                  </p>
-                </div>
-                <span className="px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-medium flex-shrink-0">
-                  Open
-                </span>
-              </div>
-
-              {/* Roles */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                {project.roles.map((role) => (
-                  <span
-                    key={role}
-                    className="px-3 py-1.5 rounded-lg bg-accent text-accent-foreground text-sm"
-                  >
-                    {role}
-                  </span>
-                ))}
-              </div>
-
-              {/* Meta */}
-              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <MapPin className="w-4 h-4" />
-                  {project.location}
-                </div>
-                <div className="flex items-center gap-1">
-                  {project.compensation.includes("Paid") ? (
-                    <DollarSign className="w-4 h-4" />
-                  ) : (
-                    <Coins className="w-4 h-4" />
-                  )}
-                  {project.compensation}
-                </div>
-                <div className="flex items-center gap-1">
-                  <Clock className="w-4 h-4" />
-                  {project.deadline}
-                </div>
-                <div className="flex items-center gap-1">
-                  <Users className="w-4 h-4" />
-                  {project.applicants} applied
-                </div>
-              </div>
-            </motion.div>
-          ))}
+          {user && (
+            <CreateProjectDialog>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                New Project
+              </Button>
+            </CreateProjectDialog>
+          )}
         </div>
 
-        {/* Empty State (when no projects) */}
-        {projects.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-16"
-          >
-            <div className="w-16 h-16 rounded-2xl bg-accent/50 flex items-center justify-center mx-auto mb-4">
-              <Plus className="w-8 h-8 text-muted-foreground" />
+        {/* Tabs */}
+        <Tabs defaultValue="browse" className="w-full">
+          <TabsList className="w-full max-w-md mb-6">
+            <TabsTrigger value="browse" className="flex-1">Browse Projects</TabsTrigger>
+            {user && <TabsTrigger value="my-projects" className="flex-1">My Projects</TabsTrigger>}
+          </TabsList>
+
+          <TabsContent value="browse">
+            {/* Status Filter */}
+            <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-2">
+              <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              {['all', 'open', 'in_progress', 'completed'].map((status) => (
+                <Button
+                  key={status}
+                  variant={statusFilter === status ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setStatusFilter(status)}
+                  className="flex-shrink-0"
+                >
+                  {status === 'all' ? 'All' : status.replace('_', ' ')}
+                </Button>
+              ))}
             </div>
-            <p className="text-muted-foreground text-lg mb-2">No project calls yet</p>
-            <p className="text-muted-foreground/70 text-sm mb-6">
-              Be the first to post a collaboration opportunity
-            </p>
-            <Button variant="pink">Post Your First Project</Button>
-          </motion.div>
-        )}
+
+            {/* Projects Grid */}
+            {isLoading ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {[...Array(6)].map((_, i) => (
+                  <Skeleton key={i} className="h-64 rounded-xl" />
+                ))}
+              </div>
+            ) : projects.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <FolderKanban className="h-12 w-12 text-muted-foreground/30 mb-4" />
+                <h3 className="text-lg font-medium mb-1">No projects found</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Be the first to create a project and find collaborators
+                </p>
+                {user && (
+                  <CreateProjectDialog>
+                    <Button>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Project
+                    </Button>
+                  </CreateProjectDialog>
+                )}
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {projects.map((project) => (
+                  <ProjectCard
+                    key={project.id}
+                    project={project}
+                    onClick={() => handleProjectClick(project)}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {user && (
+            <TabsContent value="my-projects">
+              {myProjects.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <FolderKanban className="h-12 w-12 text-muted-foreground/30 mb-4" />
+                  <h3 className="text-lg font-medium mb-1">No projects yet</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Create your first project to start collaborating
+                  </p>
+                  <CreateProjectDialog>
+                    <Button>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Project
+                    </Button>
+                  </CreateProjectDialog>
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {myProjects.map((project) => (
+                    <ProjectCard
+                      key={project.id}
+                      project={project}
+                      onClick={() => handleProjectClick(project)}
+                    />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          )}
+        </Tabs>
+
+        {/* Project Detail Sheet */}
+        <ProjectDetail
+          project={selectedProject}
+          open={detailOpen}
+          onClose={() => setDetailOpen(false)}
+        />
       </div>
     </PageLayout>
   );
