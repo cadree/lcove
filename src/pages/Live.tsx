@@ -159,7 +159,11 @@ const Live = () => {
         </Tabs>
 
         {/* Create Stream Dialog */}
-        <CreateStreamDialog open={showCreate} onClose={() => setShowCreate(false)} />
+        <CreateStreamDialog 
+          open={showCreate} 
+          onClose={() => setShowCreate(false)} 
+          onStreamCreated={(streamId) => setSelectedStreamId(streamId)}
+        />
 
         {/* Stream Viewer */}
         {selectedStreamId && (

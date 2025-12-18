@@ -42,40 +42,71 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
     hasMicrophone: boolean;
   } | null>(null);
 
-  // Check media capabilities on mount
+  const [previewActive, setPreviewActive] = useState(false);
+
+  // Start camera preview immediately on mount
   useEffect(() => {
-    const checkCapabilities = async () => {
-      const caps = await checkMediaCapabilities();
-      setMediaCapabilities(caps);
-      
-      if (!caps.hasCamera && !caps.hasMicrophone) {
-        setError('No camera or microphone found. Please connect a media device.');
+    const initPreview = async () => {
+      try {
+        const caps = await checkMediaCapabilities();
+        setMediaCapabilities(caps);
+        console.log('Media capabilities:', caps);
+
+        if (!caps.hasCamera && !caps.hasMicrophone) {
+          setError('No camera or microphone found. Please connect a media device.');
+          setIsLoading(false);
+          return;
+        }
+
+        // Start preview immediately
+        localStreamRef.current = new LocalStream();
+        const stream = await localStreamRef.current.start({
+          video: caps.hasCamera,
+          audio: caps.hasMicrophone,
+        });
+        console.log('Preview stream started:', stream.id);
+
+        // Attach to video element
+        if (videoRef.current) {
+          localStreamRef.current.attachToVideo(videoRef.current);
+          console.log('Stream attached to video element');
+        }
+
+        setPreviewActive(true);
+        setIsLoading(false);
+      } catch (err: any) {
+        console.error('Error starting preview:', err);
+        
+        if (err.name === 'NotAllowedError') {
+          setError('Camera/microphone access denied. Please click "Allow" when your browser asks for permission.');
+        } else if (err.name === 'NotFoundError') {
+          setError('No camera or microphone found. Please connect a media device.');
+        } else if (err.name === 'NotReadableError') {
+          setError('Camera/microphone is already in use by another app. Please close other apps using it.');
+        } else {
+          setError(err.message || 'Failed to access camera/microphone');
+        }
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
-    checkCapabilities();
+
+    initPreview();
+
+    return () => {
+      // Cleanup on unmount if not streaming
+      if (!isStreaming && localStreamRef.current) {
+        localStreamRef.current.stop();
+      }
+    };
   }, []);
 
-  // Initialize stream
+  // Go live (preview already running)
   const startStream = async () => {
-    if (!user) return;
+    if (!user || !previewActive) return;
     
     setIsLoading(true);
-    setError(null);
 
     try {
-      // Start local stream
-      localStreamRef.current = new LocalStream();
-      const stream = await localStreamRef.current.start({
-        video: mediaCapabilities?.hasCamera ?? true,
-        audio: mediaCapabilities?.hasMicrophone ?? true,
-      });
-
-      // Attach to video element
-      if (videoRef.current) {
-        localStreamRef.current.attachToVideo(videoRef.current);
-      }
-
       // Set up signaling channel
       signalingRef.current = new SignalingChannel(supabase, streamId, user.id);
 
@@ -91,18 +122,9 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
       setIsStreaming(true);
       toast({ title: 'You are now live!' });
     } catch (err: any) {
-      console.error('Error starting stream:', err);
-      
-      if (err.name === 'NotAllowedError') {
-        setError('Camera/microphone access denied. Please allow access in your browser settings.');
-      } else if (err.name === 'NotFoundError') {
-        setError('No camera or microphone found. Please connect a media device.');
-      } else {
-        setError(err.message || 'Failed to start stream');
-      }
-      
+      console.error('Error going live:', err);
       toast({ 
-        title: 'Failed to start stream', 
+        title: 'Failed to go live', 
         description: err.message,
         variant: 'destructive' 
       });
@@ -184,23 +206,27 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
     };
   }, []);
 
-  if (isLoading && !isStreaming) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">Checking media devices...</p>
-      </div>
-    );
-  }
-
-  if (error && !isStreaming) {
+  if (error && !previewActive) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 p-6 text-center">
         <AlertCircle className="h-12 w-12 text-destructive" />
         <p className="text-destructive font-medium">{error}</p>
-        <Button onClick={() => setError(null)} variant="outline">
-          Try Again
+        <Button onClick={() => window.location.reload()} variant="outline">
+          Retry
         </Button>
+        <p className="text-xs text-muted-foreground max-w-sm">
+          Tip: Make sure your browser has permission to access camera/microphone. Check your browser's address bar for a camera icon.
+        </p>
+      </div>
+    );
+  }
+
+  if (isLoading && !previewActive) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Requesting camera access...</p>
+        <p className="text-xs text-muted-foreground">Please allow access when prompted</p>
       </div>
     );
   }
@@ -217,12 +243,21 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
       />
 
       {/* Video disabled overlay */}
-      {!videoEnabled && isStreaming && (
+      {!videoEnabled && previewActive && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
           <div className="text-center">
             <VideoOff className="h-16 w-16 text-muted-foreground mx-auto mb-2" />
             <p className="text-muted-foreground">Camera Off</p>
           </div>
+        </div>
+      )}
+
+      {/* Preview badge when not yet live */}
+      {previewActive && !isStreaming && (
+        <div className="absolute top-4 left-4">
+          <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
+            Preview
+          </Badge>
         </div>
       )}
 
@@ -249,15 +284,15 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
         {!isStreaming ? (
           <Button 
             onClick={startStream} 
-            className="gap-2"
-            disabled={isLoading}
+            className="gap-2 bg-red-500 hover:bg-red-600"
+            disabled={isLoading || !previewActive}
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Radio className="h-4 w-4" />
             )}
-            Go Live
+            {previewActive ? 'Go Live' : 'Loading...'}
           </Button>
         ) : (
           <>

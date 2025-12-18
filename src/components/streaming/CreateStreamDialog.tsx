@@ -11,11 +11,12 @@ import { useCreateStream } from '@/hooks/useLiveStreams';
 interface CreateStreamDialogProps {
   open: boolean;
   onClose: () => void;
+  onStreamCreated?: (streamId: string) => void;
 }
 
 type StreamType = 'webrtc' | 'youtube' | 'twitch' | 'soundcloud' | 'opus';
 
-export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, onClose }) => {
+export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, onClose, onStreamCreated }) => {
   const createStream = useCreateStream();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -25,12 +26,17 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    await createStream.mutateAsync({
+    const result = await createStream.mutateAsync({
       title,
       description,
       stream_type: streamType,
       external_url: streamType !== 'webrtc' ? externalUrl : undefined,
     });
+
+    // Auto-open webrtc streams after creation
+    if (streamType === 'webrtc' && result?.id && onStreamCreated) {
+      onStreamCreated(result.id);
+    }
 
     onClose();
     setTitle('');
