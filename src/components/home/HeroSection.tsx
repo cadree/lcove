@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { usePlatformStats } from "@/hooks/usePlatformStats";
+import etherLogo from "@/assets/ether-logo.avif";
 
 const formatStat = (value: number): string => {
   if (value >= 1000) {
@@ -39,6 +40,20 @@ const HeroSection = () => {
         >
           <Sparkles className="w-4 h-4 text-primary" />
           <span className="text-sm text-muted-foreground">A Creative Operating System</span>
+        </motion.div>
+
+        {/* Logo Title */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.05 }}
+          className="mb-6"
+        >
+          <img 
+            src={etherLogo} 
+            alt="ETHER" 
+            className="h-16 sm:h-20 md:h-24 lg:h-28 mx-auto"
+          />
         </motion.div>
 
         {/* Main Headline */}
