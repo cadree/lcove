@@ -122,7 +122,7 @@ const Feed = () => {
                 description="This is your space to share what you're creating, thinking, or discovering. Your voice matters here."
                 action={user ? {
                   label: "Share Something",
-                  onClick: () => document.querySelector<HTMLTextAreaElement>('[placeholder*="Share"]')?.focus()
+                  onClick: () => document.querySelector<HTMLTextAreaElement>('[placeholder*="mind"]')?.focus()
                 } : undefined}
               />
             )}
