@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,8 @@ import {
   Coins,
   Edit,
   Plus,
+  Heart,
+  Crown,
 } from "lucide-react";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
@@ -210,18 +213,22 @@ const Profile = () => {
             transition={{ delay: 0.6 }}
             className="grid grid-cols-2 gap-4 mb-8"
           >
-            <div className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors">
+            <Link to="/store" className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors">
               <Store className="w-6 h-6 text-muted-foreground mb-2" />
-              <span className="text-sm text-muted-foreground">Add Store</span>
-            </div>
-            <div className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors">
+              <span className="text-sm text-muted-foreground">My Store</span>
+            </Link>
+            <Link to="/calendar" className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors">
               <Calendar className="w-6 h-6 text-muted-foreground mb-2" />
-              <span className="text-sm text-muted-foreground">Add Events</span>
-            </div>
-            <div className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors col-span-2">
-              <Plus className="w-6 h-6 text-muted-foreground mb-2" />
-              <span className="text-sm text-muted-foreground">Add Custom Block</span>
-            </div>
+              <span className="text-sm text-muted-foreground">My Events</span>
+            </Link>
+            <Link to="/fund" className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors">
+              <Heart className="w-6 h-6 text-primary mb-2" />
+              <span className="text-sm text-muted-foreground">Community Fund</span>
+            </Link>
+            <Link to="/membership" className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors">
+              <Crown className="w-6 h-6 text-amber-400 mb-2" />
+              <span className="text-sm text-muted-foreground">Membership</span>
+            </Link>
           </motion.div>
 
           {/* Music Dialog */}

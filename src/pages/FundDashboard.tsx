@@ -2,19 +2,21 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Users, Calendar, GraduationCap, Building2, Briefcase, Sparkles, Heart, Crown, ArrowRight } from "lucide-react";
+import { TrendingUp, Users, Calendar, GraduationCap, Building2, Briefcase, Sparkles, Heart, Crown, ArrowRight, Wallet, CheckCircle2 } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
+import { useMembership } from "@/hooks/useMembership";
+import { useAuth } from "@/contexts/AuthContext";
 
 const ALLOCATION_DATA = [
-  { name: "Community Grants", value: 35, color: "hsl(330, 100%, 71%)", icon: Users, description: "Direct support for creative projects" },
-  { name: "Events & Activations", value: 25, color: "hsl(30, 30%, 50%)", icon: Calendar, description: "Gatherings, workshops, showcases" },
-  { name: "Education", value: 15, color: "hsl(30, 30%, 65%)", icon: GraduationCap, description: "Learning programs & mentorship" },
-  { name: "Infrastructure", value: 15, color: "hsl(30, 30%, 40%)", icon: Building2, description: "Platform development & tools" },
-  { name: "Operations & Fair Pay", value: 10, color: "hsl(30, 20%, 55%)", icon: Briefcase, description: "Team compensation & overhead" },
+  { name: "Community Grants", value: 40, color: "hsl(330, 100%, 71%)", icon: Users, description: "Direct support for creative projects and artist grants" },
+  { name: "Events & Activations", value: 20, color: "hsl(30, 30%, 50%)", icon: Calendar, description: "Gatherings, workshops, showcases, and community events" },
+  { name: "Education", value: 15, color: "hsl(30, 30%, 65%)", icon: GraduationCap, description: "Learning programs, mentorship, and skill development" },
+  { name: "Infrastructure", value: 15, color: "hsl(30, 30%, 40%)", icon: Building2, description: "Platform development, tools, and creative spaces" },
+  { name: "Operations", value: 10, color: "hsl(30, 20%, 55%)", icon: Briefcase, description: "Team compensation and community operations" },
 ];
 
 const MONTHLY_DATA = [
@@ -98,7 +100,11 @@ const PieTooltip = ({ active, payload }: any) => {
 
 export default function FundDashboard() {
   const [view, setView] = useState<"lifetime" | "monthly">("lifetime");
+  const { user } = useAuth();
+  const { membership, isLoading: membershipLoading } = useMembership();
   const stats = view === "lifetime" ? FUND_STATS.lifetime : FUND_STATS.monthly;
+  
+  const isMember = membership?.subscribed;
 
   return (
     <PageLayout>
@@ -352,35 +358,147 @@ export default function FundDashboard() {
             </Card>
           </motion.div>
 
-          {/* Membership CTA Section */}
+          {/* Member Impact or CTA Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
             className="mt-8"
           >
-            <Card className="bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border-primary/30 overflow-hidden">
-              <CardContent className="p-6 md:p-8">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
-                      <Crown className="w-8 h-8 text-primary-foreground" />
+            {isMember ? (
+              /* Member Impact Card */
+              <Card className="bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border-primary/30 overflow-hidden">
+                <CardContent className="p-6 md:p-8">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                      <CheckCircle2 className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <h3 className="font-display text-xl font-medium text-foreground mb-1">
-                        Join {stats.memberCount}+ Members
-                      </h3>
-                      <p className="text-muted-foreground">
-                        {formatCurrency(stats.membershipRevenue)} contributed {view === "lifetime" ? "all time" : "this month"} through memberships
+                      <h3 className="font-display text-lg font-medium text-foreground">Your Impact</h3>
+                      <p className="text-sm text-muted-foreground">Thank you for being a member</p>
+                    </div>
+                    <Badge className="ml-auto capitalize">{membership?.tier} Member</Badge>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="text-center p-4 rounded-xl bg-background/50">
+                      <p className="text-2xl font-bold text-foreground">
+                        {formatCurrency(membership?.lifetime_contribution || 0)}
                       </p>
+                      <p className="text-xs text-muted-foreground">Your total contribution</p>
+                    </div>
+                    <div className="text-center p-4 rounded-xl bg-background/50">
+                      <p className="text-2xl font-bold text-foreground">
+                        {formatCurrency((membership?.lifetime_contribution || 0) * 0.4)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Funded grants</p>
+                    </div>
+                    <div className="text-center p-4 rounded-xl bg-background/50">
+                      <p className="text-2xl font-bold text-foreground">
+                        {formatCurrency((membership?.lifetime_contribution || 0) * 0.2)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Supported events</p>
+                    </div>
+                    <div className="text-center p-4 rounded-xl bg-background/50">
+                      <p className="text-2xl font-bold text-foreground">
+                        {Math.round((membership?.lifetime_contribution || 0) / 50)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Creators helped</p>
                     </div>
                   </div>
-                  <Link to="/membership">
-                    <Button size="lg" className="group">
-                      Become a Member
-                      <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                    </Button>
-                  </Link>
+
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <Heart className="w-4 h-4 text-primary fill-primary" />
+                      You're part of {stats.memberCount}+ members building this community
+                    </span>
+                    {membership?.grant_eligible && (
+                      <Badge variant="secondary" className="bg-primary/10 text-primary border-0">
+                        Grant Eligible
+                      </Badge>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              /* Non-Member CTA */
+              <Card className="bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border-primary/30 overflow-hidden">
+                <CardContent className="p-6 md:p-8">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
+                        <Crown className="w-8 h-8 text-primary-foreground" />
+                      </div>
+                      <div>
+                        <h3 className="font-display text-xl font-medium text-foreground mb-1">
+                          Support the Community
+                        </h3>
+                        <p className="text-muted-foreground max-w-md">
+                          Join {stats.memberCount}+ members funding grants, events, and creative opportunities. 
+                          Starting at $5/month.
+                        </p>
+                      </div>
+                    </div>
+                    <Link to="/membership">
+                      <Button size="lg" className="group">
+                        Learn More
+                        <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </motion.div>
+
+          {/* How It Works Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.55 }}
+            className="mt-8"
+          >
+            <Card className="bg-card/50 backdrop-blur-sm border-border">
+              <CardHeader>
+                <CardTitle className="text-xl font-serif flex items-center gap-2">
+                  <Wallet className="w-5 h-5 text-primary" />
+                  How the Fund Works
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-muted-foreground leading-relaxed">
+                  The Community Fund is the financial backbone of our creative ecosystem. 
+                  Unlike traditional platforms that extract value, every dollar contributed here 
+                  goes directly back into supporting creators.
+                </p>
+                <div className="grid md:grid-cols-3 gap-4 pt-2">
+                  <div className="p-4 rounded-xl bg-background/50">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center mb-3">
+                      <span className="text-primary font-bold">1</span>
+                    </div>
+                    <h4 className="font-medium text-foreground mb-1">Members Contribute</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Monthly contributions from members pool together
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-background/50">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center mb-3">
+                      <span className="text-primary font-bold">2</span>
+                    </div>
+                    <h4 className="font-medium text-foreground mb-1">Community Decides</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Allocation priorities set by member voting
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-background/50">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center mb-3">
+                      <span className="text-primary font-bold">3</span>
+                    </div>
+                    <h4 className="font-medium text-foreground mb-1">Creators Benefit</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Funds distributed to grants, events, and programs
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
