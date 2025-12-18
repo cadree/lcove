@@ -304,6 +304,54 @@ export type Database = {
         }
         Relationships: []
       }
+      live_streams: {
+        Row: {
+          created_at: string
+          description: string | null
+          ended_at: string | null
+          external_url: string | null
+          host_id: string
+          id: string
+          is_live: boolean | null
+          started_at: string | null
+          stream_type: string
+          thumbnail_url: string | null
+          title: string
+          total_tips: number | null
+          viewer_count: number | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          ended_at?: string | null
+          external_url?: string | null
+          host_id: string
+          id?: string
+          is_live?: boolean | null
+          started_at?: string | null
+          stream_type: string
+          thumbnail_url?: string | null
+          title: string
+          total_tips?: number | null
+          viewer_count?: number | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          ended_at?: string | null
+          external_url?: string | null
+          host_id?: string
+          id?: string
+          is_live?: boolean | null
+          started_at?: string | null
+          stream_type?: string
+          thumbnail_url?: string | null
+          title?: string
+          total_tips?: number | null
+          viewer_count?: number | null
+        }
+        Relationships: []
+      }
       membership_contributions: {
         Row: {
           allocated_to: Json | null
@@ -1512,6 +1560,221 @@ export type Database = {
             columns: ["story_id"]
             isOneToOne: false
             referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stream_reactions: {
+        Row: {
+          created_at: string
+          emoji: string
+          id: string
+          stream_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji: string
+          id?: string
+          stream_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          id?: string
+          stream_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_reactions_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stream_tips: {
+        Row: {
+          amount: number
+          created_at: string
+          host_id: string
+          id: string
+          message: string | null
+          stream_id: string
+          tipper_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          host_id: string
+          id?: string
+          message?: string | null
+          stream_id: string
+          tipper_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          host_id?: string
+          id?: string
+          message?: string | null
+          stream_id?: string
+          tipper_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_tips_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stream_viewers: {
+        Row: {
+          id: string
+          joined_at: string
+          left_at: string | null
+          stream_id: string
+          viewer_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          left_at?: string | null
+          stream_id: string
+          viewer_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          left_at?: string | null
+          stream_id?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_viewers_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      studio_bookings: {
+        Row: {
+          created_at: string
+          credits_spent: number | null
+          duration_hours: number | null
+          end_time: string | null
+          id: string
+          item_id: string
+          message: string | null
+          owner_id: string
+          owner_notes: string | null
+          payment_type: string | null
+          requested_date: string
+          requester_id: string
+          start_time: string | null
+          status: string
+          stripe_payment_intent_id: string | null
+          total_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          credits_spent?: number | null
+          duration_hours?: number | null
+          end_time?: string | null
+          id?: string
+          item_id: string
+          message?: string | null
+          owner_id: string
+          owner_notes?: string | null
+          payment_type?: string | null
+          requested_date: string
+          requester_id: string
+          start_time?: string | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+          total_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          credits_spent?: number | null
+          duration_hours?: number | null
+          end_time?: string | null
+          id?: string
+          item_id?: string
+          message?: string | null
+          owner_id?: string
+          owner_notes?: string | null
+          payment_type?: string | null
+          requested_date?: string
+          requester_id?: string
+          start_time?: string | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+          total_price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_bookings_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "store_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      studio_reviews: {
+        Row: {
+          booking_id: string | null
+          created_at: string
+          id: string
+          item_id: string
+          rating: number
+          review: string | null
+          reviewer_id: string
+        }
+        Insert: {
+          booking_id?: string | null
+          created_at?: string
+          id?: string
+          item_id: string
+          rating: number
+          review?: string | null
+          reviewer_id: string
+        }
+        Update: {
+          booking_id?: string | null
+          created_at?: string
+          id?: string
+          item_id?: string
+          rating?: number
+          review?: string | null
+          reviewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_reviews_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "studio_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "studio_reviews_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "store_items"
             referencedColumns: ["id"]
           },
         ]
