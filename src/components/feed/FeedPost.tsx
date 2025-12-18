@@ -1,17 +1,25 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MoreHorizontal, Trash2, Share2, Play, Pause } from 'lucide-react';
+import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Trash2, Play } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { usePosts } from '@/hooks/usePosts';
+import { usePostInteractions } from '@/hooks/usePostInteractions';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePosts } from '@/hooks/usePosts';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import CommentThread from './CommentThread';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { toast } from 'sonner';
 
 interface Post {
   id: string;
@@ -24,26 +32,41 @@ interface Post {
     display_name: string | null;
     avatar_url: string | null;
   };
-  reactions?: { emoji: string; count: number }[];
-  user_reaction?: string | null;
 }
-
-const EMOJIS = ['❤️', '🔥', '👏', '😍', '🎉', '💯'];
 
 const FeedPost = ({ post }: { post: Post }) => {
   const { user } = useAuth();
-  const { addReaction, removeReaction, deletePost } = usePosts();
-  const [showReactions, setShowReactions] = useState(false);
+  const { deletePost } = usePosts();
+  const {
+    likesCount,
+    hasLiked,
+    comments,
+    commentsCount,
+    isSaved,
+    toggleLike,
+    addComment,
+    deleteComment,
+    toggleSave,
+    isLiking,
+    isCommenting,
+  } = usePostInteractions(post.id);
+
+  const [showComments, setShowComments] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const isOwner = user?.id === post.user_id;
 
-  const handleReaction = (emoji: string) => {
-    if (post.user_reaction === emoji) {
-      removeReaction.mutate(post.id);
-    } else {
-      addReaction.mutate({ postId: post.id, emoji });
+  const handleShare = async () => {
+    try {
+      await navigator.share({
+        title: post.profile?.display_name || 'Check out this post',
+        text: post.content || undefined,
+        url: window.location.href,
+      });
+    } catch {
+      // Fallback: copy to clipboard
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success('Link copied to clipboard');
     }
-    setShowReactions(false);
   };
 
   const handleDelete = () => {
@@ -61,39 +84,37 @@ const FeedPost = ({ post }: { post: Post }) => {
     }
   };
 
-  const totalReactions = post.reactions?.reduce((acc, r) => acc + r.count, 0) || 0;
-
   return (
-    <motion.div
+    <motion.article
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       className="glass-strong rounded-2xl overflow-hidden"
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-4">
+      <header className="flex items-center justify-between p-4">
         <div className="flex items-center gap-3">
-          <Avatar className="w-10 h-10 border-2 border-primary/30">
+          <Avatar className="w-10 h-10 border-2 border-primary/20">
             <AvatarImage src={post.profile?.avatar_url || undefined} />
-            <AvatarFallback className="bg-muted text-muted-foreground">
+            <AvatarFallback className="bg-muted text-muted-foreground font-medium">
               {post.profile?.display_name?.charAt(0).toUpperCase() || '?'}
             </AvatarFallback>
           </Avatar>
           <div>
-            <p className="text-sm font-medium text-foreground">
+            <h3 className="text-sm font-semibold text-foreground">
               {post.profile?.display_name || 'User'}
-            </p>
-            <p className="text-xs text-muted-foreground">
+            </h3>
+            <time className="text-xs text-muted-foreground">
               {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-            </p>
+            </time>
           </div>
         </div>
 
         {isOwner && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-muted-foreground">
-                <MoreHorizontal className="w-5 h-5" />
+              <Button variant="ghost" size="icon" className="text-muted-foreground w-8 h-8">
+                <MoreHorizontal className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-card border-border">
@@ -102,23 +123,25 @@ const FeedPost = ({ post }: { post: Post }) => {
                 className="text-destructive focus:text-destructive gap-2"
               >
                 <Trash2 className="w-4 h-4" />
-                Delete
+                Delete post
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-      </div>
+      </header>
 
       {/* Content */}
       {post.content && (
         <div className="px-4 pb-3">
-          <p className="text-foreground whitespace-pre-wrap">{post.content}</p>
+          <p className="text-foreground/90 leading-relaxed whitespace-pre-wrap">
+            {post.content}
+          </p>
         </div>
       )}
 
       {/* Media */}
       {post.media_url && post.media_type !== 'text' && (
-        <div className="relative">
+        <div className="relative bg-muted/20">
           {post.media_type === 'video' ? (
             <div className="relative">
               <video
@@ -134,10 +157,10 @@ const FeedPost = ({ post }: { post: Post }) => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="absolute inset-0 flex items-center justify-center bg-background/30"
+                    className="absolute inset-0 flex items-center justify-center bg-background/20 pointer-events-none"
                   >
                     <div className="w-16 h-16 rounded-full glass flex items-center justify-center">
-                      <Play className="w-8 h-8 text-foreground fill-foreground" />
+                      <Play className="w-7 h-7 text-foreground fill-foreground ml-1" />
                     </div>
                   </motion.div>
                 )}
@@ -148,77 +171,114 @@ const FeedPost = ({ post }: { post: Post }) => {
               src={post.media_url}
               alt=""
               className="w-full max-h-[500px] object-cover"
+              loading="lazy"
             />
           )}
         </div>
       )}
 
-      {/* Actions */}
-      <div className="p-4">
+      {/* Action Bar */}
+      <div className="px-4 py-3 border-t border-border/30">
         <div className="flex items-center justify-between">
-          {/* Reaction Button */}
-          <div className="relative">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowReactions(!showReactions)}
-              className={`gap-2 ${post.user_reaction ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+          {/* Left Actions */}
+          <div className="flex items-center gap-1">
+            {/* Like Button */}
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={toggleLike}
+              disabled={!user || isLiking}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
+                hasLiked
+                  ? 'text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/30'
+              }`}
             >
-              <span className="text-lg">{post.user_reaction || '🤍'}</span>
-              {totalReactions > 0 && (
-                <span className="text-sm">{totalReactions}</span>
+              <motion.div
+                animate={hasLiked ? { scale: [1, 1.3, 1] } : {}}
+                transition={{ duration: 0.3 }}
+              >
+                <Heart
+                  className={`w-5 h-5 transition-all ${hasLiked ? 'fill-primary' : ''}`}
+                />
+              </motion.div>
+              {likesCount > 0 && (
+                <span className="text-sm font-medium">{likesCount}</span>
               )}
-            </Button>
+            </motion.button>
 
-            {/* Reaction Picker */}
-            <AnimatePresence>
-              {showReactions && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8, y: 10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.8, y: 10 }}
-                  className="absolute bottom-full left-0 mb-2 glass-strong rounded-full px-2 py-1.5 flex gap-1 z-10"
-                >
-                  {EMOJIS.map((emoji) => (
-                    <motion.button
-                      key={emoji}
-                      whileHover={{ scale: 1.3 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => handleReaction(emoji)}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-lg transition-colors ${
-                        post.user_reaction === emoji ? 'bg-primary/20' : 'hover:bg-accent'
-                      }`}
-                    >
-                      {emoji}
-                    </motion.button>
-                  ))}
-                </motion.div>
+            {/* Comment Button */}
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowComments(!showComments)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
+                showComments
+                  ? 'text-foreground bg-accent/30'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/30'
+              }`}
+            >
+              <MessageCircle className="w-5 h-5" />
+              {commentsCount > 0 && (
+                <span className="text-sm font-medium">{commentsCount}</span>
               )}
-            </AnimatePresence>
+            </motion.button>
+
+            {/* Share Button */}
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={handleShare}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors"
+            >
+              <Share2 className="w-5 h-5" />
+            </motion.button>
           </div>
 
-          {/* Reaction Summary */}
-          {post.reactions && post.reactions.length > 0 && (
-            <div className="flex gap-1">
-              {post.reactions.slice(0, 3).map((r) => (
-                <span key={r.emoji} className="text-sm">
-                  {r.emoji}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Share */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground hover:text-foreground"
+          {/* Right Actions */}
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={toggleSave}
+            disabled={!user}
+            className={`p-2 rounded-lg transition-colors ${
+              isSaved
+                ? 'text-primary'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent/30'
+            }`}
           >
-            <Share2 className="w-4 h-4" />
-          </Button>
+            <motion.div
+              animate={isSaved ? { scale: [1, 1.2, 1] } : {}}
+              transition={{ duration: 0.3 }}
+            >
+              <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-primary' : ''}`} />
+            </motion.div>
+          </motion.button>
         </div>
+
+        {/* Likes Summary */}
+        {likesCount > 0 && (
+          <p className="text-sm font-medium text-foreground mt-2">
+            {likesCount} {likesCount === 1 ? 'like' : 'likes'}
+          </p>
+        )}
       </div>
-    </motion.div>
+
+      {/* Comments Section */}
+      <Collapsible open={showComments} onOpenChange={setShowComments}>
+        <CollapsibleContent>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="px-4 pb-4 border-t border-border/30"
+          >
+            <CommentThread
+              comments={comments}
+              onAddComment={addComment}
+              onDeleteComment={deleteComment}
+              isCommenting={isCommenting}
+            />
+          </motion.div>
+        </CollapsibleContent>
+      </Collapsible>
+    </motion.article>
   );
 };
 
