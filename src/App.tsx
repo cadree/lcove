@@ -21,6 +21,7 @@ import Mall from "./pages/Mall";
 import FundDashboard from "./pages/FundDashboard";
 import Membership from "./pages/Membership";
 import Live from "./pages/Live";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -48,6 +49,7 @@ const App = () => (
             <Route path="/projects" element={<Projects />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="/messages" element={<Messages />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/wallet" element={<Wallet />} />
