@@ -16,6 +16,7 @@ import Onboarding from "./pages/Onboarding";
 import Messages from "./pages/Messages";
 import Notifications from "./pages/Notifications";
 import Wallet from "./pages/Wallet";
+import Store from "./pages/Store";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -46,6 +47,7 @@ const App = () => (
             <Route path="/messages" element={<Messages />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/wallet" element={<Wallet />} />
+            <Route path="/store" element={<Store />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

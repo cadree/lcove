@@ -972,6 +972,47 @@ export type Database = {
         }
         Relationships: []
       }
+      rental_inquiries: {
+        Row: {
+          created_at: string
+          id: string
+          inquirer_id: string
+          item_id: string
+          message: string
+          preferred_dates: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          inquirer_id: string
+          item_id: string
+          message: string
+          preferred_dates?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          inquirer_id?: string
+          item_id?: string
+          message?: string
+          preferred_dates?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rental_inquiries_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "store_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_posts: {
         Row: {
           created_at: string
@@ -1019,6 +1060,225 @@ export type Database = {
           created_at?: string | null
           id?: string
           name?: string
+        }
+        Relationships: []
+      }
+      store_item_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          type?: string
+        }
+        Relationships: []
+      }
+      store_items: {
+        Row: {
+          amenities: string[] | null
+          category_id: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          credits_price: number | null
+          currency: string
+          description: string | null
+          duration_minutes: number | null
+          id: string
+          images: string[] | null
+          inventory_count: number | null
+          is_active: boolean | null
+          location: string | null
+          price: number
+          shopify_product_id: string | null
+          shopify_variant_id: string | null
+          store_id: string
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          amenities?: string[] | null
+          category_id?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          credits_price?: number | null
+          currency?: string
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          images?: string[] | null
+          inventory_count?: number | null
+          is_active?: boolean | null
+          location?: string | null
+          price?: number
+          shopify_product_id?: string | null
+          shopify_variant_id?: string | null
+          store_id: string
+          title: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          amenities?: string[] | null
+          category_id?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          credits_price?: number | null
+          currency?: string
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          images?: string[] | null
+          inventory_count?: number | null
+          is_active?: boolean | null
+          location?: string | null
+          price?: number
+          shopify_product_id?: string | null
+          shopify_variant_id?: string | null
+          store_id?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "store_item_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_items_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_orders: {
+        Row: {
+          buyer_id: string
+          created_at: string
+          credits_spent: number | null
+          id: string
+          item_id: string
+          notes: string | null
+          payment_type: string
+          quantity: number
+          status: string
+          store_id: string
+          stripe_payment_intent_id: string | null
+          total_price: number
+          updated_at: string
+        }
+        Insert: {
+          buyer_id: string
+          created_at?: string
+          credits_spent?: number | null
+          id?: string
+          item_id: string
+          notes?: string | null
+          payment_type: string
+          quantity?: number
+          status?: string
+          store_id: string
+          stripe_payment_intent_id?: string | null
+          total_price: number
+          updated_at?: string
+        }
+        Update: {
+          buyer_id?: string
+          created_at?: string
+          credits_spent?: number | null
+          id?: string
+          item_id?: string
+          notes?: string | null
+          payment_type?: string
+          quantity?: number
+          status?: string
+          store_id?: string
+          stripe_payment_intent_id?: string | null
+          total_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_orders_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "store_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_orders_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stores: {
+        Row: {
+          accepts_cash: boolean | null
+          accepts_credits: boolean | null
+          cover_image_url: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          logo_url: string | null
+          name: string
+          shopify_access_token: string | null
+          shopify_store_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accepts_cash?: boolean | null
+          accepts_credits?: boolean | null
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name: string
+          shopify_access_token?: string | null
+          shopify_store_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accepts_cash?: boolean | null
+          accepts_credits?: boolean | null
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name?: string
+          shopify_access_token?: string | null
+          shopify_store_url?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
