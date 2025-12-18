@@ -1,6 +1,7 @@
 import React from 'react';
 import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Bell, Mail } from 'lucide-react';
 import { useNotificationPreferences } from '@/hooks/useNotifications';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,6 +13,7 @@ interface PreferenceItemProps {
   description: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
+  disabled?: boolean;
 }
 
 const PreferenceItem: React.FC<PreferenceItemProps> = ({
@@ -20,6 +22,7 @@ const PreferenceItem: React.FC<PreferenceItemProps> = ({
   description,
   checked,
   onCheckedChange,
+  disabled = false,
 }) => (
   <div className="flex items-center justify-between py-3">
     <div className="flex items-center gap-3">
@@ -31,12 +34,24 @@ const PreferenceItem: React.FC<PreferenceItemProps> = ({
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
     </div>
-    <Switch checked={checked} onCheckedChange={onCheckedChange} />
+    <Switch checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} />
   </div>
 );
 
 export const NotificationPreferences: React.FC = () => {
   const { preferences, isLoading, updatePreferences } = useNotificationPreferences();
+  const { isSupported, permission, requestPermission } = usePushNotifications();
+
+  const handlePushToggle = async (checked: boolean) => {
+    if (checked && permission !== 'granted') {
+      const granted = await requestPermission();
+      if (granted) {
+        updatePreferences({ push_enabled: true });
+      }
+    } else {
+      updatePreferences({ push_enabled: checked });
+    }
+  };
 
   if (isLoading || !preferences) {
     return (
@@ -56,6 +71,12 @@ export const NotificationPreferences: React.FC = () => {
       </div>
     );
   }
+
+  const pushDescription = !isSupported 
+    ? 'Not supported in this browser'
+    : permission === 'denied'
+    ? 'Permission denied - enable in browser settings'
+    : 'Receive notifications on your device';
 
   return (
     <div className="p-4 pb-24 sm:pb-8">
@@ -117,13 +138,14 @@ export const NotificationPreferences: React.FC = () => {
       <Separator className="my-6" />
 
       <h4 className="text-sm font-semibold mb-3">Delivery Methods</h4>
-      <div className="space-y-1">
+      <div className="space-y-1 pb-4">
         <PreferenceItem
           icon={<Bell className="h-4 w-4" />}
           label="Push Notifications"
-          description="Receive notifications on your device"
-          checked={preferences.push_enabled ?? false}
-          onCheckedChange={(checked) => updatePreferences({ push_enabled: checked })}
+          description={pushDescription}
+          checked={(preferences.push_enabled ?? false) && permission === 'granted'}
+          onCheckedChange={handlePushToggle}
+          disabled={!isSupported || permission === 'denied'}
         />
 
         <PreferenceItem
