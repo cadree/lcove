@@ -62,6 +62,114 @@ export type Database = {
           },
         ]
       }
+      book_bookmarks: {
+        Row: {
+          created_at: string
+          id: string
+          page_number: number
+          title: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          page_number: number
+          title?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          page_number?: number
+          title?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      book_highlights: {
+        Row: {
+          created_at: string
+          highlighted_text: string
+          id: string
+          is_important: boolean | null
+          page_number: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          highlighted_text: string
+          id?: string
+          is_important?: boolean | null
+          page_number: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          highlighted_text?: string
+          id?: string
+          is_important?: boolean | null
+          page_number?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      book_notes: {
+        Row: {
+          created_at: string
+          id: string
+          note_text: string
+          page_number: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note_text: string
+          page_number: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note_text?: string
+          page_number?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      book_reading_progress: {
+        Row: {
+          created_at: string
+          current_page: number
+          id: string
+          last_read_at: string
+          total_pages: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_page?: number
+          id?: string
+          last_read_at?: string
+          total_pages?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_page?: number
+          id?: string
+          last_read_at?: string
+          total_pages?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       brand_partnerships: {
         Row: {
           brand_logo_url: string | null
