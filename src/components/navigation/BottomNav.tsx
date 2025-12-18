@@ -39,7 +39,7 @@ const BottomNav = () => {
     duration: 0.5,
     ease: [0.16, 1, 0.3, 1]
   }} className="nav-floating">
-      <div className="relative glass-strong rounded-2xl px-2 py-2 gap-1 shadow-elevated items-start justify-center flex flex-row">
+      <div className="relative glass-strong rounded-2xl px-3 py-2 gap-1 shadow-elevated flex flex-row items-center justify-center w-auto">
         {/* Subtle top highlight */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-foreground/10 to-transparent rounded-t-2xl" />
         
