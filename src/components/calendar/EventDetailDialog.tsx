@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -6,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CalendarEvent, useEventWithRSVP, useRSVP } from "@/hooks/useCalendar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
@@ -28,7 +30,9 @@ import {
   Twitter,
   ExternalLink,
   Loader2,
-  Navigation
+  Navigation,
+  FolderOpen,
+  User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -47,6 +51,7 @@ interface EventDetailDialogProps {
 
 export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDialogProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { data: event, isLoading, refetch } = useEventWithRSVP(eventId || '');
   const { rsvp, isRsvping, toggleReminder } = useRSVP();
   const creditsData = useCredits();
@@ -261,7 +266,28 @@ END:VCALENDAR`;
       case 'paid': return `$${event.ticket_price}`;
       case 'credits': return `${event.credits_price} Credits`;
       case 'hybrid': return `$${event.ticket_price} or ${event.credits_price} Credits`;
+      case 'info': return 'Info Only';
       default: return 'Free';
+    }
+  };
+
+  const handleLearnMore = () => {
+    if (event.external_url) {
+      window.open(event.external_url, '_blank');
+    }
+  };
+
+  const handleViewProject = () => {
+    if (event.project_id) {
+      onOpenChange(false);
+      navigate(`/projects?id=${event.project_id}`);
+    }
+  };
+
+  const handleViewOrganizer = () => {
+    if (event.creator_id) {
+      onOpenChange(false);
+      navigate(`/profile/${event.creator_id}`);
     }
   };
 
@@ -431,6 +457,26 @@ END:VCALENDAR`;
                 )}
               </div>
             </div>
+
+            {/* Organizer */}
+            <div 
+              className="flex items-start gap-3 cursor-pointer hover:bg-accent/20 -mx-3 px-3 py-2 rounded-xl transition-colors"
+              onClick={handleViewOrganizer}
+            >
+              <Avatar className="w-10 h-10">
+                <AvatarImage src={event.organizer?.avatar_url || ''} />
+                <AvatarFallback className="bg-primary/20 text-primary">
+                  <User className="w-5 h-5" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <p className="text-foreground font-medium">
+                  {event.organizer?.display_name || 'Event Organizer'}
+                </p>
+                <p className="text-sm text-muted-foreground">Host</p>
+              </div>
+              <ExternalLink className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
+            </div>
           </div>
 
           {/* Description */}
@@ -443,81 +489,74 @@ END:VCALENDAR`;
             </div>
           )}
 
+          {/* Project Link */}
+          {event.project_id && (
+            <div className="pt-4 border-t border-border/30">
+              <Button
+                variant="glass"
+                size="sm"
+                onClick={handleViewProject}
+                className="w-full"
+              >
+                <FolderOpen className="w-4 h-4 mr-2" />
+                View Associated Project
+              </Button>
+            </div>
+          )}
+
           {/* Actions Section */}
           <div className="pt-4 border-t border-border/30 space-y-4">
-            {/* RSVP Buttons */}
-            <div>
-              <p className="text-sm font-medium text-foreground mb-3">Are you going?</p>
-              <div className="flex gap-2">
-                <Button
-                  variant={event.user_rsvp?.status === 'going' ? 'default' : 'glass'}
-                  size="sm"
-                  onClick={() => handleRSVP('going')}
-                  disabled={isRsvping || isSoldOut}
-                  className="flex-1"
-                >
-                  <Check className="w-4 h-4 mr-1" />
-                  Going
-                </Button>
-                <Button
-                  variant={event.user_rsvp?.status === 'interested' ? 'default' : 'glass'}
-                  size="sm"
-                  onClick={() => handleRSVP('interested')}
-                  disabled={isRsvping}
-                  className="flex-1"
-                >
-                  <Clock className="w-4 h-4 mr-1" />
-                  Interested
-                </Button>
-                <Button
-                  variant={event.user_rsvp?.status === 'not_going' ? 'default' : 'glass'}
-                  size="sm"
-                  onClick={() => handleRSVP('not_going')}
-                  disabled={isRsvping}
-                  className="flex-1"
-                >
-                  <X className="w-4 h-4 mr-1" />
-                  Can't Go
-                </Button>
-              </div>
-            </div>
-
-            {/* Notify Me / Reminder */}
-            {!event.user_rsvp ? (
+            {/* Primary Action based on ticket type */}
+            {event.ticket_type === 'free' && (
               <Button
-                variant="glass"
-                size="sm"
-                onClick={handleNotifyMe}
+                variant={event.user_rsvp?.status === 'going' ? 'glass' : 'default'}
+                size="lg"
+                onClick={() => handleRSVP(event.user_rsvp?.status === 'going' ? 'cancelled' : 'going')}
+                disabled={isRsvping || isSoldOut}
                 className="w-full"
               >
-                <Bell className="w-4 h-4 mr-2" />
-                Notify Me About This Event
-              </Button>
-            ) : (
-              <Button
-                variant="glass"
-                size="sm"
-                onClick={handleToggleReminder}
-                className="w-full"
-              >
-                {event.user_rsvp.reminder_enabled ? (
+                {isRsvping ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : event.user_rsvp?.status === 'going' ? (
                   <>
-                    <Bell className="w-4 h-4 mr-2 text-primary" />
-                    Reminder On
+                    <X className="w-4 h-4 mr-2" />
+                    Cancel RSVP
                   </>
                 ) : (
                   <>
-                    <BellOff className="w-4 h-4 mr-2" />
-                    Reminder Off
+                    <Check className="w-4 h-4 mr-2" />
+                    RSVP Free
                   </>
                 )}
               </Button>
             )}
 
-            {/* Ticket Purchase */}
-            {event.ticket_type !== 'free' && !event.user_rsvp?.ticket_purchased && !isSoldOut && (
+            {event.ticket_type === 'info' && event.external_url && (
+              <Button
+                variant="default"
+                size="lg"
+                onClick={handleLearnMore}
+                className="w-full"
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Learn More
+              </Button>
+            )}
+
+            {/* Paid Ticket Purchase */}
+            {(event.ticket_type === 'paid' || event.ticket_type === 'hybrid') && !event.user_rsvp?.ticket_purchased && !isSoldOut && (
               <div className="space-y-2">
-                {(event.ticket_type === 'paid' || event.ticket_type === 'hybrid') && (
+                {event.external_url ? (
+                  <Button
+                    variant="default"
+                    size="lg"
+                    onClick={handleLearnMore}
+                    className="w-full"
+                  >
+                    <Ticket className="w-4 h-4 mr-2" />
+                    Buy Ticket - ${event.ticket_price}
+                  </Button>
+                ) : (
                   <Button
                     variant="default"
                     size="lg"
@@ -534,10 +573,10 @@ END:VCALENDAR`;
                   </Button>
                 )}
                 
-                {(event.ticket_type === 'credits' || event.ticket_type === 'hybrid') && (
+                {(event.ticket_type === 'hybrid') && (
                   <Button
-                    variant={event.ticket_type === 'credits' ? 'default' : 'glass'}
-                    size={event.ticket_type === 'credits' ? 'lg' : 'default'}
+                    variant="glass"
+                    size="default"
                     onClick={handleUseCredits}
                     disabled={isPurchasing || creditsData.balance < (event.credits_price || 0)}
                     className="w-full"
@@ -548,14 +587,33 @@ END:VCALENDAR`;
                       <Coins className="w-4 h-4 mr-2" />
                     )}
                     Use {event.credits_price} Credits
-                    {creditsData.credits && (
-                      <span className="ml-2 text-xs opacity-70">
-                        (Balance: {creditsData.balance})
-                      </span>
-                    )}
+                    <span className="ml-2 text-xs opacity-70">
+                      (Balance: {creditsData.balance})
+                    </span>
                   </Button>
                 )}
               </div>
+            )}
+
+            {/* Credits only ticket */}
+            {event.ticket_type === 'credits' && !event.user_rsvp?.ticket_purchased && !isSoldOut && (
+              <Button
+                variant="default"
+                size="lg"
+                onClick={handleUseCredits}
+                disabled={isPurchasing || creditsData.balance < (event.credits_price || 0)}
+                className="w-full"
+              >
+                {isPurchasing ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Coins className="w-4 h-4 mr-2" />
+                )}
+                Use {event.credits_price} Credits
+                <span className="ml-2 text-xs opacity-70">
+                  (Balance: {creditsData.balance})
+                </span>
+              </Button>
             )}
 
             {/* Ticket Purchased Confirmation */}
@@ -564,6 +622,69 @@ END:VCALENDAR`;
                 <Check className="w-5 h-5" />
                 <span className="font-medium">Ticket Secured!</span>
               </div>
+            )}
+
+            {/* RSVP Status Row for non-free events */}
+            {event.ticket_type !== 'free' && event.ticket_type !== 'info' && (
+              <div>
+                <p className="text-sm font-medium text-foreground mb-3">Interested?</p>
+                <div className="flex gap-2">
+                  <Button
+                    variant={event.user_rsvp?.status === 'interested' ? 'default' : 'glass'}
+                    size="sm"
+                    onClick={() => handleRSVP('interested')}
+                    disabled={isRsvping}
+                    className="flex-1"
+                  >
+                    <Clock className="w-4 h-4 mr-1" />
+                    Interested
+                  </Button>
+                  <Button
+                    variant={event.user_rsvp?.status === 'not_going' ? 'default' : 'glass'}
+                    size="sm"
+                    onClick={() => handleRSVP('not_going')}
+                    disabled={isRsvping}
+                    className="flex-1"
+                  >
+                    <X className="w-4 h-4 mr-1" />
+                    Can't Go
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Notify Me / Reminder */}
+            {event.ticket_type !== 'info' && (
+              !event.user_rsvp ? (
+                <Button
+                  variant="glass"
+                  size="sm"
+                  onClick={handleNotifyMe}
+                  className="w-full"
+                >
+                  <Bell className="w-4 h-4 mr-2" />
+                  Notify Me About This Event
+                </Button>
+              ) : (
+                <Button
+                  variant="glass"
+                  size="sm"
+                  onClick={handleToggleReminder}
+                  className="w-full"
+                >
+                  {event.user_rsvp.reminder_enabled ? (
+                    <>
+                      <Bell className="w-4 h-4 mr-2 text-primary" />
+                      Reminder On
+                    </>
+                  ) : (
+                    <>
+                      <BellOff className="w-4 h-4 mr-2" />
+                      Reminder Off
+                    </>
+                  )}
+                </Button>
+              )
             )}
           </div>
         </div>

@@ -21,9 +21,15 @@ export interface CalendarEvent {
   credits_price: number | null;
   capacity: number | null;
   is_public: boolean | null;
+  project_id: string | null;
+  external_url: string | null;
   created_at: string;
   rsvp_count?: number;
   user_rsvp?: EventRSVP | null;
+  organizer?: {
+    display_name: string | null;
+    avatar_url: string | null;
+  } | null;
 }
 
 export interface EventRSVP {
@@ -128,10 +134,22 @@ export function useEventWithRSVP(eventId: string) {
         userRsvp = rsvp;
       }
 
+      // Get organizer profile
+      let organizer = null;
+      if (event.creator_id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('display_name, avatar_url')
+          .eq('user_id', event.creator_id)
+          .maybeSingle();
+        organizer = profile;
+      }
+
       return {
         ...event,
         rsvp_count: count || 0,
         user_rsvp: userRsvp,
+        organizer,
       } as CalendarEvent;
     },
     enabled: !!eventId,

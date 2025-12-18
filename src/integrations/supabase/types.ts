@@ -887,9 +887,11 @@ export type Database = {
           credits_price: number | null
           description: string | null
           end_date: string | null
+          external_url: string | null
           id: string
           image_url: string | null
           is_public: boolean | null
+          project_id: string | null
           start_date: string
           state: string | null
           ticket_price: number | null
@@ -908,9 +910,11 @@ export type Database = {
           credits_price?: number | null
           description?: string | null
           end_date?: string | null
+          external_url?: string | null
           id?: string
           image_url?: string | null
           is_public?: boolean | null
+          project_id?: string | null
           start_date: string
           state?: string | null
           ticket_price?: number | null
@@ -929,9 +933,11 @@ export type Database = {
           credits_price?: number | null
           description?: string | null
           end_date?: string | null
+          external_url?: string | null
           id?: string
           image_url?: string | null
           is_public?: boolean | null
+          project_id?: string | null
           start_date?: string
           state?: string | null
           ticket_price?: number | null
@@ -940,7 +946,15 @@ export type Database = {
           updated_at?: string
           venue?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       featured_creators: {
         Row: {
