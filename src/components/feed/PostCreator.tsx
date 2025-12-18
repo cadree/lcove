@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Image, Video, Type, X, Loader2, Send } from 'lucide-react';
+import { Image, Video, X, Loader2, Send } from 'lucide-react';
 import { usePosts } from '@/hooks/usePosts';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,8 @@ const PostCreator = ({ avatarUrl, displayName }: PostCreatorProps) => {
   const [preview, setPreview] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'photo' | 'video' | 'text'>('text');
   const [isExpanded, setIsExpanded] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   if (!user) return null;
 
@@ -35,6 +36,9 @@ const PostCreator = ({ avatarUrl, displayName }: PostCreatorProps) => {
     const reader = new FileReader();
     reader.onload = () => setPreview(reader.result as string);
     reader.readAsDataURL(file);
+    
+    // Reset input value so the same file can be selected again
+    e.target.value = '';
   };
 
   const handleSubmit = async () => {
@@ -131,10 +135,7 @@ const PostCreator = ({ avatarUrl, displayName }: PostCreatorProps) => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => {
-              fileInputRef.current?.setAttribute('accept', 'image/*');
-              fileInputRef.current?.click();
-            }}
+            onClick={() => photoInputRef.current?.click()}
             className="text-muted-foreground hover:text-foreground gap-2"
           >
             <Image className="w-4 h-4" />
@@ -143,10 +144,7 @@ const PostCreator = ({ avatarUrl, displayName }: PostCreatorProps) => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => {
-              fileInputRef.current?.setAttribute('accept', 'video/*');
-              fileInputRef.current?.click();
-            }}
+            onClick={() => videoInputRef.current?.click()}
             className="text-muted-foreground hover:text-foreground gap-2"
           >
             <Video className="w-4 h-4" />
@@ -184,10 +182,19 @@ const PostCreator = ({ avatarUrl, displayName }: PostCreatorProps) => {
         </AnimatePresence>
       </div>
 
+      {/* Separate file inputs for photo and video */}
       <input
-        ref={fileInputRef}
+        ref={photoInputRef}
         type="file"
-        onChange={(e) => handleFileSelect(e, fileInputRef.current?.accept?.includes('video') ? 'video' : 'photo')}
+        accept="image/*"
+        onChange={(e) => handleFileSelect(e, 'photo')}
+        className="hidden"
+      />
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/*"
+        onChange={(e) => handleFileSelect(e, 'video')}
         className="hidden"
       />
     </motion.div>
