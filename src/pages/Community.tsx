@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Megaphone, Star, FileText, BarChart3, Plus, Pin } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Megaphone, Star, FileText, BarChart3, Plus, Pin, ArrowLeft } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +19,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Community: React.FC = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<UpdateCategory | 'all'>('all');
   const [createOpen, setCreateOpen] = useState(false);
   const [newUpdate, setNewUpdate] = useState({
@@ -53,9 +55,14 @@ const Community: React.FC = () => {
         {/* Header */}
         <div className="bg-gradient-to-b from-primary/10 to-background px-4 pt-6 pb-8">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold mb-2">Community</h1>
-              <p className="text-muted-foreground">Updates, spotlights, and transparency</p>
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold">Community</h1>
+                <p className="text-muted-foreground">Updates, spotlights, and transparency</p>
+              </div>
             </div>
             {isAdmin && (
               <Button onClick={() => setCreateOpen(true)}>

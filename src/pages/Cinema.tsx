@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Film, 
@@ -11,8 +11,10 @@ import {
   Tv,
   Clapperboard,
   ChevronRight,
-  Users
+  Users,
+  ArrowLeft
 } from 'lucide-react';
+import PageLayout from '@/components/layout/PageLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +26,7 @@ import { cn } from '@/lib/utils';
 
 const Cinema = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState<string | undefined>();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -44,6 +47,7 @@ const Cinema = () => {
   ).slice(0, 10);
 
   return (
+    <PageLayout>
     <div className="min-h-screen bg-background">
       {/* Cinematic Header */}
       <div className="relative bg-gradient-to-b from-primary/20 via-background to-background">
@@ -53,6 +57,9 @@ const Cinema = () => {
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
+                <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
                 <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
                   <Film className="w-6 h-6 text-primary" />
                 </div>
@@ -180,6 +187,7 @@ const Cinema = () => {
 
       <CreateNetworkDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
     </div>
+    </PageLayout>
   );
 };
 

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/layout/PageLayout';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Radio, Plus, Users, Mic } from 'lucide-react';
+import { Radio, Plus, Users, Mic, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLiveStreams, useGoLive } from '@/hooks/useLiveStreams';
 import { LiveStreamCard } from '@/components/streaming/LiveStreamCard';
@@ -12,6 +13,7 @@ import { CreateStreamDialog } from '@/components/streaming/CreateStreamDialog';
 import { motion } from 'framer-motion';
 
 const Live = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { streams: liveStreams, isLoading: loadingLive } = useLiveStreams(true);
   const { streams: allStreams, isLoading: loadingAll } = useLiveStreams(false);
@@ -29,6 +31,9 @@ const Live = () => {
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 via-background to-background p-8">
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-4">
+              <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
               <div className="p-3 bg-primary/20 rounded-full">
                 <Radio className="h-8 w-8 text-primary" />
               </div>
