@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { ExternalLink, Handshake } from 'lucide-react';
 import { useBrandPartnerships } from '@/hooks/useBrandPartnerships';
+import { useProfile } from '@/hooks/useProfile';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface BrandPartnersProps {
@@ -8,7 +9,11 @@ interface BrandPartnersProps {
 }
 
 export function BrandPartners({ className }: BrandPartnersProps) {
+  const { profile } = useProfile();
   const { data: partners, isLoading } = useBrandPartnerships();
+
+  // Only show brand partners after onboarding is complete (contextual access)
+  if (!profile?.onboarding_completed) return null;
 
   if (isLoading) {
     return (

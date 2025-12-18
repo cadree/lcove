@@ -1,83 +1,86 @@
-import { Star, TrendingUp } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useReputation, useReputationLevel } from '@/hooks/useReputation';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ReputationScoreProps {
   userId: string;
-  showDetails?: boolean;
-  size?: 'sm' | 'md' | 'lg';
+  variant?: 'default' | 'simple' | 'inline';
   className?: string;
 }
 
-const sizeConfig = {
-  sm: { icon: 'w-3 h-3', text: 'text-xs', gap: 'gap-1' },
-  md: { icon: 'w-4 h-4', text: 'text-sm', gap: 'gap-1.5' },
-  lg: { icon: 'w-5 h-5', text: 'text-base', gap: 'gap-2' },
-};
-
-const levelColors = {
-  New: 'text-muted-foreground',
-  Rising: 'text-blue-400',
-  Established: 'text-green-400',
-  Expert: 'text-primary',
-  Elite: 'text-amber-400',
+const levelLabels = {
+  New: 'New Creator',
+  Rising: 'Rising Creator',
+  Established: 'Trusted Creator',
+  Expert: 'Expert Creator',
+  Elite: 'Elite Creator',
 };
 
 export function ReputationScore({ 
   userId, 
-  showDetails = false, 
-  size = 'md',
+  variant = 'simple',
   className 
 }: ReputationScoreProps) {
   const { data: reputation, isLoading } = useReputation(userId);
-  const { level, color } = useReputationLevel(reputation?.overall_score);
+  const { level } = useReputationLevel(reputation?.overall_score);
 
   if (isLoading || !reputation) return null;
 
+  // Don't show for new users with no reviews
+  if (reputation.review_count === 0) return null;
+
   const score = reputation.overall_score.toFixed(1);
-  const config = sizeConfig[size];
-  const levelColor = levelColors[level as keyof typeof levelColors] || 'text-muted-foreground';
+  const label = levelLabels[level as keyof typeof levelLabels] || 'Creator';
 
-  const scoreDisplay = (
-    <div className={cn('inline-flex items-center', config.gap, className)}>
-      <Star className={cn(config.icon, 'fill-current', levelColor)} />
-      <span className={cn(config.text, 'font-medium', levelColor)}>
-        {score}
-      </span>
-      {showDetails && (
-        <span className={cn(config.text, 'text-muted-foreground')}>
-          ({reputation.review_count} reviews)
-        </span>
-      )}
-    </div>
-  );
+  // Simple inline format: "Trusted Creator • 4.7"
+  if (variant === 'simple' || variant === 'inline') {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className={cn(
+              'inline-flex items-center gap-1.5 text-sm text-muted-foreground',
+              className
+            )}>
+              <span>{label}</span>
+              <span className="text-muted-foreground/60">•</span>
+              <span className="flex items-center gap-0.5">
+                <Star className="w-3.5 h-3.5 fill-primary text-primary" />
+                {score}
+              </span>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Based on {reputation.review_count} review{reputation.review_count !== 1 ? 's' : ''}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
 
-  if (showDetails) return scoreDisplay;
-
+  // Default format with more detail
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          {scoreDisplay}
-        </TooltipTrigger>
-        <TooltipContent className="w-48">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Level</span>
-              <span className={cn('font-medium', levelColor)}>{level}</span>
+          <div className={cn('inline-flex items-center gap-2', className)}>
+            <div className="flex items-center gap-1">
+              <Star className="w-4 h-4 fill-primary text-primary" />
+              <span className="font-medium text-foreground">{score}</span>
             </div>
-            <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">{label}</span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent className="w-44">
+          <div className="space-y-1.5 text-sm">
+            <div className="flex justify-between">
               <span className="text-muted-foreground">Reviews</span>
               <span>{reputation.review_count}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Avg Rating</span>
-              <span>{reputation.review_score.toFixed(1)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Completed</span>
-              <span>{reputation.completed_projects} projects</span>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Projects</span>
+              <span>{reputation.completed_projects}</span>
             </div>
           </div>
         </TooltipContent>

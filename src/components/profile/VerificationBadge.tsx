@@ -1,12 +1,10 @@
-import { BadgeCheck, Shield, Star, Crown } from 'lucide-react';
+import { BadgeCheck, Crown, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface VerificationBadgeProps {
   type: 'standard' | 'premium' | 'partner';
-  label?: string;
-  size?: 'sm' | 'md' | 'lg';
-  showLabel?: boolean;
+  size?: 'sm' | 'md';
   className?: string;
 }
 
@@ -14,65 +12,41 @@ const badgeConfig = {
   standard: {
     icon: BadgeCheck,
     color: 'text-primary',
-    bg: 'bg-primary/10',
-    label: 'Verified Creator',
+    label: 'Verified',
   },
   premium: {
     icon: Crown,
     color: 'text-amber-400',
-    bg: 'bg-amber-400/10',
-    label: 'Premium Creator',
+    label: 'Premium',
   },
   partner: {
     icon: Star,
     color: 'text-violet-400',
-    bg: 'bg-violet-400/10',
     label: 'Partner',
   },
 };
 
 const sizeConfig = {
-  sm: 'w-4 h-4',
-  md: 'w-5 h-5',
-  lg: 'w-6 h-6',
+  sm: 'w-3.5 h-3.5',
+  md: 'w-4 h-4',
 };
 
 export function VerificationBadge({ 
   type, 
-  label, 
-  size = 'md', 
-  showLabel = false,
+  size = 'sm',
   className 
 }: VerificationBadgeProps) {
   const config = badgeConfig[type];
   const Icon = config.icon;
-  const displayLabel = label || config.label;
-
-  const badge = (
-    <span className={cn(
-      'inline-flex items-center gap-1',
-      showLabel && `${config.bg} px-2 py-0.5 rounded-full`,
-      className
-    )}>
-      <Icon className={cn(sizeConfig[size], config.color)} />
-      {showLabel && (
-        <span className={cn('text-xs font-medium', config.color)}>
-          {displayLabel}
-        </span>
-      )}
-    </span>
-  );
-
-  if (showLabel) return badge;
 
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          {badge}
+          <Icon className={cn(sizeConfig[size], config.color, className)} />
         </TooltipTrigger>
-        <TooltipContent>
-          <p>{displayLabel}</p>
+        <TooltipContent side="top" className="text-xs">
+          <p>{config.label}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

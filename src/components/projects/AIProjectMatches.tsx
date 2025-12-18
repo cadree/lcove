@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useAIProjectMatches, useRefreshAIMatches, useDismissMatch } from '@/hooks/useAIProjectMatches';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface AIProjectMatchesProps {
@@ -15,11 +16,13 @@ interface AIProjectMatchesProps {
 
 export function AIProjectMatches({ onViewProject, className }: AIProjectMatchesProps) {
   const { user } = useAuth();
+  const { profile } = useProfile();
   const { data: matches, isLoading, error } = useAIProjectMatches();
   const refreshMatches = useRefreshAIMatches();
   const dismissMatch = useDismissMatch();
 
-  if (!user) return null;
+  // Only show AI matches after onboarding is complete
+  if (!user || !profile?.onboarding_completed) return null;
 
   if (isLoading) {
     return (
