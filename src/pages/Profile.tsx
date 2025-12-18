@@ -27,6 +27,8 @@ import {
   FolderKanban,
   Rocket,
   ChevronRight,
+  Star,
+  Shield,
 } from "lucide-react";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
@@ -38,12 +40,17 @@ import { ProfilePostsGrid } from "@/components/profile/ProfilePostsGrid";
 import { PostDetailModal } from "@/components/profile/PostDetailModal";
 import { CreateBlogDialog } from "@/components/profile/CreateBlogDialog";
 import { ProfileBlogsGrid } from "@/components/profile/ProfileBlogsGrid";
+import { UserReviews } from "@/components/profile/UserReviews";
+import { CreatorModuleTabs } from "@/components/profile/CreatorModuleTabs";
+import { ReputationScore } from "@/components/profile/ReputationScore";
+import { VerificationBadge } from "@/components/profile/VerificationBadge";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useProfileCustomization } from "@/hooks/useProfileCustomization";
 import { useProfilePosts } from "@/hooks/useProfilePosts";
 import { useProfileBlogs, BlogPost } from "@/hooks/useProfileBlogs";
+import { useCreatorRoles } from "@/hooks/useCreatorModules";
 import { THEME_PRESETS, ThemePreset } from "@/lib/profileThemes";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -64,6 +71,7 @@ const Profile = () => {
   const { customization, isOwner, saveCustomization } = useProfileCustomization(targetUserId);
   const { posts, isLoading: postsLoading, createPost, deletePost } = useProfilePosts(targetUserId);
   const { blogs, isLoading: blogsLoading, createBlog, deleteBlog } = useProfileBlogs(targetUserId);
+  const { data: creatorRoles = [] } = useCreatorRoles(targetUserId);
   const [showMusicDialog, setShowMusicDialog] = useState(false);
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
   const [showCreatePostDialog, setShowCreatePostDialog] = useState(false);
@@ -73,6 +81,8 @@ const Profile = () => {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const volumeSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const hasCreatorRoles = creatorRoles.length > 0;
 
   // Debounced volume save
   const handleVolumeChange = useCallback((volume: number) => {
@@ -447,6 +457,30 @@ const Profile = () => {
             <p className="text-muted-foreground leading-relaxed">{bio}</p>
           </motion.div>
 
+          {/* Reputation Score - show for all profiles */}
+          {targetUserId && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45 }}
+              className="mb-8"
+            >
+              <ReputationScore userId={targetUserId} />
+            </motion.div>
+          )}
+
+          {/* Creator Module Tabs - show if user has creator roles */}
+          {targetUserId && hasCreatorRoles && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.46 }}
+              className="mb-8"
+            >
+              <CreatorModuleTabs userId={targetUserId} isOwner={isOwnProfile} />
+            </motion.div>
+          )}
+
           {/* Quick Actions - Projects */}
           {isOwnProfile && (
             <motion.div
@@ -575,6 +609,18 @@ const Profile = () => {
               </TabsContent>
             </Tabs>
           </motion.div>
+
+          {/* User Reviews Section */}
+          {targetUserId && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.55 }}
+              className="mb-8"
+            >
+              <UserReviews userId={targetUserId} />
+            </motion.div>
+          )}
 
           {/* Additional Blocks - only show for own profile */}
           {isOwnProfile && (
