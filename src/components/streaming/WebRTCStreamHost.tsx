@@ -17,7 +17,6 @@ import { LocalStream, SignalingChannel, WebRTCPeer, checkMediaCapabilities } fro
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useSaveReplay } from '@/hooks/useLiveStreams';
 import { motion } from 'framer-motion';
 import {
   AlertDialog,
@@ -41,11 +40,12 @@ type CameraState = 'requesting' | 'ready' | 'error' | 'denied';
 export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, isLive: initialIsLive = false, onEnd }) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const saveReplay = useSaveReplay();
   const videoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<LocalStream | null>(null);
   const signalingRef = useRef<SignalingChannel | null>(null);
   const peersRef = useRef<Map<string, WebRTCPeer>>(new Map());
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
 
   const [isStreaming, setIsStreaming] = useState(initialIsLive);
   const [cameraState, setCameraState] = useState<CameraState>('requesting');
@@ -55,6 +55,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
   const [viewerCount, setViewerCount] = useState(0);
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [isGoingLive, setIsGoingLive] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Initialize camera preview
   const initCamera = useCallback(async () => {
@@ -145,6 +146,83 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
     };
   }, [initCamera]);
 
+  // Start recording
+  const startRecording = (stream: MediaStream) => {
+    recordedChunksRef.current = [];
+    
+    // Determine best supported mime type
+    const mimeTypes = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm',
+      'video/mp4',
+    ];
+    
+    let mimeType = '';
+    for (const type of mimeTypes) {
+      if (MediaRecorder.isTypeSupported(type)) {
+        mimeType = type;
+        break;
+      }
+    }
+    
+    if (!mimeType) {
+      console.warn('No supported video recording format found');
+      return;
+    }
+    
+    console.log('Starting recording with mimeType:', mimeType);
+    
+    try {
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+          console.log('Recorded chunk:', event.data.size, 'bytes');
+        }
+      };
+      
+      mediaRecorder.onerror = (event) => {
+        console.error('MediaRecorder error:', event);
+      };
+      
+      mediaRecorder.start(1000); // Capture in 1-second chunks
+      mediaRecorderRef.current = mediaRecorder;
+      console.log('Recording started');
+    } catch (err) {
+      console.error('Failed to start recording:', err);
+    }
+  };
+
+  // Stop recording and get blob
+  const stopRecording = (): Promise<Blob | null> => {
+    return new Promise((resolve) => {
+      const mediaRecorder = mediaRecorderRef.current;
+      
+      if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+        console.log('No active recording to stop');
+        resolve(recordedChunksRef.current.length > 0 
+          ? new Blob(recordedChunksRef.current, { type: 'video/webm' }) 
+          : null);
+        return;
+      }
+      
+      mediaRecorder.onstop = () => {
+        console.log('Recording stopped, chunks:', recordedChunksRef.current.length);
+        if (recordedChunksRef.current.length > 0) {
+          const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+          console.log('Created blob:', blob.size, 'bytes');
+          resolve(blob);
+        } else {
+          resolve(null);
+        }
+      };
+      
+      mediaRecorder.stop();
+    });
+  };
+
   // Go live
   const startStream = async () => {
     if (!user || cameraState !== 'ready') return;
@@ -154,6 +232,12 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
     try {
       // Set up signaling channel
       signalingRef.current = new SignalingChannel(supabase, streamId, user.id);
+
+      // Get the media stream and start recording
+      const stream = localStreamRef.current?.getStream();
+      if (stream) {
+        startRecording(stream);
+      }
 
       // Update stream status in database
       const { error } = await supabase
@@ -188,6 +272,56 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
   // Stop stream
   const stopStream = async (saveAsReplay: boolean) => {
     try {
+      setIsSaving(saveAsReplay);
+      
+      let replayUrl: string | null = null;
+      
+      // Stop recording and upload if saving replay
+      if (saveAsReplay) {
+        const blob = await stopRecording();
+        
+        if (blob && blob.size > 0 && user) {
+          console.log('Uploading replay, size:', blob.size);
+          
+          // Upload to Supabase storage
+          const fileName = `replays/${user.id}/${streamId}-${Date.now()}.webm`;
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('media')
+            .upload(fileName, blob, {
+              contentType: 'video/webm',
+              upsert: true,
+            });
+          
+          if (uploadError) {
+            console.error('Upload error:', uploadError);
+            toast({ 
+              title: 'Failed to save replay', 
+              description: uploadError.message,
+              variant: 'destructive' 
+            });
+          } else {
+            console.log('Upload successful:', uploadData);
+            // Get public URL
+            const { data: urlData } = supabase.storage
+              .from('media')
+              .getPublicUrl(fileName);
+            
+            replayUrl = urlData.publicUrl;
+            console.log('Replay URL:', replayUrl);
+          }
+        } else {
+          console.log('No recording data to save');
+          toast({ 
+            title: 'No recording data', 
+            description: 'The stream was too short to save.',
+            variant: 'destructive' 
+          });
+        }
+      } else {
+        // Just stop recording without saving
+        await stopRecording();
+      }
+
       // Stop local stream
       localStreamRef.current?.stop();
       localStreamRef.current = null;
@@ -206,16 +340,27 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
         .update({ 
           is_live: false, 
           ended_at: new Date().toISOString(),
-          replay_available: saveAsReplay,
+          replay_available: saveAsReplay && !!replayUrl,
+          replay_url: replayUrl,
         })
         .eq('id', streamId);
 
       setIsStreaming(false);
       setShowEndDialog(false);
-      toast({ title: saveAsReplay ? 'Stream ended & marked for replay!' : 'Stream ended' });
+      setIsSaving(false);
+      
+      if (saveAsReplay && replayUrl) {
+        toast({ title: 'Stream ended & replay saved!' });
+      } else if (saveAsReplay) {
+        toast({ title: 'Stream ended', description: 'Replay could not be saved.' });
+      } else {
+        toast({ title: 'Stream ended' });
+      }
+      
       onEnd();
     } catch (err: any) {
       console.error('Error ending stream:', err);
+      setIsSaving(false);
       toast({ title: 'Error ending stream', description: err.message, variant: 'destructive' });
     }
   };
@@ -403,36 +548,49 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
       </motion.div>
 
       {/* End Stream Dialog */}
-      <AlertDialog open={showEndDialog} onOpenChange={setShowEndDialog}>
+      <AlertDialog open={showEndDialog} onOpenChange={(open) => !isSaving && setShowEndDialog(open)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>End your stream?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {isSaving ? 'Saving replay...' : 'End your stream?'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Would you like to mark this stream as replayable so viewers can watch it later?
-              <br /><br />
-              <span className="text-xs text-muted-foreground">
-                Note: For full replay functionality, you would need to record the stream externally.
-              </span>
+              {isSaving ? (
+                <div className="flex items-center gap-3 py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <span>Uploading your stream recording. This may take a moment...</span>
+                </div>
+              ) : (
+                <>
+                  Would you like to save this stream as a replay so viewers can watch it later?
+                  <br /><br />
+                  <span className="text-xs text-muted-foreground">
+                    Your stream will be saved and available for playback.
+                  </span>
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel onClick={() => setShowEndDialog(false)}>
-              Keep Streaming
-            </AlertDialogCancel>
-            <Button
-              variant="outline"
-              onClick={() => stopStream(false)}
-            >
-              End (No Replay)
-            </Button>
-            <AlertDialogAction 
-              onClick={() => stopStream(true)}
-              className="bg-primary"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              End & Save
-            </AlertDialogAction>
-          </AlertDialogFooter>
+          {!isSaving && (
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+              <AlertDialogCancel onClick={() => setShowEndDialog(false)}>
+                Keep Streaming
+              </AlertDialogCancel>
+              <Button
+                variant="outline"
+                onClick={() => stopStream(false)}
+              >
+                End (No Replay)
+              </Button>
+              <AlertDialogAction 
+                onClick={() => stopStream(true)}
+                className="bg-primary"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                End & Save Replay
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          )}
         </AlertDialogContent>
       </AlertDialog>
     </div>
