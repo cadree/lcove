@@ -20,6 +20,7 @@ import Store from "./pages/Store";
 import Mall from "./pages/Mall";
 import FundDashboard from "./pages/FundDashboard";
 import Membership from "./pages/Membership";
+import Live from "./pages/Live";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -54,6 +55,7 @@ const App = () => (
             <Route path="/mall" element={<Mall />} />
             <Route path="/fund" element={<FundDashboard />} />
             <Route path="/membership" element={<Membership />} />
+            <Route path="/live" element={<Live />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

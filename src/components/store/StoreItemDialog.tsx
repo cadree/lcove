@@ -30,7 +30,10 @@ import {
   ChevronRight,
   MessageSquare,
   Sparkles,
+  Calendar,
 } from 'lucide-react';
+import { StudioBookingDialog } from '@/components/studio/StudioBookingDialog';
+import { StudioReviews } from '@/components/studio/StudioReviews';
 
 interface StoreItemDialogProps {
   item: StoreItem | null;
@@ -53,6 +56,7 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
   const [inquiryMessage, setInquiryMessage] = useState('');
   const [preferredDates, setPreferredDates] = useState('');
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [showBooking, setShowBooking] = useState(false);
 
   if (!item) return null;
 
@@ -318,6 +322,17 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
             {/* Inquiry Form for Rentals */}
             {item.type === 'rental' && (
               <div className="space-y-3 pt-3 border-t border-border">
+                <Button
+                  className="w-full"
+                  size="lg"
+                  onClick={() => setShowBooking(true)}
+                >
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Request Booking
+                </Button>
+                
+                <div className="text-center text-sm text-muted-foreground">or</div>
+                
                 <h4 className="font-medium flex items-center gap-2">
                   <MessageSquare className="w-4 h-4" />
                   Send an Inquiry
@@ -342,6 +357,7 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
                   />
                 </div>
                 <Button
+                  variant="outline"
                   className="w-full"
                   onClick={handleSendInquiry}
                   disabled={createInquiry.isPending}
@@ -351,7 +367,21 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
               </div>
             )}
           </div>
+
+          {/* Reviews Section for Rentals */}
+          {item.type === 'rental' && (
+            <StudioReviews itemId={item.id} />
+          )}
         </div>
+
+        {/* Booking Dialog */}
+        {item.type === 'rental' && (
+          <StudioBookingDialog
+            item={item}
+            open={showBooking}
+            onClose={() => setShowBooking(false)}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
