@@ -125,63 +125,64 @@ const PostCreator = ({ avatarUrl, displayName }: PostCreatorProps) => {
         )}
       </AnimatePresence>
 
-      {/* Actions */}
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="flex items-center justify-between mt-4 pt-4 border-t border-border/50"
+      {/* Actions - Always visible */}
+      <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              fileInputRef.current?.setAttribute('accept', 'image/*');
+              fileInputRef.current?.click();
+            }}
+            className="text-muted-foreground hover:text-foreground gap-2"
           >
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  fileInputRef.current?.setAttribute('accept', 'image/*');
-                  fileInputRef.current?.click();
-                }}
-                className="text-muted-foreground hover:text-foreground gap-2"
-              >
-                <Image className="w-4 h-4" />
-                Photo
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  fileInputRef.current?.setAttribute('accept', 'video/*');
-                  fileInputRef.current?.click();
-                }}
-                className="text-muted-foreground hover:text-foreground gap-2"
-              >
-                <Video className="w-4 h-4" />
-                Video
-              </Button>
-            </div>
+            <Image className="w-4 h-4" />
+            Photo
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              fileInputRef.current?.setAttribute('accept', 'video/*');
+              fileInputRef.current?.click();
+            }}
+            className="text-muted-foreground hover:text-foreground gap-2"
+          >
+            <Video className="w-4 h-4" />
+            Video
+          </Button>
+        </div>
 
-            <Button
-              onClick={handleSubmit}
-              disabled={(!content.trim() && !selectedFile) || createPost.isPending}
-              size="sm"
-              className="gap-2"
+        <AnimatePresence>
+          {(isExpanded || content.trim() || selectedFile) && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
             >
-              {createPost.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Posting...
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  Post
-                </>
-              )}
-            </Button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <Button
+                onClick={handleSubmit}
+                disabled={(!content.trim() && !selectedFile) || createPost.isPending}
+                size="sm"
+                className="gap-2"
+              >
+                {createPost.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Posting...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Post
+                  </>
+                )}
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       <input
         ref={fileInputRef}

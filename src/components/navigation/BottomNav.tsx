@@ -20,7 +20,7 @@ const BottomNav = () => {
       transition={{ delay: 0.3, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       className="nav-floating"
     >
-      <div className="relative glass-strong rounded-2xl px-2 py-2 flex items-center gap-1 shadow-elevated">
+    <div className="relative glass-strong rounded-2xl px-1.5 sm:px-2 py-2 flex items-center gap-0.5 sm:gap-1 shadow-elevated max-w-[calc(100vw-2rem)]">
         {/* Subtle top highlight */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-foreground/10 to-transparent rounded-t-2xl" />
         
@@ -30,7 +30,7 @@ const BottomNav = () => {
             to={item.path}
             className={({ isActive }) =>
               cn(
-                "relative flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-300 ease-smooth",
+                "relative flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-xl transition-all duration-300 ease-smooth",
                 isActive
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
