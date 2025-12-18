@@ -228,8 +228,8 @@ const Profile = () => {
   const accentColor = customization?.accent_color_override || theme.primaryAccent;
 
   return (
-    <PageLayout>
-      <div 
+    <PageLayout showNotificationBell={false}>
+      <div
         className="min-h-screen relative"
         style={getHeadingStyle()}
       >

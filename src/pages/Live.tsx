@@ -4,168 +4,444 @@ import PageLayout from '@/components/layout/PageLayout';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Radio, Plus, Users, Mic, ArrowLeft } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { 
+  Radio, Plus, Users, Mic, ArrowLeft, Play, Pencil, 
+  Clock, Eye, Coins, PlayCircle, Video, Headphones 
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLiveStreams, useGoLive } from '@/hooks/useLiveStreams';
+import { useLiveStreams, useGoLive, LiveStream } from '@/hooks/useLiveStreams';
 import { LiveStreamCard } from '@/components/streaming/LiveStreamCard';
 import { StreamViewer } from '@/components/streaming/StreamViewer';
 import { CreateStreamDialog } from '@/components/streaming/CreateStreamDialog';
+import { EditStreamDialog } from '@/components/streaming/EditStreamDialog';
+import { useProfile } from '@/hooks/useProfile';
 import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
+
+// Compact stream card for "My Streams" section
+const MyStreamCard: React.FC<{
+  stream: LiveStream;
+  onWatch: () => void;
+  onEdit: () => void;
+  onGoLive: () => void;
+}> = ({ stream, onWatch, onEdit, onGoLive }) => {
+  const { profile } = useProfile(stream.host_id);
+  const goLive = useGoLive();
+  
+  const getStatus = () => {
+    if (stream.is_live) return 'live';
+    if (stream.started_at && stream.ended_at) return 'ended';
+    return 'draft';
+  };
+  
+  const status = getStatus();
+  const hasReplay = status === 'ended' && stream.replay_available && stream.replay_url;
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="group"
+    >
+      <Card className="overflow-hidden bg-card/50 backdrop-blur-sm border-border/50 hover:border-primary/30 transition-all">
+        <div className="flex gap-4 p-4">
+          {/* Thumbnail */}
+          <div className="relative w-32 h-20 rounded-lg overflow-hidden bg-muted shrink-0">
+            {stream.thumbnail_url ? (
+              <img 
+                src={stream.thumbnail_url} 
+                alt={stream.title}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+                <Radio className="h-6 w-6 text-primary/50" />
+              </div>
+            )}
+            
+            {/* Status badge */}
+            {status === 'live' && (
+              <Badge className="absolute top-1 left-1 bg-red-500 text-[10px] px-1.5 py-0.5">
+                LIVE
+              </Badge>
+            )}
+            {hasReplay && (
+              <Badge className="absolute top-1 left-1 bg-primary text-[10px] px-1.5 py-0.5">
+                <PlayCircle className="h-2.5 w-2.5 mr-0.5" />
+                REPLAY
+              </Badge>
+            )}
+          </div>
+          
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <h3 className="font-medium truncate">{stream.title}</h3>
+            <p className="text-sm text-muted-foreground truncate mt-0.5">
+              {stream.description || 'No description'}
+            </p>
+            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Eye className="h-3 w-3" />
+                {stream.viewer_count}
+              </span>
+              {stream.total_tips > 0 && (
+                <span className="flex items-center gap-1">
+                  <Coins className="h-3 w-3" />
+                  {stream.total_tips}
+                </span>
+              )}
+              <Badge variant="outline" className="text-[10px]">
+                {stream.stream_type === 'webrtc' ? 'Camera' : stream.stream_type}
+              </Badge>
+            </div>
+          </div>
+          
+          {/* Actions */}
+          <div className="flex flex-col gap-2 shrink-0">
+            <Button 
+              size="sm" 
+              variant="outline"
+              className="h-8"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+            >
+              <Pencil className="h-3 w-3 mr-1" />
+              Edit
+            </Button>
+            
+            {status === 'live' ? (
+              <Button 
+                size="sm" 
+                variant="destructive"
+                className="h-8"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  goLive.mutate({ streamId: stream.id, isLive: false });
+                }}
+              >
+                End
+              </Button>
+            ) : hasReplay ? (
+              <Button 
+                size="sm" 
+                variant="default"
+                className="h-8"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onWatch();
+                }}
+              >
+                <Play className="h-3 w-3 mr-1" />
+                Watch
+              </Button>
+            ) : (
+              <Button 
+                size="sm" 
+                variant="default"
+                className="h-8"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onWatch();
+                }}
+              >
+                <Play className="h-3 w-3 mr-1" />
+                Start
+              </Button>
+            )}
+          </div>
+        </div>
+      </Card>
+    </motion.div>
+  );
+};
+
+// Featured live stream card
+const FeaturedLiveCard: React.FC<{
+  stream: LiveStream;
+  onClick: () => void;
+}> = ({ stream, onClick }) => {
+  const { profile } = useProfile(stream.host_id);
+  
+  return (
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      className="cursor-pointer"
+      onClick={onClick}
+    >
+      <Card className="overflow-hidden bg-gradient-to-br from-red-500/20 via-card to-card border-red-500/30">
+        <div className="relative aspect-video">
+          {stream.thumbnail_url ? (
+            <img 
+              src={stream.thumbnail_url} 
+              alt={stream.title}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-red-500/30 to-primary/10">
+              <Radio className="h-16 w-16 text-red-500/70 animate-pulse" />
+            </div>
+          )}
+          
+          {/* Live indicator */}
+          <div className="absolute top-3 left-3 flex items-center gap-2">
+            <Badge className="bg-red-500 animate-pulse">
+              <Radio className="h-3 w-3 mr-1" />
+              LIVE NOW
+            </Badge>
+          </div>
+          
+          {/* Viewer count */}
+          <div className="absolute bottom-3 right-3">
+            <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
+              <Users className="h-3 w-3 mr-1" />
+              {stream.viewer_count} watching
+            </Badge>
+          </div>
+          
+          {/* Gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
+        </div>
+        
+        <CardContent className="p-4">
+          <h3 className="font-semibold text-lg">{stream.title}</h3>
+          <div className="flex items-center gap-2 mt-2">
+            <Avatar className="h-6 w-6">
+              <AvatarImage src={profile?.avatar_url || undefined} />
+              <AvatarFallback className="text-xs">
+                {profile?.display_name?.charAt(0) || 'D'}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-sm text-muted-foreground">
+              {profile?.display_name || 'DJ'}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+};
 
 const Live = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { streams: liveStreams, isLoading: loadingLive } = useLiveStreams(true);
   const { streams: allStreams, isLoading: loadingAll } = useLiveStreams(false);
-  const goLive = useGoLive();
 
   const [showCreate, setShowCreate] = useState(false);
   const [selectedStreamId, setSelectedStreamId] = useState<string | null>(null);
+  const [editingStream, setEditingStream] = useState<LiveStream | null>(null);
 
   const myStreams = allStreams.filter(s => s.host_id === user?.id);
+  const otherStreams = allStreams.filter(s => s.host_id !== user?.id);
+  
+  // Stats
+  const totalLive = liveStreams.length;
+  const totalReplays = allStreams.filter(s => s.replay_available && s.replay_url).length;
 
   return (
     <PageLayout>
-      <div className="container max-w-6xl mx-auto px-4 py-6 space-y-6">
-        {/* Hero */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 via-background to-background p-8">
-          <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-4">
-              <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div className="p-3 bg-primary/20 rounded-full">
-                <Radio className="h-8 w-8 text-primary" />
+      <div className="min-h-screen">
+        {/* Hero Section */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-background to-background">
+          <div className="container max-w-6xl mx-auto px-4 py-8">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2.5 bg-primary/20 rounded-xl">
+                      <Radio className="h-6 w-6 text-primary" />
+                    </div>
+                    <h1 className="text-2xl sm:text-3xl font-bold">Live Streams</h1>
+                  </div>
+                  <p className="text-muted-foreground text-sm sm:text-base">
+                    Stream live DJ sets or watch the community
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-3xl font-bold">Live DJ Sets</h1>
-                <p className="text-muted-foreground">Stream live or tune in to community DJs</p>
-              </div>
+              
+              {user && (
+                <Button onClick={() => setShowCreate(true)} className="shrink-0">
+                  <Plus className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Start Streaming</span>
+                  <span className="sm:hidden">Stream</span>
+                </Button>
+              )}
             </div>
             
-            {user && (
-              <Button onClick={() => setShowCreate(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Start Streaming
-              </Button>
-            )}
+            {/* Quick Stats */}
+            <div className="flex gap-4 mt-6">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/10 text-red-500">
+                <div className="h-2 w-2 bg-red-500 rounded-full animate-pulse" />
+                <span className="text-sm font-medium">{totalLive} Live</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary">
+                <PlayCircle className="h-4 w-4" />
+                <span className="text-sm font-medium">{totalReplays} Replays</span>
+              </div>
+            </div>
           </div>
           
-          {/* Animated background elements */}
+          {/* Background decoration */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <motion.div
               animate={{ rotate: 360 }}
-              transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-              className="absolute -right-20 -top-20 w-64 h-64 rounded-full border border-primary/20"
+              transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
+              className="absolute -right-32 -top-32 w-64 h-64 rounded-full border border-primary/10"
+            />
+            <motion.div
+              animate={{ rotate: -360 }}
+              transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
+              className="absolute -right-16 -top-16 w-32 h-32 rounded-full border border-primary/20"
             />
           </div>
         </div>
 
-        {/* Live Now Section */}
-        {liveStreams.length > 0 && (
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="h-2 w-2 bg-red-500 rounded-full animate-pulse" />
-              <h2 className="text-xl font-semibold">Live Now</h2>
-              <span className="text-sm text-muted-foreground">({liveStreams.length})</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {liveStreams.map((stream) => (
-                <LiveStreamCard 
-                  key={stream.id} 
-                  stream={stream}
-                  onClick={() => setSelectedStreamId(stream.id)}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Tabs for browsing */}
-        <Tabs defaultValue="all">
-          <TabsList>
-            <TabsTrigger value="all">All Streams</TabsTrigger>
-            {user && <TabsTrigger value="my">My Streams</TabsTrigger>}
-          </TabsList>
-
-          <TabsContent value="all" className="mt-4">
-            {loadingAll ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-64 bg-muted animate-pulse rounded-xl" />
-                ))}
+        <div className="container max-w-6xl mx-auto px-4 py-6 space-y-8">
+          {/* Featured Live Section */}
+          {liveStreams.length > 0 && (
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-2.5 w-2.5 bg-red-500 rounded-full animate-pulse" />
+                <h2 className="text-xl font-semibold">Live Now</h2>
               </div>
-            ) : allStreams.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {allStreams.map((stream) => (
-                  <LiveStreamCard 
-                    key={stream.id} 
-                    stream={stream}
-                    onClick={() => setSelectedStreamId(stream.id)}
+              
+              {liveStreams.length === 1 ? (
+                <div className="max-w-xl">
+                  <FeaturedLiveCard 
+                    stream={liveStreams[0]}
+                    onClick={() => setSelectedStreamId(liveStreams[0].id)}
                   />
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                icon={Radio}
-                title="The stage is yours"
-                description="No one's streaming right now. Be the first to share your sound with the community and set the vibe."
-                action={user ? {
-                  label: "Start Streaming",
-                  onClick: () => setShowCreate(true)
-                } : undefined}
-              />
-            )}
-          </TabsContent>
-
-          {user && (
-            <TabsContent value="my" className="mt-4">
-              {myStreams.length > 0 ? (
+                </div>
+              ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {myStreams.map((stream) => (
-                    <div key={stream.id} className="relative">
-                      <LiveStreamCard 
+                  {liveStreams.map((stream) => (
+                    <LiveStreamCard 
+                      key={stream.id} 
+                      stream={stream}
+                      onClick={() => setSelectedStreamId(stream.id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Main Tabs */}
+          <Tabs defaultValue={user ? "my" : "all"} className="w-full">
+            <TabsList className="w-full sm:w-auto">
+              {user && <TabsTrigger value="my" className="flex-1 sm:flex-none">My Streams</TabsTrigger>}
+              <TabsTrigger value="all" className="flex-1 sm:flex-none">Browse</TabsTrigger>
+              <TabsTrigger value="replays" className="flex-1 sm:flex-none">Replays</TabsTrigger>
+            </TabsList>
+
+            {/* My Streams Tab */}
+            {user && (
+              <TabsContent value="my" className="mt-6">
+                {myStreams.length > 0 ? (
+                  <div className="space-y-3">
+                    {myStreams.map((stream) => (
+                      <MyStreamCard
+                        key={stream.id}
                         stream={stream}
-                        onClick={() => setSelectedStreamId(stream.id)}
+                        onWatch={() => setSelectedStreamId(stream.id)}
+                        onEdit={() => setEditingStream(stream)}
+                        onGoLive={() => setSelectedStreamId(stream.id)}
                       />
-                      <div className="absolute bottom-4 left-4 right-4">
-                        <Button
-                          variant={stream.is_live ? 'destructive' : 'default'}
-                          className="w-full"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            goLive.mutate({ streamId: stream.id, isLive: !stream.is_live });
-                          }}
-                        >
-                          {stream.is_live ? 'End Stream' : 'Go Live'}
-                        </Button>
-                      </div>
-                    </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon={Video}
+                    title="No streams yet"
+                    description="Create your first stream to start broadcasting to the community."
+                    action={{
+                      label: "Create Stream",
+                      onClick: () => setShowCreate(true)
+                    }}
+                  />
+                )}
+              </TabsContent>
+            )}
+
+            {/* Browse Tab */}
+            <TabsContent value="all" className="mt-6">
+              {loadingAll ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-64 bg-muted animate-pulse rounded-xl" />
+                  ))}
+                </div>
+              ) : otherStreams.length > 0 || (!user && allStreams.length > 0) ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {(user ? otherStreams : allStreams).map((stream) => (
+                    <LiveStreamCard 
+                      key={stream.id} 
+                      stream={stream}
+                      onClick={() => setSelectedStreamId(stream.id)}
+                    />
                   ))}
                 </div>
               ) : (
                 <EmptyState
-                  icon={Mic}
-                  title="Your streams will appear here"
-                  description="Once you create a stream, you can manage it, go live, and track your tips all from this spot."
-                  action={{
-                    label: "Create Your First Stream",
+                  icon={Headphones}
+                  title="No streams to browse"
+                  description="Be the first to share your sound with the community!"
+                  action={user ? {
+                    label: "Start Streaming",
                     onClick: () => setShowCreate(true)
-                  }}
+                  } : undefined}
                 />
               )}
             </TabsContent>
-          )}
-        </Tabs>
 
-        {/* Create Stream Dialog */}
+            {/* Replays Tab */}
+            <TabsContent value="replays" className="mt-6">
+              {(() => {
+                const replays = allStreams.filter(s => s.replay_available && s.replay_url);
+                return replays.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {replays.map((stream) => (
+                      <LiveStreamCard 
+                        key={stream.id} 
+                        stream={stream}
+                        onClick={() => setSelectedStreamId(stream.id)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon={PlayCircle}
+                    title="No replays available"
+                    description="Past streams with saved replays will appear here."
+                  />
+                );
+              })()}
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Dialogs */}
         <CreateStreamDialog 
           open={showCreate} 
           onClose={() => setShowCreate(false)} 
           onStreamCreated={(streamId) => setSelectedStreamId(streamId)}
         />
 
-        {/* Stream Viewer */}
+        <EditStreamDialog
+          stream={editingStream}
+          open={!!editingStream}
+          onClose={() => setEditingStream(null)}
+        />
+
         {selectedStreamId && (
           <StreamViewer
             streamId={selectedStreamId}
