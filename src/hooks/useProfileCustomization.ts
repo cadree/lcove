@@ -13,6 +13,11 @@ export interface ProfileCustomization {
   profile_music_enabled: boolean;
   profile_music_title: string | null;
   profile_music_artist: string | null;
+  profile_music_source: 'spotify' | 'apple_music' | 'upload' | null;
+  profile_music_album_art_url: string | null;
+  profile_music_album_name: string | null;
+  profile_music_preview_url: string | null;
+  profile_music_external_id: string | null;
   created_at: string;
   updated_at: string;
 }

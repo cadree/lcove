@@ -303,11 +303,16 @@ const Profile = () => {
         </div>
 
         {/* Profile Music Player - shows when music is enabled */}
-        {customization?.profile_music_enabled && customization?.profile_music_url && (
+        {customization?.profile_music_enabled && (customization?.profile_music_url || customization?.profile_music_preview_url) && (
           <ProfileMusicPlayer
             musicUrl={customization.profile_music_url}
+            previewUrl={customization.profile_music_preview_url}
             title={customization.profile_music_title}
             artist={customization.profile_music_artist}
+            albumArtUrl={customization.profile_music_album_art_url}
+            albumName={customization.profile_music_album_name}
+            source={customization.profile_music_source as 'spotify' | 'apple_music' | 'upload' | null}
+            externalId={customization.profile_music_external_id}
           />
         )}
       </div>

@@ -1,14 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
 import { 
   Palette, 
-  Image, 
   Music, 
   Sparkles,
   Upload,
@@ -20,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ProfileMusicSourceSelector, MusicData } from "./ProfileMusicSourceSelector";
 
 interface ProfileCustomizationDialogProps {
   open: boolean;
@@ -56,25 +54,32 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
   const [activeTab, setActiveTab] = useState("background");
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const musicInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [backgroundType, setBackgroundType] = useState<'color' | 'gradient' | 'image'>('gradient');
   const [backgroundValue, setBackgroundValue] = useState(PRESET_GRADIENTS[0]);
-  const [profileMusicUrl, setProfileMusicUrl] = useState<string | null>(null);
   const [profileMusicEnabled, setProfileMusicEnabled] = useState(false);
-  const [profileMusicTitle, setProfileMusicTitle] = useState("");
-  const [profileMusicArtist, setProfileMusicArtist] = useState("");
+  const [musicData, setMusicData] = useState<MusicData | null>(null);
 
   // Load existing customization
   useEffect(() => {
     if (customization) {
       setBackgroundType(customization.background_type as 'color' | 'gradient' | 'image');
       setBackgroundValue(customization.background_value);
-      setProfileMusicUrl(customization.profile_music_url);
       setProfileMusicEnabled(customization.profile_music_enabled);
-      setProfileMusicTitle(customization.profile_music_title || "");
-      setProfileMusicArtist(customization.profile_music_artist || "");
+      
+      if (customization.profile_music_url || customization.profile_music_preview_url) {
+        setMusicData({
+          source: (customization.profile_music_source as MusicData['source']) || 'upload',
+          url: customization.profile_music_url,
+          previewUrl: customization.profile_music_preview_url,
+          externalId: customization.profile_music_external_id,
+          title: customization.profile_music_title || "",
+          artist: customization.profile_music_artist || "",
+          albumName: customization.profile_music_album_name || "",
+          albumArtUrl: customization.profile_music_album_art_url,
+        });
+      }
     }
   }, [customization]);
 
@@ -108,49 +113,23 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
     }
   };
 
-  const handleMusicUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    if (!file.type.startsWith('audio/')) {
-      toast.error('Please upload an audio file');
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/profile-music.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('media')
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('media')
-        .getPublicUrl(fileName);
-
-      setProfileMusicUrl(publicUrl);
-      setProfileMusicTitle(file.name.replace(/\.[^/.]+$/, ""));
-      toast.success('Music uploaded!');
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('Failed to upload music');
-    } finally {
-      setUploading(false);
-    }
+  const handleMusicChange = (data: MusicData | null) => {
+    setMusicData(data);
   };
 
   const handleSave = async () => {
     await saveCustomization.mutateAsync({
       background_type: backgroundType,
       background_value: backgroundValue,
-      profile_music_url: profileMusicUrl,
       profile_music_enabled: profileMusicEnabled,
-      profile_music_title: profileMusicTitle || null,
-      profile_music_artist: profileMusicArtist || null,
+      profile_music_url: musicData?.url || null,
+      profile_music_preview_url: musicData?.previewUrl || null,
+      profile_music_title: musicData?.title || null,
+      profile_music_artist: musicData?.artist || null,
+      profile_music_album_name: musicData?.albumName || null,
+      profile_music_album_art_url: musicData?.albumArtUrl || null,
+      profile_music_source: musicData?.source || null,
+      profile_music_external_id: musicData?.externalId || null,
     });
     onOpenChange(false);
   };
@@ -289,81 +268,14 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
               />
             </div>
 
-            {/* Upload Music */}
+            {/* Music Source Selector */}
             <div className="space-y-3">
-              <Label className="text-sm font-medium">Upload Your Song</Label>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => musicInputRef.current?.click()}
-                  disabled={uploading}
-                  className="flex-1"
-                >
-                  {uploading ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Music className="w-4 h-4 mr-2" />
-                  )}
-                  {profileMusicUrl ? 'Change Song' : 'Upload Song'}
-                </Button>
-                <input
-                  ref={musicInputRef}
-                  type="file"
-                  accept="audio/*"
-                  onChange={handleMusicUpload}
-                  className="hidden"
-                />
-              </div>
+              <Label className="text-sm font-medium">Your Profile Song</Label>
+              <ProfileMusicSourceSelector
+                initialData={musicData || undefined}
+                onMusicChange={handleMusicChange}
+              />
             </div>
-
-            {/* Music Info */}
-            {profileMusicUrl && (
-              <div className="space-y-4 p-4 rounded-lg bg-muted/30 border border-border/50">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center">
-                    <Music className="w-6 h-6 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{profileMusicTitle || 'Unknown Track'}</p>
-                    <p className="text-xs text-muted-foreground truncate">{profileMusicArtist || 'Unknown Artist'}</p>
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Song Title</Label>
-                    <Input
-                      value={profileMusicTitle}
-                      onChange={(e) => setProfileMusicTitle(e.target.value)}
-                      placeholder="Enter song title"
-                      className="h-9"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Artist Name</Label>
-                    <Input
-                      value={profileMusicArtist}
-                      onChange={(e) => setProfileMusicArtist(e.target.value)}
-                      placeholder="Enter artist name"
-                      className="h-9"
-                    />
-                  </div>
-                </div>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setProfileMusicUrl(null);
-                    setProfileMusicTitle("");
-                    setProfileMusicArtist("");
-                  }}
-                  className="w-full text-destructive hover:text-destructive"
-                >
-                  Remove Song
-                </Button>
-              </div>
-            )}
           </TabsContent>
         </Tabs>
 
