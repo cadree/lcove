@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -8,10 +8,10 @@ import {
   MicOff, 
   Radio, 
   Users, 
-  Settings,
   Loader2,
   AlertCircle,
-  Save
+  Save,
+  RefreshCw
 } from 'lucide-react';
 import { LocalStream, SignalingChannel, WebRTCPeer, checkMediaCapabilities } from '@/utils/WebRTCStream';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,10 +32,13 @@ import {
 
 interface WebRTCStreamHostProps {
   streamId: string;
+  isLive?: boolean;
   onEnd: () => void;
 }
 
-export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, onEnd }) => {
+type CameraState = 'requesting' | 'ready' | 'error' | 'denied';
+
+export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, isLive: initialIsLive = false, onEnd }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const saveReplay = useSaveReplay();
@@ -44,107 +47,124 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
   const signalingRef = useRef<SignalingChannel | null>(null);
   const peersRef = useRef<Map<string, WebRTCPeer>>(new Map());
 
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isStreaming, setIsStreaming] = useState(initialIsLive);
+  const [cameraState, setCameraState] = useState<CameraState>('requesting');
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [viewerCount, setViewerCount] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [mediaCapabilities, setMediaCapabilities] = useState<{
-    hasCamera: boolean;
-    hasMicrophone: boolean;
-  } | null>(null);
   const [showEndDialog, setShowEndDialog] = useState(false);
+  const [isGoingLive, setIsGoingLive] = useState(false);
 
-  const [previewActive, setPreviewActive] = useState(false);
+  // Initialize camera preview
+  const initCamera = useCallback(async () => {
+    setCameraState('requesting');
+    setErrorMessage('');
 
-  // Start camera preview immediately on mount
-  useEffect(() => {
-    let mounted = true;
-    
-    const initPreview = async () => {
-      try {
-        console.log('Starting camera initialization...');
-        const caps = await checkMediaCapabilities();
-        setMediaCapabilities(caps);
-        console.log('Media capabilities:', caps);
+    try {
+      console.log('Checking media capabilities...');
+      const caps = await checkMediaCapabilities();
+      console.log('Media capabilities:', caps);
 
-        if (!caps.hasCamera && !caps.hasMicrophone) {
-          setError('No camera or microphone found. Please connect a media device.');
-          setIsLoading(false);
-          return;
-        }
-
-        // Start preview immediately
-        localStreamRef.current = new LocalStream();
-        const stream = await localStreamRef.current.start({
-          video: caps.hasCamera,
-          audio: caps.hasMicrophone,
-        });
-        console.log('Preview stream started:', stream.id, 'tracks:', stream.getTracks().map(t => t.kind));
-
-        if (!mounted) {
-          localStreamRef.current.stop();
-          return;
-        }
-
-        // Attach to video element
-        if (videoRef.current) {
-          await localStreamRef.current.attachToVideo(videoRef.current);
-          console.log('Stream attached to video element');
-        } else {
-          console.warn('Video ref not available');
-        }
-
-        setPreviewActive(true);
-        setIsLoading(false);
-      } catch (err: any) {
-        console.error('Error starting preview:', err);
-        
-        if (!mounted) return;
-        
-        if (err.name === 'NotAllowedError') {
-          setError('Camera/microphone access denied. Please click "Allow" when your browser asks for permission.');
-        } else if (err.name === 'NotFoundError') {
-          setError('No camera or microphone found. Please connect a media device.');
-        } else if (err.name === 'NotReadableError') {
-          setError('Camera/microphone is already in use by another app. Please close other apps using it.');
-        } else {
-          setError(err.message || 'Failed to access camera/microphone');
-        }
-        setIsLoading(false);
+      if (!caps.hasCamera && !caps.hasMicrophone) {
+        setCameraState('error');
+        setErrorMessage('No camera or microphone found. Please connect a media device.');
+        return;
       }
-    };
 
-    initPreview();
+      console.log('Requesting camera access...');
+      localStreamRef.current = new LocalStream();
+      const stream = await localStreamRef.current.start({
+        video: caps.hasCamera,
+        audio: caps.hasMicrophone,
+      });
+      console.log('Got media stream:', stream.id, 'tracks:', stream.getTracks().map(t => `${t.kind}:${t.label}`));
 
-    return () => {
-      mounted = false;
-      // Cleanup on unmount if not streaming
-      if (localStreamRef.current) {
-        localStreamRef.current.stop();
+      // Attach to video element
+      if (videoRef.current) {
+        console.log('Attaching stream to video element...');
+        videoRef.current.srcObject = stream;
+        videoRef.current.muted = true;
+        videoRef.current.playsInline = true;
+        
+        // Wait for video to be ready
+        videoRef.current.onloadedmetadata = async () => {
+          console.log('Video metadata loaded, attempting play...');
+          try {
+            await videoRef.current?.play();
+            console.log('Video playing successfully');
+            setCameraState('ready');
+          } catch (playErr) {
+            console.log('Autoplay blocked, will show play button:', playErr);
+            setCameraState('ready'); // Still ready, just need user interaction
+          }
+        };
+      } else {
+        console.error('Video ref not available');
+        setCameraState('error');
+        setErrorMessage('Video element not ready. Please try again.');
       }
-    };
+    } catch (err: any) {
+      console.error('Camera init error:', err);
+      
+      if (err.name === 'NotAllowedError') {
+        setCameraState('denied');
+        setErrorMessage('Camera access was denied. Please allow camera access in your browser settings and try again.');
+      } else if (err.name === 'NotFoundError') {
+        setCameraState('error');
+        setErrorMessage('No camera or microphone found. Please connect a device.');
+      } else if (err.name === 'NotReadableError') {
+        setCameraState('error');
+        setErrorMessage('Camera is in use by another application. Please close other apps using the camera.');
+      } else if (err.name === 'OverconstrainedError') {
+        setCameraState('error');
+        setErrorMessage('Camera does not support the required settings. Try a different camera.');
+      } else {
+        setCameraState('error');
+        setErrorMessage(err.message || 'Failed to access camera. Please check your settings.');
+      }
+    }
   }, []);
 
-  // Go live (preview already running)
+  // Start camera on mount
+  useEffect(() => {
+    initCamera();
+
+    return () => {
+      // Cleanup on unmount
+      if (localStreamRef.current) {
+        localStreamRef.current.stop();
+        localStreamRef.current = null;
+      }
+      if (signalingRef.current) {
+        signalingRef.current.close();
+        signalingRef.current = null;
+      }
+      peersRef.current.forEach(peer => peer.close());
+      peersRef.current.clear();
+    };
+  }, [initCamera]);
+
+  // Go live
   const startStream = async () => {
-    if (!user || !previewActive) return;
+    if (!user || cameraState !== 'ready') return;
     
-    setIsLoading(true);
+    setIsGoingLive(true);
 
     try {
       // Set up signaling channel
       signalingRef.current = new SignalingChannel(supabase, streamId, user.id);
 
       // Update stream status in database
-      await supabase
+      const { error } = await supabase
         .from('live_streams')
         .update({ 
           is_live: true, 
           started_at: new Date().toISOString() 
         })
         .eq('id', streamId);
+
+      if (error) throw error;
 
       setIsStreaming(true);
       toast({ title: 'You are now live!' });
@@ -156,46 +176,48 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
         variant: 'destructive' 
       });
     } finally {
-      setIsLoading(false);
+      setIsGoingLive(false);
     }
   };
 
-  // Stop stream - show dialog asking to save replay
+  // End stream confirmation
   const handleEndStream = () => {
     setShowEndDialog(true);
   };
 
+  // Stop stream
   const stopStream = async (saveAsReplay: boolean) => {
-    // Stop local stream
-    localStreamRef.current?.stop();
-    localStreamRef.current = null;
+    try {
+      // Stop local stream
+      localStreamRef.current?.stop();
+      localStreamRef.current = null;
 
-    // Close signaling
-    signalingRef.current?.close();
-    signalingRef.current = null;
+      // Close signaling
+      signalingRef.current?.close();
+      signalingRef.current = null;
 
-    // Close all peer connections
-    peersRef.current.forEach(peer => peer.close());
-    peersRef.current.clear();
+      // Close all peer connections
+      peersRef.current.forEach(peer => peer.close());
+      peersRef.current.clear();
 
-    // Update database
-    await supabase
-      .from('live_streams')
-      .update({ 
-        is_live: false, 
-        ended_at: new Date().toISOString() 
-      })
-      .eq('id', streamId);
+      // Update database
+      await supabase
+        .from('live_streams')
+        .update({ 
+          is_live: false, 
+          ended_at: new Date().toISOString(),
+          replay_available: saveAsReplay,
+        })
+        .eq('id', streamId);
 
-    // Save replay if requested
-    if (saveAsReplay) {
-      await saveReplay.mutateAsync({ streamId });
+      setIsStreaming(false);
+      setShowEndDialog(false);
+      toast({ title: saveAsReplay ? 'Stream ended & marked for replay!' : 'Stream ended' });
+      onEnd();
+    } catch (err: any) {
+      console.error('Error ending stream:', err);
+      toast({ title: 'Error ending stream', description: err.message, variant: 'destructive' });
     }
-
-    setIsStreaming(false);
-    setShowEndDialog(false);
-    toast({ title: saveAsReplay ? 'Stream ended & replay saved!' : 'Stream ended' });
-    onEnd();
   };
 
   // Toggle video
@@ -234,59 +256,79 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
     };
   }, [streamId]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      localStreamRef.current?.stop();
-      signalingRef.current?.close();
-      peersRef.current.forEach(peer => peer.close());
-    };
-  }, []);
-
-  // All states are now handled in the main return block
+  const renderCameraContent = () => {
+    switch (cameraState) {
+      case 'requesting':
+        return (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-background z-10">
+            <div className="text-center">
+              <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
+              <p className="text-foreground font-medium">Starting camera...</p>
+              <p className="text-xs text-muted-foreground mt-2">Please allow camera access when prompted</p>
+            </div>
+          </div>
+        );
+      
+      case 'denied':
+        return (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-destructive/10 to-background z-10">
+            <div className="text-center max-w-sm px-4">
+              <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+              <p className="text-foreground font-medium mb-2">Camera Access Denied</p>
+              <p className="text-sm text-muted-foreground mb-4">{errorMessage}</p>
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  1. Click the camera icon in your browser's address bar<br/>
+                  2. Select "Allow" for camera and microphone<br/>
+                  3. Click the button below to try again
+                </p>
+                <Button onClick={initCamera} variant="outline" className="mt-4">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Try Again
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      
+      case 'error':
+        return (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-destructive/10 to-background z-10">
+            <div className="text-center max-w-sm px-4">
+              <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+              <p className="text-foreground font-medium mb-2">Camera Error</p>
+              <p className="text-sm text-muted-foreground mb-4">{errorMessage}</p>
+              <Button onClick={initCamera} variant="outline">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          </div>
+        );
+      
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="relative w-full h-full bg-black rounded-lg overflow-hidden min-h-[300px]">
-      {/* Video Preview */}
+      {/* Video Element - always rendered */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted
-        className={`w-full h-full object-cover ${!videoEnabled || !previewActive ? 'hidden' : ''}`}
+        className={`w-full h-full object-cover ${cameraState !== 'ready' || !videoEnabled ? 'opacity-0' : 'opacity-100'}`}
+        style={{ transform: 'scaleX(-1)' }} // Mirror for self-view
       />
 
-      {/* Camera not ready overlay */}
-      {!previewActive && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
-          <div className="text-center">
-            {isLoading ? (
-              <>
-                <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
-                <p className="text-muted-foreground">Starting camera...</p>
-                <p className="text-xs text-muted-foreground/60 mt-2">Please allow camera access when prompted</p>
-              </>
-            ) : error ? (
-              <>
-                <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-                <p className="text-destructive font-medium">{error}</p>
-                <Button onClick={() => window.location.reload()} variant="outline" className="mt-4">
-                  Retry
-                </Button>
-              </>
-            ) : (
-              <>
-                <Video className="h-12 w-12 text-primary mx-auto mb-4" />
-                <p className="text-muted-foreground">Initializing camera...</p>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Camera state overlays */}
+      {renderCameraContent()}
 
       {/* Video disabled overlay */}
-      {!videoEnabled && previewActive && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
+      {cameraState === 'ready' && !videoEnabled && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted/20 to-background">
           <div className="text-center">
             <VideoOff className="h-16 w-16 text-muted-foreground mx-auto mb-2" />
             <p className="text-muted-foreground">Camera Off</p>
@@ -295,8 +337,8 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
       )}
 
       {/* Status badges */}
-      <div className="absolute top-4 left-4 flex gap-2">
-        {previewActive && !isStreaming && (
+      <div className="absolute top-4 left-4 flex gap-2 z-20">
+        {cameraState === 'ready' && !isStreaming && (
           <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
             Preview
           </Badge>
@@ -317,20 +359,20 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-full px-4 py-2"
+        className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-full px-4 py-2 z-20"
       >
         {!isStreaming ? (
           <Button 
             onClick={startStream} 
             className="gap-2 bg-red-500 hover:bg-red-600"
-            disabled={isLoading || !previewActive}
+            disabled={cameraState !== 'ready' || isGoingLive}
           >
-            {isLoading ? (
+            {isGoingLive ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Radio className="h-4 w-4" />
             )}
-            {previewActive ? 'Go Live' : 'Loading...'}
+            Go Live
           </Button>
         ) : (
           <>
@@ -366,25 +408,29 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
           <AlertDialogHeader>
             <AlertDialogTitle>End your stream?</AlertDialogTitle>
             <AlertDialogDescription>
-              Would you like to save this stream as a replay so viewers can watch it later?
+              Would you like to mark this stream as replayable so viewers can watch it later?
+              <br /><br />
+              <span className="text-xs text-muted-foreground">
+                Note: For full replay functionality, you would need to record the stream externally.
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel onClick={() => setShowEndDialog(false)}>
-              Cancel
+              Keep Streaming
             </AlertDialogCancel>
             <Button
               variant="outline"
               onClick={() => stopStream(false)}
             >
-              End without saving
+              End (No Replay)
             </Button>
             <AlertDialogAction 
               onClick={() => stopStream(true)}
               className="bg-primary"
             >
               <Save className="h-4 w-4 mr-2" />
-              Save as replay
+              End & Save
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
