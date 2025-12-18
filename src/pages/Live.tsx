@@ -250,10 +250,10 @@ const Live = () => {
       <div className="min-h-screen">
         {/* Hero Section */}
         <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-background to-background">
-          <div className="container max-w-6xl mx-auto px-4 py-8">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+                <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0">
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <div>
@@ -279,7 +279,7 @@ const Live = () => {
             </div>
             
             {/* Quick Stats */}
-            <div className="flex gap-4 mt-6">
+            <div className="flex gap-4 mt-6 ml-14">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/10 text-red-500">
                 <div className="h-2 w-2 bg-red-500 rounded-full animate-pulse" />
                 <span className="text-sm font-medium">{totalLive} Live</span>
@@ -306,7 +306,7 @@ const Live = () => {
           </div>
         </div>
 
-        <div className="container max-w-6xl mx-auto px-4 py-6 space-y-8">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
           {/* Featured Live Section */}
           {liveStreams.length > 0 && (
             <section>
