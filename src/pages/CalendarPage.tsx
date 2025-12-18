@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ const CITIES = [
 
 const CalendarPage = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<ViewType>('month');
   const [selectedCity, setSelectedCity] = useState('All Cities');
@@ -85,6 +87,8 @@ const CalendarPage = () => {
     if (item.type === 'event') {
       setSelectedEventId(item.id);
       setEventDialogOpen(true);
+    } else if (item.type === 'project') {
+      navigate(`/projects?id=${item.id}`);
     } else if (item.type === 'personal') {
       // Could open edit dialog for personal items
     }
