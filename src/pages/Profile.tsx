@@ -23,6 +23,7 @@ import {
   Plus,
   Grid,
   Bookmark,
+  FileText,
 } from "lucide-react";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
@@ -32,11 +33,14 @@ import { ProfileEffects, HolographicCard, NeonText } from "@/components/profile/
 import { CreatePostDialog } from "@/components/profile/CreatePostDialog";
 import { ProfilePostsGrid } from "@/components/profile/ProfilePostsGrid";
 import { PostDetailModal } from "@/components/profile/PostDetailModal";
+import { CreateBlogDialog } from "@/components/profile/CreateBlogDialog";
+import { ProfileBlogsGrid } from "@/components/profile/ProfileBlogsGrid";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useProfileCustomization } from "@/hooks/useProfileCustomization";
 import { useProfilePosts } from "@/hooks/useProfilePosts";
+import { useProfileBlogs, BlogPost } from "@/hooks/useProfileBlogs";
 import { THEME_PRESETS, ThemePreset } from "@/lib/profileThemes";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -56,10 +60,13 @@ const Profile = () => {
   const { credits } = useCredits();
   const { customization, isOwner, saveCustomization } = useProfileCustomization(targetUserId);
   const { posts, isLoading: postsLoading, createPost, deletePost } = useProfilePosts(targetUserId);
+  const { blogs, isLoading: blogsLoading, createBlog, deleteBlog } = useProfileBlogs(targetUserId);
   const [showMusicDialog, setShowMusicDialog] = useState(false);
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
   const [showCreatePostDialog, setShowCreatePostDialog] = useState(false);
+  const [showCreateBlogDialog, setShowCreateBlogDialog] = useState(false);
   const [selectedPost, setSelectedPost] = useState<ProfilePost | null>(null);
+  const [selectedBlog, setSelectedBlog] = useState<BlogPost | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const volumeSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -475,6 +482,13 @@ const Profile = () => {
                   <span className="hidden sm:inline">Posts</span>
                 </TabsTrigger>
                 <TabsTrigger 
+                  value="blogs" 
+                  className="flex-1 rounded-none border-t-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent py-3"
+                >
+                  <FileText className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Blog</span>
+                </TabsTrigger>
+                <TabsTrigger 
                   value="saved" 
                   className="flex-1 rounded-none border-t-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent py-3"
                 >
@@ -487,6 +501,14 @@ const Profile = () => {
                   posts={posts}
                   onPostClick={(post) => setSelectedPost(post)}
                   isLoading={postsLoading}
+                />
+              </TabsContent>
+              <TabsContent value="blogs" className="mt-4">
+                <ProfileBlogsGrid 
+                  blogs={blogs}
+                  onBlogClick={(blog) => setSelectedBlog(blog)}
+                  isLoading={blogsLoading}
+                  isOwner={isOwnProfile}
                 />
               </TabsContent>
               <TabsContent value="saved" className="mt-4">
@@ -578,6 +600,17 @@ const Profile = () => {
             />
           )}
 
+          {/* Create Blog Dialog - only for own profile */}
+          {isOwnProfile && (
+            <CreateBlogDialog
+              open={showCreateBlogDialog}
+              onOpenChange={setShowCreateBlogDialog}
+              onCreateBlog={async (data) => {
+                await createBlog.mutateAsync(data);
+              }}
+            />
+          )}
+
           {/* Post Detail Modal */}
           <PostDetailModal
             post={selectedPost}
@@ -591,18 +624,28 @@ const Profile = () => {
           />
         </div>
 
-        {/* Floating Create Post Button - only for own profile */}
+        {/* Floating Create Buttons - only for own profile */}
         {isOwnProfile && (
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.8, type: "spring", stiffness: 200 }}
-            className="fixed bottom-24 right-4 sm:bottom-8 sm:right-8 z-50"
+            className="fixed bottom-24 right-4 sm:bottom-8 sm:right-8 z-50 flex flex-col gap-3"
           >
+            <Button
+              size="lg"
+              variant="outline"
+              className="h-12 w-12 rounded-full shadow-lg bg-background/90 backdrop-blur-sm"
+              onClick={() => setShowCreateBlogDialog(true)}
+              title="Write Blog"
+            >
+              <FileText className="w-5 h-5" />
+            </Button>
             <Button
               size="lg"
               className="h-14 w-14 rounded-full shadow-lg"
               onClick={() => setShowCreatePostDialog(true)}
+              title="Create Post"
             >
               <Plus className="w-6 h-6" />
             </Button>
