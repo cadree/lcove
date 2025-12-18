@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ import { toast } from "sonner";
 
 const Profile = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { profile, loading, updateProfile } = useProfile();
   const { credits } = useCredits();
   const [showMusicDialog, setShowMusicDialog] = useState(false);
@@ -116,7 +117,7 @@ const Profile = () => {
             variant="glass"
             size="icon"
             className="absolute top-4 right-4 w-10 h-10"
-            onClick={() => toast.info('Profile settings coming soon!')}
+            onClick={() => navigate('/settings')}
           >
             <Settings className="w-5 h-5" />
           </Button>
