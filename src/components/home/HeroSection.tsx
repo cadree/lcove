@@ -1,9 +1,11 @@
 import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import lcBearLogo from "@/assets/lc-bear-logo.png";
+import { usePlatformStats } from "@/hooks/usePlatformStats";
 
 const HeroSection = () => {
+  const { data: stats } = usePlatformStats();
+
   return <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden px-6">
       {/* Background Elements */}
       <div className="absolute inset-0">
@@ -86,13 +88,13 @@ const HeroSection = () => {
         delay: 0.7
       }} className="mt-16 grid grid-cols-3 gap-8 max-w-lg mx-auto">
           {[{
-          value: "10K+",
+          value: stats?.totalCreatives || 0,
           label: "Creatives"
         }, {
-          value: "500+",
+          value: stats?.totalProjects || 0,
           label: "Projects"
         }, {
-          value: "50+",
+          value: stats?.totalCities || 0,
           label: "Cities"
         }].map(stat => <div key={stat.label} className="text-center">
               <div className="text-2xl sm:text-3xl font-display font-medium text-foreground">
