@@ -1,4 +1,4 @@
-import { useState, forwardRef } from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +19,7 @@ interface ConnectMusicDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export const ConnectMusicDialog = forwardRef<HTMLDivElement, ConnectMusicDialogProps>(({ open, onOpenChange }, ref) => {
+export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogProps) => {
   const { musicProfile, saveMusicProfile, deleteMusicProfile, isOwner } = useMusicProfile();
   
   const [spotifyUrl, setSpotifyUrl] = useState(musicProfile?.spotify_artist_url || "");
@@ -479,8 +479,6 @@ export const ConnectMusicDialog = forwardRef<HTMLDivElement, ConnectMusicDialogP
       </DialogContent>
     </Dialog>
   );
-});
-
-ConnectMusicDialog.displayName = "ConnectMusicDialog";
+};
 
 export default ConnectMusicDialog;
