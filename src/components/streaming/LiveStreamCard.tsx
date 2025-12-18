@@ -69,7 +69,12 @@ export const LiveStreamCard: React.FC<LiveStreamCardProps> = ({ stream, onClick 
         </div>
 
         <Badge variant="outline" className="mt-2 text-xs">
-          {stream.stream_type === 'webrtc' ? 'P2P Stream' : stream.stream_type}
+          {stream.stream_type === 'webrtc' ? '📹 Camera/Mic' : 
+           stream.stream_type === 'opus' ? '🎧 OPUS' :
+           stream.stream_type === 'youtube' ? '▶️ YouTube' :
+           stream.stream_type === 'twitch' ? '🟣 Twitch' :
+           stream.stream_type === 'soundcloud' ? '🎵 SoundCloud' :
+           stream.stream_type}
         </Badge>
       </CardContent>
     </Card>
