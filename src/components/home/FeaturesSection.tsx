@@ -9,31 +9,37 @@ const features = [
     icon: Users,
     title: "Modular Profiles",
     description: "Build your creative identity with customizable blocks — portfolio, store, events, music, and more.",
+    link: "/profile",
   },
   {
     icon: FolderKanban,
     title: "Project Calls",
     description: "Structured collaboration. Post roles, find talent, build together. No mass DMs.",
+    link: "/projects",
   },
   {
     icon: Calendar,
     title: "Community Calendar",
     description: "Discover local events, workshops, and gatherings. City-first, always.",
+    link: "/calendar",
   },
   {
     icon: Coins,
     title: "LC Credits",
     description: "Earn through contribution, not popularity. Credits unlock access, priority, and tools.",
+    link: "/wallet",
   },
   {
     icon: Store,
     title: "Creative Stores",
     description: "Sell services, products, and digital goods directly from your profile.",
+    link: "/mall",
   },
   {
     icon: Music,
     title: "Artist Integration",
     description: "Connect Spotify & Apple Music. Showcase your sound alongside your visual work.",
+    link: "/profile",
   },
 ];
 
@@ -75,17 +81,20 @@ const FeaturesSection = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="glass-strong rounded-2xl p-6 hover:bg-accent/30 transition-all duration-300 group"
             >
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                <feature.icon className="w-6 h-6 text-primary" />
-              </div>
-              <h3 className="font-display text-xl font-medium text-foreground mb-2">
-                {feature.title}
-              </h3>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                {feature.description}
-              </p>
+              <Link to={feature.link} className="block h-full">
+                <div className="glass-strong rounded-2xl p-6 hover:bg-accent/30 transition-all duration-300 group h-full cursor-pointer">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                    <feature.icon className="w-6 h-6 text-primary" />
+                  </div>
+                  <h3 className="font-display text-xl font-medium text-foreground mb-2">
+                    {feature.title}
+                  </h3>
+                  <p className="text-muted-foreground text-sm leading-relaxed">
+                    {feature.description}
+                  </p>
+                </div>
+              </Link>
             </motion.div>
           ))}
         </div>
