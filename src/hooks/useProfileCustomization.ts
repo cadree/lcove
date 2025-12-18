@@ -39,6 +39,7 @@ export interface ProfileCustomization {
   profile_music_album_name: string | null;
   profile_music_preview_url: string | null;
   profile_music_external_id: string | null;
+  profile_music_volume: number;
   music_visualizer_enabled: boolean;
   // Timestamps
   created_at: string;
@@ -63,6 +64,7 @@ export const DEFAULT_CUSTOMIZATION: Partial<ProfileCustomization> = {
   section_order: ['about', 'music', 'stats', 'links'],
   show_top_friends: false,
   profile_music_enabled: false,
+  profile_music_volume: 0.5,
   music_visualizer_enabled: false,
 };
 

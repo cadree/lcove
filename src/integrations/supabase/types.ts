@@ -1329,6 +1329,7 @@ export type Database = {
           profile_music_source: string | null
           profile_music_title: string | null
           profile_music_url: string | null
+          profile_music_volume: number | null
           section_order: string[] | null
           show_top_friends: boolean | null
           theme_accent_color: string | null
@@ -1362,6 +1363,7 @@ export type Database = {
           profile_music_source?: string | null
           profile_music_title?: string | null
           profile_music_url?: string | null
+          profile_music_volume?: number | null
           section_order?: string[] | null
           show_top_friends?: boolean | null
           theme_accent_color?: string | null
@@ -1395,6 +1397,7 @@ export type Database = {
           profile_music_source?: string | null
           profile_music_title?: string | null
           profile_music_url?: string | null
+          profile_music_volume?: number | null
           section_order?: string[] | null
           show_top_friends?: boolean | null
           theme_accent_color?: string | null
