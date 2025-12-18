@@ -60,8 +60,11 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
 
   // Start camera preview immediately on mount
   useEffect(() => {
+    let mounted = true;
+    
     const initPreview = async () => {
       try {
+        console.log('Starting camera initialization...');
         const caps = await checkMediaCapabilities();
         setMediaCapabilities(caps);
         console.log('Media capabilities:', caps);
@@ -78,18 +81,27 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
           video: caps.hasCamera,
           audio: caps.hasMicrophone,
         });
-        console.log('Preview stream started:', stream.id);
+        console.log('Preview stream started:', stream.id, 'tracks:', stream.getTracks().map(t => t.kind));
+
+        if (!mounted) {
+          localStreamRef.current.stop();
+          return;
+        }
 
         // Attach to video element
         if (videoRef.current) {
-          localStreamRef.current.attachToVideo(videoRef.current);
+          await localStreamRef.current.attachToVideo(videoRef.current);
           console.log('Stream attached to video element');
+        } else {
+          console.warn('Video ref not available');
         }
 
         setPreviewActive(true);
         setIsLoading(false);
       } catch (err: any) {
         console.error('Error starting preview:', err);
+        
+        if (!mounted) return;
         
         if (err.name === 'NotAllowedError') {
           setError('Camera/microphone access denied. Please click "Allow" when your browser asks for permission.');
@@ -107,8 +119,9 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
     initPreview();
 
     return () => {
+      mounted = false;
       // Cleanup on unmount if not streaming
-      if (!isStreaming && localStreamRef.current) {
+      if (localStreamRef.current) {
         localStreamRef.current.stop();
       }
     };
@@ -230,41 +243,46 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
     };
   }, []);
 
-  if (error && !previewActive) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-6 text-center">
-        <AlertCircle className="h-12 w-12 text-destructive" />
-        <p className="text-destructive font-medium">{error}</p>
-        <Button onClick={() => window.location.reload()} variant="outline">
-          Retry
-        </Button>
-        <p className="text-xs text-muted-foreground max-w-sm">
-          Tip: Make sure your browser has permission to access camera/microphone. Check your browser's address bar for a camera icon.
-        </p>
-      </div>
-    );
-  }
-
-  if (isLoading && !previewActive) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">Requesting camera access...</p>
-        <p className="text-xs text-muted-foreground">Please allow access when prompted</p>
-      </div>
-    );
-  }
+  // All states are now handled in the main return block
 
   return (
-    <div className="relative w-full h-full bg-black rounded-lg overflow-hidden">
+    <div className="relative w-full h-full bg-black rounded-lg overflow-hidden min-h-[300px]">
       {/* Video Preview */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted
-        className={`w-full h-full object-cover ${!videoEnabled ? 'hidden' : ''}`}
+        className={`w-full h-full object-cover ${!videoEnabled || !previewActive ? 'hidden' : ''}`}
       />
+
+      {/* Camera not ready overlay */}
+      {!previewActive && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
+          <div className="text-center">
+            {isLoading ? (
+              <>
+                <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
+                <p className="text-muted-foreground">Starting camera...</p>
+                <p className="text-xs text-muted-foreground/60 mt-2">Please allow camera access when prompted</p>
+              </>
+            ) : error ? (
+              <>
+                <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+                <p className="text-destructive font-medium">{error}</p>
+                <Button onClick={() => window.location.reload()} variant="outline" className="mt-4">
+                  Retry
+                </Button>
+              </>
+            ) : (
+              <>
+                <Video className="h-12 w-12 text-primary mx-auto mb-4" />
+                <p className="text-muted-foreground">Initializing camera...</p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Video disabled overlay */}
       {!videoEnabled && previewActive && (
@@ -276,17 +294,13 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, on
         </div>
       )}
 
-      {/* Preview badge when not yet live */}
-      {previewActive && !isStreaming && (
-        <div className="absolute top-4 left-4">
+      {/* Status badges */}
+      <div className="absolute top-4 left-4 flex gap-2">
+        {previewActive && !isStreaming && (
           <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
             Preview
           </Badge>
-        </div>
-      )}
-
-      {/* Status badges */}
-      <div className="absolute top-4 left-4 flex gap-2">
+        )}
         {isStreaming && (
           <Badge className="bg-red-500 animate-pulse">
             <Radio className="h-3 w-3 mr-1" />

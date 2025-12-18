@@ -43,11 +43,18 @@ export class LocalStream {
     }
   }
 
-  attachToVideo(videoElement: HTMLVideoElement) {
+  async attachToVideo(videoElement: HTMLVideoElement): Promise<void> {
     if (this.stream) {
       videoElement.srcObject = this.stream;
       videoElement.muted = true; // Prevent echo
       this.videoElement = videoElement;
+      // Ensure playback starts
+      try {
+        await videoElement.play();
+        console.log('Video playback started');
+      } catch (err) {
+        console.log('Video autoplay blocked, user interaction may be required:', err);
+      }
     }
   }
 
