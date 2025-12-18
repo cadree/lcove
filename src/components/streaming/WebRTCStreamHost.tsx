@@ -43,7 +43,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
   const videoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<LocalStream | null>(null);
   const signalingRef = useRef<SignalingChannel | null>(null);
-  const peersRef = useRef<Map<string, WebRTCPeer>>(new Map());
+  const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
 
@@ -223,6 +223,73 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
     });
   };
 
+  // Handle incoming viewer connections
+  const setupHostSignaling = useCallback(() => {
+    if (!signalingRef.current || !localStreamRef.current) return;
+    
+    const stream = localStreamRef.current.getStream();
+    if (!stream) return;
+    
+    console.log('Setting up host signaling to accept viewer connections...');
+    
+    // When a viewer sends an offer, create a peer connection and respond
+    signalingRef.current.onOffer(async (offer, viewerId) => {
+      console.log('Received offer from viewer:', viewerId);
+      
+      // Create a peer connection for this viewer
+      const peerConnection = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+        ],
+      });
+      
+      // Add our local stream tracks to the connection
+      stream.getTracks().forEach(track => {
+        console.log('Adding track to peer:', track.kind);
+        peerConnection.addTrack(track, stream);
+      });
+      
+      // Handle ICE candidates
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate && signalingRef.current) {
+          signalingRef.current.sendIceCandidate(event.candidate);
+        }
+      };
+      
+      peerConnection.onconnectionstatechange = () => {
+        console.log('Peer connection state:', peerConnection.connectionState);
+      };
+      
+      // Set the remote offer and create answer
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+      
+      // Send answer back
+      if (signalingRef.current) {
+        await signalingRef.current.sendAnswer(answer);
+      }
+      
+      // Store peer connection
+      peersRef.current.set(viewerId, peerConnection as any);
+      console.log('Answered viewer:', viewerId, 'Total peers:', peersRef.current.size);
+    });
+    
+    // Handle ICE candidates from viewers
+    signalingRef.current.onIceCandidate(async (candidate, viewerId) => {
+      console.log('Received ICE candidate from viewer:', viewerId);
+      const peer = peersRef.current.get(viewerId);
+      if (peer) {
+        try {
+          await peer.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+          console.error('Error adding ICE candidate:', err);
+        }
+      }
+    });
+  }, []);
+
   // Go live
   const startStream = async () => {
     if (!user || cameraState !== 'ready') return;
@@ -238,6 +305,9 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
       if (stream) {
         startRecording(stream);
       }
+      
+      // Setup signaling to handle incoming viewer connections
+      setupHostSignaling();
 
       // Update stream status in database
       const { error } = await supabase
@@ -257,7 +327,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
       toast({ 
         title: 'Failed to go live', 
         description: err.message,
-        variant: 'destructive' 
+        variant: 'destructive'
       });
     } finally {
       setIsGoingLive(false);

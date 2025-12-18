@@ -167,8 +167,9 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
         <WebRTCStreamViewer 
           streamId={streamId}
           hostId={stream.host_id}
-          isLive={stream.is_live}
-          viewerCount={stream.viewer_count}
+          isLive={stream.is_live || false}
+          viewerCount={stream.viewer_count || 0}
+          thumbnailUrl={stream.thumbnail_url}
         />
       );
     }
