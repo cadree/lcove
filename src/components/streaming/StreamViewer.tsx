@@ -1,16 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Radio, Users, Coins, Heart, Flame, Star, ThumbsUp, Send, X } from 'lucide-react';
-import { LiveStream, useStream, useStreamReactions, useSendReaction, useTipStream, useJoinStream } from '@/hooks/useLiveStreams';
+import { Radio, Users, Coins, Send, X, Clock, PlayCircle, Trash2 } from 'lucide-react';
+import { useStream, useStreamReactions, useSendReaction, useTipStream, useJoinStream, useDeleteStream } from '@/hooks/useLiveStreams';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WebRTCStreamViewer } from './WebRTCStreamViewer';
 import { WebRTCStreamHost } from './WebRTCStreamHost';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface StreamViewerProps {
   streamId: string;
@@ -20,28 +30,41 @@ interface StreamViewerProps {
 
 const REACTIONS = ['❤️', '🔥', '⭐', '👏', '🎵', '🎧'];
 
+// Stream status helper - single source of truth
+type StreamStatus = 'draft' | 'live' | 'ended';
+const getStreamStatus = (stream: { is_live: boolean; started_at: string | null; ended_at: string | null }): StreamStatus => {
+  if (stream.is_live) return 'live';
+  if (stream.ended_at) return 'ended';
+  return 'draft'; // Never went live yet
+};
+
 export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onClose }) => {
   const { user } = useAuth();
-  const { stream } = useStream(streamId);
+  const { stream, isLoading: streamLoading } = useStream(streamId);
   const { profile } = useProfile(stream?.host_id);
   const { reactions } = useStreamReactions(streamId);
   const sendReaction = useSendReaction();
   const tipStream = useTipStream();
   const joinStream = useJoinStream();
+  const deleteStream = useDeleteStream();
 
   const [tipAmount, setTipAmount] = useState('');
   const [tipMessage, setTipMessage] = useState('');
   const [showTipInput, setShowTipInput] = useState(false);
   const [floatingReactions, setFloatingReactions] = useState<{ id: string; emoji: string }[]>([]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   const isHost = user?.id === stream?.host_id;
+  const streamStatus = stream ? getStreamStatus(stream) : 'draft';
+  const hasReplay = streamStatus === 'ended' && stream?.replay_available && stream?.replay_url;
 
-  // Join stream on mount
+  // Join stream on mount (for viewers only, when stream is live)
   useEffect(() => {
-    if (open && user && !isHost) {
+    if (open && user && !isHost && streamStatus === 'live') {
       joinStream.mutate(streamId);
     }
-  }, [open, user, streamId, isHost]);
+  }, [open, user, streamId, isHost, streamStatus]);
 
   // Show floating reactions
   useEffect(() => {
@@ -68,62 +91,75 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
     setShowTipInput(false);
   };
 
+  const handleDelete = async () => {
+    if (deleteConfirmText !== 'DELETE') return;
+    await deleteStream.mutateAsync(streamId);
+    setShowDeleteDialog(false);
+    onClose();
+  };
+
   const renderEmbed = () => {
     if (!stream) return null;
 
-    // Check if this is a replay
-    const isReplay = !stream.is_live && stream.replay_available;
-
     // WebRTC streaming (P2P with OPUS audio)
     if (stream.stream_type === 'webrtc') {
-      if (isHost && stream.is_live) {
+      // HOST VIEW: Always show host controls if user is host and stream is not ended
+      if (isHost && streamStatus !== 'ended') {
         return (
           <WebRTCStreamHost 
             streamId={streamId} 
+            isLive={streamStatus === 'live'}
             onEnd={onClose}
           />
         );
       }
       
-      // Show replay message or connect to live stream
-      if (isReplay) {
+      // VIEWER: Stream has replay
+      if (streamStatus === 'ended' && hasReplay) {
         return (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
-            <div className="text-center p-6">
-              <Radio className="h-16 w-16 text-primary mx-auto mb-4" />
+            <div className="text-center p-6 w-full">
+              <PlayCircle className="h-16 w-16 text-primary mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">Stream Replay</h3>
-              <p className="text-muted-foreground mb-4">
-                This stream has ended but was saved as a replay.
-              </p>
-              {stream.replay_url ? (
-                <video 
-                  src={stream.replay_url} 
-                  controls 
-                  className="w-full max-w-lg mx-auto rounded-lg"
-                  autoPlay
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Replay data is available for this session.
-                </p>
-              )}
+              <p className="text-muted-foreground mb-4">Watch the recorded stream</p>
+              <video 
+                src={stream.replay_url!} 
+                controls 
+                className="w-full max-w-lg mx-auto rounded-lg"
+                autoPlay
+              />
             </div>
           </div>
         );
       }
       
-      if (!stream.is_live) {
+      // VIEWER: Stream ended without replay
+      if (streamStatus === 'ended') {
         return (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted/20 to-background">
             <div className="text-center">
               <Radio className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">This stream has ended</p>
-              <p className="text-sm text-muted-foreground/60 mt-2">No replay available</p>
+              <p className="text-muted-foreground font-medium">This stream has ended</p>
+              <p className="text-sm text-muted-foreground/60 mt-2">No replay is available</p>
             </div>
           </div>
         );
       }
       
+      // VIEWER: Stream is in draft (not yet live)
+      if (streamStatus === 'draft') {
+        return (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-background">
+            <div className="text-center">
+              <Clock className="h-16 w-16 text-primary/60 mx-auto mb-4" />
+              <p className="text-foreground font-medium">Starting Soon</p>
+              <p className="text-sm text-muted-foreground mt-2">The host is setting up their stream</p>
+            </div>
+          </div>
+        );
+      }
+      
+      // VIEWER: Stream is live - connect to watch
       return (
         <WebRTCStreamViewer 
           streamId={streamId}
@@ -176,9 +212,8 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
       );
     }
 
-    // OPUS.audio embed (external streaming platform)
+    // OPUS.audio embed
     if (stream.stream_type === 'opus' && stream.external_url) {
-      // OPUS.audio uses iframe embeds
       const opusMatch = stream.external_url.match(/opus\.audio\/(?:embed\/)?([a-zA-Z0-9-]+)/);
       const streamKey = opusMatch?.[1];
       
@@ -193,7 +228,6 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
         );
       }
       
-      // Fallback for direct URL
       return (
         <iframe
           className="w-full h-full"
@@ -204,7 +238,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
       );
     }
 
-    // Default placeholder for unrecognized stream types
+    // Default loading state
     return (
       <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
         <div className="text-center">
@@ -215,131 +249,201 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
     );
   };
 
-  if (!stream) return null;
+  if (!stream && !streamLoading) return null;
 
   return (
-    <Dialog open={open} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-4xl p-0 overflow-hidden bg-background">
-        <DialogTitle className="sr-only">{stream.title}</DialogTitle>
-        
-        {/* Video Area */}
-        <div className="relative aspect-video bg-black">
-          {renderEmbed()}
+    <>
+      <Dialog open={open} onOpenChange={() => onClose()}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-background">
+          <DialogTitle className="sr-only">{stream?.title || 'Live Stream'}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {stream?.description || 'Watch this live stream'}
+          </DialogDescription>
+          
+          {/* Video Area */}
+          <div className="relative aspect-video bg-black">
+            {streamLoading ? (
+              <div className="w-full h-full flex items-center justify-center">
+                <Radio className="h-16 w-16 text-primary animate-pulse" />
+              </div>
+            ) : (
+              renderEmbed()
+            )}
 
-          {/* Floating Reactions */}
-          <AnimatePresence>
-            {floatingReactions.map((reaction) => (
-              <motion.div
-                key={reaction.id}
-                initial={{ opacity: 1, y: 0, x: Math.random() * 100 }}
-                animate={{ opacity: 0, y: -200 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 2 }}
-                className="absolute bottom-20 right-10 text-4xl pointer-events-none"
-              >
-                {reaction.emoji}
-              </motion.div>
-            ))}
-          </AnimatePresence>
+            {/* Floating Reactions */}
+            <AnimatePresence>
+              {floatingReactions.map((reaction) => (
+                <motion.div
+                  key={reaction.id}
+                  initial={{ opacity: 1, y: 0, x: Math.random() * 100 }}
+                  animate={{ opacity: 0, y: -200 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 2 }}
+                  className="absolute bottom-20 right-10 text-4xl pointer-events-none"
+                >
+                  {reaction.emoji}
+                </motion.div>
+              ))}
+            </AnimatePresence>
 
-          {/* Live Badge & Stats (only for non-WebRTC, as WebRTC has its own) */}
-          {stream.stream_type !== 'webrtc' && (
-            <div className="absolute top-4 left-4 flex gap-2">
-              {stream.is_live && (
-                <Badge className="bg-red-500 animate-pulse">
-                  <Radio className="h-3 w-3 mr-1" />
-                  LIVE
+            {/* Status Badge (for non-WebRTC streams) */}
+            {stream && stream.stream_type !== 'webrtc' && (
+              <div className="absolute top-4 left-4 flex gap-2">
+                {streamStatus === 'live' && (
+                  <Badge className="bg-red-500 animate-pulse">
+                    <Radio className="h-3 w-3 mr-1" />
+                    LIVE
+                  </Badge>
+                )}
+                {streamStatus === 'draft' && (
+                  <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
+                    <Clock className="h-3 w-3 mr-1" />
+                    Starting Soon
+                  </Badge>
+                )}
+                <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
+                  <Users className="h-3 w-3 mr-1" />
+                  {stream.viewer_count}
                 </Badge>
-              )}
-              <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
-                <Users className="h-3 w-3 mr-1" />
-                {stream.viewer_count}
-              </Badge>
-            </div>
-          )}
+              </div>
+            )}
 
-          {/* Close Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-4 right-4 bg-background/50 backdrop-blur-sm z-10"
-            onClick={onClose}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+            {/* Close Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-4 right-4 bg-background/50 backdrop-blur-sm z-10"
+              onClick={onClose}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
 
-        {/* Controls */}
-        <div className="p-4 space-y-4">
-          {/* Host Info */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Avatar>
-                <AvatarImage src={profile?.avatar_url || undefined} />
-                <AvatarFallback>{profile?.display_name?.charAt(0) || 'D'}</AvatarFallback>
-              </Avatar>
-              <div>
-                <h3 className="font-semibold">{stream.title}</h3>
-                <p className="text-sm text-muted-foreground">{profile?.display_name || 'DJ'}</p>
+          {/* Controls */}
+          <div className="p-4 space-y-4">
+            {/* Host Info */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Avatar>
+                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarFallback>{profile?.display_name?.charAt(0) || 'D'}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="font-semibold">{stream?.title}</h3>
+                  <p className="text-sm text-muted-foreground">{profile?.display_name || 'DJ'}</p>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                {/* Delete Button (Host only) */}
+                {isHost && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete
+                  </Button>
+                )}
+
+                {/* Tip Button (viewers only) */}
+                {user && !isHost && streamStatus === 'live' && (
+                  <Button 
+                    variant="outline" 
+                    className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                    onClick={() => setShowTipInput(!showTipInput)}
+                  >
+                    <Coins className="h-4 w-4 mr-2" />
+                    Tip LC
+                  </Button>
+                )}
               </div>
             </div>
 
-            {/* Tip Button */}
-            {user && user.id !== stream.host_id && (
-              <Button 
-                variant="outline" 
-                className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                onClick={() => setShowTipInput(!showTipInput)}
+            {/* Tip Input */}
+            {showTipInput && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="flex gap-2"
               >
-                <Coins className="h-4 w-4 mr-2" />
-                Tip LC
-              </Button>
+                <Input
+                  type="number"
+                  placeholder="Amount"
+                  value={tipAmount}
+                  onChange={(e) => setTipAmount(e.target.value)}
+                  className="w-24"
+                />
+                <Input
+                  placeholder="Message (optional)"
+                  value={tipMessage}
+                  onChange={(e) => setTipMessage(e.target.value)}
+                  className="flex-1"
+                />
+                <Button onClick={handleTip} disabled={tipStream.isPending}>
+                  <Send className="h-4 w-4" />
+                </Button>
+              </motion.div>
+            )}
+
+            {/* Reactions (only when live) */}
+            {streamStatus === 'live' && (
+              <div className="flex gap-2 justify-center">
+                {REACTIONS.map((emoji) => (
+                  <Button
+                    key={emoji}
+                    variant="outline"
+                    size="lg"
+                    className="text-2xl hover:scale-110 transition-transform"
+                    onClick={() => handleReaction(emoji)}
+                    disabled={!user}
+                  >
+                    {emoji}
+                  </Button>
+                ))}
+              </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
 
-          {/* Tip Input */}
-          {showTipInput && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="flex gap-2"
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this stream?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the stream and any associated data.
+              <div className="mt-4">
+                <p className="text-sm font-medium mb-2">Type DELETE to confirm:</p>
+                <Input
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="DELETE"
+                  className="uppercase"
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowDeleteDialog(false);
+              setDeleteConfirmText('');
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete}
+              disabled={deleteConfirmText !== 'DELETE' || deleteStream.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              <Input
-                type="number"
-                placeholder="Amount"
-                value={tipAmount}
-                onChange={(e) => setTipAmount(e.target.value)}
-                className="w-24"
-              />
-              <Input
-                placeholder="Message (optional)"
-                value={tipMessage}
-                onChange={(e) => setTipMessage(e.target.value)}
-                className="flex-1"
-              />
-              <Button onClick={handleTip} disabled={tipStream.isPending}>
-                <Send className="h-4 w-4" />
-              </Button>
-            </motion.div>
-          )}
-
-          {/* Reactions */}
-          <div className="flex gap-2 justify-center">
-            {REACTIONS.map((emoji) => (
-              <Button
-                key={emoji}
-                variant="outline"
-                size="lg"
-                className="text-2xl hover:scale-110 transition-transform"
-                onClick={() => handleReaction(emoji)}
-                disabled={!user}
-              >
-                {emoji}
-              </Button>
-            ))}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+              Delete Stream
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };

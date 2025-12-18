@@ -314,3 +314,52 @@ export const useSaveReplay = () => {
     },
   });
 };
+
+export const useDeleteStream = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (streamId: string) => {
+      if (!user) throw new Error('Not authenticated');
+
+      // First verify user owns this stream
+      const { data: stream, error: fetchError } = await supabase
+        .from('live_streams')
+        .select('host_id')
+        .eq('id', streamId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (stream.host_id !== user.id) throw new Error('You can only delete your own streams');
+
+      // Delete stream reactions first
+      await supabase
+        .from('stream_reactions')
+        .delete()
+        .eq('stream_id', streamId);
+
+      // Delete stream viewers
+      await supabase
+        .from('stream_viewers')
+        .delete()
+        .eq('stream_id', streamId);
+
+      // Delete the stream
+      const { error } = await supabase
+        .from('live_streams')
+        .delete()
+        .eq('id', streamId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['live-streams'] });
+      toast({ title: 'Stream deleted' });
+    },
+    onError: (error) => {
+      toast({ title: 'Failed to delete stream', description: error.message, variant: 'destructive' });
+    },
+  });
+};
