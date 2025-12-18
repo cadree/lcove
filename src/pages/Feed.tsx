@@ -37,14 +37,17 @@ const Feed = () => {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between mb-4 mt-2"
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="flex items-center justify-between mb-5 mt-3"
         >
-          <h1 className="font-display text-2xl sm:text-3xl font-medium text-foreground">Feed</h1>
+          <h1 className="font-display text-3xl sm:text-4xl font-medium text-foreground">
+            Feed
+          </h1>
           <div className="flex gap-2">
-            <Button variant="glass" size="icon" className="w-9 h-9">
+            <Button variant="glass" size="icon" className="w-10 h-10">
               <Shuffle className="w-4 h-4" />
             </Button>
-            <Button variant="glass" size="icon" className="w-9 h-9">
+            <Button variant="glass" size="icon" className="w-10 h-10">
               <Filter className="w-4 h-4" />
             </Button>
           </div>
@@ -52,10 +55,16 @@ const Feed = () => {
 
         {/* Post Creator */}
         {user && (
-          <PostCreator 
-            avatarUrl={profile?.avatar_url} 
-            displayName={profile?.display_name} 
-          />
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
+          >
+            <PostCreator 
+              avatarUrl={profile?.avatar_url} 
+              displayName={profile?.display_name} 
+            />
+          </motion.div>
         )}
 
         {/* Category Filters */}
@@ -63,47 +72,60 @@ const Feed = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide"
+          className="flex gap-2 overflow-x-auto pb-4 mb-5 scrollbar-hide"
         >
-          {categories.map((category) => (
-            <Button
+          {categories.map((category, index) => (
+            <motion.div
               key={category}
-              variant={activeCategory === category ? "default" : "glass"}
-              size="sm"
-              onClick={() => setActiveCategory(category)}
-              className="whitespace-nowrap"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 + index * 0.05 }}
             >
-              {category}
-            </Button>
+              <Button
+                variant={activeCategory === category ? "default" : "glass"}
+                size="sm"
+                onClick={() => setActiveCategory(category)}
+                className="whitespace-nowrap"
+              >
+                {category}
+              </Button>
+            </motion.div>
           ))}
         </motion.div>
 
         {/* Feed */}
         {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : (
-          <div className="space-y-6 pb-32">
+          <div className="space-y-5 pb-32">
             <AnimatePresence mode="popLayout">
-              {filteredPosts.map((post) => (
-                <FeedPost key={post.id} post={post} />
+              {filteredPosts.map((post, index) => (
+                <motion.div
+                  key={post.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                >
+                  <FeedPost post={post} />
+                </motion.div>
               ))}
             </AnimatePresence>
 
             {/* Empty State */}
             {filteredPosts.length === 0 && (
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-center py-16"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-center py-20 glass-strong rounded-2xl"
               >
-                <p className="text-muted-foreground text-lg mb-2">
+                <p className="text-foreground text-lg font-medium mb-2">
                   {activeCategory === "All" 
                     ? "No posts yet" 
                     : `No ${activeCategory.toLowerCase()} posts yet`}
                 </p>
-                <p className="text-muted-foreground/70 text-sm">
+                <p className="text-muted-foreground text-sm">
                   Be the first to share something with the community!
                 </p>
               </motion.div>
