@@ -387,6 +387,57 @@ export type Database = {
           },
         ]
       }
+      music_profiles: {
+        Row: {
+          albums: Json | null
+          apple_music_artist_id: string | null
+          apple_music_artist_url: string | null
+          artist_image_url: string | null
+          created_at: string
+          display_name: string | null
+          genres: string[] | null
+          id: string
+          latest_release: Json | null
+          spotify_artist_id: string | null
+          spotify_artist_url: string | null
+          top_tracks: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          albums?: Json | null
+          apple_music_artist_id?: string | null
+          apple_music_artist_url?: string | null
+          artist_image_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          genres?: string[] | null
+          id?: string
+          latest_release?: Json | null
+          spotify_artist_id?: string | null
+          spotify_artist_url?: string | null
+          top_tracks?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          albums?: Json | null
+          apple_music_artist_id?: string | null
+          apple_music_artist_url?: string | null
+          artist_image_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          genres?: string[] | null
+          id?: string
+          latest_release?: Json | null
+          spotify_artist_id?: string | null
+          spotify_artist_url?: string | null
+          top_tracks?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           comments_enabled: boolean | null
