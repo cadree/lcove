@@ -22,6 +22,7 @@ import FundDashboard from "./pages/FundDashboard";
 import Membership from "./pages/Membership";
 import Live from "./pages/Live";
 import Settings from "./pages/Settings";
+import BookOfLcove from "./pages/BookOfLcove";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -58,6 +59,7 @@ const App = () => (
             <Route path="/fund" element={<FundDashboard />} />
             <Route path="/membership" element={<Membership />} />
             <Route path="/live" element={<Live />} />
+            <Route path="/book" element={<BookOfLcove />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
