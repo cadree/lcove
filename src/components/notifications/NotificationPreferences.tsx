@@ -58,7 +58,7 @@ export const NotificationPreferences: React.FC = () => {
   }
 
   return (
-    <div className="p-4">
+    <div className="p-4 pb-24 sm:pb-8">
       <h3 className="text-lg font-semibold mb-1">Notification Preferences</h3>
       <p className="text-sm text-muted-foreground mb-4">
         Choose what you want to be notified about
