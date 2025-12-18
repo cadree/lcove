@@ -75,25 +75,41 @@ const HeroSection = () => {
 
         {/* Stats */}
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.7 }}
-          className="w-full max-w-xs sm:max-w-lg mx-auto"
+          className="w-full max-w-xs sm:max-w-2xl mx-auto"
         >
-          {/* Mobile: Vertical stack, Desktop: Horizontal row */}
-          <div className="flex flex-col sm:flex-row sm:justify-center gap-4 sm:gap-8">
-            {statItems.map((stat) => (
-              <div
+          <div className="flex flex-col sm:flex-row sm:justify-center gap-3 sm:gap-0">
+            {statItems.map((stat, index) => (
+              <motion.div
                 key={stat.label}
-                className="flex sm:flex-col items-center justify-between sm:justify-center gap-2 sm:gap-0 py-2 sm:py-0 border-b sm:border-b-0 border-border/30 last:border-b-0"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5, delay: 0.8 + index * 0.1 }}
+                className="group relative flex sm:flex-col items-center justify-between sm:justify-center gap-2 sm:gap-1 py-4 px-6 sm:px-8 md:px-12 sm:border-r sm:border-border/20 sm:last:border-r-0"
               >
-                <span className="text-xs sm:text-sm text-muted-foreground sm:order-2">
+                {/* Hover glow effect */}
+                <div className="absolute inset-0 rounded-2xl bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl" />
+                
+                {/* Content */}
+                <span className="relative text-xs sm:text-[10px] md:text-xs uppercase tracking-[0.2em] text-muted-foreground/70 sm:order-2 font-medium">
                   {stat.label}
                 </span>
-                <span className="text-lg sm:text-2xl md:text-3xl font-display font-medium text-foreground sm:order-1">
-                  {isLoading ? "—" : stat.value}
+                <span className="relative text-2xl sm:text-3xl md:text-5xl font-display font-light tracking-tight text-foreground sm:order-1 tabular-nums">
+                  {isLoading ? (
+                    <span className="inline-block w-8 h-8 rounded-full bg-muted/30 animate-pulse" />
+                  ) : (
+                    <motion.span
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="text-gradient-pink"
+                    >
+                      {stat.value}
+                    </motion.span>
+                  )}
                 </span>
-              </div>
+              </motion.div>
             ))}
           </div>
         </motion.div>
