@@ -343,3 +343,109 @@ export function useLowReputationUsers() {
     enabled: isAdmin,
   });
 }
+
+export function useAllUsersWithDetails() {
+  const { isAdmin } = useIsAdmin();
+
+  return useQuery({
+    queryKey: ['admin-users-detailed'],
+    queryFn: async () => {
+      // Get all profiles
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (profilesError) throw profilesError;
+
+      // Get all user skills
+      const { data: allUserSkills } = await supabase
+        .from('user_skills')
+        .select('user_id, skills(name)');
+
+      // Get all user passions
+      const { data: allUserPassions } = await supabase
+        .from('user_passions')
+        .select('user_id, passions(name)');
+
+      // Get all user creative roles
+      const { data: allUserRoles } = await supabase
+        .from('user_creative_roles')
+        .select('user_id, creative_roles(name)');
+
+      // Map skills/passions/roles to users
+      const skillsMap = new Map<string, string[]>();
+      const passionsMap = new Map<string, string[]>();
+      const rolesMap = new Map<string, string[]>();
+
+      allUserSkills?.forEach((item: any) => {
+        const skills = skillsMap.get(item.user_id) || [];
+        if (item.skills?.name) skills.push(item.skills.name);
+        skillsMap.set(item.user_id, skills);
+      });
+
+      allUserPassions?.forEach((item: any) => {
+        const passions = passionsMap.get(item.user_id) || [];
+        if (item.passions?.name) passions.push(item.passions.name);
+        passionsMap.set(item.user_id, passions);
+      });
+
+      allUserRoles?.forEach((item: any) => {
+        const roles = rolesMap.get(item.user_id) || [];
+        if (item.creative_roles?.name) roles.push(item.creative_roles.name);
+        rolesMap.set(item.user_id, roles);
+      });
+
+      return profiles?.map(profile => ({
+        ...profile,
+        skills: skillsMap.get(profile.user_id) || [],
+        passions: passionsMap.get(profile.user_id) || [],
+        creative_roles: rolesMap.get(profile.user_id) || [],
+      }));
+    },
+    enabled: isAdmin,
+  });
+}
+
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (data: { userId: string; reason?: string }) => {
+      // First, update profile to mark as deleted/banned
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          access_status: 'banned',
+          is_suspended: true,
+          suspended_at: new Date().toISOString(),
+          suspension_reason: data.reason || 'Account removed by admin',
+        } as Record<string, unknown>)
+        .eq('user_id', data.userId);
+
+      if (profileError) throw profileError;
+
+      // Log the action
+      const { error: actionError } = await supabase
+        .from('admin_actions')
+        .insert({
+          admin_id: user?.id,
+          action_type: 'remove_user',
+          target_user_id: data.userId,
+          reason: data.reason || 'Removed by admin',
+        });
+
+      if (actionError) throw actionError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-users-detailed'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
+      toast.success('User removed from the app');
+    },
+    onError: () => {
+      toast.error('Failed to remove user');
+    },
+  });
+}

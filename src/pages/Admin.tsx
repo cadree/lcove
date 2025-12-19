@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Users, AlertTriangle, CheckCircle, XCircle, Clock, History, Search, ArrowLeft, Ban, UserCheck, ClipboardList } from 'lucide-react';
+import { Shield, Users, AlertTriangle, CheckCircle, XCircle, Clock, History, Search, ArrowLeft, Ban, UserCheck, ClipboardList, Trash2, Eye, Phone, Mail, MapPin, Briefcase, Heart, Star } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/layout/PageLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   useIsAdmin,
   useAllUsers,
@@ -25,6 +26,8 @@ import {
   useDenyOnboarding,
   useLowReputationUsers,
   useChangeAccessStatus,
+  useAllUsersWithDetails,
+  useDeleteUser,
 } from '@/hooks/useAdmin';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -35,10 +38,13 @@ const Admin: React.FC = () => {
   const [suspendDialog, setSuspendDialog] = useState<{ userId: string; name: string } | null>(null);
   const [denyDialog, setDenyDialog] = useState<{ userId: string; name: string } | null>(null);
   const [statusDialog, setStatusDialog] = useState<{ userId: string; name: string; currentStatus: string } | null>(null);
+  const [removeDialog, setRemoveDialog] = useState<{ userId: string; name: string } | null>(null);
+  const [detailDialog, setDetailDialog] = useState<any | null>(null);
   const [reason, setReason] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<'active' | 'denied' | 'banned'>('active');
 
   const { data: users, isLoading: loadingUsers } = useAllUsers();
+  const { data: usersWithDetails, isLoading: loadingUsersDetailed } = useAllUsersWithDetails();
   const { data: pendingOnboarding, isLoading: loadingPending } = usePendingOnboarding();
   const { data: adminActions, isLoading: loadingActions } = useAdminActions();
   const { data: lowRepUsers } = useLowReputationUsers();
@@ -48,6 +54,7 @@ const Admin: React.FC = () => {
   const approveOnboarding = useApproveOnboarding();
   const denyOnboarding = useDenyOnboarding();
   const changeAccessStatus = useChangeAccessStatus();
+  const deleteUser = useDeleteUser();
 
   if (checkingAdmin) {
     return (
@@ -63,9 +70,11 @@ const Admin: React.FC = () => {
     return <Navigate to="/" replace />;
   }
 
-  const filteredUsers = users?.filter(u =>
+  const filteredUsers = usersWithDetails?.filter(u =>
     u.display_name?.toLowerCase().includes(search.toLowerCase()) ||
-    u.user_id?.toLowerCase().includes(search.toLowerCase())
+    u.user_id?.toLowerCase().includes(search.toLowerCase()) ||
+    u.city?.toLowerCase().includes(search.toLowerCase()) ||
+    u.phone?.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleSuspend = () => {
@@ -96,6 +105,14 @@ const Admin: React.FC = () => {
     }
   };
 
+  const handleRemoveUser = () => {
+    if (removeDialog) {
+      deleteUser.mutate({ userId: removeDialog.userId, reason: reason || undefined });
+      setRemoveDialog(null);
+      setReason('');
+    }
+  };
+
   const getStatusBadge = (status: string | null) => {
     switch (status) {
       case 'active':
@@ -107,6 +124,16 @@ const Admin: React.FC = () => {
       default:
         return <Badge variant="secondary">Pending</Badge>;
     }
+  };
+
+  const getMindsetBadge = (level: number | null) => {
+    if (!level) return null;
+    const colors = {
+      1: 'bg-gray-500/20 text-gray-500',
+      2: 'bg-blue-500/20 text-blue-500',
+      3: 'bg-purple-500/20 text-purple-500',
+    };
+    return <Badge className={colors[level as keyof typeof colors] || ''}>Level {level}</Badge>;
   };
 
   return (
@@ -177,56 +204,150 @@ const Admin: React.FC = () => {
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search users..."
+                placeholder="Search by name, location, or phone..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
               />
             </div>
             
-            <ScrollArea className="h-[400px]">
-              {loadingUsers ? (
+            <ScrollArea className="h-[500px]">
+              {loadingUsersDetailed ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map(i => <Skeleton key={i} className="h-16" />)}
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {filteredUsers?.map(user => (
-                    <Card key={user.id}>
-                      <CardContent className="p-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Avatar>
-                            <AvatarImage src={user.avatar_url || undefined} />
-                            <AvatarFallback>{user.display_name?.[0] || '?'}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium flex items-center gap-2 flex-wrap">
-                              {user.display_name || 'Unnamed'}
-                              {getStatusBadge((user as any).access_status)}
-                              {(user as any).mindset_level && (
-                                <Badge variant="outline">L{(user as any).mindset_level}</Badge>
+                    <Card key={user.id} className="overflow-hidden">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <Avatar className="h-12 w-12">
+                              <AvatarImage src={user.avatar_url || undefined} />
+                              <AvatarFallback>{user.display_name?.[0] || '?'}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <span className="font-semibold">{user.display_name || 'Unnamed'}</span>
+                                {getStatusBadge((user as any).access_status)}
+                                {getMindsetBadge((user as any).mindset_level)}
+                              </div>
+                              
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-muted-foreground mb-2">
+                                {user.city && (
+                                  <div className="flex items-center gap-1">
+                                    <MapPin className="h-3 w-3" />
+                                    {user.city}
+                                  </div>
+                                )}
+                                {user.phone && (
+                                  <div className="flex items-center gap-1">
+                                    <Phone className="h-3 w-3" />
+                                    {user.phone}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Creative Roles */}
+                              {user.creative_roles && user.creative_roles.length > 0 && (
+                                <div className="mb-2">
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                                    <Briefcase className="h-3 w-3" />
+                                    <span>Roles:</span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {user.creative_roles.slice(0, 3).map((role: string, i: number) => (
+                                      <Badge key={i} variant="outline" className="text-xs">
+                                        {role}
+                                      </Badge>
+                                    ))}
+                                    {user.creative_roles.length > 3 && (
+                                      <Badge variant="outline" className="text-xs">
+                                        +{user.creative_roles.length - 3}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
                               )}
-                              {(user as any).onboarding_score && (
-                                <Badge variant="secondary">Score: {(user as any).onboarding_score}</Badge>
+
+                              {/* Skills */}
+                              {user.skills && user.skills.length > 0 && (
+                                <div className="mb-2">
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                                    <Star className="h-3 w-3" />
+                                    <span>Skills:</span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {user.skills.slice(0, 3).map((skill: string, i: number) => (
+                                      <Badge key={i} variant="secondary" className="text-xs">
+                                        {skill}
+                                      </Badge>
+                                    ))}
+                                    {user.skills.length > 3 && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        +{user.skills.length - 3}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
                               )}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {user.city || 'No location'}
+
+                              {/* Passions */}
+                              {user.passions && user.passions.length > 0 && (
+                                <div>
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                                    <Heart className="h-3 w-3" />
+                                    <span>Passions:</span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {user.passions.slice(0, 3).map((passion: string, i: number) => (
+                                      <Badge key={i} variant="outline" className="text-xs border-destructive/30">
+                                        {passion}
+                                      </Badge>
+                                    ))}
+                                    {user.passions.length > 3 && (
+                                      <Badge variant="outline" className="text-xs">
+                                        +{user.passions.length - 3}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setStatusDialog({ 
-                              userId: user.user_id, 
-                              name: user.display_name || 'User',
-                              currentStatus: (user as any).access_status || 'pending'
-                            })}
-                          >
-                            Status
-                          </Button>
+
+                          <div className="flex flex-col gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setDetailDialog(user)}
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              View
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setStatusDialog({ 
+                                userId: user.user_id, 
+                                name: user.display_name || 'User',
+                                currentStatus: (user as any).access_status || 'pending'
+                              })}
+                            >
+                              Status
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => setRemoveDialog({ 
+                                userId: user.user_id, 
+                                name: user.display_name || 'User'
+                              })}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -468,6 +589,108 @@ const Admin: React.FC = () => {
             <Button onClick={handleStatusChange}>
               Update Status
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove User Dialog */}
+      <Dialog open={!!removeDialog} onOpenChange={() => setRemoveDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Remove {removeDialog?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This will ban the user and remove their access to the app. This action cannot be easily undone.
+            </p>
+            <div>
+              <Label>Reason (optional)</Label>
+              <Textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Reason for removal..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveDialog(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleRemoveUser}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Remove User
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* User Detail Dialog */}
+      <Dialog open={!!detailDialog} onOpenChange={() => setDetailDialog(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>User Details</DialogTitle>
+          </DialogHeader>
+          {detailDialog && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-16 w-16">
+                  <AvatarImage src={detailDialog.avatar_url || undefined} />
+                  <AvatarFallback className="text-xl">{detailDialog.display_name?.[0] || '?'}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="font-semibold text-lg">{detailDialog.display_name || 'Unnamed'}</h3>
+                  <div className="flex gap-2 mt-1">
+                    {getStatusBadge(detailDialog.access_status)}
+                    {getMindsetBadge(detailDialog.mindset_level)}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 text-sm">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <span>{detailDialog.city || 'No location'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <span>{detailDialog.phone || 'No phone'}</span>
+                </div>
+              </div>
+
+              {detailDialog.creative_roles?.length > 0 && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Creative Roles</Label>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {detailDialog.creative_roles.map((role: string, i: number) => (
+                      <Badge key={i} variant="outline">{role}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {detailDialog.skills?.length > 0 && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Skills</Label>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {detailDialog.skills.map((skill: string, i: number) => (
+                      <Badge key={i} variant="secondary">{skill}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {detailDialog.passions?.length > 0 && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Passions</Label>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {detailDialog.passions.map((passion: string, i: number) => (
+                      <Badge key={i} variant="outline" className="border-destructive/30">{passion}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailDialog(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
