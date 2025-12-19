@@ -227,6 +227,10 @@ export const VideoPlayer = ({
             ref={videoRef}
             src={videoUrl}
             className="w-full h-full object-contain"
+            controlsList="nodownload noplaybackrate"
+            disablePictureInPicture
+            playsInline
+            onContextMenu={(e) => e.preventDefault()}
             onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime || 0)}
             onDurationChange={() => setDuration(videoRef.current?.duration || 0)}
             onLoadedMetadata={() => {
