@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Radio, Youtube, Music2, ImagePlus, X, Loader2, MonitorPlay, ExternalLink } from 'lucide-react';
+import { Radio, Youtube, Music2, ImagePlus, X, Loader2 } from 'lucide-react';
 import { useCreateStream } from '@/hooks/useLiveStreams';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,7 +17,7 @@ interface CreateStreamDialogProps {
   onStreamCreated?: (streamId: string) => void;
 }
 
-type StreamType = 'webrtc' | 'youtube' | 'twitch' | 'soundcloud' | 'obs_rtmp';
+type StreamType = 'webrtc' | 'youtube' | 'twitch' | 'soundcloud';
 
 export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, onClose, onStreamCreated }) => {
   const { user } = useAuth();
@@ -27,7 +27,7 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [streamType, setStreamType] = useState<StreamType>('obs_rtmp');
+  const [streamType, setStreamType] = useState<StreamType>('webrtc');
   const [externalUrl, setExternalUrl] = useState('');
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
@@ -88,31 +88,6 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
     }
   };
 
-  const createMuxStream = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
-
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mux-stream`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ action: 'create' }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create stream');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Mux stream creation error:', error);
-      throw error;
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,28 +102,16 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
         if (url) thumbnailUrl = url;
       }
 
-      // For OBS streams, first create the Mux stream to get credentials
-      let muxData: any = null;
-      if (streamType === 'obs_rtmp') {
-        muxData = await createMuxStream();
-      }
-      
       const result = await createStream.mutateAsync({
         title,
         description,
         stream_type: streamType,
-        external_url: streamType !== 'webrtc' && streamType !== 'obs_rtmp' ? externalUrl : undefined,
+        external_url: streamType !== 'webrtc' ? externalUrl : undefined,
         thumbnail_url: thumbnailUrl,
-        // OBS/Mux specific fields
-        mux_live_stream_id: muxData?.mux_live_stream_id,
-        mux_playback_id: muxData?.mux_playback_id,
-        rtmp_ingest_url: muxData?.rtmp_ingest_url,
-        rtmp_stream_key: muxData?.rtmp_stream_key,
-        playback_url: muxData?.playback_url,
       });
 
-      // Open the stream viewer for OBS and WebRTC streams
-      if ((streamType === 'webrtc' || streamType === 'obs_rtmp') && result?.id && onStreamCreated) {
+      // Open the stream viewer for WebRTC streams
+      if (streamType === 'webrtc' && result?.id && onStreamCreated) {
         onStreamCreated(result.id);
       }
 
@@ -169,7 +132,7 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
   const resetForm = () => {
     setTitle('');
     setDescription('');
-    setStreamType('obs_rtmp');
+    setStreamType('webrtc');
     setExternalUrl('');
     setThumbnailFile(null);
     setThumbnailPreview(null);
@@ -268,21 +231,6 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
               onValueChange={(v) => setStreamType(v as StreamType)}
               className="grid grid-cols-2 gap-2"
             >
-              {/* OBS/RTMP - Recommended */}
-              <Label
-                htmlFor="obs_rtmp"
-                className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  streamType === 'obs_rtmp' ? 'border-primary bg-primary/10' : 'border-border'
-                }`}
-              >
-                <RadioGroupItem value="obs_rtmp" id="obs_rtmp" />
-                <MonitorPlay className="h-4 w-4" />
-                <div className="text-sm">
-                  <span className="font-medium">OBS (RTMP)</span>
-                  <p className="text-xs text-muted-foreground">Recommended</p>
-                </div>
-              </Label>
-
               <Label
                 htmlFor="webrtc"
                 className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
@@ -335,7 +283,7 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
           </div>
 
           {/* URL input for external services */}
-          {streamType !== 'webrtc' && streamType !== 'obs_rtmp' && (
+          {streamType !== 'webrtc' && (
             <div className="space-y-2">
               <Label>{getUrlLabel()}</Label>
               <Input
@@ -344,28 +292,6 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
                 placeholder={getUrlPlaceholder()}
                 required
               />
-            </div>
-          )}
-
-          {/* OBS Info */}
-          {streamType === 'obs_rtmp' && (
-            <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
-              <p className="font-medium text-foreground mb-1">🎬 OBS / RTMP Streaming</p>
-              <p>Stream from OBS or any RTMP-compatible software. You'll receive a server URL and stream key after creation.</p>
-              <ul className="mt-2 space-y-1 text-xs">
-                <li>• High-quality, reliable streaming</li>
-                <li>• Works on all devices for viewers</li>
-                <li>• Automatic recording for replays</li>
-              </ul>
-              <a
-                href="https://obsproject.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 mt-2 text-primary hover:underline text-xs"
-              >
-                <ExternalLink className="h-3 w-3" />
-                Download OBS
-              </a>
             </div>
           )}
 
@@ -386,7 +312,7 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
               {(createStream.isPending || isUploading) && (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               )}
-              {streamType === 'obs_rtmp' ? 'Create & Setup' : streamType === 'webrtc' ? 'Setup Stream' : 'Create Stream'}
+              {streamType === 'webrtc' ? 'Setup Stream' : 'Create Stream'}
             </Button>
           </div>
         </form>
