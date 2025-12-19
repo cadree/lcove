@@ -31,6 +31,7 @@ import NetworkPage from "./pages/NetworkPage";
 import NetworkManage from "./pages/NetworkManage";
 import Partners from "./pages/Partners";
 import Admin from "./pages/Admin";
+import AdminOnboarding from "./pages/AdminOnboarding";
 import Community from "./pages/Community";
 
 const queryClient = new QueryClient({
@@ -76,6 +77,8 @@ const App = () => (
               <Route path="/cinema/manage/:networkId" element={<NetworkManage />} />
               <Route path="/partners" element={<Partners />} />
               <Route path="/admin" element={<Admin />} />
+              <Route path="/admin/onboarding" element={<AdminOnboarding />} />
+              <Route path="/admin/onboarding/:userId" element={<AdminOnboarding />} />
               <Route path="/community" element={<Community />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

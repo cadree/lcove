@@ -9,7 +9,7 @@ interface AccessGateProps {
 }
 
 // Routes that don't require access gate checks
-const PUBLIC_ROUTES = ['/', '/auth', '/onboarding', '/locked'];
+const PUBLIC_ROUTES = ['/', '/auth', '/onboarding', '/locked', '/admin/onboarding'];
 
 const AccessGate = ({ children }: AccessGateProps) => {
   const { user, loading: authLoading } = useAuth();
@@ -19,7 +19,7 @@ const AccessGate = ({ children }: AccessGateProps) => {
   const [showWelcome, setShowWelcome] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
 
-  const isPublicRoute = PUBLIC_ROUTES.includes(location.pathname);
+  const isPublicRoute = PUBLIC_ROUTES.includes(location.pathname) || location.pathname.startsWith('/admin/onboarding');
 
   useEffect(() => {
     // Skip checks for public routes
