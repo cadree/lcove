@@ -1701,6 +1701,9 @@ export type Database = {
           logo_url: string | null
           name: string
           owner_id: string
+          payout_enabled: boolean | null
+          payout_method: string | null
+          stripe_connect_account_id: string | null
           stripe_price_id: string | null
           stripe_product_id: string | null
           subscriber_count: number | null
@@ -1719,6 +1722,9 @@ export type Database = {
           logo_url?: string | null
           name: string
           owner_id: string
+          payout_enabled?: boolean | null
+          payout_method?: string | null
+          stripe_connect_account_id?: string | null
           stripe_price_id?: string | null
           stripe_product_id?: string | null
           subscriber_count?: number | null
@@ -1737,6 +1743,9 @@ export type Database = {
           logo_url?: string | null
           name?: string
           owner_id?: string
+          payout_enabled?: boolean | null
+          payout_method?: string | null
+          stripe_connect_account_id?: string | null
           stripe_price_id?: string | null
           stripe_product_id?: string | null
           subscriber_count?: number | null

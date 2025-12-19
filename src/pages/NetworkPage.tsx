@@ -58,11 +58,12 @@ const NetworkPage = () => {
   const featureFilms = filteredContent.filter((c) => c.content_type === 'feature_film');
 
   const handlePlayContent = (item: NetworkContent) => {
-    if (!isSubscribed && !isOwner) {
-      subscribeMutation.mutate(networkId!);
-      return;
-    }
+    // Always allow playing - but VideoPlayer will handle preview mode
     setPlayingContent(item);
+  };
+
+  const handleSubscribe = () => {
+    subscribeMutation.mutate(networkId!);
   };
 
   if (networkLoading) {
@@ -93,6 +94,10 @@ const NetworkPage = () => {
           <VideoPlayer
             content={playingContent}
             onClose={() => setPlayingContent(null)}
+            isPreviewOnly={network?.is_paid && !isSubscribed && !isOwner}
+            previewDuration={30}
+            onSubscribe={handleSubscribe}
+            networkPrice={network?.subscription_price}
           />
         )}
       </AnimatePresence>
