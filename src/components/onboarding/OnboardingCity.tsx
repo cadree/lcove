@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowRight, ArrowLeft, MapPin } from 'lucide-react';
+import { ArrowRight, ArrowLeft, MapPin, Check, X } from 'lucide-react';
 import { OnboardingData } from '@/pages/Onboarding';
 
 interface Props {
@@ -28,19 +28,50 @@ const popularCities = [
 ];
 
 const OnboardingCity = ({ data, updateData, onNext, onBack }: Props) => {
-  const [customCity, setCustomCity] = useState(
+  // Track the input value separately from confirmed city
+  const [inputValue, setInputValue] = useState(
     popularCities.includes(data.city) ? '' : data.city
   );
+  // The confirmed city is stored in data.city
+  const confirmedCity = data.city;
+  const isConfirmed = confirmedCity.trim().length > 0;
 
-  const selectCity = (city: string) => {
+  const confirmCity = (city: string) => {
+    const trimmed = city.trim();
+    if (trimmed.length >= 2) {
+      updateData({ city: trimmed });
+      // Clear input if it matches what was just confirmed (custom input)
+      if (!popularCities.includes(trimmed)) {
+        setInputValue(trimmed);
+      } else {
+        setInputValue('');
+      }
+    }
+  };
+
+  const selectPopularCity = (city: string) => {
     updateData({ city });
-    setCustomCity('');
+    setInputValue('');
   };
 
-  const handleCustomCityChange = (value: string) => {
-    setCustomCity(value);
-    updateData({ city: value });
+  const clearSelection = () => {
+    updateData({ city: '' });
+    setInputValue('');
   };
+
+  const handleInputChange = (value: string) => {
+    setInputValue(value);
+    // Don't auto-confirm while typing - wait for explicit confirmation
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && inputValue.trim().length >= 2) {
+      e.preventDefault();
+      confirmCity(inputValue);
+    }
+  };
+
+  const canConfirmInput = inputValue.trim().length >= 2 && inputValue.trim() !== confirmedCity;
 
   return (
     <div className="min-h-screen flex flex-col p-6 pb-32">
@@ -65,29 +96,73 @@ const OnboardingCity = ({ data, updateData, onNext, onBack }: Props) => {
           transition={{ delay: 0.2 }}
           className="space-y-6"
         >
-          <div className="relative">
-            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Enter your city"
-              value={customCity}
-              onChange={(e) => handleCustomCityChange(e.target.value)}
-              className="pl-12 h-14 text-lg bg-input border-border focus:border-primary"
-            />
+          {/* City Input with Confirm Button */}
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Enter your city"
+                  value={inputValue}
+                  onChange={(e) => handleInputChange(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  className={`pl-12 h-14 text-lg bg-input border-border focus:border-primary ${
+                    isConfirmed && inputValue === confirmedCity ? 'border-primary/50' : ''
+                  }`}
+                />
+              </div>
+              <Button
+                onClick={() => confirmCity(inputValue)}
+                disabled={!canConfirmInput}
+                className="h-14 px-4 bg-primary hover:bg-primary/90"
+              >
+                <Check className="h-5 w-5 mr-2" />
+                Use this city
+              </Button>
+            </div>
+
+            {/* Helper text when typing but not confirmed */}
+            {inputValue.trim().length > 0 && inputValue.trim() !== confirmedCity && (
+              <p className="text-sm text-muted-foreground">
+                Type your city, then tap "Use this city" or press Enter
+              </p>
+            )}
+
+            {/* Selected City Chip */}
+            {isConfirmed && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center gap-2"
+              >
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/20 text-primary rounded-full border border-primary/30">
+                  <MapPin className="h-4 w-4" />
+                  <span className="font-medium">Selected: {confirmedCity}</span>
+                  <button
+                    onClick={clearSelection}
+                    className="ml-1 p-0.5 hover:bg-primary/30 rounded-full transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
           </div>
 
+          {/* Popular Cities */}
           <div>
             <p className="text-sm text-muted-foreground mb-4">Or select from popular creative hubs</p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {popularCities.map((city, index) => {
-                const isSelected = data.city === city;
+                const isSelected = confirmedCity === city;
                 return (
                   <motion.button
                     key={city}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    onClick={() => selectCity(city)}
+                    onClick={() => selectPopularCity(city)}
                     className={`p-4 rounded-xl text-left transition-all ${
                       isSelected
                         ? 'bg-primary text-primary-foreground glow-pink'
@@ -115,7 +190,7 @@ const OnboardingCity = ({ data, updateData, onNext, onBack }: Props) => {
           </Button>
           <Button
             onClick={onNext}
-            disabled={!data.city.trim()}
+            disabled={!isConfirmed}
             className="flex-1 h-12 bg-primary hover:bg-primary/90 glow-pink"
           >
             Continue
