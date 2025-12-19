@@ -9,7 +9,7 @@ export interface LiveStream {
   host_id: string;
   title: string;
   description: string | null;
-  stream_type: 'webrtc' | 'youtube' | 'twitch' | 'soundcloud' | 'opus';
+  stream_type: 'webrtc' | 'youtube' | 'twitch' | 'soundcloud' | 'obs_rtmp';
   external_url: string | null;
   thumbnail_url: string | null;
   is_live: boolean;
@@ -20,6 +20,12 @@ export interface LiveStream {
   created_at: string;
   replay_available: boolean | null;
   replay_url: string | null;
+  // OBS/RTMP fields
+  rtmp_stream_key: string | null;
+  rtmp_ingest_url: string | null;
+  playback_url: string | null;
+  mux_live_stream_id: string | null;
+  mux_playback_id: string | null;
   host?: {
     display_name: string | null;
     avatar_url: string | null;
@@ -168,9 +174,15 @@ export const useCreateStream = () => {
     mutationFn: async (data: {
       title: string;
       description?: string;
-      stream_type: 'webrtc' | 'youtube' | 'twitch' | 'soundcloud' | 'opus';
+      stream_type: 'webrtc' | 'youtube' | 'twitch' | 'soundcloud' | 'obs_rtmp';
       external_url?: string;
       thumbnail_url?: string;
+      // OBS/RTMP fields
+      mux_live_stream_id?: string;
+      mux_playback_id?: string;
+      rtmp_ingest_url?: string;
+      rtmp_stream_key?: string;
+      playback_url?: string;
     }) => {
       if (!user) throw new Error('Not authenticated');
 
@@ -183,6 +195,12 @@ export const useCreateStream = () => {
           stream_type: data.stream_type,
           external_url: data.external_url,
           thumbnail_url: data.thumbnail_url,
+          // OBS/RTMP fields
+          mux_live_stream_id: data.mux_live_stream_id,
+          mux_playback_id: data.mux_playback_id,
+          rtmp_ingest_url: data.rtmp_ingest_url,
+          rtmp_stream_key: data.rtmp_stream_key,
+          playback_url: data.playback_url,
         })
         .select()
         .single();
@@ -206,7 +224,7 @@ export const useGoLive = () => {
 
   return useMutation({
     mutationFn: async ({ streamId, isLive }: { streamId: string; isLive: boolean }) => {
-      const updates: any = { is_live: isLive };
+      const updates: Record<string, unknown> = { is_live: isLive };
       if (isLive) {
         updates.started_at = new Date().toISOString();
       } else {
@@ -360,6 +378,41 @@ export const useDeleteStream = () => {
     },
     onError: (error) => {
       toast({ title: 'Failed to delete stream', description: error.message, variant: 'destructive' });
+    },
+  });
+};
+
+export const useEndOBSStream = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (streamId: string) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mux-stream`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'disable', streamId }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to end stream');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['live-streams'] });
+      toast({ title: 'Stream ended' });
+    },
+    onError: (error) => {
+      toast({ title: 'Failed to end stream', description: error.message, variant: 'destructive' });
     },
   });
 };

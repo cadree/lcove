@@ -216,32 +216,6 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
       );
     }
 
-    // OPUS.audio embed
-    if (stream.stream_type === 'opus' && stream.external_url) {
-      const opusMatch = stream.external_url.match(/opus\.audio\/(?:embed\/)?([a-zA-Z0-9-]+)/);
-      const streamKey = opusMatch?.[1];
-      
-      if (streamKey) {
-        return (
-          <iframe
-            className="w-full h-full"
-            src={`https://opus.audio/embed/${streamKey}?autoplay=true`}
-            allow="autoplay; encrypted-media"
-            allowFullScreen
-          />
-        );
-      }
-      
-      return (
-        <iframe
-          className="w-full h-full"
-          src={stream.external_url}
-          allow="autoplay; encrypted-media"
-          allowFullScreen
-        />
-      );
-    }
-
     // Default loading state
     return (
       <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
