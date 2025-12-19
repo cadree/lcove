@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ArrowRight, ArrowLeft, MapPin, Check, X } from 'lucide-react';
 import { OnboardingData } from '@/pages/Onboarding';
+import { normalizeCity } from '@/lib/cityNormalization';
 
 interface Props {
   data: OnboardingData;
@@ -39,10 +40,16 @@ const OnboardingCity = ({ data, updateData, onNext, onBack }: Props) => {
   const confirmCity = (city: string) => {
     const trimmed = city.trim();
     if (trimmed.length >= 2) {
-      updateData({ city: trimmed });
+      // Normalize the city for consistent storage
+      const { city_display, city_key } = normalizeCity(trimmed);
+      updateData({ 
+        city: city_display,
+        cityDisplay: city_display,
+        cityKey: city_key,
+      });
       // Clear input if it matches what was just confirmed (custom input)
-      if (!popularCities.includes(trimmed)) {
-        setInputValue(trimmed);
+      if (!popularCities.includes(city_display)) {
+        setInputValue(city_display);
       } else {
         setInputValue('');
       }
@@ -50,7 +57,13 @@ const OnboardingCity = ({ data, updateData, onNext, onBack }: Props) => {
   };
 
   const selectPopularCity = (city: string) => {
-    updateData({ city });
+    // Popular cities are already clean, but normalize for consistency
+    const { city_display, city_key } = normalizeCity(city);
+    updateData({ 
+      city: city_display,
+      cityDisplay: city_display,
+      cityKey: city_key,
+    });
     setInputValue('');
   };
 

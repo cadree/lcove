@@ -20,6 +20,8 @@ export interface OnboardingData {
   passions: string[];
   passionSeriousness: number;
   city: string;
+  cityDisplay: string;
+  cityKey: string;
   skills: string[];
   roles: string[];
   questionnaireResponses: Record<number, 'A' | 'B' | 'C'>;
@@ -38,6 +40,8 @@ const Onboarding = () => {
     passions: [],
     passionSeriousness: 5,
     city: '',
+    cityDisplay: '',
+    cityKey: '',
     skills: [],
     roles: [],
     questionnaireResponses: {},
@@ -137,9 +141,11 @@ const Onboarding = () => {
       // Determine access status based on mindset level
       const accessStatus = level === 2 ? 'active' : 'denied';
 
-      // Update profile with all onboarding data
+      // Update profile with all onboarding data (including normalized city fields)
       await updateProfile({
         city: data.city,
+        city_display: data.cityDisplay,
+        city_key: data.cityKey,
         passion_seriousness: data.passionSeriousness,
         access_level: level === 2 ? 'level_2' : 'level_1',
         onboarding_completed: true,
