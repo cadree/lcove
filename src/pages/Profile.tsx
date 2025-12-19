@@ -45,6 +45,7 @@ import { CreatorModuleTabs } from "@/components/profile/CreatorModuleTabs";
 import { ReputationScore } from "@/components/profile/ReputationScore";
 import { VerificationBadge } from "@/components/profile/VerificationBadge";
 import { useProfile } from "@/hooks/useProfile";
+import { useConversations } from "@/hooks/useConversations";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useProfileCustomization } from "@/hooks/useProfileCustomization";
@@ -72,6 +73,7 @@ const Profile = () => {
   const { posts, isLoading: postsLoading, createPost, deletePost } = useProfilePosts(targetUserId);
   const { blogs, isLoading: blogsLoading, createBlog, deleteBlog } = useProfileBlogs(targetUserId);
   const { data: creatorRoles = [] } = useCreatorRoles(targetUserId);
+  const { createDirectConversation } = useConversations();
   const [showMusicDialog, setShowMusicDialog] = useState(false);
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
   const [showCreatePostDialog, setShowCreatePostDialog] = useState(false);
@@ -663,9 +665,23 @@ const Profile = () => {
             >
               <Button 
                 className="w-full"
-                onClick={() => navigate('/messages')}
+                onClick={async () => {
+                  if (!targetUserId) return;
+                  try {
+                    const conversation = await createDirectConversation.mutateAsync(targetUserId);
+                    navigate(`/messages?chat=${conversation.id}`);
+                  } catch (error) {
+                    console.error('Failed to create conversation:', error);
+                    toast.error('Failed to start conversation');
+                  }
+                }}
+                disabled={createDirectConversation.isPending}
               >
-                <MessageCircle className="w-4 h-4 mr-2" />
+                {createDirectConversation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                )}
                 Message {displayName}
               </Button>
             </motion.div>
