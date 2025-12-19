@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MessageCircle } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
@@ -11,8 +12,19 @@ import { Link } from 'react-router-dom';
 
 const Messages = () => {
   const { user } = useAuth();
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const chatParam = searchParams.get('chat');
+  const [selectedConversation, setSelectedConversation] = useState<string | null>(chatParam);
   const [showNewChat, setShowNewChat] = useState(false);
+
+  // Handle chat query parameter to auto-select conversation
+  useEffect(() => {
+    if (chatParam) {
+      setSelectedConversation(chatParam);
+      // Clear the query param from URL to keep it clean
+      setSearchParams({}, { replace: true });
+    }
+  }, [chatParam, setSearchParams]);
 
   if (!user) {
     return (
