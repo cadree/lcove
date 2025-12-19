@@ -54,6 +54,7 @@ export const SubmitContentDialog = ({
   const [moodboardImages, setMoodboardImages] = useState<string[]>([]);
   const [newMoodboardUrl, setNewMoodboardUrl] = useState('');
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingMoodboard, setUploadingMoodboard] = useState(false);
 
   const resetForm = () => {
     setTitle('');
@@ -102,6 +103,40 @@ export const SubmitContentDialog = ({
     if (newMoodboardUrl.trim() && moodboardImages.length < 6) {
       setMoodboardImages([...moodboardImages, newMoodboardUrl.trim()]);
       setNewMoodboardUrl('');
+    }
+  };
+
+  const handleUploadMoodboard = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || !user || moodboardImages.length >= 6) return;
+
+    setUploadingMoodboard(true);
+    try {
+      const newImages: string[] = [];
+      const filesToUpload = Array.from(files).slice(0, 6 - moodboardImages.length);
+
+      for (const file of filesToUpload) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}-moodboard-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('media')
+          .upload(fileName, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from('media')
+          .getPublicUrl(fileName);
+
+        newImages.push(urlData.publicUrl);
+      }
+
+      setMoodboardImages([...moodboardImages, ...newImages]);
+    } catch (error: any) {
+      toast.error('Failed to upload moodboard images');
+    } finally {
+      setUploadingMoodboard(false);
     }
   };
 
@@ -352,21 +387,36 @@ export const SubmitContentDialog = ({
                 </div>
               ))}
               {moodboardImages.length < 6 && (
-                <div className="aspect-video border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center">
-                  <Image className="w-8 h-8 text-muted-foreground/50" />
-                </div>
+                <label className="aspect-video border-2 border-dashed border-muted-foreground/30 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors">
+                  {uploadingMoodboard ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    <>
+                      <Upload className="w-6 h-6 text-muted-foreground mb-1" />
+                      <span className="text-xs text-muted-foreground">Upload</span>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleUploadMoodboard}
+                    disabled={uploadingMoodboard}
+                  />
+                </label>
               )}
             </div>
 
             {moodboardImages.length < 6 && (
               <div className="flex gap-2">
                 <Input
-                  placeholder="Paste image URL"
+                  placeholder="Or paste image URL"
                   value={newMoodboardUrl}
                   onChange={(e) => setNewMoodboardUrl(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addMoodboardImage()}
                 />
-                <Button variant="outline" onClick={addMoodboardImage}>
+                <Button variant="outline" onClick={addMoodboardImage} disabled={!newMoodboardUrl.trim()}>
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
