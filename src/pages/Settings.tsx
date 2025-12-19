@@ -15,27 +15,96 @@ import {
   Save,
   Loader2,
   Lock,
+  LogOut,
+  Archive,
+  Activity,
+  BarChart3,
+  Heart,
+  MessageSquare,
+  Eye,
+  Users,
+  Ban,
 } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotificationPreferences } from "@/hooks/useNotifications";
+import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 const Settings = () => {
-  const { user, updatePassword } = useAuth();
+  const { user, updatePassword, signOut } = useAuth();
   const navigate = useNavigate();
   const { profile, loading, updateProfile } = useProfile();
   const { preferences, isLoading: prefsLoading, updatePreferences } = useNotificationPreferences();
+  const { blockedUsers, unblockUser, isLoading: blocksLoading } = useUserBlocks();
 
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [city, setCity] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   
   // Password change state
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
+
+  // Fetch user activity stats
+  const { data: activityStats } = useQuery({
+    queryKey: ['user-activity-stats', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+
+      const [likesResult, commentsResult, postsResult] = await Promise.all([
+        supabase.from('post_likes').select('id', { count: 'exact' }).eq('user_id', user.id),
+        supabase.from('post_comments').select('id', { count: 'exact' }).eq('user_id', user.id),
+        supabase.from('posts').select('id', { count: 'exact' }).eq('user_id', user.id),
+      ]);
+
+      return {
+        likesGiven: likesResult.count || 0,
+        commentsGiven: commentsResult.count || 0,
+        postsCreated: postsResult.count || 0,
+      };
+    },
+    enabled: !!user,
+  });
+
+  // Fetch insights data
+  const { data: insightsData } = useQuery({
+    queryKey: ['user-insights', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+
+      const [likesReceived, commentsReceived, followersResult] = await Promise.all([
+        supabase.from('post_likes').select('posts!inner(user_id)', { count: 'exact' }).eq('posts.user_id', user.id),
+        supabase.from('post_comments').select('posts!inner(user_id)', { count: 'exact' }).eq('posts.user_id', user.id),
+        supabase.from('favorite_friends').select('id', { count: 'exact' }).eq('friend_user_id', user.id),
+      ]);
+
+      return {
+        likesReceived: likesReceived.count || 0,
+        commentsReceived: commentsReceived.count || 0,
+        followers: followersResult.count || 0,
+      };
+    },
+    enabled: !!user,
+  });
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await signOut();
+      toast.success("Logged out successfully");
+      navigate("/");
+    } catch (error) {
+      toast.error("Failed to log out");
+    } finally {
+      setLoggingOut(false);
+    }
+  };
 
   // Initialize form with profile data
   useEffect(() => {
@@ -278,7 +347,7 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="glass-strong rounded-2xl p-6"
+          className="glass-strong rounded-2xl p-6 mb-6"
         >
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -367,6 +436,178 @@ const Settings = () => {
               />
             </div>
           </div>
+        </motion.section>
+
+        {/* Your Activity Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="glass-strong rounded-2xl p-6 mb-6"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Activity className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-medium text-foreground">Your Activity</h2>
+              <p className="text-sm text-muted-foreground">See what you've been up to</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-background/50 rounded-xl p-4 text-center">
+              <div className="w-10 h-10 rounded-full bg-pink-500/10 flex items-center justify-center mx-auto mb-2">
+                <Heart className="w-5 h-5 text-pink-500" />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{activityStats?.likesGiven || 0}</p>
+              <p className="text-xs text-muted-foreground">Likes Given</p>
+            </div>
+            <div className="bg-background/50 rounded-xl p-4 text-center">
+              <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-2">
+                <MessageSquare className="w-5 h-5 text-blue-500" />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{activityStats?.commentsGiven || 0}</p>
+              <p className="text-xs text-muted-foreground">Comments</p>
+            </div>
+            <div className="bg-background/50 rounded-xl p-4 text-center">
+              <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-2">
+                <Archive className="w-5 h-5 text-green-500" />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{activityStats?.postsCreated || 0}</p>
+              <p className="text-xs text-muted-foreground">Posts</p>
+            </div>
+          </div>
+        </motion.section>
+
+        {/* Insights Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="glass-strong rounded-2xl p-6 mb-6"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <BarChart3 className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-medium text-foreground">Insights</h2>
+              <p className="text-sm text-muted-foreground">Your profile engagement</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-background/50 rounded-xl p-4 text-center">
+              <div className="w-10 h-10 rounded-full bg-pink-500/10 flex items-center justify-center mx-auto mb-2">
+                <Heart className="w-5 h-5 text-pink-500" />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{insightsData?.likesReceived || 0}</p>
+              <p className="text-xs text-muted-foreground">Likes Received</p>
+            </div>
+            <div className="bg-background/50 rounded-xl p-4 text-center">
+              <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-2">
+                <MessageSquare className="w-5 h-5 text-blue-500" />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{insightsData?.commentsReceived || 0}</p>
+              <p className="text-xs text-muted-foreground">Comments</p>
+            </div>
+            <div className="bg-background/50 rounded-xl p-4 text-center">
+              <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center mx-auto mb-2">
+                <Users className="w-5 h-5 text-purple-500" />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{insightsData?.followers || 0}</p>
+              <p className="text-xs text-muted-foreground">Followers</p>
+            </div>
+          </div>
+        </motion.section>
+
+        {/* Blocked Users Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          className="glass-strong rounded-2xl p-6 mb-6"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
+              <Ban className="w-5 h-5 text-destructive" />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-medium text-foreground">Blocked Users</h2>
+              <p className="text-sm text-muted-foreground">Manage blocked accounts</p>
+            </div>
+          </div>
+
+          {blocksLoading ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : blockedUsers.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">No blocked users</p>
+          ) : (
+            <div className="space-y-3">
+              {blockedUsers.map((blocked) => (
+                <div key={blocked.user_id} className="flex items-center justify-between bg-background/50 rounded-xl p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                      {blocked.avatar_url ? (
+                        <img src={blocked.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="w-5 h-5 text-muted-foreground" />
+                      )}
+                    </div>
+                    <span className="font-medium text-foreground">{blocked.display_name || 'Unknown User'}</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => unblockUser.mutate(blocked.user_id)}
+                    disabled={unblockUser.isPending}
+                  >
+                    Unblock
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </motion.section>
+
+        {/* Log Out Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="glass-strong rounded-2xl p-6"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
+              <LogOut className="w-5 h-5 text-destructive" />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-medium text-foreground">Account</h2>
+              <p className="text-sm text-muted-foreground">Sign out of your account</p>
+            </div>
+          </div>
+
+          <Button 
+            variant="destructive" 
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="w-full"
+          >
+            {loggingOut ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Logging out...
+              </>
+            ) : (
+              <>
+                <LogOut className="w-4 h-4 mr-2" />
+                Log Out
+              </>
+            )}
+          </Button>
         </motion.section>
       </div>
     </PageLayout>
