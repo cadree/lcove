@@ -32,7 +32,8 @@ import {
   Loader2,
   Navigation,
   FolderOpen,
-  User
+  User,
+  Settings
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -42,6 +43,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { EventAttendeesDialog } from "./EventAttendeesDialog";
 
 interface EventDetailDialogProps {
   eventId: string | null;
@@ -56,6 +58,9 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
   const { rsvp, isRsvping, toggleReminder } = useRSVP();
   const creditsData = useCredits();
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [attendeesOpen, setAttendeesOpen] = useState(false);
+
+  const isCreator = user?.id === event?.creator_id;
 
   if (!eventId || isLoading || !event) {
     return (
@@ -439,11 +444,17 @@ END:VCALENDAR`;
             </div>
 
             {/* Attendees */}
-            <div className="flex items-start gap-3">
+            <div 
+              className={cn(
+                "flex items-start gap-3",
+                isCreator && "cursor-pointer hover:bg-accent/20 -mx-3 px-3 py-2 rounded-xl transition-colors"
+              )}
+              onClick={() => isCreator && setAttendeesOpen(true)}
+            >
               <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
                 <Users className="w-5 h-5 text-primary" />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-foreground font-medium">
                   {event.rsvp_count} attending
                 </p>
@@ -455,7 +466,11 @@ END:VCALENDAR`;
                     {isSoldOut ? 'Sold out' : `${spotsLeft} spots left`}
                   </p>
                 )}
+                {isCreator && (
+                  <p className="text-xs text-primary mt-1">Tap to manage attendees</p>
+                )}
               </div>
+              {isCreator && <Settings className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />}
             </div>
 
             {/* Organizer */}
@@ -689,6 +704,16 @@ END:VCALENDAR`;
           </div>
         </div>
       </DialogContent>
+
+      {/* Attendees Management Dialog */}
+      {event && (
+        <EventAttendeesDialog
+          eventId={event.id}
+          eventTitle={event.title}
+          open={attendeesOpen}
+          onOpenChange={setAttendeesOpen}
+        />
+      )}
     </Dialog>
   );
 }

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,9 @@ import {
   Calendar as CalendarIcon,
   List,
   Grid3X3,
-  Plus
+  Plus,
+  Globe,
+  User
 } from "lucide-react";
 import { CalendarMonthView } from "@/components/calendar/CalendarMonthView";
 import { CalendarWeekView } from "@/components/calendar/CalendarWeekView";
@@ -17,10 +19,18 @@ import { CalendarAgendaView } from "@/components/calendar/CalendarAgendaView";
 import { CalendarFilters } from "@/components/calendar/CalendarFilters";
 import { EventDetailDialog } from "@/components/calendar/EventDetailDialog";
 import { PersonalEventDialog } from "@/components/calendar/PersonalEventDialog";
+import { CreateCommunityEventDialog } from "@/components/calendar/CreateCommunityEventDialog";
 import { useCalendarItems, CalendarItem } from "@/hooks/useCalendar";
 import { useAuth } from "@/contexts/AuthContext";
 import { addMonths, subMonths, addWeeks, subWeeks, format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type ViewType = 'month' | 'week' | 'agenda';
 
@@ -47,6 +57,7 @@ const CITIES = [
 const CalendarPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<ViewType>('month');
   const [selectedCity, setSelectedCity] = useState('All Cities');
@@ -55,7 +66,28 @@ const CalendarPage = () => {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   const [personalEventOpen, setPersonalEventOpen] = useState(false);
+  const [communityEventOpen, setCommunityEventOpen] = useState(false);
   const [selectedDateForNew, setSelectedDateForNew] = useState<Date | undefined>();
+
+  // Handle URL params for deep linking to events and ticket confirmations
+  useEffect(() => {
+    const eventId = searchParams.get('event');
+    const ticketSuccess = searchParams.get('ticket_success');
+    const ticketCancelled = searchParams.get('ticket_cancelled');
+
+    if (eventId) {
+      setSelectedEventId(eventId);
+      setEventDialogOpen(true);
+    }
+
+    if (ticketSuccess === 'true') {
+      toast.success('Ticket purchased successfully! Check your email for confirmation.');
+    }
+
+    if (ticketCancelled === 'true') {
+      toast.error('Ticket purchase was cancelled.');
+    }
+  }, [searchParams]);
 
   const calendarItems = useCalendarItems({
     city: selectedCity,
@@ -90,12 +122,18 @@ const CalendarPage = () => {
     } else if (item.type === 'project') {
       navigate(`/projects?id=${item.id}`);
     } else if (item.type === 'personal') {
-      // Could open edit dialog for personal items
+      // Personal events are only visible to the owner
+      toast.info('This is a personal reminder on your calendar.');
     }
   };
 
   const handleDateClick = (date: Date) => {
+    if (!user) {
+      toast.error('Please log in to add events');
+      return;
+    }
     setSelectedDateForNew(date);
+    // Default to personal event on date click
     setPersonalEventOpen(true);
   };
 
@@ -120,16 +158,32 @@ const CalendarPage = () => {
               Calendar
             </h1>
             {user && (
-              <Button 
-                size="sm" 
-                onClick={() => {
-                  setSelectedDateForNew(undefined);
-                  setPersonalEventOpen(true);
-                }}
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                Add Event
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm">
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add Event
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="glass-strong border-border/30">
+                  <DropdownMenuItem onClick={() => {
+                    setSelectedDateForNew(undefined);
+                    setCommunityEventOpen(true);
+                  }}>
+                    <Globe className="w-4 h-4 mr-2 text-primary" />
+                    Community Event
+                    <span className="ml-2 text-xs text-muted-foreground">Public</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    setSelectedDateForNew(undefined);
+                    setPersonalEventOpen(true);
+                  }}>
+                    <User className="w-4 h-4 mr-2" />
+                    Personal Reminder
+                    <span className="ml-2 text-xs text-muted-foreground">Private</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
           <p className="text-muted-foreground text-sm">
@@ -274,6 +328,13 @@ const CalendarPage = () => {
       <PersonalEventDialog
         open={personalEventOpen}
         onOpenChange={setPersonalEventOpen}
+        defaultDate={selectedDateForNew}
+      />
+
+      {/* Community Event Dialog */}
+      <CreateCommunityEventDialog
+        open={communityEventOpen}
+        onOpenChange={setCommunityEventOpen}
         defaultDate={selectedDateForNew}
       />
     </PageLayout>
