@@ -6,9 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, User, Phone } from 'lucide-react';
 
-const authSchema = z.object({
+const signupSchema = z.object({
+  email: z.string().email('Please enter a valid email').max(255),
+  password: z.string().min(6, 'Password must be at least 6 characters').max(100),
+  displayName: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name must be less than 50 characters'),
+  phone: z.string().optional().refine(val => !val || /^[\d\s\-+()]*$/.test(val), 'Please enter a valid phone number'),
+});
+
+const loginSchema = z.object({
   email: z.string().email('Please enter a valid email').max(255),
   password: z.string().min(6, 'Password must be at least 6 characters').max(100),
 });
@@ -30,9 +38,11 @@ const Auth = () => {
   const [mode, setMode] = useState<AuthMode>(isResetMode ? 'reset' : 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; displayName?: string; phone?: string }>({});
   const [resetEmailSent, setResetEmailSent] = useState(false);
 
   const { signIn, signUp, user, resetPassword, updatePassword } = useAuth();
@@ -64,8 +74,19 @@ const Auth = () => {
         setErrors({ password: result.error.errors[0]?.message });
         return false;
       }
+    } else if (mode === 'signup') {
+      const result = signupSchema.safeParse({ email, password, displayName, phone });
+      if (!result.success) {
+        const fieldErrors: { email?: string; password?: string; displayName?: string; phone?: string } = {};
+        result.error.errors.forEach((err) => {
+          const field = err.path[0] as string;
+          fieldErrors[field as keyof typeof fieldErrors] = err.message;
+        });
+        setErrors(fieldErrors);
+        return false;
+      }
     } else {
-      const result = authSchema.safeParse({ email, password });
+      const result = loginSchema.safeParse({ email, password });
       if (!result.success) {
         const fieldErrors: { email?: string; password?: string } = {};
         result.error.errors.forEach((err) => {
@@ -118,6 +139,14 @@ const Auth = () => {
             });
           }
         } else {
+          // Save display name and phone to profile after signup
+          const { data: { user: newUser } } = await supabase.auth.getUser();
+          if (newUser) {
+            await supabase.from('profiles').update({
+              display_name: displayName.trim(),
+              phone: phone.trim() || null,
+            }).eq('id', newUser.id);
+          }
           navigate('/onboarding');
         }
       } else if (mode === 'forgot') {
@@ -169,7 +198,7 @@ const Auth = () => {
   const getSubtitle = () => {
     switch (mode) {
       case 'login': return 'Welcome back, creative soul';
-      case 'signup': return 'Begin your creative journey';
+      case 'signup': return 'Join the creative community';
       case 'forgot': return resetEmailSent ? 'Check your inbox' : 'Enter your email to reset';
       case 'reset': return 'Create your new password';
     }
@@ -266,6 +295,45 @@ const Auth = () => {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
+              {mode === 'signup' && (
+                <>
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        placeholder="Your name"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        className="pl-11 h-12 bg-input border-border focus:border-primary"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground pl-1">
+                      Use your real name or the name you go by — it helps others recognize you
+                    </p>
+                    {errors.displayName && (
+                      <p className="text-sm text-destructive">{errors.displayName}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="tel"
+                        placeholder="Phone number (optional)"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="pl-11 h-12 bg-input border-border focus:border-primary"
+                      />
+                    </div>
+                    {errors.phone && (
+                      <p className="text-sm text-destructive">{errors.phone}</p>
+                    )}
+                  </div>
+                </>
+              )}
+
               {mode !== 'reset' && (
                 <div className="space-y-2">
                   <div className="relative">
