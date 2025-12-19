@@ -44,6 +44,7 @@ import { UserReviews } from "@/components/profile/UserReviews";
 import { CreatorModuleTabs } from "@/components/profile/CreatorModuleTabs";
 import { ReputationScore } from "@/components/profile/ReputationScore";
 import { VerificationBadge } from "@/components/profile/VerificationBadge";
+import { EditProfileDetailsDialog } from "@/components/profile/EditProfileDetailsDialog";
 import { Badge } from "@/components/ui/badge";
 import { useProfile } from "@/hooks/useProfile";
 import { useConversations } from "@/hooks/useConversations";
@@ -83,6 +84,7 @@ const Profile = () => {
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
   const [showCreatePostDialog, setShowCreatePostDialog] = useState(false);
   const [showCreateBlogDialog, setShowCreateBlogDialog] = useState(false);
+  const [showEditDetailsDialog, setShowEditDetailsDialog] = useState(false);
   const [selectedPost, setSelectedPost] = useState<ProfilePost | null>(null);
   const [selectedBlog, setSelectedBlog] = useState<BlogPost | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -464,69 +466,94 @@ const Profile = () => {
             <p className="text-muted-foreground leading-relaxed">{bio}</p>
           </motion.div>
 
-          {/* Creative Roles */}
-          {userCreativeRoles.length > 0 && (
+          {/* Creative Roles, Skills, Passions */}
+          {(userCreativeRoles.length > 0 || userSkills.length > 0 || userPassions.length > 0 || isOwnProfile) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.42 }}
-              className="mb-6"
-            >
-              <h3 className="font-display text-sm font-medium text-foreground mb-2 flex items-center gap-2">
-                <Crown className="w-4 h-4 text-primary" />
-                Roles
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {userCreativeRoles.map((role) => (
-                  <Badge key={role.id} variant="default" className="bg-primary/20 text-primary border-primary/30">
-                    {role.name}
-                  </Badge>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {/* Skills */}
-          {userSkills.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.43 }}
-              className="mb-6"
-            >
-              <h3 className="font-display text-sm font-medium text-foreground mb-2 flex items-center gap-2">
-                <Star className="w-4 h-4 text-accent" />
-                Skills
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {userSkills.map((skill) => (
-                  <Badge key={skill.id} variant="secondary" className="bg-accent/20 text-accent-foreground border-accent/30">
-                    {skill.name}
-                  </Badge>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {/* Passions */}
-          {userPassions.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.44 }}
               className="mb-8"
             >
-              <h3 className="font-display text-sm font-medium text-foreground mb-2 flex items-center gap-2">
-                <Heart className="w-4 h-4 text-destructive" />
-                Passions
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {userPassions.map((passion) => (
-                  <Badge key={passion.id} variant="outline" className="border-destructive/30 text-muted-foreground">
-                    {passion.name}
-                  </Badge>
-                ))}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-display text-lg font-medium text-foreground">About Me</h2>
+                {isOwnProfile && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowEditDetailsDialog(true)}
+                  >
+                    <Edit className="w-4 h-4 mr-1" />
+                    Edit
+                  </Button>
+                )}
               </div>
+
+              {/* Creative Roles */}
+              {userCreativeRoles.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="font-display text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+                    <Crown className="w-4 h-4 text-primary" />
+                    Roles
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {userCreativeRoles.map((role) => (
+                      <Badge key={role.id} variant="default" className="bg-primary/20 text-primary border-primary/30">
+                        {role.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Skills */}
+              {userSkills.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="font-display text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+                    <Star className="w-4 h-4 text-accent" />
+                    Skills
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {userSkills.map((skill) => (
+                      <Badge key={skill.id} variant="secondary" className="bg-accent/20 text-accent-foreground border-accent/30">
+                        {skill.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Passions */}
+              {userPassions.length > 0 && (
+                <div>
+                  <h3 className="font-display text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+                    <Heart className="w-4 h-4 text-destructive" />
+                    Passions
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {userPassions.map((passion) => (
+                      <Badge key={passion.id} variant="outline" className="border-destructive/30 text-muted-foreground">
+                        {passion.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty state for own profile */}
+              {isOwnProfile && userCreativeRoles.length === 0 && userSkills.length === 0 && userPassions.length === 0 && (
+                <div className="text-center py-6 text-muted-foreground">
+                  <p className="text-sm">Add your roles, skills, and passions to let others know what you're about.</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => setShowEditDetailsDialog(true)}
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add Details
+                  </Button>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -805,6 +832,15 @@ const Profile = () => {
               deletePost.mutate(postId);
               setSelectedPost(null);
             }}
+          />
+
+          {/* Edit Profile Details Dialog */}
+          <EditProfileDetailsDialog
+            open={showEditDetailsDialog}
+            onOpenChange={setShowEditDetailsDialog}
+            currentSkills={userSkills}
+            currentPassions={userPassions}
+            currentRoles={userCreativeRoles}
           />
         </div>
 
