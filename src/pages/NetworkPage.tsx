@@ -391,11 +391,11 @@ const ContentCard = ({
   isSubscribed: boolean;
 }) => (
   <motion.div
-    whileHover={{ scale: 1.05 }}
+    whileHover={{ scale: 1.02 }}
     className="flex-shrink-0 w-[140px] md:w-[180px] group cursor-pointer"
     onClick={() => onSelect(content)}
   >
-    <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-muted">
+    <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-muted/50">
       {content.cover_art_url ? (
         <img
           src={content.cover_art_url}
@@ -430,14 +430,14 @@ const ContentCard = ({
           ) : (
             <>
               <Lock className="w-3 h-3" />
-              Subscribe
+              Preview
             </>
           )}
         </Button>
         <Button
           size="sm"
           variant="ghost"
-          className="gap-1"
+          className="gap-1 text-white"
           onClick={(e) => {
             e.stopPropagation();
             onSelect(content);
@@ -448,24 +448,25 @@ const ContentCard = ({
         </Button>
       </div>
 
-      {/* Content Type Badge */}
-      <Badge
-        className="absolute top-2 left-2 text-xs"
-        variant="secondary"
-      >
-        {content.content_type === 'tv_show' ? 'Series' : content.content_type === 'short_film' ? 'Short' : 'Film'}
-      </Badge>
-
-      {/* Featured Badge */}
-      {content.is_featured && (
-        <Badge className="absolute top-2 right-2 text-xs bg-primary">
-          <Star className="w-3 h-3 mr-1" />
-          Featured
+      {/* Content Type Badge - Bottom left to avoid overlap */}
+      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+        <Badge
+          className="text-[10px] px-1.5 py-0.5 bg-background/80 text-foreground"
+          variant="secondary"
+        >
+          {content.content_type === 'tv_show' ? 'Series' : content.content_type === 'short_film' ? 'Short' : 'Film'}
         </Badge>
-      )}
+
+        {/* Featured Badge */}
+        {content.is_featured && (
+          <Badge className="text-[10px] px-1.5 py-0.5 bg-primary">
+            <Star className="w-2.5 h-2.5" />
+          </Badge>
+        )}
+      </div>
     </div>
 
-    <div className="mt-2">
+    <div className="mt-2 px-0.5">
       <h3 className="font-medium text-sm text-foreground truncate">{content.title}</h3>
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         {content.runtime_minutes && (
@@ -475,7 +476,7 @@ const ContentCard = ({
           </span>
         )}
         {content.genre_tags?.[0] && (
-          <span>{content.genre_tags[0]}</span>
+          <span className="truncate">{content.genre_tags[0]}</span>
         )}
       </div>
     </div>

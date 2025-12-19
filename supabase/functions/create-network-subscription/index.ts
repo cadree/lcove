@@ -49,17 +49,63 @@ serve(async (req) => {
 
     if (networkError || !network) throw new Error("Network not found");
     if (!network.is_paid) throw new Error("This network is free, no subscription required");
-    if (!network.stripe_price_id) throw new Error("Network subscription not configured");
+    
     logStep("Network found", { 
       name: network.name, 
       price: network.subscription_price,
       hasConnectAccount: !!network.stripe_connect_account_id,
-      payoutEnabled: network.payout_enabled
+      payoutEnabled: network.payout_enabled,
+      hasStripePrice: !!network.stripe_price_id
     });
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2025-08-27.basil",
     });
+
+    // If no Stripe product/price exists, create them
+    let stripePriceId = network.stripe_price_id;
+    if (!stripePriceId) {
+      logStep("Creating Stripe product and price for network");
+      
+      // Create product
+      const product = await stripe.products.create({
+        name: `${network.name} Subscription`,
+        description: network.description || `Access to ${network.name} network content`,
+        metadata: {
+          network_id: networkId,
+        },
+      });
+      logStep("Product created", { productId: product.id });
+
+      // Create price
+      const price = await stripe.prices.create({
+        product: product.id,
+        unit_amount: Math.round(network.subscription_price * 100), // Convert to cents
+        currency: 'usd',
+        recurring: {
+          interval: 'month',
+        },
+        metadata: {
+          network_id: networkId,
+        },
+      });
+      logStep("Price created", { priceId: price.id });
+
+      // Update network with Stripe IDs
+      const { error: updateError } = await supabaseClient
+        .from("networks")
+        .update({
+          stripe_product_id: product.id,
+          stripe_price_id: price.id,
+        })
+        .eq("id", networkId);
+
+      if (updateError) {
+        logStep("Warning: Failed to update network with Stripe IDs", { error: updateError.message });
+      }
+
+      stripePriceId = price.id;
+    }
 
     // Check if customer exists
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
@@ -75,7 +121,7 @@ serve(async (req) => {
       customer_email: customerId ? undefined : user.email,
       line_items: [
         {
-          price: network.stripe_price_id,
+          price: stripePriceId,
           quantity: 1,
         },
       ],
