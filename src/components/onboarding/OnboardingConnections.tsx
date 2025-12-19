@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Music, Store, Crown, ChevronLeft } from 'lucide-react';
 
@@ -13,7 +14,7 @@ interface ConnectionOption {
   title: string;
   description: string;
   color: string;
-  href: string;
+  route: string;
 }
 
 const options: ConnectionOption[] = [
@@ -23,7 +24,7 @@ const options: ConnectionOption[] = [
     title: 'Connect Music Profile',
     description: 'Link your Spotify or Apple Music to showcase your catalog',
     color: 'from-green-500/20 to-green-600/10',
-    href: '/profile',
+    route: '/profile',
   },
   {
     id: 'store',
@@ -31,7 +32,7 @@ const options: ConnectionOption[] = [
     title: 'Set Up Your Store',
     description: 'Sell products, offer services, or list studio rentals',
     color: 'from-primary/20 to-primary/10',
-    href: '/store',
+    route: '/store',
   },
   {
     id: 'membership',
@@ -39,11 +40,23 @@ const options: ConnectionOption[] = [
     title: 'Become a Member',
     description: 'Support the community and unlock exclusive benefits',
     color: 'from-amber-500/20 to-amber-600/10',
-    href: '/membership',
+    route: '/membership',
   },
 ];
 
 const OnboardingConnections = ({ onComplete, onBack }: Props) => {
+  const navigate = useNavigate();
+
+  const handleOptionClick = (route: string) => {
+    // Navigate to the target page - onboarding is already complete at this point
+    navigate(route);
+  };
+
+  const handleSkip = () => {
+    // Navigate to feed/home - onboarding is already complete
+    navigate('/feed');
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
       <motion.div
@@ -69,13 +82,13 @@ const OnboardingConnections = ({ onComplete, onBack }: Props) => {
         {/* Options */}
         <div className="space-y-4 mb-8">
           {options.map((option, index) => (
-            <motion.a
+            <motion.button
               key={option.id}
-              href={option.href}
+              onClick={() => handleOptionClick(option.route)}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 + index * 0.1 }}
-              className="block"
+              className="block w-full text-left"
             >
               <div className={`glass-strong rounded-2xl p-5 hover:bg-accent/20 transition-all group cursor-pointer bg-gradient-to-r ${option.color}`}>
                 <div className="flex items-center gap-4">
@@ -93,7 +106,7 @@ const OnboardingConnections = ({ onComplete, onBack }: Props) => {
                   <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" />
                 </div>
               </div>
-            </motion.a>
+            </motion.button>
           ))}
         </div>
 
@@ -108,7 +121,7 @@ const OnboardingConnections = ({ onComplete, onBack }: Props) => {
             <ChevronLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
-          <Button onClick={onComplete} className="glow-pink">
+          <Button onClick={handleSkip} className="glow-pink">
             Skip for now
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
