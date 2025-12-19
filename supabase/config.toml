@@ -41,3 +41,6 @@ verify_jwt = true
 
 [functions.check-network-subscription]
 verify_jwt = true
+
+[functions.mux-stream]
+verify_jwt = false
