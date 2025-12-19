@@ -1,5 +1,4 @@
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Music, Store, Crown, ChevronLeft } from 'lucide-react';
 
@@ -45,16 +44,14 @@ const options: ConnectionOption[] = [
 ];
 
 const OnboardingConnections = ({ onComplete, onBack }: Props) => {
-  const navigate = useNavigate();
-
   const handleOptionClick = (route: string) => {
-    // Navigate to the target page - onboarding is already complete at this point
-    navigate(route);
+    // Use window.location for a full page reload to ensure fresh profile data
+    window.location.href = route;
   };
 
   const handleSkip = () => {
-    // Navigate to feed/home - onboarding is already complete
-    navigate('/feed');
+    // Use window.location for a full page reload
+    window.location.href = '/feed';
   };
 
   return (
