@@ -404,12 +404,13 @@ export const useSubscribeToNetwork = () => {
 
       if (error) throw error;
       if (data.url) {
-        window.open(data.url, '_blank');
+        // Redirect directly instead of opening new tab (avoids popup blocker)
+        window.location.href = data.url;
       }
       return data;
     },
     onError: (error: Error) => {
-      toast.error(error.message);
+      toast.error(`Subscription failed: ${error.message}`);
     },
   });
 };
