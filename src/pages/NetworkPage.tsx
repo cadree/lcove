@@ -13,6 +13,9 @@ import {
   Star,
   ChevronRight,
   Users,
+  Bell,
+  BellOff,
+  Send,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +32,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { ContentDetailDialog } from '@/components/cinema/ContentDetailDialog';
 import { VideoPlayer } from '@/components/cinema/VideoPlayer';
+import { SubmitContentDialog } from '@/components/cinema/SubmitContentDialog';
 import { cn } from '@/lib/utils';
 
 const NetworkPage = () => {
@@ -38,6 +42,7 @@ const NetworkPage = () => {
   const [selectedContent, setSelectedContent] = useState<NetworkContent | null>(null);
   const [playingContent, setPlayingContent] = useState<NetworkContent | null>(null);
   const [activeTab, setActiveTab] = useState('all');
+  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
 
   const { data: network, isLoading: networkLoading } = useNetwork(networkId || '');
   const { data: content = [], isLoading: contentLoading } = useNetworkContent(networkId || '');
@@ -188,7 +193,19 @@ const NetworkPage = () => {
                   onClick={() => subscribeMutation.mutate(networkId!)}
                   disabled={subscribeMutation.isPending}
                 >
+                  <Bell className="w-4 h-4 mr-2" />
                   Subscribe - ${network.subscription_price}/mo
+                </Button>
+              )}
+
+              {user && !isOwner && (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => setSubmitDialogOpen(true)}
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  Submit Content
                 </Button>
               )}
             </div>
@@ -312,6 +329,14 @@ const NetworkPage = () => {
         onClose={() => setSelectedContent(null)}
         onPlay={handlePlayContent}
         isSubscribed={isSubscribed || isOwner}
+      />
+
+      {/* Submit Content Dialog */}
+      <SubmitContentDialog
+        open={submitDialogOpen}
+        onOpenChange={setSubmitDialogOpen}
+        networkId={networkId!}
+        networkName={network.name}
       />
     </div>
   );

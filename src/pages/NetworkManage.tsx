@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
   Film,
@@ -9,7 +9,6 @@ import {
   Users,
   Eye,
   DollarSign,
-  Inbox,
   Tv,
   Trash2,
   Edit,
@@ -42,7 +41,9 @@ import { AddContentDialog } from '@/components/cinema/AddContentDialog';
 import { EditContentDialog } from '@/components/cinema/EditContentDialog';
 import { ContentDetailManageDialog } from '@/components/cinema/ContentDetailManageDialog';
 import { NetworkSettingsDialog } from '@/components/cinema/NetworkSettingsDialog';
-import { cn } from '@/lib/utils';
+import { SubmissionsPanel } from '@/components/cinema/SubmissionsPanel';
+import { NetworkAnalytics } from '@/components/cinema/NetworkAnalytics';
+import { supabase } from '@/integrations/supabase/client';
 
 const NetworkManage = () => {
   const { networkId } = useParams<{ networkId: string }>();
@@ -184,10 +185,7 @@ const NetworkManage = () => {
           <div className="flex items-center justify-between mb-6">
             <TabsList>
               <TabsTrigger value="content">Content</TabsTrigger>
-              <TabsTrigger value="submissions">
-                Submissions
-                <Badge variant="secondary" className="ml-2">0</Badge>
-              </TabsTrigger>
+              <TabsTrigger value="submissions">Submissions</TabsTrigger>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
             </TabsList>
             
@@ -259,23 +257,11 @@ const NetworkManage = () => {
           </TabsContent>
 
           <TabsContent value="submissions">
-            <div className="text-center py-16 bg-muted/30 rounded-xl">
-              <Inbox className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-xl font-medium mb-2">No pending submissions</h3>
-              <p className="text-muted-foreground">
-                When creators submit content to your network, it will appear here
-              </p>
-            </div>
+            <SubmissionsPanel networkId={networkId!} />
           </TabsContent>
 
           <TabsContent value="analytics">
-            <div className="text-center py-16 bg-muted/30 rounded-xl">
-              <Eye className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-xl font-medium mb-2">Analytics coming soon</h3>
-              <p className="text-muted-foreground">
-                Detailed viewing analytics and subscriber insights
-              </p>
-            </div>
+            <NetworkAnalytics networkId={networkId!} network={network} />
           </TabsContent>
         </Tabs>
       </div>
