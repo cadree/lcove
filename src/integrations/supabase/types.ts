@@ -1210,10 +1210,15 @@ export type Database = {
           is_live: boolean | null
           is_virtual_event: boolean | null
           max_attendees: number | null
+          mux_live_stream_id: string | null
+          mux_playback_id: string | null
           parent_event_id: string | null
+          playback_url: string | null
           replay_available: boolean | null
           replay_url: string | null
           requires_ticket: boolean | null
+          rtmp_ingest_url: string | null
+          rtmp_stream_key: string | null
           started_at: string | null
           stream_type: string
           thumbnail_url: string | null
@@ -1233,10 +1238,15 @@ export type Database = {
           is_live?: boolean | null
           is_virtual_event?: boolean | null
           max_attendees?: number | null
+          mux_live_stream_id?: string | null
+          mux_playback_id?: string | null
           parent_event_id?: string | null
+          playback_url?: string | null
           replay_available?: boolean | null
           replay_url?: string | null
           requires_ticket?: boolean | null
+          rtmp_ingest_url?: string | null
+          rtmp_stream_key?: string | null
           started_at?: string | null
           stream_type: string
           thumbnail_url?: string | null
@@ -1256,10 +1266,15 @@ export type Database = {
           is_live?: boolean | null
           is_virtual_event?: boolean | null
           max_attendees?: number | null
+          mux_live_stream_id?: string | null
+          mux_playback_id?: string | null
           parent_event_id?: string | null
+          playback_url?: string | null
           replay_available?: boolean | null
           replay_url?: string | null
           requires_ticket?: boolean | null
+          rtmp_ingest_url?: string | null
+          rtmp_stream_key?: string | null
           started_at?: string | null
           stream_type?: string
           thumbnail_url?: string | null
@@ -1274,6 +1289,13 @@ export type Database = {
             columns: ["parent_event_id"]
             isOneToOne: false
             referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_streams_parent_event_id_fkey"
+            columns: ["parent_event_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams_public"
             referencedColumns: ["id"]
           },
         ]
@@ -3100,6 +3122,13 @@ export type Database = {
             referencedRelation: "live_streams"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "stream_reactions_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       stream_tips: {
@@ -3138,6 +3167,13 @@ export type Database = {
             referencedRelation: "live_streams"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "stream_tips_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       stream_viewers: {
@@ -3168,6 +3204,13 @@ export type Database = {
             columns: ["stream_id"]
             isOneToOne: false
             referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stream_viewers_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams_public"
             referencedColumns: ["id"]
           },
         ]
@@ -3703,7 +3746,108 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      live_streams_public: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          ended_at: string | null
+          event_type: string | null
+          external_url: string | null
+          host_id: string | null
+          id: string | null
+          is_live: boolean | null
+          is_virtual_event: boolean | null
+          max_attendees: number | null
+          mux_live_stream_id: string | null
+          mux_playback_id: string | null
+          parent_event_id: string | null
+          playback_url: string | null
+          replay_available: boolean | null
+          replay_url: string | null
+          requires_ticket: boolean | null
+          rtmp_ingest_url: string | null
+          rtmp_stream_key: string | null
+          started_at: string | null
+          stream_type: string | null
+          thumbnail_url: string | null
+          ticket_price: number | null
+          title: string | null
+          total_tips: number | null
+          viewer_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          ended_at?: string | null
+          event_type?: string | null
+          external_url?: string | null
+          host_id?: string | null
+          id?: string | null
+          is_live?: boolean | null
+          is_virtual_event?: boolean | null
+          max_attendees?: number | null
+          mux_live_stream_id?: string | null
+          mux_playback_id?: string | null
+          parent_event_id?: string | null
+          playback_url?: string | null
+          replay_available?: boolean | null
+          replay_url?: string | null
+          requires_ticket?: boolean | null
+          rtmp_ingest_url?: never
+          rtmp_stream_key?: never
+          started_at?: string | null
+          stream_type?: string | null
+          thumbnail_url?: string | null
+          ticket_price?: number | null
+          title?: string | null
+          total_tips?: number | null
+          viewer_count?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          ended_at?: string | null
+          event_type?: string | null
+          external_url?: string | null
+          host_id?: string | null
+          id?: string | null
+          is_live?: boolean | null
+          is_virtual_event?: boolean | null
+          max_attendees?: number | null
+          mux_live_stream_id?: string | null
+          mux_playback_id?: string | null
+          parent_event_id?: string | null
+          playback_url?: string | null
+          replay_available?: boolean | null
+          replay_url?: string | null
+          requires_ticket?: boolean | null
+          rtmp_ingest_url?: never
+          rtmp_stream_key?: never
+          started_at?: string | null
+          stream_type?: string | null
+          thumbnail_url?: string | null
+          ticket_price?: number | null
+          title?: string | null
+          total_tips?: number | null
+          viewer_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_streams_parent_event_id_fkey"
+            columns: ["parent_event_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_streams_parent_event_id_fkey"
+            columns: ["parent_event_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       calculate_reputation_score: {
