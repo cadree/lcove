@@ -44,3 +44,9 @@ verify_jwt = true
 
 [functions.mux-stream]
 verify_jwt = false
+
+[functions.create-connect-account]
+verify_jwt = true
+
+[functions.check-connect-status]
+verify_jwt = true

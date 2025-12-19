@@ -12,6 +12,9 @@ const logStep = (step: string, details?: any) => {
   console.log(`[CREATE-NETWORK-SUBSCRIPTION] ${step}${detailsStr}`);
 };
 
+// Platform fee percentage (20%)
+const PLATFORM_FEE_PERCENT = 20;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -19,7 +22,8 @@ serve(async (req) => {
 
   const supabaseClient = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    { auth: { persistSession: false } }
   );
 
   try {
@@ -36,17 +40,22 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { userId: user.id, email: user.email });
 
-    // Get network details
+    // Get network details with owner info
     const { data: network, error: networkError } = await supabaseClient
       .from("networks")
-      .select("*")
+      .select("*, stripe_connect_account_id, payout_enabled")
       .eq("id", networkId)
       .single();
 
     if (networkError || !network) throw new Error("Network not found");
     if (!network.is_paid) throw new Error("This network is free, no subscription required");
     if (!network.stripe_price_id) throw new Error("Network subscription not configured");
-    logStep("Network found", { name: network.name, price: network.subscription_price });
+    logStep("Network found", { 
+      name: network.name, 
+      price: network.subscription_price,
+      hasConnectAccount: !!network.stripe_connect_account_id,
+      payoutEnabled: network.payout_enabled
+    });
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2025-08-27.basil",
@@ -60,8 +69,8 @@ serve(async (req) => {
     }
     logStep("Customer lookup", { customerId: customerId || "new" });
 
-    // Create checkout session
-    const session = await stripe.checkout.sessions.create({
+    // Build checkout session options
+    const sessionOptions: Stripe.Checkout.SessionCreateParams = {
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
       line_items: [
@@ -77,7 +86,28 @@ serve(async (req) => {
         network_id: networkId,
         user_id: user.id,
       },
-    });
+    };
+
+    // If creator has Stripe Connect set up, add payment split
+    // 80% goes to creator, 20% to platform
+    if (network.stripe_connect_account_id && network.payout_enabled) {
+      logStep("Adding revenue split", { 
+        creatorAccount: network.stripe_connect_account_id,
+        platformFee: `${PLATFORM_FEE_PERCENT}%` 
+      });
+
+      sessionOptions.subscription_data = {
+        application_fee_percent: PLATFORM_FEE_PERCENT,
+        transfer_data: {
+          destination: network.stripe_connect_account_id,
+        },
+      };
+    } else {
+      logStep("No Connect account - all funds go to platform");
+    }
+
+    // Create checkout session
+    const session = await stripe.checkout.sessions.create(sessionOptions);
 
     logStep("Checkout session created", { sessionId: session.id });
 

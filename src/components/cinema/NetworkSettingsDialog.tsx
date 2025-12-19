@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -29,7 +30,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Network, useContentGenres } from '@/hooks/useCinema';
-import { Settings, Upload, Trash2 } from 'lucide-react';
+import { Settings, Trash2, CreditCard, CheckCircle, AlertCircle, ExternalLink, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -39,6 +40,13 @@ interface NetworkSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   network: Network;
+}
+
+interface ConnectStatus {
+  hasAccount: boolean;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
 }
 
 export const NetworkSettingsDialog = ({
@@ -54,6 +62,9 @@ export const NetworkSettingsDialog = ({
   const [subscriptionPrice, setSubscriptionPrice] = useState(network.subscription_price.toString());
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [connectStatus, setConnectStatus] = useState<ConnectStatus | null>(null);
+  const [loadingConnect, setLoadingConnect] = useState(false);
+  const [settingUpPayout, setSettingUpPayout] = useState(false);
 
   const { data: genres = [] } = useContentGenres();
   const queryClient = useQueryClient();
@@ -67,8 +78,56 @@ export const NetworkSettingsDialog = ({
       setIsPublic(network.is_public);
       setIsPaid(network.is_paid);
       setSubscriptionPrice(network.subscription_price.toString());
+      checkConnectStatus();
     }
   }, [open, network]);
+
+  const checkConnectStatus = async () => {
+    setLoadingConnect(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data, error } = await supabase.functions.invoke('check-connect-status', {
+        body: { networkId: network.id },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      setConnectStatus(data);
+    } catch (error) {
+      console.error('Error checking connect status:', error);
+    } finally {
+      setLoadingConnect(false);
+    }
+  };
+
+  const handleSetupPayout = async () => {
+    setSettingUpPayout(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase.functions.invoke('create-connect-account', {
+        body: { networkId: network.id },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        window.open(data.url, '_blank');
+        toast.success('Complete your payout setup in the new tab');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to start payout setup');
+    } finally {
+      setSettingUpPayout(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -127,6 +186,11 @@ export const NetworkSettingsDialog = ({
       setDeleting(false);
     }
   };
+
+  const isPayoutComplete = connectStatus?.hasAccount && 
+    connectStatus?.chargesEnabled && 
+    connectStatus?.payoutsEnabled && 
+    connectStatus?.detailsSubmitted;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -213,9 +277,101 @@ export const NetworkSettingsDialog = ({
                   value={subscriptionPrice}
                   onChange={(e) => setSubscriptionPrice(e.target.value)}
                 />
+                <p className="text-xs text-muted-foreground">
+                  You receive 80% of subscription revenue. 20% goes to platform fees.
+                </p>
               </div>
             )}
           </div>
+
+          {/* Payout Setup */}
+          {isPaid && (
+            <div className="space-y-4 p-4 rounded-lg border border-primary/20 bg-primary/5">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-primary" />
+                <h4 className="font-medium">Payout Setup</h4>
+              </div>
+              
+              {loadingConnect ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Checking payout status...
+                </div>
+              ) : isPayoutComplete ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-green-600">
+                    <CheckCircle className="w-4 h-4" />
+                    Payouts are enabled! You'll receive 80% of subscription revenue.
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSetupPayout}
+                    disabled={settingUpPayout}
+                    className="gap-2"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Manage Payout Settings
+                  </Button>
+                </div>
+              ) : connectStatus?.hasAccount ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-amber-600">
+                    <AlertCircle className="w-4 h-4" />
+                    Payout setup incomplete. Complete setup to receive payments.
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {!connectStatus.detailsSubmitted && (
+                      <Badge variant="outline" className="text-amber-600 border-amber-600">
+                        Details needed
+                      </Badge>
+                    )}
+                    {!connectStatus.chargesEnabled && (
+                      <Badge variant="outline" className="text-amber-600 border-amber-600">
+                        Charges disabled
+                      </Badge>
+                    )}
+                    {!connectStatus.payoutsEnabled && (
+                      <Badge variant="outline" className="text-amber-600 border-amber-600">
+                        Payouts disabled
+                      </Badge>
+                    )}
+                  </div>
+                  <Button
+                    onClick={handleSetupPayout}
+                    disabled={settingUpPayout}
+                    className="gap-2"
+                  >
+                    {settingUpPayout ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <ExternalLink className="w-4 h-4" />
+                    )}
+                    Complete Setup
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Connect your bank account or debit card to receive payments from subscribers.
+                    You'll receive 80% of all subscription revenue.
+                  </p>
+                  <Button
+                    onClick={handleSetupPayout}
+                    disabled={settingUpPayout}
+                    className="gap-2"
+                  >
+                    {settingUpPayout ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CreditCard className="w-4 h-4" />
+                    )}
+                    Set Up Payouts
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex gap-3">
