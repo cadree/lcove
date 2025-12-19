@@ -67,7 +67,14 @@ export function PartnerApplicationDialog({ open, onOpenChange }: PartnerApplicat
 
     try {
       await createApplication.mutateAsync({
-        ...data,
+        business_name: data.business_name,
+        category: data.category,
+        description: data.description,
+        contribution: data.contribution,
+        member_benefits: data.member_benefits,
+        contact_email: data.contact_email,
+        city: data.city,
+        country: data.country,
         user_id: user.id,
         website_url: data.website_url || null,
         contact_phone: data.contact_phone || null,

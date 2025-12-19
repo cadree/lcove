@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Search, Filter, ExternalLink, Mail, Phone, Building2, ChevronRight, ArrowLeft } from 'lucide-react';
+import { MapPin, Search, Filter, ExternalLink, Mail, Phone, Building2, ChevronRight, ArrowLeft, Handshake, Plus } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePartners, usePartnerCategories, Partner, PartnerCategory } from '@/hooks/usePartners';
+import { PartnerApplicationDialog } from '@/components/partners/PartnerApplicationDialog';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Partners: React.FC = () => {
@@ -19,6 +20,7 @@ const Partners: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<PartnerCategory | 'all'>('all');
   const [cityFilter, setCityFilter] = useState('');
   const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null);
+  const [showApplicationDialog, setShowApplicationDialog] = useState(false);
 
   const categories = usePartnerCategories();
   const { data: partners, isLoading } = usePartners({
@@ -40,16 +42,49 @@ const Partners: React.FC = () => {
       <div className="min-h-screen pb-20">
         {/* Header */}
         <div className="bg-gradient-to-b from-primary/10 to-background px-4 pt-6 pb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="text-2xl font-bold">Partnerships</h1>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <h1 className="text-2xl font-bold">Partnerships</h1>
+            </div>
           </div>
           <p className="text-muted-foreground ml-12">
             Exclusive benefits for LC members from our partner network
           </p>
         </div>
+
+        {/* Become a Partner CTA */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mx-4 -mt-4 mb-4"
+        >
+          <Card className="bg-gradient-to-r from-primary/10 via-primary/5 to-background border-primary/20">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
+                    <Handshake className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-sm">Become a Partner</h3>
+                    <p className="text-xs text-muted-foreground">Share what you bring to the table</p>
+                  </div>
+                </div>
+                <Button 
+                  size="sm" 
+                  onClick={() => setShowApplicationDialog(true)}
+                  className="gap-1"
+                >
+                  <Plus className="h-4 w-4" />
+                  Apply
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Filters */}
         <div className="px-4 py-4 space-y-3 border-b">
@@ -262,6 +297,12 @@ const Partners: React.FC = () => {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Partner Application Dialog */}
+      <PartnerApplicationDialog 
+        open={showApplicationDialog} 
+        onOpenChange={setShowApplicationDialog} 
+      />
     </PageLayout>
   );
 };

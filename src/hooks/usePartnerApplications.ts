@@ -25,8 +25,8 @@ export function useCreatePartnerApplication() {
   return useMutation({
     mutationFn: async (data: PartnerApplicationData) => {
       const { data: application, error } = await supabase
-        .from('partner_applications')
-        .insert(data)
+        .from('partner_applications' as any)
+        .insert(data as any)
         .select()
         .single();
 
