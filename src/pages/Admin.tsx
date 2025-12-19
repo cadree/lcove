@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Users, AlertTriangle, CheckCircle, XCircle, Clock, History, Search, ArrowLeft, Ban, UserCheck } from 'lucide-react';
+import { Shield, Users, AlertTriangle, CheckCircle, XCircle, Clock, History, Search, ArrowLeft, Ban, UserCheck, ClipboardList } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/layout/PageLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -121,7 +121,18 @@ const Admin: React.FC = () => {
             <Shield className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>
           </div>
-          <p className="text-muted-foreground ml-12">Manage users, review onboarding, and maintain community integrity</p>
+          <div className="flex items-center justify-between ml-12">
+            <p className="text-muted-foreground">Manage users, review onboarding, and maintain community integrity</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2"
+              onClick={() => navigate('/admin/onboarding')}
+            >
+              <ClipboardList className="h-4 w-4" />
+              Onboarding Review
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
