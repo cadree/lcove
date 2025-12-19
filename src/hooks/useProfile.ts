@@ -14,6 +14,10 @@ export interface Profile {
   onboarding_completed: boolean | null;
   created_at: string;
   updated_at: string;
+  // Mindset gate fields
+  mindset_level: number | null;
+  access_status: 'pending' | 'active' | 'denied' | 'banned' | null;
+  onboarding_score: number | null;
 }
 
 export const useProfile = (userId?: string) => {
@@ -43,7 +47,25 @@ export const useProfile = (userId?: string) => {
       .single();
 
     if (!error && data) {
-      setProfile(data as Profile);
+      // Cast data and provide defaults for fields that might not exist in DB yet
+      const rawData = data as Record<string, unknown>;
+      const profileData: Profile = {
+        id: rawData.id as string,
+        user_id: rawData.user_id as string,
+        display_name: rawData.display_name as string | null,
+        city: rawData.city as string | null,
+        bio: rawData.bio as string | null,
+        avatar_url: rawData.avatar_url as string | null,
+        passion_seriousness: rawData.passion_seriousness as number | null,
+        access_level: rawData.access_level as Profile['access_level'],
+        onboarding_completed: rawData.onboarding_completed as boolean | null,
+        created_at: rawData.created_at as string,
+        updated_at: rawData.updated_at as string,
+        mindset_level: (rawData.mindset_level as number | null) ?? null,
+        access_status: (rawData.access_status as Profile['access_status']) ?? 'pending',
+        onboarding_score: (rawData.onboarding_score as number | null) ?? null,
+      };
+      setProfile(profileData);
     }
     setLoading(false);
   };

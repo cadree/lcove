@@ -194,13 +194,15 @@ export function useApproveOnboarding() {
     mutationFn: async (data: { userId: string; level: number }) => {
       const accessLevel = data.level === 3 ? 'level_3' : data.level === 2 ? 'level_2' : 'level_1';
 
+      // Use type assertion for new columns not yet in generated types
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
           onboarding_completed: true,
-          onboarding_level: data.level,
           access_level: accessLevel,
-        })
+          mindset_level: data.level,
+          access_status: 'active',
+        } as Record<string, unknown>)
         .eq('user_id', data.userId);
 
       if (profileError) throw profileError;
@@ -218,6 +220,7 @@ export function useApproveOnboarding() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-onboarding'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
       toast.success('Onboarding approved');
     },
@@ -230,11 +233,14 @@ export function useDenyOnboarding() {
 
   return useMutation({
     mutationFn: async (data: { userId: string; reason: string }) => {
+      // Use type assertion for new columns not yet in generated types
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
-          access_level: 'level_1' as const,
-        })
+          access_level: 'level_1',
+          mindset_level: 1,
+          access_status: 'denied',
+        } as Record<string, unknown>)
         .eq('user_id', data.userId);
 
       if (profileError) throw profileError;
@@ -252,9 +258,67 @@ export function useDenyOnboarding() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-onboarding'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
       toast.success('Onboarding denied');
     },
+  });
+}
+
+export function useChangeAccessStatus() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (data: { userId: string; status: 'active' | 'denied' | 'banned'; reason?: string }) => {
+      // Use type assertion for new column not yet in generated types
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          access_status: data.status,
+        } as Record<string, unknown>)
+        .eq('user_id', data.userId);
+
+      if (profileError) throw profileError;
+
+      const { error: actionError } = await supabase
+        .from('admin_actions')
+        .insert({
+          admin_id: user?.id,
+          action_type: `change_status_${data.status}`,
+          target_user_id: data.userId,
+          reason: data.reason || null,
+        });
+
+      if (actionError) throw actionError;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
+      toast.success(`User status changed to ${variables.status}`);
+    },
+    onError: () => {
+      toast.error('Failed to change user status');
+    },
+  });
+}
+
+export function useQuestionnaireResponses(userId: string) {
+  const { isAdmin } = useIsAdmin();
+
+  return useQuery({
+    queryKey: ['questionnaire-responses', userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('questionnaire_responses')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
+    },
+    enabled: isAdmin && !!userId,
   });
 }
 

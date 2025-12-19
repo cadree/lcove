@@ -58,34 +58,34 @@ const Onboarding = () => {
     }
   }, [profile, profileLoading, navigate]);
 
-  const calculateAccessLevel = (responses: Record<number, 'A' | 'B' | 'C'>) => {
-    const scores = { A: 0, B: 0, C: 0 };
-    Object.values(responses).forEach((answer) => {
-      scores[answer]++;
-    });
+  // Scoring: A=1, B=2, C=3 points per question
+  // Threshold: >= 20 points (out of 30 max for 10 questions) = Level 2 (Accepted)
+  // Below 20 = Level 1 (Denied)
+  const ACCEPTANCE_THRESHOLD = 20;
 
-    if (scores.A >= 5) return 'level_1';
-    if (scores.C >= 5) return 'level_3';
-    return 'level_2';
+  const calculateMindsetLevel = (responses: Record<number, 'A' | 'B' | 'C'>): { level: 1 | 2; score: number } => {
+    const score = Object.values(responses).reduce((sum, ans) => {
+      return sum + (ans === 'A' ? 1 : ans === 'B' ? 2 : 3);
+    }, 0);
+    
+    // Level 2 = Accepted (score >= threshold), Level 1 = Denied
+    const level = score >= ACCEPTANCE_THRESHOLD ? 2 : 1;
+    return { level, score };
   };
 
   const handleComplete = async () => {
     if (!user) return;
 
-    const level = calculateAccessLevel(data.questionnaireResponses);
-    setAccessLevel(level);
+    const { level, score } = calculateMindsetLevel(data.questionnaireResponses);
+    setAccessLevel(level === 2 ? 'level_2' : 'level_1');
 
     try {
       // Save questionnaire responses
-      const totalScore = Object.values(data.questionnaireResponses).reduce((sum, ans) => {
-        return sum + (ans === 'A' ? 1 : ans === 'B' ? 2 : 3);
-      }, 0);
-
-      await supabase.from('questionnaire_responses').insert({
+      await supabase.from('questionnaire_responses').upsert({
         user_id: user.id,
         responses: data.questionnaireResponses,
-        total_score: totalScore,
-      });
+        total_score: score,
+      }, { onConflict: 'user_id' });
 
       // Save passions
       const { data: passions } = await supabase
@@ -93,9 +93,10 @@ const Onboarding = () => {
         .select('id, name')
         .in('name', data.passions);
 
-      if (passions) {
-        await supabase.from('user_passions').insert(
-          passions.map((p) => ({ user_id: user.id, passion_id: p.id }))
+      if (passions && passions.length > 0) {
+        await supabase.from('user_passions').upsert(
+          passions.map((p) => ({ user_id: user.id, passion_id: p.id })),
+          { onConflict: 'user_id,passion_id' }
         );
       }
 
@@ -105,9 +106,10 @@ const Onboarding = () => {
         .select('id, name')
         .in('name', data.skills);
 
-      if (skills) {
-        await supabase.from('user_skills').insert(
-          skills.map((s) => ({ user_id: user.id, skill_id: s.id }))
+      if (skills && skills.length > 0) {
+        await supabase.from('user_skills').upsert(
+          skills.map((s) => ({ user_id: user.id, skill_id: s.id })),
+          { onConflict: 'user_id,skill_id' }
         );
       }
 
@@ -117,26 +119,34 @@ const Onboarding = () => {
         .select('id, name')
         .in('name', data.roles);
 
-      if (roles) {
-        await supabase.from('user_creative_roles').insert(
-          roles.map((r) => ({ user_id: user.id, role_id: r.id }))
+      if (roles && roles.length > 0) {
+        await supabase.from('user_creative_roles').upsert(
+          roles.map((r) => ({ user_id: user.id, role_id: r.id })),
+          { onConflict: 'user_id,role_id' }
         );
       }
 
-      // Update profile
+      // Determine access status based on mindset level
+      const accessStatus = level === 2 ? 'active' : 'denied';
+
+      // Update profile with all onboarding data
       await updateProfile({
         city: data.city,
         passion_seriousness: data.passionSeriousness,
-        access_level: level,
+        access_level: level === 2 ? 'level_2' : 'level_1',
         onboarding_completed: true,
+        mindset_level: level,
+        access_status: accessStatus,
+        onboarding_score: score,
       });
 
-      if (level === 'level_1') {
+      if (level === 1) {
         setCurrentStep(8); // Show denied screen
       } else {
         setCurrentStep(6); // Show connections screen (optional step)
       }
     } catch (error) {
+      console.error('Error saving onboarding data:', error);
       toast({
         title: 'Error saving data',
         description: 'Please try again.',
