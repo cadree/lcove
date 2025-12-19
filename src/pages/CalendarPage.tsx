@@ -19,8 +19,9 @@ import { CalendarAgendaView } from "@/components/calendar/CalendarAgendaView";
 import { CalendarFilters } from "@/components/calendar/CalendarFilters";
 import { EventDetailDialog } from "@/components/calendar/EventDetailDialog";
 import { PersonalEventDialog } from "@/components/calendar/PersonalEventDialog";
+import { PersonalEventDetailDialog } from "@/components/calendar/PersonalEventDetailDialog";
 import { CreateCommunityEventDialog } from "@/components/calendar/CreateCommunityEventDialog";
-import { useCalendarItems, CalendarItem } from "@/hooks/useCalendar";
+import { useCalendarItems, CalendarItem, PersonalCalendarItem } from "@/hooks/useCalendar";
 import { useAuth } from "@/contexts/AuthContext";
 import { addMonths, subMonths, addWeeks, subWeeks, format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -68,6 +69,8 @@ const CalendarPage = () => {
   const [personalEventOpen, setPersonalEventOpen] = useState(false);
   const [communityEventOpen, setCommunityEventOpen] = useState(false);
   const [selectedDateForNew, setSelectedDateForNew] = useState<Date | undefined>();
+  const [selectedPersonalItem, setSelectedPersonalItem] = useState<PersonalCalendarItem | null>(null);
+  const [personalDetailOpen, setPersonalDetailOpen] = useState(false);
 
   // Handle URL params for deep linking to events and ticket confirmations
   useEffect(() => {
@@ -122,8 +125,9 @@ const CalendarPage = () => {
     } else if (item.type === 'project') {
       navigate(`/projects?id=${item.id}`);
     } else if (item.type === 'personal') {
-      // Personal events are only visible to the owner
-      toast.info('This is a personal reminder on your calendar.');
+      // Open personal event detail dialog
+      setSelectedPersonalItem(item.data as PersonalCalendarItem);
+      setPersonalDetailOpen(true);
     }
   };
 
@@ -336,6 +340,13 @@ const CalendarPage = () => {
         open={communityEventOpen}
         onOpenChange={setCommunityEventOpen}
         defaultDate={selectedDateForNew}
+      />
+
+      {/* Personal Event Detail Dialog */}
+      <PersonalEventDetailDialog
+        item={selectedPersonalItem}
+        open={personalDetailOpen}
+        onOpenChange={setPersonalDetailOpen}
       />
     </PageLayout>
   );
