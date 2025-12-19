@@ -101,23 +101,26 @@ export function CalendarMonthView({
                 )}>
                   {date.getDate()}
                 </span>
-                <div className="mt-1 space-y-1">
+                <div className="mt-1 space-y-1 relative z-10">
                   {getItemsForDate(date).slice(0, 3).map(item => (
-                    <div
+                    <button
                       key={item.id}
+                      type="button"
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         onItemClick(item);
                       }}
                       className={cn(
-                        "text-[10px] sm:text-xs px-1 py-0.5 rounded truncate cursor-pointer hover:opacity-80 transition-opacity",
-                        item.type === 'event' ? "bg-primary/20 text-primary" : "",
+                        "w-full text-left text-[10px] sm:text-xs px-1.5 py-1 rounded truncate cursor-pointer transition-all",
+                        "hover:ring-2 hover:ring-primary/50 hover:scale-[1.02] active:scale-[0.98]",
+                        item.type === 'event' ? "bg-primary/30 text-primary font-medium" : "",
                         item.type === 'project' ? "bg-accent/50 text-accent-foreground" : "",
                         item.type === 'personal' ? "bg-secondary/50 text-secondary-foreground" : ""
                       )}
                     >
                       {item.title}
-                    </div>
+                    </button>
                   ))}
                   {getItemsForDate(date).length > 3 && (
                     <div className="text-[10px] text-muted-foreground">
