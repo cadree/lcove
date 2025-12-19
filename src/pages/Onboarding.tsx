@@ -31,7 +31,9 @@ const Onboarding = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Initialize step based on profile state - if already completed, start at connections step
   const [currentStep, setCurrentStep] = useState(0);
+  const [initialized, setInitialized] = useState(false);
   const [data, setData] = useState<OnboardingData>({
     passions: [],
     passionSeriousness: 5,
@@ -48,15 +50,21 @@ const Onboarding = () => {
     }
   }, [user, authLoading, navigate]);
 
+  // Handle redirect for completed onboarding users - redirect to feed, not restart
   useEffect(() => {
-    if (!profileLoading && profile?.onboarding_completed) {
-      if (profile.access_level === 'level_1') {
-        navigate('/denied');
-      } else {
-        navigate('/feed');
+    if (!profileLoading && !initialized && profile) {
+      setInitialized(true);
+      
+      if (profile.onboarding_completed) {
+        // If onboarding is already complete, redirect to feed (don't restart)
+        if (profile.access_status === 'denied' || profile.access_level === 'level_1') {
+          navigate('/locked');
+        } else {
+          navigate('/feed');
+        }
       }
     }
-  }, [profile, profileLoading, navigate]);
+  }, [profile, profileLoading, initialized, navigate]);
 
   // Scoring: A=1, B=2, C=3 points per question
   // Threshold: >= 20 points (out of 30 max for 10 questions) = Level 2 (Accepted)

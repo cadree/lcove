@@ -9,7 +9,7 @@ interface AccessGateProps {
 }
 
 // Routes that don't require access gate checks
-const PUBLIC_ROUTES = ['/', '/auth', '/onboarding', '/locked', '/admin/onboarding'];
+const PUBLIC_ROUTES = ['/', '/auth', '/onboarding', '/locked', '/admin/onboarding', '/denied'];
 
 const AccessGate = ({ children }: AccessGateProps) => {
   const { user, loading: authLoading } = useAuth();
