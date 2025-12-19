@@ -69,7 +69,22 @@ export const SubmissionsPanel = ({ networkId }: SubmissionsPanelProps) => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as unknown as Submission[];
+
+      // Fetch submitter profiles
+      const submitterIds = [...new Set((data || []).map(s => s.submitter_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, display_name, avatar_url')
+        .in('user_id', submitterIds);
+
+      const profileMap = new Map(
+        (profiles || []).map(p => [p.user_id, p])
+      );
+
+      return (data || []).map(submission => ({
+        ...submission,
+        submitter: profileMap.get(submission.submitter_id) || null,
+      })) as Submission[];
     },
   });
 
@@ -255,6 +270,12 @@ export const SubmissionsPanel = ({ networkId }: SubmissionsPanelProps) => {
                       {selectedSubmission.description}
                     </p>
                     <div className="text-sm text-muted-foreground space-y-1">
+                      {selectedSubmission.submitter && (
+                        <p className="flex items-center gap-2">
+                          <User className="w-4 h-4" />
+                          Submitted by: {selectedSubmission.submitter.display_name || 'Unknown'}
+                        </p>
+                      )}
                       {selectedSubmission.director && (
                         <p>Director: {selectedSubmission.director}</p>
                       )}
