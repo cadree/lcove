@@ -14,6 +14,7 @@ import {
   Trash2,
   Edit,
   MoreVertical,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,9 +25,22 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useNetwork, useNetworkContent, NetworkContent } from '@/hooks/useCinema';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { useNetwork, NetworkContent } from '@/hooks/useCinema';
+import { useNetworkContentManage, useDeleteContent, useTogglePublish } from '@/hooks/useNetworkContentManage';
 import { useAuth } from '@/contexts/AuthContext';
 import { AddContentDialog } from '@/components/cinema/AddContentDialog';
+import { EditContentDialog } from '@/components/cinema/EditContentDialog';
+import { ContentDetailManageDialog } from '@/components/cinema/ContentDetailManageDialog';
 import { NetworkSettingsDialog } from '@/components/cinema/NetworkSettingsDialog';
 import { cn } from '@/lib/utils';
 
@@ -35,9 +49,14 @@ const NetworkManage = () => {
   const { user } = useAuth();
   const [addContentOpen, setAddContentOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [editContent, setEditContent] = useState<NetworkContent | null>(null);
+  const [viewContent, setViewContent] = useState<NetworkContent | null>(null);
+  const [deleteContent, setDeleteContent] = useState<NetworkContent | null>(null);
 
   const { data: network, isLoading: networkLoading } = useNetwork(networkId || '');
-  const { data: content = [] } = useNetworkContent(networkId || '');
+  const { data: content = [], isLoading: contentLoading } = useNetworkContentManage(networkId || '');
+  const deleteContentMutation = useDeleteContent();
+  const togglePublish = useTogglePublish();
 
   // Redirect if not owner
   if (!networkLoading && network && user?.id !== network.owner_id) {
@@ -67,6 +86,35 @@ const NetworkManage = () => {
   const shortFilms = content.filter((c) => c.content_type === 'short_film');
   const tvShows = content.filter((c) => c.content_type === 'tv_show');
   const featureFilms = content.filter((c) => c.content_type === 'feature_film');
+
+  const handleEdit = (item: NetworkContent) => {
+    setEditContent(item);
+  };
+
+  const handleView = (item: NetworkContent) => {
+    setViewContent(item);
+  };
+
+  const handleDelete = (item: NetworkContent) => {
+    setDeleteContent(item);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteContent) {
+      await deleteContentMutation.mutateAsync({
+        contentId: deleteContent.id,
+        networkId: networkId!,
+      });
+      setDeleteContent(null);
+    }
+  };
+
+  const handleTogglePublish = async (item: NetworkContent) => {
+    await togglePublish.mutateAsync({
+      contentId: item.id,
+      isPublished: !item.is_published,
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -150,7 +198,11 @@ const NetworkManage = () => {
           </div>
 
           <TabsContent value="content" className="space-y-8">
-            {content.length === 0 ? (
+            {contentLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : content.length === 0 ? (
               <div className="text-center py-16 bg-muted/30 rounded-xl">
                 <Film className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-xl font-medium mb-2">No content yet</h3>
@@ -170,6 +222,10 @@ const NetworkManage = () => {
                     title="Short Films"
                     icon={<Film className="w-5 h-5" />}
                     items={shortFilms}
+                    onEdit={handleEdit}
+                    onView={handleView}
+                    onDelete={handleDelete}
+                    onTogglePublish={handleTogglePublish}
                   />
                 )}
 
@@ -179,6 +235,10 @@ const NetworkManage = () => {
                     title="Feature Films"
                     icon={<Film className="w-5 h-5" />}
                     items={featureFilms}
+                    onEdit={handleEdit}
+                    onView={handleView}
+                    onDelete={handleDelete}
+                    onTogglePublish={handleTogglePublish}
                   />
                 )}
 
@@ -188,6 +248,10 @@ const NetworkManage = () => {
                     title="TV Shows"
                     icon={<Tv className="w-5 h-5" />}
                     items={tvShows}
+                    onEdit={handleEdit}
+                    onView={handleView}
+                    onDelete={handleDelete}
+                    onTogglePublish={handleTogglePublish}
                   />
                 )}
               </>
@@ -216,10 +280,27 @@ const NetworkManage = () => {
         </Tabs>
       </div>
 
+      {/* Dialogs */}
       <AddContentDialog
         open={addContentOpen}
         onOpenChange={setAddContentOpen}
         networkId={networkId!}
+      />
+
+      <EditContentDialog
+        open={!!editContent}
+        onOpenChange={(open) => !open && setEditContent(null)}
+        content={editContent}
+      />
+
+      <ContentDetailManageDialog
+        open={!!viewContent}
+        onOpenChange={(open) => !open && setViewContent(null)}
+        content={viewContent}
+        onEdit={() => {
+          setEditContent(viewContent);
+          setViewContent(null);
+        }}
       />
 
       <NetworkSettingsDialog
@@ -227,6 +308,31 @@ const NetworkManage = () => {
         onOpenChange={setSettingsOpen}
         network={network}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteContent} onOpenChange={(open) => !open && setDeleteContent(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Content</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deleteContent?.title}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteContentMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                'Delete'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
@@ -255,10 +361,18 @@ const ContentSection = ({
   title,
   icon,
   items,
+  onEdit,
+  onView,
+  onDelete,
+  onTogglePublish,
 }: {
   title: string;
   icon: React.ReactNode;
   items: NetworkContent[];
+  onEdit: (item: NetworkContent) => void;
+  onView: (item: NetworkContent) => void;
+  onDelete: (item: NetworkContent) => void;
+  onTogglePublish: (item: NetworkContent) => void;
 }) => (
   <div>
     <h2 className="font-display text-lg font-semibold flex items-center gap-2 mb-4">
@@ -268,21 +382,43 @@ const ContentSection = ({
     </h2>
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
       {items.map((item) => (
-        <ContentManageCard key={item.id} content={item} />
+        <ContentManageCard 
+          key={item.id} 
+          content={item} 
+          onEdit={() => onEdit(item)}
+          onView={() => onView(item)}
+          onDelete={() => onDelete(item)}
+          onTogglePublish={() => onTogglePublish(item)}
+        />
       ))}
     </div>
   </div>
 );
 
 // Content Manage Card Component
-const ContentManageCard = ({ content }: { content: NetworkContent }) => (
+const ContentManageCard = ({ 
+  content,
+  onEdit,
+  onView,
+  onDelete,
+  onTogglePublish,
+}: { 
+  content: NetworkContent;
+  onEdit: () => void;
+  onView: () => void;
+  onDelete: () => void;
+  onTogglePublish: () => void;
+}) => (
   <div className="group relative">
-    <div className="aspect-[2/3] rounded-lg overflow-hidden bg-muted">
+    <div 
+      className="aspect-[2/3] rounded-lg overflow-hidden bg-muted cursor-pointer"
+      onClick={onView}
+    >
       {content.cover_art_url ? (
         <img
           src={content.cover_art_url}
           alt={content.title}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover transition-transform group-hover:scale-105"
         />
       ) : (
         <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
@@ -293,15 +429,23 @@ const ContentManageCard = ({ content }: { content: NetworkContent }) => (
       {/* Badges */}
       <div className="absolute top-2 left-2 flex flex-col gap-1">
         {content.is_featured && (
-          <Badge className="text-xs">Featured</Badge>
+          <Badge className="text-xs bg-amber-500">Featured</Badge>
         )}
         {!content.is_published && (
           <Badge variant="secondary" className="text-xs">Draft</Badge>
         )}
       </div>
 
+      {/* Hover Overlay */}
+      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+        <Eye className="w-8 h-8 text-white" />
+      </div>
+
       {/* Actions */}
-      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div 
+        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={(e) => e.stopPropagation()}
+      >
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="icon" variant="secondary" className="h-8 w-8">
@@ -309,15 +453,15 @@ const ContentManageCard = ({ content }: { content: NetworkContent }) => (
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={onEdit}>
               <Edit className="w-4 h-4 mr-2" />
               Edit
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={onTogglePublish}>
               <Eye className="w-4 h-4 mr-2" />
               {content.is_published ? 'Unpublish' : 'Publish'}
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem className="text-destructive" onClick={onDelete}>
               <Trash2 className="w-4 h-4 mr-2" />
               Delete
             </DropdownMenuItem>
