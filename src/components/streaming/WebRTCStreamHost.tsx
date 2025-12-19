@@ -537,63 +537,65 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
   };
 
   return (
-    <div className="relative w-full h-full bg-black rounded-lg overflow-hidden min-h-[300px]">
+    <div className="relative w-full h-full bg-black rounded-lg overflow-hidden min-h-[300px] flex flex-col">
       {/* Video Element */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className={`w-full h-full object-cover ${cameraState !== 'ready' || !videoEnabled ? 'opacity-0' : 'opacity-100'}`}
-        style={{ transform: 'scaleX(-1)' }}
-      />
+      <div className="relative flex-1 min-h-0">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`w-full h-full object-cover ${cameraState !== 'ready' || !videoEnabled ? 'opacity-0' : 'opacity-100'}`}
+          style={{ transform: 'scaleX(-1)' }}
+        />
 
-      {renderCameraContent()}
+        {renderCameraContent()}
 
-      {/* Video disabled overlay */}
-      {cameraState === 'ready' && !videoEnabled && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted/20 to-background">
-          <div className="text-center">
-            <VideoOff className="h-16 w-16 text-muted-foreground mx-auto mb-2" />
-            <p className="text-muted-foreground">Camera Off</p>
+        {/* Video disabled overlay */}
+        {cameraState === 'ready' && !videoEnabled && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted/20 to-background">
+            <div className="text-center">
+              <VideoOff className="h-16 w-16 text-muted-foreground mx-auto mb-2" />
+              <p className="text-muted-foreground">Camera Off</p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Status badges */}
-      <div className="absolute top-4 left-4 flex gap-2 z-20">
-        {cameraState === 'ready' && !isStreaming && (
-          <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
-            Preview
+        {/* Status badges */}
+        <div className="absolute top-3 left-3 right-3 flex gap-2 z-20">
+          {cameraState === 'ready' && !isStreaming && (
+            <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-xs">
+              Preview
+            </Badge>
+          )}
+          {isStreaming && (
+            <Badge className="bg-red-500 animate-pulse text-xs">
+              <Radio className="h-3 w-3 mr-1" />
+              LIVE
+            </Badge>
+          )}
+          <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-xs">
+            <Users className="h-3 w-3 mr-1" />
+            {viewerCount}
           </Badge>
-        )}
-        {isStreaming && (
-          <Badge className="bg-red-500 animate-pulse">
-            <Radio className="h-3 w-3 mr-1" />
-            LIVE
-          </Badge>
-        )}
-        <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
-          <Users className="h-3 w-3 mr-1" />
-          {viewerCount}
-        </Badge>
+        </div>
       </div>
 
-      {/* Controls - Mobile-first stacked layout */}
+      {/* Controls - Mobile-first centered layout */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="absolute bottom-0 left-0 right-0 z-20 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+        className="flex-shrink-0 p-3 pb-4 bg-gradient-to-t from-black/80 to-transparent"
       >
-        <div className="bg-background/90 backdrop-blur-sm rounded-2xl p-3 max-w-md mx-auto">
-          {/* Row 1: Camera + Mic toggles */}
+        <div className="flex flex-col items-center gap-3 w-full max-w-xs mx-auto">
+          {/* Camera + Mic toggles */}
           {cameraState === 'ready' && (
-            <div className="flex items-center justify-center gap-3 mb-3">
+            <div className="flex items-center justify-center gap-4">
               <Button
                 variant={videoEnabled ? 'secondary' : 'destructive'}
                 size="icon"
                 onClick={toggleVideo}
-                className="h-11 w-11 min-h-[44px] min-w-[44px]"
+                className="h-12 w-12 rounded-full"
               >
                 {videoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
               </Button>
@@ -602,19 +604,19 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
                 variant={audioEnabled ? 'secondary' : 'destructive'}
                 size="icon"
                 onClick={toggleAudio}
-                className="h-11 w-11 min-h-[44px] min-w-[44px]"
+                className="h-12 w-12 rounded-full"
               >
                 {audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
               </Button>
             </div>
           )}
 
-          {/* Row 2: Start/End Stream button */}
+          {/* Start/End Stream button */}
           <div className="w-full">
             {!isStreaming ? (
               <Button 
                 onClick={startStream} 
-                className="w-full gap-2 bg-red-500 hover:bg-red-600 h-11 min-h-[44px] text-base font-medium"
+                className="w-full gap-2 bg-red-500 hover:bg-red-600 h-12 text-base font-semibold rounded-xl"
                 disabled={cameraState !== 'ready' || isGoingLive}
               >
                 {isGoingLive ? (
@@ -628,7 +630,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
               <Button
                 variant="destructive"
                 onClick={handleEndStream}
-                className="w-full h-11 min-h-[44px] text-base font-medium"
+                className="w-full h-12 text-base font-semibold rounded-xl"
               >
                 End Stream
               </Button>
