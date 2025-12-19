@@ -79,9 +79,12 @@ export interface CalendarItem {
 }
 
 export function useEvents(filters?: { city?: string; state?: string }) {
+  const { user } = useAuth();
+  
   return useQuery({
-    queryKey: ['events', filters],
+    queryKey: ['events', filters, user?.id],
     queryFn: async () => {
+      // Build the query - RLS handles visibility (public events OR user's own events)
       let query = supabase
         .from('events')
         .select('*')
@@ -95,7 +98,10 @@ export function useEvents(filters?: { city?: string; state?: string }) {
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching events:', error);
+        throw error;
+      }
       return data as CalendarEvent[];
     },
   });

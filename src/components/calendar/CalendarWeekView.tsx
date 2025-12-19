@@ -94,28 +94,34 @@ export function CalendarWeekView({
               
               {/* Events */}
               {getItemsForDay(day).map((item, index) => (
-                <motion.div
+                <motion.button
                   key={item.id}
+                  type="button"
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: index * 0.05 }}
-                  onClick={() => onItemClick(item)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onItemClick(item);
+                  }}
                   className={cn(
-                    "absolute left-0 right-0 mx-1 px-1 py-0.5 rounded text-[10px] cursor-pointer hover:opacity-80 transition-opacity overflow-hidden",
-                    item.type === 'event' ? "bg-primary/80 text-primary-foreground" : "",
+                    "absolute left-0 right-0 mx-1 px-1.5 py-1 rounded text-[10px] cursor-pointer overflow-hidden text-left z-10",
+                    "hover:ring-2 hover:ring-white/50 hover:scale-[1.02] active:scale-[0.98] transition-all",
+                    item.type === 'event' ? "bg-primary/90 text-primary-foreground" : "",
                     item.type === 'project' ? "bg-accent text-accent-foreground" : "",
                     item.type === 'personal' ? "bg-secondary text-secondary-foreground" : ""
                   )}
                   style={{
                     top: `${getItemPosition(item)}%`,
-                    minHeight: '24px',
+                    minHeight: '28px',
                   }}
                 >
                   <div className="font-medium truncate">{item.title}</div>
                   <div className="text-[8px] opacity-80">
                     {format(new Date(item.start_date), 'h:mm a')}
                   </div>
-                </motion.div>
+                </motion.button>
               ))}
             </div>
           ))}

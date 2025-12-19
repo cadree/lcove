@@ -128,13 +128,17 @@ export function CalendarAgendaView({
           {/* Items */}
           <div className="divide-y divide-border/20">
             {group.items.map((item, itemIndex) => (
-              <motion.div
+              <motion.button
                 key={item.id}
+                type="button"
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: groupIndex * 0.1 + itemIndex * 0.05 }}
-                onClick={() => onItemClick(item)}
-                className="p-4 hover:bg-accent/20 cursor-pointer transition-colors"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onItemClick(item);
+                }}
+                className="w-full text-left p-4 hover:bg-accent/20 cursor-pointer transition-colors active:bg-accent/30"
               >
                 <div className="flex items-start gap-4">
                   {/* Type indicator */}
@@ -195,7 +199,7 @@ export function CalendarAgendaView({
                     {item.type}
                   </span>
                 </div>
-              </motion.div>
+              </motion.button>
             ))}
           </div>
         </motion.div>
