@@ -1833,6 +1833,75 @@ export type Database = {
         }
         Relationships: []
       }
+      partner_applications: {
+        Row: {
+          address: string | null
+          business_name: string
+          category: string
+          city: string
+          contact_email: string
+          contact_phone: string | null
+          contribution: string
+          country: string
+          created_at: string
+          description: string
+          id: string
+          member_benefits: string
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          state: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          website_url: string | null
+        }
+        Insert: {
+          address?: string | null
+          business_name: string
+          category: string
+          city: string
+          contact_email: string
+          contact_phone?: string | null
+          contribution: string
+          country: string
+          created_at?: string
+          description: string
+          id?: string
+          member_benefits: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          state?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          website_url?: string | null
+        }
+        Update: {
+          address?: string | null
+          business_name?: string
+          category?: string
+          city?: string
+          contact_email?: string
+          contact_phone?: string | null
+          contribution?: string
+          country?: string
+          created_at?: string
+          description?: string
+          id?: string
+          member_benefits?: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          state?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          website_url?: string | null
+        }
+        Relationships: []
+      }
       partners: {
         Row: {
           address: string | null
