@@ -7,6 +7,8 @@ export interface Profile {
   user_id: string;
   display_name: string | null;
   city: string | null;
+  city_display: string | null;
+  city_key: string | null;
   bio: string | null;
   avatar_url: string | null;
   passion_seriousness: number | null;
@@ -54,6 +56,8 @@ export const useProfile = (userId?: string) => {
         user_id: rawData.user_id as string,
         display_name: rawData.display_name as string | null,
         city: rawData.city as string | null,
+        city_display: rawData.city_display as string | null,
+        city_key: rawData.city_key as string | null,
         bio: rawData.bio as string | null,
         avatar_url: rawData.avatar_url as string | null,
         passion_seriousness: rawData.passion_seriousness as number | null,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
@@ -8,6 +8,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Search, MapPin, Briefcase, Users, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { NewMembersSection } from "@/components/directory/NewMembersSection";
+import { computeCityKey, computeCityDisplay } from "@/lib/cityNormalization";
 
 interface Profile {
   id: string;
@@ -15,17 +16,23 @@ interface Profile {
   display_name: string | null;
   avatar_url: string | null;
   city: string | null;
+  city_display: string | null;
+  city_key: string | null;
   bio: string | null;
   created_at: string | null;
+}
+
+interface CityOption {
+  key: string;
+  display: string;
 }
 
 const Directory = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCity, setSelectedCity] = useState("All Cities");
+  const [selectedCityKey, setSelectedCityKey] = useState<string | null>(null); // null = All Cities
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cities, setCities] = useState<string[]>(["All Cities"]);
 
   useEffect(() => {
     fetchProfiles();
@@ -35,24 +42,61 @@ const Directory = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, user_id, display_name, avatar_url, city, bio, created_at')
+      .select('id, user_id, display_name, avatar_url, city, city_display, city_key, bio, created_at')
       .eq('onboarding_completed', true)
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      setProfiles(data);
-      const uniqueCities = [...new Set(data.map(p => p.city).filter(Boolean))] as string[];
-      setCities(["All Cities", ...uniqueCities]);
+      setProfiles(data as Profile[]);
     }
     setLoading(false);
   };
 
+  // Build deduplicated city list using city_key (or computed key for old data)
+  const cityOptions = useMemo<CityOption[]>(() => {
+    const cityMap = new Map<string, string>(); // key -> display
+    
+    profiles.forEach(profile => {
+      // Use city_key if available, otherwise compute from city
+      const key = profile.city_key || computeCityKey(profile.city);
+      if (!key) return;
+      
+      // Use city_display if available, otherwise compute from city
+      const display = profile.city_display || computeCityDisplay(profile.city);
+      if (!display) return;
+      
+      // Only store first display value seen for each key (they should all be the same after normalization)
+      if (!cityMap.has(key)) {
+        cityMap.set(key, display);
+      }
+    });
+
+    // Convert to array and sort alphabetically by display name
+    return Array.from(cityMap.entries())
+      .map(([key, display]) => ({ key, display }))
+      .sort((a, b) => a.display.localeCompare(b.display));
+  }, [profiles]);
+
+  // Get the city key for a profile (for filtering)
+  const getProfileCityKey = (profile: Profile): string => {
+    return profile.city_key || computeCityKey(profile.city);
+  };
+
+  // Get the display value for a profile's city
+  const getProfileCityDisplay = (profile: Profile): string => {
+    return profile.city_display || computeCityDisplay(profile.city) || profile.city || '';
+  };
+
   const filteredProfiles = profiles.filter((profile) => {
+    const cityDisplay = getProfileCityDisplay(profile);
     const matchesSearch = 
       profile.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       profile.bio?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      profile.city?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCity = selectedCity === "All Cities" || profile.city === selectedCity;
+      cityDisplay.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const profileCityKey = getProfileCityKey(profile);
+    const matchesCity = selectedCityKey === null || profileCityKey === selectedCityKey;
+    
     return matchesSearch && matchesCity;
   });
 
@@ -97,16 +141,28 @@ const Directory = () => {
           transition={{ delay: 0.2 }}
           className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide"
         >
-          {cities.map((city) => (
+          {/* All Cities button */}
+          <Button
+            key="all-cities"
+            variant={selectedCityKey === null ? "default" : "glass"}
+            size="sm"
+            onClick={() => setSelectedCityKey(null)}
+            className="whitespace-nowrap"
+          >
+            <MapPin className="w-3 h-3 mr-1" />
+            All Cities
+          </Button>
+          {/* Individual city buttons */}
+          {cityOptions.map((cityOption) => (
             <Button
-              key={city}
-              variant={selectedCity === city ? "default" : "glass"}
+              key={cityOption.key}
+              variant={selectedCityKey === cityOption.key ? "default" : "glass"}
               size="sm"
-              onClick={() => setSelectedCity(city)}
+              onClick={() => setSelectedCityKey(cityOption.key)}
               className="whitespace-nowrap"
             >
               <MapPin className="w-3 h-3 mr-1" />
-              {city}
+              {cityOption.display}
             </Button>
           ))}
         </motion.div>
@@ -147,10 +203,10 @@ const Directory = () => {
                     <h3 className="font-display text-lg font-medium text-foreground truncate group-hover:text-primary transition-colors">
                       {profile.display_name || 'Anonymous'}
                     </h3>
-                    {profile.city && (
+                    {getProfileCityDisplay(profile) && (
                       <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
                         <MapPin className="w-3 h-3" />
-                        {profile.city}
+                        {getProfileCityDisplay(profile)}
                       </p>
                     )}
                     {profile.bio && (
@@ -177,7 +233,7 @@ const Directory = () => {
               label: "Clear Search",
               onClick: () => {
                 setSearchQuery("");
-                setSelectedCity("All Cities");
+                setSelectedCityKey(null);
               }
             } : undefined}
           />
