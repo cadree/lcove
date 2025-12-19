@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -8,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { NetworkContent } from '@/hooks/useCinema';
+import { VideoPlayer } from './VideoPlayer';
 import { 
   Film, 
   Clock, 
@@ -34,11 +36,25 @@ export const ContentDetailManageDialog = ({
   content,
   onEdit,
 }: ContentDetailManageDialogProps) => {
+  const [showPlayer, setShowPlayer] = useState(false);
+
   if (!content) return null;
+
+  const hasVideo = content.video_url || content.external_video_url;
 
   const formatContentType = (type: string) => {
     return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
+
+  // Show video player fullscreen
+  if (showPlayer) {
+    return (
+      <VideoPlayer
+        content={content}
+        onClose={() => setShowPlayer(false)}
+      />
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -73,10 +89,18 @@ export const ContentDetailManageDialog = ({
                 </div>
                 <h1 className="text-2xl font-bold">{content.title}</h1>
               </div>
-              <Button onClick={onEdit}>
-                <Edit className="w-4 h-4 mr-2" />
-                Edit
-              </Button>
+              <div className="flex gap-2">
+                {hasVideo && (
+                  <Button onClick={() => setShowPlayer(true)}>
+                    <Play className="w-4 h-4 mr-2" />
+                    Watch
+                  </Button>
+                )}
+                <Button variant="outline" onClick={onEdit}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -144,32 +168,18 @@ export const ContentDetailManageDialog = ({
               </div>
             )}
 
-            {/* Video Links */}
-            <div className="space-y-2">
+            {/* Video Section */}
+            <div className="space-y-3">
               <h3 className="font-semibold">Video</h3>
-              {content.video_url && (
-                <a 
-                  href={content.video_url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-primary hover:underline"
+              {hasVideo ? (
+                <Button 
+                  onClick={() => setShowPlayer(true)}
+                  className="w-full"
                 >
-                  <Play className="w-4 h-4" />
-                  Uploaded Video
-                </a>
-              )}
-              {content.external_video_url && (
-                <a 
-                  href={content.external_video_url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-primary hover:underline"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  External Video Link
-                </a>
-              )}
-              {!content.video_url && !content.external_video_url && (
+                  <Play className="w-4 h-4 mr-2" />
+                  Watch Now
+                </Button>
+              ) : (
                 <p className="text-sm text-muted-foreground">No video linked yet</p>
               )}
             </div>
