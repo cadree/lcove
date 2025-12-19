@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Users, AlertTriangle, CheckCircle, XCircle, Clock, History, Search, ArrowLeft } from 'lucide-react';
+import { Shield, Users, AlertTriangle, CheckCircle, XCircle, Clock, History, Search, ArrowLeft, Ban, UserCheck } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/layout/PageLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   useIsAdmin,
   useAllUsers,
@@ -23,6 +24,7 @@ import {
   useApproveOnboarding,
   useDenyOnboarding,
   useLowReputationUsers,
+  useChangeAccessStatus,
 } from '@/hooks/useAdmin';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -32,7 +34,9 @@ const Admin: React.FC = () => {
   const [search, setSearch] = useState('');
   const [suspendDialog, setSuspendDialog] = useState<{ userId: string; name: string } | null>(null);
   const [denyDialog, setDenyDialog] = useState<{ userId: string; name: string } | null>(null);
+  const [statusDialog, setStatusDialog] = useState<{ userId: string; name: string; currentStatus: string } | null>(null);
   const [reason, setReason] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<'active' | 'denied' | 'banned'>('active');
 
   const { data: users, isLoading: loadingUsers } = useAllUsers();
   const { data: pendingOnboarding, isLoading: loadingPending } = usePendingOnboarding();
@@ -43,6 +47,7 @@ const Admin: React.FC = () => {
   const unsuspendUser = useUnsuspendUser();
   const approveOnboarding = useApproveOnboarding();
   const denyOnboarding = useDenyOnboarding();
+  const changeAccessStatus = useChangeAccessStatus();
 
   if (checkingAdmin) {
     return (
@@ -76,6 +81,31 @@ const Admin: React.FC = () => {
       denyOnboarding.mutate({ userId: denyDialog.userId, reason });
       setDenyDialog(null);
       setReason('');
+    }
+  };
+
+  const handleStatusChange = () => {
+    if (statusDialog && selectedStatus) {
+      changeAccessStatus.mutate({ 
+        userId: statusDialog.userId, 
+        status: selectedStatus,
+        reason: reason || undefined 
+      });
+      setStatusDialog(null);
+      setReason('');
+    }
+  };
+
+  const getStatusBadge = (status: string | null) => {
+    switch (status) {
+      case 'active':
+        return <Badge className="bg-green-500/20 text-green-500">Active</Badge>;
+      case 'denied':
+        return <Badge variant="destructive">Denied</Badge>;
+      case 'banned':
+        return <Badge className="bg-red-900 text-red-100">Banned</Badge>;
+      default:
+        return <Badge variant="secondary">Pending</Badge>;
     }
   };
 
@@ -159,11 +189,14 @@ const Admin: React.FC = () => {
                             <AvatarFallback>{user.display_name?.[0] || '?'}</AvatarFallback>
                           </Avatar>
                           <div>
-                            <div className="font-medium flex items-center gap-2">
+                            <div className="font-medium flex items-center gap-2 flex-wrap">
                               {user.display_name || 'Unnamed'}
-                              {user.is_suspended && <Badge variant="destructive">Suspended</Badge>}
-                              {user.onboarding_level && (
-                                <Badge variant="outline">L{user.onboarding_level}</Badge>
+                              {getStatusBadge((user as any).access_status)}
+                              {(user as any).mindset_level && (
+                                <Badge variant="outline">L{(user as any).mindset_level}</Badge>
+                              )}
+                              {(user as any).onboarding_score && (
+                                <Badge variant="secondary">Score: {(user as any).onboarding_score}</Badge>
                               )}
                             </div>
                             <div className="text-xs text-muted-foreground">
@@ -171,24 +204,18 @@ const Admin: React.FC = () => {
                             </div>
                           </div>
                         </div>
-                        <div>
-                          {user.is_suspended ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => unsuspendUser.mutate(user.user_id)}
-                            >
-                              Unsuspend
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => setSuspendDialog({ userId: user.user_id, name: user.display_name || 'User' })}
-                            >
-                              Suspend
-                            </Button>
-                          )}
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setStatusDialog({ 
+                              userId: user.user_id, 
+                              name: user.display_name || 'User',
+                              currentStatus: (user as any).access_status || 'pending'
+                            })}
+                          >
+                            Status
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -391,6 +418,44 @@ const Admin: React.FC = () => {
             <Button variant="outline" onClick={() => setDenyDialog(null)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDeny} disabled={!reason}>
               Deny Onboarding
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Status Change Dialog */}
+      <Dialog open={!!statusDialog} onOpenChange={() => setStatusDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Status for {statusDialog?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>New Status</Label>
+              <Select value={selectedStatus} onValueChange={(v) => setSelectedStatus(v as any)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active (Full Access)</SelectItem>
+                  <SelectItem value="denied">Denied (No Access)</SelectItem>
+                  <SelectItem value="banned">Banned (Permanently Blocked)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Reason (optional)</Label>
+              <Textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Reason for status change..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatusDialog(null)}>Cancel</Button>
+            <Button onClick={handleStatusChange}>
+              Update Status
             </Button>
           </DialogFooter>
         </DialogContent>
