@@ -17,6 +17,7 @@ const Feed = () => {
   const [activeCategory, setActiveCategory] = useState("All");
   const [shuffledPosts, setShuffledPosts] = useState<typeof posts>([]);
   const [isShuffled, setIsShuffled] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const { user } = useAuth();
   const { profile } = useProfile(user?.id);
   const { posts, isLoading } = usePosts();
@@ -64,7 +65,13 @@ const Feed = () => {
             >
               <Shuffle className="w-4 h-4" />
             </Button>
-            <Button variant="glass" size="icon" className="w-10 h-10">
+            <Button 
+              variant={showFilters ? "default" : "glass"} 
+              size="icon" 
+              className="w-10 h-10"
+              onClick={() => setShowFilters(!showFilters)}
+              title="Toggle filters"
+            >
               <Filter className="w-4 h-4" />
             </Button>
           </div>
@@ -85,30 +92,35 @@ const Feed = () => {
         )}
 
         {/* Category Filters */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="flex gap-2 overflow-x-auto pb-4 mb-5 scrollbar-hide"
-        >
-          {categories.map((category, index) => (
+        <AnimatePresence>
+          {showFilters && (
             <motion.div
-              key={category}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 + index * 0.05 }}
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="flex gap-2 overflow-x-auto pb-4 mb-5 scrollbar-hide"
             >
-              <Button
-                variant={activeCategory === category ? "default" : "glass"}
-                size="sm"
-                onClick={() => setActiveCategory(category)}
-                className="whitespace-nowrap"
-              >
-                {category}
-              </Button>
+              {categories.map((category, index) => (
+                <motion.div
+                  key={category}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.1 + index * 0.05 }}
+                >
+                  <Button
+                    variant={activeCategory === category ? "default" : "glass"}
+                    size="sm"
+                    onClick={() => setActiveCategory(category)}
+                    className="whitespace-nowrap"
+                  >
+                    {category}
+                  </Button>
+                </motion.div>
+              ))}
             </motion.div>
-          ))}
-        </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Feed */}
         {isLoading ? (
