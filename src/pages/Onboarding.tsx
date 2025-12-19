@@ -141,6 +141,9 @@ const Onboarding = () => {
       // Determine access status based on mindset level
       const accessStatus = level === 2 ? 'active' : 'denied';
 
+      // Set session flag to prevent AccessGate from redirecting back during navigation
+      sessionStorage.setItem('onboarding_just_completed', 'true');
+
       // Update profile with all onboarding data (including normalized city fields)
       await updateProfile({
         city: data.city,

@@ -36,10 +36,18 @@ const AccessGate = ({ children }: AccessGateProps) => {
 
     // If profile exists, check access
     if (profile) {
-      // If onboarding not completed, force onboarding
-      if (!profile.onboarding_completed) {
+      // Check for session flag indicating user just completed onboarding
+      const justCompletedOnboarding = sessionStorage.getItem('onboarding_just_completed');
+      
+      // If onboarding not completed and no session flag, force onboarding
+      if (!profile.onboarding_completed && !justCompletedOnboarding) {
         navigate('/onboarding');
         return;
+      }
+      
+      // Clear the session flag only after profile shows onboarding is complete
+      if (profile.onboarding_completed && justCompletedOnboarding) {
+        sessionStorage.removeItem('onboarding_just_completed');
       }
 
       // Check access_status
