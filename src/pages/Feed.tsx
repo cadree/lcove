@@ -15,13 +15,23 @@ const categories = ["All", "Photo", "Video", "Text"];
 
 const Feed = () => {
   const [activeCategory, setActiveCategory] = useState("All");
+  const [shuffledPosts, setShuffledPosts] = useState<typeof posts>([]);
+  const [isShuffled, setIsShuffled] = useState(false);
   const { user } = useAuth();
   const { profile } = useProfile(user?.id);
   const { posts, isLoading } = usePosts();
 
+  const handleShuffle = () => {
+    const shuffled = [...posts].sort(() => Math.random() - 0.5);
+    setShuffledPosts(shuffled);
+    setIsShuffled(true);
+  };
+
+  const postsToDisplay = isShuffled ? shuffledPosts : posts;
+
   const filteredPosts = activeCategory === "All" 
-    ? posts 
-    : posts.filter(post => {
+    ? postsToDisplay 
+    : postsToDisplay.filter(post => {
         if (activeCategory === "Photo") return post.media_type === 'photo';
         if (activeCategory === "Video") return post.media_type === 'video';
         if (activeCategory === "Text") return post.media_type === 'text' || (!post.media_url && post.content);
@@ -45,7 +55,13 @@ const Feed = () => {
             Feed
           </h1>
           <div className="flex gap-2">
-            <Button variant="glass" size="icon" className="w-10 h-10">
+            <Button 
+              variant={isShuffled ? "default" : "glass"} 
+              size="icon" 
+              className="w-10 h-10"
+              onClick={handleShuffle}
+              title="Shuffle feed"
+            >
               <Shuffle className="w-4 h-4" />
             </Button>
             <Button variant="glass" size="icon" className="w-10 h-10">
