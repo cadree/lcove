@@ -126,7 +126,7 @@ const OnboardingSkills = ({ data, updateData, onNext, onBack }: Props) => {
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background to-transparent">
-        <div className="max-w-2xl mx-auto flex gap-4">
+        <div className="max-w-2xl mx-auto flex gap-3">
           <Button
             onClick={onBack}
             variant="outline"
@@ -137,7 +137,13 @@ const OnboardingSkills = ({ data, updateData, onNext, onBack }: Props) => {
           </Button>
           <Button
             onClick={onNext}
-            disabled={data.skills.length === 0}
+            variant="ghost"
+            className="h-12 px-4 text-muted-foreground hover:text-foreground"
+          >
+            Skip for now
+          </Button>
+          <Button
+            onClick={onNext}
             className="flex-1 h-12 bg-primary hover:bg-primary/90 glow-pink"
           >
             Continue
