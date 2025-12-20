@@ -24,9 +24,11 @@ import {
   Eye,
   Users,
   Ban,
+  Shield,
 } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsAdmin } from "@/hooks/useAdmin";
 import { useNotificationPreferences } from "@/hooks/useNotifications";
 import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { toast } from "sonner";
@@ -35,6 +37,7 @@ import { useQuery } from "@tanstack/react-query";
 
 const Settings = () => {
   const { user, updatePassword, signOut } = useAuth();
+  const isAdmin = useIsAdmin();
   const navigate = useNavigate();
   const { profile, loading, updateProfile } = useProfile();
   const { preferences, isLoading: prefsLoading, updatePreferences } = useNotificationPreferences();
@@ -572,6 +575,29 @@ const Settings = () => {
             </div>
           )}
         </motion.section>
+
+        {/* Admin Section - Only visible to admins */}
+        {isAdmin && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="glass-strong rounded-2xl p-6 mb-6"
+          >
+            <Link to="/admin" className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Shield className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h2 className="font-display text-lg font-medium text-foreground">Admin Dashboard</h2>
+                  <p className="text-sm text-muted-foreground">Manage users, credits, and announcements</p>
+                </div>
+              </div>
+              <ArrowLeft className="w-5 h-5 text-muted-foreground rotate-180" />
+            </Link>
+          </motion.section>
+        )}
 
         {/* Log Out Section */}
         <motion.section
