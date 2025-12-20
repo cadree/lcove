@@ -37,7 +37,7 @@ import { useQuery } from "@tanstack/react-query";
 
 const Settings = () => {
   const { user, updatePassword, signOut } = useAuth();
-  const isAdmin = useIsAdmin();
+  const { isAdmin } = useIsAdmin();
   const navigate = useNavigate();
   const { profile, loading, updateProfile } = useProfile();
   const { preferences, isLoading: prefsLoading, updatePreferences } = useNotificationPreferences();
