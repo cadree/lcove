@@ -44,6 +44,39 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_announcements: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          recipient_count: number
+          sent_at: string
+          sent_by: string
+          target_audience: Json
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          recipient_count?: number
+          sent_at?: string
+          sent_by: string
+          target_audience?: Json
+          title: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          recipient_count?: number
+          sent_at?: string
+          sent_by?: string
+          target_audience?: Json
+          title?: string
+        }
+        Relationships: []
+      }
       ai_project_matches: {
         Row: {
           created_at: string
@@ -3946,6 +3979,26 @@ export type Database = {
       calculate_reputation_score: {
         Args: { p_user_id: string }
         Returns: number
+      }
+      get_admin_user_data: {
+        Args: never
+        Returns: {
+          access_status: string
+          city: string
+          created_at: string
+          display_name: string
+          email: string
+          mindset_level: number
+          phone: string
+          user_id: string
+        }[]
+      }
+      get_user_emails_for_admin: {
+        Args: never
+        Returns: {
+          email: string
+          user_id: string
+        }[]
       }
       has_role: {
         Args: {
