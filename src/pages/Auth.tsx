@@ -299,13 +299,31 @@ const Auth = () => {
                 <>
                   <div className="space-y-2">
                     <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="email"
+                        placeholder="Email *"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="pl-11 h-12 bg-input border-border focus:border-primary"
+                        required
+                      />
+                    </div>
+                    {errors.email && (
+                      <p className="text-sm text-destructive">{errors.email}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="relative">
                       <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
                         type="text"
-                        placeholder="Your name"
+                        placeholder="Your name *"
                         value={displayName}
                         onChange={(e) => setDisplayName(e.target.value)}
                         className="pl-11 h-12 bg-input border-border focus:border-primary"
+                        required
                       />
                     </div>
                     <p className="text-xs text-muted-foreground pl-1">
@@ -334,7 +352,7 @@ const Auth = () => {
                 </>
               )}
 
-              {mode !== 'reset' && (
+              {mode !== 'reset' && mode !== 'signup' && (
                 <div className="space-y-2">
                   <div className="relative">
                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -344,6 +362,7 @@ const Auth = () => {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="pl-11 h-12 bg-input border-border focus:border-primary"
+                      required
                     />
                   </div>
                   {errors.email && (
