@@ -13,7 +13,7 @@ import Projects from "./pages/Projects";
 import CalendarPage from "./pages/CalendarPage";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
-import Onboarding from "./pages/Onboarding";
+
 import Locked from "./pages/Locked";
 import Messages from "./pages/Messages";
 import Notifications from "./pages/Notifications";
@@ -54,7 +54,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
-              <Route path="/onboarding" element={<Onboarding />} />
+              
               <Route path="/locked" element={<Locked />} />
               <Route path="/feed" element={<Feed />} />
               <Route path="/directory" element={<Directory />} />
