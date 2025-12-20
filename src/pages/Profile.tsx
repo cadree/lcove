@@ -55,6 +55,7 @@ import { useProfilePosts } from "@/hooks/useProfilePosts";
 import { useProfileBlogs, BlogPost } from "@/hooks/useProfileBlogs";
 import { useCreatorRoles } from "@/hooks/useCreatorModules";
 import { useUserSkills, useUserPassions, useUserCreativeRoles } from "@/hooks/useUserDetails";
+import { useUserIsAdmin } from "@/hooks/useUserIsAdmin";
 import { THEME_PRESETS, ThemePreset } from "@/lib/profileThemes";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -79,6 +80,7 @@ const Profile = () => {
   const { data: userSkills = [] } = useUserSkills(targetUserId);
   const { data: userPassions = [] } = useUserPassions(targetUserId);
   const { data: userCreativeRoles = [] } = useUserCreativeRoles(targetUserId);
+  const { data: isProfileAdmin = false } = useUserIsAdmin(targetUserId);
   const { createDirectConversation } = useConversations();
   const [showMusicDialog, setShowMusicDialog] = useState(false);
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
@@ -361,9 +363,17 @@ const Profile = () => {
 
             {/* Info */}
             <div className="flex-1 pt-2">
-              <h1 className="font-display text-2xl sm:text-3xl font-medium text-foreground mb-1">
-                {displayName}
-              </h1>
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <h1 className="font-display text-2xl sm:text-3xl font-medium text-foreground">
+                  {displayName}
+                </h1>
+                {isProfileAdmin && (
+                  <Badge className="bg-primary/20 text-primary border-primary/30 gap-1">
+                    <Shield className="w-3 h-3" />
+                    Admin
+                  </Badge>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground/70 flex items-center gap-1">
                 <MapPin className="w-4 h-4" />
                 {city}
