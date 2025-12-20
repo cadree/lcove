@@ -414,20 +414,35 @@ const Admin: React.FC = () => {
                                   )}
                                 </div>
 
-                                {/* Skills & Passions preview */}
-                                <div className="flex flex-wrap gap-1">
-                                  {user.skills.slice(0, 2).map((skill, i) => (
-                                    <Badge key={i} variant="secondary" className="text-xs">{skill}</Badge>
-                                  ))}
-                                  {user.passions.slice(0, 2).map((passion, i) => (
-                                    <Badge key={i} variant="outline" className="text-xs">{passion}</Badge>
-                                  ))}
-                                  {(user.skills.length + user.passions.length) > 4 && (
-                                    <Badge variant="outline" className="text-xs">
-                                      +{user.skills.length + user.passions.length - 4}
-                                    </Badge>
-                                  )}
-                                </div>
+                                {/* Creative Roles */}
+                                {user.creative_roles.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mb-1">
+                                    <Briefcase className="h-3 w-3 text-muted-foreground mt-0.5" />
+                                    {user.creative_roles.map((role, i) => (
+                                      <Badge key={i} className="text-xs bg-primary/20 text-primary">{role}</Badge>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Skills */}
+                                {user.skills.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mb-1">
+                                    <Star className="h-3 w-3 text-muted-foreground mt-0.5" />
+                                    {user.skills.map((skill, i) => (
+                                      <Badge key={i} variant="secondary" className="text-xs">{skill}</Badge>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Passions */}
+                                {user.passions.length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    <Heart className="h-3 w-3 text-muted-foreground mt-0.5" />
+                                    {user.passions.map((passion, i) => (
+                                      <Badge key={i} variant="outline" className="text-xs">{passion}</Badge>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </div>
 
