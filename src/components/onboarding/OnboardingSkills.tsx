@@ -61,7 +61,7 @@ const OnboardingSkills = ({ data, updateData, onNext, onBack }: Props) => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <p className="text-primary text-sm font-medium mb-2">Step 3 of 5</p>
+          <p className="text-primary text-sm font-medium mb-2">Step 3 of 4</p>
           <h1 className="font-display text-4xl md:text-5xl text-foreground mb-2">
             Your Skills
           </h1>

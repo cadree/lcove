@@ -110,7 +110,7 @@ const OnboardingPassions = ({ data, updateData, onNext, onBack }: Props) => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-6"
         >
-          <p className="text-primary text-sm font-medium mb-2">Step 1 of 5</p>
+          <p className="text-primary text-sm font-medium mb-2">Step 1 of 4</p>
           <h1 className="font-display text-3xl md:text-5xl text-foreground mb-3">
             What are you passionate about?
           </h1>

@@ -14,10 +14,7 @@ import OnboardingQuestionnaire from '@/components/onboarding/OnboardingQuestionn
 import OnboardingConnections from '@/components/onboarding/OnboardingConnections';
 import OnboardingCompletion from '@/components/onboarding/OnboardingCompletion';
 import OnboardingDenied from '@/components/onboarding/OnboardingDenied';
-import OnboardingProfile from '@/components/onboarding/OnboardingProfile';
 export interface OnboardingData {
-  displayName: string;
-  phone: string;
   passions: string[];
   passionSeriousness: number;
   city: string;
@@ -46,8 +43,6 @@ const Onboarding = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [initialized, setInitialized] = useState(false);
   const [data, setData] = useState<OnboardingData>({
-    displayName: '',
-    phone: '',
     passions: [],
     passionSeriousness: 5,
     city: '',
@@ -160,9 +155,8 @@ const Onboarding = () => {
       // Set session flag to prevent AccessGate from redirecting back during navigation
       sessionStorage.setItem('onboarding_just_completed', 'true');
 
-      // Update profile with all onboarding data (including normalized city fields and display name)
+      // Update profile with all onboarding data (including normalized city fields)
       await updateProfile({
-        display_name: data.displayName,
         city: data.city,
         city_display: data.cityDisplay,
         city_key: data.cityKey,
@@ -174,16 +168,10 @@ const Onboarding = () => {
         onboarding_score: score
       });
 
-      // Save phone number separately (not in Profile type yet)
-      if (data.phone) {
-        await supabase.from('profiles').update({
-          phone: data.phone
-        }).eq('user_id', user.id);
-      }
       if (level === 1) {
-        setCurrentStep(9); // Show denied screen
+        setCurrentStep(8); // Show denied screen
       } else {
-        setCurrentStep(7); // Show connections screen (optional step)
+        setCurrentStep(6); // Show connections screen (optional step)
       }
     } catch (error) {
       console.error('Error saving onboarding data:', error);
@@ -213,7 +201,17 @@ const Onboarding = () => {
       }} className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full" />
       </div>;
   }
-  const steps = [<OnboardingIntro key="intro" onNext={nextStep} />, <OnboardingProfile key="profile" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />, <OnboardingPassions key="passions" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />, <OnboardingCity key="city" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />, <OnboardingSkills key="skills" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />, <OnboardingRoles key="roles" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />, <OnboardingQuestionnaire key="questionnaire" data={data} updateData={updateData} onComplete={handleComplete} onBack={prevStep} />, <OnboardingConnections key="connections" onComplete={() => setCurrentStep(8)} onBack={prevStep} />, <OnboardingCompletion key="completion" accessLevel={accessLevel} />, <OnboardingDenied key="denied" />];
+  const steps = [
+    <OnboardingIntro key="intro" onNext={nextStep} />,
+    <OnboardingPassions key="passions" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
+    <OnboardingCity key="city" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
+    <OnboardingSkills key="skills" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
+    <OnboardingRoles key="roles" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
+    <OnboardingQuestionnaire key="questionnaire" data={data} updateData={updateData} onComplete={handleComplete} onBack={prevStep} />,
+    <OnboardingConnections key="connections" onComplete={() => setCurrentStep(7)} onBack={prevStep} />,
+    <OnboardingCompletion key="completion" accessLevel={accessLevel} />,
+    <OnboardingDenied key="denied" />
+  ];
   return (
     <div className="min-h-screen bg-background">
       <AnimatePresence mode="wait">
