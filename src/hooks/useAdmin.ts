@@ -29,15 +29,22 @@ export function useUserRoles() {
   return useQuery({
     queryKey: ['user-roles', user?.id],
     queryFn: async () => {
+      if (!user?.id) return [];
+      
       const { data, error } = await supabase
         .from('user_roles')
         .select('*')
-        .eq('user_id', user?.id);
+        .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching user roles:', error);
+        return [];
+      }
       return data as UserRole[];
     },
-    enabled: !!user,
+    enabled: !!user?.id,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 }
 
