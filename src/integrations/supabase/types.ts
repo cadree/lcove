@@ -2437,6 +2437,7 @@ export type Database = {
       profiles: {
         Row: {
           access_level: Database["public"]["Enums"]["access_level"] | null
+          access_status: string | null
           avatar_url: string | null
           bio: string | null
           city: string | null
@@ -2446,6 +2447,7 @@ export type Database = {
           display_name: string | null
           id: string
           is_suspended: boolean | null
+          mindset_level: number | null
           onboarding_completed: boolean | null
           onboarding_level: number | null
           onboarding_score: number | null
@@ -2458,6 +2460,7 @@ export type Database = {
         }
         Insert: {
           access_level?: Database["public"]["Enums"]["access_level"] | null
+          access_status?: string | null
           avatar_url?: string | null
           bio?: string | null
           city?: string | null
@@ -2467,6 +2470,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           is_suspended?: boolean | null
+          mindset_level?: number | null
           onboarding_completed?: boolean | null
           onboarding_level?: number | null
           onboarding_score?: number | null
@@ -2479,6 +2483,7 @@ export type Database = {
         }
         Update: {
           access_level?: Database["public"]["Enums"]["access_level"] | null
+          access_status?: string | null
           avatar_url?: string | null
           bio?: string | null
           city?: string | null
@@ -2488,6 +2493,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           is_suspended?: boolean | null
+          mindset_level?: number | null
           onboarding_completed?: boolean | null
           onboarding_level?: number | null
           onboarding_score?: number | null
