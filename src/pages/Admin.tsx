@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
-import { Shield, Users, AlertTriangle, CheckCircle, XCircle, Clock, History, Search, ArrowLeft, Ban, UserCheck, ClipboardList, Trash2, Eye, Phone, Mail, MapPin, Briefcase, Heart, Star } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { 
+  Shield, Users, AlertTriangle, CheckCircle, XCircle, Clock, History, Search, 
+  ArrowLeft, Ban, UserCheck, ClipboardList, Trash2, Eye, Phone, Mail, MapPin, 
+  Briefcase, Heart, Star, Send, Coins, Download, MessageSquare
+} from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/layout/PageLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -26,35 +30,87 @@ import {
   useDenyOnboarding,
   useLowReputationUsers,
   useChangeAccessStatus,
-  useAllUsersWithDetails,
   useDeleteUser,
 } from '@/hooks/useAdmin';
+import {
+  useAdminUserData,
+  useAdminAnnouncements,
+  useSendMassNotification,
+  useAdjustUserCredits,
+  useBulkAwardCredits,
+  exportUsersToCSV,
+  AdminUserData,
+} from '@/hooks/useAdminExtended';
 import { formatDistanceToNow } from 'date-fns';
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin, isLoading: checkingAdmin } = useIsAdmin();
+  
+  // State
   const [search, setSearch] = useState('');
+  const [mindsetFilter, setMindsetFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  
+  // Dialog states
   const [suspendDialog, setSuspendDialog] = useState<{ userId: string; name: string } | null>(null);
   const [denyDialog, setDenyDialog] = useState<{ userId: string; name: string } | null>(null);
   const [statusDialog, setStatusDialog] = useState<{ userId: string; name: string; currentStatus: string } | null>(null);
   const [removeDialog, setRemoveDialog] = useState<{ userId: string; name: string } | null>(null);
-  const [detailDialog, setDetailDialog] = useState<any | null>(null);
+  const [detailDialog, setDetailDialog] = useState<AdminUserData | null>(null);
+  const [creditDialog, setCreditDialog] = useState<{ userId: string; name: string; balance: number } | null>(null);
+  const [bulkCreditDialog, setBulkCreditDialog] = useState(false);
+  const [massMessageDialog, setMassMessageDialog] = useState(false);
+  
+  // Form states
   const [reason, setReason] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<'active' | 'denied' | 'banned'>('active');
+  const [creditAmount, setCreditAmount] = useState('');
+  const [creditReason, setCreditReason] = useState('');
+  const [messageTitle, setMessageTitle] = useState('');
+  const [messageBody, setMessageBody] = useState('');
+  const [messageTarget, setMessageTarget] = useState<'all' | 'mindset_level' | 'city'>('all');
+  const [messageTargetValue, setMessageTargetValue] = useState('');
 
+  // Queries
   const { data: users, isLoading: loadingUsers } = useAllUsers();
-  const { data: usersWithDetails, isLoading: loadingUsersDetailed } = useAllUsersWithDetails();
+  const { data: adminUserData, isLoading: loadingAdminData } = useAdminUserData();
   const { data: pendingOnboarding, isLoading: loadingPending } = usePendingOnboarding();
   const { data: adminActions, isLoading: loadingActions } = useAdminActions();
+  const { data: announcements, isLoading: loadingAnnouncements } = useAdminAnnouncements();
   const { data: lowRepUsers } = useLowReputationUsers();
 
+  // Mutations
   const suspendUser = useSuspendUser();
   const unsuspendUser = useUnsuspendUser();
   const approveOnboarding = useApproveOnboarding();
   const denyOnboarding = useDenyOnboarding();
   const changeAccessStatus = useChangeAccessStatus();
   const deleteUser = useDeleteUser();
+  const adjustCredits = useAdjustUserCredits();
+  const bulkAwardCredits = useBulkAwardCredits();
+  const sendMassNotification = useSendMassNotification();
+
+  // Filtered users
+  const filteredUsers = useMemo(() => {
+    if (!adminUserData) return [];
+    
+    return adminUserData.filter(u => {
+      const matchesSearch = 
+        u.display_name?.toLowerCase().includes(search.toLowerCase()) ||
+        u.email?.toLowerCase().includes(search.toLowerCase()) ||
+        u.city?.toLowerCase().includes(search.toLowerCase()) ||
+        u.phone?.toLowerCase().includes(search.toLowerCase());
+      
+      const matchesMindset = mindsetFilter === 'all' || 
+        u.mindset_level?.toString() === mindsetFilter;
+      
+      const matchesStatus = statusFilter === 'all' || 
+        (u.access_status || 'pending') === statusFilter;
+      
+      return matchesSearch && matchesMindset && matchesStatus;
+    });
+  }, [adminUserData, search, mindsetFilter, statusFilter]);
 
   if (checkingAdmin) {
     return (
@@ -70,13 +126,7 @@ const Admin: React.FC = () => {
     return <Navigate to="/" replace />;
   }
 
-  const filteredUsers = usersWithDetails?.filter(u =>
-    u.display_name?.toLowerCase().includes(search.toLowerCase()) ||
-    u.user_id?.toLowerCase().includes(search.toLowerCase()) ||
-    u.city?.toLowerCase().includes(search.toLowerCase()) ||
-    u.phone?.toLowerCase().includes(search.toLowerCase())
-  );
-
+  // Handlers
   const handleSuspend = () => {
     if (suspendDialog && reason) {
       suspendUser.mutate({ userId: suspendDialog.userId, reason });
@@ -113,6 +163,57 @@ const Admin: React.FC = () => {
     }
   };
 
+  const handleAdjustCredits = () => {
+    if (creditDialog && creditAmount && creditReason) {
+      adjustCredits.mutate({
+        userId: creditDialog.userId,
+        amount: parseInt(creditAmount),
+        reason: creditReason,
+      });
+      setCreditDialog(null);
+      setCreditAmount('');
+      setCreditReason('');
+    }
+  };
+
+  const handleBulkAward = () => {
+    if (creditAmount && creditReason) {
+      const targetAudience = messageTarget === 'all' 
+        ? { type: 'all' as const }
+        : { type: messageTarget, value: messageTarget === 'mindset_level' ? parseInt(messageTargetValue) : messageTargetValue };
+      
+      bulkAwardCredits.mutate({
+        amount: parseInt(creditAmount),
+        reason: creditReason,
+        targetAudience,
+      });
+      setBulkCreditDialog(false);
+      setCreditAmount('');
+      setCreditReason('');
+      setMessageTarget('all');
+      setMessageTargetValue('');
+    }
+  };
+
+  const handleSendMessage = () => {
+    if (messageTitle && messageBody) {
+      const targetAudience = messageTarget === 'all' 
+        ? { type: 'all' as const }
+        : { type: messageTarget, value: messageTarget === 'mindset_level' ? parseInt(messageTargetValue) : messageTargetValue };
+      
+      sendMassNotification.mutate({
+        title: messageTitle,
+        message: messageBody,
+        targetAudience,
+      });
+      setMassMessageDialog(false);
+      setMessageTitle('');
+      setMessageBody('');
+      setMessageTarget('all');
+      setMessageTargetValue('');
+    }
+  };
+
   const getStatusBadge = (status: string | null) => {
     switch (status) {
       case 'active':
@@ -128,12 +229,12 @@ const Admin: React.FC = () => {
 
   const getMindsetBadge = (level: number | null) => {
     if (!level) return null;
-    const colors = {
+    const colors: Record<number, string> = {
       1: 'bg-gray-500/20 text-gray-500',
       2: 'bg-blue-500/20 text-blue-500',
       3: 'bg-purple-500/20 text-purple-500',
     };
-    return <Badge className={colors[level as keyof typeof colors] || ''}>Level {level}</Badge>;
+    return <Badge className={colors[level] || ''}>Level {level}</Badge>;
   };
 
   return (
@@ -148,25 +249,27 @@ const Admin: React.FC = () => {
             <Shield className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>
           </div>
-          <div className="flex items-center justify-between ml-12">
-            <p className="text-muted-foreground">Manage users, review onboarding, and maintain community integrity</p>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="gap-2"
-              onClick={() => navigate('/admin/onboarding')}
-            >
-              <ClipboardList className="h-4 w-4" />
-              Onboarding Review
-            </Button>
+          <div className="flex items-center justify-between ml-12 flex-wrap gap-2">
+            <p className="text-muted-foreground">Manage users, credits, and communications</p>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2"
+                onClick={() => navigate('/admin/onboarding')}
+              >
+                <ClipboardList className="h-4 w-4" />
+                Onboarding
+              </Button>
+            </div>
           </div>
         </div>
 
         {/* Stats */}
-        <div className="px-4 py-4 grid grid-cols-2 gap-3">
+        <div className="px-4 py-4 grid grid-cols-2 md:grid-cols-4 gap-3">
           <Card>
             <CardContent className="p-4">
-              <div className="text-2xl font-bold">{users?.length || 0}</div>
+              <div className="text-2xl font-bold">{adminUserData?.length || 0}</div>
               <div className="text-sm text-muted-foreground">Total Users</div>
             </CardContent>
           </Card>
@@ -178,8 +281,8 @@ const Admin: React.FC = () => {
           </Card>
           <Card>
             <CardContent className="p-4">
-              <div className="text-2xl font-bold text-red-500">{users?.filter(u => u.is_suspended).length || 0}</div>
-              <div className="text-sm text-muted-foreground">Suspended</div>
+              <div className="text-2xl font-bold text-primary">{announcements?.length || 0}</div>
+              <div className="text-sm text-muted-foreground">Announcements</div>
             </CardContent>
           </Card>
           <Card>
@@ -190,174 +293,188 @@ const Admin: React.FC = () => {
           </Card>
         </div>
 
+        {/* Quick Actions */}
+        <div className="px-4 pb-4 flex gap-2 flex-wrap">
+          <Button onClick={() => setMassMessageDialog(true)} className="gap-2">
+            <Send className="h-4 w-4" />
+            Mass Message
+          </Button>
+          <Button variant="outline" onClick={() => setBulkCreditDialog(true)} className="gap-2">
+            <Coins className="h-4 w-4" />
+            Bulk Award Credits
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => adminUserData && exportUsersToCSV(adminUserData)} 
+            className="gap-2"
+            disabled={!adminUserData}
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
+
         {/* Tabs */}
         <Tabs defaultValue="users" className="px-4">
-          <TabsList className="w-full grid grid-cols-4">
+          <TabsList className="w-full grid grid-cols-5">
             <TabsTrigger value="users"><Users className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="pending"><Clock className="h-4 w-4" /></TabsTrigger>
+            <TabsTrigger value="messages"><MessageSquare className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="flagged"><AlertTriangle className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="history"><History className="h-4 w-4" /></TabsTrigger>
           </TabsList>
 
-          {/* All Users */}
+          {/* All Users Tab */}
           <TabsContent value="users" className="mt-4">
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, location, or phone..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            
-            <ScrollArea className="h-[500px]">
-              {loadingUsersDetailed ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map(i => <Skeleton key={i} className="h-16" />)}
+            <div className="space-y-4">
+              {/* Filters */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name, email, city, or phone..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-9"
+                  />
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {filteredUsers?.map(user => (
-                    <Card key={user.id} className="overflow-hidden">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex items-start gap-3 flex-1 min-w-0">
-                            <Avatar className="h-12 w-12">
-                              <AvatarImage src={user.avatar_url || undefined} />
-                              <AvatarFallback>{user.display_name?.[0] || '?'}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <span className="font-semibold">{user.display_name || 'Unnamed'}</span>
-                                {getStatusBadge((user as any).access_status)}
-                                {getMindsetBadge((user as any).mindset_level)}
+                <Select value={mindsetFilter} onValueChange={setMindsetFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Mindset" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Levels</SelectItem>
+                    <SelectItem value="1">Level 1</SelectItem>
+                    <SelectItem value="2">Level 2</SelectItem>
+                    <SelectItem value="3">Level 3</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="denied">Denied</SelectItem>
+                    <SelectItem value="banned">Banned</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="text-sm text-muted-foreground">
+                Showing {filteredUsers.length} of {adminUserData?.length || 0} users
+              </div>
+              
+              <ScrollArea className="h-[500px]">
+                {loadingAdminData ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-16" />)}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredUsers.map(user => (
+                      <Card key={user.user_id} className="overflow-hidden">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                              <Avatar className="h-12 w-12">
+                                <AvatarFallback>{user.display_name?.[0] || '?'}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                  <span className="font-semibold">{user.display_name || 'Unnamed'}</span>
+                                  {getStatusBadge(user.access_status)}
+                                  {getMindsetBadge(user.mindset_level)}
+                                  <Badge variant="outline" className="gap-1">
+                                    <Coins className="h-3 w-3" />
+                                    {user.credit_balance}
+                                  </Badge>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-muted-foreground mb-2">
+                                  {user.email && (
+                                    <div className="flex items-center gap-1">
+                                      <Mail className="h-3 w-3" />
+                                      <span className="truncate">{user.email}</span>
+                                    </div>
+                                  )}
+                                  {user.phone && (
+                                    <div className="flex items-center gap-1">
+                                      <Phone className="h-3 w-3" />
+                                      {user.phone}
+                                    </div>
+                                  )}
+                                  {user.city && (
+                                    <div className="flex items-center gap-1">
+                                      <MapPin className="h-3 w-3" />
+                                      {user.city}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Skills & Passions preview */}
+                                <div className="flex flex-wrap gap-1">
+                                  {user.skills.slice(0, 2).map((skill, i) => (
+                                    <Badge key={i} variant="secondary" className="text-xs">{skill}</Badge>
+                                  ))}
+                                  {user.passions.slice(0, 2).map((passion, i) => (
+                                    <Badge key={i} variant="outline" className="text-xs">{passion}</Badge>
+                                  ))}
+                                  {(user.skills.length + user.passions.length) > 4 && (
+                                    <Badge variant="outline" className="text-xs">
+                                      +{user.skills.length + user.passions.length - 4}
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
-                              
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-muted-foreground mb-2">
-                                {user.city && (
-                                  <div className="flex items-center gap-1">
-                                    <MapPin className="h-3 w-3" />
-                                    {user.city}
-                                  </div>
-                                )}
-                                {user.phone && (
-                                  <div className="flex items-center gap-1">
-                                    <Phone className="h-3 w-3" />
-                                    {user.phone}
-                                  </div>
-                                )}
-                              </div>
+                            </div>
 
-                              {/* Creative Roles */}
-                              {user.creative_roles && user.creative_roles.length > 0 && (
-                                <div className="mb-2">
-                                  <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
-                                    <Briefcase className="h-3 w-3" />
-                                    <span>Roles:</span>
-                                  </div>
-                                  <div className="flex flex-wrap gap-1">
-                                    {user.creative_roles.slice(0, 3).map((role: string, i: number) => (
-                                      <Badge key={i} variant="outline" className="text-xs">
-                                        {role}
-                                      </Badge>
-                                    ))}
-                                    {user.creative_roles.length > 3 && (
-                                      <Badge variant="outline" className="text-xs">
-                                        +{user.creative_roles.length - 3}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Skills */}
-                              {user.skills && user.skills.length > 0 && (
-                                <div className="mb-2">
-                                  <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
-                                    <Star className="h-3 w-3" />
-                                    <span>Skills:</span>
-                                  </div>
-                                  <div className="flex flex-wrap gap-1">
-                                    {user.skills.slice(0, 3).map((skill: string, i: number) => (
-                                      <Badge key={i} variant="secondary" className="text-xs">
-                                        {skill}
-                                      </Badge>
-                                    ))}
-                                    {user.skills.length > 3 && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        +{user.skills.length - 3}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Passions */}
-                              {user.passions && user.passions.length > 0 && (
-                                <div>
-                                  <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
-                                    <Heart className="h-3 w-3" />
-                                    <span>Passions:</span>
-                                  </div>
-                                  <div className="flex flex-wrap gap-1">
-                                    {user.passions.slice(0, 3).map((passion: string, i: number) => (
-                                      <Badge key={i} variant="outline" className="text-xs border-destructive/30">
-                                        {passion}
-                                      </Badge>
-                                    ))}
-                                    {user.passions.length > 3 && (
-                                      <Badge variant="outline" className="text-xs">
-                                        +{user.passions.length - 3}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
+                            <div className="flex flex-col gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setDetailDialog(user)}
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                View
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setCreditDialog({ 
+                                  userId: user.user_id, 
+                                  name: user.display_name || 'User',
+                                  balance: user.credit_balance
+                                })}
+                              >
+                                <Coins className="h-3 w-3 mr-1" />
+                                Credits
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setStatusDialog({ 
+                                  userId: user.user_id, 
+                                  name: user.display_name || 'User',
+                                  currentStatus: user.access_status || 'pending'
+                                })}
+                              >
+                                Status
+                              </Button>
                             </div>
                           </div>
-
-                          <div className="flex flex-col gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setDetailDialog(user)}
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              View
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setStatusDialog({ 
-                                userId: user.user_id, 
-                                name: user.display_name || 'User',
-                                currentStatus: (user as any).access_status || 'pending'
-                              })}
-                            >
-                              Status
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => setRemoveDialog({ 
-                                userId: user.user_id, 
-                                name: user.display_name || 'User'
-                              })}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </div>
           </TabsContent>
 
-          {/* Pending Onboarding */}
+          {/* Pending Onboarding Tab */}
           <TabsContent value="pending" className="mt-4">
             <ScrollArea className="h-[400px]">
               {loadingPending ? (
@@ -428,7 +545,56 @@ const Admin: React.FC = () => {
             </ScrollArea>
           </TabsContent>
 
-          {/* Flagged Users */}
+          {/* Mass Messages Tab */}
+          <TabsContent value="messages" className="mt-4">
+            <Card className="mb-4">
+              <CardHeader>
+                <CardTitle className="text-lg">Announcement History</CardTitle>
+                <CardDescription>Previous mass notifications sent to users</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[350px]">
+                  {loadingAnnouncements ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map(i => <Skeleton key={i} className="h-20" />)}
+                    </div>
+                  ) : announcements?.length === 0 ? (
+                    <div className="text-center py-12">
+                      <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">No announcements sent yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {announcements?.map(announcement => (
+                        <Card key={announcement.id}>
+                          <CardContent className="p-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <h4 className="font-semibold">{announcement.title}</h4>
+                              <Badge variant="secondary">
+                                {announcement.recipient_count} recipients
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                              {announcement.message}
+                            </p>
+                            <div className="flex justify-between items-center text-xs text-muted-foreground">
+                              <span>
+                                Target: {announcement.target_audience.type === 'all' ? 'All Users' : 
+                                  `${announcement.target_audience.type}: ${announcement.target_audience.value}`}
+                              </span>
+                              <span>{formatDistanceToNow(new Date(announcement.sent_at), { addSuffix: true })}</span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Flagged Users Tab */}
           <TabsContent value="flagged" className="mt-4">
             <ScrollArea className="h-[400px]">
               {lowRepUsers?.length === 0 ? (
@@ -462,7 +628,7 @@ const Admin: React.FC = () => {
             </ScrollArea>
           </TabsContent>
 
-          {/* Action History */}
+          {/* Action History Tab */}
           <TabsContent value="history" className="mt-4">
             <ScrollArea className="h-[400px]">
               {loadingActions ? (
@@ -482,10 +648,10 @@ const Admin: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <div>
                             <Badge variant={
-                              action.action_type === 'suspend' ? 'destructive' :
-                              action.action_type === 'approve_onboarding' ? 'default' : 'secondary'
+                              action.action_type.includes('suspend') || action.action_type.includes('deny') || action.action_type.includes('remove') ? 'destructive' :
+                              action.action_type.includes('approve') || action.action_type.includes('award') ? 'default' : 'secondary'
                             }>
-                              {action.action_type}
+                              {action.action_type.replace(/_/g, ' ')}
                             </Badge>
                             {action.reason && (
                               <p className="text-sm text-muted-foreground mt-1">{action.reason}</p>
@@ -593,30 +759,194 @@ const Admin: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Remove User Dialog */}
-      <Dialog open={!!removeDialog} onOpenChange={() => setRemoveDialog(null)}>
+      {/* Credit Adjustment Dialog */}
+      <Dialog open={!!creditDialog} onOpenChange={() => setCreditDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-destructive">Remove {removeDialog?.name}</DialogTitle>
+            <DialogTitle>Adjust Credits for {creditDialog?.name}</DialogTitle>
+            <DialogDescription>
+              Current balance: {creditDialog?.balance || 0} credits
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              This will ban the user and remove their access to the app. This action cannot be easily undone.
-            </p>
             <div>
-              <Label>Reason (optional)</Label>
+              <Label>Amount (positive to add, negative to deduct)</Label>
+              <Input
+                type="number"
+                value={creditAmount}
+                onChange={(e) => setCreditAmount(e.target.value)}
+                placeholder="e.g., 100 or -50"
+              />
+            </div>
+            <div>
+              <Label>Reason</Label>
               <Textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Reason for removal..."
+                value={creditReason}
+                onChange={(e) => setCreditReason(e.target.value)}
+                placeholder="Why are you adjusting credits?"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRemoveDialog(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleRemoveUser}>
-              <Trash2 className="h-4 w-4 mr-2" />
-              Remove User
+            <Button variant="outline" onClick={() => setCreditDialog(null)}>Cancel</Button>
+            <Button 
+              onClick={handleAdjustCredits} 
+              disabled={!creditAmount || !creditReason || adjustCredits.isPending}
+            >
+              {adjustCredits.isPending ? 'Adjusting...' : 'Adjust Credits'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Credit Dialog */}
+      <Dialog open={bulkCreditDialog} onOpenChange={setBulkCreditDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bulk Award Credits</DialogTitle>
+            <DialogDescription>
+              Award credits to multiple users at once
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Target Audience</Label>
+              <Select value={messageTarget} onValueChange={(v: any) => setMessageTarget(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Users</SelectItem>
+                  <SelectItem value="mindset_level">By Mindset Level</SelectItem>
+                  <SelectItem value="city">By City</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {messageTarget !== 'all' && (
+              <div>
+                <Label>{messageTarget === 'mindset_level' ? 'Level' : 'City'}</Label>
+                {messageTarget === 'mindset_level' ? (
+                  <Select value={messageTargetValue} onValueChange={setMessageTargetValue}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Level 1</SelectItem>
+                      <SelectItem value="2">Level 2</SelectItem>
+                      <SelectItem value="3">Level 3</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={messageTargetValue}
+                    onChange={(e) => setMessageTargetValue(e.target.value)}
+                    placeholder="Enter city name"
+                  />
+                )}
+              </div>
+            )}
+            <div>
+              <Label>Amount</Label>
+              <Input
+                type="number"
+                value={creditAmount}
+                onChange={(e) => setCreditAmount(e.target.value)}
+                placeholder="Credits to award"
+                min="1"
+              />
+            </div>
+            <div>
+              <Label>Reason</Label>
+              <Textarea
+                value={creditReason}
+                onChange={(e) => setCreditReason(e.target.value)}
+                placeholder="Why are you awarding credits?"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkCreditDialog(false)}>Cancel</Button>
+            <Button 
+              onClick={handleBulkAward} 
+              disabled={!creditAmount || !creditReason || bulkAwardCredits.isPending}
+            >
+              {bulkAwardCredits.isPending ? 'Awarding...' : 'Award Credits'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mass Message Dialog */}
+      <Dialog open={massMessageDialog} onOpenChange={setMassMessageDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Send Mass Notification</DialogTitle>
+            <DialogDescription>
+              Send an announcement to all users or a specific group
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Target Audience</Label>
+              <Select value={messageTarget} onValueChange={(v: any) => setMessageTarget(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Users</SelectItem>
+                  <SelectItem value="mindset_level">By Mindset Level</SelectItem>
+                  <SelectItem value="city">By City</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {messageTarget !== 'all' && (
+              <div>
+                <Label>{messageTarget === 'mindset_level' ? 'Level' : 'City'}</Label>
+                {messageTarget === 'mindset_level' ? (
+                  <Select value={messageTargetValue} onValueChange={setMessageTargetValue}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Level 1</SelectItem>
+                      <SelectItem value="2">Level 2</SelectItem>
+                      <SelectItem value="3">Level 3</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={messageTargetValue}
+                    onChange={(e) => setMessageTargetValue(e.target.value)}
+                    placeholder="Enter city name"
+                  />
+                )}
+              </div>
+            )}
+            <div>
+              <Label>Title</Label>
+              <Input
+                value={messageTitle}
+                onChange={(e) => setMessageTitle(e.target.value)}
+                placeholder="Notification title"
+              />
+            </div>
+            <div>
+              <Label>Message</Label>
+              <Textarea
+                value={messageBody}
+                onChange={(e) => setMessageBody(e.target.value)}
+                placeholder="Write your message..."
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMassMessageDialog(false)}>Cancel</Button>
+            <Button 
+              onClick={handleSendMessage} 
+              disabled={!messageTitle || !messageBody || sendMassNotification.isPending}
+            >
+              {sendMassNotification.isPending ? 'Sending...' : 'Send Notification'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -632,7 +962,6 @@ const Admin: React.FC = () => {
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <Avatar className="h-16 w-16">
-                  <AvatarImage src={detailDialog.avatar_url || undefined} />
                   <AvatarFallback className="text-xl">{detailDialog.display_name?.[0] || '?'}</AvatarFallback>
                 </Avatar>
                 <div>
@@ -640,11 +969,19 @@ const Admin: React.FC = () => {
                   <div className="flex gap-2 mt-1">
                     {getStatusBadge(detailDialog.access_status)}
                     {getMindsetBadge(detailDialog.mindset_level)}
+                    <Badge variant="outline" className="gap-1">
+                      <Coins className="h-3 w-3" />
+                      {detailDialog.credit_balance} credits
+                    </Badge>
                   </div>
                 </div>
               </div>
 
               <div className="grid gap-3 text-sm">
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span>{detailDialog.email || 'No email'}</span>
+                </div>
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
                   <span>{detailDialog.city || 'No location'}</span>
