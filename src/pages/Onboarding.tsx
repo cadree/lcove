@@ -214,6 +214,20 @@ const Onboarding = () => {
       </div>;
   }
   const steps = [<OnboardingIntro key="intro" onNext={nextStep} />, <OnboardingProfile key="profile" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />, <OnboardingPassions key="passions" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />, <OnboardingCity key="city" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />, <OnboardingSkills key="skills" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />, <OnboardingRoles key="roles" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />, <OnboardingQuestionnaire key="questionnaire" data={data} updateData={updateData} onComplete={handleComplete} onBack={prevStep} />, <OnboardingConnections key="connections" onComplete={() => setCurrentStep(8)} onBack={prevStep} />, <OnboardingCompletion key="completion" accessLevel={accessLevel} />, <OnboardingDenied key="denied" />];
-  return;
+  return (
+    <div className="min-h-screen bg-background">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentStep}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.3 }}
+        >
+          {steps[currentStep]}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
 };
 export default Onboarding;
