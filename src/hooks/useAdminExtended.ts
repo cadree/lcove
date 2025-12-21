@@ -416,3 +416,51 @@ export function useToggleAdminRole() {
     },
   });
 }
+
+// Send individual message to a user
+export function useSendIndividualMessage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      targetUserId: string;
+      title: string;
+      message: string;
+      deliveryMethods: {
+        email: boolean;
+        sms: boolean;
+        dm: boolean;
+      };
+    }) => {
+      const { data: result, error } = await supabase.functions.invoke('send-individual-message', {
+        body: {
+          target_user_id: data.targetUserId,
+          title: data.title,
+          message: data.message,
+          delivery_methods: data.deliveryMethods,
+        },
+      });
+
+      if (error) throw error;
+      if (result?.error) throw new Error(result.error);
+      
+      return result;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
+      const sent: string[] = [];
+      if (result.results?.email?.sent) sent.push('email');
+      if (result.results?.sms?.sent) sent.push('SMS');
+      if (result.results?.dm?.sent) sent.push('in-app');
+      
+      if (sent.length > 0) {
+        toast.success(`Message sent via: ${sent.join(', ')}`);
+      } else {
+        toast.error('No messages were delivered');
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to send message: ${error.message}`);
+    },
+  });
+}
