@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   Shield, Users, AlertTriangle, CheckCircle, XCircle, Clock, History, Search, 
   ArrowLeft, Ban, UserCheck, ClipboardList, Trash2, Eye, Phone, Mail, MapPin, 
-  Briefcase, Heart, Star, Send, Coins, Download, MessageSquare
+  Briefcase, Heart, Star, Send, Coins, Download, MessageSquare, ShieldCheck, ShieldOff
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/layout/PageLayout';
@@ -40,6 +40,7 @@ import {
   useBulkAwardCredits,
   exportUsersToCSV,
   AdminUserData,
+  useToggleAdminRole,
 } from '@/hooks/useAdminExtended';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -90,6 +91,7 @@ const Admin: React.FC = () => {
   const adjustCredits = useAdjustUserCredits();
   const bulkAwardCredits = useBulkAwardCredits();
   const sendMassNotification = useSendMassNotification();
+  const toggleAdminRole = useToggleAdminRole();
 
   // Filtered users
   const filteredUsers = useMemo(() => {
@@ -385,6 +387,12 @@ const Admin: React.FC = () => {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap mb-1">
                                   <span className="font-semibold">{user.display_name || 'Unnamed'}</span>
+                                  {user.is_admin && (
+                                    <Badge className="bg-amber-500 text-white gap-1">
+                                      <ShieldCheck className="h-3 w-3" />
+                                      Admin
+                                    </Badge>
+                                  )}
                                   {getStatusBadge(user.access_status)}
                                   {getMindsetBadge(user.mindset_level)}
                                   <Badge variant="outline" className="gap-1">
@@ -477,6 +485,27 @@ const Admin: React.FC = () => {
                                 })}
                               >
                                 Status
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={user.is_admin ? "destructive" : "outline"}
+                                onClick={() => toggleAdminRole.mutate({ 
+                                  userId: user.user_id, 
+                                  isAdmin: user.is_admin 
+                                })}
+                                disabled={toggleAdminRole.isPending}
+                              >
+                                {user.is_admin ? (
+                                  <>
+                                    <ShieldOff className="h-3 w-3 mr-1" />
+                                    Remove Admin
+                                  </>
+                                ) : (
+                                  <>
+                                    <ShieldCheck className="h-3 w-3 mr-1" />
+                                    Make Admin
+                                  </>
+                                )}
                               </Button>
                             </div>
                           </div>
