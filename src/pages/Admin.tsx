@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { 
   Shield, Users, AlertTriangle, CheckCircle, XCircle, Clock, History, Search, 
   ArrowLeft, Ban, UserCheck, ClipboardList, Trash2, Eye, Phone, Mail, MapPin, 
-  Briefcase, Heart, Star, Send, Coins, Download, MessageSquare, ShieldCheck, ShieldOff
+  Briefcase, Heart, Star, Send, Coins, Download, MessageSquare, ShieldCheck, ShieldOff,
+  MessageCircle
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/layout/PageLayout';
@@ -41,8 +42,10 @@ import {
   exportUsersToCSV,
   AdminUserData,
   useToggleAdminRole,
+  useSendIndividualMessage,
 } from '@/hooks/useAdminExtended';
 import { formatDistanceToNow } from 'date-fns';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
@@ -62,6 +65,12 @@ const Admin: React.FC = () => {
   const [creditDialog, setCreditDialog] = useState<{ userId: string; name: string; balance: number } | null>(null);
   const [bulkCreditDialog, setBulkCreditDialog] = useState(false);
   const [massMessageDialog, setMassMessageDialog] = useState(false);
+  const [individualMessageDialog, setIndividualMessageDialog] = useState<{ 
+    userId: string; 
+    name: string; 
+    email: string | null;
+    phone: string | null;
+  } | null>(null);
   
   // Form states
   const [reason, setReason] = useState('');
@@ -72,6 +81,11 @@ const Admin: React.FC = () => {
   const [messageBody, setMessageBody] = useState('');
   const [messageTarget, setMessageTarget] = useState<'all' | 'mindset_level' | 'city'>('all');
   const [messageTargetValue, setMessageTargetValue] = useState('');
+  const [deliveryMethods, setDeliveryMethods] = useState({
+    email: true,
+    sms: false,
+    dm: true,
+  });
 
   // Queries
   const { data: users, isLoading: loadingUsers } = useAllUsers();
@@ -92,6 +106,7 @@ const Admin: React.FC = () => {
   const bulkAwardCredits = useBulkAwardCredits();
   const sendMassNotification = useSendMassNotification();
   const toggleAdminRole = useToggleAdminRole();
+  const sendIndividualMessage = useSendIndividualMessage();
 
   // Filtered users
   const filteredUsers = useMemo(() => {
@@ -213,6 +228,21 @@ const Admin: React.FC = () => {
       setMessageBody('');
       setMessageTarget('all');
       setMessageTargetValue('');
+    }
+  };
+
+  const handleSendIndividualMessage = () => {
+    if (individualMessageDialog && messageTitle && messageBody) {
+      sendIndividualMessage.mutate({
+        targetUserId: individualMessageDialog.userId,
+        title: messageTitle,
+        message: messageBody,
+        deliveryMethods,
+      });
+      setIndividualMessageDialog(null);
+      setMessageTitle('');
+      setMessageBody('');
+      setDeliveryMethods({ email: true, sms: false, dm: true });
     }
   };
 
@@ -485,6 +515,19 @@ const Admin: React.FC = () => {
                                 })}
                               >
                                 Status
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setIndividualMessageDialog({ 
+                                  userId: user.user_id, 
+                                  name: user.display_name || 'User',
+                                  email: user.email,
+                                  phone: user.phone,
+                                })}
+                              >
+                                <MessageCircle className="h-3 w-3 mr-1" />
+                                Message
                               </Button>
                               <Button
                                 size="sm"
@@ -1072,6 +1115,97 @@ const Admin: React.FC = () => {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDetailDialog(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Individual Message Dialog */}
+      <Dialog open={!!individualMessageDialog} onOpenChange={() => setIndividualMessageDialog(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Send Message to {individualMessageDialog?.name}</DialogTitle>
+            <DialogDescription>
+              Choose how to deliver this message
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <Label>Delivery Methods</Label>
+              <div className="flex flex-wrap gap-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="dm-check"
+                    checked={deliveryMethods.dm}
+                    onCheckedChange={(checked) => 
+                      setDeliveryMethods(prev => ({ ...prev, dm: !!checked }))
+                    }
+                  />
+                  <label htmlFor="dm-check" className="text-sm font-medium flex items-center gap-1">
+                    <MessageCircle className="h-4 w-4" />
+                    In-App DM
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="email-check"
+                    checked={deliveryMethods.email}
+                    disabled={!individualMessageDialog?.email}
+                    onCheckedChange={(checked) => 
+                      setDeliveryMethods(prev => ({ ...prev, email: !!checked }))
+                    }
+                  />
+                  <label htmlFor="email-check" className="text-sm font-medium flex items-center gap-1">
+                    <Mail className="h-4 w-4" />
+                    Email {!individualMessageDialog?.email && '(No email)'}
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="sms-check"
+                    checked={deliveryMethods.sms}
+                    disabled={!individualMessageDialog?.phone}
+                    onCheckedChange={(checked) => 
+                      setDeliveryMethods(prev => ({ ...prev, sms: !!checked }))
+                    }
+                  />
+                  <label htmlFor="sms-check" className="text-sm font-medium flex items-center gap-1">
+                    <Phone className="h-4 w-4" />
+                    SMS {!individualMessageDialog?.phone && '(No phone)'}
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div>
+              <Label>Title</Label>
+              <Input
+                value={messageTitle}
+                onChange={(e) => setMessageTitle(e.target.value)}
+                placeholder="Message title"
+              />
+            </div>
+            <div>
+              <Label>Message</Label>
+              <Textarea
+                value={messageBody}
+                onChange={(e) => setMessageBody(e.target.value)}
+                placeholder="Write your message..."
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIndividualMessageDialog(null)}>Cancel</Button>
+            <Button 
+              onClick={handleSendIndividualMessage} 
+              disabled={
+                !messageTitle || 
+                !messageBody || 
+                (!deliveryMethods.email && !deliveryMethods.sms && !deliveryMethods.dm) ||
+                sendIndividualMessage.isPending
+              }
+            >
+              {sendIndividualMessage.isPending ? 'Sending...' : 'Send Message'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
