@@ -17,6 +17,7 @@ export interface AdminUserData {
   passions: string[];
   creative_roles: string[];
   credit_balance: number;
+  is_admin: boolean;
 }
 
 export interface AdminAnnouncement {
@@ -65,11 +66,18 @@ export function useAdminUserData() {
         .from('user_credits')
         .select('user_id, balance');
 
+      // Get all admin users
+      const { data: adminRoles } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .eq('role', 'admin');
+
       // Map skills/passions/roles/credits to users
       const skillsMap = new Map<string, string[]>();
       const passionsMap = new Map<string, string[]>();
       const rolesMap = new Map<string, string[]>();
       const creditsMap = new Map<string, number>();
+      const adminSet = new Set<string>();
 
       allUserSkills?.forEach((item: any) => {
         const skills = skillsMap.get(item.user_id) || [];
@@ -93,12 +101,17 @@ export function useAdminUserData() {
         creditsMap.set(item.user_id, item.balance || 0);
       });
 
+      adminRoles?.forEach((item: any) => {
+        adminSet.add(item.user_id);
+      });
+
       return (userData || []).map((user: any) => ({
         ...user,
         skills: skillsMap.get(user.user_id) || [],
         passions: passionsMap.get(user.user_id) || [],
         creative_roles: rolesMap.get(user.user_id) || [],
         credit_balance: creditsMap.get(user.user_id) || 0,
+        is_admin: adminSet.has(user.user_id),
       }));
     },
     enabled: isAdmin,
@@ -351,4 +364,55 @@ export function exportUsersToCSV(users: AdminUserData[]) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+// Toggle admin role for a user
+export function useToggleAdminRole() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (data: { userId: string; isAdmin: boolean }) => {
+      if (data.isAdmin) {
+        // Remove admin role
+        const { error } = await supabase
+          .from('user_roles')
+          .delete()
+          .eq('user_id', data.userId)
+          .eq('role', 'admin');
+
+        if (error) throw error;
+      } else {
+        // Add admin role
+        const { error } = await supabase
+          .from('user_roles')
+          .insert({
+            user_id: data.userId,
+            role: 'admin',
+            granted_by: user?.id,
+          });
+
+        if (error) throw error;
+      }
+
+      // Log the action
+      const { error: actionError } = await supabase
+        .from('admin_actions')
+        .insert({
+          admin_id: user?.id,
+          action_type: data.isAdmin ? 'remove_admin' : 'grant_admin',
+          target_user_id: data.userId,
+        });
+
+      if (actionError) throw actionError;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-user-data'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
+      toast.success(variables.isAdmin ? 'Admin role removed' : 'Admin role granted');
+    },
+    onError: () => {
+      toast.error('Failed to update admin role');
+    },
+  });
 }
