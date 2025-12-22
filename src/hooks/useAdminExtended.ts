@@ -53,9 +53,76 @@ async function logAdminActionSafe(payload: {
   ]);
 
   if (error) {
-    // IMPORTANT: do not throw — logging should never break core admin flows
     console.warn("Admin action log failed (non-blocking):", error);
   }
+}
+
+// Fetch admin user data with extended info
+export function useAdminUserData() {
+  const { isAdmin } = useIsAdmin();
+
+  return useQuery({
+    queryKey: ["admin-user-data"],
+    enabled: isAdmin,
+    queryFn: async (): Promise<AdminUserData[]> => {
+      const { data: userData, error: userError } = await supabase.rpc("get_admin_user_data");
+      if (userError) throw userError;
+
+      const { data: skills } = await supabase.from("user_skills").select("user_id, skills(name)");
+      const { data: passions } = await supabase.from("user_passions").select("user_id, passions(name)");
+      const { data: roles } = await supabase.from("user_creative_roles").select("user_id, creative_roles(name)");
+      const { data: credits } = await supabase.from("user_credits").select("user_id, balance");
+      const { data: adminRoles } = await supabase.from("user_roles").select("user_id, role");
+
+      const skillsMap = new Map<string, string[]>();
+      const passionsMap = new Map<string, string[]>();
+      const rolesMap = new Map<string, string[]>();
+      const creditsMap = new Map<string, number>();
+      const adminMap = new Map<string, boolean>();
+
+      skills?.forEach((s: any) => {
+        const arr = skillsMap.get(s.user_id) || [];
+        if (s.skills?.name) arr.push(s.skills.name);
+        skillsMap.set(s.user_id, arr);
+      });
+
+      passions?.forEach((p: any) => {
+        const arr = passionsMap.get(p.user_id) || [];
+        if (p.passions?.name) arr.push(p.passions.name);
+        passionsMap.set(p.user_id, arr);
+      });
+
+      roles?.forEach((r: any) => {
+        const arr = rolesMap.get(r.user_id) || [];
+        if (r.creative_roles?.name) arr.push(r.creative_roles.name);
+        rolesMap.set(r.user_id, arr);
+      });
+
+      credits?.forEach((c: any) => {
+        creditsMap.set(c.user_id, c.balance || 0);
+      });
+
+      adminRoles?.forEach((ar: any) => {
+        if (ar.role === "admin") adminMap.set(ar.user_id, true);
+      });
+
+      return (userData || []).map((u: any) => ({
+        user_id: u.user_id,
+        email: u.email || "",
+        display_name: u.display_name,
+        phone: u.phone,
+        city: u.city,
+        mindset_level: u.mindset_level,
+        access_status: u.access_status,
+        created_at: u.created_at,
+        skills: skillsMap.get(u.user_id) || [],
+        passions: passionsMap.get(u.user_id) || [],
+        creative_roles: rolesMap.get(u.user_id) || [],
+        credit_balance: creditsMap.get(u.user_id) || 0,
+        is_admin: adminMap.get(u.user_id) || false,
+      }));
+    },
+  });
 }
 
 // Fetch announcement history
@@ -132,7 +199,7 @@ export function useAdjustUserCredits() {
         .eq("user_id", data.userId)
         .single();
 
-      if (creditsErr) throw creditsErr;
+      if (creditsErr && creditsErr.code !== "PGRST116") throw creditsErr;
 
       const currentBalance = currentCredits?.balance || 0;
       const newBalance = currentBalance + data.amount;
@@ -141,7 +208,6 @@ export function useAdjustUserCredits() {
         throw new Error("Cannot deduct more credits than available");
       }
 
-      // Ledger entry (array insert to satisfy Supabase TS overloads)
       const { error: ledgerError } = await supabase.from("credit_ledger").insert([
         {
           user_id: data.userId,
@@ -171,6 +237,180 @@ export function useAdjustUserCredits() {
     },
     onError: (error: Error) => {
       toast.error(`Failed to adjust credits: ${error.message}`);
+    },
+  });
+}
+
+// Bulk award credits
+export function useBulkAwardCredits() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (data: { userIds: string[]; amount: number; reason: string }) => {
+      if (!user?.id) throw new Error("Not authenticated");
+
+      const results = await Promise.allSettled(
+        data.userIds.map(async (userId) => {
+          const { data: currentCredits } = await supabase
+            .from("user_credits")
+            .select("balance")
+            .eq("user_id", userId)
+            .single();
+
+          const currentBalance = currentCredits?.balance || 0;
+          const newBalance = currentBalance + data.amount;
+
+          await supabase.from("credit_ledger").insert([
+            {
+              user_id: userId,
+              amount: data.amount,
+              balance_after: newBalance,
+              type: "admin_award",
+              description: data.reason,
+            },
+          ]);
+
+          return userId;
+        })
+      );
+
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      return { succeeded, total: data.userIds.length };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-user-data"] });
+      toast.success(`Credits awarded to ${result.succeeded}/${result.total} users`);
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to bulk award credits: ${error.message}`);
+    },
+  });
+}
+
+// Export users to CSV
+export function exportUsersToCSV(users: AdminUserData[]): void {
+  const headers = [
+    "User ID",
+    "Email",
+    "Display Name",
+    "Phone",
+    "City",
+    "Mindset Level",
+    "Access Status",
+    "Created At",
+    "Skills",
+    "Passions",
+    "Creative Roles",
+    "Credit Balance",
+    "Is Admin",
+  ];
+
+  const rows = users.map((u) => [
+    u.user_id,
+    u.email,
+    u.display_name || "",
+    u.phone || "",
+    u.city || "",
+    u.mindset_level?.toString() || "",
+    u.access_status || "",
+    u.created_at || "",
+    u.skills.join("; "),
+    u.passions.join("; "),
+    u.creative_roles.join("; "),
+    u.credit_balance.toString(),
+    u.is_admin ? "Yes" : "No",
+  ]);
+
+  const csvContent = [headers, ...rows]
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `users_export_${new Date().toISOString().split("T")[0]}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  toast.success("Users exported to CSV");
+}
+
+// Toggle admin role
+export function useToggleAdminRole() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (data: { userId: string; makeAdmin: boolean }) => {
+      if (!user?.id) throw new Error("Not authenticated");
+
+      if (data.makeAdmin) {
+        const { error } = await supabase.from("user_roles").insert([
+          { user_id: data.userId, role: "admin" },
+        ]);
+        if (error && error.code !== "23505") throw error;
+      } else {
+        const { error } = await supabase
+          .from("user_roles")
+          .delete()
+          .eq("user_id", data.userId)
+          .eq("role", "admin");
+        if (error) throw error;
+      }
+
+      await logAdminActionSafe({
+        admin_id: user.id,
+        action_type: data.makeAdmin ? "grant_admin" : "revoke_admin",
+        target_user_id: data.userId,
+      });
+
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-user-data"] });
+      queryClient.invalidateQueries({ queryKey: ["user-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-actions"] });
+      toast.success(data.makeAdmin ? "Admin role granted" : "Admin role revoked");
+    },
+    onError: (error: Error) => {
+      console.error("Toggle admin role error:", error);
+      toast.error(`Failed to update admin role: ${error.message}`);
+    },
+  });
+}
+
+// Send individual message
+export function useSendIndividualMessage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      userId: string;
+      message: string;
+      sendDm: boolean;
+      sendEmail: boolean;
+      sendSms: boolean;
+    }) => {
+      const { data: result, error } = await supabase.functions.invoke("send-individual-message", {
+        body: data,
+      });
+
+      if (error) throw error;
+      if (result?.error) throw new Error(result.error);
+
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-actions"] });
+      toast.success("Message sent successfully");
+    },
+    onError: (error: Error) => {
+      console.error("Send individual message error:", error);
+      toast.error(`Failed to send message: ${error.message}`);
     },
   });
 }

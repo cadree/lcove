@@ -194,15 +194,21 @@ const Admin: React.FC = () => {
   };
 
   const handleBulkAward = () => {
-    if (creditAmount && creditReason) {
-      const targetAudience = messageTarget === 'all' 
-        ? { type: 'all' as const }
-        : { type: messageTarget, value: messageTarget === 'mindset_level' ? parseInt(messageTargetValue) : messageTargetValue };
+    if (creditAmount && creditReason && adminUserData) {
+      // Filter users based on target audience
+      let targetUserIds: string[] = [];
+      if (messageTarget === 'all') {
+        targetUserIds = adminUserData.map(u => u.user_id);
+      } else if (messageTarget === 'mindset_level') {
+        targetUserIds = adminUserData.filter(u => u.mindset_level === parseInt(messageTargetValue)).map(u => u.user_id);
+      } else if (messageTarget === 'city') {
+        targetUserIds = adminUserData.filter(u => u.city?.toLowerCase() === messageTargetValue.toLowerCase()).map(u => u.user_id);
+      }
       
       bulkAwardCredits.mutate({
+        userIds: targetUserIds,
         amount: parseInt(creditAmount),
         reason: creditReason,
-        targetAudience,
       });
       setBulkCreditDialog(false);
       setCreditAmount('');
@@ -232,12 +238,13 @@ const Admin: React.FC = () => {
   };
 
   const handleSendIndividualMessage = () => {
-    if (individualMessageDialog && messageTitle && messageBody) {
+    if (individualMessageDialog && messageBody) {
       sendIndividualMessage.mutate({
-        targetUserId: individualMessageDialog.userId,
-        title: messageTitle,
+        userId: individualMessageDialog.userId,
         message: messageBody,
-        deliveryMethods,
+        sendDm: deliveryMethods.dm,
+        sendEmail: deliveryMethods.email,
+        sendSms: deliveryMethods.sms,
       });
       setIndividualMessageDialog(null);
       setMessageTitle('');
@@ -534,7 +541,7 @@ const Admin: React.FC = () => {
                                 variant={user.is_admin ? "destructive" : "outline"}
                                 onClick={() => toggleAdminRole.mutate({ 
                                   userId: user.user_id, 
-                                  isAdmin: user.is_admin 
+                                  makeAdmin: !user.is_admin 
                                 })}
                                 disabled={toggleAdminRole.isPending}
                               >
