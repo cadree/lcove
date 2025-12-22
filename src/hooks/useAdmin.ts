@@ -153,8 +153,9 @@ export function useSuspendUser() {
       queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
       toast.success('User suspended');
     },
-    onError: () => {
-      toast.error('Failed to suspend user');
+    onError: (error: Error) => {
+      console.error('Failed to suspend user:', error);
+      toast.error(`Failed to suspend user: ${error.message}`);
     },
   });
 }
@@ -191,6 +192,10 @@ export function useUnsuspendUser() {
       queryClient.invalidateQueries({ queryKey: ['admin-user-data'] });
       queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
       toast.success('User unsuspended');
+    },
+    onError: (error: Error) => {
+      console.error('Failed to unsuspend user:', error);
+      toast.error(`Failed to unsuspend user: ${error.message}`);
     },
   });
 }
@@ -234,6 +239,10 @@ export function useApproveOnboarding() {
       queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
       toast.success('Onboarding approved');
     },
+    onError: (error: Error) => {
+      console.error('Failed to approve onboarding:', error);
+      toast.error(`Failed to approve onboarding: ${error.message}`);
+    },
   });
 }
 
@@ -272,6 +281,10 @@ export function useDenyOnboarding() {
       queryClient.invalidateQueries({ queryKey: ['admin-user-data'] });
       queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
       toast.success('Onboarding denied');
+    },
+    onError: (error: Error) => {
+      console.error('Failed to deny onboarding:', error);
+      toast.error(`Failed to deny onboarding: ${error.message}`);
     },
   });
 }

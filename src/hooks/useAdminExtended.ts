@@ -409,10 +409,12 @@ export function useToggleAdminRole() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-user-data'] });
       queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
+      queryClient.invalidateQueries({ queryKey: ['user-roles'] });
       toast.success(variables.isAdmin ? 'Admin role removed' : 'Admin role granted');
     },
-    onError: () => {
-      toast.error('Failed to update admin role');
+    onError: (error: Error) => {
+      console.error('Failed to update admin role:', error);
+      toast.error(`Failed to update admin role: ${error.message}`);
     },
   });
 }
