@@ -137,6 +137,7 @@ serve(async (req) => {
       project_invite: "project_invites_enabled",
       event_reminder: "event_reminders_enabled",
       live_stream: "live_streams_enabled",
+      admin: "admin_enabled",
     };
 
     const prefKey = typePreferenceMap[notification_type];

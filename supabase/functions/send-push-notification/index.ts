@@ -66,6 +66,7 @@ serve(async (req) => {
         project_invite: "project_invites_enabled",
         event_reminder: "event_reminders_enabled",
         live_stream: "live_streams_enabled",
+        admin: "admin_enabled",
       };
 
       const prefKey = typePreferenceMap[notification_type];
@@ -97,12 +98,24 @@ serve(async (req) => {
       );
     }
 
+    const notificationType = notification_type || 'general';
+    
+    // Build push payload with Instagram-like experience
     const payload = JSON.stringify({
       title,
       body: body || "",
       icon: icon || "/favicon.png",
       badge: badge || "/favicon.png",
-      data: { url: "/notifications", ...data },
+      tag: `ether-${notificationType}-${Date.now()}`,
+      renotify: true,
+      requireInteraction: notificationType === 'message' || notificationType === 'project_invite',
+      data: { 
+        url: "/notifications", 
+        type: notificationType,
+        ...data 
+      },
+      vibrate: [200, 100, 200, 100, 200],
+      timestamp: Date.now(),
     });
 
     const results: { endpoint: string; status: string; error?: string }[] = [];
