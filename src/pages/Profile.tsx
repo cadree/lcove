@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Plus, Grid, Bookmark, FileText, ArrowLeft } from "lucide-react";
+import { Loader2, Plus, Grid, Bookmark, FileText, ArrowLeft, LayoutGrid } from "lucide-react";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
 import { ProfileCustomizationDialog } from "@/components/profile/ProfileCustomizationDialog";
@@ -23,6 +23,7 @@ import { ProfileAboutSection } from "@/components/profile/ProfileAboutSection";
 import { ProfileFolders } from "@/components/profile/ProfileFolders";
 import { ProfileQuickLinks } from "@/components/profile/ProfileQuickLinks";
 import { FolderDetailView } from "@/components/profile/FolderDetailView";
+import { ProfileLayoutEditor } from "@/components/profile/ProfileLayoutEditor";
 import { useProfile } from "@/hooks/useProfile";
 import { useConversations } from "@/hooks/useConversations";
 import { useAuth } from "@/contexts/AuthContext";
@@ -34,6 +35,7 @@ import { useCreatorRoles } from "@/hooks/useCreatorModules";
 import { useUserSkills, useUserPassions, useUserCreativeRoles } from "@/hooks/useUserDetails";
 import { useUserIsAdmin } from "@/hooks/useUserIsAdmin";
 import { usePortfolioFolders, PortfolioFolder } from "@/hooks/usePortfolioFolders";
+import { useProfileLayout, ProfileSection } from "@/hooks/useProfileLayout";
 import { toast } from "sonner";
 import { ProfilePost } from "@/types/post";
 
@@ -56,6 +58,7 @@ const Profile = () => {
   const { data: userCreativeRoles = [] } = useUserCreativeRoles(targetUserId);
   const { data: isProfileAdmin = false } = useUserIsAdmin(targetUserId);
   const { folders } = usePortfolioFolders(targetUserId);
+  const { layout } = useProfileLayout(targetUserId);
   const { createDirectConversation } = useConversations();
   
   const [showMusicDialog, setShowMusicDialog] = useState(false);
@@ -63,12 +66,16 @@ const Profile = () => {
   const [showCreatePostDialog, setShowCreatePostDialog] = useState(false);
   const [showCreateBlogDialog, setShowCreateBlogDialog] = useState(false);
   const [showEditDetailsDialog, setShowEditDetailsDialog] = useState(false);
+  const [showLayoutEditor, setShowLayoutEditor] = useState(false);
   const [selectedPost, setSelectedPost] = useState<ProfilePost | null>(null);
   const [selectedBlog, setSelectedBlog] = useState<BlogPost | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<PortfolioFolder | null>(null);
   const volumeSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const hasCreatorRoles = creatorRoles.length > 0;
+
+  // Get sorted visible sections
+  const visibleSections = layout.filter(s => s.visible).sort((a, b) => a.order - b.order);
 
   const handleVolumeChange = useCallback((volume: number) => {
     if (volumeSaveTimeoutRef.current) {
@@ -138,10 +145,179 @@ const Profile = () => {
   const city = profile?.city || 'Location not set';
   const avatarUrl = profile?.avatar_url;
 
+  // Render a section based on its ID
+  const renderSection = (section: ProfileSection) => {
+    switch (section.id) {
+      case 'stats':
+        return (
+          <ProfileStats
+            key="stats"
+            credits={credits?.balance || 0}
+            projectCount={0}
+            eventCount={0}
+          />
+        );
+      case 'about':
+        return (
+          <ProfileAboutSection
+            key="about"
+            bio={bio}
+            creativeRoles={userCreativeRoles}
+            skills={userSkills}
+            passions={userPassions}
+            isOwner={isOwnProfile}
+            onEditClick={() => setShowEditDetailsDialog(true)}
+          />
+        );
+      case 'portfolio':
+        if (selectedFolder) {
+          return (
+            <FolderDetailView
+              key="portfolio"
+              folder={selectedFolder}
+              userId={targetUserId || ''}
+              isOwner={isOwnProfile}
+              onBack={() => setSelectedFolder(null)}
+              onPostClick={(post) => setSelectedPost(post)}
+            />
+          );
+        }
+        if (folders.length > 0 || isOwnProfile) {
+          return (
+            <ProfileFolders
+              key="portfolio"
+              userId={targetUserId || ''}
+              isOwner={isOwnProfile}
+              onFolderClick={(folder) => setSelectedFolder(folder)}
+            />
+          );
+        }
+        return null;
+      case 'creator_modules':
+        if (!targetUserId || !hasCreatorRoles) return null;
+        return (
+          <motion.div
+            key="creator_modules"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="px-5 py-4"
+          >
+            <CreatorModuleTabs userId={targetUserId} isOwner={isOwnProfile} />
+          </motion.div>
+        );
+      case 'music':
+        return (
+          <div key="music">
+            {customization?.profile_music_enabled && (customization?.profile_music_url || customization?.profile_music_preview_url) && (
+              <div className="px-5">
+                <ProfileRecordPlayer
+                  musicUrl={customization.profile_music_url}
+                  previewUrl={customization.profile_music_preview_url}
+                  title={customization.profile_music_title}
+                  artist={customization.profile_music_artist}
+                  albumArtUrl={customization.profile_music_album_art_url}
+                  source={customization.profile_music_source as 'spotify' | 'apple_music' | 'upload' | null}
+                  externalId={customization.profile_music_external_id}
+                  defaultVolume={customization.profile_music_volume ?? 0.5}
+                  isOwner={isOwner}
+                  onVolumeChange={handleVolumeChange}
+                />
+              </div>
+            )}
+            {isOwnProfile && (
+              <div className="px-5 py-4">
+                <MusicProfileBlock onConnectClick={() => setShowMusicDialog(true)} />
+              </div>
+            )}
+          </div>
+        );
+      case 'posts_tabs':
+        return (
+          <motion.div
+            key="posts_tabs"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.55 }}
+            className="px-5 py-4"
+          >
+            <Tabs defaultValue="posts" className="w-full">
+              <TabsList className="w-full justify-center border-b border-border rounded-none bg-transparent h-auto py-0 px-0">
+                <TabsTrigger 
+                  value="posts" 
+                  className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
+                >
+                  <Grid className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Posts</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="blogs" 
+                  className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
+                >
+                  <FileText className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Blog</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="saved" 
+                  className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
+                >
+                  <Bookmark className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Saved</span>
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="posts" className="mt-4">
+                <ProfilePostsGrid 
+                  posts={posts}
+                  onPostClick={(post) => setSelectedPost(post)}
+                  isLoading={postsLoading}
+                />
+              </TabsContent>
+              <TabsContent value="blogs" className="mt-4">
+                <ProfileBlogsGrid 
+                  blogs={blogs}
+                  onBlogClick={(blog) => setSelectedBlog(blog)}
+                  isLoading={blogsLoading}
+                  isOwner={isOwnProfile}
+                />
+              </TabsContent>
+              <TabsContent value="saved" className="mt-4">
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="w-16 h-16 rounded-full border-2 border-muted-foreground/20 flex items-center justify-center mb-4">
+                    <Bookmark className="w-8 h-8 text-muted-foreground/40" />
+                  </div>
+                  <h3 className="text-lg font-medium text-foreground mb-2">Save</h3>
+                  <p className="text-muted-foreground text-sm max-w-[220px]">
+                    Save content you want to see again.
+                  </p>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </motion.div>
+        );
+      case 'reviews':
+        if (!targetUserId) return null;
+        return (
+          <motion.div
+            key="reviews"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="px-5 py-4"
+          >
+            <UserReviews userId={targetUserId} />
+          </motion.div>
+        );
+      case 'quick_links':
+        return <ProfileQuickLinks key="quick_links" isOwner={isOwnProfile} />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <PageLayout showNotificationBell={false}>
       <div className="min-h-screen pb-20">
-        {/* Header Section */}
+        {/* Header Section - Always at top */}
         <ProfileHeader
           displayName={displayName}
           avatarUrl={avatarUrl}
@@ -157,150 +333,23 @@ const Profile = () => {
           userId={targetUserId || ''}
         />
 
-        {/* Stats Section */}
-        <ProfileStats
-          credits={credits?.balance || 0}
-          projectCount={0}
-          eventCount={0}
-        />
-
-        {/* About Section */}
-        <ProfileAboutSection
-          bio={bio}
-          creativeRoles={userCreativeRoles}
-          skills={userSkills}
-          passions={userPassions}
-          isOwner={isOwnProfile}
-          onEditClick={() => setShowEditDetailsDialog(true)}
-        />
-
-        {/* Portfolio Folders Section */}
-        {selectedFolder ? (
-          <FolderDetailView
-            folder={selectedFolder}
-            userId={targetUserId || ''}
-            isOwner={isOwnProfile}
-            onBack={() => setSelectedFolder(null)}
-            onPostClick={(post) => setSelectedPost(post)}
-          />
-        ) : (folders.length > 0 || isOwnProfile) && (
-          <ProfileFolders
-            userId={targetUserId || ''}
-            isOwner={isOwnProfile}
-            onFolderClick={(folder) => setSelectedFolder(folder)}
-          />
-        )}
-
-        {/* Creator Module Tabs */}
-        {targetUserId && hasCreatorRoles && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="px-5 py-4"
-          >
-            <CreatorModuleTabs userId={targetUserId} isOwner={isOwnProfile} />
-          </motion.div>
-        )}
-
-        {/* Profile Music */}
-        {customization?.profile_music_enabled && (customization?.profile_music_url || customization?.profile_music_preview_url) && (
-          <div className="px-5">
-            <ProfileRecordPlayer
-              musicUrl={customization.profile_music_url}
-              previewUrl={customization.profile_music_preview_url}
-              title={customization.profile_music_title}
-              artist={customization.profile_music_artist}
-              albumArtUrl={customization.profile_music_album_art_url}
-              source={customization.profile_music_source as 'spotify' | 'apple_music' | 'upload' | null}
-              externalId={customization.profile_music_external_id}
-              defaultVolume={customization.profile_music_volume ?? 0.5}
-              isOwner={isOwner}
-              onVolumeChange={handleVolumeChange}
-            />
-          </div>
-        )}
-
+        {/* Edit Layout Button - Only for owner */}
         {isOwnProfile && (
-          <div className="px-5 py-4">
-            <MusicProfileBlock onConnectClick={() => setShowMusicDialog(true)} />
+          <div className="px-5 py-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => setShowLayoutEditor(true)}
+            >
+              <LayoutGrid className="w-4 h-4 mr-2" />
+              Edit Layout
+            </Button>
           </div>
         )}
 
-        {/* Posts/Blogs Grid */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.55 }}
-          className="px-5 py-4"
-        >
-          <Tabs defaultValue="posts" className="w-full">
-            <TabsList className="w-full justify-center border-b border-border rounded-none bg-transparent h-auto py-0 px-0">
-              <TabsTrigger 
-                value="posts" 
-                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
-              >
-                <Grid className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Posts</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="blogs" 
-                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
-              >
-                <FileText className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Blog</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="saved" 
-                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
-              >
-                <Bookmark className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Saved</span>
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="posts" className="mt-4">
-              <ProfilePostsGrid 
-                posts={posts}
-                onPostClick={(post) => setSelectedPost(post)}
-                isLoading={postsLoading}
-              />
-            </TabsContent>
-            <TabsContent value="blogs" className="mt-4">
-              <ProfileBlogsGrid 
-                blogs={blogs}
-                onBlogClick={(blog) => setSelectedBlog(blog)}
-                isLoading={blogsLoading}
-                isOwner={isOwnProfile}
-              />
-            </TabsContent>
-            <TabsContent value="saved" className="mt-4">
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="w-16 h-16 rounded-full border-2 border-muted-foreground/20 flex items-center justify-center mb-4">
-                  <Bookmark className="w-8 h-8 text-muted-foreground/40" />
-                </div>
-                <h3 className="text-lg font-medium text-foreground mb-2">Save</h3>
-                <p className="text-muted-foreground text-sm max-w-[220px]">
-                  Save content you want to see again.
-                </p>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </motion.div>
-
-        {/* User Reviews */}
-        {targetUserId && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="px-5 py-4"
-          >
-            <UserReviews userId={targetUserId} />
-          </motion.div>
-        )}
-
-        {/* Quick Links */}
-        <ProfileQuickLinks isOwner={isOwnProfile} />
+        {/* Dynamic Sections based on layout */}
+        {visibleSections.map(section => renderSection(section))}
 
         {/* Floating Create Button - Mobile */}
         {isOwnProfile && (
@@ -338,6 +387,11 @@ const Profile = () => {
               currentSkills={userSkills}
               currentPassions={userPassions}
               currentRoles={userCreativeRoles}
+            />
+            <ProfileLayoutEditor
+              userId={targetUserId || ''}
+              open={showLayoutEditor}
+              onClose={() => setShowLayoutEditor(false)}
             />
           </>
         )}

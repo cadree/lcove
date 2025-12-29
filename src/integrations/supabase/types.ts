@@ -2442,6 +2442,7 @@ export type Database = {
           music_visualizer_enabled: boolean | null
           overlay_opacity: number | null
           overlay_tint: string | null
+          profile_layout: Json | null
           profile_music_album_art_url: string | null
           profile_music_album_name: string | null
           profile_music_artist: string | null
@@ -2476,6 +2477,7 @@ export type Database = {
           music_visualizer_enabled?: boolean | null
           overlay_opacity?: number | null
           overlay_tint?: string | null
+          profile_layout?: Json | null
           profile_music_album_art_url?: string | null
           profile_music_album_name?: string | null
           profile_music_artist?: string | null
@@ -2510,6 +2512,7 @@ export type Database = {
           music_visualizer_enabled?: boolean | null
           overlay_opacity?: number | null
           overlay_tint?: string | null
+          profile_layout?: Json | null
           profile_music_album_art_url?: string | null
           profile_music_album_name?: string | null
           profile_music_artist?: string | null
