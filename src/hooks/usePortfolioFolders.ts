@@ -196,9 +196,10 @@ export function useFolderPosts(folderId: string | null, userId?: string) {
       if (postsError) throw postsError;
 
       // Fetch portfolio items (direct uploads) for this folder
-      const { data: items, error: itemsError } = await supabase
+      // Note: folder_id was just added via migration, cast to handle type lag
+      const { data: items, error: itemsError } = await (supabase
         .from('portfolio_items')
-        .select('*')
+        .select('*') as any)
         .eq('folder_id', folderId)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
@@ -213,9 +214,9 @@ export function useFolderPosts(folderId: string | null, userId?: string) {
           user_id: i.user_id,
           media_url: i.media_url,
           media_type: i.media_type,
-          content: i.caption,
+          content: i.description || i.title || '',
           created_at: i.created_at,
-          folder_id: i.folder_id,
+          folder_id: folderId,
           source: 'portfolio_item' as const
         })),
       ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
