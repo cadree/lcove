@@ -98,18 +98,17 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
           .from('media')
           .getPublicUrl(filePath);
 
-        // Create a post with this media and assign to folder
-        const { error: postError } = await supabase
-          .from('posts')
+        // Create a portfolio item (separate from posts)
+        const { error: itemError } = await supabase
+          .from('portfolio_items')
           .insert({
             user_id: user.id,
+            folder_id: folder.id,
             media_url: publicUrl,
             media_type: mediaType,
-            content: '',
-            folder_id: folder.id,
           });
 
-        if (postError) throw postError;
+        if (itemError) throw itemError;
       }
 
       toast.success(`${files.length} item${files.length > 1 ? 's' : ''} added!`);

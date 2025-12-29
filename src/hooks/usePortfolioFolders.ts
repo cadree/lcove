@@ -185,15 +185,42 @@ export function useFolderPosts(folderId: string | null, userId?: string) {
     queryFn: async () => {
       if (!folderId || !userId) return [];
 
-      const { data, error } = await supabase
+      // Fetch posts assigned to this folder
+      const { data: posts, error: postsError } = await supabase
         .from('posts')
         .select('*')
         .eq('folder_id', folderId)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data || [];
+      if (postsError) throw postsError;
+
+      // Fetch portfolio items (direct uploads) for this folder
+      const { data: items, error: itemsError } = await supabase
+        .from('portfolio_items')
+        .select('*')
+        .eq('folder_id', folderId)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (itemsError) throw itemsError;
+
+      // Combine and sort by created_at
+      const combined = [
+        ...(posts || []).map(p => ({ ...p, source: 'post' as const })),
+        ...(items || []).map(i => ({ 
+          id: i.id,
+          user_id: i.user_id,
+          media_url: i.media_url,
+          media_type: i.media_type,
+          content: i.caption,
+          created_at: i.created_at,
+          folder_id: i.folder_id,
+          source: 'portfolio_item' as const
+        })),
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      return combined;
     },
     enabled: !!folderId && !!userId,
   });
