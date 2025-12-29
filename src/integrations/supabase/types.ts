@@ -2251,6 +2251,7 @@ export type Database = {
           created_at: string
           description: string | null
           display_order: number
+          folder_id: string | null
           id: string
           media_type: string
           media_url: string
@@ -2262,6 +2263,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           display_order?: number
+          folder_id?: string | null
           id?: string
           media_type?: string
           media_url: string
@@ -2273,6 +2275,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           display_order?: number
+          folder_id?: string | null
           id?: string
           media_type?: string
           media_url?: string
@@ -2280,7 +2283,15 @@ export type Database = {
           title?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "portfolio_items_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "portfolio_folders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       post_comments: {
         Row: {
