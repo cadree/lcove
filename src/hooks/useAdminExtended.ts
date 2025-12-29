@@ -390,13 +390,23 @@ export function useSendIndividualMessage() {
   return useMutation({
     mutationFn: async (data: {
       userId: string;
+      title: string;
       message: string;
       sendDm: boolean;
       sendEmail: boolean;
       sendSms: boolean;
     }) => {
       const { data: result, error } = await supabase.functions.invoke("send-individual-message", {
-        body: data,
+        body: {
+          target_user_id: data.userId,
+          title: data.title,
+          message: data.message,
+          delivery_methods: {
+            dm: data.sendDm,
+            email: data.sendEmail,
+            sms: data.sendSms,
+          },
+        },
       });
 
       if (error) throw error;
@@ -411,6 +421,57 @@ export function useSendIndividualMessage() {
     onError: (error: Error) => {
       console.error("Send individual message error:", error);
       toast.error(`Failed to send message: ${error.message}`);
+    },
+  });
+}
+
+// Send message to multiple selected users
+export function useSendMultiUserMessage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      userIds: string[];
+      title: string;
+      message: string;
+      sendDm: boolean;
+      sendEmail: boolean;
+      sendSms: boolean;
+    }) => {
+      const results = await Promise.allSettled(
+        data.userIds.map(async (userId) => {
+          const { data: result, error } = await supabase.functions.invoke("send-individual-message", {
+            body: {
+              target_user_id: userId,
+              title: data.title,
+              message: data.message,
+              delivery_methods: {
+                dm: data.sendDm,
+                email: data.sendEmail,
+                sms: data.sendSms,
+              },
+            },
+          });
+
+          if (error) throw error;
+          if (result?.error) throw new Error(result.error);
+
+          return { userId, result };
+        })
+      );
+
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.filter((r) => r.status === "rejected").length;
+      
+      return { succeeded, failed, total: data.userIds.length };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-actions"] });
+      toast.success(`Message sent to ${result.succeeded}/${result.total} users`);
+    },
+    onError: (error: Error) => {
+      console.error("Send multi-user message error:", error);
+      toast.error(`Failed to send messages: ${error.message}`);
     },
   });
 }
