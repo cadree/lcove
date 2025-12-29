@@ -2,6 +2,14 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const EMAIL_FROM = "ETHER <notifications@etherbylcove.com>";
+
+// Validate sender email - block @resend.dev domain
+const validateSenderEmail = (from: string): void => {
+  if (from.includes("@resend.dev")) {
+    throw new Error("Invalid sender domain: @resend.dev is not allowed. Use verified domain @etherbylcove.com");
+  }
+};
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,7 +59,7 @@ const getEmailTemplate = (type: string, title: string, body: string) => {
                     <p style="color: #a0a0a0; font-size: 16px; line-height: 1.6; margin: 0 0 30px;">
                       ${body}
                     </p>
-                    <a href="https://ether.community/notifications" 
+                    <a href="https://etherbylcove.com/notifications" 
                        style="display: inline-block; background: ${color}; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                       View in App
                     </a>
@@ -82,6 +90,9 @@ serve(async (req) => {
   }
 
   try {
+    // Validate sender email before processing
+    validateSenderEmail(EMAIL_FROM);
+    
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -126,7 +137,7 @@ serve(async (req) => {
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: "ETHER <notifications@resend.dev>",
+        from: EMAIL_FROM,
         to: [userData.user.email],
         subject: title,
         html,
@@ -134,6 +145,15 @@ serve(async (req) => {
     });
 
     const emailData = await emailResponse.json();
+    
+    if (!emailResponse.ok) {
+      console.error("Email send failed:", emailData);
+      return new Response(
+        JSON.stringify({ error: "Failed to send email", details: emailData }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     console.log("Email sent successfully:", emailData);
 
     return new Response(

@@ -6,6 +6,15 @@ const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
 const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
 const TWILIO_PHONE_NUMBER = Deno.env.get("TWILIO_PHONE_NUMBER");
 
+const EMAIL_FROM = "ETHER <notifications@etherbylcove.com>";
+
+// Validate sender email - block @resend.dev domain
+const validateSenderEmail = (from: string): void => {
+  if (from.includes("@resend.dev")) {
+    throw new Error("Invalid sender domain: @resend.dev is not allowed. Use verified domain @etherbylcove.com");
+  }
+};
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -44,7 +53,7 @@ const getEmailTemplate = (title: string, body: string) => {
                     <p style="color: #a0a0a0; font-size: 16px; line-height: 1.6; margin: 0 0 30px;">
                       ${body}
                     </p>
-                    <a href="https://ether.community/notifications" 
+                    <a href="https://etherbylcove.com/notifications" 
                        style="display: inline-block; background: #E91E63; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                       View in App
                     </a>
@@ -79,6 +88,9 @@ serve(async (req) => {
   }
 
   try {
+    // Validate sender email before processing
+    validateSenderEmail(EMAIL_FROM);
+    
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -216,7 +228,7 @@ serve(async (req) => {
                   Authorization: `Bearer ${RESEND_API_KEY}`,
                 },
                 body: JSON.stringify({
-                  from: "ETHER <notifications@resend.dev>",
+                  from: EMAIL_FROM,
                   to: [userData.user.email],
                   subject: title,
                   html: getEmailTemplate(title, message),
