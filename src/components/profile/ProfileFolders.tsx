@@ -48,13 +48,13 @@ export function ProfileFolders({ userId, isOwner, onFolderClick }: ProfileFolder
       const filePath = `folder-covers/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('posts')
+        .from('media')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('posts')
+        .from('media')
         .getPublicUrl(filePath);
 
       setFormData(prev => ({ ...prev, cover_image_url: publicUrl }));
