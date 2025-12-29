@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { motion } from 'framer-motion';
-import etherLogo from '@/assets/ether-logo.avif';
+import lcBearLogo from '@/assets/lc-bear-logo.png';
 
 interface AccessGateProps {
   children: React.ReactNode;
@@ -114,7 +114,7 @@ const AccessGate = ({ children }: AccessGateProps) => {
               transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
               className="w-16 h-16 mx-auto mb-6 rounded-full bg-primary/20 flex items-center justify-center"
             >
-              <img src={etherLogo} alt="Ether" className="w-10 h-10 object-contain" />
+              <img src={lcBearLogo} alt="Ether" className="w-10 h-10 object-contain" />
             </motion.div>
             
             <h2 className="font-display text-3xl md:text-4xl text-foreground mb-4">
