@@ -5,18 +5,20 @@ import {
   Calendar, 
   FolderKanban, 
   Radio, 
-  Compass,
-  TrendingUp,
-  Sparkles,
   Film,
   Store,
-  Wallet
+  Wallet,
+  MessageCircle,
+  Compass,
+  Sparkles
 } from "lucide-react";
 import HomeTopBar from "@/components/home/HomeTopBar";
-import HomeHeroCard from "@/components/home/HomeHeroCard";
-import HomeSectionHeader from "@/components/home/HomeSectionHeader";
-import HomeMiniCard from "@/components/home/HomeMiniCard";
-import HomeListRow from "@/components/home/HomeListRow";
+import WidgetHeroCard from "@/components/home/WidgetHeroCard";
+import WidgetStatChip from "@/components/home/WidgetStatChip";
+import WidgetAppIcon from "@/components/home/WidgetAppIcon";
+import WidgetMiniCard from "@/components/home/WidgetMiniCard";
+import WidgetListRow from "@/components/home/WidgetListRow";
+import WidgetSectionHeader from "@/components/home/WidgetSectionHeader";
 import BottomNav from "@/components/navigation/BottomNav";
 import {
   Drawer,
@@ -27,23 +29,35 @@ import {
 } from "@/components/ui/drawer";
 import { usePlatformStats } from "@/hooks/usePlatformStats";
 
-const quickAccessItems = [
-  { title: "Projects", label: "Collaborate", icon: FolderKanban, link: "/projects" },
-  { title: "Calendar", label: "Events", icon: Calendar, link: "/calendar" },
-  { title: "Community", label: "Connect", icon: Users, link: "/community" },
-  { title: "Live", label: "Streaming", icon: Radio, link: "/live" },
+const appIcons = [
+  { title: "Projects", icon: FolderKanban, link: "/projects" },
+  { title: "Calendar", icon: Calendar, link: "/calendar" },
+  { title: "Community", icon: Users, link: "/community" },
+  { title: "Live", icon: Radio, link: "/live" },
+];
+
+const quickAccessCards = [
+  { title: "Cinema", subtitle: "Films & networks", tag: "Watch", icon: Film, link: "/cinema" },
+  { title: "Mall", subtitle: "Creator stores", tag: "Shop", icon: Store, link: "/mall" },
+  { title: "Wallet", subtitle: "Credits & payments", tag: "Manage", icon: Wallet, link: "/wallet" },
+  { title: "Messages", subtitle: "Conversations", tag: "Chat", icon: MessageCircle, link: "/messages" },
 ];
 
 const exploreItems = [
-  { title: "Cinema", subtitle: "Creator networks & films", icon: Film, link: "/cinema" },
-  { title: "Mall", subtitle: "Shop creator stores", icon: Store, link: "/mall" },
-  { title: "Wallet", subtitle: "Credits & payments", icon: Wallet, link: "/wallet" },
   { title: "Directory", subtitle: "Find collaborators", icon: Users, link: "/directory" },
+  { title: "Feed", subtitle: "Community updates", icon: Compass, link: "/feed" },
+  { title: "Featured", subtitle: "Spotlight creators", icon: Sparkles, link: "/directory" },
 ];
 
 const Index = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { data: stats } = usePlatformStats();
+
+  const statChips = [
+    { value: stats?.totalCreatives || "—", label: "Creators" },
+    { value: stats?.totalProjects || "—", label: "Projects" },
+    { value: stats?.totalCities || "—", label: "Cities" },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -53,57 +67,47 @@ const Index = () => {
       {/* Top Bar */}
       <HomeTopBar 
         onMenuClick={() => setDrawerOpen(true)} 
-        subtitle="Discover"
+        subtitle="Home"
       />
       
       {/* Main Content */}
-      <main className="relative pb-28">
+      <main className="relative pb-28 space-y-4">
         {/* Hero Card */}
-        <HomeHeroCard 
+        <WidgetHeroCard 
+          badge="Welcome"
           headline="Create. Connect. Collaborate."
-          subtitle="Your creative journey starts here. Join a community built for artists, by artists."
+          subtext="Your creative journey starts here"
           ctaText="Get Started"
           ctaLink="/auth"
         />
 
         {/* Stats Row */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="flex justify-center gap-6 px-4 py-6"
-        >
-          <div className="text-center">
-            <p className="font-display text-xl font-semibold text-foreground">
-              {stats?.totalCreatives?.toLocaleString() || "—"}
-            </p>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Creators</p>
-          </div>
-          <div className="w-px bg-border/50" />
-          <div className="text-center">
-            <p className="font-display text-xl font-semibold text-foreground">
-              {stats?.totalProjects?.toLocaleString() || "—"}
-            </p>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Projects</p>
-          </div>
-          <div className="w-px bg-border/50" />
-          <div className="text-center">
-            <p className="font-display text-xl font-semibold text-foreground">
-              {stats?.totalCities?.toLocaleString() || "—"}
-            </p>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Cities</p>
-          </div>
-        </motion.div>
+        <WidgetStatChip stats={statChips} />
 
-        {/* Quick Access Section */}
+        {/* App Icons Section */}
+        <section className="pt-2">
+          <WidgetSectionHeader title="Quick Launch" />
+          <div className="flex justify-center gap-4 px-4">
+            {appIcons.map((item, index) => (
+              <WidgetAppIcon 
+                key={item.title}
+                {...item}
+                index={index}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* Quick Access Cards */}
         <section className="pt-4">
-          <HomeSectionHeader 
+          <WidgetSectionHeader 
             title="Quick Access"
-            subtitle="Jump right in"
+            link="/feed"
+            linkText="More"
           />
           <div className="grid grid-cols-2 gap-3 px-4">
-            {quickAccessItems.map((item, index) => (
-              <HomeMiniCard 
+            {quickAccessCards.map((item, index) => (
+              <WidgetMiniCard 
                 key={item.title}
                 {...item}
                 index={index}
@@ -113,79 +117,19 @@ const Index = () => {
         </section>
 
         {/* Explore Section */}
-        <section className="pt-8">
-          <HomeSectionHeader 
+        <section className="pt-4">
+          <WidgetSectionHeader 
             title="Explore"
-            subtitle="Discover more"
             link="/feed"
-            linkText="See all"
           />
-          <div className="space-y-1">
+          <div className="space-y-1 px-0">
             {exploreItems.map((item, index) => (
-              <HomeListRow 
+              <WidgetListRow 
                 key={item.title}
                 {...item}
                 index={index}
               />
             ))}
-          </div>
-        </section>
-
-        {/* Trending Section */}
-        <section className="pt-8">
-          <HomeSectionHeader 
-            title="Trending Now"
-            subtitle="What's hot in the community"
-            link="/feed"
-          />
-          <div className="space-y-1">
-            <HomeListRow
-              title="New Project Launches"
-              subtitle="12 projects started this week"
-              meta="New"
-              icon={TrendingUp}
-              link="/projects"
-              index={0}
-            />
-            <HomeListRow
-              title="Featured Creators"
-              subtitle="Spotlight on rising talent"
-              icon={Sparkles}
-              link="/directory"
-              index={1}
-            />
-            <HomeListRow
-              title="Upcoming Events"
-              subtitle="Don't miss out"
-              icon={Calendar}
-              link="/calendar"
-              index={2}
-            />
-          </div>
-        </section>
-
-        {/* Community Section */}
-        <section className="pt-8 pb-4">
-          <HomeSectionHeader 
-            title="Your Community"
-            subtitle="Stay connected"
-            link="/community"
-          />
-          <div className="space-y-1">
-            <HomeListRow
-              title="Community Feed"
-              subtitle="Latest updates & announcements"
-              icon={Compass}
-              link="/community"
-              index={0}
-            />
-            <HomeListRow
-              title="Messages"
-              subtitle="Conversations with creators"
-              icon={Users}
-              link="/messages"
-              index={1}
-            />
           </div>
         </section>
       </main>
@@ -215,7 +159,7 @@ const Index = () => {
               <a
                 key={item.title}
                 href={item.link}
-                className="block px-4 py-3 rounded-xl text-foreground hover:bg-accent/30 transition-colors"
+                className="block px-4 py-3 rounded-xl text-foreground hover:bg-accent/30 transition-colors tap-target"
                 onClick={() => setDrawerOpen(false)}
               >
                 {item.title}
