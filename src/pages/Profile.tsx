@@ -1,40 +1,14 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Settings,
-  MapPin,
-  Calendar,
-  Store,
-  Coins,
-  Edit,
-  BookOpen,
-  Heart,
-  Crown,
-  Camera,
-  Loader2,
-  Sparkles,
-  ArrowLeft,
-  MessageCircle,
-  Plus,
-  Grid,
-  Bookmark,
-  FileText,
-  FolderKanban,
-  Rocket,
-  ChevronRight,
-  Star,
-  Shield,
-} from "lucide-react";
+import { Loader2, Plus, Grid, Bookmark, FileText, ArrowLeft } from "lucide-react";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
 import { ProfileCustomizationDialog } from "@/components/profile/ProfileCustomizationDialog";
 import { ProfileRecordPlayer } from "@/components/profile/ProfileRecordPlayer";
-import { ProfileEffects, HolographicCard, NeonText } from "@/components/profile/ProfileEffects";
 import { CreatePostDialog } from "@/components/profile/CreatePostDialog";
 import { ProfilePostsGrid } from "@/components/profile/ProfilePostsGrid";
 import { PostDetailModal } from "@/components/profile/PostDetailModal";
@@ -42,10 +16,12 @@ import { CreateBlogDialog } from "@/components/profile/CreateBlogDialog";
 import { ProfileBlogsGrid } from "@/components/profile/ProfileBlogsGrid";
 import { UserReviews } from "@/components/profile/UserReviews";
 import { CreatorModuleTabs } from "@/components/profile/CreatorModuleTabs";
-import { ReputationScore } from "@/components/profile/ReputationScore";
-import { VerificationBadge } from "@/components/profile/VerificationBadge";
 import { EditProfileDetailsDialog } from "@/components/profile/EditProfileDetailsDialog";
-import { Badge } from "@/components/ui/badge";
+import { ProfileHeader } from "@/components/profile/ProfileHeader";
+import { ProfileStats } from "@/components/profile/ProfileStats";
+import { ProfileAboutSection } from "@/components/profile/ProfileAboutSection";
+import { ProfileFolders } from "@/components/profile/ProfileFolders";
+import { ProfileQuickLinks } from "@/components/profile/ProfileQuickLinks";
 import { useProfile } from "@/hooks/useProfile";
 import { useConversations } from "@/hooks/useConversations";
 import { useAuth } from "@/contexts/AuthContext";
@@ -56,10 +32,8 @@ import { useProfileBlogs, BlogPost } from "@/hooks/useProfileBlogs";
 import { useCreatorRoles } from "@/hooks/useCreatorModules";
 import { useUserSkills, useUserPassions, useUserCreativeRoles } from "@/hooks/useUserDetails";
 import { useUserIsAdmin } from "@/hooks/useUserIsAdmin";
-import { THEME_PRESETS, ThemePreset } from "@/lib/profileThemes";
-import { supabase } from "@/integrations/supabase/client";
+import { usePortfolioFolders, PortfolioFolder } from "@/hooks/usePortfolioFolders";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { ProfilePost } from "@/types/post";
 
 const Profile = () => {
@@ -67,7 +41,6 @@ const Profile = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   
-  // If viewing another user's profile, use their ID; otherwise use current user's ID
   const targetUserId = urlUserId || user?.id;
   const isOwnProfile = !urlUserId || urlUserId === user?.id;
   
@@ -81,7 +54,9 @@ const Profile = () => {
   const { data: userPassions = [] } = useUserPassions(targetUserId);
   const { data: userCreativeRoles = [] } = useUserCreativeRoles(targetUserId);
   const { data: isProfileAdmin = false } = useUserIsAdmin(targetUserId);
+  const { folders } = usePortfolioFolders(targetUserId);
   const { createDirectConversation } = useConversations();
+  
   const [showMusicDialog, setShowMusicDialog] = useState(false);
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
   const [showCreatePostDialog, setShowCreatePostDialog] = useState(false);
@@ -89,13 +64,11 @@ const Profile = () => {
   const [showEditDetailsDialog, setShowEditDetailsDialog] = useState(false);
   const [selectedPost, setSelectedPost] = useState<ProfilePost | null>(null);
   const [selectedBlog, setSelectedBlog] = useState<BlogPost | null>(null);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFolder, setSelectedFolder] = useState<PortfolioFolder | null>(null);
   const volumeSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const hasCreatorRoles = creatorRoles.length > 0;
 
-  // Debounced volume save
   const handleVolumeChange = useCallback((volume: number) => {
     if (volumeSaveTimeoutRef.current) {
       clearTimeout(volumeSaveTimeoutRef.current);
@@ -105,37 +78,18 @@ const Profile = () => {
     }, 500);
   }, [saveCustomization]);
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
+  const handleAvatarUpdate = async (url: string) => {
+    await updateProfile({ avatar_url: url });
+  };
 
-    setUploadingAvatar(true);
+  const handleMessageClick = async () => {
+    if (!targetUserId) return;
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/avatar.${fileExt}`;
-
-      // Upload to storage
-      const { error: uploadError } = await supabase.storage
-        .from('media')
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('media')
-        .getPublicUrl(fileName);
-
-      // Update profile
-      const { error: updateError } = await updateProfile({ avatar_url: publicUrl });
-      if (updateError) throw updateError;
-
-      toast.success('Profile picture updated!');
+      const conversation = await createDirectConversation.mutateAsync(targetUserId);
+      navigate(`/messages?chat=${conversation.id}`);
     } catch (error) {
-      console.error('Avatar upload error:', error);
-      toast.error('Failed to upload profile picture');
-    } finally {
-      setUploadingAvatar(false);
+      console.error('Failed to create conversation:', error);
+      toast.error('Failed to start conversation');
     }
   };
 
@@ -149,13 +103,12 @@ const Profile = () => {
     );
   }
 
-  // If viewing own profile but not logged in
   if (!user && !urlUserId) {
     return (
       <PageLayout>
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
           <h2 className="font-display text-2xl text-foreground">Sign in to view your profile</h2>
-          <p className="text-muted-foreground text-center">Create an account or sign in to customize your profile and connect with the community.</p>
+          <p className="text-muted-foreground text-center">Create an account or sign in to customize your profile.</p>
           <Button asChild>
             <Link to="/auth">Sign In</Link>
           </Button>
@@ -164,13 +117,12 @@ const Profile = () => {
     );
   }
 
-  // If profile not found for the given userId
   if (!loading && !profile && urlUserId) {
     return (
       <PageLayout>
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
           <h2 className="font-display text-2xl text-foreground">Profile not found</h2>
-          <p className="text-muted-foreground text-center">This user doesn't exist or their profile is not available.</p>
+          <p className="text-muted-foreground text-center">This user doesn't exist.</p>
           <Button onClick={() => navigate(-1)}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Go Back
@@ -180,467 +132,71 @@ const Profile = () => {
     );
   }
 
-  // Default values for display
   const displayName = profile?.display_name || 'Creative';
   const bio = profile?.bio || 'Welcome to my profile!';
   const city = profile?.city || 'Location not set';
   const avatarUrl = profile?.avatar_url;
 
-  // Get theme preset
-  const themePreset = (customization?.theme_preset as ThemePreset) || 'clean_modern';
-  const theme = THEME_PRESETS[themePreset];
-  const isCyberpunk = themePreset === 'cyberpunk';
-  const isRetro = themePreset === 'retro_spacehey';
-
-  // Determine background styles based on customization
-  const getBackgroundStyle = () => {
-    if (!customization) {
-      return "bg-gradient-to-br from-primary/30 via-background to-accent/20";
-    }
-    
-    if (customization.background_type === 'image') {
-      return "";
-    }
-    if (customization.background_type === 'color') {
-      return customization.background_value;
-    }
-    // gradient
-    return `bg-gradient-to-br ${customization.background_value}`;
-  };
-
-  const backgroundImageStyle = customization?.background_type === 'image' 
-    ? { 
-        backgroundImage: `url(${customization.background_value})`, 
-        backgroundSize: 'cover', 
-        backgroundPosition: 'center',
-        filter: customization.background_blur ? `blur(${customization.background_blur}px)` : undefined,
-        opacity: customization.background_opacity ?? 1,
-      }
-    : {
-        opacity: customization?.background_opacity ?? 1,
-      };
-
-  // Get theme-specific card styles
-  const getCardStyle = () => {
-    if (isCyberpunk) return "bg-black/90 border border-cyan-500/30 rounded-none";
-    if (isRetro) return "bg-black/80 border-2 border-pink-500/50 rounded-lg";
-    return "glass-strong rounded-xl";
-  };
-
-  // Get theme-specific text styles
-  const getHeadingStyle = () => {
-    if (customization?.custom_font) {
-      return { fontFamily: customization.custom_font };
-    }
-    return {};
-  };
-
-  // Get accent color
-  const accentColor = customization?.accent_color_override || theme.primaryAccent;
-
   return (
     <PageLayout showNotificationBell={false}>
-      <div
-        className="min-h-screen relative"
-        style={getHeadingStyle()}
-      >
-        {/* Cover Image / Background */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6 }}
-          className={cn("relative h-48 sm:h-64 overflow-hidden", getBackgroundStyle())}
-        >
-          {/* Background with opacity/blur */}
-          {customization?.background_type === 'image' && customization.background_value && (
-            <div 
-              className="absolute inset-0"
-              style={backgroundImageStyle}
-            />
-          )}
+      <div className="min-h-screen pb-20">
+        {/* Header Section */}
+        <ProfileHeader
+          displayName={displayName}
+          avatarUrl={avatarUrl}
+          city={city}
+          isOwnProfile={isOwnProfile}
+          isProfileAdmin={isProfileAdmin}
+          customization={customization}
+          onSettingsClick={() => navigate('/settings')}
+          onCustomizeClick={() => setShowCustomizationDialog(true)}
+          onEditProfileClick={() => setShowEditDetailsDialog(true)}
+          onMessageClick={handleMessageClick}
+          onAvatarUpdate={handleAvatarUpdate}
+          userId={targetUserId || ''}
+        />
 
-          {/* Overlay Tint */}
-          {customization?.overlay_tint && (
-            <div 
-              className="absolute inset-0"
-              style={{ 
-                backgroundColor: customization.overlay_tint,
-                opacity: customization.overlay_opacity ?? 0.3,
-              }}
-            />
-          )}
+        {/* Stats Section */}
+        <ProfileStats
+          credits={credits?.balance || 0}
+          projectCount={0}
+          eventCount={0}
+        />
 
-          {/* Theme Effects */}
-          <ProfileEffects
-            grain={customization?.effect_grain}
-            scanlines={customization?.effect_scanlines}
-            neonGlow={customization?.effect_neon_glow}
-            holographic={customization?.effect_holographic}
-            motionGradient={customization?.effect_motion_gradient}
+        {/* About Section */}
+        <ProfileAboutSection
+          bio={bio}
+          creativeRoles={userCreativeRoles}
+          skills={userSkills}
+          passions={userPassions}
+          isOwner={isOwnProfile}
+          onEditClick={() => setShowEditDetailsDialog(true)}
+        />
+
+        {/* Portfolio Folders Section */}
+        {(folders.length > 0 || isOwnProfile) && (
+          <ProfileFolders
+            userId={targetUserId || ''}
+            isOwner={isOwnProfile}
+            onFolderClick={(folder) => setSelectedFolder(folder)}
           />
+        )}
 
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-          
-          {/* Back Button - show when viewing other profiles */}
-          {!isOwnProfile && (
-            <Button
-              variant="glass"
-              size="icon"
-              className="absolute top-4 left-4 w-10 h-10 z-10"
-              onClick={() => navigate(-1)}
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          )}
-          
-          {/* Settings Button - only show for own profile */}
-          {isOwnProfile && (
-            <Button
-              variant="glass"
-              size="icon"
-              className="absolute top-4 right-4 w-10 h-10 z-10"
-              onClick={() => navigate('/settings')}
-            >
-              <Settings className="w-5 h-5" />
-            </Button>
-          )}
-
-          {/* Customize Button - only show for own profile */}
-          {isOwnProfile && (
-            <Button
-              variant="glass"
-              size="icon"
-              className="absolute top-4 right-16 w-10 h-10 z-10"
-              onClick={() => setShowCustomizationDialog(true)}
-            >
-              <Sparkles className="w-5 h-5" />
-            </Button>
-          )}
-        </motion.div>
-
-        <div className="px-6 -mt-16 relative z-10">
-          {/* Avatar & Basic Info */}
+        {/* Creator Module Tabs */}
+        {targetUserId && hasCreatorRoles && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="flex flex-col sm:flex-row items-start gap-4 mb-6"
+            transition={{ delay: 0.5 }}
+            className="px-5 py-4"
           >
-            {/* Avatar with upload */}
-            <div className="relative group">
-              <Avatar className="w-28 h-28 border-4 border-background shadow-lg">
-                <AvatarImage src={avatarUrl || undefined} />
-                <AvatarFallback className="bg-muted text-muted-foreground text-2xl">
-                  {displayName.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              
-              {/* Upload overlay - only show for own profile */}
-              {isOwnProfile && (
-                <>
-                  <button
-                    onClick={() => avatarInputRef.current?.click()}
-                    disabled={uploadingAvatar}
-                    className="absolute inset-0 rounded-full bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
-                  >
-                    {uploadingAvatar ? (
-                      <Loader2 className="w-6 h-6 animate-spin text-foreground" />
-                    ) : (
-                      <Camera className="w-6 h-6 text-foreground" />
-                    )}
-                  </button>
-                  
-                  <input
-                    ref={avatarInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarUpload}
-                    className="hidden"
-                  />
-                </>
-              )}
-            </div>
-
-            {/* Info */}
-            <div className="flex-1 pt-2">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <h1 className="font-display text-2xl sm:text-3xl font-medium text-foreground">
-                  {displayName}
-                </h1>
-                {isProfileAdmin && (
-                  <Badge className="bg-primary/20 text-primary border-primary/30 gap-1">
-                    <Shield className="w-3 h-3" />
-                    Admin
-                  </Badge>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground/70 flex items-center gap-1">
-                <MapPin className="w-4 h-4" />
-                {city}
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            {isOwnProfile ? (
-              <Button variant="outline" className="hidden sm:flex">
-                <Edit className="w-4 h-4 mr-2" />
-                Edit Profile
-              </Button>
-            ) : (
-              <Button 
-                variant="default" 
-                className="hidden sm:flex"
-                onClick={() => navigate('/messages')}
-              >
-                <MessageCircle className="w-4 h-4 mr-2" />
-                Message
-              </Button>
-            )}
+            <CreatorModuleTabs userId={targetUserId} isOwner={isOwnProfile} />
           </motion.div>
+        )}
 
-          {/* Stats */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="grid grid-cols-3 gap-4 mb-8"
-          >
-            {isCyberpunk ? (
-              <>
-                <HolographicCard className={cn(getCardStyle(), "p-4 text-center")}>
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <Coins className="w-4 h-4" style={{ color: accentColor }} />
-                    <NeonText color={accentColor} className="font-mono text-xl font-bold">
-                      {credits?.balance || 0}
-                    </NeonText>
-                  </div>
-                  <span className="text-xs text-cyan-400/70">LC Credits</span>
-                </HolographicCard>
-                <HolographicCard className={cn(getCardStyle(), "p-4 text-center")}>
-                  <NeonText color={accentColor} className="font-mono text-xl font-bold block mb-1">
-                    0
-                  </NeonText>
-                  <span className="text-xs text-cyan-400/70">Projects</span>
-                </HolographicCard>
-                <HolographicCard className={cn(getCardStyle(), "p-4 text-center")}>
-                  <NeonText color={accentColor} className="font-mono text-xl font-bold block mb-1">
-                    0
-                  </NeonText>
-                  <span className="text-xs text-cyan-400/70">Events</span>
-                </HolographicCard>
-              </>
-            ) : (
-              <>
-                <div className={cn(getCardStyle(), "p-4 text-center")}>
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <Coins className="w-4 h-4" style={{ color: isRetro ? '#ff69b4' : undefined }} />
-                    <span 
-                      className="font-display text-xl font-medium"
-                      style={{ color: isRetro ? '#ff69b4' : undefined }}
-                    >
-                      {credits?.balance || 0}
-                    </span>
-                  </div>
-                  <span className={cn("text-xs", isRetro ? "text-pink-300" : "text-muted-foreground")}>LC Credits</span>
-                </div>
-                <div className={cn(getCardStyle(), "p-4 text-center")}>
-                  <span 
-                    className="font-display text-xl font-medium block mb-1"
-                    style={{ color: isRetro ? '#00ffff' : undefined }}
-                  >
-                    0
-                  </span>
-                  <span className={cn("text-xs", isRetro ? "text-cyan-300" : "text-muted-foreground")}>Projects</span>
-                </div>
-                <div className={cn(getCardStyle(), "p-4 text-center")}>
-                  <span 
-                    className="font-display text-xl font-medium block mb-1"
-                    style={{ color: isRetro ? '#ff69b4' : undefined }}
-                  >
-                    0
-                  </span>
-                  <span className={cn("text-xs", isRetro ? "text-pink-300" : "text-muted-foreground")}>Events</span>
-                </div>
-              </>
-            )}
-          </motion.div>
-
-          {/* Bio */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="mb-8"
-          >
-            <h2 className="font-display text-lg font-medium text-foreground mb-3">About</h2>
-            <p className="text-muted-foreground leading-relaxed">{bio}</p>
-          </motion.div>
-
-          {/* Creative Roles, Skills, Passions */}
-          {(userCreativeRoles.length > 0 || userSkills.length > 0 || userPassions.length > 0 || isOwnProfile) && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.42 }}
-              className="mb-8"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-display text-lg font-medium text-foreground">About Me</h2>
-                {isOwnProfile && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowEditDetailsDialog(true)}
-                  >
-                    <Edit className="w-4 h-4 mr-1" />
-                    Edit
-                  </Button>
-                )}
-              </div>
-
-              {/* Creative Roles */}
-              {userCreativeRoles.length > 0 && (
-                <div className="mb-4">
-                  <h3 className="font-display text-sm font-medium text-foreground mb-2 flex items-center gap-2">
-                    <Crown className="w-4 h-4 text-primary" />
-                    Roles
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {userCreativeRoles.map((role) => (
-                      <Badge key={role.id} variant="default" className="bg-primary/20 text-primary border-primary/30">
-                        {role.name}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Skills */}
-              {userSkills.length > 0 && (
-                <div className="mb-4">
-                  <h3 className="font-display text-sm font-medium text-foreground mb-2 flex items-center gap-2">
-                    <Star className="w-4 h-4 text-accent" />
-                    Skills
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {userSkills.map((skill) => (
-                      <Badge key={skill.id} variant="secondary" className="bg-accent/20 text-accent-foreground border-accent/30">
-                        {skill.name}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Passions */}
-              {userPassions.length > 0 && (
-                <div>
-                  <h3 className="font-display text-sm font-medium text-foreground mb-2 flex items-center gap-2">
-                    <Heart className="w-4 h-4 text-destructive" />
-                    Passions
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {userPassions.map((passion) => (
-                      <Badge key={passion.id} variant="outline" className="border-destructive/30 text-muted-foreground">
-                        {passion.name}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Empty state for own profile */}
-              {isOwnProfile && userCreativeRoles.length === 0 && userSkills.length === 0 && userPassions.length === 0 && (
-                <div className="text-center py-6 text-muted-foreground">
-                  <p className="text-sm">Add your roles, skills, and passions to let others know what you're about.</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => setShowEditDetailsDialog(true)}
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add Details
-                  </Button>
-                </div>
-              )}
-            </motion.div>
-          )}
-
-          {/* Reputation Score - show for all profiles */}
-          {targetUserId && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.45 }}
-              className="mb-8"
-            >
-              <ReputationScore userId={targetUserId} />
-            </motion.div>
-          )}
-
-          {/* Creator Module Tabs - show if user has creator roles */}
-          {targetUserId && hasCreatorRoles && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.46 }}
-              className="mb-8"
-            >
-              <CreatorModuleTabs userId={targetUserId} isOwner={isOwnProfile} />
-            </motion.div>
-          )}
-
-          {/* Quick Actions - Projects */}
-          {isOwnProfile && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.45 }}
-              className="mb-8"
-            >
-              <h2 className="font-display text-lg font-medium text-foreground mb-3">Quick Actions</h2>
-              <div className="grid grid-cols-2 gap-3">
-                <Link 
-                  to="/projects"
-                  className={cn(
-                    getCardStyle(),
-                    "p-4 flex flex-col items-center gap-2 hover:scale-[1.02] transition-transform cursor-pointer"
-                  )}
-                >
-                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                    <FolderKanban className="w-5 h-5 text-primary" />
-                  </div>
-                  <span className="text-sm font-medium text-foreground">Browse Projects</span>
-                  <span className="text-xs text-muted-foreground text-center">Find collaborators</span>
-                </Link>
-                <Link 
-                  to="/projects"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    navigate('/projects');
-                    // Small delay to let the page load, then trigger the create dialog
-                    setTimeout(() => {
-                      document.querySelector<HTMLButtonElement>('[data-create-project]')?.click();
-                    }, 100);
-                  }}
-                  className={cn(
-                    getCardStyle(),
-                    "p-4 flex flex-col items-center gap-2 hover:scale-[1.02] transition-transform cursor-pointer border-primary/30"
-                  )}
-                >
-                  <div className="w-10 h-10 rounded-full bg-accent/30 flex items-center justify-center">
-                    <Rocket className="w-5 h-5 text-accent-foreground" />
-                  </div>
-                  <span className="text-sm font-medium text-foreground">Post a Project</span>
-                  <span className="text-xs text-muted-foreground text-center">Need help? Ask the community</span>
-                </Link>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Profile Music Record Player - shows when music is enabled */}
-          {customization?.profile_music_enabled && (customization?.profile_music_url || customization?.profile_music_preview_url) && (
+        {/* Profile Music */}
+        {customization?.profile_music_enabled && (customization?.profile_music_url || customization?.profile_music_preview_url) && (
+          <div className="px-5">
             <ProfileRecordPlayer
               musicUrl={customization.profile_music_url}
               previewUrl={customization.profile_music_preview_url}
@@ -653,234 +209,137 @@ const Profile = () => {
               isOwner={isOwner}
               onVolumeChange={handleVolumeChange}
             />
-          )}
+          </div>
+        )}
 
-          {/* Music Block - only show for own profile with connect option */}
-          {isOwnProfile && (
+        {isOwnProfile && (
+          <div className="px-5 py-4">
             <MusicProfileBlock onConnectClick={() => setShowMusicDialog(true)} />
-          )}
+          </div>
+        )}
 
-          {/* Posts Grid Section */}
+        {/* Posts/Blogs Grid */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.55 }}
+          className="px-5 py-4"
+        >
+          <Tabs defaultValue="posts" className="w-full">
+            <TabsList className="w-full justify-center border-b border-border rounded-none bg-transparent h-auto py-0 px-0">
+              <TabsTrigger 
+                value="posts" 
+                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
+              >
+                <Grid className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Posts</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="blogs" 
+                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
+              >
+                <FileText className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Blog</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="saved" 
+                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
+              >
+                <Bookmark className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Saved</span>
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="posts" className="mt-4">
+              <ProfilePostsGrid 
+                posts={posts}
+                onPostClick={(post) => setSelectedPost(post)}
+                isLoading={postsLoading}
+              />
+            </TabsContent>
+            <TabsContent value="blogs" className="mt-4">
+              <ProfileBlogsGrid 
+                blogs={blogs}
+                onBlogClick={(blog) => setSelectedBlog(blog)}
+                isLoading={blogsLoading}
+                isOwner={isOwnProfile}
+              />
+            </TabsContent>
+            <TabsContent value="saved" className="mt-4">
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-16 h-16 rounded-full border-2 border-muted-foreground/20 flex items-center justify-center mb-4">
+                  <Bookmark className="w-8 h-8 text-muted-foreground/40" />
+                </div>
+                <h3 className="text-lg font-medium text-foreground mb-2">Save</h3>
+                <p className="text-muted-foreground text-sm max-w-[220px]">
+                  Save content you want to see again.
+                </p>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </motion.div>
+
+        {/* User Reviews */}
+        {targetUserId && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="mt-8 mb-8"
+            transition={{ delay: 0.6 }}
+            className="px-5 py-4"
           >
-            <Tabs defaultValue="posts" className="w-full">
-              <TabsList className="w-full justify-center border-t border-border rounded-none bg-transparent h-auto py-0">
-                <TabsTrigger 
-                  value="posts" 
-                  className="flex-1 rounded-none border-t-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent py-3"
-                >
-                  <Grid className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Posts</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="blogs" 
-                  className="flex-1 rounded-none border-t-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent py-3"
-                >
-                  <FileText className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Blog</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="saved" 
-                  className="flex-1 rounded-none border-t-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent py-3"
-                >
-                  <Bookmark className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Saved</span>
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="posts" className="mt-4">
-                <ProfilePostsGrid 
-                  posts={posts}
-                  onPostClick={(post) => setSelectedPost(post)}
-                  isLoading={postsLoading}
-                />
-              </TabsContent>
-              <TabsContent value="blogs" className="mt-4">
-                <ProfileBlogsGrid 
-                  blogs={blogs}
-                  onBlogClick={(blog) => setSelectedBlog(blog)}
-                  isLoading={blogsLoading}
-                  isOwner={isOwnProfile}
-                />
-              </TabsContent>
-              <TabsContent value="saved" className="mt-4">
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="w-20 h-20 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center mb-4">
-                    <Bookmark className="w-10 h-10 text-muted-foreground/50" />
-                  </div>
-                  <h3 className="text-xl font-medium text-foreground mb-2">Save</h3>
-                  <p className="text-muted-foreground text-sm max-w-[250px]">
-                    Save photos and videos that you want to see again.
-                  </p>
-                </div>
-              </TabsContent>
-            </Tabs>
+            <UserReviews userId={targetUserId} />
           </motion.div>
+        )}
 
-          {/* User Reviews Section */}
-          {targetUserId && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.55 }}
-              className="mb-8"
-            >
-              <UserReviews userId={targetUserId} />
-            </motion.div>
-          )}
+        {/* Quick Links */}
+        <ProfileQuickLinks isOwner={isOwnProfile} />
 
-          {/* Additional Blocks - only show for own profile */}
-          {isOwnProfile && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              className="grid grid-cols-2 gap-4 mb-8"
-            >
-              <Link to="/store" className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors">
-                <Store className="w-6 h-6 text-muted-foreground mb-2" />
-                <span className="text-sm text-muted-foreground">My Store</span>
-              </Link>
-              <Link to="/calendar" className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors">
-                <Calendar className="w-6 h-6 text-muted-foreground mb-2" />
-                <span className="text-sm text-muted-foreground">My Events</span>
-              </Link>
-              <Link to="/fund" className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors">
-                <Heart className="w-6 h-6 text-primary mb-2" />
-                <span className="text-sm text-muted-foreground">Community Fund</span>
-              </Link>
-              <Link to="/membership" className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors">
-                <Crown className="w-6 h-6 text-amber-400 mb-2" />
-                <span className="text-sm text-muted-foreground">Membership</span>
-              </Link>
-              <Link to="/book" className="glass-strong rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors col-span-2">
-                <BookOpen className="w-6 h-6 text-foreground mb-2" />
-                <span className="text-sm text-muted-foreground">The Book of LCOVE</span>
-              </Link>
-            </motion.div>
-          )}
-
-          {/* Message button for mobile - only show on other users' profiles */}
-          {!isOwnProfile && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              className="mt-8 mb-8 sm:hidden"
-            >
-              <Button 
-                className="w-full"
-                onClick={async () => {
-                  if (!targetUserId) return;
-                  try {
-                    const conversation = await createDirectConversation.mutateAsync(targetUserId);
-                    navigate(`/messages?chat=${conversation.id}`);
-                  } catch (error) {
-                    console.error('Failed to create conversation:', error);
-                    toast.error('Failed to start conversation');
-                  }
-                }}
-                disabled={createDirectConversation.isPending}
-              >
-                {createDirectConversation.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                )}
-                Message {displayName}
-              </Button>
-            </motion.div>
-          )}
-
-          {/* Music Dialog - only for own profile */}
-          {isOwnProfile && (
-            <ConnectMusicDialog open={showMusicDialog} onOpenChange={setShowMusicDialog} />
-          )}
-          
-          {/* Customization Dialog - only for own profile */}
-          {isOwnProfile && (
-            <ProfileCustomizationDialog 
-              open={showCustomizationDialog} 
-              onOpenChange={setShowCustomizationDialog} 
-            />
-          )}
-
-          {/* Create Post Dialog - only for own profile */}
-          {isOwnProfile && (
-            <CreatePostDialog
-              open={showCreatePostDialog}
-              onOpenChange={setShowCreatePostDialog}
-              onCreatePost={async (data) => {
-                await createPost.mutateAsync(data);
-              }}
-              userAvatar={avatarUrl}
-              userName={displayName}
-            />
-          )}
-
-          {/* Create Blog Dialog - only for own profile */}
-          {isOwnProfile && (
-            <CreateBlogDialog
-              open={showCreateBlogDialog}
-              onOpenChange={setShowCreateBlogDialog}
-              onCreateBlog={async (data) => {
-                await createBlog.mutateAsync(data);
-              }}
-            />
-          )}
-
-          {/* Post Detail Modal */}
-          <PostDetailModal
-            post={selectedPost}
-            open={!!selectedPost}
-            onOpenChange={(open) => !open && setSelectedPost(null)}
-            isOwner={isOwnProfile}
-            onDelete={(postId) => {
-              deletePost.mutate(postId);
-              setSelectedPost(null);
-            }}
-          />
-
-          {/* Edit Profile Details Dialog */}
-          <EditProfileDetailsDialog
-            open={showEditDetailsDialog}
-            onOpenChange={setShowEditDetailsDialog}
-            currentSkills={userSkills}
-            currentPassions={userPassions}
-            currentRoles={userCreativeRoles}
-          />
-        </div>
-
-        {/* Floating Create Buttons - only for own profile */}
+        {/* Floating Create Button - Mobile */}
         {isOwnProfile && (
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.8, type: "spring", stiffness: 200 }}
-            className="fixed bottom-24 right-4 sm:bottom-8 sm:right-8 z-50 flex flex-col gap-3"
-          >
+          <div className="fixed bottom-24 right-5 z-40 flex flex-col gap-2 sm:hidden">
             <Button
-              size="lg"
-              variant="outline"
-              className="h-12 w-12 rounded-full shadow-lg bg-background/90 backdrop-blur-sm"
-              onClick={() => setShowCreateBlogDialog(true)}
-              title="Write Blog"
-            >
-              <FileText className="w-5 h-5" />
-            </Button>
-            <Button
-              size="lg"
-              className="h-14 w-14 rounded-full shadow-lg"
+              size="icon"
+              className="w-14 h-14 rounded-full shadow-lg"
               onClick={() => setShowCreatePostDialog(true)}
-              title="Create Post"
             >
               <Plus className="w-6 h-6" />
             </Button>
-          </motion.div>
+          </div>
         )}
+
+        {/* Dialogs */}
+        {isOwnProfile && (
+          <>
+            <ConnectMusicDialog open={showMusicDialog} onOpenChange={setShowMusicDialog} />
+            <ProfileCustomizationDialog open={showCustomizationDialog} onOpenChange={setShowCustomizationDialog} />
+            <CreatePostDialog
+              open={showCreatePostDialog}
+              onOpenChange={setShowCreatePostDialog}
+              onCreatePost={async (data) => { await createPost.mutateAsync(data); }}
+              userAvatar={avatarUrl}
+              userName={displayName}
+            />
+            <CreateBlogDialog
+              open={showCreateBlogDialog}
+              onOpenChange={setShowCreateBlogDialog}
+              onCreateBlog={async (data) => { await createBlog.mutateAsync(data); }}
+            />
+            <EditProfileDetailsDialog
+              open={showEditDetailsDialog}
+              onOpenChange={setShowEditDetailsDialog}
+            />
+          </>
+        )}
+
+        <PostDetailModal
+          post={selectedPost}
+          open={!!selectedPost}
+          onOpenChange={(open) => !open && setSelectedPost(null)}
+          isOwner={isOwnProfile}
+          onDelete={(postId) => {
+            deletePost.mutate(postId);
+            setSelectedPost(null);
+          }}
+        />
       </div>
     </PageLayout>
   );

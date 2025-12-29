@@ -2187,6 +2187,42 @@ export type Database = {
         }
         Relationships: []
       }
+      portfolio_folders: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string
+          description: string | null
+          display_order: number | null
+          id: string
+          is_featured: boolean | null
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_featured?: boolean | null
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_featured?: boolean | null
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       portfolio_items: {
         Row: {
           created_at: string
@@ -2336,6 +2372,7 @@ export type Database = {
           comments_enabled: boolean | null
           content: string | null
           created_at: string
+          folder_id: string | null
           id: string
           location: string | null
           media_type: string | null
@@ -2348,6 +2385,7 @@ export type Database = {
           comments_enabled?: boolean | null
           content?: string | null
           created_at?: string
+          folder_id?: string | null
           id?: string
           location?: string | null
           media_type?: string | null
@@ -2360,13 +2398,22 @@ export type Database = {
           comments_enabled?: boolean | null
           content?: string | null
           created_at?: string
+          folder_id?: string | null
           id?: string
           location?: string | null
           media_type?: string | null
           media_url?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "posts_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "portfolio_folders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profile_customizations: {
         Row: {
