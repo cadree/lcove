@@ -53,3 +53,9 @@ verify_jwt = true
 
 [functions.send-mass-notification]
 verify_jwt = true
+
+[functions.send-dm-notification]
+verify_jwt = true
+
+[functions.send-individual-message]
+verify_jwt = true

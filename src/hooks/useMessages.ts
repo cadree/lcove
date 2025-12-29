@@ -110,7 +110,7 @@ export function useMessages(conversationId: string | null) {
         mediaUrl = publicUrl;
       }
 
-      const { error } = await supabase
+      const { data: messageData, error } = await supabase
         .from('messages')
         .insert({
           conversation_id: conversationId,
@@ -118,12 +118,62 @@ export function useMessages(conversationId: string | null) {
           content: content || null,
           media_url: mediaUrl,
           media_type: mediaType || null,
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
       // Clear typing indicator
       await clearTypingIndicator();
+
+      // Send notification to other participants
+      try {
+        // Get sender's profile name
+        const { data: senderProfile } = await supabase
+          .from('profiles')
+          .select('display_name')
+          .eq('user_id', user.id)
+          .single();
+
+        const senderName = senderProfile?.display_name || 'Someone';
+
+        // Get other participants
+        const { data: participants } = await supabase
+          .from('conversation_participants')
+          .select('user_id')
+          .eq('conversation_id', conversationId)
+          .neq('user_id', user.id);
+
+        // Send notification to each participant
+        if (participants && participants.length > 0) {
+          for (const participant of participants) {
+            // Create in-app notification
+            await supabase.from('notifications').insert({
+              user_id: participant.user_id,
+              type: 'message',
+              title: 'New Message',
+              body: `${senderName} sent you a message`,
+              data: { conversation_id: conversationId },
+            });
+
+            // Trigger email/SMS notifications via edge function
+            supabase.functions.invoke('send-dm-notification', {
+              body: {
+                recipient_id: participant.user_id,
+                sender_name: senderName,
+                message_preview: content?.substring(0, 100),
+                conversation_id: conversationId,
+              },
+            }).catch(err => {
+              console.error('Error sending DM notification:', err);
+            });
+          }
+        }
+      } catch (notifError) {
+        console.error('Error sending notifications:', notifError);
+        // Don't throw - message was sent successfully
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
