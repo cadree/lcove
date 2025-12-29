@@ -5,6 +5,16 @@ import { useIsAdmin } from "./useAdmin";
 import { toast } from "sonner";
 import type { Json } from "@/integrations/supabase/types";
 
+export interface SocialLinks {
+  instagram?: string;
+  twitter?: string;
+  tiktok?: string;
+  youtube?: string;
+  linkedin?: string;
+  website?: string;
+  [key: string]: string | undefined;
+}
+
 export interface AdminUserData {
   user_id: string;
   email: string;
@@ -19,6 +29,7 @@ export interface AdminUserData {
   creative_roles: string[];
   credit_balance: number;
   is_admin: boolean;
+  social_links: SocialLinks | null;
 }
 
 export interface AdminAnnouncement {
@@ -106,6 +117,13 @@ export function useAdminUserData() {
         if (ar.role === "admin") adminMap.set(ar.user_id, true);
       });
 
+      // Fetch social_links from profiles
+      const { data: profilesData } = await supabase.from("profiles").select("user_id, social_links");
+      const socialLinksMap = new Map<string, SocialLinks | null>();
+      profilesData?.forEach((p: any) => {
+        socialLinksMap.set(p.user_id, p.social_links || null);
+      });
+
       return (userData || []).map((u: any) => ({
         user_id: u.user_id,
         email: u.email || "",
@@ -120,6 +138,7 @@ export function useAdminUserData() {
         creative_roles: rolesMap.get(u.user_id) || [],
         credit_balance: creditsMap.get(u.user_id) || 0,
         is_admin: adminMap.get(u.user_id) || false,
+        social_links: socialLinksMap.get(u.user_id) || null,
       }));
     },
   });

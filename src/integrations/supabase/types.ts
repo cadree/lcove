@@ -2489,6 +2489,7 @@ export type Database = {
           onboarding_score: number | null
           passion_seriousness: number | null
           phone: string | null
+          social_links: Json | null
           suspended_at: string | null
           suspension_reason: string | null
           updated_at: string | null
@@ -2512,6 +2513,7 @@ export type Database = {
           onboarding_score?: number | null
           passion_seriousness?: number | null
           phone?: string | null
+          social_links?: Json | null
           suspended_at?: string | null
           suspension_reason?: string | null
           updated_at?: string | null
@@ -2535,6 +2537,7 @@ export type Database = {
           onboarding_score?: number | null
           passion_seriousness?: number | null
           phone?: string | null
+          social_links?: Json | null
           suspended_at?: string | null
           suspension_reason?: string | null
           updated_at?: string | null

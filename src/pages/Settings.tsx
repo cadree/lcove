@@ -27,6 +27,12 @@ import {
   Shield,
   Settings as SettingsIcon,
   ArrowRight,
+  Phone,
+  Globe,
+  Instagram,
+  Twitter,
+  Youtube,
+  Linkedin,
 } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,6 +54,15 @@ const Settings = () => {
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [city, setCity] = useState("");
+  const [phone, setPhone] = useState("");
+  const [socialLinks, setSocialLinks] = useState({
+    instagram: "",
+    twitter: "",
+    tiktok: "",
+    youtube: "",
+    linkedin: "",
+    website: "",
+  });
   const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   
@@ -117,16 +132,35 @@ const Settings = () => {
       setDisplayName(profile.display_name || "");
       setBio(profile.bio || "");
       setCity(profile.city || "");
+      setPhone(profile.phone || "");
+      setSocialLinks({
+        instagram: profile.social_links?.instagram || "",
+        twitter: profile.social_links?.twitter || "",
+        tiktok: profile.social_links?.tiktok || "",
+        youtube: profile.social_links?.youtube || "",
+        linkedin: profile.social_links?.linkedin || "",
+        website: profile.social_links?.website || "",
+      });
     }
   }, [profile]);
 
   const handleSaveProfile = async () => {
     setSaving(true);
     try {
+      // Build social_links object, filtering out empty strings
+      const cleanedSocialLinks: Record<string, string> = {};
+      Object.entries(socialLinks).forEach(([key, value]) => {
+        if (value.trim()) {
+          cleanedSocialLinks[key] = value.trim();
+        }
+      });
+
       const { error } = await updateProfile({
         display_name: displayName || null,
         bio: bio || null,
         city: city || null,
+        phone: phone || null,
+        social_links: Object.keys(cleanedSocialLinks).length > 0 ? cleanedSocialLinks : null,
       });
       
       if (error) throw error;
@@ -268,6 +302,148 @@ const Settings = () => {
                 <>
                   <Save className="w-4 h-4 mr-2" />
                   Save Changes
+                </>
+              )}
+            </Button>
+          </div>
+        </motion.section>
+
+        {/* Contact Info Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12 }}
+          className="glass-strong rounded-2xl p-6 mb-6"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Phone className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-medium text-foreground">Contact Info</h2>
+              <p className="text-sm text-muted-foreground">Add your phone and social media</p>
+            </div>
+          </div>
+
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="flex items-center gap-2">
+                <Phone className="w-4 h-4" /> Phone Number
+              </Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="+1 (555) 123-4567"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="bg-background/50"
+              />
+              <p className="text-xs text-muted-foreground">For SMS notifications from the community</p>
+            </div>
+
+            <Separator className="bg-border/50" />
+
+            <div className="space-y-4">
+              <Label className="text-foreground font-medium">Social Media Links</Label>
+              
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="instagram" className="flex items-center gap-2 text-sm">
+                    <Instagram className="w-4 h-4" /> Instagram
+                  </Label>
+                  <Input
+                    id="instagram"
+                    placeholder="@username or URL"
+                    value={socialLinks.instagram}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, instagram: e.target.value })}
+                    className="bg-background/50"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="twitter" className="flex items-center gap-2 text-sm">
+                    <Twitter className="w-4 h-4" /> Twitter / X
+                  </Label>
+                  <Input
+                    id="twitter"
+                    placeholder="@username or URL"
+                    value={socialLinks.twitter}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, twitter: e.target.value })}
+                    className="bg-background/50"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="tiktok" className="flex items-center gap-2 text-sm">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
+                    </svg>
+                    TikTok
+                  </Label>
+                  <Input
+                    id="tiktok"
+                    placeholder="@username or URL"
+                    value={socialLinks.tiktok}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, tiktok: e.target.value })}
+                    className="bg-background/50"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="youtube" className="flex items-center gap-2 text-sm">
+                    <Youtube className="w-4 h-4" /> YouTube
+                  </Label>
+                  <Input
+                    id="youtube"
+                    placeholder="Channel URL"
+                    value={socialLinks.youtube}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, youtube: e.target.value })}
+                    className="bg-background/50"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="linkedin" className="flex items-center gap-2 text-sm">
+                    <Linkedin className="w-4 h-4" /> LinkedIn
+                  </Label>
+                  <Input
+                    id="linkedin"
+                    placeholder="Profile URL"
+                    value={socialLinks.linkedin}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, linkedin: e.target.value })}
+                    className="bg-background/50"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="website" className="flex items-center gap-2 text-sm">
+                    <Globe className="w-4 h-4" /> Website
+                  </Label>
+                  <Input
+                    id="website"
+                    placeholder="https://yoursite.com"
+                    value={socialLinks.website}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, website: e.target.value })}
+                    className="bg-background/50"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Button 
+              onClick={handleSaveProfile} 
+              disabled={saving}
+              className="w-full sm:w-auto"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Contact Info
                 </>
               )}
             </Button>
