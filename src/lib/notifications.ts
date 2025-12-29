@@ -62,6 +62,7 @@ export const createNotification = async ({
         title,
         body: body || '',
         data,
+        notification_type: type,
       },
     }).catch((err) => {
       console.error('Error sending push notification:', err);

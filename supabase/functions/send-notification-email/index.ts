@@ -113,17 +113,37 @@ serve(async (req) => {
       );
     }
 
-    // Check if email notifications are enabled
+    // Check if email notifications are enabled and notification type is enabled
     const { data: prefs } = await supabaseClient
       .from("notification_preferences")
-      .select("email_enabled")
+      .select("*")
       .eq("user_id", user_id)
       .single();
 
+    // Check if email delivery is enabled
     if (!prefs?.email_enabled) {
       console.log("Email notifications disabled for user:", user_id);
       return new Response(
         JSON.stringify({ message: "Email notifications disabled" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check if this specific notification type is enabled
+    const typePreferenceMap: Record<string, string> = {
+      message: "messages_enabled",
+      like: "likes_enabled",
+      comment: "comments_enabled",
+      project_invite: "project_invites_enabled",
+      event_reminder: "event_reminders_enabled",
+      live_stream: "live_streams_enabled",
+    };
+
+    const prefKey = typePreferenceMap[notification_type];
+    if (prefKey && prefs[prefKey] === false) {
+      console.log(`Notification type ${notification_type} disabled for user:`, user_id);
+      return new Response(
+        JSON.stringify({ message: `${notification_type} notifications disabled` }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
