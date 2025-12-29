@@ -1,12 +1,12 @@
-import { Home, Compass, Search, User, Plus } from "lucide-react";
-import { NavLink, Link } from "react-router-dom";
+import { Home, MessageCircle, FolderKanban, Search, User } from "lucide-react";
+import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
 const navItems = [
   { icon: Home, label: "Home", path: "/" },
-  { icon: Compass, label: "Feed", path: "/feed" },
-  // Center slot for + button
+  { icon: MessageCircle, label: "Messages", path: "/messages" },
+  { icon: FolderKanban, label: "Projects", path: "/projects" },
   { icon: Search, label: "Directory", path: "/directory" },
   { icon: User, label: "Profile", path: "/profile" },
 ];
@@ -28,67 +28,8 @@ const BottomNav = () => {
         {/* Subtle top highlight */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-foreground/10 to-transparent rounded-t-full" />
         
-        {/* Left nav items */}
-        {navItems.slice(0, 2).map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              cn(
-                "relative flex flex-col items-center justify-center w-14 h-12 rounded-xl transition-all duration-300 ease-smooth flex-shrink-0",
-                isActive
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                {isActive && (
-                  <motion.div
-                    layoutId="nav-indicator"
-                    className="absolute inset-x-2 top-1 bottom-1 rounded-xl bg-primary/10"
-                    transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
-                  />
-                )}
-                <motion.div
-                  whileTap={{ scale: 0.9 }}
-                  transition={{ duration: 0.15 }}
-                  className="flex flex-col items-center gap-0.5"
-                >
-                  <item.icon
-                    className={cn(
-                      "w-5 h-5 relative z-10 transition-all duration-300",
-                      isActive && "drop-shadow-[0_0_8px_hsl(340_82%_65%/0.5)]"
-                    )}
-                    strokeWidth={isActive ? 2.5 : 1.5}
-                  />
-                  <span className={cn(
-                    "text-[9px] relative z-10 transition-all",
-                    isActive ? "text-primary font-medium" : "text-muted-foreground"
-                  )}>
-                    {item.label}
-                  </span>
-                </motion.div>
-              </>
-            )}
-          </NavLink>
-        ))}
-
-        {/* Center + Button */}
-        <Link to="/projects">
-          <motion.div
-            whileTap={{ scale: 0.9 }}
-            className="relative mx-2"
-          >
-            <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg glow-pink-sm">
-              <Plus className="w-6 h-6 text-primary-foreground" strokeWidth={2.5} />
-            </div>
-          </motion.div>
-        </Link>
-
-        {/* Right nav items */}
-        {navItems.slice(2).map((item) => (
+        {/* Nav items */}
+        {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
