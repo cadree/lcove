@@ -85,7 +85,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
       for (const file of Array.from(files)) {
         const fileExt = file.name.split('.').pop()?.toLowerCase();
         const isVideo = ['mp4', 'mov', 'webm', 'avi'].includes(fileExt || '');
-        const mediaType = isVideo ? 'video' : 'image';
+        const mediaType = isVideo ? 'video' : 'photo';
         const filePath = `${user.id}/portfolio/${Date.now()}-${file.name}`;
 
         const { error: uploadError } = await supabase.storage
