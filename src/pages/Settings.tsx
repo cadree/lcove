@@ -50,7 +50,7 @@ const Settings = () => {
   const navigate = useNavigate();
   const { profile, loading, updateProfile } = useProfile();
   const { preferences, isLoading: prefsLoading, updatePreferences } = useNotificationPreferences();
-  const { isSupported: pushSupported, isSubscribed: pushSubscribed, permission: pushPermission, requestPermission, unsubscribe: unsubscribePush } = usePushNotifications();
+  const { isSupported: pushSupported, isSubscribed: pushSubscribed, permission: pushPermission, requestPermission, unsubscribe: unsubscribePush, status: pushStatus, error: pushError, isLoading: pushLoading } = usePushNotifications();
   const { blockedUsers, unblockUser, isLoading: blocksLoading } = useUserBlocks();
 
   const [displayName, setDisplayName] = useState("");
@@ -641,31 +641,34 @@ const Settings = () => {
               <div className="flex-1">
                 <Label className="text-foreground">Push Notifications</Label>
                 <p className="text-sm text-muted-foreground">
-                  {!pushSupported 
+                  {pushStatus === 'not_supported' 
                     ? "Not supported in this browser" 
-                    : pushPermission === 'denied' 
+                    : pushStatus === 'permission_denied' 
                       ? "Blocked in browser settings" 
-                      : pushSubscribed 
-                        ? "Receive notifications on your device" 
-                        : "Click to enable push notifications"}
+                      : pushStatus === 'subscribed' 
+                        ? "Enabled - receiving notifications" 
+                        : pushStatus === 'error'
+                          ? pushError || "Configuration error"
+                          : "Click to enable push notifications"}
                 </p>
+                {pushError && pushStatus !== 'permission_denied' && (
+                  <p className="text-xs text-destructive mt-1">{pushError}</p>
+                )}
               </div>
               <Switch
                 checked={(preferences?.push_enabled ?? true) && pushSubscribed}
                 onCheckedChange={async (checked) => {
                   if (checked) {
-                    // Request permission and subscribe
                     const granted = await requestPermission();
                     if (granted) {
                       handleNotificationToggle('push_enabled', true);
                     }
                   } else {
-                    // Unsubscribe and disable
                     await unsubscribePush();
                     handleNotificationToggle('push_enabled', false);
                   }
                 }}
-                disabled={!pushSupported || pushPermission === 'denied'}
+                disabled={!pushSupported || pushPermission === 'denied' || pushLoading}
               />
             </div>
 
