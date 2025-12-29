@@ -1800,6 +1800,7 @@ export type Database = {
           messages_enabled: boolean | null
           project_invites_enabled: boolean | null
           push_enabled: boolean | null
+          sms_enabled: boolean | null
           updated_at: string
           user_id: string
         }
@@ -1814,6 +1815,7 @@ export type Database = {
           messages_enabled?: boolean | null
           project_invites_enabled?: boolean | null
           push_enabled?: boolean | null
+          sms_enabled?: boolean | null
           updated_at?: string
           user_id: string
         }
@@ -1828,6 +1830,7 @@ export type Database = {
           messages_enabled?: boolean | null
           project_invites_enabled?: boolean | null
           push_enabled?: boolean | null
+          sms_enabled?: boolean | null
           updated_at?: string
           user_id?: string
         }

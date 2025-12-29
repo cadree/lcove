@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Bell, Mail } from 'lucide-react';
+import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Bell, Mail, Smartphone } from 'lucide-react';
 import { useNotificationPreferences } from '@/hooks/useNotifications';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { Switch } from '@/components/ui/switch';
@@ -154,6 +154,14 @@ export const NotificationPreferences: React.FC = () => {
           description="Get important updates via email"
           checked={preferences.email_enabled ?? false}
           onCheckedChange={(checked) => updatePreferences({ email_enabled: checked })}
+        />
+
+        <PreferenceItem
+          icon={<Smartphone className="h-4 w-4" />}
+          label="SMS Notifications"
+          description="Get text messages for new DMs"
+          checked={preferences.sms_enabled ?? false}
+          onCheckedChange={(checked) => updatePreferences({ sms_enabled: checked })}
         />
       </div>
     </div>

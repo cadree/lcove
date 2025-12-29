@@ -27,6 +27,7 @@ export interface NotificationPreferences {
   live_streams_enabled: boolean;
   push_enabled: boolean;
   email_enabled: boolean;
+  sms_enabled: boolean;
 }
 
 export const useNotifications = () => {
