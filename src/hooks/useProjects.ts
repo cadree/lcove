@@ -331,27 +331,102 @@ export const useProjectApplications = (projectId?: string) => {
 
       if (error) throw error;
 
-      // If accepted, send notification
+      // If accepted, create/update project group chat and send notification
       if (status === 'accepted' && application) {
-        // Get project and role details if not provided
-        let finalProjectTitle = projectTitle;
-        let finalRoleTitle = roleTitle;
+        // Get project and role details
+        const { data: project } = await supabase
+          .from('projects')
+          .select('title, description, creator_id, cover_image_url')
+          .eq('id', application.project_id)
+          .single();
+        
+        const { data: role } = await supabase
+          .from('project_roles')
+          .select('role_name')
+          .eq('id', application.role_id)
+          .single();
 
-        if (!finalProjectTitle || !finalRoleTitle) {
-          const { data: project } = await supabase
-            .from('projects')
-            .select('title')
-            .eq('id', application.project_id)
-            .single();
-          
-          const { data: role } = await supabase
-            .from('project_roles')
-            .select('role_name')
-            .eq('id', application.role_id)
+        const finalProjectTitle = projectTitle || project?.title || 'a project';
+        const finalRoleTitle = roleTitle || role?.role_name || 'a role';
+
+        // Check if project group chat already exists
+        let { data: existingConversation } = await (supabase
+          .from('conversations')
+          .select('id') as any)
+          .eq('project_id', application.project_id)
+          .eq('type', 'group')
+          .maybeSingle();
+
+        let conversationId = existingConversation?.id;
+
+        // Create project group chat if it doesn't exist
+        if (!conversationId && project) {
+          const { data: newConversation, error: convError } = await supabase
+            .from('conversations')
+            .insert({
+              type: 'group',
+              name: finalProjectTitle,
+              description: project.description || `Project group chat for ${finalProjectTitle}`,
+              avatar_url: project.cover_image_url,
+              created_by: project.creator_id,
+              visibility: 'private',
+              project_id: application.project_id
+            } as any)
+            .select('id')
             .single();
 
-          finalProjectTitle = project?.title || 'a project';
-          finalRoleTitle = role?.role_name || 'a role';
+          if (convError) {
+            console.error('Failed to create project conversation:', convError);
+          } else {
+            conversationId = newConversation?.id;
+
+            // Add project creator as owner
+            await supabase
+              .from('conversation_participants')
+              .insert({
+                conversation_id: conversationId,
+                user_id: project.creator_id,
+                role: 'owner',
+                project_role_name: 'Project Creator'
+              } as any);
+          }
+        }
+
+        // Add accepted applicant to the group chat
+        if (conversationId) {
+          // Check if user is already a participant
+          const { data: existingParticipant } = await supabase
+            .from('conversation_participants')
+            .select('id')
+            .eq('conversation_id', conversationId)
+            .eq('user_id', application.applicant_id)
+            .maybeSingle();
+
+          if (!existingParticipant) {
+            await supabase
+              .from('conversation_participants')
+              .insert({
+                conversation_id: conversationId,
+                user_id: application.applicant_id,
+                role: 'member',
+                project_role_name: finalRoleTitle
+              } as any);
+
+            // Send welcome message to the group
+            const { data: applicantProfile } = await supabase
+              .from('profiles')
+              .select('display_name')
+              .eq('user_id', application.applicant_id)
+              .single();
+
+            await supabase
+              .from('messages')
+              .insert({
+                conversation_id: conversationId,
+                sender_id: project?.creator_id || user?.id,
+                content: `🎉 Welcome ${applicantProfile?.display_name || 'New member'} to the team as ${finalRoleTitle}!`
+              });
+          }
         }
 
         // Send acceptance notification
@@ -368,6 +443,7 @@ export const useProjectApplications = (projectId?: string) => {
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['project-applications'] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
       toast({ title: status === 'accepted' ? 'Application accepted!' : 'Application rejected' });
     },
     onError: (error) => {

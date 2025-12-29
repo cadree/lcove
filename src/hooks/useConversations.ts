@@ -9,10 +9,21 @@ interface Participant {
   joined_at: string;
   last_read_at: string | null;
   is_muted: boolean;
+  project_role_name?: string | null;
   profile?: {
     display_name: string | null;
     avatar_url: string | null;
   };
+}
+
+interface ProjectInfo {
+  id: string;
+  title: string;
+  description: string | null;
+  cover_image_url: string | null;
+  status: string;
+  timeline_start: string | null;
+  timeline_end: string | null;
 }
 
 interface Conversation {
@@ -23,6 +34,8 @@ interface Conversation {
   created_by: string;
   created_at: string;
   updated_at: string;
+  project_id?: string | null;
+  project?: ProjectInfo | null;
   participants?: Participant[];
   last_message?: {
     content: string | null;
@@ -65,8 +78,21 @@ export function useConversations() {
       // Get all participants for these conversations
       const { data: allParticipants } = await supabase
         .from('conversation_participants')
-        .select('conversation_id, user_id, joined_at, last_read_at, is_muted')
+        .select('conversation_id, user_id, joined_at, last_read_at, is_muted, project_role_name')
         .in('conversation_id', conversationIds);
+
+      // Fetch project details for project-linked conversations
+      const projectIds = convos?.filter(c => (c as any).project_id).map(c => (c as any).project_id) || [];
+      let projectMap = new Map<string, ProjectInfo>();
+      
+      if (projectIds.length > 0) {
+        const { data: projects } = await supabase
+          .from('projects')
+          .select('id, title, description, cover_image_url, status, timeline_start, timeline_end')
+          .in('id', projectIds);
+        
+        projectMap = new Map(projects?.map(p => [p.id, p as ProjectInfo]) || []);
+      }
 
       // Get profiles for all participants
       const userIds = [...new Set(allParticipants?.map(p => p.user_id) || [])];
@@ -111,18 +137,24 @@ export function useConversations() {
       const unreadMap = new Map(unreadCounts.map(uc => [uc.convId, uc.count]));
       const mutedMap = new Map(participations.map(p => [p.conversation_id, p.is_muted]));
 
-      return (convos || []).map(conv => ({
-        ...conv,
-        participants: allParticipants
-          ?.filter(p => p.conversation_id === conv.id)
-          .map(p => ({
-            ...p,
-            profile: profileMap.get(p.user_id),
-          })),
-        last_message: lastMessageMap.get(conv.id),
-        unread_count: unreadMap.get(conv.id) || 0,
-        is_muted: mutedMap.get(conv.id) || false,
-      })) as Conversation[];
+      return (convos || []).map(conv => {
+        const projectId = (conv as any).project_id;
+        return {
+          ...conv,
+          project_id: projectId,
+          project: projectId ? projectMap.get(projectId) : null,
+          participants: allParticipants
+            ?.filter(p => p.conversation_id === conv.id)
+            .map(p => ({
+              ...p,
+              project_role_name: (p as any).project_role_name,
+              profile: profileMap.get(p.user_id),
+            })),
+          last_message: lastMessageMap.get(conv.id),
+          unread_count: unreadMap.get(conv.id) || 0,
+          is_muted: mutedMap.get(conv.id) || false,
+        };
+      }) as Conversation[];
     },
     enabled: !!user,
   });
