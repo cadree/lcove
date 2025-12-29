@@ -326,6 +326,9 @@ const Profile = () => {
             <EditProfileDetailsDialog
               open={showEditDetailsDialog}
               onOpenChange={setShowEditDetailsDialog}
+              currentSkills={userSkills}
+              currentPassions={userPassions}
+              currentRoles={userCreativeRoles}
             />
           </>
         )}
