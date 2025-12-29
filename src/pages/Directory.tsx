@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -106,16 +107,14 @@ const Directory = () => {
 
   return (
     <PageLayout>
-      <div className="px-6 pt-8 pb-24">
+      <div className="px-6 pt-6 pb-24">
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <h1 className="font-display text-3xl font-medium text-foreground mb-2">Directory</h1>
-          <p className="text-muted-foreground">Find creatives by name, city, or interests</p>
-        </motion.div>
+        <PageHeader
+          title="Directory"
+          description="Find creatives by name, city, or interests"
+          icon={<Users className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+          className="mb-6"
+        />
 
         {/* Search Bar */}
         <motion.div

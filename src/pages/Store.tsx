@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyStore, useStoreItems, useMyStoreItems, StoreItem } from '@/hooks/useStore';
 import PageLayout from '@/components/layout/PageLayout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { StoreItemCard } from '@/components/store/StoreItemCard';
 import { StoreItemDialog } from '@/components/store/StoreItemDialog';
 import { CreateItemDialog } from '@/components/store/CreateItemDialog';
@@ -77,57 +78,42 @@ const Store = () => {
         {/* Header */}
         <div className="sticky top-0 z-10 glass-strong border-b border-border/30">
           <div className="container mx-auto px-4 py-5">
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="flex items-center justify-between mb-5"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <ShoppingBag className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <h1 className="font-display text-2xl sm:text-3xl font-medium text-foreground">Store</h1>
-                  <p className="text-sm text-muted-foreground">
-                    Discover products, services & studio rentals
-                  </p>
-                </div>
-              </div>
-              {user && (
-                <div className="flex items-center gap-2">
-                  {myStore ? (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setStoreSetupOpen(true)}
-                      >
-                        <Settings className="w-4 h-4 mr-2" />
-                        Settings
+            <PageHeader
+              title="Store"
+              description="Discover products, services & studio rentals"
+              icon={<ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+              className="mb-5"
+              actions={
+                user && (
+                  <div className="flex items-center gap-2">
+                    {myStore ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setStoreSetupOpen(true)}
+                        >
+                          <Settings className="w-4 h-4 mr-2" />
+                          Settings
+                        </Button>
+                        <Button size="sm" onClick={handleCreateNew}>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Item
+                        </Button>
+                      </>
+                    ) : (
+                      <Button onClick={() => setStoreSetupOpen(true)}>
+                        <StoreIcon className="w-4 h-4 mr-2" />
+                        Create Store
                       </Button>
-                      <Button size="sm" onClick={handleCreateNew}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Item
-                      </Button>
-                    </>
-                  ) : (
-                    <Button onClick={() => setStoreSetupOpen(true)}>
-                      <StoreIcon className="w-4 h-4 mr-2" />
-                      Create Store
-                    </Button>
-                  )}
-                </div>
-              )}
-            </motion.div>
+                    )}
+                  </div>
+                )
+              }
+            />
 
             {/* Search */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.1 }}
-              className="relative max-w-md"
-            >
+            <div className="relative max-w-md">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search items..."
@@ -135,7 +121,7 @@ const Store = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-11"
               />
-            </motion.div>
+            </div>
           </div>
         </div>
 

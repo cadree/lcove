@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +10,6 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import {
-  ArrowLeft,
   User,
   Bell,
   Save,
@@ -25,6 +25,8 @@ import {
   Users,
   Ban,
   Shield,
+  Settings as SettingsIcon,
+  ArrowRight,
 } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
@@ -194,23 +196,12 @@ const Settings = () => {
     <PageLayout>
       <div className="px-4 sm:px-6 py-6 pb-32 max-w-2xl mx-auto">
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-4 mb-8"
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/profile")}
-            className="shrink-0"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h1 className="font-display text-2xl sm:text-3xl font-medium text-foreground">
-            Settings
-          </h1>
-        </motion.div>
+        <PageHeader
+          title="Settings"
+          icon={<SettingsIcon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+          backPath="/profile"
+          className="mb-8"
+        />
 
         {/* Profile Section */}
         <motion.section
@@ -594,7 +585,7 @@ const Settings = () => {
                   <p className="text-sm text-muted-foreground">Manage users, credits, and announcements</p>
                 </div>
               </div>
-              <ArrowLeft className="w-5 h-5 text-muted-foreground rotate-180" />
+              <ArrowRight className="w-5 h-5 text-muted-foreground" />
             </Link>
           </motion.section>
         )}

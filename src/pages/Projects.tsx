@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, FolderKanban, Filter, Rocket, Lightbulb } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PageLayout from '@/components/layout/PageLayout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { useProjects, Project } from '@/hooks/useProjects';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProjectCard } from '@/components/projects/ProjectCard';
@@ -28,25 +29,21 @@ const Projects: React.FC = () => {
     <PageLayout>
       <div className="p-4 sm:p-6 pb-32">
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex items-center justify-between mb-6"
-        >
-          <div>
-            <h1 className="font-display text-3xl sm:text-4xl font-medium text-foreground">Projects</h1>
-            <p className="text-sm text-muted-foreground mt-1">Find collaborators, share budgets transparently</p>
-          </div>
-          {user && (
-            <CreateProjectDialog>
-              <Button data-create-project>
-                <Plus className="h-4 w-4 mr-2" />
-                New Project
-              </Button>
-            </CreateProjectDialog>
-          )}
-        </motion.div>
+        <PageHeader
+          title="Projects"
+          description="Find collaborators, share budgets transparently"
+          icon={<FolderKanban className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+          actions={
+            user && (
+              <CreateProjectDialog>
+                <Button data-create-project>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Project
+                </Button>
+              </CreateProjectDialog>
+            )
+          }
+        />
 
         {/* Tabs */}
         <motion.div
