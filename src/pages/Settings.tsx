@@ -38,6 +38,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "@/hooks/useAdmin";
 import { useNotificationPreferences } from "@/hooks/useNotifications";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,6 +50,7 @@ const Settings = () => {
   const navigate = useNavigate();
   const { profile, loading, updateProfile } = useProfile();
   const { preferences, isLoading: prefsLoading, updatePreferences } = useNotificationPreferences();
+  const { isSupported: pushSupported, isSubscribed: pushSubscribed, permission: pushPermission, requestPermission, unsubscribe: unsubscribePush } = usePushNotifications();
   const { blockedUsers, unblockUser, isLoading: blocksLoading } = useUserBlocks();
 
   const [displayName, setDisplayName] = useState("");
@@ -606,6 +608,19 @@ const Settings = () => {
               />
             </div>
 
+            <Separator className="bg-border/50" />
+
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <Label className="text-foreground">Admin & System</Label>
+                <p className="text-sm text-muted-foreground">Important platform updates</p>
+              </div>
+              <Switch
+                checked={preferences?.admin_enabled ?? true}
+                onCheckedChange={(checked) => handleNotificationToggle('admin_enabled', checked)}
+              />
+            </div>
+
             <Separator className="bg-border/50 my-4" />
             <p className="text-sm font-medium text-muted-foreground mb-4">Delivery Methods</p>
 
@@ -623,13 +638,34 @@ const Settings = () => {
             <Separator className="bg-border/50" />
 
             <div className="flex items-center justify-between py-2">
-              <div>
+              <div className="flex-1">
                 <Label className="text-foreground">Push Notifications</Label>
-                <p className="text-sm text-muted-foreground">Receive notifications on your device</p>
+                <p className="text-sm text-muted-foreground">
+                  {!pushSupported 
+                    ? "Not supported in this browser" 
+                    : pushPermission === 'denied' 
+                      ? "Blocked in browser settings" 
+                      : pushSubscribed 
+                        ? "Receive notifications on your device" 
+                        : "Click to enable push notifications"}
+                </p>
               </div>
               <Switch
-                checked={preferences?.push_enabled ?? true}
-                onCheckedChange={(checked) => handleNotificationToggle('push_enabled', checked)}
+                checked={(preferences?.push_enabled ?? true) && pushSubscribed}
+                onCheckedChange={async (checked) => {
+                  if (checked) {
+                    // Request permission and subscribe
+                    const granted = await requestPermission();
+                    if (granted) {
+                      handleNotificationToggle('push_enabled', true);
+                    }
+                  } else {
+                    // Unsubscribe and disable
+                    await unsubscribePush();
+                    handleNotificationToggle('push_enabled', false);
+                  }
+                }}
+                disabled={!pushSupported || pushPermission === 'denied'}
               />
             </div>
 

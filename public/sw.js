@@ -1,6 +1,6 @@
 self.addEventListener("install", (event) => {
   console.log("Service Worker installed");
-  self.skipWaiting(); // keep if you want instant updates
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -25,7 +25,6 @@ self.addEventListener("push", (event) => {
       try {
         payload = event.data.json();
       } catch (e) {
-        // fall back to text payload
         try {
           const text = await event.data.text();
           payload = { body: text };
@@ -36,32 +35,38 @@ self.addEventListener("push", (event) => {
     }
 
     const merged = { ...defaultData, ...payload };
+    const notificationType = merged.data?.type || 'general';
     
-    // Enhanced notification options for lockscreen visibility (like Instagram)
+    // Instagram-like notification options for maximum lockscreen visibility
     const options = {
       body: merged.body,
       icon: merged.icon || "/favicon.png",
       badge: merged.badge || "/favicon.png",
-      // Multiple vibration patterns for attention
+      // Strong vibration pattern for attention
       vibrate: [200, 100, 200, 100, 200],
-      // Notification data for click handling
+      // Deep link data
       data: merged.data || { url: "/notifications" },
-      // Actions for quick response
+      // Quick actions
       actions: [
         { action: "view", title: "View" },
         { action: "dismiss", title: "Dismiss" },
       ],
-      // Show on lockscreen
-      requireInteraction: false,
-      // Keep notification visible until user interacts
+      // Critical: require interaction for important notifications
+      requireInteraction: notificationType === 'message' || notificationType === 'project_invite',
+      // Audible notification
       silent: false,
-      // Tag to replace duplicate notifications
-      tag: merged.tag || `ether-${Date.now()}`,
-      // Renotify even if same tag (for multiple of same type)
-      renotify: true,
-      // Timestamp for notification ordering
-      timestamp: Date.now(),
+      // Type-based grouping tag (Instagram-style)
+      tag: merged.tag || `ether-${notificationType}-${Date.now()}`,
+      // Renotify for multiple of same type
+      renotify: merged.renotify !== false,
+      // Ordering timestamp
+      timestamp: merged.timestamp || Date.now(),
+      // Image support for rich notifications
+      image: merged.image || null,
     };
+
+    // Remove null values
+    if (!options.image) delete options.image;
 
     await self.registration.showNotification(merged.title, options);
   };
@@ -73,14 +78,32 @@ self.addEventListener("notificationclick", (event) => {
   console.log("Notification clicked:", event);
   event.notification.close();
 
+  // Handle dismiss action
   if (event.action === "dismiss") return;
 
   event.waitUntil(
     (async () => {
-      const rawUrl = event.notification?.data?.url || "/notifications";
+      const notificationData = event.notification?.data || {};
+      const notificationType = notificationData.type || 'general';
+      
+      // Build URL based on notification type for deep linking
+      let targetPath = notificationData.url || "/notifications";
+      
+      // Type-specific deep links
+      if (notificationType === 'message' && notificationData.conversation_id) {
+        targetPath = `/messages?conversation=${notificationData.conversation_id}`;
+      } else if (notificationType === 'project_invite' && notificationData.project_id) {
+        targetPath = `/projects?id=${notificationData.project_id}`;
+      } else if (notificationType === 'live_stream' && notificationData.stream_id) {
+        targetPath = `/live?stream=${notificationData.stream_id}`;
+      } else if (notificationType === 'event_reminder' && notificationData.event_id) {
+        targetPath = `/calendar?event=${notificationData.event_id}`;
+      } else if ((notificationType === 'like' || notificationType === 'comment') && notificationData.post_id) {
+        targetPath = `/feed?post=${notificationData.post_id}`;
+      }
 
       // Force same-origin + absolute URL
-      const target = new URL(rawUrl, self.location.origin);
+      const target = new URL(targetPath, self.location.origin);
       if (target.origin !== self.location.origin) {
         target.href = self.location.origin + "/notifications";
       }
@@ -90,7 +113,6 @@ self.addEventListener("notificationclick", (event) => {
       // Reuse existing tab if possible
       for (const client of clientList) {
         if ("focus" in client) {
-          // Navigate then focus
           try {
             await client.navigate(target.href);
           } catch (_) {}
@@ -104,4 +126,9 @@ self.addEventListener("notificationclick", (event) => {
       }
     })(),
   );
+});
+
+// Handle notification close (for analytics if needed)
+self.addEventListener("notificationclose", (event) => {
+  console.log("Notification closed:", event.notification.tag);
 });

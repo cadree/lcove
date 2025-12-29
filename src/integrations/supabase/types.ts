@@ -1790,6 +1790,7 @@ export type Database = {
       }
       notification_preferences: {
         Row: {
+          admin_enabled: boolean | null
           comments_enabled: boolean | null
           created_at: string
           email_enabled: boolean | null
@@ -1805,6 +1806,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          admin_enabled?: boolean | null
           comments_enabled?: boolean | null
           created_at?: string
           email_enabled?: boolean | null
@@ -1820,6 +1822,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          admin_enabled?: boolean | null
           comments_enabled?: boolean | null
           created_at?: string
           email_enabled?: boolean | null
