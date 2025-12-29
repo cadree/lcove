@@ -42,6 +42,7 @@ export function useProfilePosts(userId?: string) {
         collaborators: post.collaborators ?? null,
         alt_text: post.alt_text ?? null,
         comments_enabled: post.comments_enabled ?? true,
+        folder_id: post.folder_id ?? null,
         profile: profile || { display_name: null, avatar_url: null },
       }));
     },

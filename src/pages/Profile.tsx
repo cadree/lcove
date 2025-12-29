@@ -22,6 +22,7 @@ import { ProfileStats } from "@/components/profile/ProfileStats";
 import { ProfileAboutSection } from "@/components/profile/ProfileAboutSection";
 import { ProfileFolders } from "@/components/profile/ProfileFolders";
 import { ProfileQuickLinks } from "@/components/profile/ProfileQuickLinks";
+import { FolderDetailView } from "@/components/profile/FolderDetailView";
 import { useProfile } from "@/hooks/useProfile";
 import { useConversations } from "@/hooks/useConversations";
 import { useAuth } from "@/contexts/AuthContext";
@@ -174,7 +175,15 @@ const Profile = () => {
         />
 
         {/* Portfolio Folders Section */}
-        {(folders.length > 0 || isOwnProfile) && (
+        {selectedFolder ? (
+          <FolderDetailView
+            folder={selectedFolder}
+            userId={targetUserId || ''}
+            isOwner={isOwnProfile}
+            onBack={() => setSelectedFolder(null)}
+            onPostClick={(post) => setSelectedPost(post)}
+          />
+        ) : (folders.length > 0 || isOwnProfile) && (
           <ProfileFolders
             userId={targetUserId || ''}
             isOwner={isOwnProfile}
