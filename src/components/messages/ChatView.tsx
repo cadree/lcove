@@ -3,13 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
 import { 
   ArrowLeft, MoreVertical, Phone, Video, Trash2, 
-  Check, CheckCheck, Play, Pause, Image as ImageIcon
+  Check, CheckCheck, Play, Pause, Image as ImageIcon,
+  Users, Calendar, Info, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/hooks/useMessages';
 import { useConversations } from '@/hooks/useConversations';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import MessageComposer from './MessageComposer';
 import { toast } from 'sonner';
 import {
@@ -18,6 +20,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 interface ChatViewProps {
   conversationId: string;
@@ -39,8 +46,11 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
+  const [showProjectInfo, setShowProjectInfo] = useState(false);
 
   const conversation = conversations.find(c => c.id === conversationId);
+  const isProjectChat = !!(conversation as any)?.project_id;
+  const project = (conversation as any)?.project;
 
   const getConversationName = () => {
     if (!conversation) return 'Chat';
@@ -54,6 +64,10 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
     if (conversation.type === 'group') return conversation.avatar_url;
     const otherParticipant = conversation.participants?.find(p => p.user_id !== user?.id);
     return otherParticipant?.profile?.avatar_url;
+  };
+
+  const getParticipantRole = (participant: any) => {
+    return participant.project_role_name || null;
   };
 
   // Scroll to bottom on new messages
@@ -116,8 +130,13 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
         </Avatar>
 
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-foreground truncate">{getConversationName()}</h3>
-          {typingUsers.length > 0 && (
+          <div className="flex items-center gap-2">
+            <h3 className="font-medium text-foreground truncate">{getConversationName()}</h3>
+            {isProjectChat && (
+              <Badge variant="secondary" className="text-xs">Project</Badge>
+            )}
+          </div>
+          {typingUsers.length > 0 ? (
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -125,10 +144,24 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
             >
               {typingUsers.map(t => t.profile?.display_name || 'Someone').join(', ')} typing...
             </motion.p>
+          ) : isProjectChat && (
+            <p className="text-xs text-muted-foreground">
+              {conversation?.participants?.length || 0} team members
+            </p>
           )}
         </div>
 
         <div className="flex gap-1">
+          {isProjectChat && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-muted-foreground hover:text-primary"
+              onClick={() => setShowProjectInfo(!showProjectInfo)}
+            >
+              <Info className="w-5 h-5" />
+            </Button>
+          )}
           <Button 
             variant="ghost" 
             size="icon" 
@@ -170,6 +203,69 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
         </div>
       </div>
 
+      {/* Project Info Panel */}
+      <AnimatePresence>
+        {isProjectChat && showProjectInfo && project && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="border-b border-border/50 bg-muted/30 overflow-hidden"
+          >
+            <div className="p-4 space-y-4">
+              {/* Project Details */}
+              <div>
+                <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <Info className="w-4 h-4 text-primary" />
+                  Project Details
+                </h4>
+                {project.description && (
+                  <p className="text-sm text-muted-foreground">{project.description}</p>
+                )}
+                {(project.timeline_start || project.timeline_end) && (
+                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                    <Calendar className="w-3 h-3" />
+                    <span>
+                      {project.timeline_start && format(new Date(project.timeline_start), 'MMM d')}
+                      {project.timeline_start && project.timeline_end && ' - '}
+                      {project.timeline_end && format(new Date(project.timeline_end), 'MMM d, yyyy')}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Team Members with Roles */}
+              <div>
+                <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-primary" />
+                  Team ({conversation?.participants?.length || 0})
+                </h4>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {conversation?.participants?.map((participant) => (
+                    <div key={participant.user_id} className="flex items-center gap-2">
+                      <Avatar className="w-6 h-6">
+                        <AvatarImage src={participant.profile?.avatar_url || undefined} />
+                        <AvatarFallback className="text-xs bg-muted">
+                          {participant.profile?.display_name?.charAt(0) || '?'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm flex-1 truncate">
+                        {participant.profile?.display_name || 'Unknown'}
+                      </span>
+                      {getParticipantRole(participant) && (
+                        <Badge variant="outline" className="text-xs">
+                          {getParticipantRole(participant)}
+                        </Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {isLoading ? (
@@ -198,6 +294,8 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                 {group.messages.map((msg) => {
                   const isOwn = msg.sender_id === user?.id;
                   const isRead = msg.read_by && msg.read_by.length > 0;
+                  const senderParticipant = conversation?.participants?.find(p => p.user_id === msg.sender_id);
+                  const senderRole = senderParticipant ? getParticipantRole(senderParticipant) : null;
 
                   return (
                     <motion.div
@@ -217,6 +315,20 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                         )}
 
                         <div className={`group ${isOwn ? 'items-end' : 'items-start'}`}>
+                          {/* Sender name with role for group chats */}
+                          {!isOwn && conversation?.type === 'group' && (
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-medium text-foreground">
+                                {msg.profile?.display_name || 'Unknown'}
+                              </span>
+                              {senderRole && (
+                                <Badge variant="outline" className="text-[10px] py-0 h-4">
+                                  {senderRole}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                          
                           {/* Media */}
                           {msg.media_url && (
                             <div className="mb-1 rounded-xl overflow-hidden">

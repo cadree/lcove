@@ -510,6 +510,7 @@ export type Database = {
           is_muted: boolean | null
           joined_at: string
           last_read_at: string | null
+          project_role_name: string | null
           role: Database["public"]["Enums"]["group_member_role"] | null
           user_id: string
         }
@@ -519,6 +520,7 @@ export type Database = {
           is_muted?: boolean | null
           joined_at?: string
           last_read_at?: string | null
+          project_role_name?: string | null
           role?: Database["public"]["Enums"]["group_member_role"] | null
           user_id: string
         }
@@ -528,6 +530,7 @@ export type Database = {
           is_muted?: boolean | null
           joined_at?: string
           last_read_at?: string | null
+          project_role_name?: string | null
           role?: Database["public"]["Enums"]["group_member_role"] | null
           user_id?: string
         }
@@ -551,6 +554,7 @@ export type Database = {
           is_community_hub: boolean | null
           max_members: number | null
           name: string | null
+          project_id: string | null
           topic: string | null
           type: string
           updated_at: string
@@ -565,6 +569,7 @@ export type Database = {
           is_community_hub?: boolean | null
           max_members?: number | null
           name?: string | null
+          project_id?: string | null
           topic?: string | null
           type: string
           updated_at?: string
@@ -579,12 +584,21 @@ export type Database = {
           is_community_hub?: boolean | null
           max_members?: number | null
           name?: string | null
+          project_id?: string | null
           topic?: string | null
           type?: string
           updated_at?: string
           visibility?: Database["public"]["Enums"]["group_visibility"] | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "conversations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       creative_roles: {
         Row: {
