@@ -7,12 +7,30 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Heart,
   MessageCircle,
   Send,
   Bookmark,
   MoreHorizontal,
   MapPin,
+  Trash2,
+  Edit,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
@@ -25,6 +43,7 @@ interface PostDetailModalProps {
   onOpenChange: (open: boolean) => void;
   isOwner?: boolean;
   onDelete?: (postId: string) => void;
+  onEdit?: (post: ProfilePost) => void;
 }
 
 export function PostDetailModal({ 
@@ -33,11 +52,13 @@ export function PostDetailModal({
   onOpenChange, 
   isOwner,
   onDelete,
+  onEdit,
 }: PostDetailModalProps) {
   const navigate = useNavigate();
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [comment, setComment] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   if (!post) return null;
 
@@ -50,60 +71,99 @@ export function PostDetailModal({
     navigate(`/profile/${post.user_id}`);
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-full p-0 gap-0 overflow-hidden max-h-[90vh]">
-        <div className="flex flex-col md:flex-row h-full">
-          {/* Media Section */}
-          <div className="md:w-[60%] bg-black flex items-center justify-center">
-            {post.media_type === 'video' ? (
-              <video
-                src={post.media_url || undefined}
-                controls
-                autoPlay
-                className="max-w-full max-h-[60vh] md:max-h-[80vh] object-contain"
-              />
-            ) : (
-              <img
-                src={post.media_url || undefined}
-                alt={post.content || 'Post'}
-                className="max-w-full max-h-[60vh] md:max-h-[80vh] object-contain"
-              />
-            )}
-          </div>
+  const handleDelete = () => {
+    if (onDelete && post.id) {
+      onDelete(post.id);
+      setShowDeleteConfirm(false);
+      onOpenChange(false);
+    }
+  };
 
-          {/* Details Section */}
-          <div className="md:w-[40%] flex flex-col bg-background">
-            {/* Header */}
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <button onClick={handleProfileClick}>
-                  <Avatar className="w-8 h-8 cursor-pointer hover:opacity-80 transition-opacity">
-                    <AvatarImage src={avatarUrl || undefined} />
-                    <AvatarFallback className="bg-muted text-muted-foreground text-xs">
-                      {displayName.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                </button>
-                <div>
-                  <button 
-                    onClick={handleProfileClick}
-                    className="text-sm font-semibold text-foreground hover:underline"
-                  >
-                    {displayName}
-                  </button>
-                  {post.location && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
-                      {post.location}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreHorizontal className="w-4 h-4" />
-              </Button>
+  const handleEdit = () => {
+    if (onEdit) {
+      onEdit(post);
+    }
+  };
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl w-full p-0 gap-0 overflow-hidden max-h-[90vh] [&>button:last-child]:hidden">
+          <div className="flex flex-col md:flex-row h-full">
+            {/* Media Section */}
+            <div className="md:w-[60%] bg-black flex items-center justify-center">
+              {post.media_type === 'video' ? (
+                <video
+                  src={post.media_url || undefined}
+                  controls
+                  autoPlay
+                  className="max-w-full max-h-[60vh] md:max-h-[80vh] object-contain"
+                />
+              ) : (
+                <img
+                  src={post.media_url || undefined}
+                  alt={post.content || 'Post'}
+                  className="max-w-full max-h-[60vh] md:max-h-[80vh] object-contain"
+                />
+              )}
             </div>
+
+            {/* Details Section */}
+            <div className="md:w-[40%] flex flex-col bg-background">
+              {/* Header */}
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <button onClick={handleProfileClick}>
+                    <Avatar className="w-8 h-8 cursor-pointer hover:opacity-80 transition-opacity">
+                      <AvatarImage src={avatarUrl || undefined} />
+                      <AvatarFallback className="bg-muted text-muted-foreground text-xs">
+                        {displayName.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
+                  <div>
+                    <button 
+                      onClick={handleProfileClick}
+                      className="text-sm font-semibold text-foreground hover:underline"
+                    >
+                      {displayName}
+                    </button>
+                    {post.location && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />
+                        {post.location}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                
+                {isOwner ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="bg-card border-border">
+                      <DropdownMenuItem onClick={handleEdit} className="cursor-pointer">
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit Post
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => setShowDeleteConfirm(true)} 
+                        className="cursor-pointer text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete Post
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
 
             {/* Content / Comments Area */}
             <div className="flex-1 overflow-y-auto p-4">
@@ -193,5 +253,26 @@ export function PostDetailModal({
         </div>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+      <AlertDialogContent className="bg-card border-border">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Post</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete this post? This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction 
+            onClick={handleDelete}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
