@@ -29,6 +29,9 @@ export interface NotificationPreferences {
   push_enabled: boolean;
   email_enabled: boolean;
   sms_enabled: boolean;
+  new_projects_enabled: boolean;
+  new_events_enabled: boolean;
+  application_updates_enabled: boolean;
 }
 
 export const useNotifications = () => {

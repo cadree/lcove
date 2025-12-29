@@ -62,3 +62,9 @@ verify_jwt = true
 
 [functions.send-push-notification]
 verify_jwt = false
+
+[functions.notify-application-accepted]
+verify_jwt = false
+
+[functions.notify-new-content]
+verify_jwt = false

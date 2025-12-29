@@ -170,6 +170,24 @@ export const useProjects = (status?: string) => {
         if (rolesError) throw rolesError;
       }
 
+      // Get creator name for notification
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('user_id', user.id)
+        .single();
+
+      // Notify opted-in users about the new project
+      supabase.functions.invoke('notify-new-content', {
+        body: {
+          content_type: 'project',
+          content_id: project.id,
+          title: data.title,
+          description: data.description,
+          creator_name: profile?.display_name || 'A creator'
+        }
+      }).catch(err => console.error('Failed to send new project notifications:', err));
+
       return project;
     },
     onSuccess: () => {
@@ -291,13 +309,61 @@ export const useProjectApplications = (projectId?: string) => {
   });
 
   const reviewApplication = useMutation({
-    mutationFn: async ({ applicationId, status }: { applicationId: string; status: 'accepted' | 'rejected' }) => {
+    mutationFn: async ({ applicationId, status, projectTitle, roleTitle }: { 
+      applicationId: string; 
+      status: 'accepted' | 'rejected';
+      projectTitle?: string;
+      roleTitle?: string;
+    }) => {
+      // Get application details first
+      const { data: application, error: appError } = await supabase
+        .from('project_applications')
+        .select('applicant_id, project_id, role_id')
+        .eq('id', applicationId)
+        .single();
+
+      if (appError) throw appError;
+
       const { error } = await supabase
         .from('project_applications')
         .update({ status, reviewed_by: user?.id })
         .eq('id', applicationId);
 
       if (error) throw error;
+
+      // If accepted, send notification
+      if (status === 'accepted' && application) {
+        // Get project and role details if not provided
+        let finalProjectTitle = projectTitle;
+        let finalRoleTitle = roleTitle;
+
+        if (!finalProjectTitle || !finalRoleTitle) {
+          const { data: project } = await supabase
+            .from('projects')
+            .select('title')
+            .eq('id', application.project_id)
+            .single();
+          
+          const { data: role } = await supabase
+            .from('project_roles')
+            .select('role_name')
+            .eq('id', application.role_id)
+            .single();
+
+          finalProjectTitle = project?.title || 'a project';
+          finalRoleTitle = role?.role_name || 'a role';
+        }
+
+        // Send acceptance notification
+        supabase.functions.invoke('notify-application-accepted', {
+          body: {
+            applicant_id: application.applicant_id,
+            project_id: application.project_id,
+            project_title: finalProjectTitle,
+            role_title: finalRoleTitle
+          }
+        }).catch(err => console.error('Failed to send acceptance notification:', err));
+      }
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['project-applications'] });

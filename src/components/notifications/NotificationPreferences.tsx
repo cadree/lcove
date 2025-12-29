@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Bell, Mail, Smartphone } from 'lucide-react';
+import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Bell, Mail, Smartphone, FolderKanban, CalendarPlus, CheckCircle } from 'lucide-react';
 import { useNotificationPreferences } from '@/hooks/useNotifications';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { Switch } from '@/components/ui/switch';
@@ -132,6 +132,38 @@ export const NotificationPreferences: React.FC = () => {
           description="When someone you follow goes live"
           checked={preferences.live_streams_enabled ?? true}
           onCheckedChange={(checked) => updatePreferences({ live_streams_enabled: checked })}
+        />
+
+        <PreferenceItem
+          icon={<CheckCircle className="h-4 w-4 text-green-500" />}
+          label="Application Updates"
+          description="When your project applications are accepted"
+          checked={preferences.application_updates_enabled ?? true}
+          onCheckedChange={(checked) => updatePreferences({ application_updates_enabled: checked })}
+        />
+      </div>
+
+      <Separator className="my-6" />
+
+      <h4 className="text-sm font-semibold mb-3">Community Updates</h4>
+      <p className="text-xs text-muted-foreground mb-3">
+        Get notified when new content is posted
+      </p>
+      <div className="space-y-1 pb-4">
+        <PreferenceItem
+          icon={<FolderKanban className="h-4 w-4 text-green-500" />}
+          label="New Projects"
+          description="When new collaboration projects are posted"
+          checked={preferences.new_projects_enabled ?? false}
+          onCheckedChange={(checked) => updatePreferences({ new_projects_enabled: checked })}
+        />
+
+        <PreferenceItem
+          icon={<CalendarPlus className="h-4 w-4 text-amber-500" />}
+          label="New Events"
+          description="When new community events are posted"
+          checked={preferences.new_events_enabled ?? false}
+          onCheckedChange={(checked) => updatePreferences({ new_events_enabled: checked })}
         />
       </div>
 
