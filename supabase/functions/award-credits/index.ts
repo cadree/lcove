@@ -35,7 +35,27 @@ serve(async (req) => {
 
     const { target_user_id, amount, description, reference_type, reference_id } = await req.json();
     
+    // Determine target user - defaults to authenticated user
     const targetUserId = target_user_id || user.id;
+    
+    // If awarding to a different user, verify caller is an admin
+    if (target_user_id && target_user_id !== user.id) {
+      logStep("Checking admin permission for awarding to another user");
+      
+      const { data: adminRole, error: roleError } = await supabaseClient
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .single();
+      
+      if (roleError || !adminRole) {
+        logStep("Unauthorized: User is not an admin", { userId: user.id });
+        throw new Error("Unauthorized: Only admins can award credits to other users");
+      }
+      
+      logStep("Admin permission verified", { adminId: user.id, targetUserId: target_user_id });
+    }
     
     if (!amount || amount <= 0) throw new Error("Invalid amount");
     if (!description) throw new Error("Description required");
