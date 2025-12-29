@@ -47,13 +47,13 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
       const filePath = `folder-covers/${folder.id}/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('posts')
+        .from('media')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('posts')
+        .from('media')
         .getPublicUrl(filePath);
 
       await updateFolder.mutateAsync({ id: folder.id, cover_image_url: publicUrl });

@@ -187,10 +187,7 @@ export function useFolderPosts(folderId: string | null, userId?: string) {
 
       const { data, error } = await supabase
         .from('posts')
-        .select(`
-          *,
-          profiles:user_id (display_name, avatar_url)
-        `)
+        .select('*')
         .eq('folder_id', folderId)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
