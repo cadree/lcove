@@ -73,7 +73,10 @@ const MessageComposer = ({ onSend, onTyping, isSending }: MessageComposerProps) 
   };
 
   return (
-    <div className="p-4 border-t border-border/50 bg-card/50 backdrop-blur-sm">
+    <div 
+      className="p-4 border-t border-border/50 bg-card/50 backdrop-blur-sm"
+      style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 16px), 16px)' }}
+    >
       {/* File Preview */}
       <AnimatePresence>
         {preview && (

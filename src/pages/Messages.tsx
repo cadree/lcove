@@ -56,8 +56,8 @@ const Messages = () => {
   }
 
   return (
-    <PageLayout hideNav={!!selectedConversation}>
-      <div className="h-[calc(100vh-80px)] md:h-[calc(100vh-40px)] flex">
+    <PageLayout hideNav={!!selectedConversation} showNotificationBell={false}>
+      <div className="h-[calc(100dvh-env(safe-area-inset-bottom,0px))] md:h-screen flex flex-col md:flex-row">
         {/* Conversation List */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
