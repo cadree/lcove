@@ -46,8 +46,12 @@ export const PageHeader = ({
             {icon}
           </div>}
         <div>
-          
-          {description}
+          <h1 className="text-lg sm:text-xl font-display font-semibold text-foreground">
+            {title}
+          </h1>
+          {description && (
+            <p className="text-sm text-muted-foreground">{description}</p>
+          )}
         </div>
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
