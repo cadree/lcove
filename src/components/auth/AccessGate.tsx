@@ -108,14 +108,14 @@ const AccessGate = ({ children }: AccessGateProps) => {
             className="bg-card border border-border rounded-2xl p-8 md:p-12 text-center max-w-md mx-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <motion.div
+            <motion.img
+              src={lcBearLogo}
+              alt="Ether"
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
-              className="w-16 h-16 mx-auto mb-6 rounded-full bg-primary/20 flex items-center justify-center"
-            >
-              <img src={lcBearLogo} alt="Ether" className="w-10 h-10 object-contain" />
-            </motion.div>
+              className="w-24 h-24 mx-auto mb-6 object-contain"
+            />
             
             <h2 className="font-display text-3xl md:text-4xl text-foreground mb-4">
               Welcome home Familcy
