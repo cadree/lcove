@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Plus, ImageIcon, Camera, Play, Check } from 'lucide-react';
+import { ArrowLeft, Plus, ImageIcon, Camera, Play, Check, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -9,12 +9,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { PortfolioFolder, useFolderPosts, usePortfolioFolders } from '@/hooks/usePortfolioFolders';
 import { useProfilePosts } from '@/hooks/useProfilePosts';
 import { ProfilePost } from '@/types/post';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface FolderDetailViewProps {
   folder: PortfolioFolder;
@@ -25,12 +32,15 @@ interface FolderDetailViewProps {
 }
 
 export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick }: FolderDetailViewProps) {
-  const { data: folderPosts, isLoading } = useFolderPosts(folder.id, userId);
-  const { posts: allPosts } = useProfilePosts(userId);
+  const { user } = useAuth();
+  const { data: folderPosts, isLoading, refetch: refetchFolderPosts } = useFolderPosts(folder.id, userId);
+  const { posts: allPosts, refetch: refetchAllPosts } = useProfilePosts(userId);
   const { updateFolder, assignPostToFolder } = usePortfolioFolders(userId);
   const [showAddPostsDialog, setShowAddPostsDialog] = useState(false);
   const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const mediaInputRef = useRef<HTMLInputElement>(null);
 
   // Filter posts that aren't already in this folder
   const availablePosts = allPosts.filter(
@@ -63,6 +73,56 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
       toast.error('Failed to update cover');
     } finally {
       setIsUploadingCover(false);
+    }
+  };
+
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !user) return;
+
+    setIsUploadingMedia(true);
+    try {
+      for (const file of Array.from(files)) {
+        const fileExt = file.name.split('.').pop()?.toLowerCase();
+        const isVideo = ['mp4', 'mov', 'webm', 'avi'].includes(fileExt || '');
+        const mediaType = isVideo ? 'video' : 'image';
+        const filePath = `${user.id}/portfolio/${Date.now()}-${file.name}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('media')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('media')
+          .getPublicUrl(filePath);
+
+        // Create a post with this media and assign to folder
+        const { error: postError } = await supabase
+          .from('posts')
+          .insert({
+            user_id: user.id,
+            media_url: publicUrl,
+            media_type: mediaType,
+            content: '',
+            folder_id: folder.id,
+          });
+
+        if (postError) throw postError;
+      }
+
+      toast.success(`${files.length} item${files.length > 1 ? 's' : ''} added!`);
+      refetchFolderPosts();
+      refetchAllPosts();
+    } catch (error) {
+      console.error('Error uploading media:', error);
+      toast.error('Failed to upload media');
+    } finally {
+      setIsUploadingMedia(false);
+      if (mediaInputRef.current) {
+        mediaInputRef.current.value = '';
+      }
     }
   };
 
@@ -101,11 +161,39 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
             </p>
           </div>
           {isOwner && (
-            <Button variant="outline" size="sm" onClick={() => setShowAddPostsDialog(true)}>
-              <Plus className="w-4 h-4 mr-1" />
-              Add
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={isUploadingMedia}>
+                  {isUploadingMedia ? (
+                    <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-1" />
+                  ) : (
+                    <Plus className="w-4 h-4 mr-1" />
+                  )}
+                  Add
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => mediaInputRef.current?.click()}>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload New
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowAddPostsDialog(true)}>
+                  <ImageIcon className="w-4 h-4 mr-2" />
+                  From Posts
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
+          {/* Hidden file input for direct upload */}
+          <input
+            ref={mediaInputRef}
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            className="hidden"
+            onChange={handleMediaUpload}
+            disabled={isUploadingMedia}
+          />
         </div>
       </div>
 
