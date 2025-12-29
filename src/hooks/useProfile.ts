@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
+export interface SocialLinks {
+  instagram?: string;
+  twitter?: string;
+  tiktok?: string;
+  youtube?: string;
+  linkedin?: string;
+  website?: string;
+  [key: string]: string | undefined;
+}
+
 export interface Profile {
   id: string;
   user_id: string;
@@ -20,6 +30,9 @@ export interface Profile {
   mindset_level: number | null;
   access_status: 'pending' | 'active' | 'denied' | 'banned' | null;
   onboarding_score: number | null;
+  // Contact info
+  phone: string | null;
+  social_links: SocialLinks | null;
 }
 
 export const useProfile = (userId?: string) => {
@@ -68,6 +81,8 @@ export const useProfile = (userId?: string) => {
         mindset_level: (rawData.mindset_level as number | null) ?? null,
         access_status: (rawData.access_status as Profile['access_status']) ?? 'pending',
         onboarding_score: (rawData.onboarding_score as number | null) ?? null,
+        phone: (rawData.phone as string | null) ?? null,
+        social_links: (rawData.social_links as SocialLinks | null) ?? null,
       };
       setProfile(profileData);
     }

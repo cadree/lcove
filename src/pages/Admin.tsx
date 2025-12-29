@@ -1207,6 +1207,50 @@ const Admin: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              {detailDialog.social_links && Object.values(detailDialog.social_links).some(v => v) && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Social Links</Label>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {detailDialog.social_links.instagram && (
+                      <Badge variant="outline" className="gap-1">
+                        <span className="text-pink-500">IG</span>
+                        {detailDialog.social_links.instagram}
+                      </Badge>
+                    )}
+                    {detailDialog.social_links.twitter && (
+                      <Badge variant="outline" className="gap-1">
+                        <span className="text-blue-400">X</span>
+                        {detailDialog.social_links.twitter}
+                      </Badge>
+                    )}
+                    {detailDialog.social_links.tiktok && (
+                      <Badge variant="outline" className="gap-1">
+                        <span>TikTok</span>
+                        {detailDialog.social_links.tiktok}
+                      </Badge>
+                    )}
+                    {detailDialog.social_links.youtube && (
+                      <Badge variant="outline" className="gap-1">
+                        <span className="text-red-500">YT</span>
+                        {detailDialog.social_links.youtube}
+                      </Badge>
+                    )}
+                    {detailDialog.social_links.linkedin && (
+                      <Badge variant="outline" className="gap-1">
+                        <span className="text-blue-600">LI</span>
+                        {detailDialog.social_links.linkedin}
+                      </Badge>
+                    )}
+                    {detailDialog.social_links.website && (
+                      <Badge variant="outline" className="gap-1">
+                        <span>🌐</span>
+                        {detailDialog.social_links.website}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
