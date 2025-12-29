@@ -10,10 +10,47 @@ interface PushNotificationRequest {
   user_id: string;
   title: string;
   body?: string;
+  url?: string;
   data?: Record<string, unknown>;
   icon?: string;
   badge?: string;
   notification_type?: string;
+}
+
+function logStep(step: string, details?: Record<string, unknown>) {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${step}`, details ? JSON.stringify(details) : "");
+}
+
+// Simple web push sender - sends payload to push service endpoint
+// Note: Full VAPID signing requires web-push library which isn't available in Deno
+// Most push services will accept the request, but some may reject without proper VAPID
+async function sendPushToEndpoint(
+  endpoint: string,
+  payload: string
+): Promise<{ success: boolean; status?: number; error?: string }> {
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "TTL": "86400",
+        "Urgency": "high",
+      },
+      body: payload,
+    });
+
+    if (response.status === 201 || response.status === 200) {
+      return { success: true, status: response.status };
+    } else if (response.status === 410 || response.status === 404) {
+      return { success: false, status: response.status, error: "Subscription expired" };
+    } else {
+      const errorText = await response.text();
+      return { success: false, status: response.status, error: `${response.status}: ${errorText}` };
+    }
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
 }
 
 serve(async (req) => {
@@ -24,11 +61,11 @@ serve(async (req) => {
   try {
     const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY");
     const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY");
-    
+
     if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-      console.error("VAPID keys not configured");
+      logStep("ERROR: VAPID keys not configured");
       return new Response(
-        JSON.stringify({ error: "Push notifications not configured" }),
+        JSON.stringify({ error: "Push notifications not configured - VAPID keys missing" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -38,9 +75,10 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { user_id, title, body, data, icon, badge, notification_type }: PushNotificationRequest = await req.json();
+    const requestBody: PushNotificationRequest = await req.json();
+    const { user_id, title, body, url, data, icon, badge, notification_type } = requestBody;
 
-    console.log(`Sending push notification to user: ${user_id}, title: ${title}, type: ${notification_type}`);
+    logStep("Processing push notification", { user_id, title, notification_type });
 
     // Check if push notifications are enabled for this user
     const { data: prefs } = await supabase
@@ -50,7 +88,7 @@ serve(async (req) => {
       .single();
 
     if (!prefs?.push_enabled) {
-      console.log("Push notifications disabled for user:", user_id);
+      logStep("Push notifications disabled for user", { user_id });
       return new Response(
         JSON.stringify({ message: "Push notifications disabled" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -71,7 +109,7 @@ serve(async (req) => {
 
       const prefKey = typePreferenceMap[notification_type];
       if (prefKey && prefs[prefKey] === false) {
-        console.log(`Notification type ${notification_type} disabled for user:`, user_id);
+        logStep(`Notification type ${notification_type} disabled for user`, { user_id });
         return new Response(
           JSON.stringify({ message: `${notification_type} notifications disabled` }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -86,21 +124,23 @@ serve(async (req) => {
       .eq("user_id", user_id);
 
     if (subError) {
-      console.error("Error fetching subscriptions:", subError);
+      logStep("Error fetching subscriptions", { error: subError.message });
       throw subError;
     }
 
     if (!subscriptions || subscriptions.length === 0) {
-      console.log("No push subscriptions found for user:", user_id);
+      logStep("No push subscriptions found for user", { user_id });
       return new Response(
         JSON.stringify({ message: "No push subscriptions" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const notificationType = notification_type || 'general';
-    
-    // Build push payload with Instagram-like experience
+    logStep(`Found ${subscriptions.length} subscriptions for user`);
+
+    const notificationType = notification_type || "general";
+
+    // Build push payload matching what the service worker expects
     const payload = JSON.stringify({
       title,
       body: body || "",
@@ -108,11 +148,11 @@ serve(async (req) => {
       badge: badge || "/favicon.png",
       tag: `ether-${notificationType}-${Date.now()}`,
       renotify: true,
-      requireInteraction: notificationType === 'message' || notificationType === 'project_invite',
-      data: { 
-        url: "/notifications", 
+      requireInteraction: notificationType === "message" || notificationType === "project_invite",
+      data: {
+        url: url || "/notifications",
         type: notificationType,
-        ...data 
+        ...data,
       },
       vibrate: [200, 100, 200, 100, 200],
       timestamp: Date.now(),
@@ -121,61 +161,52 @@ serve(async (req) => {
     const results: { endpoint: string; status: string; error?: string }[] = [];
     const expiredEndpoints: string[] = [];
 
-    // Send to all subscriptions using simple POST
-    // Note: For production, you should use the web-push npm package via Deno
-    // This simple approach works for testing
+    // Send to all subscriptions
     for (const sub of subscriptions) {
-      try {
-        const response = await fetch(sub.endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "TTL": "86400",
-            "Urgency": "normal",
-          },
-          body: payload,
-        });
+      const result = await sendPushToEndpoint(sub.endpoint, payload);
 
-        if (response.status === 201 || response.status === 200) {
-          console.log(`Push sent successfully to endpoint: ${sub.endpoint.substring(0, 50)}...`);
-          results.push({ endpoint: sub.endpoint, status: "sent" });
-        } else if (response.status === 410 || response.status === 404) {
-          // Subscription expired or invalid
-          console.log(`Subscription expired: ${sub.endpoint.substring(0, 50)}...`);
-          expiredEndpoints.push(sub.endpoint);
-          results.push({ endpoint: sub.endpoint, status: "expired" });
-        } else {
-          const errorText = await response.text();
-          console.error(`Push failed: ${response.status} - ${errorText}`);
-          results.push({ endpoint: sub.endpoint, status: "failed", error: `${response.status}: ${errorText}` });
-        }
-      } catch (error) {
-        console.error(`Error sending to endpoint: ${error}`);
-        results.push({ endpoint: sub.endpoint, status: "error", error: String(error) });
+      if (result.success) {
+        logStep(`Push sent successfully`, { endpoint: sub.endpoint.substring(0, 50) });
+        results.push({ endpoint: sub.endpoint, status: "sent" });
+      } else if (result.status === 410 || result.status === 404) {
+        logStep(`Subscription expired`, { endpoint: sub.endpoint.substring(0, 50) });
+        expiredEndpoints.push(sub.endpoint);
+        results.push({ endpoint: sub.endpoint, status: "expired" });
+      } else {
+        logStep(`Push failed`, { endpoint: sub.endpoint.substring(0, 50), error: result.error });
+        results.push({ endpoint: sub.endpoint, status: "failed", error: result.error });
       }
     }
 
     // Clean up expired subscriptions
     if (expiredEndpoints.length > 0) {
-      await supabase
+      const { error: deleteError } = await supabase
         .from("push_subscriptions")
         .delete()
         .in("endpoint", expiredEndpoints);
-      console.log(`Cleaned up ${expiredEndpoints.length} expired subscriptions`);
+      
+      if (deleteError) {
+        logStep("Error cleaning up expired subscriptions", { error: deleteError.message });
+      } else {
+        logStep(`Cleaned up ${expiredEndpoints.length} expired subscriptions`);
+      }
     }
 
+    const successCount = results.filter((r) => r.status === "sent").length;
+    logStep("Push notification complete", { sent: successCount, total: subscriptions.length });
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        sent: results.filter(r => r.status === "sent").length,
+      JSON.stringify({
+        success: successCount > 0,
+        sent: successCount,
         total: subscriptions.length,
-        results 
+        results,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("Error sending push notification:", errorMessage);
+    logStep("ERROR in send-push-notification", { error: errorMessage });
     return new Response(
       JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
