@@ -73,6 +73,14 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
               </Badge>
               <SheetTitle className="text-xl">{project.title}</SheetTitle>
             </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={onClose}
+              className="shrink-0 -mt-1 -mr-2"
+            >
+              <X className="h-5 w-5" />
+            </Button>
           </div>
         </SheetHeader>
 
