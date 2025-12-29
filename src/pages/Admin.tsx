@@ -43,6 +43,7 @@ import {
   AdminUserData,
   useToggleAdminRole,
   useSendIndividualMessage,
+  useSendMultiUserMessage,
 } from '@/hooks/useAdminExtended';
 import { formatDistanceToNow } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -55,6 +56,7 @@ const Admin: React.FC = () => {
   const [search, setSearch] = useState('');
   const [mindsetFilter, setMindsetFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   
   // Dialog states
   const [suspendDialog, setSuspendDialog] = useState<{ userId: string; name: string } | null>(null);
@@ -65,6 +67,7 @@ const Admin: React.FC = () => {
   const [creditDialog, setCreditDialog] = useState<{ userId: string; name: string; balance: number } | null>(null);
   const [bulkCreditDialog, setBulkCreditDialog] = useState(false);
   const [massMessageDialog, setMassMessageDialog] = useState(false);
+  const [multiUserMessageDialog, setMultiUserMessageDialog] = useState(false);
   const [individualMessageDialog, setIndividualMessageDialog] = useState<{ 
     userId: string; 
     name: string; 
@@ -107,6 +110,7 @@ const Admin: React.FC = () => {
   const sendMassNotification = useSendMassNotification();
   const toggleAdminRole = useToggleAdminRole();
   const sendIndividualMessage = useSendIndividualMessage();
+  const sendMultiUserMessage = useSendMultiUserMessage();
 
   // Filtered users
   const filteredUsers = useMemo(() => {
@@ -238,9 +242,10 @@ const Admin: React.FC = () => {
   };
 
   const handleSendIndividualMessage = () => {
-    if (individualMessageDialog && messageBody) {
+    if (individualMessageDialog && messageTitle && messageBody) {
       sendIndividualMessage.mutate({
         userId: individualMessageDialog.userId,
+        title: messageTitle,
         message: messageBody,
         sendDm: deliveryMethods.dm,
         sendEmail: deliveryMethods.email,
@@ -251,6 +256,44 @@ const Admin: React.FC = () => {
       setMessageBody('');
       setDeliveryMethods({ email: true, sms: false, dm: true });
     }
+  };
+
+  const handleSendMultiUserMessage = () => {
+    if (selectedUsers.size > 0 && messageTitle && messageBody) {
+      sendMultiUserMessage.mutate({
+        userIds: Array.from(selectedUsers),
+        title: messageTitle,
+        message: messageBody,
+        sendDm: deliveryMethods.dm,
+        sendEmail: deliveryMethods.email,
+        sendSms: deliveryMethods.sms,
+      });
+      setMultiUserMessageDialog(false);
+      setSelectedUsers(new Set());
+      setMessageTitle('');
+      setMessageBody('');
+      setDeliveryMethods({ email: true, sms: false, dm: true });
+    }
+  };
+
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUsers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllFilteredUsers = () => {
+    setSelectedUsers(new Set(filteredUsers.map(u => u.user_id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedUsers(new Set());
   };
 
   const getStatusBadge = (status: string | null) => {
@@ -338,6 +381,15 @@ const Admin: React.FC = () => {
             <Send className="h-4 w-4" />
             Mass Message
           </Button>
+          {selectedUsers.size > 0 && (
+            <Button 
+              onClick={() => setMultiUserMessageDialog(true)} 
+              className="gap-2 bg-primary"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Message Selected ({selectedUsers.size})
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setBulkCreditDialog(true)} className="gap-2">
             <Coins className="h-4 w-4" />
             Bulk Award Credits
@@ -402,8 +454,35 @@ const Admin: React.FC = () => {
                 </Select>
               </div>
 
-              <div className="text-sm text-muted-foreground">
-                Showing {filteredUsers.length} of {adminUserData?.length || 0} users
+              {/* Selection Controls */}
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Showing {filteredUsers.length} of {adminUserData?.length || 0} users
+                  {selectedUsers.size > 0 && (
+                    <span className="ml-2 text-primary font-medium">
+                      ({selectedUsers.size} selected)
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={selectAllFilteredUsers}
+                    disabled={filteredUsers.length === 0}
+                  >
+                    Select All ({filteredUsers.length})
+                  </Button>
+                  {selectedUsers.size > 0 && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={clearSelection}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
               </div>
               
               <ScrollArea className="h-[500px]">
@@ -414,13 +493,23 @@ const Admin: React.FC = () => {
                 ) : (
                   <div className="space-y-3">
                     {filteredUsers.map(user => (
-                      <Card key={user.user_id} className="overflow-hidden">
+                      <Card 
+                        key={user.user_id} 
+                        className={`overflow-hidden transition-colors ${selectedUsers.has(user.user_id) ? 'ring-2 ring-primary bg-primary/5' : ''}`}
+                      >
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-start gap-3 flex-1 min-w-0">
-                              <Avatar className="h-12 w-12">
-                                <AvatarFallback>{user.display_name?.[0] || '?'}</AvatarFallback>
-                              </Avatar>
+                              <div className="flex flex-col items-center gap-2">
+                                <Checkbox
+                                  checked={selectedUsers.has(user.user_id)}
+                                  onCheckedChange={() => toggleUserSelection(user.user_id)}
+                                  className="mt-1"
+                                />
+                                <Avatar className="h-10 w-10">
+                                  <AvatarFallback>{user.display_name?.[0] || '?'}</AvatarFallback>
+                                </Avatar>
+                              </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap mb-1">
                                   <span className="font-semibold">{user.display_name || 'Unnamed'}</span>
@@ -1212,6 +1301,116 @@ const Admin: React.FC = () => {
               }
             >
               {sendIndividualMessage.isPending ? 'Sending...' : 'Send Message'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Multi-User Message Dialog */}
+      <Dialog open={multiUserMessageDialog} onOpenChange={setMultiUserMessageDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Send Message to {selectedUsers.size} Users</DialogTitle>
+            <DialogDescription>
+              Choose how to deliver this message to selected users
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Selected Users Preview */}
+            <div className="bg-muted/50 rounded-lg p-3">
+              <Label className="text-xs text-muted-foreground mb-2 block">Selected Recipients</Label>
+              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+                {Array.from(selectedUsers).slice(0, 10).map(userId => {
+                  const user = adminUserData?.find(u => u.user_id === userId);
+                  return (
+                    <Badge key={userId} variant="secondary" className="text-xs">
+                      {user?.display_name || 'User'}
+                    </Badge>
+                  );
+                })}
+                {selectedUsers.size > 10 && (
+                  <Badge variant="outline" className="text-xs">
+                    +{selectedUsers.size - 10} more
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label>Delivery Methods</Label>
+              <div className="flex flex-wrap gap-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="multi-dm-check"
+                    checked={deliveryMethods.dm}
+                    onCheckedChange={(checked) => 
+                      setDeliveryMethods(prev => ({ ...prev, dm: !!checked }))
+                    }
+                  />
+                  <label htmlFor="multi-dm-check" className="text-sm font-medium flex items-center gap-1">
+                    <MessageCircle className="h-4 w-4" />
+                    In-App Notification
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="multi-email-check"
+                    checked={deliveryMethods.email}
+                    onCheckedChange={(checked) => 
+                      setDeliveryMethods(prev => ({ ...prev, email: !!checked }))
+                    }
+                  />
+                  <label htmlFor="multi-email-check" className="text-sm font-medium flex items-center gap-1">
+                    <Mail className="h-4 w-4" />
+                    Email
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="multi-sms-check"
+                    checked={deliveryMethods.sms}
+                    onCheckedChange={(checked) => 
+                      setDeliveryMethods(prev => ({ ...prev, sms: !!checked }))
+                    }
+                  />
+                  <label htmlFor="multi-sms-check" className="text-sm font-medium flex items-center gap-1">
+                    <Phone className="h-4 w-4" />
+                    SMS
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div>
+              <Label>Title</Label>
+              <Input
+                value={messageTitle}
+                onChange={(e) => setMessageTitle(e.target.value)}
+                placeholder="Message title"
+              />
+            </div>
+            <div>
+              <Label>Message</Label>
+              <Textarea
+                value={messageBody}
+                onChange={(e) => setMessageBody(e.target.value)}
+                placeholder="Write your message..."
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMultiUserMessageDialog(false)}>Cancel</Button>
+            <Button 
+              onClick={handleSendMultiUserMessage} 
+              disabled={
+                !messageTitle || 
+                !messageBody || 
+                selectedUsers.size === 0 ||
+                (!deliveryMethods.email && !deliveryMethods.sms && !deliveryMethods.dm) ||
+                sendMultiUserMessage.isPending
+              }
+            >
+              {sendMultiUserMessage.isPending ? 'Sending...' : `Send to ${selectedUsers.size} Users`}
             </Button>
           </DialogFooter>
         </DialogContent>
