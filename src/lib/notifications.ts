@@ -55,6 +55,18 @@ export const createNotification = async ({
       console.error('Error sending notification email:', err);
     });
 
+    // Trigger push notification via edge function
+    supabase.functions.invoke('send-push-notification', {
+      body: {
+        user_id: userId,
+        title,
+        body: body || '',
+        data,
+      },
+    }).catch((err) => {
+      console.error('Error sending push notification:', err);
+    });
+
     return notification;
   } catch (error) {
     console.error('Error in createNotification:', error);
