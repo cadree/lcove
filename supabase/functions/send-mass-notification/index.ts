@@ -2,6 +2,9 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
+const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
+const TWILIO_PHONE_NUMBER = Deno.env.get("TWILIO_PHONE_NUMBER");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -66,6 +69,9 @@ const getEmailTemplate = (title: string, body: string) => {
   `;
 };
 
+// Helper to add delay between API calls to avoid rate limits
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -119,10 +125,10 @@ serve(async (req) => {
 
     console.log(`Sending mass notification: "${title}" to ${targetAudience.type}`);
 
-    // Build query for target users
+    // Build query for target users - get phone numbers too
     let query = supabaseAdmin
       .from("profiles")
-      .select("user_id")
+      .select("user_id, phone")
       .eq("is_suspended", false);
 
     if (targetAudience.type === "mindset_level" && targetAudience.value) {
@@ -174,68 +180,103 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Created ${insertedCount} notifications`);
+    console.log(`Created ${insertedCount} in-app notifications`);
 
-    // Send emails to users who have email notifications enabled
+    // Track delivery stats
     let emailsSent = 0;
-    
-    if (RESEND_API_KEY) {
-      console.log("Sending emails to users...");
-      
-      // Get users with email preferences and their emails
-      for (const targetUser of targetUsers) {
-        try {
-          // Check if user has email notifications enabled
-          const { data: prefs } = await supabaseAdmin
-            .from("notification_preferences")
-            .select("email_enabled")
-            .eq("user_id", targetUser.user_id)
-            .single();
+    let smsSent = 0;
 
-          // Default to enabled if no preferences set
-          const emailEnabled = prefs?.email_enabled !== false;
+    // Process emails and SMS for each user
+    for (const targetUser of targetUsers) {
+      try {
+        // Get user preferences
+        const { data: prefs } = await supabaseAdmin
+          .from("notification_preferences")
+          .select("email_enabled, sms_enabled")
+          .eq("user_id", targetUser.user_id)
+          .single();
 
-          if (emailEnabled) {
-            // Get user email from auth
-            const { data: userData, error: userFetchError } = await supabaseAdmin.auth.admin.getUserById(targetUser.user_id);
-            
-            if (userFetchError || !userData?.user?.email) {
-              console.log(`Could not get email for user ${targetUser.user_id}`);
-              continue;
+        // Default email to enabled if no preferences
+        const emailEnabled = prefs?.email_enabled !== false;
+        const smsEnabled = prefs?.sms_enabled === true;
+
+        // Send email if enabled and API key exists
+        if (emailEnabled && RESEND_API_KEY) {
+          const { data: userData } = await supabaseAdmin.auth.admin.getUserById(targetUser.user_id);
+          
+          if (userData?.user?.email) {
+            try {
+              // Add delay to avoid rate limits (500ms between emails)
+              await delay(500);
+              
+              const emailResponse = await fetch("https://api.resend.com/emails", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${RESEND_API_KEY}`,
+                },
+                body: JSON.stringify({
+                  from: "ETHER <notifications@resend.dev>",
+                  to: [userData.user.email],
+                  subject: title,
+                  html: getEmailTemplate(title, message),
+                }),
+              });
+
+              if (emailResponse.ok) {
+                emailsSent++;
+                console.log(`Email sent to ${userData.user.email}`);
+              } else {
+                const errorData = await emailResponse.text();
+                console.error(`Failed to send email to ${userData.user.email}:`, errorData);
+              }
+            } catch (emailError) {
+              console.error(`Email error for ${userData.user.email}:`, emailError);
             }
+          }
+        }
 
-            const html = getEmailTemplate(title, message);
-
-            const emailResponse = await fetch("https://api.resend.com/emails", {
+        // Send SMS if enabled and Twilio is configured
+        if (smsEnabled && targetUser.phone && TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_PHONE_NUMBER) {
+          try {
+            // Add delay to avoid rate limits
+            await delay(200);
+            
+            const smsBody = `ETHER: ${title}\n\n${message.substring(0, 140)}${message.length > 140 ? '...' : ''}`;
+            
+            const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
+            const twilioAuth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
+            
+            const smsResponse = await fetch(twilioUrl, {
               method: "POST",
               headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${RESEND_API_KEY}`,
+                "Content-Type": "application/x-www-form-urlencoded",
+                Authorization: `Basic ${twilioAuth}`,
               },
-              body: JSON.stringify({
-                from: "ETHER <notifications@resend.dev>",
-                to: [userData.user.email],
-                subject: title,
-                html,
+              body: new URLSearchParams({
+                To: targetUser.phone,
+                From: TWILIO_PHONE_NUMBER,
+                Body: smsBody,
               }),
             });
 
-            if (emailResponse.ok) {
-              emailsSent++;
+            if (smsResponse.ok) {
+              smsSent++;
+              console.log(`SMS sent to ${targetUser.phone}`);
             } else {
-              const errorData = await emailResponse.text();
-              console.error(`Failed to send email to ${userData.user.email}:`, errorData);
+              const errorData = await smsResponse.text();
+              console.error(`Failed to send SMS to ${targetUser.phone}:`, errorData);
             }
+          } catch (smsError) {
+            console.error(`SMS error for ${targetUser.phone}:`, smsError);
           }
-        } catch (emailError) {
-          console.error(`Error sending email to user ${targetUser.user_id}:`, emailError);
         }
+      } catch (userError) {
+        console.error(`Error processing user ${targetUser.user_id}:`, userError);
       }
-      
-      console.log(`Sent ${emailsSent} emails`);
-    } else {
-      console.log("RESEND_API_KEY not configured, skipping email notifications");
     }
+
+    console.log(`Delivery complete: ${emailsSent} emails, ${smsSent} SMS sent`);
 
     // Log the announcement in admin_announcements
     const { error: announcementError } = await supabaseAdmin
@@ -256,23 +297,25 @@ serve(async (req) => {
     await supabaseAdmin.from("admin_actions").insert({
       admin_id: user.id,
       action_type: "mass_notification",
-      target_user_id: user.id, // Self-reference for mass actions
+      target_user_id: user.id,
       metadata: {
         title,
         target_audience: targetAudience,
         recipient_count: insertedCount,
         emails_sent: emailsSent,
+        sms_sent: smsSent,
       },
     });
 
-    console.log(`Mass notification sent successfully to ${insertedCount} users, ${emailsSent} emails sent`);
+    console.log(`Mass notification complete: ${insertedCount} in-app, ${emailsSent} emails, ${smsSent} SMS`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         recipientCount: insertedCount,
         emailsSent,
-        message: `Notification sent to ${insertedCount} users (${emailsSent} emails)` 
+        smsSent,
+        message: `Sent to ${insertedCount} users (${emailsSent} emails, ${smsSent} SMS)` 
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
