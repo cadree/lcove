@@ -43,6 +43,7 @@ const Projects: React.FC = () => {
               </CreateProjectDialog>
             )
           }
+          className="mb-8"
         />
 
         {/* Tabs */}
@@ -52,7 +53,7 @@ const Projects: React.FC = () => {
           transition={{ delay: 0.1 }}
         >
           <Tabs defaultValue="browse" className="w-full">
-            <TabsList className="w-full max-w-md mb-6">
+            <TabsList className="w-full max-w-md mb-8">
               <TabsTrigger value="browse" className="flex-1">Browse Projects</TabsTrigger>
               {user && <TabsTrigger value="my-projects" className="flex-1">My Projects</TabsTrigger>}
             </TabsList>
@@ -63,7 +64,7 @@ const Projects: React.FC = () => {
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.15 }}
-                className="flex items-center gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide"
+                className="flex items-center gap-2 mb-8 overflow-x-auto pb-2 scrollbar-hide"
               >
                 <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 {['all', 'open', 'in_progress', 'completed'].map((status) => (
