@@ -13,6 +13,7 @@ interface PushNotificationRequest {
   data?: Record<string, unknown>;
   icon?: string;
   badge?: string;
+  notification_type?: string;
 }
 
 serve(async (req) => {
@@ -37,14 +38,14 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { user_id, title, body, data, icon, badge }: PushNotificationRequest = await req.json();
+    const { user_id, title, body, data, icon, badge, notification_type }: PushNotificationRequest = await req.json();
 
-    console.log(`Sending push notification to user: ${user_id}, title: ${title}`);
+    console.log(`Sending push notification to user: ${user_id}, title: ${title}, type: ${notification_type}`);
 
     // Check if push notifications are enabled for this user
     const { data: prefs } = await supabase
       .from("notification_preferences")
-      .select("push_enabled")
+      .select("*")
       .eq("user_id", user_id)
       .single();
 
@@ -54,6 +55,27 @@ serve(async (req) => {
         JSON.stringify({ message: "Push notifications disabled" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Check if this specific notification type is enabled
+    if (notification_type) {
+      const typePreferenceMap: Record<string, string> = {
+        message: "messages_enabled",
+        like: "likes_enabled",
+        comment: "comments_enabled",
+        project_invite: "project_invites_enabled",
+        event_reminder: "event_reminders_enabled",
+        live_stream: "live_streams_enabled",
+      };
+
+      const prefKey = typePreferenceMap[notification_type];
+      if (prefKey && prefs[prefKey] === false) {
+        console.log(`Notification type ${notification_type} disabled for user:`, user_id);
+        return new Response(
+          JSON.stringify({ message: `${notification_type} notifications disabled` }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Get all push subscriptions for this user

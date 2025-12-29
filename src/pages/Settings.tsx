@@ -605,6 +605,47 @@ const Settings = () => {
                 onCheckedChange={(checked) => handleNotificationToggle('live_streams_enabled', checked)}
               />
             </div>
+
+            <Separator className="bg-border/50 my-4" />
+            <p className="text-sm font-medium text-muted-foreground mb-4">Delivery Methods</p>
+
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <Label className="text-foreground">Email Notifications</Label>
+                <p className="text-sm text-muted-foreground">Receive notifications via email</p>
+              </div>
+              <Switch
+                checked={preferences?.email_enabled ?? true}
+                onCheckedChange={(checked) => handleNotificationToggle('email_enabled', checked)}
+              />
+            </div>
+
+            <Separator className="bg-border/50" />
+
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <Label className="text-foreground">Push Notifications</Label>
+                <p className="text-sm text-muted-foreground">Receive notifications on your device</p>
+              </div>
+              <Switch
+                checked={preferences?.push_enabled ?? true}
+                onCheckedChange={(checked) => handleNotificationToggle('push_enabled', checked)}
+              />
+            </div>
+
+            <Separator className="bg-border/50" />
+
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <Label className="text-foreground">SMS Notifications</Label>
+                <p className="text-sm text-muted-foreground">Receive text messages (requires phone number)</p>
+              </div>
+              <Switch
+                checked={preferences?.sms_enabled ?? false}
+                onCheckedChange={(checked) => handleNotificationToggle('sms_enabled', checked)}
+                disabled={!phone}
+              />
+            </div>
           </div>
         </motion.section>
 

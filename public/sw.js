@@ -12,7 +12,7 @@ self.addEventListener("push", (event) => {
   console.log("Push event received:", event);
 
   const defaultData = {
-    title: "ETHER Notification",
+    title: "ETHER",
     body: "You have a new notification",
     icon: "/favicon.png",
     badge: "/favicon.png",
@@ -36,16 +36,31 @@ self.addEventListener("push", (event) => {
     }
 
     const merged = { ...defaultData, ...payload };
+    
+    // Enhanced notification options for lockscreen visibility (like Instagram)
     const options = {
       body: merged.body,
       icon: merged.icon || "/favicon.png",
       badge: merged.badge || "/favicon.png",
-      vibrate: [100, 50, 100],
+      // Multiple vibration patterns for attention
+      vibrate: [200, 100, 200, 100, 200],
+      // Notification data for click handling
       data: merged.data || { url: "/notifications" },
+      // Actions for quick response
       actions: [
         { action: "view", title: "View" },
         { action: "dismiss", title: "Dismiss" },
       ],
+      // Show on lockscreen
+      requireInteraction: false,
+      // Keep notification visible until user interacts
+      silent: false,
+      // Tag to replace duplicate notifications
+      tag: merged.tag || `ether-${Date.now()}`,
+      // Renotify even if same tag (for multiple of same type)
+      renotify: true,
+      // Timestamp for notification ordering
+      timestamp: Date.now(),
     };
 
     await self.registration.showNotification(merged.title, options);
