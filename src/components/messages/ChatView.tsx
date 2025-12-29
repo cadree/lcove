@@ -118,7 +118,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
     <div className="h-full w-full flex flex-col bg-background">
       {/* Header */}
       <div className="flex items-center gap-3 p-4 border-b border-border/50 bg-card/50 backdrop-blur-sm">
-        <Button variant="ghost" size="icon" onClick={onBack} className="md:hidden">
+        <Button variant="ghost" size="icon" onClick={onBack}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
 
