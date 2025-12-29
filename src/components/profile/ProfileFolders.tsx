@@ -134,113 +134,109 @@ export function ProfileFolders({ userId, isOwner, onFolderClick }: ProfileFolder
           <p className="text-sm">No portfolio folders yet</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {/* Vertical Scrolling Feed */}
-          {folders.map((folder, index) => (
-            <motion.div
-              key={folder.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-            >
-              <div
-                className={cn(
-                  "group relative flex items-center gap-4 p-3 rounded-xl cursor-pointer",
-                  "bg-card/50 border border-border/50",
-                  "hover:bg-card hover:border-primary/30 hover:shadow-md transition-all duration-200"
-                )}
-                onClick={() => onFolderClick(folder)}
+        <ScrollArea className="w-full">
+          <div className="flex gap-4 pb-4">
+            {/* Horizontal Scrolling Cards */}
+            {folders.map((folder, index) => (
+              <motion.div
+                key={folder.id}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="flex-shrink-0"
               >
-                {/* Cover Image Thumbnail */}
-                <div className={cn(
-                  "relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0",
-                  "bg-gradient-to-br from-muted/80 to-muted/40"
-                )}>
-                  {folder.cover_image_url ? (
-                    <img
-                      src={folder.cover_image_url}
-                      alt={folder.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Folder className="w-6 h-6 text-muted-foreground/40" />
-                    </div>
+                <div
+                  className={cn(
+                    "group relative w-40 cursor-pointer",
+                    "rounded-xl overflow-hidden",
+                    "bg-card/50 border border-border/50",
+                    "hover:border-primary/30 hover:shadow-md transition-all duration-200"
                   )}
-                </div>
+                  onClick={() => onFolderClick(folder)}
+                >
+                  {/* Cover Image */}
+                  <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-muted/80 to-muted/40">
+                    {folder.cover_image_url ? (
+                      <img
+                        src={folder.cover_image_url}
+                        alt={folder.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Folder className="w-10 h-10 text-muted-foreground/40" />
+                      </div>
+                    )}
+                  </div>
 
-                {/* Folder Info */}
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-foreground truncate">
-                    {folder.name}
-                  </h3>
-                  {folder.description && (
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {folder.description}
+                  {/* Folder Info */}
+                  <div className="p-3">
+                    <h3 className="font-medium text-foreground text-sm truncate">
+                      {folder.name}
+                    </h3>
+                    <p className="text-xs text-muted-foreground/70 mt-0.5">
+                      {folder.post_count || 0} {folder.post_count === 1 ? 'item' : 'items'}
                     </p>
+                  </div>
+
+                  {/* Owner Actions */}
+                  {isOwner && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 right-2 w-7 h-7 bg-background/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEditDialog(folder); }}>
+                          <Edit className="w-4 h-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={(e) => { e.stopPropagation(); handleDelete(folder); }}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
-                  <p className="text-xs text-muted-foreground/70 mt-1">
-                    {folder.post_count || 0} {folder.post_count === 1 ? 'item' : 'items'}
-                  </p>
                 </div>
+              </motion.div>
+            ))}
 
-                {/* Arrow */}
-                <ChevronRight className="w-5 h-5 text-muted-foreground/50 group-hover:text-foreground transition-colors" />
-
-                {/* Owner Actions */}
-                {isOwner && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute top-2 right-2 w-8 h-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEditDialog(folder); }}>
-                        <Edit className="w-4 h-4 mr-2" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={(e) => { e.stopPropagation(); handleDelete(folder); }}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
-            </motion.div>
-          ))}
-
-          {/* Add Folder Button - Only for owner */}
-          {isOwner && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: folders.length * 0.05 }}
-            >
-              <button
-                className={cn(
-                  "w-full flex items-center justify-center gap-2 p-4 rounded-xl",
-                  "border-2 border-dashed border-muted-foreground/20",
-                  "text-muted-foreground hover:text-foreground",
-                  "hover:border-primary/40 hover:bg-primary/5 transition-all"
-                )}
-                onClick={() => setShowCreateDialog(true)}
+            {/* Add Folder Button - Only for owner */}
+            {isOwner && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: folders.length * 0.05 }}
+                className="flex-shrink-0"
               >
-                <Plus className="w-5 h-5" />
-                <span className="text-sm font-medium">Create New Folder</span>
-              </button>
-            </motion.div>
-          )}
-        </div>
+                <button
+                  className={cn(
+                    "w-40 aspect-square rounded-xl",
+                    "flex flex-col items-center justify-center gap-2",
+                    "border-2 border-dashed border-muted-foreground/20",
+                    "text-muted-foreground hover:text-foreground",
+                    "hover:border-primary/40 hover:bg-primary/5 transition-all"
+                  )}
+                  onClick={() => setShowCreateDialog(true)}
+                >
+                  <Plus className="w-8 h-8" />
+                  <span className="text-xs font-medium">New Folder</span>
+                </button>
+              </motion.div>
+            )}
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
       )}
 
       {/* Create/Edit Dialog */}
