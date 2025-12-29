@@ -5,6 +5,7 @@ import {
   Check, ArrowUpRight, ArrowDownLeft, Coins, Clock, CheckCircle, XCircle
 } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCredits, useCreditLedger, usePayoutMethods, usePayouts, useTransactions } from '@/hooks/useCredits';
 import { CreditBadge } from '@/components/credits/CreditBadge';
@@ -71,10 +72,12 @@ const WalletPage: React.FC = () => {
     <PageLayout>
       <div className="p-4 sm:p-6 pb-32 max-w-4xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-display font-bold mb-1">Wallet</h1>
-          <p className="text-sm text-muted-foreground">Manage your LC Credits and payouts</p>
-        </div>
+        <PageHeader
+          title="Wallet"
+          description="Manage your LC Credits and payouts"
+          icon={<Wallet className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+          className="mb-8"
+        />
 
         {/* Balance Card */}
         <Card className="mb-6 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">

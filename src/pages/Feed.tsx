@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
+import { PageHeader } from "@/components/layout/PageHeader";
 import StoriesRow from "@/components/stories/StoriesRow";
 import PostCreator from "@/components/feed/PostCreator";
 import FeedPost from "@/components/feed/FeedPost";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import { Filter, Shuffle, Loader2, Sparkles } from "lucide-react";
+import { Filter, Shuffle, Loader2, Sparkles, Compass } from "lucide-react";
 import { usePosts } from "@/hooks/usePosts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -46,36 +47,33 @@ const Feed = () => {
         <StoriesRow />
 
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="flex items-center justify-between mb-5 mt-3"
-        >
-          <h1 className="font-display text-3xl sm:text-4xl font-medium text-foreground">
-            Feed
-          </h1>
-          <div className="flex gap-2">
-            <Button 
-              variant={isShuffled ? "default" : "glass"} 
-              size="icon" 
-              className="w-10 h-10"
-              onClick={handleShuffle}
-              title="Shuffle feed"
-            >
-              <Shuffle className="w-4 h-4" />
-            </Button>
-            <Button 
-              variant={showFilters ? "default" : "glass"} 
-              size="icon" 
-              className="w-10 h-10"
-              onClick={() => setShowFilters(!showFilters)}
-              title="Toggle filters"
-            >
-              <Filter className="w-4 h-4" />
-            </Button>
-          </div>
-        </motion.div>
+        <PageHeader
+          title="Feed"
+          icon={<Compass className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+          className="mt-3 mb-5"
+          actions={
+            <div className="flex gap-2">
+              <Button 
+                variant={isShuffled ? "default" : "glass"} 
+                size="icon" 
+                className="w-10 h-10"
+                onClick={handleShuffle}
+                title="Shuffle feed"
+              >
+                <Shuffle className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant={showFilters ? "default" : "glass"} 
+                size="icon" 
+                className="w-10 h-10"
+                onClick={() => setShowFilters(!showFilters)}
+                title="Toggle filters"
+              >
+                <Filter className="w-4 h-4" />
+              </Button>
+            </div>
+          }
+        />
 
         {/* Post Creator */}
         {user && (

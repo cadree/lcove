@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/layout/PageLayout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +22,7 @@ import {
   ArrowRight,
   Grid3X3,
   LayoutList,
+  ShoppingCart,
 } from 'lucide-react';
 
 interface StoreWithProfile {
@@ -148,29 +150,23 @@ const Mall = () => {
         {/* Hero Header */}
         <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-background to-accent/10 border-b border-border">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,hsl(var(--primary)/0.1),transparent_50%)]" />
-          <div className="container mx-auto px-4 py-12 relative">
-            <div className="max-w-2xl">
-              <Badge variant="secondary" className="mb-4">
-                <Sparkles className="w-3 h-3 mr-1" />
-                Creative Mall
-              </Badge>
-              <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4 tracking-tight">
-                Discover Creative Storefronts
-              </h1>
-              <p className="text-lg text-muted-foreground mb-6">
-                Browse products, services, and studio rentals from talented creators in your community.
-              </p>
-              
-              {/* Search Bar */}
-              <div className="relative max-w-xl">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  placeholder="Search stores, products, services..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-12 h-12 text-lg bg-background/80 backdrop-blur-sm border-border/50"
-                />
-              </div>
+          <div className="container mx-auto px-4 py-8 relative">
+            <PageHeader
+              title="Creative Mall"
+              description="Browse products, services, and studio rentals from talented creators"
+              icon={<ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+              className="mb-6"
+            />
+            
+            {/* Search Bar */}
+            <div className="relative max-w-xl">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input
+                placeholder="Search stores, products, services..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-12 h-12 text-lg bg-background/80 backdrop-blur-sm border-border/50"
+              />
             </div>
           </div>
         </div>

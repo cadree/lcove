@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -79,18 +80,12 @@ const Membership = () => {
       <div className="min-h-screen py-8 px-4">
         <div className="max-w-5xl mx-auto">
           {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
-          >
-            <h1 className="font-display text-4xl md:text-5xl font-medium text-foreground mb-4">
-              Become a Member
-            </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Support the creative community and unlock exclusive benefits. Every contribution goes directly into community grants, events, and education.
-            </p>
-          </motion.div>
+          <PageHeader
+            title="Become a Member"
+            description="Support the creative community and unlock exclusive benefits. Every contribution goes directly into community grants, events, and education."
+            icon={<Heart className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+            className="mb-12 text-center"
+          />
 
           {/* Current Membership Status */}
           {membership?.subscribed && (

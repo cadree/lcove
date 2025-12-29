@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, Users, Calendar, GraduationCap, Building2, Briefcase, Sparkles, Heart, Crown, ArrowRight, Wallet, CheckCircle2 } from "lucide-react";
+import { TrendingUp, Users, Calendar, GraduationCap, Building2, Briefcase, Sparkles, Heart, Crown, ArrowRight, Wallet, CheckCircle2, PiggyBank } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { useMembership } from "@/hooks/useMembership";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFundStats } from "@/hooks/useFundStats";
@@ -86,23 +87,12 @@ export default function FundDashboard() {
       <div className="min-h-screen bg-background">
         <div className="max-w-6xl mx-auto px-4 py-8 pb-24">
           {/* Hero Section */}
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
-          >
-            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full mb-4">
-              <Sparkles className="w-4 h-4" />
-              <span className="text-sm font-medium">100% Transparent</span>
-            </div>
-            <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground mb-4">
-              Community Fund
-            </h1>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Every dollar, every decision, fully visible. See exactly how community contributions 
-              fuel creative dreams.
-            </p>
-          </motion.div>
+          <PageHeader
+            title="Community Fund"
+            description="Every dollar, every decision, fully visible. See exactly how community contributions fuel creative dreams."
+            icon={<PiggyBank className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+            className="mb-8"
+          />
 
           {/* View Toggle */}
           <div className="flex justify-center mb-8">

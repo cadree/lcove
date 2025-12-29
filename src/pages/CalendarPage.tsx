@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { 
   ChevronLeft, 
@@ -152,16 +153,12 @@ const CalendarPage = () => {
     <PageLayout>
       <div className="px-4 sm:px-6 pt-6 pb-24">
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="font-display text-2xl sm:text-3xl font-medium text-foreground">
-              Calendar
-            </h1>
-            {user && (
+        <PageHeader
+          title="Calendar"
+          description="Community events, projects, and personal schedule"
+          icon={<CalendarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+          actions={
+            user && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button size="sm">
@@ -188,12 +185,9 @@ const CalendarPage = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
-          </div>
-          <p className="text-muted-foreground text-sm">
-            Community events, projects, and personal schedule
-          </p>
-        </motion.div>
+            )
+          }
+        />
 
         {/* View Switcher & Navigation */}
         <motion.div

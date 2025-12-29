@@ -1,0 +1,71 @@
+import { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+
+interface PageHeaderProps {
+  title: string;
+  description?: string;
+  icon?: ReactNode;
+  actions?: ReactNode;
+  showBack?: boolean;
+  backPath?: string;
+  className?: string;
+}
+
+export const PageHeader = ({
+  title,
+  description,
+  icon,
+  actions,
+  showBack = true,
+  backPath,
+  className = "",
+}: PageHeaderProps) => {
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    if (backPath) {
+      navigate(backPath);
+    } else {
+      navigate(-1);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className={`flex items-center justify-between mb-6 ${className}`}
+    >
+      <div className="flex items-center gap-3">
+        {showBack && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleBack}
+            className="shrink-0"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        )}
+        {icon && (
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            {icon}
+          </div>
+        )}
+        <div>
+          <h1 className="font-display text-2xl sm:text-3xl font-medium text-foreground">
+            {title}
+          </h1>
+          {description && (
+            <p className="text-sm text-muted-foreground mt-0.5">{description}</p>
+          )}
+        </div>
+      </div>
+      {actions && <div className="flex items-center gap-2">{actions}</div>}
+    </motion.div>
+  );
+};
