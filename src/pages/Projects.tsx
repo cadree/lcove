@@ -33,6 +33,7 @@ const Projects: React.FC = () => {
           title="Projects"
           description="Find collaborators, share budgets transparently"
           icon={<FolderKanban className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+          backPath="/"
           actions={
             user && (
               <CreateProjectDialog>
