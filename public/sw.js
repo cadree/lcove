@@ -91,7 +91,7 @@ self.addEventListener("notificationclick", (event) => {
       
       // Type-specific deep links
       if (notificationType === 'message' && notificationData.conversation_id) {
-        targetPath = `/messages?conversation=${notificationData.conversation_id}`;
+        targetPath = `/messages?chat=${notificationData.conversation_id}`;
       } else if (notificationType === 'project_invite' && notificationData.project_id) {
         targetPath = `/projects?id=${notificationData.project_id}`;
       } else if (notificationType === 'live_stream' && notificationData.stream_id) {

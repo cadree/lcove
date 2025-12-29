@@ -23,7 +23,11 @@ interface DMNotificationRequest {
   conversation_id: string;
 }
 
-const getEmailTemplate = (senderName: string, messagePreview?: string) => {
+const getEmailTemplate = (senderName: string, messagePreview?: string, conversationId?: string) => {
+  const messageLink = conversationId 
+    ? `https://etherbylcove.com/messages?chat=${conversationId}` 
+    : "https://etherbylcove.com/messages";
+    
   return `
     <!DOCTYPE html>
     <html>
@@ -48,7 +52,7 @@ const getEmailTemplate = (senderName: string, messagePreview?: string) => {
                   <p style="color: #a0a0a0; font-size: 14px; margin: 0 0 30px;">
                     Open the app to view and reply to this message.
                   </p>
-                  <a href="https://etherbylcove.com/messages" 
+                  <a href="${messageLink}" 
                      style="display: inline-block; background: #E91E63; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                     View Message
                   </a>
@@ -89,12 +93,12 @@ serve(async (req) => {
 
     const { recipient_id, sender_name, message_preview, conversation_id }: DMNotificationRequest = await req.json();
 
-    console.log(`Processing DM notification for recipient: ${recipient_id} from sender: ${sender_name}`);
+    console.log(`Processing DM notification for recipient: ${recipient_id} from sender: ${sender_name}, conversation: ${conversation_id}`);
 
     // Get recipient's notification preferences
     const { data: preferences, error: prefError } = await supabase
       .from("notification_preferences")
-      .select("email_enabled, sms_enabled, messages_enabled")
+      .select("email_enabled, sms_enabled, push_enabled, messages_enabled")
       .eq("user_id", recipient_id)
       .single();
 
@@ -113,10 +117,99 @@ serve(async (req) => {
       });
     }
 
-    const emailEnabled = preferences?.email_enabled ?? true; // Default to true
+    const emailEnabled = preferences?.email_enabled ?? true;
     const smsEnabled = preferences?.sms_enabled ?? false;
+    const pushEnabled = preferences?.push_enabled ?? true;
 
-    const results: { email?: string; sms?: string } = {};
+    const results: { email?: string; sms?: string; push?: string } = {};
+
+    // Send PUSH notification if enabled (this is the priority notification method)
+    if (pushEnabled) {
+      try {
+        console.log("Attempting to send push notification...");
+        
+        // Get push subscriptions for this user
+        const { data: subscriptions, error: subError } = await supabase
+          .from("push_subscriptions")
+          .select("*")
+          .eq("user_id", recipient_id);
+
+        if (subError) {
+          console.error("Error fetching push subscriptions:", subError);
+          results.push = "error_fetching_subscriptions";
+        } else if (!subscriptions || subscriptions.length === 0) {
+          console.log("No push subscriptions found for user");
+          results.push = "no_subscriptions";
+        } else {
+          // Build push payload with deep-link to conversation
+          const pushPayload = JSON.stringify({
+            title: `${sender_name}`,
+            body: message_preview || "Sent you a message",
+            icon: "/favicon.png",
+            badge: "/favicon.png",
+            tag: `ether-message-${conversation_id}`,
+            renotify: true,
+            requireInteraction: true, // Keep on lockscreen until user interacts
+            data: { 
+              url: `/messages?chat=${conversation_id}`,
+              type: "message",
+              conversation_id: conversation_id,
+              sender_name: sender_name,
+            },
+            vibrate: [200, 100, 200],
+            timestamp: Date.now(),
+          });
+
+          let sentCount = 0;
+          const expiredEndpoints: string[] = [];
+
+          for (const sub of subscriptions) {
+            try {
+              const response = await fetch(sub.endpoint, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "TTL": "86400",
+                  "Urgency": "high",
+                },
+                body: pushPayload,
+              });
+
+              if (response.status === 201 || response.status === 200) {
+                console.log(`Push sent to: ${sub.endpoint.substring(0, 50)}...`);
+                sentCount++;
+              } else if (response.status === 410 || response.status === 404) {
+                console.log(`Subscription expired: ${sub.endpoint.substring(0, 50)}...`);
+                expiredEndpoints.push(sub.endpoint);
+              } else {
+                const errorText = await response.text();
+                console.error(`Push failed: ${response.status} - ${errorText}`);
+              }
+            } catch (pushError) {
+              console.error(`Error sending push: ${pushError}`);
+            }
+          }
+
+          // Clean up expired subscriptions
+          if (expiredEndpoints.length > 0) {
+            await supabase
+              .from("push_subscriptions")
+              .delete()
+              .in("endpoint", expiredEndpoints);
+            console.log(`Cleaned up ${expiredEndpoints.length} expired subscriptions`);
+          }
+
+          results.push = sentCount > 0 ? `sent_${sentCount}` : "failed";
+          console.log(`Push notification result: ${results.push}`);
+        }
+      } catch (pushError) {
+        console.error("Error with push notifications:", pushError);
+        results.push = "error";
+      }
+    } else {
+      console.log("Push notifications disabled for user");
+      results.push = "disabled";
+    }
 
     // Send email notification if enabled
     if (emailEnabled) {
@@ -128,9 +221,10 @@ serve(async (req) => {
           
           if (userError) {
             console.error("Error fetching user:", userError);
+            results.email = "error_fetching_user";
           } else if (userData?.user?.email) {
             const resend = new Resend(resendApiKey);
-            const html = getEmailTemplate(sender_name, message_preview);
+            const html = getEmailTemplate(sender_name, message_preview, conversation_id);
             
             const emailResponse = await resend.emails.send({
               from: EMAIL_FROM,
@@ -141,6 +235,8 @@ serve(async (req) => {
 
             console.log("Email sent:", emailResponse);
             results.email = "sent";
+          } else {
+            results.email = "no_email";
           }
         } else {
           console.log("RESEND_API_KEY not configured");
@@ -150,6 +246,8 @@ serve(async (req) => {
         console.error("Error sending email:", emailError);
         results.email = "failed";
       }
+    } else {
+      results.email = "disabled";
     }
 
     // Send SMS notification if enabled
@@ -169,6 +267,7 @@ serve(async (req) => {
 
           if (profileError) {
             console.error("Error fetching profile:", profileError);
+            results.sms = "error_fetching_profile";
           } else if (profile?.phone) {
             const smsBody = message_preview 
               ? `ETHER: New message from ${sender_name}: "${message_preview.substring(0, 100)}${message_preview.length > 100 ? '...' : ''}"`
@@ -210,7 +309,11 @@ serve(async (req) => {
         console.error("Error sending SMS:", smsError);
         results.sms = "failed";
       }
+    } else {
+      results.sms = "disabled";
     }
+
+    console.log("DM notification results:", results);
 
     return new Response(JSON.stringify({ success: true, results }), {
       status: 200,
