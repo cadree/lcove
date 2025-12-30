@@ -2503,11 +2503,13 @@ export type Database = {
       }
       pipeline_items: {
         Row: {
+          avatar_url: string | null
           company: string | null
           created_at: string
           email: string | null
           id: string
           instagram_url: string | null
+          linked_user_id: string | null
           linkedin_url: string | null
           name: string
           notes: string | null
@@ -2525,11 +2527,13 @@ export type Database = {
           website_url: string | null
         }
         Insert: {
+          avatar_url?: string | null
           company?: string | null
           created_at?: string
           email?: string | null
           id?: string
           instagram_url?: string | null
+          linked_user_id?: string | null
           linkedin_url?: string | null
           name: string
           notes?: string | null
@@ -2547,11 +2551,13 @@ export type Database = {
           website_url?: string | null
         }
         Update: {
+          avatar_url?: string | null
           company?: string | null
           created_at?: string
           email?: string | null
           id?: string
           instagram_url?: string | null
+          linked_user_id?: string | null
           linkedin_url?: string | null
           name?: string
           notes?: string | null

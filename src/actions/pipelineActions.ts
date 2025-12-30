@@ -35,6 +35,9 @@ export interface PipelineItem {
   priority: 'low' | 'medium' | 'high' | null;
   status: string | null;
   tags: string[] | null;
+  // Avatar and linked user
+  avatar_url: string | null;
+  linked_user_id: string | null;
 }
 
 export interface PipelineEvent {
@@ -139,6 +142,8 @@ export interface CreatePipelineItemData {
   priority?: 'low' | 'medium' | 'high';
   status?: string;
   tags?: string[];
+  avatarUrl?: string;
+  linkedUserId?: string;
 }
 
 export async function createPipelineItem(
@@ -177,7 +182,9 @@ export async function createPipelineItem(
       notes: data.notes || null,
       priority: data.priority || null,
       status: data.status || null,
-      tags: data.tags || null
+      tags: data.tags || null,
+      avatar_url: data.avatarUrl || null,
+      linked_user_id: data.linkedUserId || null
     })
     .select()
     .single();

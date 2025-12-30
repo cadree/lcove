@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { FileText, Clock, ArrowRight, PlusCircle, StickyNote, Trash2, Save, Loader2, MoveRight, Mail, Phone, Globe } from "lucide-react";
+import { FileText, Clock, ArrowRight, PlusCircle, StickyNote, Trash2, Save, Loader2, MoveRight, Mail, Phone, Globe, Camera, Link2 } from "lucide-react";
 import { PipelineItem, PipelineEvent, PipelineStage } from "@/actions/pipelineActions";
 import { ContactTasksSection } from "./ContactTasksSection";
 import { toast } from "sonner";
@@ -50,6 +51,7 @@ export function PipelineItemDrawer({
   const [editRole, setEditRole] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editPriority, setEditPriority] = useState<'low' | 'medium' | 'high' | ''>("");
+  const [editAvatarUrl, setEditAvatarUrl] = useState("");
 
   // Reset edit state when item changes
   useEffect(() => {
@@ -61,6 +63,7 @@ export function PipelineItemDrawer({
       setEditRole(item.role || "");
       setEditNotes(item.notes || "");
       setEditPriority(item.priority || "");
+      setEditAvatarUrl(item.avatar_url || "");
       setIsEditing(false);
     }
   }, [item?.id]);
@@ -85,6 +88,7 @@ export function PipelineItemDrawer({
         role: editRole.trim() || null,
         notes: editNotes.trim() || null,
         priority: editPriority || null,
+        avatar_url: editAvatarUrl.trim() || null,
       });
       setIsEditing(false);
       toast.success("Contact updated");
@@ -114,8 +118,17 @@ export function PipelineItemDrawer({
     setEditRole(item.role || "");
     setEditNotes(item.notes || "");
     setEditPriority(item.priority || "");
+    setEditAvatarUrl(item.avatar_url || "");
     setIsEditing(false);
   };
+
+  // Generate initials
+  const initials = item.name
+    .split(' ')
+    .map(word => word[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
 
   const handleStageChange = async (newStageId: string) => {
     if (newStageId === item.stage_id) return;
@@ -178,6 +191,25 @@ export function PipelineItemDrawer({
 
           {isEditing ? (
             <div className="space-y-3">
+              {/* Avatar edit */}
+              <div className="flex items-center gap-3">
+                <Avatar className="w-14 h-14 border-2 border-border">
+                  <AvatarImage src={editAvatarUrl || undefined} />
+                  <AvatarFallback className="bg-primary/10 text-primary">
+                    {initials || <Camera className="w-5 h-5" />}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 space-y-1">
+                  <Label htmlFor="edit-avatar" className="text-xs">Avatar URL</Label>
+                  <Input
+                    id="edit-avatar"
+                    value={editAvatarUrl}
+                    onChange={(e) => setEditAvatarUrl(e.target.value)}
+                    placeholder="https://example.com/photo.jpg"
+                    className="text-sm"
+                  />
+                </div>
+              </div>
               <div className="space-y-1">
                 <Label htmlFor="edit-name" className="text-xs">Name *</Label>
                 <Input
@@ -244,17 +276,33 @@ export function PipelineItemDrawer({
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-2">
-                <SheetTitle className="text-left text-xl">{item.name}</SheetTitle>
-                {item.priority && (
-                  <Badge className={priorityColors[item.priority]}>
-                    {item.priority}
-                  </Badge>
-                )}
+              <div className="flex items-center gap-3">
+                <Avatar className="w-14 h-14 border-2 border-border">
+                  <AvatarImage src={item.avatar_url || undefined} />
+                  <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <SheetTitle className="text-left text-xl">{item.name}</SheetTitle>
+                    {item.priority && (
+                      <Badge className={priorityColors[item.priority]}>
+                        {item.priority}
+                      </Badge>
+                    )}
+                  </div>
+                  {subtitle && (
+                    <p className="text-muted-foreground text-sm text-left">{subtitle}</p>
+                  )}
+                  {item.linked_user_id && (
+                    <div className="flex items-center gap-1 text-xs text-green-500 mt-1">
+                      <Link2 className="w-3 h-3" />
+                      <span>Linked to Ether user</span>
+                    </div>
+                  )}
+                </div>
               </div>
-              {subtitle && (
-                <p className="text-muted-foreground text-sm text-left">{subtitle}</p>
-              )}
               
               {/* Contact info display */}
               <div className="space-y-1 pt-2">

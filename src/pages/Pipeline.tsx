@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import PageLayout from "@/components/layout/PageLayout";
 import { usePipeline } from "@/hooks/usePipeline";
 import { PipelineItemDrawer } from "@/components/pipeline/PipelineItemDrawer";
@@ -617,10 +618,20 @@ function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging
           </div>
           
           {/* Avatar */}
-          <div className={`w-10 h-10 rounded-lg ${avatarColor} flex items-center justify-center shrink-0 relative`}>
-            <span className="text-sm font-semibold text-white">{initials}</span>
+          <div className="relative shrink-0">
+            <Avatar className="w-10 h-10">
+              <AvatarImage src={item.avatar_url || undefined} />
+              <AvatarFallback className={`${avatarColor} text-white text-sm font-semibold`}>
+                {initials}
+              </AvatarFallback>
+            </Avatar>
             {item.priority && (
               <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${priorityColors[item.priority]} border-2 border-background`} />
+            )}
+            {item.linked_user_id && (
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
+                <Check className="w-2 h-2 text-white" />
+              </div>
             )}
           </div>
           
