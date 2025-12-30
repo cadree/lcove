@@ -1,53 +1,72 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Loader2, Users, Plus } from "lucide-react";
+import { Users, Plus, UserPlus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { usePipeline } from "@/hooks/usePipeline";
 import { PipelineItemDrawer } from "./PipelineItemDrawer";
 import { CreatePipelineItemDialog } from "./CreatePipelineItemDialog";
 import { PipelineItem } from "@/actions/pipelineActions";
+import { toast } from "sonner";
 
 export function PipelineSection() {
-  const { stages, isLoading, getItemsByStage, getEventsForItem, createItem, updateItem, moveItem, deleteItem, isCreating, isMoving } = usePipeline();
+  const { stages, isLoading, error, getItemsByStage, getEventsForItem, createItem, updateItem, moveItem, deleteItem, isCreating, isMoving } = usePipeline();
   const [selectedItem, setSelectedItem] = useState<PipelineItem | null>(null);
   const [createDialogStageId, setCreateDialogStageId] = useState<string | null>(null);
 
   const handleCreateItem = async (title: string, subtitle?: string) => {
     if (!createDialogStageId) return;
-    await createItem({ stageId: createDialogStageId, title, subtitle });
-    setCreateDialogStageId(null);
+    try {
+      await createItem({ stageId: createDialogStageId, title, subtitle });
+      setCreateDialogStageId(null);
+      toast.success("Item added to pipeline");
+    } catch (err) {
+      toast.error("Failed to create item");
+    }
   };
 
   const handleUpdateItem = async (itemId: string, fields: { title?: string; subtitle?: string; notes?: string }) => {
-    await updateItem({ itemId, fields });
-    // Update selected item with new data
-    if (selectedItem && selectedItem.id === itemId) {
-      setSelectedItem({ ...selectedItem, ...fields });
+    try {
+      await updateItem({ itemId, fields });
+      if (selectedItem && selectedItem.id === itemId) {
+        setSelectedItem({ ...selectedItem, ...fields });
+      }
+    } catch (err) {
+      toast.error("Failed to update item");
+      throw err;
     }
   };
 
   const handleMoveItem = async (itemId: string, toStageId: string) => {
-    // Get items in target stage to determine sort order (add at end)
     const targetItems = getItemsByStage(toStageId);
     const newSortOrder = targetItems.length > 0 
       ? Math.max(...targetItems.map(i => i.sort_order)) + 1 
       : 0;
     
-    await moveItem({ itemId, toStageId, newSortOrder });
-    
-    // Update selected item with new stage
-    if (selectedItem && selectedItem.id === itemId) {
-      setSelectedItem({ ...selectedItem, stage_id: toStageId, sort_order: newSortOrder });
+    try {
+      await moveItem({ itemId, toStageId, newSortOrder });
+      if (selectedItem && selectedItem.id === itemId) {
+        setSelectedItem({ ...selectedItem, stage_id: toStageId, sort_order: newSortOrder });
+      }
+    } catch (err) {
+      toast.error("Failed to move item");
+      throw err;
     }
   };
 
   const handleDeleteItem = async (itemId: string) => {
-    await deleteItem(itemId);
-    setSelectedItem(null);
+    try {
+      await deleteItem(itemId);
+      setSelectedItem(null);
+    } catch (err) {
+      toast.error("Failed to delete item");
+      throw err;
+    }
   };
 
+  // Loading state with skeletons
   if (isLoading) {
     return (
       <motion.div
@@ -59,9 +78,49 @@ export function PipelineSection() {
           <Users className="w-5 h-5 text-primary" />
           <h2 className="font-display text-lg font-semibold text-foreground">My Pipeline</h2>
         </div>
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        
+        {/* Desktop skeleton */}
+        <div className="hidden md:grid md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <PipelineColumnSkeleton key={i} />
+          ))}
         </div>
+        
+        {/* Mobile skeleton */}
+        <div className="md:hidden">
+          <ScrollArea className="w-full whitespace-nowrap">
+            <div className="flex gap-4 pb-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="w-[280px] flex-shrink-0">
+                  <PipelineColumnSkeleton />
+                </div>
+              ))}
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="px-5 py-4"
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <Users className="w-5 h-5 text-primary" />
+          <h2 className="font-display text-lg font-semibold text-foreground">My Pipeline</h2>
+        </div>
+        <Card className="bg-muted/30 border-border/50 p-6 text-center">
+          <p className="text-muted-foreground text-sm mb-3">Unable to load your pipeline</p>
+          <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </Card>
       </motion.div>
     );
   }
@@ -144,6 +203,25 @@ export function PipelineSection() {
   );
 }
 
+// Loading skeleton for columns
+function PipelineColumnSkeleton() {
+  return (
+    <Card className="bg-muted/30 border-border/50 overflow-hidden">
+      <div className="px-3 py-2.5 border-b border-border/50 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-5 w-6 rounded-full" />
+        </div>
+        <Skeleton className="h-6 w-6 rounded" />
+      </div>
+      <div className="p-2 space-y-2 min-h-[120px]">
+        <Skeleton className="h-14 w-full rounded-lg" />
+        <Skeleton className="h-14 w-full rounded-lg opacity-60" />
+      </div>
+    </Card>
+  );
+}
+
 interface PipelineColumnProps {
   stageId: string;
   name: string;
@@ -170,7 +248,7 @@ function PipelineColumn({ stageId, name, color, items, onItemClick, onAddClick }
         <Button
           variant="ghost"
           size="icon"
-          className="h-6 w-6"
+          className="h-6 w-6 hover:bg-primary/10 hover:text-primary"
           onClick={onAddClick}
         >
           <Plus className="w-4 h-4" />
@@ -180,7 +258,7 @@ function PipelineColumn({ stageId, name, color, items, onItemClick, onAddClick }
       {/* Items */}
       <div className="p-2 space-y-2 min-h-[120px] max-h-[300px] overflow-y-auto">
         {items.length === 0 ? (
-          <p className="text-xs text-muted-foreground text-center py-4">No items</p>
+          <PipelineEmptyState onAddClick={onAddClick} />
         ) : (
           items.map((item) => (
             <PipelineItemCard
@@ -195,6 +273,27 @@ function PipelineColumn({ stageId, name, color, items, onItemClick, onAddClick }
   );
 }
 
+// Empty state for columns
+function PipelineEmptyState({ onAddClick }: { onAddClick: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-6 px-2 text-center">
+      <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center mb-3">
+        <UserPlus className="w-5 h-5 text-muted-foreground/60" />
+      </div>
+      <p className="text-xs text-muted-foreground mb-2">No items yet</p>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-xs text-primary hover:text-primary hover:bg-primary/10 h-7"
+        onClick={onAddClick}
+      >
+        <Plus className="w-3 h-3 mr-1" />
+        Add first card
+      </Button>
+    </div>
+  );
+}
+
 interface PipelineItemCardProps {
   item: PipelineItem;
   onClick: () => void;
@@ -203,7 +302,7 @@ interface PipelineItemCardProps {
 function PipelineItemCard({ item, onClick }: PipelineItemCardProps) {
   return (
     <Card
-      className="p-3 bg-background hover:bg-accent/50 cursor-pointer transition-colors border-border/50"
+      className="p-3 bg-background/80 hover:bg-accent/50 cursor-pointer transition-all duration-200 border-border/50 hover:border-primary/30 hover:shadow-sm"
       onClick={onClick}
     >
       <p className="font-medium text-sm text-foreground truncate">{item.title}</p>
