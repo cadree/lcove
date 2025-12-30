@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import PageLayout from "@/components/layout/PageLayout";
 import { usePipeline } from "@/hooks/usePipeline";
 import { PipelineItemDrawer } from "@/components/pipeline/PipelineItemDrawer";
-import { CreatePipelineItemDialog } from "@/components/pipeline/CreatePipelineItemDialog";
+import { AddContactDialog, ContactFormData } from "@/components/pipeline/AddContactDialog";
 import { PipelineItem } from "@/actions/pipelineActions";
 import { toast } from "sonner";
 
@@ -18,7 +18,8 @@ const Pipeline = () => {
   const navigate = useNavigate();
   const { stages, items, isLoading, error, getItemsByStage, getEventsForItem, createItem, updateItem, moveItem, deleteItem, isCreating, isMoving } = usePipeline();
   const [selectedItem, setSelectedItem] = useState<PipelineItem | null>(null);
-  const [createDialogStageId, setCreateDialogStageId] = useState<string | null>(null);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [addToStageId, setAddToStageId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Filter items by search
@@ -31,15 +32,31 @@ const Pipeline = () => {
     );
   };
 
-  const handleCreateItem = async (title: string, subtitle?: string) => {
-    if (!createDialogStageId) return;
+  const handleCreateContact = async (data: ContactFormData) => {
+    // Use first stage if no specific stage selected
+    const stageId = addToStageId || stages[0]?.id;
+    if (!stageId) return;
+    
+    // Build subtitle from available data
+    const subtitleParts = [];
+    if (data.company) subtitleParts.push(data.company);
+    if (data.email) subtitleParts.push(data.email);
+    if (data.socialHandle) subtitleParts.push(data.socialHandle);
+    const subtitle = subtitleParts.join(' • ') || undefined;
+
     try {
-      await createItem({ stageId: createDialogStageId, title, subtitle });
-      setCreateDialogStageId(null);
+      await createItem({ stageId, title: data.name, subtitle });
+      setShowAddDialog(false);
+      setAddToStageId(null);
       toast.success("Contact added to pipeline");
     } catch (err) {
       toast.error("Failed to add contact");
     }
+  };
+  
+  const openAddDialog = (stageId?: string) => {
+    setAddToStageId(stageId || null);
+    setShowAddDialog(true);
   };
 
   const handleUpdateItem = async (itemId: string, fields: { title?: string; subtitle?: string; notes?: string }) => {
@@ -124,11 +141,7 @@ const Pipeline = () => {
                 variant="default"
                 size="sm"
                 className="gap-2"
-                onClick={() => {
-                  if (stages.length > 0) {
-                    setCreateDialogStageId(stages[0].id);
-                  }
-                }}
+                onClick={() => openAddDialog()}
               >
                 <Plus className="w-4 h-4" />
                 <span className="hidden sm:inline">Add Contact</span>
@@ -175,7 +188,7 @@ const Pipeline = () => {
                       color={stage.color}
                       items={stageItems}
                       onItemClick={setSelectedItem}
-                      onAddClick={() => setCreateDialogStageId(stage.id)}
+                      onAddClick={() => openAddDialog(stage.id)}
                     />
                   );
                 })}
@@ -189,15 +202,15 @@ const Pipeline = () => {
                       const stageItems = filterItems(getItemsByStage(stage.id));
                       return (
                         <div key={stage.id} className="w-[300px] flex-shrink-0">
-                          <PipelineColumn
-                            stageId={stage.id}
-                            name={stage.name}
-                            color={stage.color}
-                            items={stageItems}
-                            onItemClick={setSelectedItem}
-                            onAddClick={() => setCreateDialogStageId(stage.id)}
-                          />
-                        </div>
+                        <PipelineColumn
+                          stageId={stage.id}
+                          name={stage.name}
+                          color={stage.color}
+                          items={stageItems}
+                          onItemClick={setSelectedItem}
+                          onAddClick={() => openAddDialog(stage.id)}
+                        />
+                      </div>
                       );
                     })}
                   </div>
@@ -208,13 +221,12 @@ const Pipeline = () => {
           )}
         </div>
 
-        {/* Create Item Dialog */}
-        <CreatePipelineItemDialog
-          open={!!createDialogStageId}
-          onOpenChange={(open) => !open && setCreateDialogStageId(null)}
-          onSubmit={handleCreateItem}
+        {/* Add Contact Dialog */}
+        <AddContactDialog
+          open={showAddDialog}
+          onOpenChange={setShowAddDialog}
+          onSubmit={handleCreateContact}
           isLoading={isCreating}
-          stageName={stages.find(s => s.id === createDialogStageId)?.name || ''}
         />
 
         {/* Item Detail Drawer */}
