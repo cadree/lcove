@@ -4,10 +4,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 // VAPID public key - this is safe to expose in client code
-// For production, this should be set via VITE_VAPID_PUBLIC_KEY environment variable
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || 
-  // Fallback VAPID public key for development/testing
-  'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U';
+// Must be set via VITE_VAPID_PUBLIC_KEY environment variable
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
+
+// Log VAPID key status on load for debugging
+console.log('VAPID public key configured:', !!VAPID_PUBLIC_KEY);
 
 // Convert base64url string to ArrayBuffer for push subscription
 function urlBase64ToArrayBuffer(base64String: string): ArrayBuffer {
