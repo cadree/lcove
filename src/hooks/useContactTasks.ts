@@ -100,7 +100,7 @@ export function useContactTasks(pipelineItemId: string | null) {
   };
 }
 
-// Hook for My Day dashboard - gets all tasks with due dates
+// Hook for My Day dashboard - gets ALL incomplete tasks
 export function useMyDayTasks() {
   const { user } = useAuth();
 
@@ -114,17 +114,17 @@ export function useMyDayTasks() {
           pipeline_items!inner (
             id,
             name,
-            company
+            company,
+            stage_id
           )
         `)
         .eq('is_done', false)
-        .not('due_at', 'is', null)
-        .order('due_at', { ascending: true });
+        .order('due_at', { ascending: true, nullsFirst: false });
       
       if (error) throw error;
       
       return data as (ContactTask & { 
-        pipeline_items: { id: string; name: string; company: string | null } 
+        pipeline_items: { id: string; name: string; company: string | null; stage_id: string } 
       })[];
     },
     enabled: !!user,
