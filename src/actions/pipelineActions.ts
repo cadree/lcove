@@ -21,14 +21,8 @@ export interface PipelineItem {
   sort_order: number;
   created_at: string;
   updated_at: string;
-  // Instagram fields
   instagram_handle: string | null;
   instagram_url: string | null;
-  instagram_followers: number | null;
-  instagram_posts: number | null;
-  instagram_bio: string | null;
-  instagram_profile_image_url: string | null;
-  instagram_verified_status: string | null;
 }
 
 export interface PipelineEvent {
@@ -129,11 +123,6 @@ export interface CreatePipelineItemData {
   subtitle?: string;
   instagramHandle?: string;
   instagramUrl?: string;
-  instagramFollowers?: number;
-  instagramPosts?: number;
-  instagramBio?: string;
-  instagramProfileImageUrl?: string;
-  instagramVerifiedStatus?: string;
 }
 
 export async function createPipelineItem(
@@ -154,7 +143,7 @@ export async function createPipelineItem(
     ? existingItems[0].sort_order + 1 
     : 0;
   
-  // Insert the item with Instagram fields
+  // Insert the item
   const { data: item, error: itemError } = await supabase
     .from('pipeline_items')
     .insert({
@@ -164,12 +153,7 @@ export async function createPipelineItem(
       subtitle: data.subtitle || null,
       sort_order: nextSortOrder,
       instagram_handle: data.instagramHandle || null,
-      instagram_url: data.instagramUrl || null,
-      instagram_followers: data.instagramFollowers || null,
-      instagram_posts: data.instagramPosts || null,
-      instagram_bio: data.instagramBio || null,
-      instagram_profile_image_url: data.instagramProfileImageUrl || null,
-      instagram_verified_status: data.instagramVerifiedStatus || 'unverified'
+      instagram_url: data.instagramUrl || null
     })
     .select()
     .single();

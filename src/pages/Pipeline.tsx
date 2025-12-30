@@ -42,16 +42,9 @@ const Pipeline = () => {
     // Build subtitle from available data
     const subtitleParts = [];
     
-    // For Instagram, show stats
-    if (data.source === "instagram") {
-      if (data.instagramFollowers) {
-        const formatCount = (n: number) => 
-          n >= 1000000 ? `${(n/1000000).toFixed(1)}M` : 
-          n >= 1000 ? `${(n/1000).toFixed(1)}K` : String(n);
-        subtitleParts.push(`${formatCount(data.instagramFollowers)} followers`);
-      }
-      if (data.instagramPosts) subtitleParts.push(`${data.instagramPosts} posts`);
-      if (data.instagramHandle) subtitleParts.push(`@${data.instagramHandle}`);
+    if (data.source === "instagram" && data.instagramHandle) {
+      subtitleParts.push(`@${data.instagramHandle}`);
+      subtitleParts.push("Instagram");
     } else {
       if (data.company) subtitleParts.push(data.company);
       if (data.socialHandle) subtitleParts.push(data.socialHandle);
@@ -66,12 +59,7 @@ const Pipeline = () => {
         title: data.name, 
         subtitle,
         instagramHandle: data.instagramHandle,
-        instagramUrl: data.instagramUrl,
-        instagramFollowers: data.instagramFollowers,
-        instagramPosts: data.instagramPosts,
-        instagramBio: data.instagramBio,
-        instagramProfileImageUrl: data.instagramProfileImageUrl,
-        instagramVerifiedStatus: data.instagramVerifiedStatus
+        instagramUrl: data.instagramUrl
       });
       setShowAddDialog(false);
       setAddToStageId(null);
@@ -192,7 +180,7 @@ const Pipeline = () => {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search contacts, timeline, appointments..."
+                  placeholder="Search contacts..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 bg-muted/30 border-border/50"
@@ -494,13 +482,6 @@ function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging
   const colorIndex = item.title.charCodeAt(0) % colors.length;
   const avatarColor = colors[colorIndex];
 
-  // Check if we have an Instagram profile image
-  const hasProfileImage = !!item.instagram_profile_image_url;
-  
-  // Determine verification badge
-  const verificationStatus = item.instagram_verified_status;
-  const showBadge = verificationStatus === 'user_entered' || verificationStatus === 'connected_oauth';
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -523,32 +504,13 @@ function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging
           </div>
           
           {/* Avatar */}
-          {hasProfileImage ? (
-            <img
-              src={item.instagram_profile_image_url!}
-              alt={item.title}
-              className="w-10 h-10 rounded-lg object-cover shrink-0"
-              onError={(e) => {
-                // Fallback to initials if image fails
-                (e.target as HTMLImageElement).style.display = 'none';
-                (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-              }}
-            />
-          ) : null}
-          <div className={`w-10 h-10 rounded-lg ${avatarColor} flex items-center justify-center shrink-0 ${hasProfileImage ? 'hidden' : ''}`}>
+          <div className={`w-10 h-10 rounded-lg ${avatarColor} flex items-center justify-center shrink-0`}>
             <span className="text-sm font-semibold text-white">{initials}</span>
           </div>
           
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
-              <p className="font-medium text-sm text-foreground truncate">{item.title}</p>
-              {showBadge && (
-                <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                  {verificationStatus === 'user_entered' ? 'User-entered' : 'Connected'}
-                </span>
-              )}
-            </div>
+            <p className="font-medium text-sm text-foreground truncate">{item.title}</p>
             {item.subtitle && (
               <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
             )}
