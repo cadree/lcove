@@ -78,13 +78,10 @@ export const usePushNotifications = () => {
           }
         }
         
-        // No active subscription found
-        // Check permission status for appropriate messaging
-        if (Notification.permission === 'denied') {
-          setState({ status: 'permission_denied', error: 'Notification permission was denied. Enable it in browser settings.', isLoading: false });
-        } else {
-          setState({ status: 'not_subscribed', error: null, isLoading: false });
-        }
+        // No active subscription found - always show as "not subscribed"
+        // Don't check Notification.permission here because in iframe contexts
+        // it can incorrectly return 'denied' even when permissions weren't denied
+        setState({ status: 'not_subscribed', error: null, isLoading: false });
       } catch (error) {
         console.error('Error checking push subscription:', error);
         // Don't show error status, just treat as not subscribed
