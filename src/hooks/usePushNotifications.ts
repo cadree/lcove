@@ -55,32 +55,40 @@ export const usePushNotifications = () => {
         return;
       }
 
-      // Check permission
-      if (Notification.permission === 'denied') {
-        setState({ status: 'permission_denied', error: 'Notification permission was denied. Enable it in browser settings.', isLoading: false });
-        return;
-      }
-
+      // Check if we have a user
       if (!user?.id) {
         setState({ status: 'not_subscribed', error: null, isLoading: false });
         return;
       }
 
-      // Check for existing subscription
+      // Check for existing service worker registration first
       try {
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.getSubscription();
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        const swRegistration = registrations.find(r => r.active?.scriptURL?.includes('sw.js'));
         
-        if (subscription) {
-          // Verify subscription is in database
-          await saveSubscriptionToDb(subscription, user.id);
-          setState({ status: 'subscribed', error: null, isLoading: false });
+        if (swRegistration) {
+          // Check for existing push subscription
+          const subscription = await swRegistration.pushManager.getSubscription();
+          
+          if (subscription) {
+            // Verify subscription is in database
+            await saveSubscriptionToDb(subscription, user.id);
+            setState({ status: 'subscribed', error: null, isLoading: false });
+            return;
+          }
+        }
+        
+        // No active subscription found
+        // Check permission status for appropriate messaging
+        if (Notification.permission === 'denied') {
+          setState({ status: 'permission_denied', error: 'Notification permission was denied. Enable it in browser settings.', isLoading: false });
         } else {
           setState({ status: 'not_subscribed', error: null, isLoading: false });
         }
       } catch (error) {
         console.error('Error checking push subscription:', error);
-        setState({ status: 'error', error: 'Failed to check subscription status', isLoading: false });
+        // Don't show error status, just treat as not subscribed
+        setState({ status: 'not_subscribed', error: null, isLoading: false });
       }
     };
 
@@ -304,11 +312,8 @@ export const usePushNotifications = () => {
   // Derived values for backwards compatibility
   const isSupported = state.status !== 'not_supported';
   const isSubscribed = state.status === 'subscribed';
-  const permission = state.status === 'permission_denied' 
-    ? 'denied' 
-    : state.status === 'subscribed' 
-      ? 'granted' 
-      : 'default';
+  // Use actual browser permission, not derived from state
+  const permission = typeof Notification !== 'undefined' ? Notification.permission : 'default';
 
   return {
     // New comprehensive state
