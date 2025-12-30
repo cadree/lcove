@@ -1,46 +1,154 @@
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Clock, ArrowRight, PlusCircle, StickyNote } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { FileText, Clock, ArrowRight, PlusCircle, StickyNote, Trash2, Save, Loader2 } from "lucide-react";
 import { PipelineItem, PipelineEvent } from "@/actions/pipelineActions";
+import { toast } from "sonner";
 
 interface PipelineItemDrawerProps {
   item: PipelineItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   getEventsForItem: (itemId: string) => PipelineEvent[];
+  onUpdate: (itemId: string, fields: { title?: string; subtitle?: string; notes?: string }) => Promise<void>;
+  onDelete: (itemId: string) => Promise<void>;
 }
 
-export function PipelineItemDrawer({ item, open, onOpenChange, getEventsForItem }: PipelineItemDrawerProps) {
+export function PipelineItemDrawer({ 
+  item, 
+  open, 
+  onOpenChange, 
+  getEventsForItem,
+  onUpdate,
+  onDelete 
+}: PipelineItemDrawerProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editSubtitle, setEditSubtitle] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+
+  // Reset edit state when item changes
+  useEffect(() => {
+    if (item) {
+      setEditTitle(item.title);
+      setEditSubtitle(item.subtitle || "");
+      setEditNotes(item.notes || "");
+      setIsEditing(false);
+    }
+  }, [item?.id]);
+
   if (!item) return null;
 
   const events = getEventsForItem(item.id);
+
+  const handleSave = async () => {
+    if (!editTitle.trim()) {
+      toast.error("Title is required");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await onUpdate(item.id, {
+        title: editTitle.trim(),
+        subtitle: editSubtitle.trim() || undefined,
+        notes: editNotes.trim() || undefined,
+      });
+      setIsEditing(false);
+      toast.success("Item updated");
+    } catch (error) {
+      toast.error("Failed to update item");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await onDelete(item.id);
+      toast.success("Item deleted");
+    } catch (error) {
+      toast.error("Failed to delete item");
+      setIsDeleting(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setEditTitle(item.title);
+    setEditSubtitle(item.subtitle || "");
+    setEditNotes(item.notes || "");
+    setIsEditing(false);
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md">
         <SheetHeader className="pb-4">
-          <SheetTitle className="text-left text-xl">{item.title}</SheetTitle>
-          {item.subtitle && (
-            <p className="text-muted-foreground text-sm text-left">{item.subtitle}</p>
+          {isEditing ? (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label htmlFor="edit-title" className="text-xs">Title</Label>
+                <Input
+                  id="edit-title"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Title"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-subtitle" className="text-xs">Subtitle</Label>
+                <Input
+                  id="edit-subtitle"
+                  value={editSubtitle}
+                  onChange={(e) => setEditSubtitle(e.target.value)}
+                  placeholder="Subtitle (optional)"
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              <SheetTitle className="text-left text-xl">{item.title}</SheetTitle>
+              {item.subtitle && (
+                <p className="text-muted-foreground text-sm text-left">{item.subtitle}</p>
+              )}
+            </>
           )}
         </SheetHeader>
 
-        <ScrollArea className="h-[calc(100vh-180px)] pr-4">
+        <ScrollArea className="h-[calc(100vh-260px)] pr-4">
           {/* Notes Section */}
-          {item.notes && (
-            <div className="mb-6">
-              <div className="flex items-center gap-2 mb-2">
-                <FileText className="w-4 h-4 text-muted-foreground" />
-                <h3 className="font-medium text-sm text-foreground">Notes</h3>
-              </div>
-              <div className="bg-muted/30 rounded-lg p-3 text-sm text-foreground whitespace-pre-wrap">
-                {item.notes}
-              </div>
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-2">
+              <FileText className="w-4 h-4 text-muted-foreground" />
+              <h3 className="font-medium text-sm text-foreground">Notes</h3>
             </div>
-          )}
+            {isEditing ? (
+              <Textarea
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                placeholder="Add notes about this item..."
+                className="min-h-[120px]"
+              />
+            ) : (
+              <div 
+                className="bg-muted/30 rounded-lg p-3 text-sm text-foreground whitespace-pre-wrap min-h-[60px] cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => setIsEditing(true)}
+              >
+                {item.notes || <span className="text-muted-foreground italic">Click to add notes...</span>}
+              </div>
+            )}
+          </div>
 
           <Separator className="my-4" />
 
@@ -69,6 +177,58 @@ export function PipelineItemDrawer({ item, open, onOpenChange, getEventsForItem 
             </p>
           </div>
         </ScrollArea>
+
+        {/* Action Buttons */}
+        <div className="pt-4 border-t border-border flex gap-2">
+          {isEditing ? (
+            <>
+              <Button variant="outline" onClick={handleCancel} disabled={isSaving} className="flex-1">
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+                {isSaving ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save
+                  </>
+                )}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => setIsEditing(true)} className="flex-1">
+                Edit
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="icon" disabled={isDeleting}>
+                    {isDeleting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete item?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete "{item.title}" and all its activity history. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          )}
+        </div>
       </SheetContent>
     </Sheet>
   );

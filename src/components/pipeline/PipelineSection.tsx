@@ -1,15 +1,37 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Loader2, Users } from "lucide-react";
+import { Loader2, Users, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { usePipeline } from "@/hooks/usePipeline";
 import { PipelineItemDrawer } from "./PipelineItemDrawer";
+import { CreatePipelineItemDialog } from "./CreatePipelineItemDialog";
 import { PipelineItem } from "@/actions/pipelineActions";
 
 export function PipelineSection() {
-  const { stages, isLoading, getItemsByStage, getEventsForItem } = usePipeline();
+  const { stages, isLoading, getItemsByStage, getEventsForItem, createItem, updateItem, deleteItem, isCreating } = usePipeline();
   const [selectedItem, setSelectedItem] = useState<PipelineItem | null>(null);
+  const [createDialogStageId, setCreateDialogStageId] = useState<string | null>(null);
+
+  const handleCreateItem = async (title: string, subtitle?: string) => {
+    if (!createDialogStageId) return;
+    await createItem({ stageId: createDialogStageId, title, subtitle });
+    setCreateDialogStageId(null);
+  };
+
+  const handleUpdateItem = async (itemId: string, fields: { title?: string; subtitle?: string; notes?: string }) => {
+    await updateItem({ itemId, fields });
+    // Update selected item with new data
+    if (selectedItem && selectedItem.id === itemId) {
+      setSelectedItem({ ...selectedItem, ...fields });
+    }
+  };
+
+  const handleDeleteItem = async (itemId: string) => {
+    await deleteItem(itemId);
+    setSelectedItem(null);
+  };
 
   if (isLoading) {
     return (
@@ -47,10 +69,12 @@ export function PipelineSection() {
           return (
             <PipelineColumn
               key={stage.id}
+              stageId={stage.id}
               name={stage.name}
               color={stage.color}
               items={items}
               onItemClick={setSelectedItem}
+              onAddClick={() => setCreateDialogStageId(stage.id)}
             />
           );
         })}
@@ -65,10 +89,12 @@ export function PipelineSection() {
               return (
                 <div key={stage.id} className="w-[280px] flex-shrink-0">
                   <PipelineColumn
+                    stageId={stage.id}
                     name={stage.name}
                     color={stage.color}
                     items={items}
                     onItemClick={setSelectedItem}
+                    onAddClick={() => setCreateDialogStageId(stage.id)}
                   />
                 </div>
               );
@@ -78,25 +104,38 @@ export function PipelineSection() {
         </ScrollArea>
       </div>
 
+      {/* Create Item Dialog */}
+      <CreatePipelineItemDialog
+        open={!!createDialogStageId}
+        onOpenChange={(open) => !open && setCreateDialogStageId(null)}
+        onSubmit={handleCreateItem}
+        isLoading={isCreating}
+        stageName={stages.find(s => s.id === createDialogStageId)?.name || ''}
+      />
+
       {/* Item Detail Drawer */}
       <PipelineItemDrawer
         item={selectedItem}
         open={!!selectedItem}
         onOpenChange={(open) => !open && setSelectedItem(null)}
         getEventsForItem={getEventsForItem}
+        onUpdate={handleUpdateItem}
+        onDelete={handleDeleteItem}
       />
     </motion.div>
   );
 }
 
 interface PipelineColumnProps {
+  stageId: string;
   name: string;
   color: string | null;
   items: PipelineItem[];
   onItemClick: (item: PipelineItem) => void;
+  onAddClick: () => void;
 }
 
-function PipelineColumn({ name, color, items, onItemClick }: PipelineColumnProps) {
+function PipelineColumn({ stageId, name, color, items, onItemClick, onAddClick }: PipelineColumnProps) {
   return (
     <Card className="bg-muted/30 border-border/50 overflow-hidden">
       {/* Column Header */}
@@ -104,10 +143,20 @@ function PipelineColumn({ name, color, items, onItemClick }: PipelineColumnProps
         className="px-3 py-2.5 border-b border-border/50 flex items-center justify-between"
         style={{ borderLeftColor: color || undefined, borderLeftWidth: color ? 3 : 0 }}
       >
-        <span className="font-medium text-sm text-foreground truncate">{name}</span>
-        <span className="text-xs text-muted-foreground bg-background/50 px-2 py-0.5 rounded-full">
-          {items.length}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm text-foreground truncate">{name}</span>
+          <span className="text-xs text-muted-foreground bg-background/50 px-2 py-0.5 rounded-full">
+            {items.length}
+          </span>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
+          onClick={onAddClick}
+        >
+          <Plus className="w-4 h-4" />
+        </Button>
       </div>
 
       {/* Items */}
