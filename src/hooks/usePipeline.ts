@@ -11,7 +11,8 @@ import {
   getPipelineItemEvents,
   PipelineData,
   PipelineItem,
-  PipelineEvent
+  PipelineEvent,
+  CreatePipelineItemData
 } from "@/actions/pipelineActions";
 
 export function usePipeline() {
@@ -30,8 +31,7 @@ export function usePipeline() {
   });
 
   const createItemMutation = useMutation({
-    mutationFn: ({ stageId, title, subtitle }: { stageId: string; title: string; subtitle?: string }) =>
-      createPipelineItem(stageId, title, subtitle),
+    mutationFn: (data: CreatePipelineItemData) => createPipelineItem(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pipeline', user?.id] });
     },

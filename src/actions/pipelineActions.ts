@@ -21,6 +21,14 @@ export interface PipelineItem {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  // Instagram fields
+  instagram_handle: string | null;
+  instagram_url: string | null;
+  instagram_followers: number | null;
+  instagram_posts: number | null;
+  instagram_bio: string | null;
+  instagram_profile_image_url: string | null;
+  instagram_verified_status: string | null;
 }
 
 export interface PipelineEvent {
@@ -115,10 +123,21 @@ export async function getMyPipeline(): Promise<PipelineData> {
  * Creates a new pipeline item in the specified stage.
  * Also creates a 'created' event.
  */
+export interface CreatePipelineItemData {
+  stageId: string;
+  title: string;
+  subtitle?: string;
+  instagramHandle?: string;
+  instagramUrl?: string;
+  instagramFollowers?: number;
+  instagramPosts?: number;
+  instagramBio?: string;
+  instagramProfileImageUrl?: string;
+  instagramVerifiedStatus?: string;
+}
+
 export async function createPipelineItem(
-  stage_id: string,
-  title: string,
-  subtitle?: string
+  data: CreatePipelineItemData
 ): Promise<PipelineItem> {
   const userId = await getAuthUserId();
   
@@ -127,7 +146,7 @@ export async function createPipelineItem(
     .from('pipeline_items')
     .select('sort_order')
     .eq('owner_user_id', userId)
-    .eq('stage_id', stage_id)
+    .eq('stage_id', data.stageId)
     .order('sort_order', { ascending: false })
     .limit(1);
   
@@ -135,15 +154,22 @@ export async function createPipelineItem(
     ? existingItems[0].sort_order + 1 
     : 0;
   
-  // Insert the item
+  // Insert the item with Instagram fields
   const { data: item, error: itemError } = await supabase
     .from('pipeline_items')
     .insert({
       owner_user_id: userId,
-      stage_id,
-      title,
-      subtitle: subtitle || null,
-      sort_order: nextSortOrder
+      stage_id: data.stageId,
+      title: data.title,
+      subtitle: data.subtitle || null,
+      sort_order: nextSortOrder,
+      instagram_handle: data.instagramHandle || null,
+      instagram_url: data.instagramUrl || null,
+      instagram_followers: data.instagramFollowers || null,
+      instagram_posts: data.instagramPosts || null,
+      instagram_bio: data.instagramBio || null,
+      instagram_profile_image_url: data.instagramProfileImageUrl || null,
+      instagram_verified_status: data.instagramVerifiedStatus || 'unverified'
     })
     .select()
     .single();
@@ -159,7 +185,7 @@ export async function createPipelineItem(
       owner_user_id: userId,
       item_id: item.id,
       type: 'created',
-      data: { title, stage_id }
+      data: { title: data.title, stage_id: data.stageId }
     });
   
   if (eventError) {

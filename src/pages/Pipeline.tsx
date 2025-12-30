@@ -43,23 +43,36 @@ const Pipeline = () => {
     const subtitleParts = [];
     
     // For Instagram, show stats
-    if (data.source === "instagram" && data.followers) {
-      const formatCount = (n: number) => 
-        n >= 1000000 ? `${(n/1000000).toFixed(1)}M` : 
-        n >= 1000 ? `${(n/1000).toFixed(1)}K` : String(n);
-      
-      subtitleParts.push(`${formatCount(data.followers)} followers`);
-      if (data.posts) subtitleParts.push(`${data.posts} posts`);
+    if (data.source === "instagram") {
+      if (data.instagramFollowers) {
+        const formatCount = (n: number) => 
+          n >= 1000000 ? `${(n/1000000).toFixed(1)}M` : 
+          n >= 1000 ? `${(n/1000).toFixed(1)}K` : String(n);
+        subtitleParts.push(`${formatCount(data.instagramFollowers)} followers`);
+      }
+      if (data.instagramPosts) subtitleParts.push(`${data.instagramPosts} posts`);
+      if (data.instagramHandle) subtitleParts.push(`@${data.instagramHandle}`);
+    } else {
+      if (data.company) subtitleParts.push(data.company);
+      if (data.socialHandle) subtitleParts.push(data.socialHandle);
+      if (data.email) subtitleParts.push(data.email);
     }
-    
-    if (data.company) subtitleParts.push(data.company);
-    if (data.socialHandle) subtitleParts.push(data.socialHandle);
-    if (data.email) subtitleParts.push(data.email);
     
     const subtitle = subtitleParts.join(' • ') || undefined;
 
     try {
-      await createItem({ stageId, title: data.name, subtitle });
+      await createItem({ 
+        stageId, 
+        title: data.name, 
+        subtitle,
+        instagramHandle: data.instagramHandle,
+        instagramUrl: data.instagramUrl,
+        instagramFollowers: data.instagramFollowers,
+        instagramPosts: data.instagramPosts,
+        instagramBio: data.instagramBio,
+        instagramProfileImageUrl: data.instagramProfileImageUrl,
+        instagramVerifiedStatus: data.instagramVerifiedStatus
+      });
       setShowAddDialog(false);
       setAddToStageId(null);
       toast.success("Contact added to pipeline");
@@ -481,6 +494,13 @@ function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging
   const colorIndex = item.title.charCodeAt(0) % colors.length;
   const avatarColor = colors[colorIndex];
 
+  // Check if we have an Instagram profile image
+  const hasProfileImage = !!item.instagram_profile_image_url;
+  
+  // Determine verification badge
+  const verificationStatus = item.instagram_verified_status;
+  const showBadge = verificationStatus === 'user_entered' || verificationStatus === 'connected_oauth';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -503,13 +523,32 @@ function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging
           </div>
           
           {/* Avatar */}
-          <div className={`w-10 h-10 rounded-lg ${avatarColor} flex items-center justify-center shrink-0`}>
+          {hasProfileImage ? (
+            <img
+              src={item.instagram_profile_image_url!}
+              alt={item.title}
+              className="w-10 h-10 rounded-lg object-cover shrink-0"
+              onError={(e) => {
+                // Fallback to initials if image fails
+                (e.target as HTMLImageElement).style.display = 'none';
+                (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+              }}
+            />
+          ) : null}
+          <div className={`w-10 h-10 rounded-lg ${avatarColor} flex items-center justify-center shrink-0 ${hasProfileImage ? 'hidden' : ''}`}>
             <span className="text-sm font-semibold text-white">{initials}</span>
           </div>
           
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm text-foreground truncate">{item.title}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="font-medium text-sm text-foreground truncate">{item.title}</p>
+              {showBadge && (
+                <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                  {verificationStatus === 'user_entered' ? 'User-entered' : 'Connected'}
+                </span>
+              )}
+            </div>
             {item.subtitle && (
               <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
             )}
