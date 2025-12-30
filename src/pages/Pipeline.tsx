@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, DragEvent } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Users, Plus, Search, ArrowLeft, UserPlus } from "lucide-react";
+import { Users, Plus, Search, ArrowLeft, UserPlus, GripVertical } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,8 @@ const Pipeline = () => {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addToStageId, setAddToStageId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [dragOverStageId, setDragOverStageId] = useState<string | null>(null);
 
   // Filter items by search
   const filterItems = (stageItems: PipelineItem[]) => {
@@ -108,6 +110,44 @@ const Pipeline = () => {
       toast.error("Failed to delete contact");
       throw err;
     }
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (e: DragEvent<HTMLDivElement>, itemId: string) => {
+    setDraggedItemId(itemId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', itemId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItemId(null);
+    setDragOverStageId(null);
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>, stageId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverStageId(stageId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverStageId(null);
+  };
+
+  const handleDrop = async (e: DragEvent<HTMLDivElement>, toStageId: string) => {
+    e.preventDefault();
+    const itemId = e.dataTransfer.getData('text/plain');
+    
+    if (itemId && draggedItemId) {
+      const item = items.find(i => i.id === itemId);
+      if (item && item.stage_id !== toStageId) {
+        await handleMoveItem(itemId, toStageId);
+        toast.success("Contact moved");
+      }
+    }
+    
+    setDraggedItemId(null);
+    setDragOverStageId(null);
   };
 
   const totalContacts = items.length;
@@ -201,6 +241,13 @@ const Pipeline = () => {
                       items={stageItems}
                       onItemClick={setSelectedItem}
                       onAddClick={() => openAddDialog(stage.id)}
+                      isDragOver={dragOverStageId === stage.id}
+                      onDragOver={(e) => handleDragOver(e, stage.id)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, stage.id)}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                      draggedItemId={draggedItemId}
                     />
                   );
                 })}
@@ -221,6 +268,13 @@ const Pipeline = () => {
                           items={stageItems}
                           onItemClick={setSelectedItem}
                           onAddClick={() => openAddDialog(stage.id)}
+                          isDragOver={dragOverStageId === stage.id}
+                          onDragOver={(e) => handleDragOver(e, stage.id)}
+                          onDragLeave={handleDragLeave}
+                          onDrop={(e) => handleDrop(e, stage.id)}
+                          onDragStart={handleDragStart}
+                          onDragEnd={handleDragEnd}
+                          draggedItemId={draggedItemId}
                         />
                       </div>
                       );
@@ -288,11 +342,39 @@ interface PipelineColumnProps {
   items: PipelineItem[];
   onItemClick: (item: PipelineItem) => void;
   onAddClick: () => void;
+  isDragOver: boolean;
+  onDragOver: (e: DragEvent<HTMLDivElement>) => void;
+  onDragLeave: () => void;
+  onDrop: (e: DragEvent<HTMLDivElement>) => void;
+  onDragStart: (e: DragEvent<HTMLDivElement>, itemId: string) => void;
+  onDragEnd: () => void;
+  draggedItemId: string | null;
 }
 
-function PipelineColumn({ stageId, name, color, items, onItemClick, onAddClick }: PipelineColumnProps) {
+function PipelineColumn({ 
+  stageId, 
+  name, 
+  color, 
+  items, 
+  onItemClick, 
+  onAddClick,
+  isDragOver,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onDragStart,
+  onDragEnd,
+  draggedItemId
+}: PipelineColumnProps) {
   return (
-    <Card className="bg-muted/20 border-border/40 overflow-hidden flex flex-col h-[calc(100vh-200px)]">
+    <Card 
+      className={`bg-muted/20 border-border/40 overflow-hidden flex flex-col h-[calc(100vh-200px)] transition-all duration-200 ${
+        isDragOver ? 'ring-2 ring-primary bg-primary/5' : ''
+      }`}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
       {/* Column Header */}
       <div className="px-4 py-3 border-b border-border/50 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
@@ -319,13 +401,16 @@ function PipelineColumn({ stageId, name, color, items, onItemClick, onAddClick }
       <ScrollArea className="flex-1">
         <div className="p-3 space-y-2">
           {items.length === 0 ? (
-            <PipelineEmptyState onAddClick={onAddClick} />
+            <PipelineEmptyState onAddClick={onAddClick} isDragOver={isDragOver} />
           ) : (
             items.map((item) => (
               <PipelineContactCard
                 key={item.id}
                 item={item}
                 onClick={() => onItemClick(item)}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+                isDragging={draggedItemId === item.id}
               />
             ))
           )}
@@ -336,26 +421,32 @@ function PipelineColumn({ stageId, name, color, items, onItemClick, onAddClick }
 }
 
 // Empty state
-function PipelineEmptyState({ onAddClick }: { onAddClick: () => void }) {
+function PipelineEmptyState({ onAddClick, isDragOver }: { onAddClick: () => void; isDragOver?: boolean }) {
   return (
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex flex-col items-center justify-center py-8 px-4 text-center"
+      className={`flex flex-col items-center justify-center py-8 px-4 text-center rounded-lg border-2 border-dashed transition-colors ${
+        isDragOver ? 'border-primary bg-primary/5' : 'border-transparent'
+      }`}
     >
       <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-3">
         <UserPlus className="w-6 h-6 text-muted-foreground/60" />
       </div>
-      <p className="text-sm text-muted-foreground mb-3">No contacts yet</p>
-      <Button
-        variant="outline"
-        size="sm"
-        className="text-sm gap-2"
-        onClick={onAddClick}
-      >
-        <Plus className="w-4 h-4" />
-        Add first contact
-      </Button>
+      <p className="text-sm text-muted-foreground mb-3">
+        {isDragOver ? 'Drop here to move' : 'No contacts yet'}
+      </p>
+      {!isDragOver && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-sm gap-2"
+          onClick={onAddClick}
+        >
+          <Plus className="w-4 h-4" />
+          Add first contact
+        </Button>
+      )}
     </motion.div>
   );
 }
@@ -363,9 +454,12 @@ function PipelineEmptyState({ onAddClick }: { onAddClick: () => void }) {
 interface PipelineContactCardProps {
   item: PipelineItem;
   onClick: () => void;
+  onDragStart: (e: DragEvent<HTMLDivElement>, itemId: string) => void;
+  onDragEnd: () => void;
+  isDragging: boolean;
 }
 
-function PipelineContactCard({ item, onClick }: PipelineContactCardProps) {
+function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging }: PipelineContactCardProps) {
   // Generate initials from title
   const initials = item.title
     .split(' ')
@@ -390,15 +484,24 @@ function PipelineContactCard({ item, onClick }: PipelineContactCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={{ opacity: isDragging ? 0.5 : 1, y: 0 }}
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
+      draggable
+      onDragStart={(e) => onDragStart(e as unknown as DragEvent<HTMLDivElement>, item.id)}
+      onDragEnd={onDragEnd}
+      className={`cursor-grab active:cursor-grabbing ${isDragging ? 'opacity-50' : ''}`}
     >
       <Card
-        className="p-3 bg-background/80 hover:bg-accent/30 cursor-pointer transition-all duration-200 border-border/50 hover:border-primary/30"
+        className="p-3 bg-background/80 hover:bg-accent/30 transition-all duration-200 border-border/50 hover:border-primary/30"
         onClick={onClick}
       >
         <div className="flex items-center gap-3">
+          {/* Drag Handle */}
+          <div className="text-muted-foreground/40 hover:text-muted-foreground shrink-0">
+            <GripVertical className="w-4 h-4" />
+          </div>
+          
           {/* Avatar */}
           <div className={`w-10 h-10 rounded-lg ${avatarColor} flex items-center justify-center shrink-0`}>
             <span className="text-sm font-semibold text-white">{initials}</span>
