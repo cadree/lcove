@@ -16,25 +16,25 @@ export function PipelineSection() {
   const [selectedItem, setSelectedItem] = useState<PipelineItem | null>(null);
   const [createDialogStageId, setCreateDialogStageId] = useState<string | null>(null);
 
-  const handleCreateItem = async (title: string, subtitle?: string) => {
+  const handleCreateItem = async (name: string) => {
     if (!createDialogStageId) return;
     try {
-      await createItem({ stageId: createDialogStageId, title, subtitle });
+      await createItem({ stageId: createDialogStageId, name });
       setCreateDialogStageId(null);
-      toast.success("Item added to pipeline");
+      toast.success("Contact added to pipeline");
     } catch (err) {
-      toast.error("Failed to create item");
+      toast.error("Failed to create contact");
     }
   };
 
-  const handleUpdateItem = async (itemId: string, fields: { title?: string; subtitle?: string; notes?: string }) => {
+  const handleUpdateItem = async (itemId: string, fields: Partial<PipelineItem>) => {
     try {
       await updateItem({ itemId, fields });
       if (selectedItem && selectedItem.id === itemId) {
         setSelectedItem({ ...selectedItem, ...fields });
       }
     } catch (err) {
-      toast.error("Failed to update item");
+      toast.error("Failed to update contact");
       throw err;
     }
   };
@@ -51,7 +51,7 @@ export function PipelineSection() {
         setSelectedItem({ ...selectedItem, stage_id: toStageId, sort_order: newSortOrder });
       }
     } catch (err) {
-      toast.error("Failed to move item");
+      toast.error("Failed to move contact");
       throw err;
     }
   };
@@ -61,7 +61,7 @@ export function PipelineSection() {
       await deleteItem(itemId);
       setSelectedItem(null);
     } catch (err) {
-      toast.error("Failed to delete item");
+      toast.error("Failed to delete contact");
       throw err;
     }
   };
@@ -280,7 +280,7 @@ function PipelineEmptyState({ onAddClick }: { onAddClick: () => void }) {
       <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center mb-3">
         <UserPlus className="w-5 h-5 text-muted-foreground/60" />
       </div>
-      <p className="text-xs text-muted-foreground mb-2">No items yet</p>
+      <p className="text-xs text-muted-foreground mb-2">No contacts yet</p>
       <Button
         variant="ghost"
         size="sm"
@@ -288,7 +288,7 @@ function PipelineEmptyState({ onAddClick }: { onAddClick: () => void }) {
         onClick={onAddClick}
       >
         <Plus className="w-3 h-3 mr-1" />
-        Add first card
+        Add first contact
       </Button>
     </div>
   );
@@ -300,14 +300,20 @@ interface PipelineItemCardProps {
 }
 
 function PipelineItemCard({ item, onClick }: PipelineItemCardProps) {
+  // Build subtitle from available info
+  const subtitleParts = [];
+  if (item.role) subtitleParts.push(item.role);
+  if (item.company) subtitleParts.push(item.company);
+  const subtitle = subtitleParts.join(' • ');
+
   return (
     <Card
       className="p-3 bg-background/80 hover:bg-accent/50 cursor-pointer transition-all duration-200 border-border/50 hover:border-primary/30 hover:shadow-sm"
       onClick={onClick}
     >
-      <p className="font-medium text-sm text-foreground truncate">{item.title}</p>
-      {item.subtitle && (
-        <p className="text-xs text-muted-foreground truncate mt-0.5">{item.subtitle}</p>
+      <p className="font-medium text-sm text-foreground truncate">{item.name}</p>
+      {subtitle && (
+        <p className="text-xs text-muted-foreground truncate mt-0.5">{subtitle}</p>
       )}
     </Card>
   );
