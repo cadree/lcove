@@ -558,6 +558,44 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_tasks: {
+        Row: {
+          created_at: string
+          due_at: string | null
+          id: string
+          is_done: boolean
+          owner_user_id: string
+          pipeline_item_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          due_at?: string | null
+          id?: string
+          is_done?: boolean
+          owner_user_id: string
+          pipeline_item_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          due_at?: string | null
+          id?: string
+          is_done?: boolean
+          owner_user_id?: string
+          pipeline_item_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_tasks_pipeline_item_id_fkey"
+            columns: ["pipeline_item_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_timeline: {
         Row: {
           contact_id: string
