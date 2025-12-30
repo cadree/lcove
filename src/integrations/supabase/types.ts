@@ -125,6 +125,66 @@ export type Database = {
           },
         ]
       }
+      appointments: {
+        Row: {
+          contact_id: string | null
+          created_at: string
+          description: string | null
+          ends_at: string
+          id: string
+          location: string | null
+          owner_user_id: string
+          starts_at: string
+          status: string
+          team_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          contact_id?: string | null
+          created_at?: string
+          description?: string | null
+          ends_at: string
+          id?: string
+          location?: string | null
+          owner_user_id: string
+          starts_at: string
+          status?: string
+          team_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          contact_id?: string | null
+          created_at?: string
+          description?: string | null
+          ends_at?: string
+          id?: string
+          location?: string | null
+          owner_user_id?: string
+          starts_at?: string
+          status?: string
+          team_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blog_posts: {
         Row: {
           content: string
@@ -272,6 +332,96 @@ export type Database = {
         }
         Relationships: []
       }
+      booking_pages: {
+        Row: {
+          availability: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          meeting_length_minutes: number
+          owner_user_id: string
+          slug: string
+          timezone: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          availability?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          meeting_length_minutes?: number
+          owner_user_id: string
+          slug: string
+          timezone?: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          availability?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          meeting_length_minutes?: number
+          owner_user_id?: string
+          slug?: string
+          timezone?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      booking_requests: {
+        Row: {
+          appointment_id: string | null
+          booking_page_id: string
+          contact_email: string
+          contact_name: string
+          created_at: string
+          id: string
+          requested_end: string
+          requested_start: string
+          status: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          booking_page_id: string
+          contact_email: string
+          contact_name: string
+          created_at?: string
+          id?: string
+          requested_end: string
+          requested_start: string
+          status?: string
+        }
+        Update: {
+          appointment_id?: string | null
+          booking_page_id?: string
+          contact_email?: string
+          contact_name?: string
+          created_at?: string
+          id?: string
+          requested_end?: string
+          requested_start?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_requests_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_requests_booking_page_id_fkey"
+            columns: ["booking_page_id"]
+            isOneToOne: false
+            referencedRelation: "booking_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brand_partnerships: {
         Row: {
           brand_logo_url: string | null
@@ -404,6 +554,74 @@ export type Database = {
           is_published?: boolean
           published_at?: string | null
           title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      contact_timeline: {
+        Row: {
+          contact_id: string
+          created_at: string
+          data: Json | null
+          id: string
+          type: string
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string
+          data?: Json | null
+          id?: string
+          type: string
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string
+          data?: Json | null
+          id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_timeline_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          company: string | null
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          notes: string | null
+          owner_user_id: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          full_name: string
+          id?: string
+          notes?: string | null
+          owner_user_id: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          notes?: string | null
+          owner_user_id?: string
+          phone?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -3580,6 +3798,62 @@ export type Database = {
           },
         ]
       }
+      team_members: {
+        Row: {
+          created_at: string
+          role: string
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          role?: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          role?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          owner_user_id: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          owner_user_id: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          owner_user_id?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount: number
@@ -4135,6 +4409,14 @@ export type Database = {
       }
       is_conversation_participant: {
         Args: { conv_id: string; uid: string }
+        Returns: boolean
+      }
+      is_team_admin: {
+        Args: { p_team_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      is_team_member: {
+        Args: { p_team_id: string; p_user_id: string }
         Returns: boolean
       }
       is_user_blocked: {
