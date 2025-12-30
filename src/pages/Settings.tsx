@@ -672,7 +672,7 @@ const Settings = () => {
                     }
                   }
                 }}
-                disabled={!pushSupported || pushPermission === 'denied' || pushLoading || pushStatus === 'checking'}
+                disabled={!pushSupported || pushStatus === 'not_supported' || pushLoading || pushStatus === 'checking'}
               />
             </div>
 
