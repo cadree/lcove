@@ -5,6 +5,7 @@ import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Plus, Grid, Bookmark, FileText, ArrowLeft, LayoutGrid } from "lucide-react";
+import { PipelineSection } from "@/components/pipeline/PipelineSection";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
 import { ProfileCustomizationDialog } from "@/components/profile/ProfileCustomizationDialog";
@@ -309,6 +310,9 @@ const Profile = () => {
         );
       case 'quick_links':
         return <ProfileQuickLinks key="quick_links" isOwner={isOwnProfile} />;
+      case 'pipeline':
+        if (!isOwnProfile) return null;
+        return <PipelineSection key="pipeline" />;
       default:
         return null;
     }
