@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
 import { 
@@ -9,6 +10,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/hooks/useMessages';
 import { useConversations } from '@/hooks/useConversations';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,7 +35,8 @@ interface ChatViewProps {
 
 const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   const { user } = useAuth();
-  const { conversations } = useConversations();
+  const navigate = useNavigate();
+  const { conversations, toggleMute } = useConversations();
   const { 
     messages, 
     isLoading, 
@@ -43,12 +46,23 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
     setTypingIndicator,
     typingUsers 
   } = useMessages(conversationId);
+  const { blockUser } = useUserBlocks();
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [showProjectInfo, setShowProjectInfo] = useState(false);
 
   const conversation = conversations.find(c => c.id === conversationId);
+  
+  // Get the other participant's user ID for direct messages
+  const getOtherUserId = () => {
+    if (!conversation || conversation.type !== 'direct') return null;
+    const otherParticipant = conversation.participants?.find(p => p.user_id !== user?.id);
+    return otherParticipant?.user_id || null;
+  };
+  
+  const otherUserId = getOtherUserId();
+  const isMuted = conversation?.participants?.find(p => p.user_id === user?.id)?.is_muted || false;
   const isProjectChat = !!(conversation as any)?.project_id;
   const project = (conversation as any)?.project;
 
@@ -195,9 +209,33 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-card border-border">
-              <DropdownMenuItem>View profile</DropdownMenuItem>
-              <DropdownMenuItem>Mute notifications</DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive">Block user</DropdownMenuItem>
+              {otherUserId && conversation?.type === 'direct' && (
+                <DropdownMenuItem onClick={() => navigate(`/profile/${otherUserId}`)}>
+                  View profile
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem 
+                onClick={() => {
+                  toggleMute.mutate({ conversationId, muted: !isMuted });
+                  toast.success(isMuted ? 'Notifications unmuted' : 'Notifications muted');
+                }}
+              >
+                {isMuted ? 'Unmute notifications' : 'Mute notifications'}
+              </DropdownMenuItem>
+              {otherUserId && conversation?.type === 'direct' && (
+                <DropdownMenuItem 
+                  className="text-destructive"
+                  onClick={() => {
+                    blockUser.mutate(otherUserId, {
+                      onSuccess: () => {
+                        onBack();
+                      }
+                    });
+                  }}
+                >
+                  Block user
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
