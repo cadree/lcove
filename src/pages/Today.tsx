@@ -1,13 +1,14 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { format, isToday, isTomorrow, isPast, parseISO, addDays, startOfDay, endOfDay, isWithinInterval } from "date-fns";
-import { ArrowLeft, Sun, AlertCircle, Calendar, Circle, ChevronRight, Loader2, Plus, Search, Filter, Inbox, Clock } from "lucide-react";
+import { ArrowLeft, Sun, AlertCircle, Calendar, Circle, ChevronRight, Loader2, Plus, Search, Filter, Inbox, Clock, CalendarDays, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import PageLayout from "@/components/layout/PageLayout";
 import { useMyDayTasks, ContactTask } from "@/hooks/useContactTasks";
+import { useMyDayCalendarTasks, CalendarTaskWithDetails } from "@/hooks/useCalendarTasks";
 import { usePipeline } from "@/hooks/usePipeline";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -36,22 +37,37 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { useAuth } from "@/contexts/AuthContext";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type TaskWithContact = ContactTask & {
   pipeline_items: { id: string; name: string; company: string | null; stage_id: string };
 };
 
+type UnifiedTask = {
+  id: string;
+  title: string;
+  due_at: string | null;
+  is_done: boolean;
+  type: 'contact' | 'calendar';
+  source: string; // Contact name or Event/Project title
+  sourceId: string; // Pipeline item id, event id, or project id
+  stageId?: string;
+};
+
 type FilterType = "all" | "today" | "overdue" | "upcoming" | "no-date";
+type TabType = "all" | "contacts" | "calendar";
 
 const Today = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: tasks = [], isLoading } = useMyDayTasks();
+  const { data: contactTasks = [], isLoading: contactLoading } = useMyDayTasks();
+  const { data: calendarTasks = [], isLoading: calendarLoading } = useMyDayCalendarTasks();
   const { stages, items } = usePipeline();
   const queryClient = useQueryClient();
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
+  const [activeTab, setActiveTab] = useState<TabType>("all");
   const [showAddTask, setShowAddTask] = useState(false);
   
   // Add task form state
@@ -59,6 +75,9 @@ const Today = () => {
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDueDate, setTaskDueDate] = useState<Date | undefined>();
   const [isCreating, setIsCreating] = useState(false);
+
+  const isLoading = contactLoading || calendarLoading;
+  const tasks = contactTasks; // For backwards compatibility
 
   const now = new Date();
   const todayStart = startOfDay(now);

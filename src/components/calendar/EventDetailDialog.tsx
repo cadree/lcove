@@ -8,9 +8,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { CalendarEvent, useEventWithRSVP, useRSVP } from "@/hooks/useCalendar";
+import { CalendarEvent, useEventWithRSVP, useRSVP, useCreatePersonalItem } from "@/hooks/useCalendar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
+import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { supabase } from "@/integrations/supabase/client";
 import { format, formatDistanceToNow } from "date-fns";
 import { 
@@ -33,7 +34,9 @@ import {
   Navigation,
   FolderOpen,
   User,
-  Settings
+  Settings,
+  Sun,
+  CalendarCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -57,8 +60,12 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
   const { data: event, isLoading, refetch } = useEventWithRSVP(eventId || '');
   const { rsvp, isRsvping, toggleReminder } = useRSVP();
   const creditsData = useCredits();
+  const { isAddedToMyDay, addEventToMyDay, removeByReference } = useCalendarTasks();
+  const createPersonalItem = useCreatePersonalItem();
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [attendeesOpen, setAttendeesOpen] = useState(false);
+  const [isAddingToMyDay, setIsAddingToMyDay] = useState(false);
+  const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
 
   const isCreator = user?.id === event?.creator_id;
 
@@ -294,6 +301,69 @@ END:VCALENDAR`;
       onOpenChange(false);
       navigate(`/profile/${event.creator_id}`);
     }
+  };
+
+  const isEventInMyDay = isAddedToMyDay(event.id);
+
+  const handleAddToMyDay = async () => {
+    if (!user) {
+      toast.error('Please log in to add to My Day');
+      return;
+    }
+    
+    setIsAddingToMyDay(true);
+    try {
+      if (isEventInMyDay) {
+        await removeByReference.mutateAsync({ eventId: event.id });
+        toast.success('Removed from My Day');
+      } else {
+        await addEventToMyDay.mutateAsync({
+          eventId: event.id,
+          title: event.title,
+          dueAt: event.start_date,
+        });
+        toast.success('Added to My Day!');
+      }
+    } catch (error) {
+      toast.error('Failed to update My Day');
+    } finally {
+      setIsAddingToMyDay(false);
+    }
+  };
+
+  const handleAddToPersonalCalendar = async () => {
+    if (!user) {
+      toast.error('Please log in to add to calendar');
+      return;
+    }
+    
+    setIsAddingToCalendar(true);
+    try {
+      await createPersonalItem.mutateAsync({
+        title: event.title,
+        description: event.description || null,
+        location: event.venue ? `${event.venue}, ${event.city}` : event.city,
+        start_date: event.start_date,
+        end_date: event.end_date || null,
+        all_day: false,
+        color: null,
+        reminder_minutes: 60,
+      });
+      toast.success('Added to your personal calendar!');
+    } catch (error) {
+      toast.error('Failed to add to calendar');
+    } finally {
+      setIsAddingToCalendar(false);
+    }
+  };
+
+  const handleAttendEvent = () => {
+    if (!user) {
+      toast.error('Please log in to RSVP');
+      return;
+    }
+    // RSVP as going
+    rsvp({ eventId: event.id, status: 'going' });
   };
 
   return (
@@ -676,6 +746,8 @@ END:VCALENDAR`;
                   size="sm"
                   onClick={handleNotifyMe}
                   className="w-full"
+                  role="button"
+                  aria-label="Get notified about this event"
                 >
                   <Bell className="w-4 h-4 mr-2" />
                   Notify Me About This Event
@@ -686,6 +758,8 @@ END:VCALENDAR`;
                   size="sm"
                   onClick={handleToggleReminder}
                   className="w-full"
+                  role="button"
+                  aria-label={event.user_rsvp.reminder_enabled ? "Turn off reminder" : "Turn on reminder"}
                 >
                   {event.user_rsvp.reminder_enabled ? (
                     <>
@@ -700,6 +774,65 @@ END:VCALENDAR`;
                   )}
                 </Button>
               )
+            )}
+
+            {/* Quick Actions Row */}
+            <div className="flex gap-2 pt-2">
+              {/* Add to My Day */}
+              <Button
+                variant={isEventInMyDay ? "default" : "glass"}
+                size="sm"
+                onClick={handleAddToMyDay}
+                disabled={isAddingToMyDay}
+                className="flex-1"
+                role="button"
+                aria-label={isEventInMyDay ? "Remove from My Day" : "Add to My Day"}
+              >
+                {isAddingToMyDay ? (
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                ) : (
+                  <Sun className={cn("w-4 h-4 mr-1", isEventInMyDay && "text-amber-500")} />
+                )}
+                {isEventInMyDay ? "In My Day" : "Add to My Day"}
+              </Button>
+
+              {/* Add to Personal Calendar */}
+              <Button
+                variant="glass"
+                size="sm"
+                onClick={handleAddToPersonalCalendar}
+                disabled={isAddingToCalendar}
+                className="flex-1"
+                role="button"
+                aria-label="Save to personal calendar"
+              >
+                {isAddingToCalendar ? (
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                ) : (
+                  <CalendarCheck className="w-4 h-4 mr-1" />
+                )}
+                Save to Calendar
+              </Button>
+            </div>
+
+            {/* I'm Attending button for quick RSVP */}
+            {event.ticket_type === 'free' && !event.user_rsvp?.status?.includes('going') && !isSoldOut && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAttendEvent}
+                disabled={isRsvping}
+                className="w-full border-green-500/50 text-green-500 hover:bg-green-500/10"
+                role="button"
+                aria-label="Mark as attending"
+              >
+                {isRsvping ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Check className="w-4 h-4 mr-2" />
+                )}
+                I'm Attending
+              </Button>
             )}
           </div>
         </div>
