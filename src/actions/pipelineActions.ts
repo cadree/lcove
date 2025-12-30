@@ -15,14 +15,26 @@ export interface PipelineItem {
   id: string;
   owner_user_id: string;
   stage_id: string;
-  title: string;
-  subtitle: string | null;
-  notes: string | null;
+  name: string;
   sort_order: number;
   created_at: string;
   updated_at: string;
-  instagram_handle: string | null;
+  // Contact info
+  email: string | null;
+  phone: string | null;
+  company: string | null;
+  role: string | null;
+  // Social links (plain URLs)
   instagram_url: string | null;
+  twitter_url: string | null;
+  linkedin_url: string | null;
+  tiktok_url: string | null;
+  website_url: string | null;
+  // CRM fields
+  notes: string | null;
+  priority: 'low' | 'medium' | 'high' | null;
+  status: string | null;
+  tags: string[] | null;
 }
 
 export interface PipelineEvent {
@@ -51,7 +63,6 @@ async function getAuthUserId(): Promise<string> {
 
 /**
  * Ensures default pipeline stages exist for the authenticated user.
- * Calls the database function public.ensure_default_pipeline(auth.uid())
  */
 export async function ensureMyDefaultPipeline(): Promise<void> {
   const userId = await getAuthUserId();
@@ -67,12 +78,10 @@ export async function ensureMyDefaultPipeline(): Promise<void> {
 
 /**
  * Gets the full pipeline for the authenticated user.
- * Returns stages ordered by sort_order, items grouped by stage, and recent events.
  */
 export async function getMyPipeline(): Promise<PipelineData> {
   const userId = await getAuthUserId();
   
-  // Fetch stages
   const { data: stages, error: stagesError } = await supabase
     .from('pipeline_stages')
     .select('*')
@@ -83,7 +92,6 @@ export async function getMyPipeline(): Promise<PipelineData> {
     throw new Error(`Failed to fetch stages: ${stagesError.message}`);
   }
   
-  // Fetch items
   const { data: items, error: itemsError } = await supabase
     .from('pipeline_items')
     .select('*')
@@ -94,7 +102,6 @@ export async function getMyPipeline(): Promise<PipelineData> {
     throw new Error(`Failed to fetch items: ${itemsError.message}`);
   }
   
-  // Fetch recent events (last 50 per user, can be filtered per item client-side)
   const { data: events, error: eventsError } = await supabase
     .from('pipeline_events')
     .select('*')
@@ -115,14 +122,23 @@ export async function getMyPipeline(): Promise<PipelineData> {
 
 /**
  * Creates a new pipeline item in the specified stage.
- * Also creates a 'created' event.
  */
 export interface CreatePipelineItemData {
   stageId: string;
-  title: string;
-  subtitle?: string;
-  instagramHandle?: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  company?: string;
+  role?: string;
   instagramUrl?: string;
+  twitterUrl?: string;
+  linkedinUrl?: string;
+  tiktokUrl?: string;
+  websiteUrl?: string;
+  notes?: string;
+  priority?: 'low' | 'medium' | 'high';
+  status?: string;
+  tags?: string[];
 }
 
 export async function createPipelineItem(
@@ -130,7 +146,6 @@ export async function createPipelineItem(
 ): Promise<PipelineItem> {
   const userId = await getAuthUserId();
   
-  // Get max sort_order for items in this stage
   const { data: existingItems } = await supabase
     .from('pipeline_items')
     .select('sort_order')
@@ -143,17 +158,26 @@ export async function createPipelineItem(
     ? existingItems[0].sort_order + 1 
     : 0;
   
-  // Insert the item
   const { data: item, error: itemError } = await supabase
     .from('pipeline_items')
     .insert({
       owner_user_id: userId,
       stage_id: data.stageId,
-      title: data.title,
-      subtitle: data.subtitle || null,
+      name: data.name,
       sort_order: nextSortOrder,
-      instagram_handle: data.instagramHandle || null,
-      instagram_url: data.instagramUrl || null
+      email: data.email || null,
+      phone: data.phone || null,
+      company: data.company || null,
+      role: data.role || null,
+      instagram_url: data.instagramUrl || null,
+      twitter_url: data.twitterUrl || null,
+      linkedin_url: data.linkedinUrl || null,
+      tiktok_url: data.tiktokUrl || null,
+      website_url: data.websiteUrl || null,
+      notes: data.notes || null,
+      priority: data.priority || null,
+      status: data.status || null,
+      tags: data.tags || null
     })
     .select()
     .single();
@@ -163,40 +187,30 @@ export async function createPipelineItem(
   }
   
   // Insert created event
-  const { error: eventError } = await supabase
+  await supabase
     .from('pipeline_events')
     .insert({
       owner_user_id: userId,
       item_id: item.id,
       type: 'created',
-      data: { title: data.title, stage_id: data.stageId }
+      data: { name: data.name, stage_id: data.stageId }
     });
-  
-  if (eventError) {
-    console.warn(`Failed to create event: ${eventError.message}`);
-  }
   
   return item as PipelineItem;
 }
 
 /**
  * Updates an existing pipeline item.
- * Only updates owned items.
  */
 export async function updatePipelineItem(
   item_id: string,
-  fields: { title?: string; subtitle?: string; notes?: string }
+  fields: Partial<Omit<PipelineItem, 'id' | 'owner_user_id' | 'created_at' | 'updated_at'>>
 ): Promise<PipelineItem> {
   const userId = await getAuthUserId();
   
-  const updateData: Record<string, unknown> = {};
-  if (fields.title !== undefined) updateData.title = fields.title;
-  if (fields.subtitle !== undefined) updateData.subtitle = fields.subtitle;
-  if (fields.notes !== undefined) updateData.notes = fields.notes;
-  
   const { data: item, error } = await supabase
     .from('pipeline_items')
-    .update(updateData)
+    .update(fields)
     .eq('id', item_id)
     .eq('owner_user_id', userId)
     .select()
@@ -211,7 +225,6 @@ export async function updatePipelineItem(
 
 /**
  * Moves a pipeline item to a new stage and/or position.
- * Creates a 'stage_changed' event if the stage changes.
  */
 export async function movePipelineItem(
   item_id: string,
@@ -220,7 +233,6 @@ export async function movePipelineItem(
 ): Promise<PipelineItem> {
   const userId = await getAuthUserId();
   
-  // Get current item to check stage change
   const { data: currentItem, error: fetchError } = await supabase
     .from('pipeline_items')
     .select('stage_id')
@@ -235,7 +247,6 @@ export async function movePipelineItem(
   const from_stage_id = currentItem.stage_id;
   const stageChanged = from_stage_id !== to_stage_id;
   
-  // Update the item
   const { data: item, error: updateError } = await supabase
     .from('pipeline_items')
     .update({
@@ -251,9 +262,8 @@ export async function movePipelineItem(
     throw new Error(`Failed to move item: ${updateError?.message}`);
   }
   
-  // Create stage_changed event if stage actually changed
   if (stageChanged) {
-    const { error: eventError } = await supabase
+    await supabase
       .from('pipeline_events')
       .insert({
         owner_user_id: userId,
@@ -261,10 +271,6 @@ export async function movePipelineItem(
         type: 'stage_changed',
         data: { from_stage_id, to_stage_id }
       });
-    
-    if (eventError) {
-      console.warn(`Failed to create stage_changed event: ${eventError.message}`);
-    }
   }
   
   return item as PipelineItem;
@@ -272,7 +278,6 @@ export async function movePipelineItem(
 
 /**
  * Deletes a pipeline item.
- * Events are cascaded by the database.
  */
 export async function deletePipelineItem(item_id: string): Promise<void> {
   const userId = await getAuthUserId();
@@ -290,7 +295,6 @@ export async function deletePipelineItem(item_id: string): Promise<void> {
 
 /**
  * Adds a note to a pipeline item and creates a 'note_added' event.
- * Appends the note to existing notes with a timestamp.
  */
 export async function addPipelineNoteEvent(
   item_id: string,
@@ -298,7 +302,6 @@ export async function addPipelineNoteEvent(
 ): Promise<PipelineItem> {
   const userId = await getAuthUserId();
   
-  // Get current item to append note
   const { data: currentItem, error: fetchError } = await supabase
     .from('pipeline_items')
     .select('notes')
@@ -310,14 +313,12 @@ export async function addPipelineNoteEvent(
     throw new Error(`Failed to fetch item: ${fetchError?.message}`);
   }
   
-  // Append note with timestamp
   const timestamp = new Date().toISOString();
   const newNote = `[${timestamp}] ${noteText}`;
   const updatedNotes = currentItem.notes 
     ? `${currentItem.notes}\n\n${newNote}`
     : newNote;
   
-  // Update item notes
   const { data: item, error: updateError } = await supabase
     .from('pipeline_items')
     .update({ notes: updatedNotes })
@@ -330,8 +331,7 @@ export async function addPipelineNoteEvent(
     throw new Error(`Failed to update notes: ${updateError?.message}`);
   }
   
-  // Create note_added event
-  const { error: eventError } = await supabase
+  await supabase
     .from('pipeline_events')
     .insert({
       owner_user_id: userId,
@@ -339,10 +339,6 @@ export async function addPipelineNoteEvent(
       type: 'note_added',
       data: { note: noteText, timestamp }
     });
-  
-  if (eventError) {
-    console.warn(`Failed to create note_added event: ${eventError.message}`);
-  }
   
   return item as PipelineItem;
 }

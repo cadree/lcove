@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 interface CreatePipelineItemDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (title: string, subtitle?: string) => Promise<void>;
+  onSubmit: (name: string) => Promise<void>;
   isLoading: boolean;
   stageName: string;
 }
@@ -20,22 +20,19 @@ export function CreatePipelineItemDialog({
   isLoading,
   stageName
 }: CreatePipelineItemDialogProps) {
-  const [title, setTitle] = useState("");
-  const [subtitle, setSubtitle] = useState("");
+  const [name, setName] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!name.trim()) return;
     
-    await onSubmit(title.trim(), subtitle.trim() || undefined);
-    setTitle("");
-    setSubtitle("");
+    await onSubmit(name.trim());
+    setName("");
   };
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
-      setTitle("");
-      setSubtitle("");
+      setName("");
     }
     onOpenChange(newOpen);
   };
@@ -49,23 +46,13 @@ export function CreatePipelineItemDialog({
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="title">Title *</Label>
+            <Label htmlFor="name">Name *</Label>
             <Input
-              id="title"
-              placeholder="Enter contact or lead name"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              id="name"
+              placeholder="Contact name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               autoFocus
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="subtitle">Subtitle (optional)</Label>
-            <Input
-              id="subtitle"
-              placeholder="Company, role, or description"
-              value={subtitle}
-              onChange={(e) => setSubtitle(e.target.value)}
             />
           </div>
           
@@ -78,14 +65,14 @@ export function CreatePipelineItemDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={!title.trim() || isLoading}>
+            <Button type="submit" disabled={!name.trim() || isLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Adding...
                 </>
               ) : (
-                "Add Item"
+                "Add Contact"
               )}
             </Button>
           </DialogFooter>

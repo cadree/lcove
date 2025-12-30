@@ -29,37 +29,31 @@ const Pipeline = () => {
     if (!searchQuery.trim()) return stageItems;
     const query = searchQuery.toLowerCase();
     return stageItems.filter(
-      item => item.title.toLowerCase().includes(query) || 
-              item.subtitle?.toLowerCase().includes(query)
+      item => item.name.toLowerCase().includes(query) || 
+              item.company?.toLowerCase().includes(query) ||
+              item.email?.toLowerCase().includes(query)
     );
   };
 
   const handleCreateContact = async (data: ContactFormData) => {
-    // Use first stage if no specific stage selected
     const stageId = addToStageId || stages[0]?.id;
     if (!stageId) return;
-    
-    // Build subtitle from available data
-    const subtitleParts = [];
-    
-    if (data.source === "instagram" && data.instagramHandle) {
-      subtitleParts.push(`@${data.instagramHandle}`);
-      subtitleParts.push("Instagram");
-    } else {
-      if (data.company) subtitleParts.push(data.company);
-      if (data.socialHandle) subtitleParts.push(data.socialHandle);
-      if (data.email) subtitleParts.push(data.email);
-    }
-    
-    const subtitle = subtitleParts.join(' • ') || undefined;
 
     try {
       await createItem({ 
         stageId, 
-        title: data.name, 
-        subtitle,
-        instagramHandle: data.instagramHandle,
-        instagramUrl: data.instagramUrl
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        company: data.company,
+        role: data.role,
+        instagramUrl: data.instagramUrl,
+        twitterUrl: data.twitterUrl,
+        linkedinUrl: data.linkedinUrl,
+        tiktokUrl: data.tiktokUrl,
+        websiteUrl: data.websiteUrl,
+        notes: data.notes,
+        priority: data.priority
       });
       setShowAddDialog(false);
       setAddToStageId(null);
@@ -74,7 +68,7 @@ const Pipeline = () => {
     setShowAddDialog(true);
   };
 
-  const handleUpdateItem = async (itemId: string, fields: { title?: string; subtitle?: string; notes?: string }) => {
+  const handleUpdateItem = async (itemId: string, fields: Partial<PipelineItem>) => {
     try {
       await updateItem({ itemId, fields });
       if (selectedItem && selectedItem.id === itemId) {
@@ -461,15 +455,15 @@ interface PipelineContactCardProps {
 }
 
 function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging }: PipelineContactCardProps) {
-  // Generate initials from title
-  const initials = item.title
+  // Generate initials from name
+  const initials = item.name
     .split(' ')
     .map(word => word[0])
     .slice(0, 2)
     .join('')
     .toUpperCase();
 
-  // Generate a consistent color based on the title
+  // Generate a consistent color based on the name
   const colors = [
     'bg-primary',
     'bg-blue-500',
@@ -479,8 +473,22 @@ function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging
     'bg-rose-500',
     'bg-cyan-500',
   ];
-  const colorIndex = item.title.charCodeAt(0) % colors.length;
+  const colorIndex = item.name.charCodeAt(0) % colors.length;
   const avatarColor = colors[colorIndex];
+
+  // Build subtitle from available info
+  const subtitleParts = [];
+  if (item.role) subtitleParts.push(item.role);
+  if (item.company) subtitleParts.push(item.company);
+  if (!item.role && !item.company && item.email) subtitleParts.push(item.email);
+  const subtitle = subtitleParts.join(' • ');
+
+  // Priority indicator color
+  const priorityColors = {
+    high: 'bg-red-500',
+    medium: 'bg-amber-500',
+    low: 'bg-green-500'
+  };
 
   return (
     <motion.div
@@ -504,15 +512,18 @@ function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging
           </div>
           
           {/* Avatar */}
-          <div className={`w-10 h-10 rounded-lg ${avatarColor} flex items-center justify-center shrink-0`}>
+          <div className={`w-10 h-10 rounded-lg ${avatarColor} flex items-center justify-center shrink-0 relative`}>
             <span className="text-sm font-semibold text-white">{initials}</span>
+            {item.priority && (
+              <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${priorityColors[item.priority]} border-2 border-background`} />
+            )}
           </div>
           
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm text-foreground truncate">{item.title}</p>
-            {item.subtitle && (
-              <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
+            <p className="font-medium text-sm text-foreground truncate">{item.name}</p>
+            {subtitle && (
+              <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
             )}
           </div>
         </div>

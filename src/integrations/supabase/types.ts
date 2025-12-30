@@ -2465,58 +2465,70 @@ export type Database = {
       }
       pipeline_items: {
         Row: {
+          company: string | null
           created_at: string
+          email: string | null
           id: string
-          instagram_bio: string | null
-          instagram_followers: number | null
-          instagram_handle: string | null
-          instagram_posts: number | null
-          instagram_profile_image_url: string | null
           instagram_url: string | null
-          instagram_verified_status: string | null
+          linkedin_url: string | null
+          name: string
           notes: string | null
           owner_user_id: string
+          phone: string | null
+          priority: string | null
+          role: string | null
           sort_order: number
           stage_id: string
-          subtitle: string | null
-          title: string
+          status: string | null
+          tags: string[] | null
+          tiktok_url: string | null
+          twitter_url: string | null
           updated_at: string
+          website_url: string | null
         }
         Insert: {
+          company?: string | null
           created_at?: string
+          email?: string | null
           id?: string
-          instagram_bio?: string | null
-          instagram_followers?: number | null
-          instagram_handle?: string | null
-          instagram_posts?: number | null
-          instagram_profile_image_url?: string | null
           instagram_url?: string | null
-          instagram_verified_status?: string | null
+          linkedin_url?: string | null
+          name: string
           notes?: string | null
           owner_user_id: string
+          phone?: string | null
+          priority?: string | null
+          role?: string | null
           sort_order?: number
           stage_id: string
-          subtitle?: string | null
-          title: string
+          status?: string | null
+          tags?: string[] | null
+          tiktok_url?: string | null
+          twitter_url?: string | null
           updated_at?: string
+          website_url?: string | null
         }
         Update: {
+          company?: string | null
           created_at?: string
+          email?: string | null
           id?: string
-          instagram_bio?: string | null
-          instagram_followers?: number | null
-          instagram_handle?: string | null
-          instagram_posts?: number | null
-          instagram_profile_image_url?: string | null
           instagram_url?: string | null
-          instagram_verified_status?: string | null
+          linkedin_url?: string | null
+          name?: string
           notes?: string | null
           owner_user_id?: string
+          phone?: string | null
+          priority?: string | null
+          role?: string | null
           sort_order?: number
           stage_id?: string
-          subtitle?: string | null
-          title?: string
+          status?: string | null
+          tags?: string[] | null
+          tiktok_url?: string | null
+          twitter_url?: string | null
           updated_at?: string
+          website_url?: string | null
         }
         Relationships: [
           {
