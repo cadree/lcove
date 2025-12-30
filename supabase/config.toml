@@ -71,3 +71,6 @@ verify_jwt = false
 
 [functions.notify-new-application]
 verify_jwt = false
+
+[functions.scrape-instagram]
+verify_jwt = true

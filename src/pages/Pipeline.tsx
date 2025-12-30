@@ -39,9 +39,21 @@ const Pipeline = () => {
     
     // Build subtitle from available data
     const subtitleParts = [];
+    
+    // For Instagram, show stats
+    if (data.source === "instagram" && data.followers) {
+      const formatCount = (n: number) => 
+        n >= 1000000 ? `${(n/1000000).toFixed(1)}M` : 
+        n >= 1000 ? `${(n/1000).toFixed(1)}K` : String(n);
+      
+      subtitleParts.push(`${formatCount(data.followers)} followers`);
+      if (data.posts) subtitleParts.push(`${data.posts} posts`);
+    }
+    
     if (data.company) subtitleParts.push(data.company);
-    if (data.email) subtitleParts.push(data.email);
     if (data.socialHandle) subtitleParts.push(data.socialHandle);
+    if (data.email) subtitleParts.push(data.email);
+    
     const subtitle = subtitleParts.join(' • ') || undefined;
 
     try {
