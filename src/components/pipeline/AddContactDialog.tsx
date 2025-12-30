@@ -16,6 +16,8 @@ import {
   Target
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 type ContactMethod = "manual" | "instagram" | "linkedin" | "tiktok" | "twitter" | "leadscan" | null;
 
@@ -33,6 +35,13 @@ export interface ContactFormData {
   company?: string;
   source?: string;
   socialHandle?: string;
+  // Extended Instagram data
+  followers?: number;
+  following?: number;
+  posts?: number;
+  bio?: string;
+  profilePictureUrl?: string;
+  isVerified?: boolean;
 }
 
 const methodOptions = [
@@ -62,6 +71,7 @@ export function AddContactDialog({
   const [selectedMethod, setSelectedMethod] = useState<ContactMethod>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
+  const [scanStatus, setScanStatus] = useState("");
   
   // Form state
   const [name, setName] = useState("");
@@ -79,6 +89,7 @@ export function AddContactDialog({
     setSocialHandle("");
     setIsScanning(false);
     setScanProgress(0);
+    setScanStatus("");
   };
 
   const handleOpenChange = (newOpen: boolean) => {
@@ -93,6 +104,7 @@ export function AddContactDialog({
     setSocialHandle("");
     setIsScanning(false);
     setScanProgress(0);
+    setScanStatus("");
   };
 
   const handleManualSubmit = async (e: React.FormEvent) => {
@@ -110,13 +122,83 @@ export function AddContactDialog({
     resetForm();
   };
 
-  const handleSocialScan = async () => {
+  const handleInstagramScan = async () => {
     if (!socialHandle.trim()) return;
     
     setIsScanning(true);
-    setScanProgress(0);
+    setScanProgress(10);
+    setScanStatus("Connecting to Instagram...");
+
+    try {
+      // Start progress animation
+      const progressInterval = setInterval(() => {
+        setScanProgress(prev => Math.min(prev + 5, 80));
+      }, 300);
+
+      setScanProgress(30);
+      setScanStatus("Fetching profile data...");
+
+      const { data, error } = await supabase.functions.invoke('scrape-instagram', {
+        body: { username: socialHandle.trim() }
+      });
+
+      clearInterval(progressInterval);
+
+      if (error) {
+        throw new Error(error.message || 'Failed to scrape Instagram');
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to extract Instagram data');
+      }
+
+      setScanProgress(90);
+      setScanStatus("Processing data...");
+
+      const profile = data.data;
+      
+      setScanProgress(100);
+      setScanStatus("Complete!");
+
+      // Submit with extracted data
+      await onSubmit({
+        name: profile.displayName || socialHandle,
+        socialHandle: `@${profile.username}`,
+        source: "instagram",
+        bio: profile.bio,
+        followers: profile.followers,
+        following: profile.following,
+        posts: profile.posts,
+        profilePictureUrl: profile.profilePictureUrl,
+        isVerified: profile.isVerified,
+        company: profile.category || undefined,
+      });
+
+      toast.success(`Instagram profile extracted: ${profile.displayName}`);
+      resetForm();
+
+    } catch (err: any) {
+      console.error('Instagram scan error:', err);
+      toast.error(err.message || 'Failed to scan Instagram profile');
+      setIsScanning(false);
+      setScanProgress(0);
+      setScanStatus("");
+    }
+  };
+
+  const handleSocialScan = async () => {
+    if (!socialHandle.trim()) return;
+
+    // Use real API for Instagram
+    if (selectedMethod === "instagram") {
+      return handleInstagramScan();
+    }
     
-    // Simulate scanning progress
+    // Fallback for other platforms (simulated for now)
+    setIsScanning(true);
+    setScanProgress(0);
+    setScanStatus("Extracting data...");
+    
     const interval = setInterval(() => {
       setScanProgress(prev => {
         if (prev >= 100) {
@@ -127,12 +209,10 @@ export function AddContactDialog({
       });
     }, 200);
 
-    // Simulate extraction delay then submit
     setTimeout(async () => {
       clearInterval(interval);
       setScanProgress(100);
       
-      // Extract a name from the handle (for demo - in production this would come from API)
       const extractedName = socialHandle.replace(/[@_]/g, ' ').trim();
       const formattedName = extractedName
         .split(' ')
@@ -335,7 +415,7 @@ export function AddContactDialog({
                       className="h-2"
                     />
                     <p className="text-sm text-center text-muted-foreground">
-                      Extracting data...
+                      {scanStatus || "Extracting data..."}
                     </p>
                   </div>
                 )}
