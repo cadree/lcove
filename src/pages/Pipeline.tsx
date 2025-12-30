@@ -194,7 +194,7 @@ const Pipeline = () => {
   const totalContacts = items.length;
 
   return (
-    <PageLayout hideNav>
+    <PageLayout>
       <div className="min-h-screen bg-background">
         {/* Header */}
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
@@ -203,7 +203,7 @@ const Pipeline = () => {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                onClick={() => navigate(-1)}
+                onClick={() => navigate('/')}
                 className="shrink-0"
               >
                 <ArrowLeft className="w-5 h-5" />
