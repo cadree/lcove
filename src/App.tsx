@@ -36,6 +36,7 @@ import Community from "./pages/Community";
 import BookingSettings from "./pages/BookingSettings";
 import PublicBookingPage from "./pages/PublicBookingPage";
 import Pipeline from "./pages/Pipeline";
+import Today from "./pages/Today";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -86,6 +87,7 @@ const App = () => (
               <Route path="/settings/booking" element={<BookingSettings />} />
               <Route path="/book/:slug" element={<PublicBookingPage />} />
               <Route path="/pipeline" element={<Pipeline />} />
+              <Route path="/today" element={<Today />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

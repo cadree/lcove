@@ -10,8 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { FileText, Clock, ArrowRight, PlusCircle, StickyNote, Trash2, Save, Loader2, MoveRight, Mail, Phone, Building, Briefcase, Globe } from "lucide-react";
+import { FileText, Clock, ArrowRight, PlusCircle, StickyNote, Trash2, Save, Loader2, MoveRight, Mail, Phone, Globe } from "lucide-react";
 import { PipelineItem, PipelineEvent, PipelineStage } from "@/actions/pipelineActions";
+import { ContactTasksSection } from "./ContactTasksSection";
 import { toast } from "sonner";
 
 interface PipelineItemDrawerProps {
@@ -283,6 +284,13 @@ export function PipelineItemDrawer({
         </SheetHeader>
 
         <ScrollArea className="h-[calc(100vh-320px)] pr-4">
+          {/* Tasks Section */}
+          <div className="mb-6">
+            <ContactTasksSection pipelineItemId={item.id} />
+          </div>
+
+          <Separator className="my-4" />
+
           {/* Notes Section */}
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-2">

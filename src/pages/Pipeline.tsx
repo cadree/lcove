@@ -1,7 +1,7 @@
-import { useState, DragEvent } from "react";
+import { useState, useEffect, DragEvent } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
-import { Users, Plus, Search, ArrowLeft, UserPlus, GripVertical } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Users, Plus, Search, ArrowLeft, UserPlus, GripVertical, Pencil, Check, X, Sun } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,13 +16,30 @@ import { toast } from "sonner";
 
 const Pipeline = () => {
   const navigate = useNavigate();
-  const { stages, items, isLoading, error, getItemsByStage, getEventsForItem, createItem, updateItem, moveItem, deleteItem, isCreating, isMoving } = usePipeline();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { stages, items, isLoading, error, getItemsByStage, getEventsForItem, createItem, updateItem, moveItem, deleteItem, updateStageName, isCreating, isMoving } = usePipeline();
   const [selectedItem, setSelectedItem] = useState<PipelineItem | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addToStageId, setAddToStageId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragOverStageId, setDragOverStageId] = useState<string | null>(null);
+  const [editingStageId, setEditingStageId] = useState<string | null>(null);
+  const [editingStageName, setEditingStageName] = useState("");
+
+  // Handle openContact query param
+  useEffect(() => {
+    const openContactId = searchParams.get('openContact');
+    if (openContactId && items.length > 0) {
+      const item = items.find(i => i.id === openContactId);
+      if (item) {
+        setSelectedItem(item);
+        // Clear the query param
+        searchParams.delete('openContact');
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  }, [searchParams, items, setSearchParams]);
 
   // Filter items by search
   const filterItems = (stageItems: PipelineItem[]) => {
@@ -107,6 +124,34 @@ const Pipeline = () => {
     }
   };
 
+  // Stage name editing handlers
+  const handleStartEditStageName = (stageId: string, currentName: string) => {
+    setEditingStageId(stageId);
+    setEditingStageName(currentName);
+  };
+
+  const handleSaveStageName = async () => {
+    if (!editingStageId || !editingStageName.trim()) {
+      setEditingStageId(null);
+      return;
+    }
+    
+    try {
+      await updateStageName({ stageId: editingStageId, name: editingStageName.trim() });
+      toast.success("Stage renamed");
+    } catch (err) {
+      toast.error("Failed to rename stage");
+    } finally {
+      setEditingStageId(null);
+      setEditingStageName("");
+    }
+  };
+
+  const handleCancelEditStageName = () => {
+    setEditingStageId(null);
+    setEditingStageName("");
+  };
+
   // Drag and drop handlers
   const handleDragStart = (e: DragEvent<HTMLDivElement>, itemId: string) => {
     setDraggedItemId(itemId);
@@ -185,6 +230,15 @@ const Pipeline = () => {
             {/* Actions */}
             <div className="flex items-center gap-2">
               <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => navigate('/today')}
+              >
+                <Sun className="w-4 h-4 text-amber-500" />
+                <span className="hidden sm:inline">My Day</span>
+              </Button>
+              <Button
                 variant="default"
                 size="sm"
                 className="gap-2"
@@ -243,6 +297,12 @@ const Pipeline = () => {
                       onDragStart={handleDragStart}
                       onDragEnd={handleDragEnd}
                       draggedItemId={draggedItemId}
+                      isEditingName={editingStageId === stage.id}
+                      editingName={editingStageName}
+                      onStartEditName={() => handleStartEditStageName(stage.id, stage.name)}
+                      onEditingNameChange={setEditingStageName}
+                      onSaveEditName={handleSaveStageName}
+                      onCancelEditName={handleCancelEditStageName}
                     />
                   );
                 })}
@@ -270,6 +330,12 @@ const Pipeline = () => {
                           onDragStart={handleDragStart}
                           onDragEnd={handleDragEnd}
                           draggedItemId={draggedItemId}
+                          isEditingName={editingStageId === stage.id}
+                          editingName={editingStageName}
+                          onStartEditName={() => handleStartEditStageName(stage.id, stage.name)}
+                          onEditingNameChange={setEditingStageName}
+                          onSaveEditName={handleSaveStageName}
+                          onCancelEditName={handleCancelEditStageName}
                         />
                       </div>
                       );
@@ -344,6 +410,12 @@ interface PipelineColumnProps {
   onDragStart: (e: DragEvent<HTMLDivElement>, itemId: string) => void;
   onDragEnd: () => void;
   draggedItemId: string | null;
+  isEditingName: boolean;
+  editingName: string;
+  onStartEditName: () => void;
+  onEditingNameChange: (name: string) => void;
+  onSaveEditName: () => void;
+  onCancelEditName: () => void;
 }
 
 function PipelineColumn({ 
@@ -359,7 +431,13 @@ function PipelineColumn({
   onDrop,
   onDragStart,
   onDragEnd,
-  draggedItemId
+  draggedItemId,
+  isEditingName,
+  editingName,
+  onStartEditName,
+  onEditingNameChange,
+  onSaveEditName,
+  onCancelEditName
 }: PipelineColumnProps) {
   return (
     <Card 
@@ -372,20 +450,47 @@ function PipelineColumn({
     >
       {/* Column Header */}
       <div className="px-4 py-3 border-b border-border/50 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           <div 
-            className="w-3 h-3 rounded-full" 
+            className="w-3 h-3 rounded-full shrink-0" 
             style={{ backgroundColor: color || 'hsl(var(--primary))' }} 
           />
-          <span className="font-medium text-sm text-foreground">{name}</span>
-          <span className="text-xs text-muted-foreground">
+          {isEditingName ? (
+            <div className="flex items-center gap-1 flex-1">
+              <Input
+                value={editingName}
+                onChange={(e) => onEditingNameChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') onSaveEditName();
+                  if (e.key === 'Escape') onCancelEditName();
+                }}
+                className="h-7 text-sm px-2"
+                autoFocus
+              />
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onSaveEditName}>
+                <Check className="w-3 h-3" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onCancelEditName}>
+                <X className="w-3 h-3" />
+              </Button>
+            </div>
+          ) : (
+            <button
+              onClick={onStartEditName}
+              className="font-medium text-sm text-foreground hover:text-primary transition-colors flex items-center gap-1 group truncate"
+            >
+              <span className="truncate">{name}</span>
+              <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+            </button>
+          )}
+          <span className="text-xs text-muted-foreground shrink-0">
             {items.length}
           </span>
         </div>
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 hover:bg-primary/10 hover:text-primary"
+          className="h-7 w-7 hover:bg-primary/10 hover:text-primary shrink-0"
           onClick={onAddClick}
         >
           <Plus className="w-4 h-4" />

@@ -14,6 +14,7 @@ import {
   PipelineEvent,
   CreatePipelineItemData
 } from "@/actions/pipelineActions";
+import { updateStageName } from "@/actions/pipelineStageActions";
 
 export function usePipeline() {
   const { user } = useAuth();
@@ -68,6 +69,14 @@ export function usePipeline() {
     },
   });
 
+  const updateStageNameMutation = useMutation({
+    mutationFn: ({ stageId, name }: { stageId: string; name: string }) =>
+      updateStageName(stageId, name),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pipeline', user?.id] });
+    },
+  });
+
   // Helper to get items grouped by stage
   const getItemsByStage = (stageId: string): PipelineItem[] => {
     if (!data?.items) return [];
@@ -98,10 +107,12 @@ export function usePipeline() {
     moveItem: moveItemMutation.mutateAsync,
     deleteItem: deleteItemMutation.mutateAsync,
     addNote: addNoteMutation.mutateAsync,
+    updateStageName: updateStageNameMutation.mutateAsync,
     isCreating: createItemMutation.isPending,
     isUpdating: updateItemMutation.isPending,
     isMoving: moveItemMutation.isPending,
     isDeleting: deleteItemMutation.isPending,
+    isUpdatingStageName: updateStageNameMutation.isPending,
   };
 }
 
