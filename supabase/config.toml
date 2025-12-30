@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.notify-new-content]
 verify_jwt = false
+
+[functions.notify-new-application]
+verify_jwt = false

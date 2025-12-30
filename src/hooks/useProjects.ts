@@ -297,6 +297,44 @@ export const useProjectApplications = (projectId?: string) => {
         });
 
       if (error) throw error;
+
+      // Notify project owner of new application
+      try {
+        // Get project and role details
+        const { data: project } = await supabase
+          .from('projects')
+          .select('title, creator_id')
+          .eq('id', projectId)
+          .single();
+        
+        const { data: role } = await supabase
+          .from('project_roles')
+          .select('role_name')
+          .eq('id', roleId)
+          .single();
+
+        // Get applicant name
+        const { data: applicantProfile } = await supabase
+          .from('profiles')
+          .select('display_name')
+          .eq('user_id', user.id)
+          .single();
+
+        if (project && role) {
+          await supabase.functions.invoke('notify-new-application', {
+            body: {
+              project_id: projectId,
+              project_creator_id: project.creator_id,
+              project_title: project.title,
+              role_title: role.role_name,
+              applicant_name: applicantProfile?.display_name || 'Someone'
+            }
+          });
+        }
+      } catch (notifyError) {
+        console.error('Error sending application notification:', notifyError);
+        // Don't throw - application was submitted successfully
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-applications'] });
