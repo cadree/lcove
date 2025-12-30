@@ -2428,6 +2428,115 @@ export type Database = {
         }
         Relationships: []
       }
+      pipeline_events: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          item_id: string
+          owner_user_id: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          id?: string
+          item_id: string
+          owner_user_id: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          item_id?: string
+          owner_user_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_events_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_items: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          owner_user_id: string
+          sort_order: number
+          stage_id: string
+          subtitle: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          owner_user_id: string
+          sort_order?: number
+          stage_id: string
+          subtitle?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          owner_user_id?: string
+          sort_order?: number
+          stage_id?: string
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_items_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_stages: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          name: string
+          owner_user_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          owner_user_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          owner_user_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       portfolio_folders: {
         Row: {
           cover_image_url: string | null
@@ -4379,6 +4488,10 @@ export type Database = {
       calculate_reputation_score: {
         Args: { p_user_id: string }
         Returns: number
+      }
+      ensure_default_pipeline: {
+        Args: { p_user_id: string }
+        Returns: undefined
       }
       get_admin_user_data: {
         Args: never
