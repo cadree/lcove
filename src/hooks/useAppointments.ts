@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import type { Json } from "@/integrations/supabase/types";
 
 export interface Appointment {
   id: string;
@@ -130,6 +131,27 @@ export function useAppointments(options?: {
       return data as Appointment[];
     },
     enabled: !!user,
+  });
+}
+
+// Fetch appointments by owner ID (for public booking page)
+export function useAppointmentsByOwner(ownerId: string) {
+  return useQuery({
+    queryKey: ['appointments-by-owner', ownerId],
+    queryFn: async () => {
+      if (!ownerId) return [];
+
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('id, starts_at, ends_at, status')
+        .eq('owner_user_id', ownerId)
+        .gte('starts_at', new Date().toISOString())
+        .order('starts_at', { ascending: true });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!ownerId,
   });
 }
 
@@ -365,17 +387,19 @@ export function useCreateBookingPage() {
     }) => {
       if (!user) throw new Error('Must be logged in');
 
+      const insertData = {
+        slug: page.slug,
+        title: page.title,
+        timezone: page.timezone,
+        meeting_length_minutes: page.meeting_length_minutes,
+        availability: page.availability as unknown as Json,
+        is_active: page.is_active,
+        owner_user_id: user.id,
+      };
+      
       const { data, error } = await supabase
         .from('booking_pages')
-        .insert({
-          slug: page.slug,
-          title: page.title,
-          timezone: page.timezone,
-          meeting_length_minutes: page.meeting_length_minutes,
-          availability: page.availability as unknown as Record<string, unknown>,
-          is_active: page.is_active,
-          owner_user_id: user.id,
-        })
+        .insert(insertData)
         .select()
         .single();
 
