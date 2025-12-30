@@ -5,8 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, X, ChevronDown, ChevronUp } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Loader2, X, User, Mail, Link, Briefcase, StickyNote } from "lucide-react";
 
 interface AddContactDialogProps {
   open: boolean;
@@ -32,14 +31,30 @@ export interface ContactFormData {
   tags?: string[];
 }
 
+interface SectionProps {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+}
+
+function Section({ icon, title, children }: SectionProps) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+        {icon}
+        <span>{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export function AddContactDialog({
   open,
   onOpenChange,
   onSubmit,
   isLoading
 }: AddContactDialogProps) {
-  const [showSocial, setShowSocial] = useState(false);
-  
   // Form state
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -53,6 +68,7 @@ export function AddContactDialog({
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [notes, setNotes] = useState("");
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | ''>("");
+  const [tagsInput, setTagsInput] = useState("");
 
   const resetForm = () => {
     setName("");
@@ -67,7 +83,7 @@ export function AddContactDialog({
     setWebsiteUrl("");
     setNotes("");
     setPriority("");
-    setShowSocial(false);
+    setTagsInput("");
   };
 
   const handleOpenChange = (newOpen: boolean) => {
@@ -81,6 +97,12 @@ export function AddContactDialog({
     e.preventDefault();
     if (!name.trim()) return;
     
+    // Parse tags from comma-separated input
+    const tags = tagsInput
+      .split(',')
+      .map(t => t.trim())
+      .filter(t => t.length > 0);
+    
     await onSubmit({
       name: name.trim(),
       email: email.trim() || undefined,
@@ -93,7 +115,8 @@ export function AddContactDialog({
       tiktokUrl: tiktokUrl.trim() || undefined,
       websiteUrl: websiteUrl.trim() || undefined,
       notes: notes.trim() || undefined,
-      priority: priority || undefined
+      priority: priority || undefined,
+      tags: tags.length > 0 ? tags : undefined
     });
     
     resetForm();
@@ -111,189 +134,191 @@ export function AddContactDialog({
             <X className="h-5 w-5" />
           </button>
           <h2 className="text-xl font-semibold text-foreground">Add Contact</h2>
+          <p className="text-sm text-muted-foreground mt-1">Add a new contact to your pipeline</p>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
-          {/* Name (required) */}
-          <div className="space-y-2">
-            <Label htmlFor="name" className="text-sm text-foreground">
-              Name <span className="text-primary">*</span>
-            </Label>
-            <Input
-              id="name"
-              placeholder="Full name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="bg-muted/30 border-border/50"
-              autoFocus
-            />
-          </div>
-
-          {/* Contact info row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm text-foreground">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="email@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="bg-muted/30 border-border/50"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone" className="text-sm text-foreground">Phone</Label>
-              <Input
-                id="phone"
-                placeholder="+1..."
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="bg-muted/30 border-border/50"
-              />
-            </div>
-          </div>
-
-          {/* Company & Role */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="company" className="text-sm text-foreground">Company</Label>
-              <Input
-                id="company"
-                placeholder="Company name"
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-                className="bg-muted/30 border-border/50"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="role" className="text-sm text-foreground">Role</Label>
-              <Input
-                id="role"
-                placeholder="Job title"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="bg-muted/30 border-border/50"
-              />
-            </div>
-          </div>
-
-          {/* Priority */}
-          <div className="space-y-2">
-            <Label className="text-sm text-foreground">Priority</Label>
-            <Select value={priority} onValueChange={(v) => setPriority(v as 'low' | 'medium' | 'high' | '')}>
-              <SelectTrigger className="bg-muted/30 border-border/50">
-                <SelectValue placeholder="Select priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Social Links Toggle */}
-          <button
-            type="button"
-            onClick={() => setShowSocial(!showSocial)}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {showSocial ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            Social & Website Links
-          </button>
-
-          <AnimatePresence>
-            {showSocial && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden space-y-3"
-              >
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="instagram" className="text-sm text-foreground">Instagram</Label>
-                    <Input
-                      id="instagram"
-                      placeholder="instagram.com/..."
-                      value={instagramUrl}
-                      onChange={(e) => setInstagramUrl(e.target.value)}
-                      className="bg-muted/30 border-border/50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="twitter" className="text-sm text-foreground">Twitter/X</Label>
-                    <Input
-                      id="twitter"
-                      placeholder="twitter.com/..."
-                      value={twitterUrl}
-                      onChange={(e) => setTwitterUrl(e.target.value)}
-                      className="bg-muted/30 border-border/50"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="linkedin" className="text-sm text-foreground">LinkedIn</Label>
-                    <Input
-                      id="linkedin"
-                      placeholder="linkedin.com/in/..."
-                      value={linkedinUrl}
-                      onChange={(e) => setLinkedinUrl(e.target.value)}
-                      className="bg-muted/30 border-border/50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tiktok" className="text-sm text-foreground">TikTok</Label>
-                    <Input
-                      id="tiktok"
-                      placeholder="tiktok.com/@..."
-                      value={tiktokUrl}
-                      onChange={(e) => setTiktokUrl(e.target.value)}
-                      className="bg-muted/30 border-border/50"
-                    />
-                  </div>
-                </div>
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
+          {/* Basic Info Section */}
+          <Section icon={<User className="w-4 h-4" />} title="Basic Info">
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-sm text-foreground">
+                  Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="name"
+                  placeholder="Full name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="bg-muted/30 border-border/50"
+                  autoFocus
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="website" className="text-sm text-foreground">Website</Label>
+                  <Label htmlFor="company" className="text-sm text-foreground">Company</Label>
                   <Input
-                    id="website"
-                    placeholder="https://..."
-                    value={websiteUrl}
-                    onChange={(e) => setWebsiteUrl(e.target.value)}
+                    id="company"
+                    placeholder="Company name"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
                     className="bg-muted/30 border-border/50"
                   />
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                <div className="space-y-2">
+                  <Label htmlFor="role" className="text-sm text-foreground">Role</Label>
+                  <Input
+                    id="role"
+                    placeholder="Job title"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="bg-muted/30 border-border/50"
+                  />
+                </div>
+              </div>
+            </div>
+          </Section>
 
-          {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes" className="text-sm text-foreground">Notes</Label>
+          {/* Contact Info Section */}
+          <Section icon={<Mail className="w-4 h-4" />} title="Contact Info">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm text-foreground">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="email@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="bg-muted/30 border-border/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone" className="text-sm text-foreground">Phone</Label>
+                <Input
+                  id="phone"
+                  placeholder="+1 (555) 000-0000"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="bg-muted/30 border-border/50"
+                />
+              </div>
+            </div>
+          </Section>
+
+          {/* Social & Links Section */}
+          <Section icon={<Link className="w-4 h-4" />} title="Social & Links">
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="instagram" className="text-sm text-foreground">Instagram URL</Label>
+                  <Input
+                    id="instagram"
+                    placeholder="instagram.com/username"
+                    value={instagramUrl}
+                    onChange={(e) => setInstagramUrl(e.target.value)}
+                    className="bg-muted/30 border-border/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="twitter" className="text-sm text-foreground">Twitter/X URL</Label>
+                  <Input
+                    id="twitter"
+                    placeholder="twitter.com/username"
+                    value={twitterUrl}
+                    onChange={(e) => setTwitterUrl(e.target.value)}
+                    className="bg-muted/30 border-border/50"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="linkedin" className="text-sm text-foreground">LinkedIn URL</Label>
+                  <Input
+                    id="linkedin"
+                    placeholder="linkedin.com/in/username"
+                    value={linkedinUrl}
+                    onChange={(e) => setLinkedinUrl(e.target.value)}
+                    className="bg-muted/30 border-border/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tiktok" className="text-sm text-foreground">TikTok URL</Label>
+                  <Input
+                    id="tiktok"
+                    placeholder="tiktok.com/@username"
+                    value={tiktokUrl}
+                    onChange={(e) => setTiktokUrl(e.target.value)}
+                    className="bg-muted/30 border-border/50"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="website" className="text-sm text-foreground">Website URL</Label>
+                <Input
+                  id="website"
+                  placeholder="https://example.com"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  className="bg-muted/30 border-border/50"
+                />
+              </div>
+            </div>
+          </Section>
+
+          {/* Organization Section */}
+          <Section icon={<Briefcase className="w-4 h-4" />} title="Organization">
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label className="text-sm text-foreground">Priority</Label>
+                <Select value={priority} onValueChange={(v) => setPriority(v as 'low' | 'medium' | 'high' | '')}>
+                  <SelectTrigger className="bg-muted/30 border-border/50">
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tags" className="text-sm text-foreground">Tags</Label>
+                <Input
+                  id="tags"
+                  placeholder="influencer, brand, partner (comma separated)"
+                  value={tagsInput}
+                  onChange={(e) => setTagsInput(e.target.value)}
+                  className="bg-muted/30 border-border/50"
+                />
+                <p className="text-xs text-muted-foreground">Separate multiple tags with commas</p>
+              </div>
+            </div>
+          </Section>
+
+          {/* Notes Section */}
+          <Section icon={<StickyNote className="w-4 h-4" />} title="Notes">
             <Textarea
               id="notes"
-              placeholder="Add any notes..."
+              placeholder="Add any notes about this contact..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="bg-muted/30 border-border/50 min-h-[80px]"
+              className="bg-muted/30 border-border/50 min-h-[100px] resize-none"
             />
-          </div>
+          </Section>
 
           {/* Submit */}
-          <div className="pt-2">
+          <div className="pt-2 sticky bottom-0 bg-card pb-1">
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-primary to-pink-500 hover:opacity-90"
+              className="w-full"
               disabled={!name.trim() || isLoading}
             >
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Adding...
+                  Adding Contact...
                 </>
               ) : (
                 "Add Contact"
