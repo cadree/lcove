@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMyStore, useStoreItems, useMyStoreItems, StoreItem } from '@/hooks/useStore';
+import { useMyStore, useStoreItems, useMyStoreItems, StoreItem, Store as StoreType } from '@/hooks/useStore';
+import { supabase } from '@/integrations/supabase/client';
 import PageLayout from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StoreItemCard } from '@/components/store/StoreItemCard';
@@ -14,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Package,
   Wrench,
@@ -24,10 +28,15 @@ import {
   Settings,
   ShoppingBag,
   Sparkles,
+  ArrowLeft,
 } from 'lucide-react';
 
 const Store = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const storeIdParam = searchParams.get('store');
+  
   const { data: myStore, isLoading: isLoadingStore } = useMyStore();
   const { data: myItems } = useMyStoreItems();
   const [activeTab, setActiveTab] = useState<'products' | 'services' | 'rentals' | 'my-store'>('products');
@@ -38,15 +47,58 @@ const Store = () => {
   const [storeSetupOpen, setStoreSetupOpen] = useState(false);
   const [editItem, setEditItem] = useState<StoreItem | null>(null);
 
+  // Fetch the specific store if viewing another user's store
+  const { data: viewingStore } = useQuery({
+    queryKey: ['store-by-id', storeIdParam],
+    queryFn: async () => {
+      if (!storeIdParam) return null;
+      const { data, error } = await supabase
+        .from('stores')
+        .select('*')
+        .eq('id', storeIdParam)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (error) throw error;
+      
+      // Fetch owner profile
+      if (data) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('display_name, avatar_url, city')
+          .eq('user_id', data.user_id)
+          .single();
+        
+        return { ...data, profile } as StoreType & { profile?: { display_name: string; avatar_url: string; city: string } };
+      }
+      return null;
+    },
+    enabled: !!storeIdParam,
+  });
+
+  // Check if viewing own store
+  const isViewingOwnStore = storeIdParam && myStore?.id === storeIdParam;
+
   const typeMap = {
     products: 'product' as const,
     services: 'service' as const,
     rentals: 'rental' as const,
   };
   const currentType = activeTab !== 'my-store' ? typeMap[activeTab] : undefined;
-  const { data: items, isLoading } = useStoreItems(currentType);
+  
+  // When viewing a specific store, always filter by that store ID
+  const effectiveStoreId = storeIdParam || undefined;
+  const { data: items, isLoading } = useStoreItems(
+    storeIdParam ? undefined : currentType, // Don't filter by type when viewing a specific store
+    effectiveStoreId
+  );
 
-  const filteredItems = (activeTab === 'my-store' ? myItems : items)?.filter((item) =>
+  // Filter items by type when viewing a specific store
+  const typeFilteredItems = storeIdParam && items
+    ? (currentType ? items.filter(item => item.type === currentType) : items)
+    : items;
+
+  const filteredItems = (activeTab === 'my-store' ? myItems : typeFilteredItems)?.filter((item) =>
     item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.description?.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
@@ -78,39 +130,73 @@ const Store = () => {
         {/* Header */}
         <div className="sticky top-0 z-10 glass-strong border-b border-border/30">
           <div className="container mx-auto px-4 py-5">
-            <PageHeader
-              title="Store"
-              description="Discover products, services & studio rentals"
-              icon={<ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
-              className="mb-5"
-              actions={
-                user && (
-                  <div className="flex items-center gap-2">
-                    {myStore ? (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setStoreSetupOpen(true)}
-                        >
-                          <Settings className="w-4 h-4 mr-2" />
-                          Settings
-                        </Button>
-                        <Button size="sm" onClick={handleCreateNew}>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add Item
-                        </Button>
-                      </>
-                    ) : (
-                      <Button onClick={() => setStoreSetupOpen(true)}>
-                        <StoreIcon className="w-4 h-4 mr-2" />
-                        Create Store
-                      </Button>
+            {/* Show store header when viewing a specific store */}
+            {storeIdParam && viewingStore ? (
+              <div className="mb-5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    searchParams.delete('store');
+                    setSearchParams(searchParams);
+                  }}
+                  className="mb-3"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to All Stores
+                </Button>
+                <div className="flex items-center gap-4">
+                  <Avatar className="w-16 h-16 border-2 border-border">
+                    <AvatarImage src={viewingStore.logo_url || viewingStore.profile?.avatar_url || undefined} />
+                    <AvatarFallback className="text-lg">{viewingStore.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h1 className="text-2xl font-bold text-foreground">{viewingStore.name}</h1>
+                    <p className="text-muted-foreground">
+                      {viewingStore.profile?.display_name}
+                      {viewingStore.profile?.city && ` • ${viewingStore.profile.city}`}
+                    </p>
+                    {viewingStore.description && (
+                      <p className="text-sm text-muted-foreground mt-1">{viewingStore.description}</p>
                     )}
                   </div>
-                )
-              }
-            />
+                </div>
+              </div>
+            ) : (
+              <PageHeader
+                title="Store"
+                description="Discover products, services & studio rentals"
+                icon={<ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+                className="mb-5"
+                actions={
+                  user && !storeIdParam && (
+                    <div className="flex items-center gap-2">
+                      {myStore ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setStoreSetupOpen(true)}
+                          >
+                            <Settings className="w-4 h-4 mr-2" />
+                            Settings
+                          </Button>
+                          <Button size="sm" onClick={handleCreateNew}>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Item
+                          </Button>
+                        </>
+                      ) : (
+                        <Button onClick={() => setStoreSetupOpen(true)}>
+                          <StoreIcon className="w-4 h-4 mr-2" />
+                          Create Store
+                        </Button>
+                      )}
+                    </div>
+                  )
+                }
+              />
+            )}
 
             {/* Search */}
             <div className="relative max-w-md">
@@ -136,14 +222,23 @@ const Store = () => {
               <TabsList className="mb-6">
                 {tabConfig.map((tab) => {
                   const Icon = tab.icon;
+                  // Count items per tab when viewing a specific store
+                  const tabItemCount = storeIdParam && items
+                    ? items.filter(item => item.type === typeMap[tab.id as keyof typeof typeMap]).length
+                    : undefined;
                   return (
                     <TabsTrigger key={tab.id} value={tab.id} className="flex items-center gap-2">
                       <Icon className="w-4 h-4" />
                       {tab.label}
+                      {storeIdParam && tabItemCount !== undefined && tabItemCount > 0 && (
+                        <Badge variant="secondary" className="ml-1 text-xs">
+                          {tabItemCount}
+                        </Badge>
+                      )}
                     </TabsTrigger>
                   );
                 })}
-                {user && myStore && (
+                {user && myStore && !storeIdParam && (
                   <TabsTrigger value="my-store" className="flex items-center gap-2">
                     <StoreIcon className="w-4 h-4" />
                     My Store
@@ -173,24 +268,28 @@ const Store = () => {
                     <EmptyState
                       icon={tabId === 'products' ? Package : tabId === 'services' ? Wrench : tabId === 'rentals' ? Building2 : Sparkles}
                       title={
-                        tabId === 'my-store' 
-                          ? 'Your store is waiting'
-                          : tabId === 'products'
-                            ? 'No products yet'
-                            : tabId === 'services'
-                              ? 'No services available'
-                              : 'No studios listed'
+                        storeIdParam && viewingStore
+                          ? `No ${tabId === 'products' ? 'products' : tabId === 'services' ? 'services' : 'studios'} in this store`
+                          : tabId === 'my-store' 
+                            ? 'Your store is waiting'
+                            : tabId === 'products'
+                              ? 'No products yet'
+                              : tabId === 'services'
+                                ? 'No services available'
+                                : 'No studios listed'
                       }
                       description={
-                        tabId === 'my-store'
-                          ? 'Share your creations, offer your skills, or list your space. The community is eager to discover what you have to offer.'
-                          : searchQuery
-                            ? 'Try adjusting your search to find what you need.'
-                            : tabId === 'products'
-                              ? 'Physical and digital goods from creators will appear here.'
-                              : tabId === 'services'
-                                ? 'Freelance services from community members will show up here.'
-                                : 'Studio spaces and equipment rentals will be listed here.'
+                        storeIdParam && viewingStore
+                          ? `${viewingStore.name} hasn't added any ${tabId === 'products' ? 'products' : tabId === 'services' ? 'services' : 'studios'} yet.`
+                          : tabId === 'my-store'
+                            ? 'Share your creations, offer your skills, or list your space. The community is eager to discover what you have to offer.'
+                            : searchQuery
+                              ? 'Try adjusting your search to find what you need.'
+                              : tabId === 'products'
+                                ? 'Physical and digital goods from creators will appear here.'
+                                : tabId === 'services'
+                                  ? 'Freelance services from community members will show up here.'
+                                  : 'Studio spaces and equipment rentals will be listed here.'
                       }
                       action={tabId === 'my-store' && user && myStore ? {
                         label: 'Add Your First Item',
@@ -210,7 +309,7 @@ const Store = () => {
                           <StoreItemCard
                             item={item}
                             onClick={() => handleItemClick(item)}
-                            showSeller={tabId !== 'my-store'}
+                            showSeller={tabId !== 'my-store' && !storeIdParam}
                           />
                           {tabId === 'my-store' && (
                             <Button
