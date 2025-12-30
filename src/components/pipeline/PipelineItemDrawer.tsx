@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { FileText, Clock, ArrowRight, PlusCircle, StickyNote, Trash2, Save, Loader2 } from "lucide-react";
-import { PipelineItem, PipelineEvent } from "@/actions/pipelineActions";
+import { FileText, Clock, ArrowRight, PlusCircle, StickyNote, Trash2, Save, Loader2, MoveRight } from "lucide-react";
+import { PipelineItem, PipelineEvent, PipelineStage } from "@/actions/pipelineActions";
 import { toast } from "sonner";
 
 interface PipelineItemDrawerProps {
@@ -18,8 +19,11 @@ interface PipelineItemDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   getEventsForItem: (itemId: string) => PipelineEvent[];
+  stages: PipelineStage[];
   onUpdate: (itemId: string, fields: { title?: string; subtitle?: string; notes?: string }) => Promise<void>;
+  onMove: (itemId: string, toStageId: string) => Promise<void>;
   onDelete: (itemId: string) => Promise<void>;
+  isMoving: boolean;
 }
 
 export function PipelineItemDrawer({ 
@@ -27,8 +31,11 @@ export function PipelineItemDrawer({
   open, 
   onOpenChange, 
   getEventsForItem,
+  stages,
   onUpdate,
-  onDelete 
+  onMove,
+  onDelete,
+  isMoving
 }: PipelineItemDrawerProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -91,10 +98,54 @@ export function PipelineItemDrawer({
     setIsEditing(false);
   };
 
+  const handleStageChange = async (newStageId: string) => {
+    if (newStageId === item.stage_id) return;
+    try {
+      await onMove(item.id, newStageId);
+      toast.success("Item moved");
+    } catch (error) {
+      toast.error("Failed to move item");
+    }
+  };
+
+  const currentStage = stages.find(s => s.id === item.stage_id);
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md">
         <SheetHeader className="pb-4">
+          {/* Move to Stage Selector */}
+          <div className="flex items-center gap-2 mb-3">
+            <MoveRight className="w-4 h-4 text-muted-foreground" />
+            <Select 
+              value={item.stage_id} 
+              onValueChange={handleStageChange}
+              disabled={isMoving}
+            >
+              <SelectTrigger className="w-full h-8 text-sm">
+                <SelectValue placeholder="Move to stage..." />
+              </SelectTrigger>
+              <SelectContent>
+                {stages.map((stage) => (
+                  <SelectItem key={stage.id} value={stage.id}>
+                    <div className="flex items-center gap-2">
+                      {stage.color && (
+                        <div 
+                          className="w-2 h-2 rounded-full" 
+                          style={{ backgroundColor: stage.color }}
+                        />
+                      )}
+                      <span>{stage.name}</span>
+                      {stage.id === item.stage_id && (
+                        <span className="text-muted-foreground text-xs">(current)</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {isEditing ? (
             <div className="space-y-3">
               <div className="space-y-1">

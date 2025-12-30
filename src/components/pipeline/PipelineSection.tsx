@@ -10,7 +10,7 @@ import { CreatePipelineItemDialog } from "./CreatePipelineItemDialog";
 import { PipelineItem } from "@/actions/pipelineActions";
 
 export function PipelineSection() {
-  const { stages, isLoading, getItemsByStage, getEventsForItem, createItem, updateItem, deleteItem, isCreating } = usePipeline();
+  const { stages, isLoading, getItemsByStage, getEventsForItem, createItem, updateItem, moveItem, deleteItem, isCreating, isMoving } = usePipeline();
   const [selectedItem, setSelectedItem] = useState<PipelineItem | null>(null);
   const [createDialogStageId, setCreateDialogStageId] = useState<string | null>(null);
 
@@ -25,6 +25,21 @@ export function PipelineSection() {
     // Update selected item with new data
     if (selectedItem && selectedItem.id === itemId) {
       setSelectedItem({ ...selectedItem, ...fields });
+    }
+  };
+
+  const handleMoveItem = async (itemId: string, toStageId: string) => {
+    // Get items in target stage to determine sort order (add at end)
+    const targetItems = getItemsByStage(toStageId);
+    const newSortOrder = targetItems.length > 0 
+      ? Math.max(...targetItems.map(i => i.sort_order)) + 1 
+      : 0;
+    
+    await moveItem({ itemId, toStageId, newSortOrder });
+    
+    // Update selected item with new stage
+    if (selectedItem && selectedItem.id === itemId) {
+      setSelectedItem({ ...selectedItem, stage_id: toStageId, sort_order: newSortOrder });
     }
   };
 
@@ -119,8 +134,11 @@ export function PipelineSection() {
         open={!!selectedItem}
         onOpenChange={(open) => !open && setSelectedItem(null)}
         getEventsForItem={getEventsForItem}
+        stages={stages}
         onUpdate={handleUpdateItem}
+        onMove={handleMoveItem}
         onDelete={handleDeleteItem}
+        isMoving={isMoving}
       />
     </motion.div>
   );
