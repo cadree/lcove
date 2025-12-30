@@ -33,6 +33,8 @@ import Partners from "./pages/Partners";
 import Admin from "./pages/Admin";
 import AdminOnboarding from "./pages/AdminOnboarding";
 import Community from "./pages/Community";
+import BookingSettings from "./pages/BookingSettings";
+import PublicBookingPage from "./pages/PublicBookingPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -80,6 +82,8 @@ const App = () => (
               <Route path="/admin/onboarding" element={<AdminOnboarding />} />
               <Route path="/admin/onboarding/:userId" element={<AdminOnboarding />} />
               <Route path="/community" element={<Community />} />
+              <Route path="/settings/booking" element={<BookingSettings />} />
+              <Route path="/book/:slug" element={<PublicBookingPage />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

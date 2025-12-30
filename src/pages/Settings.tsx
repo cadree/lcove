@@ -827,6 +827,27 @@ const Settings = () => {
           )}
         </motion.section>
 
+        {/* Booking Page Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.36 }}
+          className="glass-strong rounded-2xl p-6 mb-6"
+        >
+          <Link to="/settings/booking" className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <SettingsIcon className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="font-display text-lg font-medium text-foreground">Booking Pages</h2>
+                <p className="text-sm text-muted-foreground">Let others book time with you</p>
+              </div>
+            </div>
+            <ArrowRight className="w-5 h-5 text-muted-foreground" />
+          </Link>
+        </motion.section>
+
         {/* Admin Section - Only visible to admins */}
         {isAdmin && (
           <motion.section
