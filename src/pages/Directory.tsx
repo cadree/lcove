@@ -21,11 +21,17 @@ interface Profile {
   city_key: string | null;
   bio: string | null;
   created_at: string | null;
+  passions?: string[];
 }
 
 interface CityOption {
   key: string;
   display: string;
+}
+
+interface UserPassion {
+  user_id: string;
+  passions: { name: string } | null;
 }
 
 const Directory = () => {
@@ -41,15 +47,43 @@ const Directory = () => {
 
   const fetchProfiles = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    
+    // Fetch profiles
+    const { data: profilesData, error: profilesError } = await supabase
       .from('profiles')
       .select('id, user_id, display_name, avatar_url, city, city_display, city_key, bio, created_at')
       .eq('onboarding_completed', true)
       .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setProfiles(data as Profile[]);
+    if (profilesError || !profilesData) {
+      setLoading(false);
+      return;
     }
+    
+    // Fetch user passions with passion names
+    const { data: passionsData } = await supabase
+      .from('user_passions')
+      .select('user_id, passions(name)');
+    
+    // Group passions by user_id
+    const passionsByUser = new Map<string, string[]>();
+    if (passionsData) {
+      (passionsData as UserPassion[]).forEach(up => {
+        if (up.passions?.name) {
+          const existing = passionsByUser.get(up.user_id) || [];
+          existing.push(up.passions.name);
+          passionsByUser.set(up.user_id, existing);
+        }
+      });
+    }
+    
+    // Merge passions into profiles
+    const profilesWithPassions = profilesData.map(profile => ({
+      ...profile,
+      passions: passionsByUser.get(profile.user_id) || []
+    }));
+    
+    setProfiles(profilesWithPassions as Profile[]);
     setLoading(false);
   };
 
@@ -90,10 +124,12 @@ const Directory = () => {
 
   const filteredProfiles = profiles.filter((profile) => {
     const cityDisplay = getProfileCityDisplay(profile);
+    const searchLower = searchQuery.toLowerCase();
     const matchesSearch = 
-      profile.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      profile.bio?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      cityDisplay.toLowerCase().includes(searchQuery.toLowerCase());
+      profile.display_name?.toLowerCase().includes(searchLower) ||
+      profile.bio?.toLowerCase().includes(searchLower) ||
+      cityDisplay.toLowerCase().includes(searchLower) ||
+      profile.passions?.some(passion => passion.toLowerCase().includes(searchLower));
     
     const profileCityKey = getProfileCityKey(profile);
     const matchesCity = selectedCityKey === null || profileCityKey === selectedCityKey;
@@ -126,7 +162,7 @@ const Directory = () => {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search by name, city, or bio..."
+            placeholder="Search by name, city, bio, or passions..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full h-14 pl-12 pr-4 rounded-xl bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
