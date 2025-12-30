@@ -2467,6 +2467,13 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          instagram_bio: string | null
+          instagram_followers: number | null
+          instagram_handle: string | null
+          instagram_posts: number | null
+          instagram_profile_image_url: string | null
+          instagram_url: string | null
+          instagram_verified_status: string | null
           notes: string | null
           owner_user_id: string
           sort_order: number
@@ -2478,6 +2485,13 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          instagram_bio?: string | null
+          instagram_followers?: number | null
+          instagram_handle?: string | null
+          instagram_posts?: number | null
+          instagram_profile_image_url?: string | null
+          instagram_url?: string | null
+          instagram_verified_status?: string | null
           notes?: string | null
           owner_user_id: string
           sort_order?: number
@@ -2489,6 +2503,13 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          instagram_bio?: string | null
+          instagram_followers?: number | null
+          instagram_handle?: string | null
+          instagram_posts?: number | null
+          instagram_profile_image_url?: string | null
+          instagram_url?: string | null
+          instagram_verified_status?: string | null
           notes?: string | null
           owner_user_id?: string
           sort_order?: number
