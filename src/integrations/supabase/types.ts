@@ -516,6 +516,64 @@ export type Database = {
           },
         ]
       }
+      calendar_tasks: {
+        Row: {
+          created_at: string
+          due_at: string | null
+          event_id: string | null
+          id: string
+          is_done: boolean
+          personal_item_id: string | null
+          project_id: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          due_at?: string | null
+          event_id?: string | null
+          id?: string
+          is_done?: boolean
+          personal_item_id?: string | null
+          project_id?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          due_at?: string | null
+          event_id?: string | null
+          id?: string
+          is_done?: boolean
+          personal_item_id?: string | null
+          project_id?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_tasks_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_tasks_personal_item_id_fkey"
+            columns: ["personal_item_id"]
+            isOneToOne: false
+            referencedRelation: "personal_calendar_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       community_updates: {
         Row: {
           author_id: string
