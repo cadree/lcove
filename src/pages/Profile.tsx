@@ -4,8 +4,8 @@ import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Plus, Grid, Bookmark, FileText, ArrowLeft, LayoutGrid } from "lucide-react";
-import { PipelineSection } from "@/components/pipeline/PipelineSection";
+import { Loader2, Plus, Grid, Bookmark, FileText, ArrowLeft, LayoutGrid, Users } from "lucide-react";
+import { Card } from "@/components/ui/card";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
 import { ProfileCustomizationDialog } from "@/components/profile/ProfileCustomizationDialog";
@@ -312,7 +312,30 @@ const Profile = () => {
         return <ProfileQuickLinks key="quick_links" isOwner={isOwnProfile} />;
       case 'pipeline':
         if (!isOwnProfile) return null;
-        return <PipelineSection key="pipeline" />;
+        return (
+          <motion.div
+            key="pipeline"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="px-5 py-4"
+          >
+            <Card 
+              className="bg-muted/30 border-border/50 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => navigate('/pipeline')}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-medium text-foreground">My Pipeline</h3>
+                  <p className="text-xs text-muted-foreground">Manage your contacts and leads</p>
+                </div>
+                <ArrowLeft className="w-4 h-4 text-muted-foreground rotate-180" />
+              </div>
+            </Card>
+          </motion.div>
+        );
       default:
         return null;
     }
