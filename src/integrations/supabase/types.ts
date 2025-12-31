@@ -2928,11 +2928,13 @@ export type Database = {
           created_at: string
           description: string | null
           display_order: number
+          external_url: string | null
           folder_id: string | null
           id: string
           media_type: string
           media_url: string
           tags: string[] | null
+          thumbnail_url: string | null
           title: string | null
           user_id: string
         }
@@ -2940,11 +2942,13 @@ export type Database = {
           created_at?: string
           description?: string | null
           display_order?: number
+          external_url?: string | null
           folder_id?: string | null
           id?: string
           media_type?: string
           media_url: string
           tags?: string[] | null
+          thumbnail_url?: string | null
           title?: string | null
           user_id: string
         }
@@ -2952,11 +2956,13 @@ export type Database = {
           created_at?: string
           description?: string | null
           display_order?: number
+          external_url?: string | null
           folder_id?: string | null
           id?: string
           media_type?: string
           media_url?: string
           tags?: string[] | null
+          thumbnail_url?: string | null
           title?: string | null
           user_id?: string
         }

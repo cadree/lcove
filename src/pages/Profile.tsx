@@ -179,7 +179,15 @@ const Profile = () => {
               userId={targetUserId || ''}
               isOwner={isOwnProfile}
               onBack={() => setSelectedFolder(null)}
-              onPostClick={(post) => setSelectedPost(post)}
+              onPostClick={(item) => {
+                // Only open post modal for actual posts with media, not external links
+                if ('source' in item && item.source === 'portfolio_item' && item.external_url) {
+                  return; // External links are handled in FolderDetailView
+                }
+                if (item.media_url) {
+                  setSelectedPost(item as ProfilePost);
+                }
+              }}
             />
           );
         }

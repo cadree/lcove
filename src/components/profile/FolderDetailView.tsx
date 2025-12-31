@@ -1,13 +1,16 @@
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Plus, ImageIcon, Camera, Play, Check, Upload } from 'lucide-react';
+import { ArrowLeft, Plus, ImageIcon, Camera, Play, Check, Upload, Link, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -15,7 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { PortfolioFolder, useFolderPosts, usePortfolioFolders } from '@/hooks/usePortfolioFolders';
+import { PortfolioFolder, useFolderPosts, usePortfolioFolders, useAddPortfolioItem, PortfolioItem } from '@/hooks/usePortfolioFolders';
 import { useProfilePosts } from '@/hooks/useProfilePosts';
 import { ProfilePost } from '@/types/post';
 import { cn } from '@/lib/utils';
@@ -28,7 +31,7 @@ interface FolderDetailViewProps {
   userId: string;
   isOwner: boolean;
   onBack: () => void;
-  onPostClick: (post: ProfilePost) => void;
+  onPostClick: (post: ProfilePost | PortfolioItem) => void;
 }
 
 export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick }: FolderDetailViewProps) {
@@ -36,10 +39,13 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
   const { data: folderPosts, isLoading, refetch: refetchFolderPosts } = useFolderPosts(folder.id, userId);
   const { posts: allPosts, refetch: refetchAllPosts } = useProfilePosts(userId);
   const { updateFolder, assignPostToFolder } = usePortfolioFolders(userId);
+  const addPortfolioItem = useAddPortfolioItem(userId);
   const [showAddPostsDialog, setShowAddPostsDialog] = useState(false);
+  const [showAddLinkDialog, setShowAddLinkDialog] = useState(false);
   const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [linkForm, setLinkForm] = useState({ title: '', url: '', thumbnailUrl: '' });
   const mediaInputRef = useRef<HTMLInputElement>(null);
 
   // Filter posts that aren't already in this folder
@@ -145,6 +151,33 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
     await assignPostToFolder.mutateAsync({ postId, folderId: null });
   };
 
+  const handleAddLink = async () => {
+    if (!linkForm.url.trim()) {
+      toast.error('Please enter a URL');
+      return;
+    }
+    
+    await addPortfolioItem.mutateAsync({
+      folder_id: folder.id,
+      title: linkForm.title || 'External Work',
+      external_url: linkForm.url,
+      thumbnail_url: linkForm.thumbnailUrl || undefined,
+      media_type: 'link',
+    });
+    
+    setLinkForm({ title: '', url: '', thumbnailUrl: '' });
+    setShowAddLinkDialog(false);
+    refetchFolderPosts();
+  };
+
+  const handleItemClick = (item: PortfolioItem) => {
+    if (item.external_url) {
+      window.open(item.external_url, '_blank', 'noopener,noreferrer');
+    } else {
+      onPostClick(item);
+    }
+  };
+
   return (
     <div className="min-h-[400px]">
       {/* Header */}
@@ -174,7 +207,11 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => mediaInputRef.current?.click()}>
                   <Upload className="w-4 h-4 mr-2" />
-                  Upload New
+                  Upload Media
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowAddLinkDialog(true)}>
+                  <Link className="w-4 h-4 mr-2" />
+                  Add Link
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setShowAddPostsDialog(true)}>
                   <ImageIcon className="w-4 h-4 mr-2" />
@@ -264,20 +301,44 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-1 p-1">
-          {folderPosts?.map((post, index) => (
+        <div className="grid grid-cols-3 gap-0.5 sm:gap-1">
+          {folderPosts?.map((item, index) => (
             <motion.button
-              key={post.id}
+              key={item.id}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: index * 0.03 }}
+              transition={{ delay: index * 0.02 }}
               className="aspect-square relative group overflow-hidden bg-muted"
-              onClick={() => onPostClick(post as ProfilePost)}
+              onClick={() => handleItemClick(item)}
             >
-              {post.media_type === 'video' ? (
+              {/* External Link Item */}
+              {item.external_url ? (
+                <>
+                  {item.thumbnail_url ? (
+                    <img
+                      src={item.thumbnail_url}
+                      alt={item.title || 'External work'}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+                      <ExternalLink className="w-8 h-8 text-primary/60" />
+                    </div>
+                  )}
+                  <div className="absolute top-2 right-2">
+                    <ExternalLink className="w-4 h-4 text-white drop-shadow-lg" />
+                  </div>
+                  {item.title && (
+                    <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
+                      <p className="text-white text-xs font-medium truncate">{item.title}</p>
+                    </div>
+                  )}
+                </>
+              ) : item.media_type === 'video' ? (
                 <>
                   <video
-                    src={post.media_url || undefined}
+                    src={item.media_url || undefined}
                     className="w-full h-full object-cover"
                     muted
                     preload="metadata"
@@ -288,8 +349,8 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
                 </>
               ) : (
                 <img
-                  src={post.media_url || undefined}
-                  alt={post.content || 'Post'}
+                  src={item.media_url || undefined}
+                  alt={item.content || 'Post'}
                   className="w-full h-full object-cover"
                   loading="lazy"
                 />
@@ -297,7 +358,9 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
               
               {/* Hover overlay */}
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="text-white text-xs">View</span>
+                <span className="text-white text-xs">
+                  {item.external_url ? 'Open Link' : 'View'}
+                </span>
               </div>
             </motion.button>
           ))}
@@ -378,6 +441,60 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Link Dialog */}
+      <Dialog open={showAddLinkDialog} onOpenChange={setShowAddLinkDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display">Add External Work Link</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="link-title">Title</Label>
+              <Input
+                id="link-title"
+                placeholder="e.g., Featured on Vogue, Music Video, etc."
+                value={linkForm.title}
+                onChange={(e) => setLinkForm(prev => ({ ...prev, title: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="link-url">URL *</Label>
+              <Input
+                id="link-url"
+                placeholder="https://..."
+                type="url"
+                value={linkForm.url}
+                onChange={(e) => setLinkForm(prev => ({ ...prev, url: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="link-thumbnail">Thumbnail URL (optional)</Label>
+              <Input
+                id="link-thumbnail"
+                placeholder="https://... (image URL for preview)"
+                type="url"
+                value={linkForm.thumbnailUrl}
+                onChange={(e) => setLinkForm(prev => ({ ...prev, thumbnailUrl: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Add an image URL for a visual preview in your portfolio grid
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddLinkDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddLink}
+              disabled={!linkForm.url.trim() || addPortfolioItem.isPending}
+            >
+              {addPortfolioItem.isPending ? 'Adding...' : 'Add Link'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
