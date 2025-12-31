@@ -10,15 +10,27 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import PageLayout from "@/components/layout/PageLayout";
 import { usePipeline } from "@/hooks/usePipeline";
+import { usePipelines, Pipeline as PipelineType } from "@/hooks/usePipelines";
 import { PipelineItemDrawer } from "@/components/pipeline/PipelineItemDrawer";
 import { AddContactDialog, ContactFormData } from "@/components/pipeline/AddContactDialog";
+import { PipelineSelector } from "@/components/pipeline/PipelineSelector";
 import { PipelineItem } from "@/actions/pipelineActions";
 import { toast } from "sonner";
 
-const Pipeline = () => {
+const PipelinePage = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { stages, items, isLoading, error, getItemsByStage, getEventsForItem, createItem, updateItem, moveItem, deleteItem, updateStageName, isCreating, isMoving } = usePipeline();
+  const { pipelines, isLoading: pipelinesLoading } = usePipelines();
+  const [currentPipeline, setCurrentPipeline] = useState<PipelineType | null>(null);
+  
+  // Set initial pipeline
+  useEffect(() => {
+    if (pipelines.length > 0 && !currentPipeline) {
+      setCurrentPipeline(pipelines[0]);
+    }
+  }, [pipelines, currentPipeline]);
+  
+  const { stages, items, isLoading, error, getItemsByStage, getEventsForItem, createItem, updateItem, moveItem, deleteItem, updateStageName, isCreating, isMoving } = usePipeline(currentPipeline?.id);
   const [selectedItem, setSelectedItem] = useState<PipelineItem | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addToStageId, setAddToStageId] = useState<string | null>(null);
@@ -210,7 +222,10 @@ const Pipeline = () => {
               </Button>
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-primary" />
-                <h1 className="font-display text-xl font-semibold text-foreground">Pipeline</h1>
+                <PipelineSelector 
+                  currentPipeline={currentPipeline} 
+                  onPipelineChange={setCurrentPipeline} 
+                />
                 <span className="text-sm text-muted-foreground">({totalContacts})</span>
               </div>
             </div>
@@ -648,4 +663,4 @@ function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging
   );
 }
 
-export default Pipeline;
+export default PipelinePage;

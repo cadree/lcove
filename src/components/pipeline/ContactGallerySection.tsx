@@ -18,26 +18,30 @@ export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionP
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
-    const isVideo = file.type.startsWith('video/');
-    const isImage = file.type.startsWith('image/');
+    // Handle multiple file uploads
+    for (const file of Array.from(files)) {
+      const isVideo = file.type.startsWith('video/');
+      const isImage = file.type.startsWith('image/');
 
-    if (!isVideo && !isImage) {
-      toast.error("Please select an image or video file");
-      return;
+      if (!isVideo && !isImage) {
+        toast.error(`Skipped ${file.name}: not an image or video`);
+        continue;
+      }
+
+      try {
+        await uploadMedia({
+          file,
+          mediaType: isVideo ? 'video' : 'image',
+        });
+      } catch (error) {
+        toast.error(`Failed to upload ${file.name}`);
+      }
     }
-
-    try {
-      await uploadMedia({
-        file,
-        mediaType: isVideo ? 'video' : 'image',
-      });
-      toast.success("Media uploaded");
-    } catch (error) {
-      toast.error("Failed to upload media");
-    }
+    
+    toast.success(`${files.length} file(s) uploaded`);
 
     // Reset input
     if (fileInputRef.current) {
@@ -92,6 +96,7 @@ export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionP
           ref={fileInputRef}
           type="file"
           accept="image/*,video/*"
+          multiple
           onChange={handleFileSelect}
           className="hidden"
           aria-hidden="true"

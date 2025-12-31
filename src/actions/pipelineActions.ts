@@ -66,46 +66,69 @@ async function getAuthUserId(): Promise<string> {
 
 /**
  * Ensures default pipeline stages exist for the authenticated user.
+ * Returns the pipeline ID.
  */
-export async function ensureMyDefaultPipeline(): Promise<void> {
+export async function ensureMyDefaultPipeline(pipelineId?: string): Promise<string> {
   const userId = await getAuthUserId();
   
-  const { error } = await supabase.rpc('ensure_default_pipeline', {
-    p_user_id: userId
+  const { data, error } = await supabase.rpc('ensure_default_pipeline', {
+    p_user_id: userId,
+    p_pipeline_id: pipelineId || null
   });
   
   if (error) {
     throw new Error(`Failed to ensure default pipeline: ${error.message}`);
   }
+  
+  return data as string;
 }
 
 /**
  * Gets the full pipeline for the authenticated user.
+ * If pipelineId is provided, only returns stages for that pipeline.
  */
-export async function getMyPipeline(): Promise<PipelineData> {
+export async function getMyPipeline(pipelineId?: string): Promise<PipelineData> {
   const userId = await getAuthUserId();
   
-  const { data: stages, error: stagesError } = await supabase
-    .from('pipeline_stages')
-    .select('*')
-    .eq('owner_user_id', userId)
-    .order('sort_order', { ascending: true });
+  // Build stages query - filter by pipeline_id if provided
+  let stages: PipelineStage[] = [];
+  let items: PipelineItem[] = [];
+  let events: PipelineEvent[] = [];
   
-  if (stagesError) {
-    throw new Error(`Failed to fetch stages: ${stagesError.message}`);
+  if (pipelineId) {
+    const { data, error } = await (supabase
+      .from('pipeline_stages')
+      .select('*')
+      .eq('owner_user_id', userId) as any)
+      .eq('pipeline_id', pipelineId)
+      .order('sort_order', { ascending: true });
+    if (error) throw new Error(`Failed to fetch stages: ${error.message}`);
+    stages = (data || []) as PipelineStage[];
+  } else {
+    const { data, error } = await supabase
+      .from('pipeline_stages')
+      .select('*')
+      .eq('owner_user_id', userId)
+      .order('sort_order', { ascending: true });
+    if (error) throw new Error(`Failed to fetch stages: ${error.message}`);
+    stages = (data || []) as PipelineStage[];
   }
   
-  const { data: items, error: itemsError } = await supabase
-    .from('pipeline_items')
-    .select('*')
-    .eq('owner_user_id', userId)
-    .order('sort_order', { ascending: true });
+  // Get stage IDs for filtering items
+  const stageIds = stages.map(s => s.id);
   
-  if (itemsError) {
-    throw new Error(`Failed to fetch items: ${itemsError.message}`);
+  if (stageIds.length > 0) {
+    const { data, error } = await supabase
+      .from('pipeline_items')
+      .select('*')
+      .eq('owner_user_id', userId)
+      .in('stage_id', stageIds)
+      .order('sort_order', { ascending: true });
+    if (error) throw new Error(`Failed to fetch items: ${error.message}`);
+    items = (data || []) as PipelineItem[];
   }
   
-  const { data: events, error: eventsError } = await supabase
+  const { data: eventsData, error: eventsError } = await supabase
     .from('pipeline_events')
     .select('*')
     .eq('owner_user_id', userId)
@@ -115,12 +138,9 @@ export async function getMyPipeline(): Promise<PipelineData> {
   if (eventsError) {
     throw new Error(`Failed to fetch events: ${eventsError.message}`);
   }
+  events = (eventsData || []) as PipelineEvent[];
   
-  return {
-    stages: stages as PipelineStage[],
-    items: items as PipelineItem[],
-    events: events as PipelineEvent[]
-  };
+  return { stages, items, events };
 }
 
 /**
