@@ -2820,6 +2820,7 @@ export type Database = {
           id: string
           name: string
           owner_user_id: string
+          pipeline_id: string | null
           sort_order: number
           updated_at: string
         }
@@ -2829,12 +2830,55 @@ export type Database = {
           id?: string
           name: string
           owner_user_id: string
+          pipeline_id?: string | null
           sort_order?: number
           updated_at?: string
         }
         Update: {
           color?: string | null
           created_at?: string
+          id?: string
+          name?: string
+          owner_user_id?: string
+          pipeline_id?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_stages_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipelines: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          owner_user_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          owner_user_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
           id?: string
           name?: string
           owner_user_id?: string
