@@ -4795,12 +4795,10 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: number
       }
-      ensure_default_pipeline:
-        | { Args: { p_user_id: string }; Returns: undefined }
-        | {
-            Args: { p_pipeline_id?: string; p_user_id: string }
-            Returns: string
-          }
+      ensure_default_pipeline: {
+        Args: { p_pipeline_id?: string; p_user_id: string }
+        Returns: string
+      }
       get_admin_user_data: {
         Args: never
         Returns: {
