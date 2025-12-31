@@ -616,6 +616,177 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_invoices: {
+        Row: {
+          attached_images: string[] | null
+          created_at: string
+          currency: string
+          description: string | null
+          due_date: string | null
+          id: string
+          invoice_number: string
+          line_items: Json
+          owner_user_id: string
+          paid_at: string | null
+          pipeline_item_id: string
+          recipient_email: string | null
+          recipient_phone: string | null
+          sent_at: string | null
+          sent_via: string | null
+          status: string
+          subtotal: number
+          tax_amount: number | null
+          tax_rate: number | null
+          title: string
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          attached_images?: string[] | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number: string
+          line_items?: Json
+          owner_user_id: string
+          paid_at?: string | null
+          pipeline_item_id: string
+          recipient_email?: string | null
+          recipient_phone?: string | null
+          sent_at?: string | null
+          sent_via?: string | null
+          status?: string
+          subtotal?: number
+          tax_amount?: number | null
+          tax_rate?: number | null
+          title: string
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          attached_images?: string[] | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number?: string
+          line_items?: Json
+          owner_user_id?: string
+          paid_at?: string | null
+          pipeline_item_id?: string
+          recipient_email?: string | null
+          recipient_phone?: string | null
+          sent_at?: string | null
+          sent_via?: string | null
+          status?: string
+          subtotal?: number
+          tax_amount?: number | null
+          tax_rate?: number | null
+          title?: string
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_invoices_pipeline_item_id_fkey"
+            columns: ["pipeline_item_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contact_media: {
+        Row: {
+          created_at: string
+          id: string
+          media_type: string
+          media_url: string
+          notes: string | null
+          owner_user_id: string
+          pipeline_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          media_type?: string
+          media_url: string
+          notes?: string | null
+          owner_user_id: string
+          pipeline_item_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          media_type?: string
+          media_url?: string
+          notes?: string | null
+          owner_user_id?: string
+          pipeline_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_media_pipeline_item_id_fkey"
+            columns: ["pipeline_item_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contact_quotes: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          description: string | null
+          id: string
+          owner_user_id: string
+          pipeline_item_id: string
+          status: string
+          title: string
+          updated_at: string
+          valid_until: string | null
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          owner_user_id: string
+          pipeline_item_id: string
+          status?: string
+          title: string
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          owner_user_id?: string
+          pipeline_item_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_quotes_pipeline_item_id_fkey"
+            columns: ["pipeline_item_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_tasks: {
         Row: {
           created_at: string
