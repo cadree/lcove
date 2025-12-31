@@ -224,6 +224,169 @@ export type Database = {
         }
         Relationships: []
       }
+      board_item_comments: {
+        Row: {
+          board_item_id: string
+          body: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          board_item_id: string
+          body: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          board_item_id?: string
+          body?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "board_item_comments_board_item_id_fkey"
+            columns: ["board_item_id"]
+            isOneToOne: false
+            referencedRelation: "board_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      board_items: {
+        Row: {
+          board_id: string
+          content: Json
+          created_at: string
+          created_by: string | null
+          h: number
+          id: string
+          is_trashed: boolean
+          parent_item_id: string | null
+          rotation: number
+          title: string | null
+          type: string
+          updated_at: string
+          w: number
+          x: number
+          y: number
+          z_index: number
+        }
+        Insert: {
+          board_id: string
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          h?: number
+          id?: string
+          is_trashed?: boolean
+          parent_item_id?: string | null
+          rotation?: number
+          title?: string | null
+          type: string
+          updated_at?: string
+          w?: number
+          x?: number
+          y?: number
+          z_index?: number
+        }
+        Update: {
+          board_id?: string
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          h?: number
+          id?: string
+          is_trashed?: boolean
+          parent_item_id?: string | null
+          rotation?: number
+          title?: string | null
+          type?: string
+          updated_at?: string
+          w?: number
+          x?: number
+          y?: number
+          z_index?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "board_items_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "boards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "board_items_parent_item_id_fkey"
+            columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "board_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      board_members: {
+        Row: {
+          board_id: string
+          created_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          board_id: string
+          created_at?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          board_id?: string
+          created_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "board_members_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "boards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      boards: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_trashed: boolean
+          owner_user_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_trashed?: boolean
+          owner_user_id: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_trashed?: boolean
+          owner_user_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       book_bookmarks: {
         Row: {
           created_at: string
