@@ -16,16 +16,16 @@ import {
 } from "@/actions/pipelineActions";
 import { updateStageName } from "@/actions/pipelineStageActions";
 
-export function usePipeline() {
+export function usePipeline(pipelineId?: string) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   // Initialize default pipeline and fetch data
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['pipeline', user?.id],
+    queryKey: ['pipeline', user?.id, pipelineId],
     queryFn: async () => {
-      await ensureMyDefaultPipeline();
-      return getMyPipeline();
+      const resolvedPipelineId = await ensureMyDefaultPipeline(pipelineId);
+      return getMyPipeline(resolvedPipelineId);
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 5, // 5 minutes
@@ -34,15 +34,15 @@ export function usePipeline() {
   const createItemMutation = useMutation({
     mutationFn: (data: CreatePipelineItemData) => createPipelineItem(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pipeline', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['pipeline', user?.id, pipelineId] });
     },
   });
 
   const updateItemMutation = useMutation({
-    mutationFn: ({ itemId, fields }: { itemId: string; fields: { title?: string; subtitle?: string; notes?: string } }) =>
+    mutationFn: ({ itemId, fields }: { itemId: string; fields: Partial<PipelineItem> }) =>
       updatePipelineItem(itemId, fields),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pipeline', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['pipeline', user?.id, pipelineId] });
     },
   });
 
@@ -50,14 +50,14 @@ export function usePipeline() {
     mutationFn: ({ itemId, toStageId, newSortOrder }: { itemId: string; toStageId: string; newSortOrder: number }) =>
       movePipelineItem(itemId, toStageId, newSortOrder),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pipeline', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['pipeline', user?.id, pipelineId] });
     },
   });
 
   const deleteItemMutation = useMutation({
     mutationFn: (itemId: string) => deletePipelineItem(itemId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pipeline', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['pipeline', user?.id, pipelineId] });
     },
   });
 
@@ -65,7 +65,7 @@ export function usePipeline() {
     mutationFn: ({ itemId, noteText }: { itemId: string; noteText: string }) =>
       addPipelineNoteEvent(itemId, noteText),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pipeline', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['pipeline', user?.id, pipelineId] });
     },
   });
 
@@ -73,7 +73,7 @@ export function usePipeline() {
     mutationFn: ({ stageId, name }: { stageId: string; name: string }) =>
       updateStageName(stageId, name),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pipeline', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['pipeline', user?.id, pipelineId] });
     },
   });
 
