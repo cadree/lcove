@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Plus, ImageIcon, Camera, Play, Check, Upload, Link, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Paintbrush, Plus, ImageIcon, Camera, Play, Check, Upload, Link, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -199,9 +199,9 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
                   {isUploadingMedia ? (
                     <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-1" />
                   ) : (
-                    <Plus className="w-4 h-4 mr-1" />
+                    <Paintbrush className="w-4 h-4 mr-1" />
                   )}
-                  Add
+                  Create
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
