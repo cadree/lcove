@@ -14,6 +14,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { FileText, Clock, ArrowRight, PlusCircle, StickyNote, Trash2, Save, Loader2, MoveRight, Mail, Phone, Globe, Camera, Link2 } from "lucide-react";
 import { PipelineItem, PipelineEvent, PipelineStage } from "@/actions/pipelineActions";
 import { ContactTasksSection } from "./ContactTasksSection";
+import { ContactGallerySection } from "./ContactGallerySection";
+import { ContactQuotesSection } from "./ContactQuotesSection";
+import { ContactInvoicesSection } from "./ContactInvoicesSection";
 import { toast } from "sonner";
 
 interface PipelineItemDrawerProps {
@@ -335,6 +338,31 @@ export function PipelineItemDrawer({
           {/* Tasks Section */}
           <div className="mb-6">
             <ContactTasksSection pipelineItemId={item.id} />
+          </div>
+
+          <Separator className="my-4" />
+
+          {/* Gallery Section */}
+          <div className="mb-6">
+            <ContactGallerySection pipelineItemId={item.id} />
+          </div>
+
+          <Separator className="my-4" />
+
+          {/* Quotes Section */}
+          <div className="mb-6">
+            <ContactQuotesSection pipelineItemId={item.id} />
+          </div>
+
+          <Separator className="my-4" />
+
+          {/* Invoices Section */}
+          <div className="mb-6">
+            <ContactInvoicesSection 
+              pipelineItemId={item.id} 
+              contactEmail={item.email || undefined}
+              contactPhone={item.phone || undefined}
+            />
           </div>
 
           <Separator className="my-4" />

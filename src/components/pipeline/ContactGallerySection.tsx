@@ -1,0 +1,204 @@
+import { useState, useRef } from "react";
+import { Image, Video, Upload, X, Loader2, StickyNote, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useContactMedia, ContactMedia } from "@/hooks/useContactMedia";
+import { toast } from "sonner";
+
+interface ContactGallerySectionProps {
+  pipelineItemId: string;
+}
+
+export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionProps) {
+  const { media, isLoading, uploadMedia, updateNotes, deleteMedia, isUploading } = useContactMedia(pipelineItemId);
+  const [selectedMedia, setSelectedMedia] = useState<ContactMedia | null>(null);
+  const [editingNotes, setEditingNotes] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const isVideo = file.type.startsWith('video/');
+    const isImage = file.type.startsWith('image/');
+
+    if (!isVideo && !isImage) {
+      toast.error("Please select an image or video file");
+      return;
+    }
+
+    try {
+      await uploadMedia({
+        file,
+        mediaType: isVideo ? 'video' : 'image',
+      });
+      toast.success("Media uploaded");
+    } catch (error) {
+      toast.error("Failed to upload media");
+    }
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    if (!selectedMedia) return;
+    try {
+      await updateNotes({ mediaId: selectedMedia.id, notes: editingNotes });
+      setSelectedMedia({ ...selectedMedia, notes: editingNotes });
+      toast.success("Notes saved");
+    } catch (error) {
+      toast.error("Failed to save notes");
+    }
+  };
+
+  const handleDelete = async (mediaId: string) => {
+    try {
+      await deleteMedia(mediaId);
+      setSelectedMedia(null);
+      toast.success("Media deleted");
+    } catch (error) {
+      toast.error("Failed to delete media");
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Image className="w-4 h-4 text-muted-foreground" />
+          <h3 className="font-medium text-sm text-foreground">Gallery</h3>
+          <span className="text-xs text-muted-foreground">({media.length})</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading}
+          role="button"
+          aria-label="Upload media"
+        >
+          {isUploading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Upload className="w-4 h-4" />
+          )}
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*"
+          onChange={handleFileSelect}
+          className="hidden"
+          aria-hidden="true"
+        />
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-6">
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : media.length === 0 ? (
+        <div 
+          className="text-center py-6 bg-muted/30 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+          onClick={() => fileInputRef.current?.click()}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
+        >
+          <Image className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+          <p className="text-sm text-muted-foreground">Add photos or videos</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          {media.map((item) => (
+            <div
+              key={item.id}
+              className="relative aspect-square rounded-lg overflow-hidden cursor-pointer group"
+              onClick={() => {
+                setSelectedMedia(item);
+                setEditingNotes(item.notes || "");
+              }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && setSelectedMedia(item)}
+            >
+              {item.media_type === 'video' ? (
+                <div className="w-full h-full bg-muted flex items-center justify-center">
+                  <Video className="w-6 h-6 text-muted-foreground" />
+                </div>
+              ) : (
+                <img
+                  src={item.media_url}
+                  alt="Contact media"
+                  className="w-full h-full object-cover"
+                />
+              )}
+              {item.notes && (
+                <div className="absolute bottom-1 right-1 bg-background/80 rounded p-0.5">
+                  <StickyNote className="w-3 h-3 text-amber-500" />
+                </div>
+              )}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Media Detail Dialog */}
+      <Dialog open={!!selectedMedia} onOpenChange={(open) => !open && setSelectedMedia(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Media Details</DialogTitle>
+          </DialogHeader>
+          
+          {selectedMedia && (
+            <div className="space-y-4">
+              {selectedMedia.media_type === 'video' ? (
+                <video
+                  src={selectedMedia.media_url}
+                  controls
+                  className="w-full rounded-lg"
+                />
+              ) : (
+                <img
+                  src={selectedMedia.media_url}
+                  alt="Contact media"
+                  className="w-full rounded-lg"
+                />
+              )}
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Notes</label>
+                <Textarea
+                  value={editingNotes}
+                  onChange={(e) => setEditingNotes(e.target.value)}
+                  placeholder="Add notes about this media..."
+                  className="min-h-[100px]"
+                />
+                <div className="flex gap-2">
+                  <Button onClick={handleSaveNotes} className="flex-1" role="button">
+                    Save Notes
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    size="icon"
+                    onClick={() => handleDelete(selectedMedia.id)}
+                    role="button"
+                    aria-label="Delete media"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
