@@ -16,12 +16,13 @@ export const DEFAULT_SECTIONS: ProfileSection[] = [
   { id: 'stats', label: 'Stats', visible: true, size: 'medium', order: 0 },
   { id: 'about', label: 'About', visible: true, size: 'medium', order: 1 },
   { id: 'pipeline', label: 'My Pipeline', visible: true, size: 'large', order: 2 },
-  { id: 'portfolio', label: 'Portfolio', visible: true, size: 'medium', order: 3 },
-  { id: 'creator_modules', label: 'Creator Modules', visible: true, size: 'medium', order: 4 },
-  { id: 'music', label: 'Music Player', visible: true, size: 'medium', order: 5 },
-  { id: 'posts_tabs', label: 'Posts & Blogs', visible: true, size: 'large', order: 6 },
-  { id: 'reviews', label: 'Reviews', visible: true, size: 'medium', order: 7 },
-  { id: 'quick_links', label: 'Quick Links', visible: true, size: 'small', order: 8 },
+  { id: 'boards', label: 'Boards', visible: true, size: 'medium', order: 3 },
+  { id: 'portfolio', label: 'Portfolio', visible: true, size: 'medium', order: 4 },
+  { id: 'creator_modules', label: 'Creator Modules', visible: true, size: 'medium', order: 5 },
+  { id: 'music', label: 'Music Player', visible: true, size: 'medium', order: 6 },
+  { id: 'posts_tabs', label: 'Posts & Blogs', visible: true, size: 'large', order: 7 },
+  { id: 'reviews', label: 'Reviews', visible: true, size: 'medium', order: 8 },
+  { id: 'quick_links', label: 'Quick Links', visible: true, size: 'small', order: 9 },
 ];
 
 const parseLayoutFromJson = (json: Json | null): ProfileSection[] => {
