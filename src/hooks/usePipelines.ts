@@ -60,8 +60,8 @@ export function usePipelines() {
       
       if (error) throw error;
       
-      // Create default stages for new pipeline
-      await supabase.rpc('ensure_default_pipeline', { 
+      // Create default stages for new pipeline - pass both parameters explicitly
+      await supabase.rpc('ensure_default_pipeline' as any, { 
         p_user_id: user.id,
         p_pipeline_id: (data as any).id 
       });
