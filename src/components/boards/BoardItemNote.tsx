@@ -27,13 +27,13 @@ export function BoardItemNote({ content, onChange, isSelected }: BoardItemNotePr
   };
 
   return (
-    <div className="p-3">
+    <div className="p-4 h-full">
       <Textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
         onBlur={handleBlur}
         placeholder="Write a note..."
-        className="min-h-[80px] resize-none border-none bg-transparent p-0 focus-visible:ring-0 text-sm"
+        className="min-h-[120px] h-full resize-none border-none bg-transparent p-0 focus-visible:ring-0 text-[#44403c] text-sm placeholder:text-[#a8a29e]"
       />
     </div>
   );

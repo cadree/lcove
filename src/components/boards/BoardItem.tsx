@@ -32,6 +32,25 @@ export function BoardItem({
   const [isDragging, setIsDragging] = useState(false);
   const itemRef = useRef<HTMLDivElement>(null);
 
+  const getItemStyles = () => {
+    switch (item.type) {
+      case 'note':
+        return "bg-[#fef3c7] shadow-lg"; // Yellow sticky note
+      case 'todo':
+        return "bg-white shadow-lg";
+      case 'link':
+        return "bg-white shadow-lg";
+      case 'image':
+        return "bg-[#1a1a1a] shadow-lg overflow-hidden";
+      case 'column':
+        return "bg-white/5 border border-dashed border-white/20";
+      case 'board_ref':
+        return "bg-[#f5f5f4] shadow-lg";
+      default:
+        return "bg-white shadow-lg";
+    }
+  };
+
   const renderContent = () => {
     switch (item.type) {
       case 'note':
@@ -63,9 +82,33 @@ export function BoardItem({
             onChange={onContentChange}
           />
         );
+      case 'board_ref':
+        return (
+          <div className="p-4 flex flex-col items-center justify-center h-full">
+            <div className="w-16 h-16 bg-[#e7e5e4] rounded-lg flex items-center justify-center mb-2">
+              <div className="grid grid-cols-2 gap-1">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="w-4 h-4 bg-[#a8a29e] rounded-sm" />
+                ))}
+              </div>
+            </div>
+            <span className="text-sm font-medium text-[#44403c]">New Board</span>
+            <span className="text-xs text-[#78716c]">0 cards</span>
+          </div>
+        );
+      case 'column':
+        return (
+          <div className="p-4 h-full">
+            <input 
+              type="text" 
+              placeholder="Column title..."
+              className="bg-transparent border-none text-white text-sm font-medium w-full outline-none placeholder:text-white/40"
+            />
+          </div>
+        );
       default:
         return (
-          <div className="p-3 text-sm text-muted-foreground">
+          <div className="p-3 text-sm text-gray-500">
             Unknown item type
           </div>
         );
@@ -89,11 +132,10 @@ export function BoardItem({
         if (!isDragging) onSelect();
       }}
       className={cn(
-        "absolute cursor-move",
-        "bg-card border border-border rounded-lg shadow-md",
-        "transition-shadow duration-200",
-        isSelected && "ring-2 ring-primary shadow-lg",
-        isDragging && "opacity-90 shadow-xl"
+        "absolute cursor-move rounded-lg",
+        getItemStyles(),
+        isSelected && "ring-2 ring-primary",
+        isDragging && "opacity-90 scale-105"
       )}
       style={{
         width: item.w,
