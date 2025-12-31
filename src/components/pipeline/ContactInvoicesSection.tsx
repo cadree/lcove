@@ -514,7 +514,19 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
 
             <div className="space-y-2">
               <Label>Send via</Label>
-              <Select value={sendVia} onValueChange={(v) => setSendVia(v as 'email' | 'sms')}>
+              <Select 
+                value={sendVia} 
+                onValueChange={(v) => {
+                  const method = v as 'email' | 'sms';
+                  setSendVia(method);
+                  // Update recipient based on selected method
+                  if (method === 'email') {
+                    setSendRecipient(contactEmail || '');
+                  } else {
+                    setSendRecipient(contactPhone || '');
+                  }
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
