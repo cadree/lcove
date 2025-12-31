@@ -25,13 +25,15 @@ export function BoardCanvas({
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
 
   const handleCanvasClick = (e: React.MouseEvent) => {
-    if (e.target === canvasRef.current) {
+    if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('canvas-inner')) {
       onSelectItem(null);
     }
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.target === canvasRef.current && e.button === 1) {
+    // Middle mouse button or right click for panning
+    if ((e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('canvas-inner')) && (e.button === 1 || e.button === 2)) {
+      e.preventDefault();
       setIsPanning(true);
       setStartPan({ x: e.clientX - offset.x, y: e.clientY - offset.y });
     }
@@ -65,22 +67,21 @@ export function BoardCanvas({
   return (
     <div
       ref={canvasRef}
-      className="absolute inset-0 overflow-hidden cursor-default"
+      className="absolute inset-0 overflow-hidden cursor-default bg-[#3a3a3a]"
       onClick={handleCanvasClick}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onContextMenu={(e) => e.preventDefault()}
       style={{
-        backgroundImage: `
-          radial-gradient(circle at 1px 1px, hsl(var(--border)) 1px, transparent 0)
-        `,
-        backgroundSize: '24px 24px',
+        backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`,
+        backgroundSize: '20px 20px',
         backgroundPosition: `${offset.x}px ${offset.y}px`,
       }}
     >
       <motion.div
-        className="absolute inset-0"
+        className="canvas-inner absolute inset-0"
         style={{
           transform: `translate(${offset.x}px, ${offset.y}px)`,
         }}
