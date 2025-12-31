@@ -179,6 +179,20 @@ export function usePortfolioFolders(userId?: string) {
   };
 }
 
+export interface PortfolioItem {
+  id: string;
+  user_id: string;
+  media_url: string | null;
+  media_type: string;
+  content: string;
+  created_at: string;
+  folder_id: string;
+  external_url?: string | null;
+  thumbnail_url?: string | null;
+  title?: string;
+  source: 'post' | 'portfolio_item';
+}
+
 export function useFolderPosts(folderId: string | null, userId?: string) {
   return useQuery({
     queryKey: ['folder-posts', folderId, userId],
@@ -195,8 +209,7 @@ export function useFolderPosts(folderId: string | null, userId?: string) {
 
       if (postsError) throw postsError;
 
-      // Fetch portfolio items (direct uploads) for this folder
-      // Note: folder_id was just added via migration, cast to handle type lag
+      // Fetch portfolio items (direct uploads + external links) for this folder
       const { data: items, error: itemsError } = await (supabase
         .from('portfolio_items')
         .select('*') as any)
@@ -207,16 +220,22 @@ export function useFolderPosts(folderId: string | null, userId?: string) {
       if (itemsError) throw itemsError;
 
       // Combine and sort by created_at
-      const combined = [
-        ...(posts || []).map(p => ({ ...p, source: 'post' as const })),
+      const combined: PortfolioItem[] = [
+        ...(posts || []).map(p => ({ 
+          ...p, 
+          source: 'post' as const 
+        })),
         ...(items || []).map(i => ({ 
           id: i.id,
           user_id: i.user_id,
           media_url: i.media_url,
-          media_type: i.media_type,
+          media_type: i.media_type || 'link',
           content: i.description || i.title || '',
+          title: i.title,
           created_at: i.created_at,
           folder_id: folderId,
+          external_url: i.external_url,
+          thumbnail_url: i.thumbnail_url,
           source: 'portfolio_item' as const
         })),
       ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -224,5 +243,52 @@ export function useFolderPosts(folderId: string | null, userId?: string) {
       return combined;
     },
     enabled: !!folderId && !!userId,
+  });
+}
+
+export function useAddPortfolioItem(userId?: string) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const targetUserId = userId || user?.id;
+
+  return useMutation({
+    mutationFn: async (input: {
+      folder_id: string;
+      title?: string;
+      description?: string;
+      media_url?: string;
+      media_type?: string;
+      external_url?: string;
+      thumbnail_url?: string;
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('portfolio_items')
+        .insert({
+          user_id: user.id,
+          folder_id: input.folder_id,
+          title: input.title || null,
+          description: input.description || null,
+          media_url: input.media_url || null,
+          media_type: input.media_type || 'link',
+          external_url: input.external_url || null,
+          thumbnail_url: input.thumbnail_url || null,
+        } as any)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['folder-posts', variables.folder_id, targetUserId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolio-folders', targetUserId] });
+      toast.success('Item added to portfolio!');
+    },
+    onError: (error) => {
+      console.error('Error adding portfolio item:', error);
+      toast.error('Failed to add item');
+    },
   });
 }
