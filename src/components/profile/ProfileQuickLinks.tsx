@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Store, Calendar, Heart, Crown, BookOpen, FolderKanban, Rocket } from 'lucide-react';
+import { Store, Calendar, Heart, Crown, BookOpen, FolderKanban, Rocket, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ProfileQuickLinksProps {
@@ -14,7 +14,7 @@ export function ProfileQuickLinks({ isOwner }: ProfileQuickLinksProps) {
     { to: '/store', icon: Store, label: 'My Store', color: 'text-muted-foreground' },
     { to: '/calendar', icon: Calendar, label: 'Events', color: 'text-muted-foreground' },
     { to: '/fund', icon: Heart, label: 'Fund', color: 'text-primary' },
-    { to: '/membership', icon: Crown, label: 'Member', color: 'text-amber-400' },
+    { to: '/boards', icon: LayoutDashboard, label: 'Boards', color: 'text-amber-400' },
   ];
 
   return (

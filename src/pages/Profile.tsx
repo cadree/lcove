@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Plus, Grid, Bookmark, FileText, ArrowLeft, LayoutGrid, Users } from "lucide-react";
+import { Loader2, Plus, Grid, Bookmark, FileText, ArrowLeft, LayoutGrid, Users, LayoutDashboard } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
@@ -338,6 +338,32 @@ const Profile = () => {
                 <div className="flex-1">
                   <h3 className="font-medium text-foreground">My Pipeline</h3>
                   <p className="text-xs text-muted-foreground">Manage your contacts and leads</p>
+                </div>
+                <ArrowLeft className="w-4 h-4 text-muted-foreground rotate-180" />
+              </div>
+            </Card>
+          </motion.div>
+        );
+      case 'boards':
+        if (!isOwnProfile) return null;
+        return (
+          <motion.div
+            key="boards"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="px-5 py-4"
+          >
+            <Card 
+              className="bg-muted/30 border-border/50 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => navigate('/boards')}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                  <LayoutDashboard className="w-5 h-5 text-amber-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-medium text-foreground">Boards</h3>
+                  <p className="text-xs text-muted-foreground">Visual canvas workspaces</p>
                 </div>
                 <ArrowLeft className="w-4 h-4 text-muted-foreground rotate-180" />
               </div>
