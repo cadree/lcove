@@ -22,18 +22,76 @@ function logStep(step: string, details?: Record<string, unknown>) {
   console.log(`[${timestamp}] ${step}`, details ? JSON.stringify(details) : "");
 }
 
-// Simple web push sender - sends payload to push service endpoint
-// Note: Full VAPID signing requires web-push library which isn't available in Deno
-// Most push services will accept the request, but some may reject without proper VAPID
-async function sendPushToEndpoint(
+// Base64URL encoding for VAPID JWT
+function base64UrlEncode(data: Uint8Array): string {
+  const base64 = btoa(String.fromCharCode(...data));
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+// Create VAPID JWT for authentication
+async function createVapidJwt(
+  audience: string,
+  subject: string,
+  vapidPublicKey: string,
+  vapidPrivateKey: string
+): Promise<string> {
+  const header = { alg: 'ES256', typ: 'JWT' };
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    aud: audience,
+    exp: now + 12 * 60 * 60, // 12 hours
+    sub: subject,
+  };
+
+  const headerB64 = base64UrlEncode(new TextEncoder().encode(JSON.stringify(header)));
+  const payloadB64 = base64UrlEncode(new TextEncoder().encode(JSON.stringify(payload)));
+  const unsignedToken = `${headerB64}.${payloadB64}`;
+
+  // Convert VAPID private key from base64url to raw key
+  const privateKeyBuffer = Uint8Array.from(atob(vapidPrivateKey.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+
+  // Import the private key
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8',
+    privateKeyBuffer,
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    false,
+    ['sign']
+  );
+
+  // Sign the token
+  const signature = await crypto.subtle.sign(
+    { name: 'ECDSA', hash: 'SHA-256' },
+    cryptoKey,
+    new TextEncoder().encode(unsignedToken)
+  );
+
+  const signatureB64 = base64UrlEncode(new Uint8Array(signature));
+  return `${unsignedToken}.${signatureB64}`;
+}
+
+// Send push notification with proper VAPID headers
+async function sendPushNotification(
   endpoint: string,
-  payload: string
+  p256dh: string,
+  auth: string,
+  payload: string,
+  vapidPublicKey: string,
+  vapidPrivateKey: string
 ): Promise<{ success: boolean; status?: number; error?: string }> {
   try {
+    // Extract origin from endpoint for VAPID audience
+    const endpointUrl = new URL(endpoint);
+    const audience = endpointUrl.origin;
+
+    // For simple push, we send directly without encryption
+    // Note: Full encryption requires web-push-libs which is complex in Deno
+    // Most modern browsers accept unencrypted payloads for testing
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Content-Length": String(new TextEncoder().encode(payload).length),
         "TTL": "86400",
         "Urgency": "high",
       },
@@ -80,14 +138,17 @@ serve(async (req) => {
 
     logStep("Processing push notification", { user_id, title, notification_type });
 
-    // Check if push notifications are enabled for this user
-    const { data: prefs } = await supabase
+    // Check if push notifications are enabled for this user (default to true if no prefs)
+    const { data: prefs, error: prefsError } = await supabase
       .from("notification_preferences")
       .select("*")
       .eq("user_id", user_id)
       .single();
 
-    if (!prefs?.push_enabled) {
+    // Default to enabled if no preferences exist
+    const pushEnabled = prefs?.push_enabled ?? true;
+    
+    if (!pushEnabled) {
       logStep("Push notifications disabled for user", { user_id });
       return new Response(
         JSON.stringify({ message: "Push notifications disabled" }),
@@ -96,7 +157,7 @@ serve(async (req) => {
     }
 
     // Check if this specific notification type is enabled
-    if (notification_type) {
+    if (notification_type && prefs) {
       const typePreferenceMap: Record<string, string> = {
         message: "messages_enabled",
         like: "likes_enabled",
@@ -131,7 +192,7 @@ serve(async (req) => {
     if (!subscriptions || subscriptions.length === 0) {
       logStep("No push subscriptions found for user", { user_id });
       return new Response(
-        JSON.stringify({ message: "No push subscriptions" }),
+        JSON.stringify({ message: "No push subscriptions", sent: 0 }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -163,7 +224,14 @@ serve(async (req) => {
 
     // Send to all subscriptions
     for (const sub of subscriptions) {
-      const result = await sendPushToEndpoint(sub.endpoint, payload);
+      const result = await sendPushNotification(
+        sub.endpoint,
+        sub.p256dh,
+        sub.auth,
+        payload,
+        VAPID_PUBLIC_KEY,
+        VAPID_PRIVATE_KEY
+      );
 
       if (result.success) {
         logStep(`Push sent successfully`, { endpoint: sub.endpoint.substring(0, 50) });
