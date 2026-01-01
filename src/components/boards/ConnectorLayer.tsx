@@ -1,7 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import type { Json } from "@/integrations/supabase/types";
 
-// Inline type to avoid circular imports
 interface BoardItemData {
   id: string;
   type: string;
@@ -39,124 +37,115 @@ interface Point {
   y: number;
 }
 
-// Calculate best anchor points based on relative positions of elements
-function getBestAnchors(startRect: DOMRect, endRect: DOMRect): { startAnchor: string; endAnchor: string } {
-  const startCenterX = startRect.left + startRect.width / 2;
-  const startCenterY = startRect.top + startRect.height / 2;
-  const endCenterX = endRect.left + endRect.width / 2;
-  const endCenterY = endRect.top + endRect.height / 2;
-  
-  const dx = endCenterX - startCenterX;
-  const dy = endCenterY - startCenterY;
-  
-  let startAnchor: string;
-  let endAnchor: string;
-  
-  // Determine best anchor based on relative position
-  if (Math.abs(dx) > Math.abs(dy)) {
-    // Horizontal connection
-    if (dx > 0) {
-      startAnchor = 'right';
-      endAnchor = 'left';
-    } else {
-      startAnchor = 'left';
-      endAnchor = 'right';
-    }
-  } else {
-    // Vertical connection
-    if (dy > 0) {
-      startAnchor = 'bottom';
-      endAnchor = 'top';
-    } else {
-      startAnchor = 'top';
-      endAnchor = 'bottom';
-    }
-  }
-  
-  return { startAnchor, endAnchor };
-}
-
-function getAnchorPointFromElement(
-  element: HTMLElement,
-  anchor: string,
+// Get the best anchor point - Milanote style (closest edge)
+function getSmartAnchorPoint(
+  startRect: DOMRect, 
+  endRect: DOMRect,
   canvasOffset: { x: number; y: number }
-): Point {
-  const rect = element.getBoundingClientRect();
-  
-  const adjustedRect = {
-    left: rect.left - canvasOffset.x,
-    right: rect.right - canvasOffset.x,
-    top: rect.top - canvasOffset.y,
-    bottom: rect.bottom - canvasOffset.y,
-    width: rect.width,
-    height: rect.height,
+): { startPoint: Point; endPoint: Point } {
+  const startCenter = {
+    x: startRect.left + startRect.width / 2 - canvasOffset.x,
+    y: startRect.top + startRect.height / 2 - canvasOffset.y
+  };
+  const endCenter = {
+    x: endRect.left + endRect.width / 2 - canvasOffset.x,
+    y: endRect.top + endRect.height / 2 - canvasOffset.y
   };
 
-  switch (anchor) {
-    case 'left':
-      return { x: adjustedRect.left, y: adjustedRect.top + adjustedRect.height / 2 };
-    case 'right':
-      return { x: adjustedRect.right, y: adjustedRect.top + adjustedRect.height / 2 };
-    case 'top':
-      return { x: adjustedRect.left + adjustedRect.width / 2, y: adjustedRect.top };
-    case 'bottom':
-      return { x: adjustedRect.left + adjustedRect.width / 2, y: adjustedRect.bottom };
-    default:
-      return { x: adjustedRect.right, y: adjustedRect.top + adjustedRect.height / 2 };
+  // Calculate angle between centers
+  const dx = endCenter.x - startCenter.x;
+  const dy = endCenter.y - startCenter.y;
+
+  // Determine best exit/entry points based on relative position
+  let startPoint: Point;
+  let endPoint: Point;
+
+  // Adjust start rect for canvas offset
+  const sRect = {
+    left: startRect.left - canvasOffset.x,
+    right: startRect.right - canvasOffset.x,
+    top: startRect.top - canvasOffset.y,
+    bottom: startRect.bottom - canvasOffset.y,
+    width: startRect.width,
+    height: startRect.height
+  };
+
+  const eRect = {
+    left: endRect.left - canvasOffset.x,
+    right: endRect.right - canvasOffset.x,
+    top: endRect.top - canvasOffset.y,
+    bottom: endRect.bottom - canvasOffset.y,
+    width: endRect.width,
+    height: endRect.height
+  };
+
+  // More horizontal than vertical
+  if (Math.abs(dx) > Math.abs(dy)) {
+    if (dx > 0) {
+      // End is to the right
+      startPoint = { x: sRect.right, y: sRect.top + sRect.height / 2 };
+      endPoint = { x: eRect.left, y: eRect.top + eRect.height / 2 };
+    } else {
+      // End is to the left
+      startPoint = { x: sRect.left, y: sRect.top + sRect.height / 2 };
+      endPoint = { x: eRect.right, y: eRect.top + eRect.height / 2 };
+    }
+  } else {
+    // More vertical than horizontal
+    if (dy > 0) {
+      // End is below
+      startPoint = { x: sRect.left + sRect.width / 2, y: sRect.bottom };
+      endPoint = { x: eRect.left + eRect.width / 2, y: eRect.top };
+    } else {
+      // End is above
+      startPoint = { x: sRect.left + sRect.width / 2, y: sRect.top };
+      endPoint = { x: eRect.left + eRect.width / 2, y: eRect.bottom };
+    }
   }
+
+  return { startPoint, endPoint };
 }
 
-function generateBezierPath(start: Point, end: Point, startAnchor: string, endAnchor: string): string {
+// Generate smooth bezier curve - Milanote style
+function generateSmoothPath(start: Point, end: Point): string {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const distance = Math.sqrt(dx * dx + dy * dy);
-  const curvature = Math.min(distance * 0.4, 80);
-
-  let cp1x = start.x;
-  let cp1y = start.y;
-  let cp2x = end.x;
-  let cp2y = end.y;
-
-  switch (startAnchor) {
-    case 'right': cp1x = start.x + curvature; break;
-    case 'left': cp1x = start.x - curvature; break;
-    case 'bottom': cp1y = start.y + curvature; break;
-    case 'top': cp1y = start.y - curvature; break;
-  }
-
-  switch (endAnchor) {
-    case 'right': cp2x = end.x + curvature; break;
-    case 'left': cp2x = end.x - curvature; break;
-    case 'bottom': cp2y = end.y + curvature; break;
-    case 'top': cp2y = end.y - curvature; break;
+  
+  // Control point offset - creates nice smooth curves
+  const curveStrength = Math.min(distance * 0.3, 60);
+  
+  // Determine curve direction based on start/end orientation
+  const isHorizontal = Math.abs(dx) > Math.abs(dy);
+  
+  let cp1x, cp1y, cp2x, cp2y;
+  
+  if (isHorizontal) {
+    cp1x = start.x + curveStrength;
+    cp1y = start.y;
+    cp2x = end.x - curveStrength;
+    cp2y = end.y;
+  } else {
+    cp1x = start.x;
+    cp1y = start.y + (dy > 0 ? curveStrength : -curveStrength);
+    cp2x = end.x;
+    cp2y = end.y + (dy > 0 ? -curveStrength : curveStrength);
   }
 
   return `M ${start.x} ${start.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${end.x} ${end.y}`;
 }
 
-// Premium filled arrow head
-function getArrowHead(end: Point, endAnchor: string, size: number = 12): string {
-  const angle = Math.PI / 5;
-  let baseAngle: number;
+// Milanote-style arrowhead - small and elegant
+function getArrowPath(end: Point, start: Point, size: number = 8): string {
+  const angle = Math.atan2(end.y - start.y, end.x - start.x);
+  const arrowAngle = Math.PI / 6; // 30 degrees
   
-  switch (endAnchor) {
-    case 'left': baseAngle = 0; break;
-    case 'right': baseAngle = Math.PI; break;
-    case 'top': baseAngle = Math.PI / 2; break;
-    case 'bottom': baseAngle = -Math.PI / 2; break;
-    default: baseAngle = 0;
-  }
+  const x1 = end.x - size * Math.cos(angle - arrowAngle);
+  const y1 = end.y - size * Math.sin(angle - arrowAngle);
+  const x2 = end.x - size * Math.cos(angle + arrowAngle);
+  const y2 = end.y - size * Math.sin(angle + arrowAngle);
   
-  const tipX = end.x;
-  const tipY = end.y;
-  const x1 = end.x + size * Math.cos(baseAngle - angle);
-  const y1 = end.y + size * Math.sin(baseAngle - angle);
-  const x2 = end.x + size * Math.cos(baseAngle + angle);
-  const y2 = end.y + size * Math.sin(baseAngle + angle);
-  const insetX = end.x + (size * 0.3) * Math.cos(baseAngle);
-  const insetY = end.y + (size * 0.3) * Math.sin(baseAngle);
-  
-  return `M ${tipX} ${tipY} L ${x1} ${y1} L ${insetX} ${insetY} L ${x2} ${y2} Z`;
+  return `M ${end.x} ${end.y} L ${x1} ${y1} L ${x2} ${y2} Z`;
 }
 
 const ConnectorPath = memo(function ConnectorPath({
@@ -172,15 +161,7 @@ const ConnectorPath = memo(function ConnectorPath({
   onSelect: () => void;
   onDelete: () => void;
 }) {
-  const pathRef = useRef<SVGPathElement>(null);
-  const glowPathRef = useRef<SVGPathElement>(null);
-  const shadowPathRef = useRef<SVGPathElement>(null);
-  const hitAreaRef = useRef<SVGPathElement>(null);
-  const arrowRef = useRef<SVGPathElement>(null);
-  const startDotRef = useRef<SVGCircleElement>(null);
-  const endDotRef = useRef<SVGCircleElement>(null);
-  const deleteButtonRef = useRef<SVGGElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
+  const [pathData, setPathData] = useState<{ path: string; arrow: string; midPoint: Point } | null>(null);
 
   const updatePath = useCallback(() => {
     if (!connector.startItemId || !connector.endItemId) return;
@@ -189,62 +170,44 @@ const ConnectorPath = memo(function ConnectorPath({
     const endEl = document.querySelector(`[data-item-id="${connector.endItemId}"]`) as HTMLElement;
 
     if (!startEl || !endEl) {
-      setIsVisible(false);
+      setPathData(null);
       return;
     }
-
-    setIsVisible(true);
 
     const startRect = startEl.getBoundingClientRect();
     const endRect = endEl.getBoundingClientRect();
     
-    // Calculate best anchors dynamically based on element positions
-    const { startAnchor, endAnchor } = getBestAnchors(startRect, endRect);
-
-    const startPoint = getAnchorPointFromElement(startEl, startAnchor, canvasOffset);
-    const endPoint = getAnchorPointFromElement(endEl, endAnchor, canvasOffset);
-    const path = generateBezierPath(startPoint, endPoint, startAnchor, endAnchor);
-    const arrowPath = getArrowHead(endPoint, endAnchor, 14);
-
-    // Update all path elements
-    [pathRef, glowPathRef, shadowPathRef, hitAreaRef].forEach(ref => {
-      if (ref.current) {
-        ref.current.setAttribute('d', path);
-      }
-    });
+    const { startPoint, endPoint } = getSmartAnchorPoint(startRect, endRect, canvasOffset);
+    const path = generateSmoothPath(startPoint, endPoint);
     
-    if (arrowRef.current) {
-      arrowRef.current.setAttribute('d', arrowPath);
-    }
-    if (startDotRef.current && isSelected) {
-      startDotRef.current.setAttribute('cx', String(startPoint.x));
-      startDotRef.current.setAttribute('cy', String(startPoint.y));
-    }
-    if (endDotRef.current && isSelected) {
-      endDotRef.current.setAttribute('cx', String(endPoint.x));
-      endDotRef.current.setAttribute('cy', String(endPoint.y));
-    }
-    if (deleteButtonRef.current && isSelected) {
-      const midX = (startPoint.x + endPoint.x) / 2;
-      const midY = (startPoint.y + endPoint.y) / 2;
-      deleteButtonRef.current.setAttribute('transform', `translate(${midX}, ${midY})`);
-    }
-  }, [connector, canvasOffset, isSelected]);
+    // Calculate control point for arrow direction
+    const dx = endPoint.x - startPoint.x;
+    const isHorizontal = Math.abs(dx) > Math.abs(endPoint.y - startPoint.y);
+    const controlPoint = isHorizontal 
+      ? { x: endPoint.x - Math.min(Math.abs(dx) * 0.3, 60), y: endPoint.y }
+      : { x: endPoint.x, y: endPoint.y - Math.sign(endPoint.y - startPoint.y) * Math.min(Math.abs(endPoint.y - startPoint.y) * 0.3, 60) };
+    
+    const arrow = getArrowPath(endPoint, controlPoint, 10);
+    
+    const midPoint = {
+      x: (startPoint.x + endPoint.x) / 2,
+      y: (startPoint.y + endPoint.y) / 2
+    };
+
+    setPathData({ path, arrow, midPoint });
+  }, [connector, canvasOffset]);
 
   useEffect(() => {
     updatePath();
-
-    const handleUpdate = () => {
-      requestAnimationFrame(updatePath);
-    };
-
+    
+    const handleUpdate = () => requestAnimationFrame(updatePath);
+    
     window.addEventListener('board-item-drag', handleUpdate);
     window.addEventListener('board-canvas-pan', handleUpdate);
     window.addEventListener('resize', handleUpdate);
-
-    // Continuous update for smooth connections
-    const interval = setInterval(updatePath, 50);
-
+    
+    const interval = setInterval(updatePath, 32); // ~30fps for smooth updates
+    
     return () => {
       window.removeEventListener('board-item-drag', handleUpdate);
       window.removeEventListener('board-canvas-pan', handleUpdate);
@@ -253,47 +216,20 @@ const ConnectorPath = memo(function ConnectorPath({
     };
   }, [updatePath]);
 
-  useEffect(() => {
-    updatePath();
-  }, [canvasOffset, updatePath]);
+  if (!pathData) return null;
 
-  if (!isVisible) return null;
-
-  // Use design system colors - bubblegum pink for selected, warm tan for default
-  const strokeColor = isSelected ? 'hsl(340, 82%, 65%)' : 'hsl(35, 22%, 55%)';
-  const glowColor = isSelected ? 'hsla(340, 82%, 65%, 0.4)' : 'hsla(35, 22%, 55%, 0.2)';
-  const lineWidth = connector.strokeWidth || 2.5;
+  // Milanote uses a subtle gray/teal color for lines
+  const lineColor = isSelected ? 'hsl(340, 82%, 65%)' : 'hsl(200, 15%, 50%)';
+  const lineWidth = connector.strokeWidth || 1.5;
 
   return (
-    <g>
-      {/* Shadow for depth */}
+    <g className="connector-group">
+      {/* Hit area - invisible wider stroke for easier clicking */}
       <path
-        ref={shadowPathRef}
-        fill="none"
-        stroke="hsla(0, 0%, 0%, 0.3)"
-        strokeWidth={lineWidth + 4}
-        strokeLinecap="round"
-        className="pointer-events-none"
-        style={{ filter: 'blur(4px)', transform: 'translate(1px, 2px)' }}
-      />
-      
-      {/* Glow effect */}
-      <path
-        ref={glowPathRef}
-        fill="none"
-        stroke={glowColor}
-        strokeWidth={lineWidth + 8}
-        strokeLinecap="round"
-        className="pointer-events-none"
-        style={{ filter: 'blur(6px)' }}
-      />
-      
-      {/* Hit area for clicking */}
-      <path
-        ref={hitAreaRef}
+        d={pathData.path}
         fill="none"
         stroke="transparent"
-        strokeWidth={32}
+        strokeWidth={20}
         className="cursor-pointer"
         onClick={(e) => {
           e.stopPropagation();
@@ -305,50 +241,44 @@ const ConnectorPath = memo(function ConnectorPath({
         }}
       />
       
-      {/* Main line */}
+      {/* Main line - Milanote style: thin, clean, slightly transparent */}
       <path
-        ref={pathRef}
+        d={pathData.path}
         fill="none"
-        stroke={strokeColor}
+        stroke={lineColor}
         strokeWidth={lineWidth}
-        strokeDasharray={connector.strokeStyle === 'dashed' ? '10 6' : undefined}
-        className="pointer-events-none transition-all duration-200"
         strokeLinecap="round"
+        className="pointer-events-none transition-colors duration-150"
+        style={{ opacity: isSelected ? 1 : 0.7 }}
       />
       
-      {/* Arrow head - filled */}
+      {/* Arrowhead - filled, elegant */}
       <path
-        ref={arrowRef}
-        fill={strokeColor}
+        d={pathData.arrow}
+        fill={lineColor}
         stroke="none"
-        className="pointer-events-none transition-all duration-200"
+        className="pointer-events-none transition-colors duration-150"
+        style={{ opacity: isSelected ? 1 : 0.7 }}
       />
       
+      {/* Selection UI - only show when selected */}
       {isSelected && (
         <>
-          {/* Selected state anchor dots with pink glow */}
+          {/* Center control dot */}
           <circle
-            ref={startDotRef}
-            r={8}
-            fill="hsl(340, 82%, 65%)"
-            stroke="hsl(0, 0%, 100%)"
-            strokeWidth={3}
-            className="pointer-events-none"
-            style={{ filter: 'drop-shadow(0 0 6px hsla(340, 82%, 65%, 0.6))' }}
-          />
-          <circle
-            ref={endDotRef}
-            r={8}
-            fill="hsl(340, 82%, 65%)"
-            stroke="hsl(0, 0%, 100%)"
-            strokeWidth={3}
-            className="pointer-events-none"
-            style={{ filter: 'drop-shadow(0 0 6px hsla(340, 82%, 65%, 0.6))' }}
+            cx={pathData.midPoint.x}
+            cy={pathData.midPoint.y}
+            r={5}
+            fill="white"
+            stroke="hsl(340, 82%, 65%)"
+            strokeWidth={2}
+            className="cursor-move"
+            style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }}
           />
           
           {/* Delete button */}
           <g
-            ref={deleteButtonRef}
+            transform={`translate(${pathData.midPoint.x + 16}, ${pathData.midPoint.y - 16})`}
             className="cursor-pointer"
             onClick={(e) => {
               e.stopPropagation();
@@ -360,19 +290,14 @@ const ConnectorPath = memo(function ConnectorPath({
               onDelete();
             }}
           >
-            <circle r={16} fill="hsl(0, 72%, 51%)" style={{ filter: 'drop-shadow(0 2px 8px hsla(0, 0%, 0%, 0.4))' }} />
-            <circle r={14} fill="hsl(0, 72%, 45%)" />
-            <text
-              textAnchor="middle"
-              dominantBaseline="central"
-              fill="white"
-              fontSize={18}
-              fontWeight="bold"
-              className="pointer-events-none select-none"
-              style={{ fontFamily: 'system-ui' }}
-            >
-              ×
-            </text>
+            <circle r={12} fill="hsl(0, 72%, 51%)" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }} />
+            <path
+              d="M -4 -4 L 4 4 M 4 -4 L -4 4"
+              stroke="white"
+              strokeWidth={2}
+              strokeLinecap="round"
+              className="pointer-events-none"
+            />
           </g>
         </>
       )}
@@ -388,6 +313,9 @@ export function ConnectorLayer({
   onSelectConnector,
   onDeleteConnector,
 }: ConnectorLayerProps) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
+
   const connectors: Connector[] = items
     .filter(item => item.type === 'connector')
     .map(item => ({
@@ -396,17 +324,10 @@ export function ConnectorLayer({
       endItemId: item.end_item_id || null,
       startAnchor: item.start_anchor || 'right',
       endAnchor: item.end_anchor || 'left',
-      strokeWidth: item.stroke_width || 2.5,
+      strokeWidth: item.stroke_width || 1.5,
       strokeStyle: item.stroke_style || 'solid',
-      strokeColor: item.stroke_color || 'hsl(35, 22%, 55%)',
+      strokeColor: item.stroke_color || 'hsl(200, 15%, 50%)',
     }));
-
-  const handleBackgroundClick = useCallback(() => {
-    onSelectConnector(null);
-  }, [onSelectConnector]);
-
-  const svgRef = useRef<SVGSVGElement>(null);
-  const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
 
   const updateCanvasOffset = useCallback(() => {
     if (svgRef.current) {
@@ -420,15 +341,12 @@ export function ConnectorLayer({
   }, [offset, updateCanvasOffset]);
 
   useEffect(() => {
-    const handleUpdate = () => {
-      updateCanvasOffset();
-    };
-
+    const handleUpdate = () => updateCanvasOffset();
+    
     window.addEventListener('resize', handleUpdate);
     window.addEventListener('board-canvas-pan', handleUpdate);
     
-    // More frequent updates for smoother connections
-    const interval = setInterval(updateCanvasOffset, 50);
+    const interval = setInterval(updateCanvasOffset, 32);
     
     return () => {
       window.removeEventListener('resize', handleUpdate);
@@ -437,20 +355,19 @@ export function ConnectorLayer({
     };
   }, [updateCanvasOffset]);
 
-  if (connectors.length === 0) {
-    return null;
-  }
+  const handleBackgroundClick = useCallback(() => {
+    onSelectConnector(null);
+  }, [onSelectConnector]);
+
+  if (connectors.length === 0) return null;
 
   return (
     <svg
       ref={svgRef}
       className="absolute inset-0 pointer-events-none overflow-visible"
-      style={{ zIndex: 5 }}
+      style={{ zIndex: 10 }}
     >
-      <g 
-        className="pointer-events-auto"
-        onClick={handleBackgroundClick}
-      >
+      <g className="pointer-events-auto" onClick={handleBackgroundClick}>
         {connectors.map((connector) => (
           <ConnectorPath
             key={connector.id}
