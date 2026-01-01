@@ -45,8 +45,12 @@ serve(async (req) => {
 
     const { eventId, eventTitle, ticketPrice, quantity = 1 } = await req.json();
 
-    if (!eventId || !ticketPrice) {
-      throw new Error("Missing required fields: eventId, ticketPrice");
+    if (!eventId) {
+      throw new Error("Missing required field: eventId");
+    }
+
+    if (!ticketPrice || ticketPrice <= 0) {
+      throw new Error("Invalid ticket price: A valid ticket price is required for paid events");
     }
 
     console.log(`Creating checkout session for event: ${eventId}, price: ${ticketPrice}`);
