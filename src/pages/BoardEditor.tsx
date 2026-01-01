@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { useBoard, useBoards } from "@/hooks/useBoards";
 import { useBoardItems, BoardItemType } from "@/hooks/useBoardItems";
 import { useAuth } from "@/contexts/AuthContext";
 import { Json } from "@/integrations/supabase/types";
+import { toast } from "sonner";
 
 const BoardEditor = () => {
   const { boardId } = useParams<{ boardId: string }>();
@@ -22,9 +23,22 @@ const BoardEditor = () => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState("");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
+  
+  // Connect mode state
+  const [isConnectMode, setIsConnectMode] = useState(false);
+  const [connectStartItemId, setConnectStartItemId] = useState<string | null>(null);
 
   const handleAddItem = async (type: BoardItemType, customContent?: Json, customX?: number, customY?: number) => {
     if (!boardId) return;
+    
+    // If clicking Line tool, enter connect mode instead of creating an item
+    if (type === 'line' || type === 'connector') {
+      setIsConnectMode(true);
+      setConnectStartItemId(null);
+      toast.info("Connect mode: Click a card to start, then click another card to connect");
+      return;
+    }
     
     // Calculate center position based on viewport
     const centerX = customX ?? 100 + Math.random() * 400;
@@ -37,17 +51,14 @@ const BoardEditor = () => {
           ? { items: [{ text: '', done: false }] }
           : type === 'link'
             ? { url: '', title: '' }
-            : type === 'line'
-              ? { color: '#ffffff', thickness: 2 }
-              : {}
+            : {}
     );
 
-    const dimensions = {
+    const dimensions: Record<string, { w: number; h: number }> = {
       note: { w: 200, h: 180 },
       todo: { w: 240, h: 200 },
       link: { w: 200, h: 100 },
       image: { w: 240, h: 200 },
-      line: { w: 200, h: 8 },
       column: { w: 280, h: 400 },
       board_ref: { w: 160, h: 140 },
     };
@@ -73,6 +84,69 @@ const BoardEditor = () => {
   const handleCreateItem = (type: BoardItemType, content: Json, x: number, y: number) => {
     handleAddItem(type, content, x, y);
   };
+
+  // Handle item click in connect mode
+  const handleItemClickForConnect = useCallback(async (itemId: string) => {
+    if (!isConnectMode || !boardId) return false;
+
+    // Don't allow connecting to connectors
+    const clickedItem = items.find(i => i.id === itemId);
+    if (clickedItem?.type === 'connector' || clickedItem?.type === 'line') {
+      return false;
+    }
+
+    if (!connectStartItemId) {
+      // First click - set start item
+      setConnectStartItemId(itemId);
+      toast.info("Now click another card to complete the connection");
+      return true;
+    } else if (connectStartItemId !== itemId) {
+      // Second click - create connector
+      try {
+        await createItem.mutateAsync({
+          board_id: boardId,
+          type: 'connector',
+          title: null,
+          content: {},
+          x: 0,
+          y: 0,
+          w: 0,
+          h: 0,
+          rotation: 0,
+          z_index: items.length,
+          parent_item_id: null,
+          created_by: user?.id || null,
+          start_item_id: connectStartItemId,
+          end_item_id: itemId,
+          start_anchor: 'right',
+          end_anchor: 'left',
+          stroke_width: 2,
+          stroke_style: 'solid',
+          stroke_color: '#ffffff',
+        });
+        toast.success("Connection created!");
+      } catch (error) {
+        console.error('Failed to create connector:', error);
+        toast.error("Failed to create connection");
+      }
+      
+      // Exit connect mode
+      setIsConnectMode(false);
+      setConnectStartItemId(null);
+      return true;
+    }
+    return false;
+  }, [isConnectMode, connectStartItemId, boardId, items, createItem, user?.id]);
+
+  const handleCancelConnectMode = useCallback(() => {
+    setIsConnectMode(false);
+    setConnectStartItemId(null);
+  }, []);
+
+  const handleDeleteConnector = useCallback((id: string) => {
+    deleteItem.mutate(id);
+    setSelectedConnectorId(null);
+  }, [deleteItem]);
 
   const handleTitleSave = () => {
     if (!boardId || !editedTitle.trim()) {
@@ -120,7 +194,10 @@ const BoardEditor = () => {
   return (
     <div className="min-h-screen bg-[#3a3a3a] flex">
       {/* Left Sidebar - Milanote style */}
-      <BoardSidebar onAddItem={handleAddItem} />
+      <BoardSidebar 
+        onAddItem={handleAddItem} 
+        isConnectMode={isConnectMode}
+      />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
@@ -171,8 +248,19 @@ const BoardEditor = () => {
             )}
           </div>
 
-          <div className="flex items-center gap-2 text-white/50 text-sm">
-            <span>0 Unsorted</span>
+          <div className="flex items-center gap-2">
+            {isConnectMode && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCancelConnectMode}
+                className="text-white border-white/20 hover:bg-white/10"
+              >
+                <X className="w-3 h-3 mr-1" />
+                Cancel Connect
+              </Button>
+            )}
+            <span className="text-white/50 text-sm">0 Unsorted</span>
           </div>
         </motion.header>
 
@@ -181,10 +269,20 @@ const BoardEditor = () => {
           <BoardCanvas
             items={items}
             selectedItemId={selectedItemId}
-            onSelectItem={setSelectedItemId}
+            selectedConnectorId={selectedConnectorId}
+            isConnectMode={isConnectMode}
+            connectStartItemId={connectStartItemId}
+            onSelectItem={(id) => {
+              // Clear connector selection when selecting an item
+              setSelectedConnectorId(null);
+              setSelectedItemId(id);
+            }}
+            onSelectConnector={setSelectedConnectorId}
             onUpdateItem={(id, updates) => updateItem.mutate({ id, ...updates })}
             onDeleteItem={(id) => deleteItem.mutate(id)}
+            onDeleteConnector={handleDeleteConnector}
             onCreateItem={handleCreateItem}
+            onItemClickForConnect={handleItemClickForConnect}
           />
         </div>
       </div>
