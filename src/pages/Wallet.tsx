@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import { useSearchParams } from 'react-router-dom';
 import { 
   Wallet, Plus, CreditCard, Building2, Smartphone, Trash2, 
   Check, ArrowUpRight, ArrowDownLeft, Coins, Clock, CheckCircle, XCircle
@@ -18,8 +19,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
-const payoutMethodIcons = {
+const payoutMethodIcons: Record<string, any> = {
   bank_account: Building2,
   debit_card: CreditCard,
   apple_pay: Smartphone,
@@ -35,6 +39,9 @@ const statusColors: Record<string, string> = {
 
 const WalletPage: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { credits, isLoading: creditsLoading } = useCredits();
   const { ledger, isLoading: ledgerLoading } = useCreditLedger();
   const { methods, setupPayoutMethod, setDefaultMethod, deleteMethod, isSettingUp } = usePayoutMethods();
@@ -45,17 +52,45 @@ const WalletPage: React.FC = () => {
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
   const [payoutDialogOpen, setPayoutDialogOpen] = useState(false);
 
+  // Handle Stripe setup callback
+  useEffect(() => {
+    const setupResult = searchParams.get('setup');
+    if (setupResult === 'success') {
+      toast({ title: 'Payment method added successfully!' });
+      // Sync payment methods from Stripe
+      supabase.functions.invoke('setup-payout-method', {
+        body: { type: 'sync' }
+      }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['payout-methods'] });
+      });
+      // Clear the param
+      searchParams.delete('setup');
+      setSearchParams(searchParams, { replace: true });
+    } else if (setupResult === 'cancelled') {
+      toast({ title: 'Setup cancelled', variant: 'destructive' });
+      searchParams.delete('setup');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams, toast, queryClient]);
+
   const handleRequestPayout = () => {
     const amount = parseFloat(payoutAmount);
-    if (!amount || amount <= 0) return;
+    if (!amount || amount <= 0) {
+      toast({ title: 'Invalid amount', description: 'Please enter a valid amount', variant: 'destructive' });
+      return;
+    }
 
     if (selectedMethod === 'credits') {
       requestPayout({ amount, use_credits: true });
     } else if (selectedMethod) {
       requestPayout({ amount, payout_method_id: selectedMethod });
+    } else {
+      toast({ title: 'Select a payout method', variant: 'destructive' });
+      return;
     }
     setPayoutDialogOpen(false);
     setPayoutAmount('');
+    setSelectedMethod(null);
   };
 
   if (!user) {
