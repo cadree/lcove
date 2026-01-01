@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, forwardRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,19 +7,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, Users, Calendar, GraduationCap, Building2, Briefcase, Sparkles, Heart, Crown, ArrowRight, Wallet, CheckCircle2, PiggyBank } from "lucide-react";
+import { TrendingUp, Users, Calendar, GraduationCap, Building2, Briefcase, Heart, Crown, ArrowRight, Wallet, CheckCircle2, PiggyBank, RefreshCw } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useMembership } from "@/hooks/useMembership";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFundStats } from "@/hooks/useFundStats";
+import { toast } from "sonner";
 
 const ALLOCATION_DATA = [
-  { name: "Community Grants", value: 40, color: "hsl(330, 100%, 71%)", icon: Users, description: "Direct support for creative projects and artist grants" },
-  { name: "Events & Activations", value: 20, color: "hsl(30, 30%, 50%)", icon: Calendar, description: "Gatherings, workshops, showcases, and community events" },
-  { name: "Education", value: 15, color: "hsl(30, 30%, 65%)", icon: GraduationCap, description: "Learning programs, mentorship, and skill development" },
-  { name: "Infrastructure", value: 15, color: "hsl(30, 30%, 40%)", icon: Building2, description: "Platform development, tools, and creative spaces" },
-  { name: "Operations", value: 10, color: "hsl(30, 20%, 55%)", icon: Briefcase, description: "Team compensation and community operations" },
+  { name: "Community Grants", key: "communityGrants", color: "hsl(330, 100%, 71%)", icon: Users, description: "Direct support for creative projects and artist grants" },
+  { name: "Events & Activations", key: "eventsActivations", color: "hsl(30, 30%, 50%)", icon: Calendar, description: "Gatherings, workshops, showcases, and community events" },
+  { name: "Education", key: "education", color: "hsl(30, 30%, 65%)", icon: GraduationCap, description: "Learning programs, mentorship, and skill development" },
+  { name: "Infrastructure", key: "infrastructure", color: "hsl(30, 30%, 40%)", icon: Building2, description: "Platform development, tools, and creative spaces" },
+  { name: "Operations", key: "operations", color: "hsl(30, 20%, 55%)", icon: Briefcase, description: "Team compensation and community operations" },
 ];
 
 const formatCurrency = (value: number) => {
@@ -31,22 +32,28 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
-const AnimatedNumber = ({ value, prefix = "" }: { value: number; prefix?: string }) => {
-  return (
-    <motion.span
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
-    >
-      {prefix}{value.toLocaleString()}
-    </motion.span>
-  );
-};
+const AnimatedNumber = forwardRef<HTMLSpanElement, { value: number; prefix?: string }>(
+  ({ value, prefix = "" }, ref) => {
+    return (
+      <motion.span
+        ref={ref}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        key={value}
+      >
+        {prefix}{value.toLocaleString()}
+      </motion.span>
+    );
+  }
+);
 
-const CustomTooltip = ({ active, payload }: any) => {
+AnimatedNumber.displayName = "AnimatedNumber";
+
+const CustomTooltip = forwardRef<HTMLDivElement, any>(({ active, payload }, ref) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-card/95 backdrop-blur-sm border border-border rounded-xl p-3 shadow-xl">
+      <div ref={ref} className="bg-card/95 backdrop-blur-sm border border-border rounded-xl p-3 shadow-xl">
         <p className="text-foreground font-medium">{payload[0].payload.month}</p>
         {payload.map((entry: any, index: number) => (
           <p key={index} className="text-sm text-muted-foreground">
@@ -57,30 +64,66 @@ const CustomTooltip = ({ active, payload }: any) => {
     );
   }
   return null;
-};
+});
 
-const PieTooltip = ({ active, payload }: any) => {
+CustomTooltip.displayName = "CustomTooltip";
+
+const PieTooltip = forwardRef<HTMLDivElement, any>(({ active, payload }, ref) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
-      <div className="bg-card/95 backdrop-blur-sm border border-border rounded-xl p-3 shadow-xl">
+      <div ref={ref} className="bg-card/95 backdrop-blur-sm border border-border rounded-xl p-3 shadow-xl">
         <p className="text-foreground font-medium">{data.name}</p>
-        <p className="text-primary text-lg font-bold">{data.value}%</p>
+        <p className="text-primary text-lg font-bold">{formatCurrency(data.value)}</p>
         <p className="text-sm text-muted-foreground max-w-[200px]">{data.description}</p>
       </div>
     );
   }
   return null;
-};
+});
+
+PieTooltip.displayName = "PieTooltip";
 
 export default function FundDashboard() {
   const [view, setView] = useState<"lifetime" | "monthly">("lifetime");
   const { user } = useAuth();
-  const { membership, isLoading: membershipLoading } = useMembership();
-  const { data: fundStats, isLoading: fundLoading } = useFundStats();
+  const navigate = useNavigate();
+  const { membership, isLoading: membershipLoading, startCheckout, openCustomerPortal } = useMembership();
+  const { data: fundStats, isLoading: fundLoading, refetch, isFetching } = useFundStats();
   
   const stats = view === "lifetime" ? fundStats?.lifetime : fundStats?.monthly;
   const isMember = membership?.subscribed;
+
+  // Prepare pie chart data with actual dollar amounts
+  const pieChartData = ALLOCATION_DATA.map(item => ({
+    ...item,
+    value: fundStats?.allocations?.[item.key as keyof typeof fundStats.allocations] || 0,
+  }));
+
+  const handleContribute = async () => {
+    if (!user) {
+      toast.error("Please sign in to contribute");
+      navigate("/auth");
+      return;
+    }
+
+    if (!isMember) {
+      navigate("/membership");
+      return;
+    }
+
+    // Already a member - just show a toast
+    toast.info("You're already a member! Manage your subscription below.");
+  };
+
+  const handleManageSubscription = async () => {
+    try {
+      await openCustomerPortal();
+    } catch (error) {
+      console.error('Error opening portal:', error);
+      toast.error("Failed to open subscription management");
+    }
+  };
 
   return (
     <PageLayout>
@@ -94,8 +137,8 @@ export default function FundDashboard() {
             className="mb-8"
           />
 
-          {/* View Toggle */}
-          <div className="flex justify-center mb-8">
+          {/* View Toggle with Refresh */}
+          <div className="flex justify-center items-center gap-4 mb-8">
             <Tabs value={view} onValueChange={(v) => setView(v as "lifetime" | "monthly")} className="w-auto">
               <TabsList className="bg-card/50 backdrop-blur-sm border border-border">
                 <TabsTrigger value="lifetime" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
@@ -106,6 +149,23 @@ export default function FundDashboard() {
                 </TabsTrigger>
               </TabsList>
             </Tabs>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="shrink-0"
+            >
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+
+          {/* Live indicator */}
+          <div className="flex justify-center mb-6">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              Live updates enabled
+            </div>
           </div>
 
           {/* Stats Grid */}
@@ -193,7 +253,7 @@ export default function FundDashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={ALLOCATION_DATA}
+                          data={pieChartData}
                           cx="50%"
                           cy="50%"
                           innerRadius={60}
@@ -203,7 +263,7 @@ export default function FundDashboard() {
                           animationBegin={0}
                           animationDuration={1000}
                         >
-                          {ALLOCATION_DATA.map((entry, index) => (
+                          {pieChartData.map((entry, index) => (
                             <Cell 
                               key={`cell-${index}`} 
                               fill={entry.color}
@@ -281,7 +341,7 @@ export default function FundDashboard() {
             </motion.div>
           </div>
 
-          {/* Allocation Details */}
+          {/* Allocation Details - No percentages, just dollar amounts */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -295,7 +355,9 @@ export default function FundDashboard() {
                 <div className="grid gap-4">
                   {ALLOCATION_DATA.map((item, index) => {
                     const Icon = item.icon;
-                    const amount = (stats?.totalDistributed || 0) * item.value / 100;
+                    const amount = fundStats?.allocations?.[item.key as keyof typeof fundStats.allocations] || 0;
+                    const totalDistributed = fundStats?.lifetime.totalDistributed || 1;
+                    const percentage = totalDistributed > 0 ? (amount / totalDistributed) * 100 : 0;
                     
                     return (
                       <motion.div
@@ -314,9 +376,6 @@ export default function FundDashboard() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <h3 className="font-medium text-foreground">{item.name}</h3>
-                            <Badge variant="secondary" className="text-xs">
-                              {item.value}%
-                            </Badge>
                           </div>
                           <p className="text-sm text-muted-foreground truncate">{item.description}</p>
                         </div>
@@ -334,7 +393,7 @@ export default function FundDashboard() {
                           <div className="h-2 bg-muted rounded-full overflow-hidden">
                             <motion.div
                               initial={{ width: 0 }}
-                              animate={{ width: `${item.value}%` }}
+                              animate={{ width: `${percentage}%` }}
                               transition={{ duration: 1, delay: 0.2 * index }}
                               className="h-full rounded-full"
                               style={{ backgroundColor: item.color }}
@@ -398,16 +457,19 @@ export default function FundDashboard() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       <Heart className="w-4 h-4 text-primary fill-primary" />
                       You're part of {stats?.memberCount || 0}+ members building this community
-                    </span>
-                    {membership?.grant_eligible && (
-                      <Badge variant="secondary" className="bg-primary/10 text-primary border-0">
-                        Grant Eligible
-                      </Badge>
-                    )}
+                      {membership?.grant_eligible && (
+                        <Badge variant="secondary" className="bg-primary/10 text-primary border-0 ml-2">
+                          Grant Eligible
+                        </Badge>
+                      )}
+                    </div>
+                    <Button variant="outline" size="sm" onClick={handleManageSubscription}>
+                      Manage Subscription
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -430,12 +492,14 @@ export default function FundDashboard() {
                         </p>
                       </div>
                     </div>
-                    <Link to="/membership">
-                      <Button size="lg" className="group">
-                        Learn More
-                        <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                      </Button>
-                    </Link>
+                    <Button 
+                      size="lg" 
+                      className="group"
+                      onClick={handleContribute}
+                    >
+                      Become a Member
+                      <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -502,7 +566,8 @@ export default function FundDashboard() {
             transition={{ delay: 0.6 }}
             className="mt-12 text-center"
           >
-            <p className="text-muted-foreground text-sm">
+            <p className="text-muted-foreground text-sm flex items-center justify-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500" />
               Updated in real-time • Audited quarterly • Community-governed decisions
             </p>
           </motion.div>
