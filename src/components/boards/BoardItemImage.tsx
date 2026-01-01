@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Image, Upload, Video, Loader2 } from "lucide-react";
+import { Image, Upload, Video, Loader2, X } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -23,6 +23,7 @@ export function BoardItemImage({ content, onChange }: BoardItemImageProps) {
   const [alt, setAlt] = useState(imageContent?.alt || "");
   const [mediaType, setMediaType] = useState<'image' | 'video'>(imageContent?.mediaType || 'image');
   const [isUploading, setIsUploading] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(!imageContent?.url);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -30,6 +31,7 @@ export function BoardItemImage({ content, onChange }: BoardItemImageProps) {
     setUrl(c?.url || "");
     setAlt(c?.alt || "");
     setMediaType(c?.mediaType || 'image');
+    setShowUrlInput(!c?.url);
   }, [content]);
 
   const handleBlur = () => {
@@ -58,7 +60,6 @@ export function BoardItemImage({ content, onChange }: BoardItemImageProps) {
         .upload(filePath, file);
 
       if (uploadError) {
-        // If bucket doesn't exist, create it first
         if (uploadError.message.includes('Bucket not found')) {
           toast.error("Storage not configured. Please contact support.");
           return;
@@ -73,6 +74,7 @@ export function BoardItemImage({ content, onChange }: BoardItemImageProps) {
       const newMediaType = isVideo ? 'video' : 'image';
       setUrl(publicUrl);
       setMediaType(newMediaType);
+      setShowUrlInput(false);
       onChange({ url: publicUrl, alt: file.name, mediaType: newMediaType } as unknown as Json);
       toast.success(`${isVideo ? 'Video' : 'Image'} uploaded successfully`);
     } catch (error) {
@@ -90,29 +92,45 @@ export function BoardItemImage({ content, onChange }: BoardItemImageProps) {
     }
   };
 
+  const handleClearMedia = () => {
+    setUrl("");
+    setAlt("");
+    setShowUrlInput(true);
+    onChange({ url: "", alt: "", mediaType: 'image' } as unknown as Json);
+  };
+
   return (
-    <div className="p-3 space-y-2">
+    <div className="p-2 space-y-2">
       {url ? (
-        <div className="relative">
+        <div className="relative group">
           {mediaType === 'video' ? (
             <video
               src={url}
               controls
-              className="w-full h-auto rounded-md object-cover max-h-48"
+              className="w-full h-auto rounded-md object-contain max-h-48"
+              playsInline
             />
           ) : (
             <img
               src={url}
               alt={alt}
-              className="w-full h-auto rounded-md object-cover max-h-48"
+              className="w-full h-auto rounded-md object-contain max-h-48"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
               }}
             />
           )}
+          <Button
+            variant="destructive"
+            size="icon"
+            className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={handleClearMedia}
+          >
+            <X className="w-3 h-3" />
+          </Button>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-4 text-muted-foreground">
+        <div className="flex flex-col items-center justify-center py-4 text-muted-foreground bg-black/20 rounded-lg">
           {isUploading ? (
             <Loader2 className="w-8 h-8 mb-2 animate-spin" />
           ) : (
@@ -121,7 +139,7 @@ export function BoardItemImage({ content, onChange }: BoardItemImageProps) {
                 <Image className="w-6 h-6" />
                 <Video className="w-6 h-6" />
               </div>
-              <span className="text-xs mb-3">Upload or paste URL</span>
+              <span className="text-xs mb-3 text-white/60">Upload or paste URL</span>
               <Button
                 variant="outline"
                 size="sm"
@@ -142,13 +160,15 @@ export function BoardItemImage({ content, onChange }: BoardItemImageProps) {
         className="hidden"
         onChange={handleInputChange}
       />
-      <Input
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-        onBlur={handleBlur}
-        placeholder="Or paste URL..."
-        className="h-7 text-xs border-none bg-muted/50 focus-visible:ring-1"
-      />
+      {showUrlInput && (
+        <Input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onBlur={handleBlur}
+          placeholder="Or paste URL..."
+          className="h-7 text-xs border-none bg-white/10 focus-visible:ring-1 text-white placeholder:text-white/40"
+        />
+      )}
     </div>
   );
 }

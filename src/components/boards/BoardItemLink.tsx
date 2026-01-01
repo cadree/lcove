@@ -28,36 +28,45 @@ export function BoardItemLink({ content, onChange }: BoardItemLinkProps) {
     onChange({ url, title } as unknown as Json);
   };
 
-  const openLink = () => {
+  const openLink = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
     if (url) {
       const fullUrl = url.startsWith('http') ? url : `https://${url}`;
-      window.open(fullUrl, '_blank');
+      window.open(fullUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
+  const handleInputClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
   return (
-    <div className="p-3 space-y-2">
+    <div className="p-3 space-y-2" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center gap-2">
         <ExternalLink className="w-4 h-4 text-primary flex-shrink-0" />
         <Input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={handleBlur}
+          onClick={handleInputClick}
           placeholder="Link title..."
-          className="flex-1 h-7 text-sm font-medium border-none bg-transparent p-0 focus-visible:ring-0"
+          className="flex-1 h-7 text-sm font-medium border-none bg-transparent p-0 focus-visible:ring-0 text-gray-800"
         />
       </div>
       <Input
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         onBlur={handleBlur}
+        onClick={handleInputClick}
         placeholder="https://example.com"
-        className="h-7 text-xs text-muted-foreground border-none bg-transparent p-0 focus-visible:ring-0"
+        className="h-7 text-xs text-gray-600 border-none bg-transparent p-0 focus-visible:ring-0"
       />
       {url && (
         <button
+          type="button"
           onClick={openLink}
-          className="text-xs text-primary hover:underline"
+          className="text-xs text-primary hover:underline font-medium"
         >
           Open link →
         </button>

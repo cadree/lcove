@@ -57,69 +57,73 @@ export const BoardItem = memo(function BoardItem({
   onDelete,
 }: BoardItemProps) {
   const elementRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const isDraggingRef = useRef(false);
+  const [isDraggingState, setIsDraggingState] = useState(false);
   const positionRef = useRef({ x: item.x, y: item.y });
   const startPosRef = useRef({ x: 0, y: 0 });
   const startMouseRef = useRef({ x: 0, y: 0 });
+  const hasDraggedRef = useRef(false);
 
-  // Sync position when item.x/y changes from DB (only when not dragging)
+  // Sync position from props only when not dragging
   useEffect(() => {
-    if (!isDragging) {
+    if (!isDraggingRef.current) {
       positionRef.current = { x: item.x, y: item.y };
-      if (elementRef.current) {
-        elementRef.current.style.transform = `translate3d(${item.x}px, ${item.y}px, 0)`;
-      }
     }
-  }, [item.x, item.y, isDragging]);
+  }, [item.x, item.y]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0 || isConnectMode) return;
     
     e.stopPropagation();
-    setIsDragging(true);
+    e.preventDefault();
     
-    startPosRef.current = { ...positionRef.current };
+    isDraggingRef.current = true;
+    hasDraggedRef.current = false;
+    setIsDraggingState(true);
+    
+    startPosRef.current = { x: positionRef.current.x, y: positionRef.current.y };
     startMouseRef.current = { x: e.clientX, y: e.clientY };
 
-    if (elementRef.current) {
-      elementRef.current.style.willChange = 'transform';
-      elementRef.current.style.cursor = 'grabbing';
-    }
-
     const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      
+      hasDraggedRef.current = true;
+      
       const deltaX = moveEvent.clientX - startMouseRef.current.x;
       const deltaY = moveEvent.clientY - startMouseRef.current.y;
       
-      positionRef.current = {
-        x: startPosRef.current.x + deltaX,
-        y: startPosRef.current.y + deltaY,
-      };
+      const newX = startPosRef.current.x + deltaX;
+      const newY = startPosRef.current.y + deltaY;
+      
+      positionRef.current = { x: newX, y: newY };
 
       if (elementRef.current) {
-        elementRef.current.style.transform = `translate3d(${positionRef.current.x}px, ${positionRef.current.y}px, 0)`;
+        elementRef.current.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
       }
 
-      // Dispatch custom event for connector updates
-      window.dispatchEvent(new CustomEvent('board-item-drag', {
-        detail: { moving: true }
-      }));
+      window.dispatchEvent(new CustomEvent('board-item-drag', { detail: { moving: true } }));
     };
 
     const handleMouseUp = () => {
-      setIsDragging(false);
+      if (!isDraggingRef.current) return;
       
-      if (elementRef.current) {
-        elementRef.current.style.willChange = '';
-        elementRef.current.style.cursor = '';
+      isDraggingRef.current = false;
+      setIsDraggingState(false);
+
+      // Only save to DB if we actually moved
+      if (hasDraggedRef.current) {
+        const finalX = positionRef.current.x;
+        const finalY = positionRef.current.y;
+        
+        // Ensure the visual position stays locked during DB update
+        if (elementRef.current) {
+          elementRef.current.style.transform = `translate3d(${finalX}px, ${finalY}px, 0)`;
+        }
+        
+        onDragEnd(finalX, finalY);
       }
 
-      // Only write to DB once on drag end
-      onDragEnd(positionRef.current.x, positionRef.current.y);
-
-      // Notify connectors to do final update
-      window.dispatchEvent(new CustomEvent('board-item-drag', {
-        detail: { moving: false }
-      }));
+      window.dispatchEvent(new CustomEvent('board-item-drag', { detail: { moving: false } }));
 
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
@@ -138,7 +142,7 @@ export const BoardItem = memo(function BoardItem({
       case 'link':
         return "bg-white";
       case 'image':
-        return "bg-[#1a1a1a] overflow-hidden";
+        return "bg-transparent overflow-hidden";
       case 'line':
         return "bg-transparent";
       case 'column':
@@ -223,8 +227,8 @@ export const BoardItem = memo(function BoardItem({
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isDragging) onSelect();
-  }, [isDragging, onSelect]);
+    if (!hasDraggedRef.current) onSelect();
+  }, [onSelect]);
 
   const handleDeleteClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -261,19 +265,19 @@ export const BoardItem = memo(function BoardItem({
       onClick={handleClick}
       className={cn(
         "absolute rounded-lg",
-        isDragging ? "" : "shadow-lg",
+        isDraggingState ? "" : "shadow-lg",
         isConnectMode ? "cursor-crosshair" : "cursor-grab",
         getItemStyles(),
         isSelected && "ring-2 ring-primary",
         isConnectStart && "ring-2 ring-green-500 ring-offset-2 ring-offset-[#3a3a3a]",
         isConnectMode && !isConnectStart && "hover:ring-2 hover:ring-blue-400",
-        isDragging && "opacity-90 z-[9999]"
+        isDraggingState && "opacity-90 z-[9999]"
       )}
       style={{
         width: item.w,
         minHeight: item.h,
-        zIndex: isDragging ? 9999 : isSelected ? 1000 : item.z_index,
-        transform: `translate3d(${item.x}px, ${item.y}px, 0)`,
+        zIndex: isDraggingState ? 9999 : isSelected ? 1000 : item.z_index,
+        transform: `translate3d(${positionRef.current.x}px, ${positionRef.current.y}px, 0)`,
         backfaceVisibility: 'hidden',
       }}
     >
