@@ -39,7 +39,7 @@ interface BoardCanvasProps {
   connectStartItemId: string | null;
   onSelectItem: (id: string | null) => void;
   onSelectConnector: (id: string | null) => void;
-  onUpdateItem: (id: string, updates: Partial<BoardItemData>) => void;
+  onUpdateItem: (id: string, updates: { x?: number; y?: number; w?: number; h?: number; content?: Json }) => void;
   onDeleteItem: (id: string) => void;
   onDeleteConnector: (id: string) => void;
   onCreateItem?: (type: ItemType, content: Json, x: number, y: number) => void;
