@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, memo } from "react";
 import { BoardItem as BoardItemType, BoardItemType as ItemType } from "@/hooks/useBoardItems";
-import { BoardItemOptimized } from "./BoardItemOptimized";
-import { ConnectorLayerOptimized } from "./ConnectorLayerOptimized";
+import { BoardItem } from "./BoardItem";
+import { ConnectorLayer } from "./ConnectorLayer";
 import { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -187,7 +187,7 @@ export const BoardCanvas = memo(function BoardCanvas({
       }}
     >
       {/* Connector Layer - renders SVG connections */}
-      <ConnectorLayerOptimized
+      <ConnectorLayer
         items={items}
         offset={offset}
         selectedConnectorId={selectedConnectorId}
@@ -202,7 +202,7 @@ export const BoardCanvas = memo(function BoardCanvas({
         }}
       >
         {nonConnectorItems.map((item) => (
-          <BoardItemOptimized
+          <BoardItem
             key={item.id}
             item={item}
             isSelected={selectedItemId === item.id}
