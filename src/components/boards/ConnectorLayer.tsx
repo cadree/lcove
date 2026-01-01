@@ -96,9 +96,9 @@ function generateBezierPath(start: Point, end: Point, startAnchor: string, endAn
   return `M ${start.x} ${start.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${end.x} ${end.y}`;
 }
 
-// Calculate arrow head points
-function getArrowHead(end: Point, endAnchor: string, size: number = 10): string {
-  const angle = Math.PI / 6; // 30 degrees
+// Calculate filled arrow head polygon points
+function getArrowHead(end: Point, endAnchor: string, size: number = 8): string {
+  const angle = Math.PI / 7; // Narrower angle for sleeker look
   let baseAngle: number;
   
   switch (endAnchor) {
@@ -109,12 +109,18 @@ function getArrowHead(end: Point, endAnchor: string, size: number = 10): string 
     default: baseAngle = 0;
   }
   
+  // Create a filled triangle arrow
+  const tipX = end.x;
+  const tipY = end.y;
   const x1 = end.x + size * Math.cos(baseAngle - angle);
   const y1 = end.y + size * Math.sin(baseAngle - angle);
   const x2 = end.x + size * Math.cos(baseAngle + angle);
   const y2 = end.y + size * Math.sin(baseAngle + angle);
+  // Add a slight inset for a more refined arrow shape
+  const insetX = end.x + (size * 0.4) * Math.cos(baseAngle);
+  const insetY = end.y + (size * 0.4) * Math.sin(baseAngle);
   
-  return `M ${x1} ${y1} L ${end.x} ${end.y} L ${x2} ${y2}`;
+  return `M ${tipX} ${tipY} L ${x1} ${y1} L ${insetX} ${insetY} L ${x2} ${y2} Z`;
 }
 
 const ConnectorPath = memo(function ConnectorPath({
@@ -202,16 +208,17 @@ const ConnectorPath = memo(function ConnectorPath({
 
   if (!isVisible) return null;
 
-  const strokeColor = isSelected ? '#3b82f6' : connector.strokeColor;
+  const strokeColor = isSelected ? '#60a5fa' : (connector.strokeColor || '#64748b');
+  const lineWidth = connector.strokeWidth || 1.5;
 
   return (
-    <g>
+    <g style={{ filter: isSelected ? 'drop-shadow(0 0 4px rgba(96, 165, 250, 0.5))' : 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15))' }}>
       {/* Hit area for clicking */}
       <path
         ref={hitAreaRef}
         fill="none"
         stroke="transparent"
-        strokeWidth={20}
+        strokeWidth={24}
         className="cursor-pointer"
         onClick={(e) => {
           e.stopPropagation();
@@ -223,34 +230,39 @@ const ConnectorPath = memo(function ConnectorPath({
         ref={pathRef}
         fill="none"
         stroke={strokeColor}
-        strokeWidth={connector.strokeWidth}
-        strokeDasharray={connector.strokeStyle === 'dashed' ? '8 4' : undefined}
-        className="pointer-events-none"
+        strokeWidth={lineWidth}
+        strokeDasharray={connector.strokeStyle === 'dashed' ? '6 4' : undefined}
+        className="pointer-events-none transition-colors duration-150"
         strokeLinecap="round"
+        style={{ opacity: 0.9 }}
       />
-      {/* Arrow head */}
+      {/* Arrow head - filled */}
       <path
         ref={arrowRef}
-        fill="none"
-        stroke={strokeColor}
-        strokeWidth={connector.strokeWidth}
-        className="pointer-events-none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        fill={strokeColor}
+        stroke="none"
+        className="pointer-events-none transition-colors duration-150"
+        style={{ opacity: 0.9 }}
       />
       {isSelected && (
         <>
           <circle
             ref={startDotRef}
-            r={6}
-            fill="#3b82f6"
+            r={5}
+            fill="#60a5fa"
+            stroke="#ffffff"
+            strokeWidth={2}
             className="pointer-events-none"
+            style={{ filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2))' }}
           />
           <circle
             ref={endDotRef}
-            r={6}
-            fill="#3b82f6"
+            r={5}
+            fill="#60a5fa"
+            stroke="#ffffff"
+            strokeWidth={2}
             className="pointer-events-none"
+            style={{ filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2))' }}
           />
           <g
             ref={deleteButtonRef}
