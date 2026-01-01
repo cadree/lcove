@@ -71,8 +71,56 @@ export const BoardItem = memo(function BoardItem({
     }
   }, [item.x, item.y]);
 
+  const startDrag = useCallback((clientX: number, clientY: number) => {
+    isDraggingRef.current = true;
+    hasDraggedRef.current = false;
+    setIsDraggingState(true);
+    
+    startPosRef.current = { x: positionRef.current.x, y: positionRef.current.y };
+    startMouseRef.current = { x: clientX, y: clientY };
+  }, []);
+
+  const moveDrag = useCallback((clientX: number, clientY: number) => {
+    if (!isDraggingRef.current) return;
+    
+    hasDraggedRef.current = true;
+    
+    const deltaX = clientX - startMouseRef.current.x;
+    const deltaY = clientY - startMouseRef.current.y;
+    
+    const newX = startPosRef.current.x + deltaX;
+    const newY = startPosRef.current.y + deltaY;
+    
+    positionRef.current = { x: newX, y: newY };
+
+    if (elementRef.current) {
+      elementRef.current.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
+    }
+
+    window.dispatchEvent(new CustomEvent('board-item-drag', { detail: { moving: true } }));
+  }, []);
+
+  const endDrag = useCallback(() => {
+    if (!isDraggingRef.current) return;
+    
+    isDraggingRef.current = false;
+    setIsDraggingState(false);
+
+    if (hasDraggedRef.current) {
+      const finalX = positionRef.current.x;
+      const finalY = positionRef.current.y;
+      
+      if (elementRef.current) {
+        elementRef.current.style.transform = `translate3d(${finalX}px, ${finalY}px, 0)`;
+      }
+      
+      onDragEnd(finalX, finalY);
+    }
+
+    window.dispatchEvent(new CustomEvent('board-item-drag', { detail: { moving: false } }));
+  }, [onDragEnd]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // Allow clicks on interactive elements inside the card
     const target = e.target as HTMLElement;
     const isInteractive = target.tagName === 'INPUT' || 
                           target.tagName === 'TEXTAREA' || 
@@ -86,60 +134,55 @@ export const BoardItem = memo(function BoardItem({
     e.stopPropagation();
     e.preventDefault();
     
-    isDraggingRef.current = true;
-    hasDraggedRef.current = false;
-    setIsDraggingState(true);
-    
-    startPosRef.current = { x: positionRef.current.x, y: positionRef.current.y };
-    startMouseRef.current = { x: e.clientX, y: e.clientY };
+    startDrag(e.clientX, e.clientY);
+
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!isDraggingRef.current) return;
-      
-      hasDraggedRef.current = true;
-      
-      const deltaX = moveEvent.clientX - startMouseRef.current.x;
-      const deltaY = moveEvent.clientY - startMouseRef.current.y;
-      
-      const newX = startPosRef.current.x + deltaX;
-      const newY = startPosRef.current.y + deltaY;
-      
-      positionRef.current = { x: newX, y: newY };
-
-      if (elementRef.current) {
-        elementRef.current.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
-      }
-
-      window.dispatchEvent(new CustomEvent('board-item-drag', { detail: { moving: true } }));
+      moveDrag(moveEvent.clientX, moveEvent.clientY);
     };
 
     const handleMouseUp = () => {
-      if (!isDraggingRef.current) return;
-      
-      isDraggingRef.current = false;
-      setIsDraggingState(false);
-
-      // Only save to DB if we actually moved
-      if (hasDraggedRef.current) {
-        const finalX = positionRef.current.x;
-        const finalY = positionRef.current.y;
-        
-        // Ensure the visual position stays locked during DB update
-        if (elementRef.current) {
-          elementRef.current.style.transform = `translate3d(${finalX}px, ${finalY}px, 0)`;
-        }
-        
-        onDragEnd(finalX, finalY);
-      }
-
-      window.dispatchEvent(new CustomEvent('board-item-drag', { detail: { moving: false } }));
-
+      endDrag();
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, [isConnectMode, onDragEnd]);
+  }, [isConnectMode, startDrag, moveDrag, endDrag]);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    const isInteractive = target.tagName === 'INPUT' || 
+                          target.tagName === 'TEXTAREA' || 
+                          target.tagName === 'BUTTON' ||
+                          target.closest('button') ||
+                          target.closest('input') ||
+                          target.closest('textarea');
+    
+    if (isConnectMode || isInteractive) return;
+    
+    e.stopPropagation();
+    
+    const touch = e.touches[0];
+    startDrag(touch.clientX, touch.clientY);
+
+    const handleTouchMove = (moveEvent: TouchEvent) => {
+      moveEvent.preventDefault();
+      const moveTouch = moveEvent.touches[0];
+      moveDrag(moveTouch.clientX, moveTouch.clientY);
+    };
+
+    const handleTouchEnd = () => {
+      endDrag();
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('touchcancel', handleTouchEnd);
+    };
+
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+    document.addEventListener('touchcancel', handleTouchEnd);
+  }, [isConnectMode, startDrag, moveDrag, endDrag]);
 
   const getItemStyles = useCallback(() => {
     switch (item.type) {
@@ -274,6 +317,7 @@ export const BoardItem = memo(function BoardItem({
       ref={elementRef}
       data-item-id={item.id}
       onMouseDown={handleMouseDown}
+      onTouchStart={handleTouchStart}
       onClick={handleClick}
       className={cn(
         "absolute rounded-lg",
