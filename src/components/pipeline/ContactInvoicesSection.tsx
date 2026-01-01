@@ -250,46 +250,55 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
               {/* Line Items */}
               <div className="space-y-2">
                 <Label>Line Items</Label>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {newInvoice.line_items.map((item, index) => (
-                    <div key={index} className="flex gap-2 items-start">
+                    <div key={index} className="p-3 bg-muted/30 rounded-lg space-y-2">
                       <Input
-                        placeholder="Description"
+                        placeholder="Item description"
                         value={item.description}
                         onChange={(e) => updateLineItem(index, 'description', e.target.value)}
-                        className="flex-1"
                       />
-                      <Input
-                        type="number"
-                        placeholder="Qty"
-                        value={item.quantity}
-                        onChange={(e) => updateLineItem(index, 'quantity', parseFloat(e.target.value) || 0)}
-                        className="w-16"
-                      />
-                      <Input
-                        type="number"
-                        placeholder="Price"
-                        value={item.unit_price}
-                        onChange={(e) => updateLineItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                        className="w-20"
-                      />
-                      <span className="text-sm text-muted-foreground w-16 text-right pt-2">
-                        ${item.total.toFixed(2)}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9"
-                        onClick={() => removeLineItem(index)}
-                        disabled={newInvoice.line_items.length <= 1}
-                        role="button"
-                        aria-label="Remove line item"
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Quantity</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => updateLineItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Unit Price ($)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={item.unit_price || ''}
+                            onChange={(e) => updateLineItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Total</Label>
+                          <div className="h-9 px-3 flex items-center bg-muted rounded-md font-medium">
+                            ${item.total.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                      {newInvoice.line_items.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive h-7 text-xs"
+                          onClick={() => removeLineItem(index)}
+                        >
+                          <X className="w-3 h-3 mr-1" /> Remove
+                        </Button>
+                      )}
                     </div>
                   ))}
-                  <Button variant="outline" size="sm" onClick={addLineItem} role="button">
+                  <Button variant="outline" size="sm" onClick={addLineItem}>
                     <Plus className="w-4 h-4 mr-1" /> Add Item
                   </Button>
                 </div>
