@@ -184,6 +184,7 @@ export const BoardItem = memo(function BoardItem({
           <BoardItemLink
             content={item.content}
             onChange={onContentChange}
+            isSelected={isSelected}
           />
         );
       case 'image':
