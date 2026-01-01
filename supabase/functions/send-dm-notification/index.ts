@@ -312,8 +312,17 @@ serve(async (req) => {
 
             const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
             
+            // Format phone number with country code if not present
+            let formattedPhone = profile.phone.replace(/\D/g, ''); // Remove non-digits
+            if (!formattedPhone.startsWith('1') && formattedPhone.length === 10) {
+              formattedPhone = '1' + formattedPhone; // Add US country code
+            }
+            if (!formattedPhone.startsWith('+')) {
+              formattedPhone = '+' + formattedPhone;
+            }
+            
             const formData = new URLSearchParams();
-            formData.append("To", profile.phone);
+            formData.append("To", formattedPhone);
             formData.append("From", twilioPhone);
             formData.append("Body", smsBody);
 
