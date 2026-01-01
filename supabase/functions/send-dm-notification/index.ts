@@ -260,19 +260,23 @@ serve(async (req) => {
             console.error("Error fetching user:", userError);
             results.email = "error_fetching_user";
           } else if (userData?.user?.email) {
+            const recipientEmail = userData.user.email;
+            console.log(`Sending email notification to: ${recipientEmail}`);
+            
             const resend = new Resend(resendApiKey);
             const html = getEmailTemplate(sender_name, message_preview, conversation_id);
             
             const emailResponse = await resend.emails.send({
               from: EMAIL_FROM,
-              to: [userData.user.email],
+              to: [recipientEmail],
               subject: `New message from ${sender_name}`,
               html,
             });
 
-            console.log("Email sent:", emailResponse);
+            console.log("Email sent to", recipientEmail, ":", emailResponse);
             results.email = "sent";
           } else {
+            console.log("No email found for user");
             results.email = "no_email";
           }
         } else {
@@ -314,12 +318,16 @@ serve(async (req) => {
             
             // Format phone number with country code if not present
             let formattedPhone = profile.phone.replace(/\D/g, ''); // Remove non-digits
+            console.log(`Original phone: ${profile.phone}, stripped: ${formattedPhone}`);
+            
             if (!formattedPhone.startsWith('1') && formattedPhone.length === 10) {
               formattedPhone = '1' + formattedPhone; // Add US country code
             }
             if (!formattedPhone.startsWith('+')) {
               formattedPhone = '+' + formattedPhone;
             }
+            
+            console.log(`Sending SMS to formatted phone: ${formattedPhone}`);
             
             const formData = new URLSearchParams();
             formData.append("To", formattedPhone);
@@ -335,12 +343,14 @@ serve(async (req) => {
               body: formData.toString(),
             });
 
+            const smsResponseData = await smsResponse.text();
+            console.log(`SMS API response (${smsResponse.status}):`, smsResponseData);
+
             if (smsResponse.ok) {
-              console.log("SMS sent successfully");
+              console.log(`SMS sent successfully to ${formattedPhone}`);
               results.sms = "sent";
             } else {
-              const errorText = await smsResponse.text();
-              console.error("SMS send failed:", errorText);
+              console.error("SMS send failed:", smsResponseData);
               results.sms = "failed";
             }
           } else {
