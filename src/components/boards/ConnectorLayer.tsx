@@ -28,6 +28,7 @@ interface Connector {
 interface ConnectorLayerProps {
   items: BoardItemData[];
   offset: { x: number; y: number };
+  scale?: number;
   selectedConnectorId: string | null;
   onSelectConnector: (id: string | null) => void;
   onDeleteConnector: (id: string) => void;
@@ -72,7 +73,7 @@ function generateBezierPath(start: Point, end: Point, startAnchor: string, endAn
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const distance = Math.sqrt(dx * dx + dy * dy);
-  const curvature = Math.min(distance * 0.4, 100);
+  const curvature = Math.min(distance * 0.5, 120);
 
   let cp1x = start.x;
   let cp1y = start.y;
@@ -96,9 +97,9 @@ function generateBezierPath(start: Point, end: Point, startAnchor: string, endAn
   return `M ${start.x} ${start.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${end.x} ${end.y}`;
 }
 
-// Calculate filled arrow head polygon points
-function getArrowHead(end: Point, endAnchor: string, size: number = 8): string {
-  const angle = Math.PI / 7; // Narrower angle for sleeker look
+// Premium arrow head design - sleek chevron style
+function getArrowHead(end: Point, endAnchor: string, size: number = 10): string {
+  const angle = Math.PI / 6;
   let baseAngle: number;
   
   switch (endAnchor) {
@@ -109,16 +110,14 @@ function getArrowHead(end: Point, endAnchor: string, size: number = 8): string {
     default: baseAngle = 0;
   }
   
-  // Create a filled triangle arrow
   const tipX = end.x;
   const tipY = end.y;
   const x1 = end.x + size * Math.cos(baseAngle - angle);
   const y1 = end.y + size * Math.sin(baseAngle - angle);
   const x2 = end.x + size * Math.cos(baseAngle + angle);
   const y2 = end.y + size * Math.sin(baseAngle + angle);
-  // Add a slight inset for a more refined arrow shape
-  const insetX = end.x + (size * 0.4) * Math.cos(baseAngle);
-  const insetY = end.y + (size * 0.4) * Math.sin(baseAngle);
+  const insetX = end.x + (size * 0.35) * Math.cos(baseAngle);
+  const insetY = end.y + (size * 0.35) * Math.sin(baseAngle);
   
   return `M ${tipX} ${tipY} L ${x1} ${y1} L ${insetX} ${insetY} L ${x2} ${y2} Z`;
 }
@@ -160,7 +159,7 @@ const ConnectorPath = memo(function ConnectorPath({
     const startPoint = getAnchorPointFromElement(startEl, connector.startAnchor, canvasOffset);
     const endPoint = getAnchorPointFromElement(endEl, connector.endAnchor, canvasOffset);
     const path = generateBezierPath(startPoint, endPoint, connector.startAnchor, connector.endAnchor);
-    const arrowPath = getArrowHead(endPoint, connector.endAnchor, 12);
+    const arrowPath = getArrowHead(endPoint, connector.endAnchor, 14);
 
     if (pathRef.current) {
       pathRef.current.setAttribute('d', path);
@@ -193,12 +192,22 @@ const ConnectorPath = memo(function ConnectorPath({
       requestAnimationFrame(updatePath);
     };
 
+    const handlePan = () => {
+      requestAnimationFrame(updatePath);
+    };
+
     window.addEventListener('board-item-drag', handleDrag);
+    window.addEventListener('board-canvas-pan', handlePan);
     window.addEventListener('resize', handleDrag);
+
+    // Update more frequently during interactions
+    const interval = setInterval(updatePath, 100);
 
     return () => {
       window.removeEventListener('board-item-drag', handleDrag);
+      window.removeEventListener('board-canvas-pan', handlePan);
       window.removeEventListener('resize', handleDrag);
+      clearInterval(interval);
     };
   }, [updatePath]);
 
@@ -208,62 +217,102 @@ const ConnectorPath = memo(function ConnectorPath({
 
   if (!isVisible) return null;
 
-  const strokeColor = isSelected ? '#60a5fa' : (connector.strokeColor || '#64748b');
-  const lineWidth = connector.strokeWidth || 1.5;
+  const strokeColor = isSelected ? '#818cf8' : (connector.strokeColor || '#94a3b8');
+  const glowColor = isSelected ? 'rgba(129, 140, 248, 0.6)' : 'rgba(148, 163, 184, 0.3)';
+  const lineWidth = connector.strokeWidth || 2;
 
   return (
-    <g style={{ filter: isSelected ? 'drop-shadow(0 0 4px rgba(96, 165, 250, 0.5))' : 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15))' }}>
+    <g>
+      {/* Glow effect behind the line */}
+      <path
+        fill="none"
+        stroke={glowColor}
+        strokeWidth={lineWidth + 6}
+        strokeLinecap="round"
+        className="pointer-events-none"
+        style={{ filter: 'blur(4px)' }}
+        ref={(el) => {
+          if (el && pathRef.current) {
+            const d = pathRef.current.getAttribute('d');
+            if (d) el.setAttribute('d', d);
+          }
+        }}
+      />
+      
       {/* Hit area for clicking */}
       <path
         ref={hitAreaRef}
         fill="none"
         stroke="transparent"
-        strokeWidth={24}
+        strokeWidth={28}
         className="cursor-pointer"
         onClick={(e) => {
           e.stopPropagation();
           onSelect();
         }}
+        onTouchEnd={(e) => {
+          e.stopPropagation();
+          onSelect();
+        }}
       />
-      {/* Main line */}
+      
+      {/* Main line - gradient effect simulated with layered strokes */}
+      <path
+        fill="none"
+        stroke="rgba(0,0,0,0.2)"
+        strokeWidth={lineWidth + 1}
+        strokeDasharray={connector.strokeStyle === 'dashed' ? '8 5' : undefined}
+        className="pointer-events-none"
+        strokeLinecap="round"
+        ref={(el) => {
+          if (el && pathRef.current) {
+            const d = pathRef.current.getAttribute('d');
+            if (d) el.setAttribute('d', d);
+          }
+        }}
+      />
       <path
         ref={pathRef}
         fill="none"
         stroke={strokeColor}
         strokeWidth={lineWidth}
-        strokeDasharray={connector.strokeStyle === 'dashed' ? '6 4' : undefined}
-        className="pointer-events-none transition-colors duration-150"
+        strokeDasharray={connector.strokeStyle === 'dashed' ? '8 5' : undefined}
+        className="pointer-events-none transition-all duration-200"
         strokeLinecap="round"
-        style={{ opacity: 0.9 }}
       />
-      {/* Arrow head - filled */}
+      
+      {/* Arrow head - filled with premium look */}
       <path
         ref={arrowRef}
         fill={strokeColor}
         stroke="none"
-        className="pointer-events-none transition-colors duration-150"
-        style={{ opacity: 0.9 }}
+        className="pointer-events-none transition-all duration-200"
+        style={{ filter: isSelected ? 'drop-shadow(0 0 3px rgba(129, 140, 248, 0.5))' : 'none' }}
       />
+      
       {isSelected && (
         <>
+          {/* Selected state anchor dots with glow */}
           <circle
             ref={startDotRef}
-            r={5}
-            fill="#60a5fa"
+            r={7}
+            fill="#818cf8"
             stroke="#ffffff"
-            strokeWidth={2}
+            strokeWidth={2.5}
             className="pointer-events-none"
-            style={{ filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2))' }}
+            style={{ filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3))' }}
           />
           <circle
             ref={endDotRef}
-            r={5}
-            fill="#60a5fa"
+            r={7}
+            fill="#818cf8"
             stroke="#ffffff"
-            strokeWidth={2}
+            strokeWidth={2.5}
             className="pointer-events-none"
-            style={{ filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2))' }}
+            style={{ filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3))' }}
           />
+          
+          {/* Delete button with better styling */}
           <g
             ref={deleteButtonRef}
             className="cursor-pointer"
@@ -271,13 +320,19 @@ const ConnectorPath = memo(function ConnectorPath({
               e.stopPropagation();
               onDelete();
             }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onDelete();
+            }}
           >
-            <circle r={12} fill="#ef4444" />
+            <circle r={14} fill="#ef4444" style={{ filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3))' }} />
+            <circle r={12} fill="#dc2626" />
             <text
               textAnchor="middle"
               dominantBaseline="central"
               fill="white"
-              fontSize={14}
+              fontSize={16}
               fontWeight="bold"
               className="pointer-events-none select-none"
             >
@@ -293,6 +348,7 @@ const ConnectorPath = memo(function ConnectorPath({
 export function ConnectorLayer({
   items,
   offset,
+  scale = 1,
   selectedConnectorId,
   onSelectConnector,
   onDeleteConnector,
@@ -307,7 +363,7 @@ export function ConnectorLayer({
       endAnchor: item.end_anchor || 'left',
       strokeWidth: item.stroke_width || 2,
       strokeStyle: item.stroke_style || 'solid',
-      strokeColor: item.stroke_color || '#ffffff',
+      strokeColor: item.stroke_color || '#94a3b8',
     }));
 
   const handleBackgroundClick = useCallback(() => {
@@ -317,7 +373,7 @@ export function ConnectorLayer({
   const svgRef = useRef<SVGSVGElement>(null);
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
 
-  useEffect(() => {
+  const updateCanvasOffset = useCallback(() => {
     if (svgRef.current) {
       const rect = svgRef.current.getBoundingClientRect();
       setCanvasOffset({ x: rect.left + offset.x, y: rect.top + offset.y });
@@ -325,16 +381,26 @@ export function ConnectorLayer({
   }, [offset]);
 
   useEffect(() => {
+    updateCanvasOffset();
+  }, [offset, updateCanvasOffset]);
+
+  useEffect(() => {
     const handleResize = () => {
-      if (svgRef.current) {
-        const rect = svgRef.current.getBoundingClientRect();
-        setCanvasOffset({ x: rect.left + offset.x, y: rect.top + offset.y });
-      }
+      updateCanvasOffset();
+    };
+
+    const handlePan = () => {
+      updateCanvasOffset();
     };
 
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [offset]);
+    window.addEventListener('board-canvas-pan', handlePan);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('board-canvas-pan', handlePan);
+    };
+  }, [updateCanvasOffset]);
 
   if (connectors.length === 0) {
     return null;
@@ -346,6 +412,16 @@ export function ConnectorLayer({
       className="absolute inset-0 pointer-events-none overflow-visible"
       style={{ zIndex: 5 }}
     >
+      <defs>
+        {/* SVG filters for premium effects */}
+        <filter id="connector-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="2" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
       <g 
         className="pointer-events-auto"
         onClick={handleBackgroundClick}

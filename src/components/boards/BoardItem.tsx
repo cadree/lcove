@@ -63,11 +63,15 @@ export const BoardItem = memo(function BoardItem({
   const startPosRef = useRef({ x: 0, y: 0 });
   const startMouseRef = useRef({ x: 0, y: 0 });
   const hasDraggedRef = useRef(false);
+  const rafRef = useRef<number | null>(null);
 
   // Sync position from props only when not dragging
   useEffect(() => {
     if (!isDraggingRef.current) {
       positionRef.current = { x: item.x, y: item.y };
+      if (elementRef.current) {
+        elementRef.current.style.transform = `translate3d(${item.x}px, ${item.y}px, 0)`;
+      }
     }
   }, [item.x, item.y]);
 
@@ -93,11 +97,17 @@ export const BoardItem = memo(function BoardItem({
     
     positionRef.current = { x: newX, y: newY };
 
-    if (elementRef.current) {
-      elementRef.current.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
+    // Use RAF for smooth 60fps updates
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
     }
-
-    window.dispatchEvent(new CustomEvent('board-item-drag', { detail: { moving: true } }));
+    
+    rafRef.current = requestAnimationFrame(() => {
+      if (elementRef.current) {
+        elementRef.current.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
+      }
+      window.dispatchEvent(new CustomEvent('board-item-drag', { detail: { moving: true } }));
+    });
   }, []);
 
   const endDrag = useCallback(() => {
@@ -105,6 +115,11 @@ export const BoardItem = memo(function BoardItem({
     
     isDraggingRef.current = false;
     setIsDraggingState(false);
+
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
 
     if (hasDraggedRef.current) {
       const finalX = positionRef.current.x;
@@ -125,9 +140,11 @@ export const BoardItem = memo(function BoardItem({
     const isInteractive = target.tagName === 'INPUT' || 
                           target.tagName === 'TEXTAREA' || 
                           target.tagName === 'BUTTON' ||
+                          target.tagName === 'VIDEO' ||
                           target.closest('button') ||
                           target.closest('input') ||
-                          target.closest('textarea');
+                          target.closest('textarea') ||
+                          target.closest('video');
     
     if (e.button !== 0 || isConnectMode || isInteractive) return;
     
@@ -155,11 +172,14 @@ export const BoardItem = memo(function BoardItem({
     const isInteractive = target.tagName === 'INPUT' || 
                           target.tagName === 'TEXTAREA' || 
                           target.tagName === 'BUTTON' ||
+                          target.tagName === 'VIDEO' ||
                           target.closest('button') ||
                           target.closest('input') ||
-                          target.closest('textarea');
+                          target.closest('textarea') ||
+                          target.closest('video') ||
+                          target.closest('[data-expand-media]');
     
-    if (isConnectMode || isInteractive) return;
+    if (isConnectMode || isInteractive || e.touches.length !== 1) return;
     
     e.stopPropagation();
     
@@ -167,6 +187,7 @@ export const BoardItem = memo(function BoardItem({
     startDrag(touch.clientX, touch.clientY);
 
     const handleTouchMove = (moveEvent: TouchEvent) => {
+      if (moveEvent.touches.length !== 1) return;
       moveEvent.preventDefault();
       const moveTouch = moveEvent.touches[0];
       moveDrag(moveTouch.clientX, moveTouch.clientY);
@@ -312,6 +333,32 @@ export const BoardItem = memo(function BoardItem({
     document.addEventListener('mouseup', handleUp);
   }, [item.w, item.h, onResize]);
 
+  // Touch-friendly resize
+  const handleResizeTouchStart = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation();
+    const touch = e.touches[0];
+    const startX = touch.clientX;
+    const startY = touch.clientY;
+    const startW = item.w;
+    const startH = item.h;
+
+    const handleTouchMove = (moveEvent: TouchEvent) => {
+      moveEvent.preventDefault();
+      const moveTouch = moveEvent.touches[0];
+      const newW = Math.max(100, startW + moveTouch.clientX - startX);
+      const newH = Math.max(60, startH + moveTouch.clientY - startY);
+      onResize(newW, newH);
+    };
+
+    const handleTouchEnd = () => {
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+  }, [item.w, item.h, onResize]);
+
   return (
     <div
       ref={elementRef}
@@ -320,14 +367,14 @@ export const BoardItem = memo(function BoardItem({
       onTouchStart={handleTouchStart}
       onClick={handleClick}
       className={cn(
-        "absolute rounded-lg",
+        "absolute rounded-lg will-change-transform",
         isDraggingState ? "" : "shadow-lg",
-        isConnectMode ? "cursor-crosshair" : "cursor-grab",
+        isConnectMode ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing",
         getItemStyles(),
         isSelected && "ring-2 ring-primary",
         isConnectStart && "ring-2 ring-green-500 ring-offset-2 ring-offset-[#3a3a3a]",
         isConnectMode && !isConnectStart && "hover:ring-2 hover:ring-blue-400",
-        isDraggingState && "opacity-90 z-[9999]"
+        isDraggingState && "opacity-90 z-[9999] shadow-2xl"
       )}
       style={{
         width: item.w,
@@ -335,16 +382,23 @@ export const BoardItem = memo(function BoardItem({
         zIndex: isDraggingState ? 9999 : isSelected ? 1000 : item.z_index,
         transform: `translate3d(${positionRef.current.x}px, ${positionRef.current.y}px, 0)`,
         backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
+        touchAction: 'none',
       }}
     >
       {isSelected && (
         <Button
           variant="destructive"
           size="icon"
-          className="absolute -top-2 -right-2 h-6 w-6 rounded-full z-10"
+          className="absolute -top-2 -right-2 h-7 w-7 rounded-full z-10 min-h-[28px]"
           onClick={handleDeleteClick}
+          onTouchEnd={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onDelete();
+          }}
         >
-          <Trash2 className="w-3 h-3" />
+          <Trash2 className="w-3.5 h-3.5" />
         </Button>
       )}
 
@@ -352,10 +406,11 @@ export const BoardItem = memo(function BoardItem({
 
       {isSelected && (
         <div
-          className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize"
+          className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize"
           onMouseDown={handleResizeMouseDown}
+          onTouchStart={handleResizeTouchStart}
         >
-          <div className="absolute bottom-1 right-1 w-2 h-2 border-r-2 border-b-2 border-primary rounded-br" />
+          <div className="absolute bottom-1 right-1 w-3 h-3 border-r-2 border-b-2 border-primary rounded-br" />
         </div>
       )}
     </div>

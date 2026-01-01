@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, memo } from "react";
+import { useRef, useState, useCallback, memo, useEffect } from "react";
 import { BoardItem } from "./BoardItem";
 import { ConnectorLayer } from "./ConnectorLayer";
 import { Json } from "@/integrations/supabase/types";
@@ -68,6 +68,15 @@ export const BoardCanvas = memo(function BoardCanvas({
   const [isDragOver, setIsDragOver] = useState(false);
   const initialPinchDistanceRef = useRef<number | null>(null);
   const initialScaleRef = useRef<number>(1);
+  
+  // For single-finger panning on mobile
+  const singleTouchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const isSingleTouchPanning = useRef(false);
+
+  // Dispatch custom event when offset changes for connector updates
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('board-canvas-pan'));
+  }, [offset, scale]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('canvas-inner')) {
@@ -107,9 +116,6 @@ export const BoardCanvas = memo(function BoardCanvas({
     setIsPanning(false);
   }, []);
 
-  // Touch handlers for mobile canvas panning and zooming (two-finger)
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-
   const getPinchDistance = (touches: React.TouchList) => {
     const dx = touches[0].clientX - touches[1].clientX;
     const dy = touches[0].clientY - touches[1].clientY;
@@ -117,20 +123,35 @@ export const BoardCanvas = memo(function BoardCanvas({
   };
   
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    // Two-finger touch for panning and zooming
+    const target = e.target as HTMLElement;
+    const isOnCard = target.closest('[data-item-id]');
+    
+    // Two-finger touch for pinch zoom
     if (e.touches.length === 2) {
       e.preventDefault();
       const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
       setIsPanning(true);
       startPanRef.current = { x: midX - offset.x, y: midY - offset.y };
-      touchStartRef.current = { x: midX, y: midY };
       initialPinchDistanceRef.current = getPinchDistance(e.touches);
       initialScaleRef.current = scale;
+      isSingleTouchPanning.current = false;
+    }
+    // Single-finger touch for panning (only if not on a card)
+    else if (e.touches.length === 1 && !isOnCard) {
+      const touch = e.touches[0];
+      singleTouchStartRef.current = { 
+        x: touch.clientX, 
+        y: touch.clientY,
+        time: Date.now()
+      };
+      startPanRef.current = { x: touch.clientX - offset.x, y: touch.clientY - offset.y };
+      isSingleTouchPanning.current = true;
     }
   }, [offset, scale]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    // Two-finger pinch to zoom and pan
     if (e.touches.length === 2) {
       e.preventDefault();
       const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
@@ -153,12 +174,29 @@ export const BoardCanvas = memo(function BoardCanvas({
         setScale(newScale);
       }
     }
+    // Single-finger panning
+    else if (e.touches.length === 1 && isSingleTouchPanning.current && singleTouchStartRef.current) {
+      const touch = e.touches[0];
+      const dx = touch.clientX - singleTouchStartRef.current.x;
+      const dy = touch.clientY - singleTouchStartRef.current.y;
+      
+      // Start panning after threshold to avoid accidental pans
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        e.preventDefault();
+        const newOffset = {
+          x: touch.clientX - startPanRef.current.x,
+          y: touch.clientY - startPanRef.current.y,
+        };
+        setOffset(newOffset);
+      }
+    }
   }, [isPanning]);
 
   const handleTouchEnd = useCallback(() => {
     setIsPanning(false);
-    touchStartRef.current = null;
+    singleTouchStartRef.current = null;
     initialPinchDistanceRef.current = null;
+    isSingleTouchPanning.current = false;
   }, []);
 
   // Mouse wheel zoom
@@ -255,9 +293,10 @@ export const BoardCanvas = memo(function BoardCanvas({
   return (
     <div
       ref={canvasRef}
-      className={`absolute inset-0 overflow-hidden transition-colors touch-none ${
+      className={`absolute inset-0 overflow-hidden transition-colors ${
         isDragOver ? 'bg-primary/10 ring-2 ring-primary ring-inset' : ''
       } ${isConnectMode ? 'cursor-crosshair' : 'cursor-default'}`}
+      style={{ touchAction: 'none' }}
       onClick={handleCanvasClick}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -272,16 +311,22 @@ export const BoardCanvas = memo(function BoardCanvas({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      style={{
-        backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`,
-        backgroundSize: `${20 * scale}px ${20 * scale}px`,
-        backgroundPosition: `${offset.x}px ${offset.y}px`,
-        backgroundColor: '#3a3a3a',
-      }}
     >
+      {/* Background grid layer */}
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`,
+          backgroundSize: `${20 * scale}px ${20 * scale}px`,
+          backgroundPosition: `${offset.x}px ${offset.y}px`,
+          backgroundColor: '#3a3a3a',
+        }}
+      />
+      
       <ConnectorLayer
         items={items}
         offset={offset}
+        scale={scale}
         selectedConnectorId={selectedConnectorId}
         onSelectConnector={onSelectConnector}
         onDeleteConnector={onDeleteConnector}

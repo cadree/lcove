@@ -70,14 +70,14 @@ export function DrawingLayer({ isActive, offset, onClose }: DrawingLayerProps) {
     ctx.stroke();
   };
 
-  const getCanvasPoint = useCallback((e: React.MouseEvent | React.Touch): Point => {
+  const getCanvasPoint = useCallback((clientX: number, clientY: number): Point => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
 
     const rect = canvas.getBoundingClientRect();
     return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: clientX - rect.left,
+      y: clientY - rect.top,
     };
   }, []);
 
@@ -86,14 +86,14 @@ export function DrawingLayer({ isActive, offset, onClose }: DrawingLayerProps) {
     if (e.button !== 0) return;
     e.stopPropagation();
     setIsDrawing(true);
-    const point = getCanvasPoint(e);
+    const point = getCanvasPoint(e.clientX, e.clientY);
     setCurrentStroke([point]);
   }, [getCanvasPoint]);
 
   const handleCanvasMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDrawing) return;
     e.stopPropagation();
-    const point = getCanvasPoint(e);
+    const point = getCanvasPoint(e.clientX, e.clientY);
     setCurrentStroke((prev) => [...prev, point]);
   }, [isDrawing, getCanvasPoint]);
 
@@ -115,7 +115,8 @@ export function DrawingLayer({ isActive, offset, onClose }: DrawingLayerProps) {
     e.preventDefault();
     e.stopPropagation();
     setIsDrawing(true);
-    const point = getCanvasPoint(e.touches[0]);
+    const touch = e.touches[0];
+    const point = getCanvasPoint(touch.clientX, touch.clientY);
     setCurrentStroke([point]);
   }, [getCanvasPoint]);
 
@@ -123,7 +124,8 @@ export function DrawingLayer({ isActive, offset, onClose }: DrawingLayerProps) {
     if (!isDrawing || e.touches.length !== 1) return;
     e.preventDefault();
     e.stopPropagation();
-    const point = getCanvasPoint(e.touches[0]);
+    const touch = e.touches[0];
+    const point = getCanvasPoint(touch.clientX, touch.clientY);
     setCurrentStroke((prev) => [...prev, point]);
   }, [isDrawing, getCanvasPoint]);
 
@@ -139,44 +141,37 @@ export function DrawingLayer({ isActive, offset, onClose }: DrawingLayerProps) {
     setCurrentStroke([]);
   }, [isDrawing, currentStroke, strokeColor, strokeWidth]);
 
-  const handleClear = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
+  const handleClear = useCallback(() => {
     setStrokes([]);
     setCurrentStroke([]);
   }, []);
 
-  const handleColorClick = useCallback((e: React.MouseEvent | React.TouchEvent, color: string) => {
-    e.stopPropagation();
-    e.preventDefault();
+  const handleColorSelect = useCallback((color: string) => {
     setStrokeColor(color);
   }, []);
 
   const handleSliderChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    e.stopPropagation();
     setStrokeWidth(Number(e.target.value));
   }, []);
 
-  const handleDone = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
+  const handleDone = useCallback(() => {
     onClose();
   }, [onClose]);
-
-  const handleToolbarMouseDown = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.stopPropagation();
-  }, []);
 
   if (!isActive) return null;
 
   return (
-    <div className="absolute inset-0 z-50">
-      {/* Toolbar - positioned above canvas */}
+    <div className="absolute inset-0" style={{ zIndex: 100 }}>
+      {/* Toolbar - positioned above canvas with proper z-index and touch support */}
       <div 
-        className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#2a2a2a] rounded-lg px-4 py-2 flex items-center gap-3 shadow-xl border border-white/10 z-[60]"
-        onMouseDown={handleToolbarMouseDown}
+        className="absolute top-2 left-1/2 -translate-x-1/2 bg-[#2a2a2a] rounded-lg px-3 py-2 flex flex-wrap items-center gap-2 sm:gap-3 shadow-xl border border-white/10 max-w-[95vw]"
+        style={{ zIndex: 110 }}
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
-        <span className="text-white/70 text-sm">Drawing Mode</span>
+        <span className="text-white/70 text-xs sm:text-sm hidden sm:inline">Draw</span>
         
         {/* Color picker */}
         <div className="flex gap-1">
@@ -184,48 +179,68 @@ export function DrawingLayer({ isActive, offset, onClose }: DrawingLayerProps) {
             <button
               key={color}
               type="button"
-              className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${
+              className={`w-7 h-7 sm:w-6 sm:h-6 rounded-full border-2 transition-transform active:scale-95 ${
                 strokeColor === color ? "border-white scale-110" : "border-transparent"
               }`}
               style={{ backgroundColor: color }}
-              onClick={(e) => handleColorClick(e, color)}
-              onMouseDown={(e) => e.stopPropagation()}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleColorSelect(color);
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleColorSelect(color);
+              }}
             />
           ))}
         </div>
 
         {/* Stroke width */}
-        <div 
-          className="flex items-center gap-2"
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <span className="text-white/50 text-xs">Size:</span>
+        <div className="flex items-center gap-1 sm:gap-2">
+          <span className="text-white/50 text-xs hidden sm:inline">Size:</span>
           <input
             type="range"
             min="1"
             max="20"
             value={strokeWidth}
             onChange={handleSliderChange}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
-            className="w-16 accent-primary cursor-pointer"
+            className="w-12 sm:w-16 accent-primary cursor-pointer"
           />
           <span className="text-white/50 text-xs w-4">{strokeWidth}</span>
         </div>
 
         <button
           type="button"
-          onClick={handleClear}
-          onMouseDown={(e) => e.stopPropagation()}
-          className="px-3 py-1 text-sm text-white/70 hover:text-white hover:bg-white/10 rounded transition-colors"
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleClear();
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleClear();
+          }}
+          className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-white/70 hover:text-white active:bg-white/20 hover:bg-white/10 rounded transition-colors min-h-[36px]"
         >
           Clear
         </button>
 
         <button
           type="button"
-          onClick={handleDone}
-          onMouseDown={(e) => e.stopPropagation()}
-          className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleDone();
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDone();
+          }}
+          className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-primary text-primary-foreground rounded active:bg-primary/80 hover:bg-primary/90 transition-colors min-h-[36px]"
         >
           Done
         </button>
@@ -234,8 +249,8 @@ export function DrawingLayer({ isActive, offset, onClose }: DrawingLayerProps) {
       {/* Canvas - for drawing only */}
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full cursor-crosshair touch-none"
-        style={{ zIndex: 55 }}
+        className="absolute inset-0 w-full h-full cursor-crosshair"
+        style={{ zIndex: 105, touchAction: 'none' }}
         onMouseDown={handleCanvasMouseDown}
         onMouseMove={handleCanvasMouseMove}
         onMouseUp={handleCanvasMouseUp}
