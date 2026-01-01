@@ -1,17 +1,13 @@
-import { Home, MessageCircle, FolderKanban, Search, User } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-
-const navItems = [
-  { icon: Home, label: "Home", path: "/" },
-  { icon: MessageCircle, label: "Messages", path: "/messages" },
-  { icon: FolderKanban, label: "Projects", path: "/projects" },
-  { icon: Search, label: "Directory", path: "/directory" },
-  { icon: User, label: "Profile", path: "/profile" },
-];
+import { Settings2 } from "lucide-react";
+import { useNavCustomization } from "@/hooks/useNavCustomization";
+import { NavCustomizationSheet } from "./NavCustomizationSheet";
 
 const BottomNav = () => {
+  const { activeNavItems } = useNavCustomization();
+
   return (
     <motion.nav
       initial={{ y: 100, opacity: 0 }}
@@ -24,12 +20,12 @@ const BottomNav = () => {
         paddingRight: 'env(safe-area-inset-right, 0px)',
       }}
     >
-      <div className="relative glass-strong rounded-full px-3 py-2 shadow-elevated flex flex-row items-center justify-center pointer-events-auto mx-4">
+      <div className="relative glass-strong rounded-full px-2 py-2 shadow-elevated flex flex-row items-center justify-center pointer-events-auto mx-4 gap-0.5">
         {/* Subtle top highlight */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-foreground/10 to-transparent rounded-t-full" />
         
         {/* Nav items */}
-        {navItems.map((item) => (
+        {activeNavItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
@@ -74,6 +70,22 @@ const BottomNav = () => {
             )}
           </NavLink>
         ))}
+
+        {/* Settings gear for customization */}
+        <NavCustomizationSheet>
+          <button
+            className="relative flex flex-col items-center justify-center w-10 h-12 rounded-xl transition-all duration-300 text-muted-foreground hover:text-foreground flex-shrink-0"
+          >
+            <motion.div
+              whileTap={{ scale: 0.9, rotate: 90 }}
+              transition={{ duration: 0.2 }}
+              className="flex flex-col items-center gap-0.5"
+            >
+              <Settings2 className="w-4 h-4" strokeWidth={1.5} />
+              <span className="text-[8px]">Edit</span>
+            </motion.div>
+          </button>
+        </NavCustomizationSheet>
       </div>
     </motion.nav>
   );
