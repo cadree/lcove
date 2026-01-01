@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Plus, Grid, Bookmark, FileText, ArrowLeft, LayoutGrid, Users, LayoutDashboard, ShoppingBag, Calendar } from "lucide-react";
+import { Loader2, Plus, Grid, Bookmark, FileText, ArrowLeft, LayoutGrid, Users, LayoutDashboard, ShoppingBag, Calendar, PenLine } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
@@ -464,13 +464,22 @@ const Profile = () => {
         {/* Dynamic Sections based on layout */}
         {visibleSections.map(section => renderSection(section))}
 
-        {/* Floating Create Button - Always visible */}
+        {/* Floating Create Buttons - Always visible */}
         {isOwnProfile && (
-          <div className="fixed bottom-24 right-5 z-40 flex flex-col gap-2">
+          <div className="fixed bottom-24 right-5 z-40 flex flex-col gap-3">
+            <Button
+              size="icon"
+              className="w-12 h-12 rounded-full shadow-lg bg-secondary hover:bg-secondary/90"
+              onClick={() => setShowCreateBlogDialog(true)}
+              title="Write a blog"
+            >
+              <PenLine className="w-5 h-5" />
+            </Button>
             <Button
               size="icon"
               className="w-14 h-14 rounded-full shadow-lg bg-primary hover:bg-primary/90"
               onClick={() => setShowCreatePostDialog(true)}
+              title="Create post"
             >
               <Plus className="w-6 h-6" />
             </Button>
