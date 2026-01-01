@@ -77,6 +77,113 @@ const getEmailTemplate = (senderName: string, messagePreview?: string, conversat
   `;
 };
 
+interface PushSubscription {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_id: string;
+}
+
+// Send push notification using the centralized push function
+async function sendPushNotification(
+  supabaseUrl: string,
+  supabaseServiceKey: string,
+  userId: string,
+  senderName: string,
+  messagePreview: string | undefined,
+  conversationId: string
+): Promise<{ success: boolean; result: string }> {
+  try {
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Get all push subscriptions for this user
+    const { data: subscriptions, error: subError } = await supabaseClient
+      .from("push_subscriptions")
+      .select("endpoint, p256dh, auth, user_id")
+      .eq("user_id", userId);
+
+    if (subError) {
+      console.error("Error fetching push subscriptions:", subError);
+      return { success: false, result: "error_fetching_subscriptions" };
+    }
+
+    const subs = subscriptions as PushSubscription[] | null;
+    
+    if (!subs || subs.length === 0) {
+      console.log("No push subscriptions found for user");
+      return { success: false, result: "no_subscriptions" };
+    }
+
+    console.log(`Found ${subscriptions.length} push subscriptions for user`);
+
+    // Build push payload
+    const pushPayload = JSON.stringify({
+      title: senderName,
+      body: messagePreview || "Sent you a message",
+      icon: "/favicon.png",
+      badge: "/favicon.png",
+      tag: `ether-message-${conversationId}`,
+      renotify: true,
+      requireInteraction: true,
+      data: { 
+        url: `/messages?chat=${conversationId}`,
+        type: "message",
+        conversation_id: conversationId,
+        sender_name: senderName,
+      },
+      vibrate: [200, 100, 200],
+      timestamp: Date.now(),
+    });
+
+    let sentCount = 0;
+    const expiredEndpoints: string[] = [];
+
+    for (const sub of subs) {
+      try {
+        const response = await fetch(sub.endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "TTL": "86400",
+            "Urgency": "high",
+          },
+          body: pushPayload,
+        });
+
+        if (response.status === 201 || response.status === 200) {
+          console.log(`Push sent to: ${sub.endpoint.substring(0, 50)}...`);
+          sentCount++;
+        } else if (response.status === 410 || response.status === 404) {
+          console.log(`Subscription expired: ${sub.endpoint.substring(0, 50)}...`);
+          expiredEndpoints.push(sub.endpoint);
+        } else {
+          const errorText = await response.text();
+          console.error(`Push failed: ${response.status} - ${errorText}`);
+        }
+      } catch (pushError) {
+        console.error(`Error sending push: ${pushError}`);
+      }
+    }
+
+    // Clean up expired subscriptions
+    if (expiredEndpoints.length > 0) {
+      await supabaseClient
+        .from("push_subscriptions")
+        .delete()
+        .in("endpoint", expiredEndpoints);
+      console.log(`Cleaned up ${expiredEndpoints.length} expired subscriptions`);
+    }
+
+    if (sentCount > 0) {
+      return { success: true, result: `sent_${sentCount}` };
+    }
+    return { success: false, result: "failed" };
+  } catch (error) {
+    console.error("Error with push notifications:", error);
+    return { success: false, result: "error" };
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -124,89 +231,18 @@ serve(async (req) => {
 
     const results: { email?: string; sms?: string; push?: string } = {};
 
-    // Send PUSH notification if enabled (this is the priority notification method)
+    // Send PUSH notification if enabled (priority notification method)
     if (pushEnabled) {
-      try {
-        console.log("Attempting to send push notification...");
-        
-        // Get push subscriptions for this user
-        const { data: subscriptions, error: subError } = await supabase
-          .from("push_subscriptions")
-          .select("*")
-          .eq("user_id", recipient_id);
-
-        if (subError) {
-          console.error("Error fetching push subscriptions:", subError);
-          results.push = "error_fetching_subscriptions";
-        } else if (!subscriptions || subscriptions.length === 0) {
-          console.log("No push subscriptions found for user");
-          results.push = "no_subscriptions";
-        } else {
-          // Build push payload with deep-link to conversation
-          const pushPayload = JSON.stringify({
-            title: `${sender_name}`,
-            body: message_preview || "Sent you a message",
-            icon: "/favicon.png",
-            badge: "/favicon.png",
-            tag: `ether-message-${conversation_id}`,
-            renotify: true,
-            requireInteraction: true, // Keep on lockscreen until user interacts
-            data: { 
-              url: `/messages?chat=${conversation_id}`,
-              type: "message",
-              conversation_id: conversation_id,
-              sender_name: sender_name,
-            },
-            vibrate: [200, 100, 200],
-            timestamp: Date.now(),
-          });
-
-          let sentCount = 0;
-          const expiredEndpoints: string[] = [];
-
-          for (const sub of subscriptions) {
-            try {
-              const response = await fetch(sub.endpoint, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "TTL": "86400",
-                  "Urgency": "high",
-                },
-                body: pushPayload,
-              });
-
-              if (response.status === 201 || response.status === 200) {
-                console.log(`Push sent to: ${sub.endpoint.substring(0, 50)}...`);
-                sentCount++;
-              } else if (response.status === 410 || response.status === 404) {
-                console.log(`Subscription expired: ${sub.endpoint.substring(0, 50)}...`);
-                expiredEndpoints.push(sub.endpoint);
-              } else {
-                const errorText = await response.text();
-                console.error(`Push failed: ${response.status} - ${errorText}`);
-              }
-            } catch (pushError) {
-              console.error(`Error sending push: ${pushError}`);
-            }
-          }
-
-          // Clean up expired subscriptions
-          if (expiredEndpoints.length > 0) {
-            await supabase
-              .from("push_subscriptions")
-              .delete()
-              .in("endpoint", expiredEndpoints);
-            console.log(`Cleaned up ${expiredEndpoints.length} expired subscriptions`);
-          }
-
-          results.push = sentCount > 0 ? `sent_${sentCount}` : "failed";
-          console.log(`Push notification result: ${results.push}`);
-        }
-      } catch (pushError) {
-        console.error("Error with push notifications:", pushError);
-        results.push = "error";
-      }
+      const pushResult = await sendPushNotification(
+        supabaseUrl,
+        supabaseServiceKey,
+        recipient_id,
+        sender_name,
+        message_preview,
+        conversation_id
+      );
+      results.push = pushResult.result;
+      console.log(`Push notification result: ${pushResult.result}`);
     } else {
       console.log("Push notifications disabled for user");
       results.push = "disabled";
