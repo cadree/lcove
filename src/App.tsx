@@ -9,6 +9,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { NavCustomizationProvider } from "@/hooks/useNavCustomization";
 import AccessGate from "@/components/auth/AccessGate";
 import Index from "./pages/Index";
+import Landing from "./pages/Landing";
 import Feed from "./pages/Feed";
 import Directory from "./pages/Directory";
 import Projects from "./pages/Projects";
@@ -62,7 +63,9 @@ const App = () => (
               <Toaster />
               <Sonner />
               <Routes>
-                <Route path="/" element={<Index />} />
+                <Route path="/" element={<Landing />} />
+                <Route path="/home" element={<Index />} />
+                <Route path="/landing" element={<Landing />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/onboarding" element={<Onboarding />} />
                 <Route path="/locked" element={<Locked />} />

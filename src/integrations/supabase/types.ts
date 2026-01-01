@@ -1489,6 +1489,36 @@ export type Database = {
         }
         Relationships: []
       }
+      creator_applications: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          message: string | null
+          name: string
+          portfolio_url: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          message?: string | null
+          name: string
+          portfolio_url?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string | null
+          name?: string
+          portfolio_url?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       creator_roles: {
         Row: {
           created_at: string
@@ -2667,6 +2697,27 @@ export type Database = {
           subscription_price?: number | null
           total_views?: number | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      newsletter_signups: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
         }
         Relationships: []
       }
