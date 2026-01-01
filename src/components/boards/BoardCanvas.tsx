@@ -104,6 +104,39 @@ export const BoardCanvas = memo(function BoardCanvas({
     setIsPanning(false);
   }, []);
 
+  // Touch handlers for mobile canvas panning (two-finger pan)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    // Two-finger touch for panning
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      setIsPanning(true);
+      startPanRef.current = { x: midX - offset.x, y: midY - offset.y };
+      touchStartRef.current = { x: midX, y: midY };
+    }
+  }, [offset]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (isPanning && e.touches.length === 2) {
+      e.preventDefault();
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const newOffset = {
+        x: midX - startPanRef.current.x,
+        y: midY - startPanRef.current.y,
+      };
+      setOffset(newOffset);
+    }
+  }, [isPanning]);
+
+  const handleTouchEnd = useCallback(() => {
+    setIsPanning(false);
+    touchStartRef.current = null;
+  }, []);
+
   const handleItemDragEnd = useCallback((id: string, x: number, y: number) => {
     onUpdateItem(id, { x, y });
   }, [onUpdateItem]);
@@ -191,7 +224,7 @@ export const BoardCanvas = memo(function BoardCanvas({
   return (
     <div
       ref={canvasRef}
-      className={`absolute inset-0 overflow-hidden transition-colors ${
+      className={`absolute inset-0 overflow-hidden transition-colors touch-none ${
         isDragOver ? 'bg-primary/10 ring-2 ring-primary ring-inset' : ''
       } ${isConnectMode ? 'cursor-crosshair' : 'cursor-default'}`}
       onClick={handleCanvasClick}
@@ -199,6 +232,10 @@ export const BoardCanvas = memo(function BoardCanvas({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       onContextMenu={(e) => e.preventDefault()}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}

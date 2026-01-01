@@ -155,15 +155,15 @@ export function ProfileFolders({ userId, isOwner, onFolderClick }: ProfileFolder
                   onClick={() => onFolderClick(folder)}
                 >
                   {/* Cover Image */}
-                  <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-muted/80 to-muted/40">
+                  <div className="relative w-full aspect-square overflow-hidden bg-gradient-to-br from-muted/80 to-muted/40">
                     {folder.cover_image_url ? (
                       <img
                         src={folder.cover_image_url}
                         alt={folder.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
+                      <div className="absolute inset-0 w-full h-full flex items-center justify-center">
                         <Folder className="w-10 h-10 text-muted-foreground/40" />
                       </div>
                     )}
