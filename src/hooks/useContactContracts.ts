@@ -1,6 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { Json } from "@/integrations/supabase/types";
+
+interface AdditionalParty {
+  name: string;
+  role: string;
+  address: string;
+  email: string;
+  phone: string;
+}
 
 export interface ContactContract {
   id: string;
@@ -19,6 +28,7 @@ export interface ContactContract {
   client_address: string | null;
   client_email: string | null;
   client_phone: string | null;
+  additional_parties: AdditionalParty[] | null;
   
   // Scope
   scope_description: string | null;
@@ -104,7 +114,11 @@ export function useContactContracts(pipelineItemId: string | null) {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data as ContactContract[];
+      // Transform the data to properly type additional_parties
+      return (data || []).map(contract => ({
+        ...contract,
+        additional_parties: (contract.additional_parties as unknown as AdditionalParty[] | null) || [],
+      })) as ContactContract[];
     },
     enabled: !!user && !!pipelineItemId,
   });
@@ -118,56 +132,59 @@ export function useContactContracts(pipelineItemId: string | null) {
   };
 
   const createContract = useMutation({
-    mutationFn: async (contract: Partial<ContractCreateInput> & { title: string }) => {
+    mutationFn: async (contract: Partial<ContractCreateInput> & { title: string; additional_parties?: AdditionalParty[] }) => {
       if (!user || !pipelineItemId) throw new Error("Not authenticated");
+
+      const insertData = {
+        pipeline_item_id: pipelineItemId,
+        owner_user_id: user.id,
+        contract_number: generateContractNumber(),
+        title: contract.title,
+        status: 'draft' as const,
+        provider_name: contract.provider_name || null,
+        provider_address: contract.provider_address || null,
+        provider_email: contract.provider_email || null,
+        provider_phone: contract.provider_phone || null,
+        client_name: contract.client_name || null,
+        client_address: contract.client_address || null,
+        client_email: contract.client_email || null,
+        client_phone: contract.client_phone || null,
+        additional_parties: (contract.additional_parties || []) as unknown as Json,
+        scope_description: contract.scope_description || null,
+        deliverables: contract.deliverables || null,
+        timeline_milestones: contract.timeline_milestones || null,
+        exclusions: contract.exclusions || null,
+        revisions_included: contract.revisions_included ?? 2,
+        revision_cost: contract.revision_cost || null,
+        total_price: contract.total_price || null,
+        payment_type: contract.payment_type || null,
+        payment_schedule: contract.payment_schedule || null,
+        payment_methods: contract.payment_methods || null,
+        late_fee_percentage: contract.late_fee_percentage || null,
+        refund_policy: contract.refund_policy || null,
+        project_start_date: contract.project_start_date || null,
+        estimated_completion_date: contract.estimated_completion_date || null,
+        client_responsibilities: contract.client_responsibilities || null,
+        ownership_before_payment: contract.ownership_before_payment || 'Provider retains ownership until paid in full',
+        ownership_after_payment: contract.ownership_after_payment || 'Client receives full rights after payment',
+        portfolio_rights: contract.portfolio_rights ?? true,
+        confidentiality_enabled: contract.confidentiality_enabled ?? false,
+        confidentiality_duration: contract.confidentiality_duration || null,
+        confidentiality_terms: contract.confidentiality_terms || null,
+        termination_notice_days: contract.termination_notice_days ?? 14,
+        termination_terms: contract.termination_terms || null,
+        early_termination_fee: contract.early_termination_fee || null,
+        limitation_of_liability: contract.limitation_of_liability || null,
+        indemnification_terms: contract.indemnification_terms || null,
+        governing_law_state: contract.governing_law_state || null,
+        governing_law_country: contract.governing_law_country || 'USA',
+        force_majeure_enabled: contract.force_majeure_enabled ?? false,
+        force_majeure_terms: contract.force_majeure_terms || null,
+      };
 
       const { data, error } = await supabase
         .from('contact_contracts')
-        .insert({
-          pipeline_item_id: pipelineItemId,
-          owner_user_id: user.id,
-          contract_number: generateContractNumber(),
-          title: contract.title,
-          status: 'draft',
-          provider_name: contract.provider_name || null,
-          provider_address: contract.provider_address || null,
-          provider_email: contract.provider_email || null,
-          provider_phone: contract.provider_phone || null,
-          client_name: contract.client_name || null,
-          client_address: contract.client_address || null,
-          client_email: contract.client_email || null,
-          client_phone: contract.client_phone || null,
-          scope_description: contract.scope_description || null,
-          deliverables: contract.deliverables || null,
-          timeline_milestones: contract.timeline_milestones || null,
-          exclusions: contract.exclusions || null,
-          revisions_included: contract.revisions_included ?? 2,
-          revision_cost: contract.revision_cost || null,
-          total_price: contract.total_price || null,
-          payment_type: contract.payment_type || null,
-          payment_schedule: contract.payment_schedule || null,
-          payment_methods: contract.payment_methods || null,
-          late_fee_percentage: contract.late_fee_percentage || null,
-          refund_policy: contract.refund_policy || null,
-          project_start_date: contract.project_start_date || null,
-          estimated_completion_date: contract.estimated_completion_date || null,
-          client_responsibilities: contract.client_responsibilities || null,
-          ownership_before_payment: contract.ownership_before_payment || 'Provider retains ownership until paid in full',
-          ownership_after_payment: contract.ownership_after_payment || 'Client receives full rights after payment',
-          portfolio_rights: contract.portfolio_rights ?? true,
-          confidentiality_enabled: contract.confidentiality_enabled ?? false,
-          confidentiality_duration: contract.confidentiality_duration || null,
-          confidentiality_terms: contract.confidentiality_terms || null,
-          termination_notice_days: contract.termination_notice_days ?? 14,
-          termination_terms: contract.termination_terms || null,
-          early_termination_fee: contract.early_termination_fee || null,
-          limitation_of_liability: contract.limitation_of_liability || null,
-          indemnification_terms: contract.indemnification_terms || null,
-          governing_law_state: contract.governing_law_state || null,
-          governing_law_country: contract.governing_law_country || 'USA',
-          force_majeure_enabled: contract.force_majeure_enabled ?? false,
-          force_majeure_terms: contract.force_majeure_terms || null,
-        })
+        .insert(insertData)
         .select()
         .single();
       
@@ -181,9 +198,18 @@ export function useContactContracts(pipelineItemId: string | null) {
 
   const updateContract = useMutation({
     mutationFn: async ({ contractId, updates }: { contractId: string; updates: Partial<ContactContract> }) => {
+      // Convert additional_parties if present
+      const dbUpdates: Record<string, unknown> = { 
+        ...updates, 
+        updated_at: new Date().toISOString() 
+      };
+      if (updates.additional_parties) {
+        dbUpdates.additional_parties = updates.additional_parties as unknown as Json;
+      }
+      
       const { error } = await supabase
         .from('contact_contracts')
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update(dbUpdates)
         .eq('id', contractId);
       
       if (error) throw error;

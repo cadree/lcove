@@ -816,6 +816,7 @@ export type Database = {
       }
       contact_contracts: {
         Row: {
+          additional_parties: Json | null
           client_address: string | null
           client_email: string | null
           client_name: string | null
@@ -873,6 +874,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          additional_parties?: Json | null
           client_address?: string | null
           client_email?: string | null
           client_name?: string | null
@@ -930,6 +932,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          additional_parties?: Json | null
           client_address?: string | null
           client_email?: string | null
           client_name?: string | null
