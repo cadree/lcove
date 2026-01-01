@@ -96,6 +96,27 @@ function generateBezierPath(start: Point, end: Point, startAnchor: string, endAn
   return `M ${start.x} ${start.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${end.x} ${end.y}`;
 }
 
+// Calculate arrow head points
+function getArrowHead(end: Point, endAnchor: string, size: number = 10): string {
+  const angle = Math.PI / 6; // 30 degrees
+  let baseAngle: number;
+  
+  switch (endAnchor) {
+    case 'left': baseAngle = 0; break;
+    case 'right': baseAngle = Math.PI; break;
+    case 'top': baseAngle = Math.PI / 2; break;
+    case 'bottom': baseAngle = -Math.PI / 2; break;
+    default: baseAngle = 0;
+  }
+  
+  const x1 = end.x + size * Math.cos(baseAngle - angle);
+  const y1 = end.y + size * Math.sin(baseAngle - angle);
+  const x2 = end.x + size * Math.cos(baseAngle + angle);
+  const y2 = end.y + size * Math.sin(baseAngle + angle);
+  
+  return `M ${x1} ${y1} L ${end.x} ${end.y} L ${x2} ${y2}`;
+}
+
 const ConnectorPath = memo(function ConnectorPath({
   connector,
   canvasOffset,
@@ -111,6 +132,7 @@ const ConnectorPath = memo(function ConnectorPath({
 }) {
   const pathRef = useRef<SVGPathElement>(null);
   const hitAreaRef = useRef<SVGPathElement>(null);
+  const arrowRef = useRef<SVGPathElement>(null);
   const startDotRef = useRef<SVGCircleElement>(null);
   const endDotRef = useRef<SVGCircleElement>(null);
   const deleteButtonRef = useRef<SVGGElement>(null);
@@ -132,12 +154,16 @@ const ConnectorPath = memo(function ConnectorPath({
     const startPoint = getAnchorPointFromElement(startEl, connector.startAnchor, canvasOffset);
     const endPoint = getAnchorPointFromElement(endEl, connector.endAnchor, canvasOffset);
     const path = generateBezierPath(startPoint, endPoint, connector.startAnchor, connector.endAnchor);
+    const arrowPath = getArrowHead(endPoint, connector.endAnchor, 12);
 
     if (pathRef.current) {
       pathRef.current.setAttribute('d', path);
     }
     if (hitAreaRef.current) {
       hitAreaRef.current.setAttribute('d', path);
+    }
+    if (arrowRef.current) {
+      arrowRef.current.setAttribute('d', arrowPath);
     }
     if (startDotRef.current && isSelected) {
       startDotRef.current.setAttribute('cx', String(startPoint.x));
@@ -176,8 +202,11 @@ const ConnectorPath = memo(function ConnectorPath({
 
   if (!isVisible) return null;
 
+  const strokeColor = isSelected ? '#3b82f6' : connector.strokeColor;
+
   return (
     <g>
+      {/* Hit area for clicking */}
       <path
         ref={hitAreaRef}
         fill="none"
@@ -189,14 +218,25 @@ const ConnectorPath = memo(function ConnectorPath({
           onSelect();
         }}
       />
+      {/* Main line */}
       <path
         ref={pathRef}
         fill="none"
-        stroke={isSelected ? '#3b82f6' : connector.strokeColor}
+        stroke={strokeColor}
         strokeWidth={connector.strokeWidth}
         strokeDasharray={connector.strokeStyle === 'dashed' ? '8 4' : undefined}
         className="pointer-events-none"
         strokeLinecap="round"
+      />
+      {/* Arrow head */}
+      <path
+        ref={arrowRef}
+        fill="none"
+        stroke={strokeColor}
+        strokeWidth={connector.strokeWidth}
+        className="pointer-events-none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
       {isSelected && (
         <>
