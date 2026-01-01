@@ -247,7 +247,7 @@ serve(async (req) => {
       const html = generateContractHTML(contract as ContractData, signUrl);
 
       const emailResponse = await resend.emails.send({
-        from: `${contract.provider_name || 'Contract'} <onboarding@resend.dev>`,
+        from: "Ether <notifications@etherbylcove.com>",
         to: [recipient],
         subject: `Contract: ${contract.title}`,
         html,
