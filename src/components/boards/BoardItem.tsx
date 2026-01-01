@@ -72,7 +72,16 @@ export const BoardItem = memo(function BoardItem({
   }, [item.x, item.y]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0 || isConnectMode) return;
+    // Allow clicks on interactive elements inside the card
+    const target = e.target as HTMLElement;
+    const isInteractive = target.tagName === 'INPUT' || 
+                          target.tagName === 'TEXTAREA' || 
+                          target.tagName === 'BUTTON' ||
+                          target.closest('button') ||
+                          target.closest('input') ||
+                          target.closest('textarea');
+    
+    if (e.button !== 0 || isConnectMode || isInteractive) return;
     
     e.stopPropagation();
     e.preventDefault();
@@ -83,7 +92,6 @@ export const BoardItem = memo(function BoardItem({
     
     startPosRef.current = { x: positionRef.current.x, y: positionRef.current.y };
     startMouseRef.current = { x: e.clientX, y: e.clientY };
-
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!isDraggingRef.current) return;
       
@@ -227,8 +235,11 @@ export const BoardItem = memo(function BoardItem({
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!hasDraggedRef.current) onSelect();
-  }, [onSelect]);
+    // Always call onSelect - in connect mode, the parent handles the logic
+    if (!hasDraggedRef.current || isConnectMode) {
+      onSelect();
+    }
+  }, [onSelect, isConnectMode]);
 
   const handleDeleteClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
