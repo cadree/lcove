@@ -371,10 +371,10 @@ export const BoardItem = memo(function BoardItem({
         isDraggingState ? "" : "shadow-lg",
         isConnectMode ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing",
         getItemStyles(),
-        isSelected && "ring-2 ring-primary",
-        isConnectStart && "ring-2 ring-green-500 ring-offset-2 ring-offset-[#3a3a3a]",
-        isConnectMode && !isConnectStart && "hover:ring-2 hover:ring-blue-400",
-        isDraggingState && "opacity-90 z-[9999] shadow-2xl"
+        isSelected && "ring-2 ring-primary/80",
+        isConnectStart && "ring-2 ring-primary ring-offset-2 ring-offset-[#3a3a3a]",
+        isConnectMode && !isConnectStart && "hover:ring-2 hover:ring-primary/50",
+        isDraggingState && "opacity-95 z-[9999] shadow-2xl"
       )}
       style={{
         width: item.w,
@@ -386,11 +386,31 @@ export const BoardItem = memo(function BoardItem({
         touchAction: 'none',
       }}
     >
+      {/* Milanote-style line handle - appears on hover/select */}
+      {(isSelected || isConnectMode) && item.type !== 'connector' && item.type !== 'line' && (
+        <div
+          className="absolute -top-1 -right-1 w-5 h-5 bg-white border-2 border-primary rounded-full cursor-crosshair z-20 flex items-center justify-center shadow-md hover:scale-110 transition-transform"
+          style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect(); // This triggers connect mode in parent
+          }}
+          onTouchEnd={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onSelect();
+          }}
+        >
+          <div className="w-1.5 h-1.5 bg-primary rounded-full" />
+        </div>
+      )}
+
+      {/* Delete button - moved to top left */}
       {isSelected && (
         <Button
           variant="destructive"
           size="icon"
-          className="absolute -top-2 -right-2 h-7 w-7 rounded-full z-10 min-h-[28px]"
+          className="absolute -top-2 -left-2 h-6 w-6 rounded-full z-10 min-h-[24px]"
           onClick={handleDeleteClick}
           onTouchEnd={(e) => {
             e.stopPropagation();
@@ -398,19 +418,20 @@ export const BoardItem = memo(function BoardItem({
             onDelete();
           }}
         >
-          <Trash2 className="w-3.5 h-3.5" />
+          <Trash2 className="w-3 h-3" />
         </Button>
       )}
 
       {renderContent()}
 
+      {/* Resize handle */}
       {isSelected && (
         <div
           className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize"
           onMouseDown={handleResizeMouseDown}
           onTouchStart={handleResizeTouchStart}
         >
-          <div className="absolute bottom-1 right-1 w-3 h-3 border-r-2 border-b-2 border-primary rounded-br" />
+          <div className="absolute bottom-1 right-1 w-2.5 h-2.5 border-r-2 border-b-2 border-primary/60 rounded-br" />
         </div>
       )}
     </div>
