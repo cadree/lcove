@@ -30,6 +30,7 @@ import {
 import { usePlatformStats } from "@/hooks/usePlatformStats";
 
 const appIcons = [
+  { title: "Feed", icon: Compass, link: "/feed" },
   { title: "Projects", icon: FolderKanban, link: "/projects" },
   { title: "Calendar", icon: Calendar, link: "/calendar" },
   { title: "Community", icon: Users, link: "/community" },
