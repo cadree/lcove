@@ -3,6 +3,10 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 interface BoardItemData {
   id: string;
   type: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
   start_item_id?: string | null;
   end_item_id?: string | null;
   start_anchor?: string | null;
@@ -37,69 +41,47 @@ interface Point {
   y: number;
 }
 
-// Get the best anchor point - Milanote style (closest edge)
-function getSmartAnchorPoint(
-  startRect: DOMRect, 
-  endRect: DOMRect,
-  canvasOffset: { x: number; y: number }
+// Get anchor point on the edge of a card based on relative position
+function getSmartAnchorPoints(
+  startItem: BoardItemData,
+  endItem: BoardItemData
 ): { startPoint: Point; endPoint: Point } {
   const startCenter = {
-    x: startRect.left + startRect.width / 2 - canvasOffset.x,
-    y: startRect.top + startRect.height / 2 - canvasOffset.y
+    x: startItem.x + startItem.w / 2,
+    y: startItem.y + startItem.h / 2
   };
   const endCenter = {
-    x: endRect.left + endRect.width / 2 - canvasOffset.x,
-    y: endRect.top + endRect.height / 2 - canvasOffset.y
+    x: endItem.x + endItem.w / 2,
+    y: endItem.y + endItem.h / 2
   };
 
-  // Calculate angle between centers
   const dx = endCenter.x - startCenter.x;
   const dy = endCenter.y - startCenter.y;
 
-  // Determine best exit/entry points based on relative position
   let startPoint: Point;
   let endPoint: Point;
-
-  // Adjust start rect for canvas offset
-  const sRect = {
-    left: startRect.left - canvasOffset.x,
-    right: startRect.right - canvasOffset.x,
-    top: startRect.top - canvasOffset.y,
-    bottom: startRect.bottom - canvasOffset.y,
-    width: startRect.width,
-    height: startRect.height
-  };
-
-  const eRect = {
-    left: endRect.left - canvasOffset.x,
-    right: endRect.right - canvasOffset.x,
-    top: endRect.top - canvasOffset.y,
-    bottom: endRect.bottom - canvasOffset.y,
-    width: endRect.width,
-    height: endRect.height
-  };
 
   // More horizontal than vertical
   if (Math.abs(dx) > Math.abs(dy)) {
     if (dx > 0) {
       // End is to the right
-      startPoint = { x: sRect.right, y: sRect.top + sRect.height / 2 };
-      endPoint = { x: eRect.left, y: eRect.top + eRect.height / 2 };
+      startPoint = { x: startItem.x + startItem.w, y: startItem.y + startItem.h / 2 };
+      endPoint = { x: endItem.x, y: endItem.y + endItem.h / 2 };
     } else {
       // End is to the left
-      startPoint = { x: sRect.left, y: sRect.top + sRect.height / 2 };
-      endPoint = { x: eRect.right, y: eRect.top + eRect.height / 2 };
+      startPoint = { x: startItem.x, y: startItem.y + startItem.h / 2 };
+      endPoint = { x: endItem.x + endItem.w, y: endItem.y + endItem.h / 2 };
     }
   } else {
     // More vertical than horizontal
     if (dy > 0) {
       // End is below
-      startPoint = { x: sRect.left + sRect.width / 2, y: sRect.bottom };
-      endPoint = { x: eRect.left + eRect.width / 2, y: eRect.top };
+      startPoint = { x: startItem.x + startItem.w / 2, y: startItem.y + startItem.h };
+      endPoint = { x: endItem.x + endItem.w / 2, y: endItem.y };
     } else {
       // End is above
-      startPoint = { x: sRect.left + sRect.width / 2, y: sRect.top };
-      endPoint = { x: eRect.left + eRect.width / 2, y: eRect.bottom };
+      startPoint = { x: startItem.x + startItem.w / 2, y: startItem.y };
+      endPoint = { x: endItem.x + endItem.w / 2, y: endItem.y + endItem.h };
     }
   }
 
@@ -112,10 +94,7 @@ function generateSmoothPath(start: Point, end: Point): string {
   const dy = end.y - start.y;
   const distance = Math.sqrt(dx * dx + dy * dy);
   
-  // Control point offset - creates nice smooth curves
-  const curveStrength = Math.min(distance * 0.3, 60);
-  
-  // Determine curve direction based on start/end orientation
+  const curveStrength = Math.min(distance * 0.35, 80);
   const isHorizontal = Math.abs(dx) > Math.abs(dy);
   
   let cp1x, cp1y, cp2x, cp2y;
@@ -136,9 +115,9 @@ function generateSmoothPath(start: Point, end: Point): string {
 }
 
 // Milanote-style arrowhead - small and elegant
-function getArrowPath(end: Point, start: Point, size: number = 8): string {
-  const angle = Math.atan2(end.y - start.y, end.x - start.x);
-  const arrowAngle = Math.PI / 6; // 30 degrees
+function getArrowPath(end: Point, controlPoint: Point, size: number = 8): string {
+  const angle = Math.atan2(end.y - controlPoint.y, end.x - controlPoint.x);
+  const arrowAngle = Math.PI / 7; // ~25 degrees for sleeker look
   
   const x1 = end.x - size * Math.cos(angle - arrowAngle);
   const y1 = end.y - size * Math.sin(angle - arrowAngle);
@@ -148,137 +127,151 @@ function getArrowPath(end: Point, start: Point, size: number = 8): string {
   return `M ${end.x} ${end.y} L ${x1} ${y1} L ${x2} ${y2} Z`;
 }
 
+// Get control point for arrow direction calculation
+function getControlPoint(start: Point, end: Point): Point {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  const curveStrength = Math.min(distance * 0.35, 80);
+  const isHorizontal = Math.abs(dx) > Math.abs(dy);
+  
+  if (isHorizontal) {
+    return { x: end.x - curveStrength, y: end.y };
+  } else {
+    return { x: end.x, y: end.y + (dy > 0 ? -curveStrength : curveStrength) };
+  }
+}
+
 const ConnectorPath = memo(function ConnectorPath({
   connector,
-  canvasOffset,
+  items,
+  offset,
+  scale,
   isSelected,
   onSelect,
   onDelete,
 }: {
   connector: Connector;
-  canvasOffset: { x: number; y: number };
+  items: BoardItemData[];
+  offset: { x: number; y: number };
+  scale: number;
   isSelected: boolean;
   onSelect: () => void;
   onDelete: () => void;
 }) {
-  const [pathData, setPathData] = useState<{ path: string; arrow: string; midPoint: Point } | null>(null);
+  const startItem = items.find(i => i.id === connector.startItemId);
+  const endItem = items.find(i => i.id === connector.endItemId);
 
-  const updatePath = useCallback(() => {
-    if (!connector.startItemId || !connector.endItemId) return;
+  if (!startItem || !endItem) return null;
 
-    const startEl = document.querySelector(`[data-item-id="${connector.startItemId}"]`) as HTMLElement;
-    const endEl = document.querySelector(`[data-item-id="${connector.endItemId}"]`) as HTMLElement;
+  const { startPoint, endPoint } = getSmartAnchorPoints(startItem, endItem);
+  
+  // Transform points by canvas offset and scale
+  const transformedStart = {
+    x: startPoint.x * scale + offset.x,
+    y: startPoint.y * scale + offset.y
+  };
+  const transformedEnd = {
+    x: endPoint.x * scale + offset.x,
+    y: endPoint.y * scale + offset.y
+  };
 
-    if (!startEl || !endEl) {
-      setPathData(null);
-      return;
-    }
+  const path = generateSmoothPath(transformedStart, transformedEnd);
+  const controlPoint = getControlPoint(transformedStart, transformedEnd);
+  const arrow = getArrowPath(transformedEnd, controlPoint, 9 * scale);
+  
+  const midPoint = {
+    x: (transformedStart.x + transformedEnd.x) / 2,
+    y: (transformedStart.y + transformedEnd.y) / 2
+  };
 
-    const startRect = startEl.getBoundingClientRect();
-    const endRect = endEl.getBoundingClientRect();
-    
-    const { startPoint, endPoint } = getSmartAnchorPoint(startRect, endRect, canvasOffset);
-    const path = generateSmoothPath(startPoint, endPoint);
-    
-    // Calculate control point for arrow direction
-    const dx = endPoint.x - startPoint.x;
-    const isHorizontal = Math.abs(dx) > Math.abs(endPoint.y - startPoint.y);
-    const controlPoint = isHorizontal 
-      ? { x: endPoint.x - Math.min(Math.abs(dx) * 0.3, 60), y: endPoint.y }
-      : { x: endPoint.x, y: endPoint.y - Math.sign(endPoint.y - startPoint.y) * Math.min(Math.abs(endPoint.y - startPoint.y) * 0.3, 60) };
-    
-    const arrow = getArrowPath(endPoint, controlPoint, 10);
-    
-    const midPoint = {
-      x: (startPoint.x + endPoint.x) / 2,
-      y: (startPoint.y + endPoint.y) / 2
-    };
-
-    setPathData({ path, arrow, midPoint });
-  }, [connector, canvasOffset]);
-
-  useEffect(() => {
-    updatePath();
-    
-    const handleUpdate = () => requestAnimationFrame(updatePath);
-    
-    window.addEventListener('board-item-drag', handleUpdate);
-    window.addEventListener('board-canvas-pan', handleUpdate);
-    window.addEventListener('resize', handleUpdate);
-    
-    const interval = setInterval(updatePath, 32); // ~30fps for smooth updates
-    
-    return () => {
-      window.removeEventListener('board-item-drag', handleUpdate);
-      window.removeEventListener('board-canvas-pan', handleUpdate);
-      window.removeEventListener('resize', handleUpdate);
-      clearInterval(interval);
-    };
-  }, [updatePath]);
-
-  if (!pathData) return null;
-
-  // Milanote uses a subtle gray/teal color for lines
-  const lineColor = isSelected ? 'hsl(340, 82%, 65%)' : 'hsl(200, 15%, 50%)';
-  const lineWidth = connector.strokeWidth || 1.5;
+  // Milanote color palette - subtle warm gray
+  const defaultColor = "rgba(120, 113, 108, 0.8)"; // Warm gray
+  const selectedColor = "hsl(340, 82%, 65%)"; // Pink accent
+  const lineColor = isSelected ? selectedColor : defaultColor;
+  const lineWidth = (connector.strokeWidth || 1.5) * scale;
 
   return (
     <g className="connector-group">
       {/* Hit area - invisible wider stroke for easier clicking */}
       <path
-        d={pathData.path}
+        d={path}
         fill="none"
         stroke="transparent"
-        strokeWidth={20}
+        strokeWidth={Math.max(24, 24 * scale)}
         className="cursor-pointer"
+        style={{ pointerEvents: 'stroke' }}
         onClick={(e) => {
           e.stopPropagation();
           onSelect();
         }}
         onTouchEnd={(e) => {
           e.stopPropagation();
+          e.preventDefault();
           onSelect();
         }}
       />
       
-      {/* Main line - Milanote style: thin, clean, slightly transparent */}
+      {/* Main line - clean Milanote style */}
       <path
-        d={pathData.path}
+        d={path}
         fill="none"
         stroke={lineColor}
         strokeWidth={lineWidth}
         strokeLinecap="round"
-        className="pointer-events-none transition-colors duration-150"
-        style={{ opacity: isSelected ? 1 : 0.7 }}
+        className="pointer-events-none transition-all duration-150"
       />
       
       {/* Arrowhead - filled, elegant */}
       <path
-        d={pathData.arrow}
+        d={arrow}
         fill={lineColor}
         stroke="none"
-        className="pointer-events-none transition-colors duration-150"
-        style={{ opacity: isSelected ? 1 : 0.7 }}
+        className="pointer-events-none transition-all duration-150"
       />
       
       {/* Selection UI - only show when selected */}
       {isSelected && (
         <>
+          {/* Start anchor dot */}
+          <circle
+            cx={transformedStart.x}
+            cy={transformedStart.y}
+            r={5 * scale}
+            fill="white"
+            stroke={selectedColor}
+            strokeWidth={2}
+            className="pointer-events-none"
+            style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.15))' }}
+          />
+          
+          {/* End anchor dot */}
+          <circle
+            cx={transformedEnd.x}
+            cy={transformedEnd.y}
+            r={5 * scale}
+            fill="white"
+            stroke={selectedColor}
+            strokeWidth={2}
+            className="pointer-events-none"
+            style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.15))' }}
+          />
+          
           {/* Center control dot */}
           <circle
-            cx={pathData.midPoint.x}
-            cy={pathData.midPoint.y}
-            r={5}
+            cx={midPoint.x}
+            cy={midPoint.y}
+            r={6 * scale}
             fill="white"
-            stroke="hsl(340, 82%, 65%)"
+            stroke={selectedColor}
             strokeWidth={2}
             className="cursor-move"
-            style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }}
+            style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.2))' }}
           />
           
           {/* Delete button */}
           <g
-            transform={`translate(${pathData.midPoint.x + 16}, ${pathData.midPoint.y - 16})`}
+            transform={`translate(${midPoint.x + 18 * scale}, ${midPoint.y - 18 * scale})`}
             className="cursor-pointer"
             onClick={(e) => {
               e.stopPropagation();
@@ -290,11 +283,15 @@ const ConnectorPath = memo(function ConnectorPath({
               onDelete();
             }}
           >
-            <circle r={12} fill="hsl(0, 72%, 51%)" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }} />
+            <circle 
+              r={12 * scale} 
+              fill="hsl(0, 72%, 51%)" 
+              style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.25))' }} 
+            />
             <path
-              d="M -4 -4 L 4 4 M 4 -4 L -4 4"
+              d={`M ${-4 * scale} ${-4 * scale} L ${4 * scale} ${4 * scale} M ${4 * scale} ${-4 * scale} L ${-4 * scale} ${4 * scale}`}
               stroke="white"
-              strokeWidth={2}
+              strokeWidth={2 * scale}
               strokeLinecap="round"
               className="pointer-events-none"
             />
@@ -314,7 +311,7 @@ export function ConnectorLayer({
   onDeleteConnector,
 }: ConnectorLayerProps) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
+  const [, forceUpdate] = useState(0);
 
   const connectors: Connector[] = items
     .filter(item => item.type === 'connector')
@@ -326,34 +323,28 @@ export function ConnectorLayer({
       endAnchor: item.end_anchor || 'left',
       strokeWidth: item.stroke_width || 1.5,
       strokeStyle: item.stroke_style || 'solid',
-      strokeColor: item.stroke_color || 'hsl(200, 15%, 50%)',
+      strokeColor: item.stroke_color || 'default',
     }));
 
-  const updateCanvasOffset = useCallback(() => {
-    if (svgRef.current) {
-      const rect = svgRef.current.getBoundingClientRect();
-      setCanvasOffset({ x: rect.left + offset.x, y: rect.top + offset.y });
-    }
-  }, [offset]);
-
+  // Force re-render on item/offset/scale changes
   useEffect(() => {
-    updateCanvasOffset();
-  }, [offset, updateCanvasOffset]);
+    forceUpdate(n => n + 1);
+  }, [items, offset, scale]);
 
+  // Listen for drag and pan events to re-render
   useEffect(() => {
-    const handleUpdate = () => updateCanvasOffset();
+    const handleUpdate = () => forceUpdate(n => n + 1);
     
-    window.addEventListener('resize', handleUpdate);
+    window.addEventListener('board-item-drag', handleUpdate);
     window.addEventListener('board-canvas-pan', handleUpdate);
-    
-    const interval = setInterval(updateCanvasOffset, 32);
+    window.addEventListener('resize', handleUpdate);
     
     return () => {
-      window.removeEventListener('resize', handleUpdate);
+      window.removeEventListener('board-item-drag', handleUpdate);
       window.removeEventListener('board-canvas-pan', handleUpdate);
-      clearInterval(interval);
+      window.removeEventListener('resize', handleUpdate);
     };
-  }, [updateCanvasOffset]);
+  }, []);
 
   const handleBackgroundClick = useCallback(() => {
     onSelectConnector(null);
@@ -364,15 +355,17 @@ export function ConnectorLayer({
   return (
     <svg
       ref={svgRef}
-      className="absolute inset-0 pointer-events-none overflow-visible"
-      style={{ zIndex: 10 }}
+      className="absolute inset-0 overflow-visible"
+      style={{ zIndex: 5, pointerEvents: 'none' }}
     >
-      <g className="pointer-events-auto" onClick={handleBackgroundClick}>
+      <g style={{ pointerEvents: 'auto' }} onClick={handleBackgroundClick}>
         {connectors.map((connector) => (
           <ConnectorPath
             key={connector.id}
             connector={connector}
-            canvasOffset={canvasOffset}
+            items={items}
+            offset={offset}
+            scale={scale}
             isSelected={selectedConnectorId === connector.id}
             onSelect={() => onSelectConnector(connector.id)}
             onDelete={() => onDeleteConnector(connector.id)}
