@@ -17,6 +17,8 @@ import { ContactTasksSection } from "./ContactTasksSection";
 import { ContactGallerySection } from "./ContactGallerySection";
 import { ContactQuotesSection } from "./ContactQuotesSection";
 import { ContactInvoicesSection } from "./ContactInvoicesSection";
+import { ContactContractsSection } from "./ContactContractsSection";
+import { ContactAvatarUpload } from "./ContactAvatarUpload";
 import { toast } from "sonner";
 
 interface PipelineItemDrawerProps {

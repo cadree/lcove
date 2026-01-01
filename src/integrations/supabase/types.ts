@@ -814,6 +814,188 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_contracts: {
+        Row: {
+          client_address: string | null
+          client_email: string | null
+          client_name: string | null
+          client_phone: string | null
+          client_responsibilities: string | null
+          client_signature_url: string | null
+          client_signed_at: string | null
+          confidentiality_duration: string | null
+          confidentiality_enabled: boolean | null
+          confidentiality_terms: string | null
+          contract_number: string
+          created_at: string
+          deliverables: string | null
+          early_termination_fee: number | null
+          estimated_completion_date: string | null
+          exclusions: string | null
+          force_majeure_enabled: boolean | null
+          force_majeure_terms: string | null
+          governing_law_country: string | null
+          governing_law_state: string | null
+          id: string
+          indemnification_terms: string | null
+          late_fee_percentage: number | null
+          limitation_of_liability: string | null
+          owner_user_id: string
+          ownership_after_payment: string | null
+          ownership_before_payment: string | null
+          payment_methods: string | null
+          payment_schedule: string | null
+          payment_type: string | null
+          pdf_url: string | null
+          pipeline_item_id: string
+          portfolio_rights: boolean | null
+          project_start_date: string | null
+          provider_address: string | null
+          provider_email: string | null
+          provider_name: string | null
+          provider_phone: string | null
+          provider_signature_url: string | null
+          provider_signed_at: string | null
+          recipient_email: string | null
+          recipient_phone: string | null
+          refund_policy: string | null
+          revision_cost: number | null
+          revisions_included: number | null
+          scope_description: string | null
+          sent_at: string | null
+          sent_via: string | null
+          status: string
+          termination_notice_days: number | null
+          termination_terms: string | null
+          timeline_milestones: string | null
+          title: string
+          total_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          client_address?: string | null
+          client_email?: string | null
+          client_name?: string | null
+          client_phone?: string | null
+          client_responsibilities?: string | null
+          client_signature_url?: string | null
+          client_signed_at?: string | null
+          confidentiality_duration?: string | null
+          confidentiality_enabled?: boolean | null
+          confidentiality_terms?: string | null
+          contract_number: string
+          created_at?: string
+          deliverables?: string | null
+          early_termination_fee?: number | null
+          estimated_completion_date?: string | null
+          exclusions?: string | null
+          force_majeure_enabled?: boolean | null
+          force_majeure_terms?: string | null
+          governing_law_country?: string | null
+          governing_law_state?: string | null
+          id?: string
+          indemnification_terms?: string | null
+          late_fee_percentage?: number | null
+          limitation_of_liability?: string | null
+          owner_user_id: string
+          ownership_after_payment?: string | null
+          ownership_before_payment?: string | null
+          payment_methods?: string | null
+          payment_schedule?: string | null
+          payment_type?: string | null
+          pdf_url?: string | null
+          pipeline_item_id: string
+          portfolio_rights?: boolean | null
+          project_start_date?: string | null
+          provider_address?: string | null
+          provider_email?: string | null
+          provider_name?: string | null
+          provider_phone?: string | null
+          provider_signature_url?: string | null
+          provider_signed_at?: string | null
+          recipient_email?: string | null
+          recipient_phone?: string | null
+          refund_policy?: string | null
+          revision_cost?: number | null
+          revisions_included?: number | null
+          scope_description?: string | null
+          sent_at?: string | null
+          sent_via?: string | null
+          status?: string
+          termination_notice_days?: number | null
+          termination_terms?: string | null
+          timeline_milestones?: string | null
+          title: string
+          total_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          client_address?: string | null
+          client_email?: string | null
+          client_name?: string | null
+          client_phone?: string | null
+          client_responsibilities?: string | null
+          client_signature_url?: string | null
+          client_signed_at?: string | null
+          confidentiality_duration?: string | null
+          confidentiality_enabled?: boolean | null
+          confidentiality_terms?: string | null
+          contract_number?: string
+          created_at?: string
+          deliverables?: string | null
+          early_termination_fee?: number | null
+          estimated_completion_date?: string | null
+          exclusions?: string | null
+          force_majeure_enabled?: boolean | null
+          force_majeure_terms?: string | null
+          governing_law_country?: string | null
+          governing_law_state?: string | null
+          id?: string
+          indemnification_terms?: string | null
+          late_fee_percentage?: number | null
+          limitation_of_liability?: string | null
+          owner_user_id?: string
+          ownership_after_payment?: string | null
+          ownership_before_payment?: string | null
+          payment_methods?: string | null
+          payment_schedule?: string | null
+          payment_type?: string | null
+          pdf_url?: string | null
+          pipeline_item_id?: string
+          portfolio_rights?: boolean | null
+          project_start_date?: string | null
+          provider_address?: string | null
+          provider_email?: string | null
+          provider_name?: string | null
+          provider_phone?: string | null
+          provider_signature_url?: string | null
+          provider_signed_at?: string | null
+          recipient_email?: string | null
+          recipient_phone?: string | null
+          refund_policy?: string | null
+          revision_cost?: number | null
+          revisions_included?: number | null
+          scope_description?: string | null
+          sent_at?: string | null
+          sent_via?: string | null
+          status?: string
+          termination_notice_days?: number | null
+          termination_terms?: string | null
+          timeline_milestones?: string | null
+          title?: string
+          total_price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_contracts_pipeline_item_id_fkey"
+            columns: ["pipeline_item_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_invoices: {
         Row: {
           attached_images: string[] | null
