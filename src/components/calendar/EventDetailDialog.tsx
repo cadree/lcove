@@ -691,34 +691,40 @@ END:VCALENDAR`;
             {/* Paid Ticket Purchase */}
             {(event.ticket_type === 'paid' || event.ticket_type === 'hybrid') && !event.user_rsvp?.ticket_purchased && !isSoldOut && (
               <div className="space-y-2">
-                {event.external_url ? (
-                  <Button
-                    variant="default"
-                    size="lg"
-                    onClick={handleLearnMore}
-                    className="w-full"
-                  >
-                    <Ticket className="w-4 h-4 mr-2" />
-                    Buy Ticket - ${event.ticket_price}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="default"
-                    size="lg"
-                    onClick={handleBuyTickets}
-                    disabled={isPurchasing}
-                    className="w-full"
-                  >
-                    {isPurchasing ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
+                {event.ticket_price && event.ticket_price > 0 ? (
+                  event.external_url ? (
+                    <Button
+                      variant="default"
+                      size="lg"
+                      onClick={handleLearnMore}
+                      className="w-full"
+                    >
                       <Ticket className="w-4 h-4 mr-2" />
-                    )}
-                    Buy Ticket - ${event.ticket_price}
-                  </Button>
+                      Buy Ticket - ${event.ticket_price}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="default"
+                      size="lg"
+                      onClick={handleBuyTickets}
+                      disabled={isPurchasing}
+                      className="w-full"
+                    >
+                      {isPurchasing ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Ticket className="w-4 h-4 mr-2" />
+                      )}
+                      Buy Ticket - ${event.ticket_price}
+                    </Button>
+                  )
+                ) : (
+                  <div className="text-center py-3 px-4 rounded-xl bg-muted/50 text-muted-foreground text-sm">
+                    Ticket price not set by organizer
+                  </div>
                 )}
                 
-                {(event.ticket_type === 'hybrid') && (
+                {(event.ticket_type === 'hybrid') && event.credits_price && event.credits_price > 0 && (
                   <Button
                     variant="glass"
                     size="default"
@@ -741,7 +747,7 @@ END:VCALENDAR`;
             )}
 
             {/* Credits only ticket */}
-            {event.ticket_type === 'credits' && !event.user_rsvp?.ticket_purchased && !isSoldOut && (
+            {event.ticket_type === 'credits' && !event.user_rsvp?.ticket_purchased && !isSoldOut && event.credits_price && event.credits_price > 0 && (
               <Button
                 variant="default"
                 size="lg"
