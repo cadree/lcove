@@ -142,6 +142,31 @@ function getControlPoint(start: Point, end: Point): Point {
   }
 }
 
+// Parse item positions directly from DOM for real-time updates
+function getItemPosition(itemId: string, items: BoardItemData[]): BoardItemData | null {
+  // First try to get from DOM for real-time position
+  const element = document.querySelector(`[data-item-id="${itemId}"]`) as HTMLElement;
+  const item = items.find(i => i.id === itemId);
+  
+  if (!item) return null;
+  
+  if (element) {
+    const style = element.style.transform;
+    const match = style.match(/translate3d\(([^,]+)px,\s*([^,]+)px/);
+    if (match) {
+      return {
+        ...item,
+        x: parseFloat(match[1]),
+        y: parseFloat(match[2]),
+        w: element.offsetWidth || item.w,
+        h: element.offsetHeight || item.h,
+      };
+    }
+  }
+  
+  return item;
+}
+
 const ConnectorPath = memo(function ConnectorPath({
   connector,
   items,
@@ -159,31 +184,103 @@ const ConnectorPath = memo(function ConnectorPath({
   onSelect: () => void;
   onDelete: () => void;
 }) {
-  const startItem = items.find(i => i.id === connector.startItemId);
-  const endItem = items.find(i => i.id === connector.endItemId);
+  const [pathData, setPathData] = useState<{
+    path: string;
+    arrow: string;
+    transformedStart: Point;
+    transformedEnd: Point;
+    midPoint: Point;
+  } | null>(null);
 
-  if (!startItem || !endItem) return null;
+  const updatePath = useCallback(() => {
+    const startItem = getItemPosition(connector.startItemId || '', items);
+    const endItem = getItemPosition(connector.endItemId || '', items);
 
-  const { startPoint, endPoint } = getSmartAnchorPoints(startItem, endItem);
-  
-  // Transform points by canvas offset and scale
-  const transformedStart = {
-    x: startPoint.x * scale + offset.x,
-    y: startPoint.y * scale + offset.y
-  };
-  const transformedEnd = {
-    x: endPoint.x * scale + offset.x,
-    y: endPoint.y * scale + offset.y
-  };
+    if (!startItem || !endItem) {
+      setPathData(null);
+      return;
+    }
 
-  const path = generateSmoothPath(transformedStart, transformedEnd);
-  const controlPoint = getControlPoint(transformedStart, transformedEnd);
-  const arrow = getArrowPath(transformedEnd, controlPoint, 9 * scale);
-  
-  const midPoint = {
-    x: (transformedStart.x + transformedEnd.x) / 2,
-    y: (transformedStart.y + transformedEnd.y) / 2
-  };
+    const { startPoint, endPoint } = getSmartAnchorPoints(startItem, endItem);
+    
+    // Transform points by canvas offset and scale
+    const transformedStart = {
+      x: startPoint.x * scale + offset.x,
+      y: startPoint.y * scale + offset.y
+    };
+    const transformedEnd = {
+      x: endPoint.x * scale + offset.x,
+      y: endPoint.y * scale + offset.y
+    };
+
+    const path = generateSmoothPath(transformedStart, transformedEnd);
+    const controlPoint = getControlPoint(transformedStart, transformedEnd);
+    const arrow = getArrowPath(transformedEnd, controlPoint, 9 * scale);
+    
+    const midPoint = {
+      x: (transformedStart.x + transformedEnd.x) / 2,
+      y: (transformedStart.y + transformedEnd.y) / 2
+    };
+
+    setPathData({ path, arrow, transformedStart, transformedEnd, midPoint });
+  }, [connector.startItemId, connector.endItemId, items, offset, scale]);
+
+  // Update on mount and when dependencies change
+  useEffect(() => {
+    updatePath();
+  }, [updatePath]);
+
+  // Listen for drag events with RAF for smooth updates
+  useEffect(() => {
+    let rafId: number | null = null;
+    
+    const handleDragUpdate = () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        updatePath();
+      });
+    };
+    
+    window.addEventListener('board-item-drag', handleDragUpdate);
+    window.addEventListener('board-canvas-pan', handleDragUpdate);
+    
+    // Poll during drags for maximum smoothness
+    let pollInterval: number | null = null;
+    const startPolling = () => {
+      if (pollInterval) return;
+      pollInterval = window.setInterval(updatePath, 16); // ~60fps
+    };
+    const stopPolling = () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    };
+    
+    const handleDragState = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.moving) {
+        startPolling();
+      } else {
+        stopPolling();
+        updatePath();
+      }
+    };
+    
+    window.addEventListener('board-item-drag', handleDragState);
+    
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      stopPolling();
+      window.removeEventListener('board-item-drag', handleDragUpdate);
+      window.removeEventListener('board-canvas-pan', handleDragUpdate);
+      window.removeEventListener('board-item-drag', handleDragState);
+    };
+  }, [updatePath]);
+
+  if (!pathData) return null;
+
+  const { path, arrow, transformedStart, transformedEnd, midPoint } = pathData;
 
   // Milanote color palette - subtle warm gray
   const defaultColor = "rgba(120, 113, 108, 0.8)"; // Warm gray
@@ -219,7 +316,7 @@ const ConnectorPath = memo(function ConnectorPath({
         stroke={lineColor}
         strokeWidth={lineWidth}
         strokeLinecap="round"
-        className="pointer-events-none transition-all duration-150"
+        className="pointer-events-none"
       />
       
       {/* Arrowhead - filled, elegant */}
@@ -227,7 +324,7 @@ const ConnectorPath = memo(function ConnectorPath({
         d={arrow}
         fill={lineColor}
         stroke="none"
-        className="pointer-events-none transition-all duration-150"
+        className="pointer-events-none"
       />
       
       {/* Selection UI - only show when selected */}
@@ -326,24 +423,16 @@ export function ConnectorLayer({
       strokeColor: item.stroke_color || 'default',
     }));
 
-  // Force re-render on item/offset/scale changes
+  // Force re-render on item changes
   useEffect(() => {
     forceUpdate(n => n + 1);
   }, [items, offset, scale]);
 
-  // Listen for drag and pan events to re-render
+  // Listen for resize events
   useEffect(() => {
     const handleUpdate = () => forceUpdate(n => n + 1);
-    
-    window.addEventListener('board-item-drag', handleUpdate);
-    window.addEventListener('board-canvas-pan', handleUpdate);
     window.addEventListener('resize', handleUpdate);
-    
-    return () => {
-      window.removeEventListener('board-item-drag', handleUpdate);
-      window.removeEventListener('board-canvas-pan', handleUpdate);
-      window.removeEventListener('resize', handleUpdate);
-    };
+    return () => window.removeEventListener('resize', handleUpdate);
   }, []);
 
   const handleBackgroundClick = useCallback(() => {
