@@ -56,6 +56,44 @@ serve(async (req) => {
 
     logStep("Customer found/created", { customerId });
 
+    // Sync existing payment methods from Stripe
+    if (type === 'sync') {
+      const paymentMethods = await stripe.paymentMethods.list({
+        customer: customerId,
+        type: 'card',
+      });
+
+      for (const pm of paymentMethods.data) {
+        // Check if method already exists
+        const { data: existing } = await supabaseClient
+          .from('payout_methods')
+          .select('id')
+          .eq('stripe_payment_method_id', pm.id)
+          .single();
+
+        if (!existing) {
+          const isFirst = paymentMethods.data.indexOf(pm) === 0;
+          const { error } = await supabaseClient.from('payout_methods').insert({
+            user_id: user.id,
+            type: 'debit_card',
+            stripe_payment_method_id: pm.id,
+            last_four: pm.card?.last4,
+            brand: pm.card?.brand,
+            is_default: isFirst,
+          });
+          if (error) logStep("Error syncing payment method", error);
+        }
+      }
+
+      return new Response(JSON.stringify({ 
+        success: true,
+        synced: paymentMethods.data.length
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
     if (type === 'setup_intent') {
       // Create a SetupIntent for adding payment methods
       const setupIntent = await stripe.setupIntents.create({
