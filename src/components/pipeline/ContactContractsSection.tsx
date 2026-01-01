@@ -23,7 +23,18 @@ interface ContactContractsSectionProps {
   contactPhone?: string;
 }
 
-type ContractFormData = Partial<ContractCreateInput> & { title: string };
+interface AdditionalParty {
+  name: string;
+  role: string;
+  address: string;
+  email: string;
+  phone: string;
+}
+
+type ContractFormData = Partial<ContractCreateInput> & { 
+  title: string;
+  additional_parties?: AdditionalParty[];
+};
 
 const defaultContract: ContractFormData = {
   title: '',
@@ -35,6 +46,7 @@ const defaultContract: ContractFormData = {
   client_address: '',
   client_email: '',
   client_phone: '',
+  additional_parties: [],
   scope_description: '',
   deliverables: '',
   timeline_milestones: '',
@@ -86,7 +98,29 @@ export function ContactContractsSection({ pipelineItemId, contactName, contactEm
     client_name: contactName || '',
     client_email: contactEmail || '',
     client_phone: contactPhone || '',
+    additional_parties: [],
   });
+
+  const addParty = () => {
+    setNewContract({
+      ...newContract,
+      additional_parties: [
+        ...(newContract.additional_parties || []),
+        { name: '', role: '', address: '', email: '', phone: '' }
+      ]
+    });
+  };
+
+  const updateParty = (index: number, field: keyof AdditionalParty, value: string) => {
+    const updated = [...(newContract.additional_parties || [])];
+    updated[index] = { ...updated[index], [field]: value };
+    setNewContract({ ...newContract, additional_parties: updated });
+  };
+
+  const removeParty = (index: number) => {
+    const updated = (newContract.additional_parties || []).filter((_, i) => i !== index);
+    setNewContract({ ...newContract, additional_parties: updated });
+  };
 
   // Collapsible sections state
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -259,6 +293,64 @@ export function ContactContractsSection({ pipelineItemId, contactName, contactEm
                       />
                     </div>
                   </div>
+
+                  {/* Additional Parties */}
+                  {(newContract.additional_parties || []).map((party, index) => (
+                    <div key={index} className="p-3 bg-muted/30 rounded-lg space-y-3 relative">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-medium text-muted-foreground">Additional Party #{index + 1}</p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => removeParty(index)}
+                        >
+                          <X className="w-3 h-3 text-destructive" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          placeholder="Name / Company"
+                          value={party.name}
+                          onChange={(e) => updateParty(index, 'name', e.target.value)}
+                        />
+                        <Input
+                          placeholder="Role (e.g., Co-Producer)"
+                          value={party.role}
+                          onChange={(e) => updateParty(index, 'role', e.target.value)}
+                        />
+                      </div>
+                      <Textarea
+                        placeholder="Address"
+                        value={party.address}
+                        onChange={(e) => updateParty(index, 'address', e.target.value)}
+                        className="min-h-[50px]"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          placeholder="Email"
+                          value={party.email}
+                          onChange={(e) => updateParty(index, 'email', e.target.value)}
+                        />
+                        <Input
+                          placeholder="Phone"
+                          value={party.phone}
+                          onChange={(e) => updateParty(index, 'phone', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  ))}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addParty}
+                    className="w-full"
+                  >
+                    <Plus className="w-4 h-4 mr-1" /> Add Another Party
+                  </Button>
                 </CollapsibleContent>
               </Collapsible>
 

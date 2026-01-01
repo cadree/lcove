@@ -7,6 +7,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+interface AdditionalParty {
+  name: string;
+  role: string;
+  address: string;
+  email: string;
+  phone: string;
+}
+
 interface ContractData {
   id: string;
   contract_number: string;
@@ -19,6 +27,7 @@ interface ContractData {
   client_address: string | null;
   client_email: string | null;
   client_phone: string | null;
+  additional_parties: AdditionalParty[] | null;
   scope_description: string | null;
   deliverables: string | null;
   timeline_milestones: string | null;
@@ -111,6 +120,20 @@ function generateContractHTML(contract: ContractData, signUrl: string): string {
           ${contract.client_phone ? `<p>Phone: ${contract.client_phone}</p>` : ''}
         </div>
       </div>
+      
+      ${(contract.additional_parties && contract.additional_parties.length > 0) ? `
+        <div class="grid-2" style="margin-top: 15px;">
+          ${contract.additional_parties.map((party: AdditionalParty) => `
+            <div class="party-box">
+              <h3>${party.role || 'Additional Party'}</h3>
+              <p><strong>${party.name || 'Not specified'}</strong></p>
+              ${party.address ? `<p>${party.address}</p>` : ''}
+              ${party.email ? `<p>Email: ${party.email}</p>` : ''}
+              ${party.phone ? `<p>Phone: ${party.phone}</p>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
 
       ${contract.scope_description || contract.deliverables ? `
         <h2>2. Scope of Work</h2>
