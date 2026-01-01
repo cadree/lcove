@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -6,11 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Loader2, ArrowLeft, Check, X, Home } from "lucide-react";
 import { BoardCanvas } from "@/components/boards/BoardCanvas";
 import { BoardSidebar } from "@/components/boards/BoardSidebar";
+import { DrawingLayer } from "@/components/boards/DrawingLayer";
 import { useBoard, useBoards } from "@/hooks/useBoards";
 import { useBoardItems, BoardItemType } from "@/hooks/useBoardItems";
 import { useAuth } from "@/contexts/AuthContext";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 const BoardEditor = () => {
   const { boardId } = useParams<{ boardId: string }>();
@@ -20,6 +23,8 @@ const BoardEditor = () => {
   const { updateBoard } = useBoards();
   const { items, isLoading: itemsLoading, createItem, updateItem, deleteItem } = useBoardItems(boardId);
   
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState("");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -28,6 +33,10 @@ const BoardEditor = () => {
   // Connect mode state
   const [isConnectMode, setIsConnectMode] = useState(false);
   const [connectStartItemId, setConnectStartItemId] = useState<string | null>(null);
+  
+  // Draw mode state
+  const [isDrawMode, setIsDrawMode] = useState(false);
+  const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
 
   const handleAddItem = async (type: BoardItemType, customContent?: Json, customX?: number, customY?: number) => {
     if (!boardId) return;
@@ -148,6 +157,46 @@ const BoardEditor = () => {
     setSelectedConnectorId(null);
   }, [deleteItem]);
 
+  const handleToggleDrawMode = useCallback(() => {
+    setIsDrawMode(prev => !prev);
+    if (!isDrawMode) {
+      toast.info("Draw mode enabled. Draw on the canvas!");
+    }
+  }, [isDrawMode]);
+
+  const handleExportPDF = useCallback(async () => {
+    if (!canvasContainerRef.current) {
+      toast.error("Canvas not ready");
+      return;
+    }
+
+    toast.info("Generating PDF...");
+
+    try {
+      const canvas = await html2canvas(canvasContainerRef.current, {
+        backgroundColor: '#3a3a3a',
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [canvas.width, canvas.height],
+      });
+
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save(`${board?.title || 'board'}.pdf`);
+
+      toast.success("PDF exported successfully!");
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast.error("Failed to export PDF");
+    }
+  }, [board?.title]);
+
   const handleTitleSave = () => {
     if (!boardId || !editedTitle.trim()) {
       setIsEditingTitle(false);
@@ -197,6 +246,9 @@ const BoardEditor = () => {
       <BoardSidebar 
         onAddItem={handleAddItem} 
         isConnectMode={isConnectMode}
+        isDrawMode={isDrawMode}
+        onToggleDrawMode={handleToggleDrawMode}
+        onExportPDF={handleExportPDF}
       />
 
       {/* Main Content Area */}
@@ -249,6 +301,17 @@ const BoardEditor = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {isDrawMode && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsDrawMode(false)}
+                className="text-white border-white/20 hover:bg-white/10"
+              >
+                <X className="w-3 h-3 mr-1" />
+                Exit Draw
+              </Button>
+            )}
             {isConnectMode && (
               <Button
                 variant="outline"
@@ -265,7 +328,7 @@ const BoardEditor = () => {
         </motion.header>
 
         {/* Canvas */}
-        <div className="flex-1 relative overflow-hidden">
+        <div ref={canvasContainerRef} className="flex-1 relative overflow-hidden">
           <BoardCanvas
             items={items}
             selectedItemId={selectedItemId}
@@ -273,7 +336,6 @@ const BoardEditor = () => {
             isConnectMode={isConnectMode}
             connectStartItemId={connectStartItemId}
             onSelectItem={(id) => {
-              // Clear connector selection when selecting an item
               setSelectedConnectorId(null);
               setSelectedItemId(id);
             }}
@@ -283,6 +345,13 @@ const BoardEditor = () => {
             onDeleteConnector={handleDeleteConnector}
             onCreateItem={handleCreateItem}
             onItemClickForConnect={handleItemClickForConnect}
+          />
+          
+          {/* Drawing Layer Overlay */}
+          <DrawingLayer
+            isActive={isDrawMode}
+            offset={canvasOffset}
+            onClose={() => setIsDrawMode(false)}
           />
         </div>
       </div>

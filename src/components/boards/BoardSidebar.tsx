@@ -12,17 +12,19 @@ import {
   Minus, 
   LayoutGrid,
   Columns,
-  MessageSquare,
-  MoreHorizontal,
   Upload,
   Pencil,
-  Trash2
+  Trash2,
+  FileDown
 } from "lucide-react";
 import { BoardItemType } from "@/hooks/useBoardItems";
 
 interface BoardSidebarProps {
   onAddItem: (type: BoardItemType) => void;
   isConnectMode?: boolean;
+  isDrawMode?: boolean;
+  onToggleDrawMode?: () => void;
+  onExportPDF?: () => void;
 }
 
 const sidebarItems: { type: BoardItemType; icon: React.ElementType; label: string }[] = [
@@ -34,7 +36,7 @@ const sidebarItems: { type: BoardItemType; icon: React.ElementType; label: strin
   { type: 'column', icon: Columns, label: 'Column' },
 ];
 
-export function BoardSidebar({ onAddItem, isConnectMode }: BoardSidebarProps) {
+export function BoardSidebar({ onAddItem, isConnectMode, isDrawMode, onToggleDrawMode, onExportPDF }: BoardSidebarProps) {
   return (
     <div className="w-16 bg-[#2a2a2a] border-r border-white/10 flex flex-col py-4">
       {/* Main tools */}
@@ -78,7 +80,7 @@ export function BoardSidebar({ onAddItem, isConnectMode }: BoardSidebarProps) {
               onClick={() => onAddItem('image')}
             >
               <Image className="w-5 h-5" />
-              <span className="text-[10px]">Add image</span>
+              <span className="text-[10px]">Image</span>
             </Button>
           </TooltipTrigger>
           <TooltipContent side="right">
@@ -90,14 +92,19 @@ export function BoardSidebar({ onAddItem, isConnectMode }: BoardSidebarProps) {
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
-              className="w-12 h-12 flex flex-col items-center gap-1 text-white/70 hover:text-white hover:bg-white/10 rounded-lg"
+              className={`w-12 h-12 flex flex-col items-center gap-1 rounded-lg transition-colors ${
+                isDrawMode 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'text-white/70 hover:text-white hover:bg-white/10'
+              }`}
+              onClick={onToggleDrawMode}
             >
-              <Upload className="w-5 h-5" />
-              <span className="text-[10px]">Upload</span>
+              <Pencil className="w-5 h-5" />
+              <span className="text-[10px]">Draw</span>
             </Button>
           </TooltipTrigger>
           <TooltipContent side="right">
-            <p>Upload File</p>
+            <p>Draw on canvas</p>
           </TooltipContent>
         </Tooltip>
 
@@ -106,13 +113,14 @@ export function BoardSidebar({ onAddItem, isConnectMode }: BoardSidebarProps) {
             <Button
               variant="ghost"
               className="w-12 h-12 flex flex-col items-center gap-1 text-white/70 hover:text-white hover:bg-white/10 rounded-lg"
+              onClick={onExportPDF}
             >
-              <Pencil className="w-5 h-5" />
-              <span className="text-[10px]">Draw</span>
+              <FileDown className="w-5 h-5" />
+              <span className="text-[10px]">Export</span>
             </Button>
           </TooltipTrigger>
           <TooltipContent side="right">
-            <p>Draw</p>
+            <p>Export to PDF</p>
           </TooltipContent>
         </Tooltip>
       </div>
