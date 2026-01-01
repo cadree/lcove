@@ -146,13 +146,14 @@ export const usePayoutMethods = () => {
       });
 
       if (error) throw error;
+      if (data.error) throw new Error(data.error);
       return data;
     },
     onSuccess: (data) => {
       if (data.url) {
-        window.open(data.url, '_blank');
+        // Use location.href for reliable redirect (avoids popup blockers)
+        window.location.href = data.url;
       }
-      queryClient.invalidateQueries({ queryKey: ['payout-methods'] });
     },
     onError: (error) => {
       toast({ title: 'Failed to setup payout method', description: error.message, variant: 'destructive' });
