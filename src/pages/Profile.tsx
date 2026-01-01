@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Plus, Grid, Bookmark, FileText, ArrowLeft, LayoutGrid, Users, LayoutDashboard } from "lucide-react";
+import { Loader2, Plus, Grid, Bookmark, FileText, ArrowLeft, LayoutGrid, Users, LayoutDashboard, ShoppingBag, Calendar } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
@@ -364,6 +364,58 @@ const Profile = () => {
                 <div className="flex-1">
                   <h3 className="font-medium text-foreground">Boards</h3>
                   <p className="text-xs text-muted-foreground">Visual canvas workspaces</p>
+                </div>
+                <ArrowLeft className="w-4 h-4 text-muted-foreground rotate-180" />
+              </div>
+            </Card>
+          </motion.div>
+        );
+      case 'store':
+        if (!isOwnProfile) return null;
+        return (
+          <motion.div
+            key="store"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="px-5 py-4"
+          >
+            <Card 
+              className="bg-muted/30 border-border/50 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => navigate('/store')}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                  <ShoppingBag className="w-5 h-5 text-emerald-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-medium text-foreground">My Store</h3>
+                  <p className="text-xs text-muted-foreground">Manage your products and sales</p>
+                </div>
+                <ArrowLeft className="w-4 h-4 text-muted-foreground rotate-180" />
+              </div>
+            </Card>
+          </motion.div>
+        );
+      case 'calendar':
+        if (!isOwnProfile) return null;
+        return (
+          <motion.div
+            key="calendar"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="px-5 py-4"
+          >
+            <Card 
+              className="bg-muted/30 border-border/50 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => navigate('/calendar')}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-medium text-foreground">Calendar</h3>
+                  <p className="text-xs text-muted-foreground">Events and personal schedule</p>
                 </div>
                 <ArrowLeft className="w-4 h-4 text-muted-foreground rotate-180" />
               </div>
