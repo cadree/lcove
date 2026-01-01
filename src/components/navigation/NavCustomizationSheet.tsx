@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -16,21 +16,19 @@ export function NavCustomizationSheet({ children }: NavCustomizationSheetProps) 
     enabledIds, 
     toggleNavItem, 
     reorderNavItems, 
-    resetToDefault, 
-    isItemEnabled 
+    resetToDefault,
   } = useNavCustomization();
   
   const [open, setOpen] = useState(false);
-  const [orderedIds, setOrderedIds] = useState<string[]>([]);
+  const [orderedIds, setOrderedIds] = useState<string[]>(enabledIds);
 
-  // Sync ordered items when sheet opens
+  // Keep orderedIds in sync with enabledIds
+  useEffect(() => {
+    setOrderedIds(enabledIds.filter(id => allNavItems.some(item => item.id === id)));
+  }, [enabledIds]);
+
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
-    if (isOpen) {
-      // Get enabled items in current order
-      const enabledInOrder = enabledIds.filter(id => allNavItems.some(item => item.id === id));
-      setOrderedIds(enabledInOrder);
-    }
   };
 
   const handleReorder = (newOrder: string[]) => {
@@ -40,15 +38,12 @@ export function NavCustomizationSheet({ children }: NavCustomizationSheetProps) 
 
   const handleToggle = (id: string) => {
     toggleNavItem(id);
-    // Update local order state
-    if (enabledIds.includes(id)) {
-      setOrderedIds(prev => prev.filter(i => i !== id));
-    } else if (enabledIds.length < 5) {
-      setOrderedIds(prev => [...prev, id]);
-    }
   };
 
-  const enabledItems = allNavItems.filter(item => enabledIds.includes(item.id));
+  const handleReset = () => {
+    resetToDefault();
+  };
+
   const disabledItems = allNavItems.filter(item => !enabledIds.includes(item.id));
 
   return (
@@ -67,7 +62,7 @@ export function NavCustomizationSheet({ children }: NavCustomizationSheetProps) 
             <Button
               variant="ghost"
               size="sm"
-              onClick={resetToDefault}
+              onClick={handleReset}
               className="text-muted-foreground text-xs"
             >
               <RotateCcw className="h-3.5 w-3.5 mr-1.5" />

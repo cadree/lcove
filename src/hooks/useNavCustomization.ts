@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { 
   Home, MessageCircle, FolderKanban, Search, User, 
   Calendar, Wallet, Settings, Bell, Users, Video, 
   ShoppingBag, Kanban, BookOpen, Radio, Store
 } from "lucide-react";
-import { LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 export interface NavItem {
   id: string;
@@ -13,7 +13,6 @@ export interface NavItem {
   path: string;
 }
 
-// All available navigation items
 export const allNavItems: NavItem[] = [
   { id: "home", icon: Home, label: "Home", path: "/" },
   { id: "messages", icon: MessageCircle, label: "Messages", path: "/messages" },
@@ -33,9 +32,7 @@ export const allNavItems: NavItem[] = [
   { id: "store", icon: Store, label: "Store", path: "/store" },
 ];
 
-// Default nav items (by id)
 const defaultNavIds = ["home", "messages", "projects", "directory", "profile"];
-
 const STORAGE_KEY = "ether-nav-customization";
 
 interface NavCustomization {
@@ -43,33 +40,50 @@ interface NavCustomization {
   order: string[];
 }
 
-export function useNavCustomization() {
-  const [customization, setCustomization] = useState<NavCustomization>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch (e) {
-      console.error("Failed to parse nav customization:", e);
-    }
-    return {
-      enabledIds: defaultNavIds,
-      order: defaultNavIds,
-    };
-  });
+interface NavCustomizationContextType {
+  activeNavItems: NavItem[];
+  allNavItems: NavItem[];
+  enabledIds: string[];
+  toggleNavItem: (id: string) => void;
+  reorderNavItems: (newOrder: string[]) => void;
+  resetToDefault: () => void;
+  isItemEnabled: (id: string) => boolean;
+}
 
-  // Save to localStorage whenever customization changes
+const NavCustomizationContext = createContext<NavCustomizationContextType | null>(null);
+
+function getStoredCustomization(): NavCustomization {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return parsed;
+    }
+  } catch (e) {
+    console.error("Failed to parse nav customization:", e);
+  }
+  return {
+    enabledIds: defaultNavIds,
+    order: defaultNavIds,
+  };
+}
+
+interface ProviderProps {
+  children: ReactNode;
+}
+
+export function NavCustomizationProvider(props: ProviderProps) {
+  const [customization, setCustomization] = useState<NavCustomization>(getStoredCustomization);
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(customization));
   }, [customization]);
 
-  // Get the active nav items in order
   const activeNavItems = customization.order
     .filter(id => customization.enabledIds.includes(id))
     .map(id => allNavItems.find(item => item.id === id))
     .filter((item): item is NavItem => item !== undefined)
-    .slice(0, 5); // Max 5 items
+    .slice(0, 5);
 
   const toggleNavItem = useCallback((id: string) => {
     setCustomization(prev => {
@@ -78,14 +92,11 @@ export function useNavCustomization() {
       let newOrder = [...prev.order];
       
       if (isEnabled) {
-        // Don't allow less than 3 items
         if (prev.enabledIds.length <= 3) return prev;
         newEnabledIds = prev.enabledIds.filter(i => i !== id);
       } else {
-        // Don't allow more than 5 items
         if (prev.enabledIds.length >= 5) return prev;
         newEnabledIds = [...prev.enabledIds, id];
-        // Add to order if not present
         if (!newOrder.includes(id)) {
           newOrder.push(id);
         }
@@ -113,7 +124,7 @@ export function useNavCustomization() {
     return customization.enabledIds.includes(id);
   }, [customization.enabledIds]);
 
-  return {
+  const contextValue: NavCustomizationContextType = {
     activeNavItems,
     allNavItems,
     enabledIds: customization.enabledIds,
@@ -122,4 +133,18 @@ export function useNavCustomization() {
     resetToDefault,
     isItemEnabled,
   };
+
+  return React.createElement(
+    NavCustomizationContext.Provider,
+    { value: contextValue },
+    props.children
+  );
+}
+
+export function useNavCustomization() {
+  const context = useContext(NavCustomizationContext);
+  if (!context) {
+    throw new Error("useNavCustomization must be used within NavCustomizationProvider");
+  }
+  return context;
 }
