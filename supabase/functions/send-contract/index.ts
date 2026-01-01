@@ -252,8 +252,10 @@ serve(async (req) => {
       });
     }
 
-    // Generate signing URL (this would link to your app's signing page)
-    const appUrl = Deno.env.get("APP_URL") || "https://ether.app";
+    // Generate signing URL - use Supabase URL to derive app URL
+    const supabaseUrlStr = Deno.env.get("SUPABASE_URL") || "";
+    // Default to lovable preview URL or production
+    const appUrl = Deno.env.get("APP_URL") || "https://wjbyvlgsxscwukkolehg.lovableproject.com";
     const signUrl = `${appUrl}/sign-contract/${contract.id}`;
 
     if (via === "email") {
@@ -269,8 +271,10 @@ serve(async (req) => {
       const resend = new Resend(resendApiKey);
       const html = generateContractHTML(contract as ContractData, signUrl);
 
+      // Use provider name in sender if available
+      const senderName = contract.provider_name || "Ether";
       const emailResponse = await resend.emails.send({
-        from: "Ether <notifications@etherbylcove.com>",
+        from: `${senderName} <notifications@etherbylcove.com>`,
         to: [recipient],
         subject: `Contract: ${contract.title}`,
         html,
