@@ -1,20 +1,45 @@
 import { useRef, useState, useCallback, memo } from "react";
-import { BoardItem as BoardItemType, BoardItemType as ItemType } from "@/hooks/useBoardItems";
 import { BoardItem } from "./BoardItem";
 import { ConnectorLayer } from "./ConnectorLayer";
 import { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+type ItemType = 'note' | 'todo' | 'link' | 'image' | 'column' | 'board_ref' | 'line' | 'connector';
+
+interface BoardItemData {
+  id: string;
+  board_id: string;
+  type: string;
+  title: string | null;
+  content: Json;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rotation: number;
+  z_index: number;
+  parent_item_id: string | null;
+  is_trashed: boolean;
+  created_by: string | null;
+  start_item_id?: string | null;
+  end_item_id?: string | null;
+  start_anchor?: string | null;
+  end_anchor?: string | null;
+  stroke_width?: number;
+  stroke_style?: string;
+  stroke_color?: string;
+}
+
 interface BoardCanvasProps {
-  items: BoardItemType[];
+  items: BoardItemData[];
   selectedItemId: string | null;
   selectedConnectorId: string | null;
   isConnectMode: boolean;
   connectStartItemId: string | null;
   onSelectItem: (id: string | null) => void;
   onSelectConnector: (id: string | null) => void;
-  onUpdateItem: (id: string, updates: Partial<BoardItemType>) => void;
+  onUpdateItem: (id: string, updates: Partial<BoardItemData>) => void;
   onDeleteItem: (id: string) => void;
   onDeleteConnector: (id: string) => void;
   onCreateItem?: (type: ItemType, content: Json, x: number, y: number) => void;
@@ -161,7 +186,6 @@ export const BoardCanvas = memo(function BoardCanvas({
     }
   }, [offset, onCreateItem]);
 
-  // Filter out connector items from regular rendering
   const nonConnectorItems = items.filter(item => item.type !== 'connector');
 
   return (
@@ -186,7 +210,6 @@ export const BoardCanvas = memo(function BoardCanvas({
         backgroundColor: '#3a3a3a',
       }}
     >
-      {/* Connector Layer - renders SVG connections */}
       <ConnectorLayer
         items={items}
         offset={offset}

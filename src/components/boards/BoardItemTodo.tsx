@@ -59,7 +59,7 @@ export function BoardItemTodo({ content, onChange }: BoardItemTodoProps) {
 
   return (
     <div className="p-3 space-y-2">
-      <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+      <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
         Todo List
       </h4>
       {items.map((item, index) => (
@@ -73,8 +73,8 @@ export function BoardItemTodo({ content, onChange }: BoardItemTodoProps) {
             onChange={(e) => handleTextChange(index, e.target.value)}
             onBlur={handleTextBlur}
             placeholder="Add item..."
-            className={`flex-1 h-7 text-sm border-none bg-transparent p-0 focus-visible:ring-0 text-foreground placeholder:text-muted-foreground/50 ${
-              item.done ? "line-through text-muted-foreground" : ""
+            className={`flex-1 h-7 text-sm border-none bg-transparent px-1 focus-visible:ring-0 text-gray-800 placeholder:text-gray-400 ${
+              item.done ? "line-through text-gray-400" : ""
             }`}
           />
           <Button
@@ -90,7 +90,7 @@ export function BoardItemTodo({ content, onChange }: BoardItemTodoProps) {
       <Button
         variant="ghost"
         size="sm"
-        className="w-full h-7 text-xs"
+        className="w-full h-7 text-xs text-gray-600 hover:text-gray-800"
         onClick={addItem}
       >
         <Plus className="w-3 h-3 mr-1" />

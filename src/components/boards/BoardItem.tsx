@@ -1,7 +1,6 @@
-import { memo, useRef, useEffect, useCallback } from "react";
+import { memo, useRef, useEffect, useCallback, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BoardItem as BoardItemType } from "@/hooks/useBoardItems";
 import { BoardItemNote } from "./BoardItemNote";
 import { BoardItemTodo } from "./BoardItemTodo";
 import { BoardItemLink } from "./BoardItemLink";
@@ -9,10 +8,33 @@ import { BoardItemImage } from "./BoardItemImage";
 import { BoardItemLine } from "./BoardItemLine";
 import { cn } from "@/lib/utils";
 import { Json } from "@/integrations/supabase/types";
-import { useDragOptimized } from "@/hooks/useDragOptimized";
+
+interface BoardItemData {
+  id: string;
+  board_id: string;
+  type: string;
+  title: string | null;
+  content: Json;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rotation: number;
+  z_index: number;
+  parent_item_id: string | null;
+  is_trashed: boolean;
+  created_by: string | null;
+  start_item_id?: string | null;
+  end_item_id?: string | null;
+  start_anchor?: string | null;
+  end_anchor?: string | null;
+  stroke_width?: number;
+  stroke_style?: string;
+  stroke_color?: string;
+}
 
 interface BoardItemProps {
-  item: BoardItemType;
+  item: BoardItemData;
   isSelected: boolean;
   isConnectMode?: boolean;
   isConnectStart?: boolean;
@@ -34,18 +56,78 @@ export const BoardItem = memo(function BoardItem({
   onContentChange,
   onDelete,
 }: BoardItemProps) {
-  const { elementRef, isDragging, handleMouseDown } = useDragOptimized({
-    initialX: item.x,
-    initialY: item.y,
-    onDragEnd,
-  });
+  const elementRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const positionRef = useRef({ x: item.x, y: item.y });
+  const startPosRef = useRef({ x: 0, y: 0 });
+  const startMouseRef = useRef({ x: 0, y: 0 });
 
-  // Sync position when item.x/y changes from DB
+  // Sync position when item.x/y changes from DB (only when not dragging)
   useEffect(() => {
-    if (elementRef.current && !isDragging) {
-      elementRef.current.style.transform = `translate3d(${item.x}px, ${item.y}px, 0)`;
+    if (!isDragging) {
+      positionRef.current = { x: item.x, y: item.y };
+      if (elementRef.current) {
+        elementRef.current.style.transform = `translate3d(${item.x}px, ${item.y}px, 0)`;
+      }
     }
-  }, [item.x, item.y, isDragging, elementRef]);
+  }, [item.x, item.y, isDragging]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0 || isConnectMode) return;
+    
+    e.stopPropagation();
+    setIsDragging(true);
+    
+    startPosRef.current = { ...positionRef.current };
+    startMouseRef.current = { x: e.clientX, y: e.clientY };
+
+    if (elementRef.current) {
+      elementRef.current.style.willChange = 'transform';
+      elementRef.current.style.cursor = 'grabbing';
+    }
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startMouseRef.current.x;
+      const deltaY = moveEvent.clientY - startMouseRef.current.y;
+      
+      positionRef.current = {
+        x: startPosRef.current.x + deltaX,
+        y: startPosRef.current.y + deltaY,
+      };
+
+      if (elementRef.current) {
+        elementRef.current.style.transform = `translate3d(${positionRef.current.x}px, ${positionRef.current.y}px, 0)`;
+      }
+
+      // Dispatch custom event for connector updates
+      window.dispatchEvent(new CustomEvent('board-item-drag', {
+        detail: { moving: true }
+      }));
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      
+      if (elementRef.current) {
+        elementRef.current.style.willChange = '';
+        elementRef.current.style.cursor = '';
+      }
+
+      // Only write to DB once on drag end
+      onDragEnd(positionRef.current.x, positionRef.current.y);
+
+      // Notify connectors to do final update
+      window.dispatchEvent(new CustomEvent('board-item-drag', {
+        detail: { moving: false }
+      }));
+
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [isConnectMode, onDragEnd]);
 
   const getItemStyles = useCallback(() => {
     switch (item.type) {
@@ -175,7 +257,7 @@ export const BoardItem = memo(function BoardItem({
     <div
       ref={elementRef}
       data-item-id={item.id}
-      onMouseDown={isConnectMode ? undefined : handleMouseDown}
+      onMouseDown={handleMouseDown}
       onClick={handleClick}
       className={cn(
         "absolute rounded-lg",
