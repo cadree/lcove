@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Json } from "@/integrations/supabase/types";
 
-export type BoardItemType = 'note' | 'link' | 'todo' | 'image' | 'line' | 'column' | 'board_ref';
+export type BoardItemType = 'note' | 'link' | 'todo' | 'image' | 'line' | 'column' | 'board_ref' | 'connector';
 
 export interface BoardItem {
   id: string;
@@ -23,6 +23,14 @@ export interface BoardItem {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // Connector-specific fields
+  start_item_id?: string | null;
+  end_item_id?: string | null;
+  start_anchor?: string | null;
+  end_anchor?: string | null;
+  stroke_width?: number;
+  stroke_style?: string;
+  stroke_color?: string;
 }
 
 export const useBoardItems = (boardId: string | undefined) => {

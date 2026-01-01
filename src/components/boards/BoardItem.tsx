@@ -14,6 +14,8 @@ import { Json } from "@/integrations/supabase/types";
 interface BoardItemProps {
   item: BoardItemType;
   isSelected: boolean;
+  isConnectMode?: boolean;
+  isConnectStart?: boolean;
   onSelect: () => void;
   onDragEnd: (x: number, y: number) => void;
   onResize: (w: number, h: number) => void;
@@ -24,6 +26,8 @@ interface BoardItemProps {
 export function BoardItem({
   item,
   isSelected,
+  isConnectMode,
+  isConnectStart,
   onSelect,
   onDragEnd,
   onResize,
@@ -142,9 +146,12 @@ export function BoardItem({
         if (!isDragging) onSelect();
       }}
       className={cn(
-        "absolute cursor-move rounded-lg",
+        "absolute rounded-lg transition-all",
+        isConnectMode ? "cursor-crosshair" : "cursor-move",
         getItemStyles(),
         isSelected && "ring-2 ring-primary",
+        isConnectStart && "ring-2 ring-green-500 ring-offset-2 ring-offset-[#3a3a3a]",
+        isConnectMode && !isConnectStart && "hover:ring-2 hover:ring-blue-400",
         isDragging && "opacity-90 scale-105"
       )}
       style={{

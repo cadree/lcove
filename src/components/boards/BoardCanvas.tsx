@@ -2,6 +2,7 @@ import { useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { BoardItem as BoardItemType, BoardItemType as ItemType } from "@/hooks/useBoardItems";
 import { BoardItem } from "./BoardItem";
+import { ConnectorLayer } from "./ConnectorLayer";
 import { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -9,19 +10,31 @@ import { toast } from "sonner";
 interface BoardCanvasProps {
   items: BoardItemType[];
   selectedItemId: string | null;
+  selectedConnectorId: string | null;
+  isConnectMode: boolean;
+  connectStartItemId: string | null;
   onSelectItem: (id: string | null) => void;
+  onSelectConnector: (id: string | null) => void;
   onUpdateItem: (id: string, updates: Partial<BoardItemType>) => void;
   onDeleteItem: (id: string) => void;
+  onDeleteConnector: (id: string) => void;
   onCreateItem?: (type: ItemType, content: Json, x: number, y: number) => void;
+  onItemClickForConnect?: (itemId: string) => Promise<boolean>;
 }
 
 export function BoardCanvas({
   items,
   selectedItemId,
+  selectedConnectorId,
+  isConnectMode,
+  connectStartItemId,
   onSelectItem,
+  onSelectConnector,
   onUpdateItem,
   onDeleteItem,
+  onDeleteConnector,
   onCreateItem,
+  onItemClickForConnect,
 }: BoardCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isPanning, setIsPanning] = useState(false);
@@ -32,8 +45,20 @@ export function BoardCanvas({
   const handleCanvasClick = (e: React.MouseEvent) => {
     if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('canvas-inner')) {
       onSelectItem(null);
+      onSelectConnector(null);
     }
   };
+
+  const handleItemSelect = useCallback(async (itemId: string) => {
+    // If in connect mode, handle connection logic
+    if (isConnectMode && onItemClickForConnect) {
+      const handled = await onItemClickForConnect(itemId);
+      if (handled) return;
+    }
+    // Otherwise, normal selection
+    onSelectConnector(null);
+    onSelectItem(itemId);
+  }, [isConnectMode, onItemClickForConnect, onSelectItem, onSelectConnector]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     // Middle mouse button or right click for panning
@@ -139,12 +164,15 @@ export function BoardCanvas({
     }
   };
 
+  // Filter out connector items from regular rendering
+  const nonConnectorItems = items.filter(item => item.type !== 'connector');
+
   return (
     <div
       ref={canvasRef}
-      className={`absolute inset-0 overflow-hidden cursor-default bg-[#3a3a3a] transition-colors ${
+      className={`absolute inset-0 overflow-hidden transition-colors ${
         isDragOver ? 'bg-primary/10 ring-2 ring-primary ring-inset' : ''
-      }`}
+      } ${isConnectMode ? 'cursor-crosshair' : 'cursor-default'}`}
       onClick={handleCanvasClick}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -158,20 +186,32 @@ export function BoardCanvas({
         backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`,
         backgroundSize: '20px 20px',
         backgroundPosition: `${offset.x}px ${offset.y}px`,
+        backgroundColor: '#3a3a3a',
       }}
     >
+      {/* Connector Layer - renders SVG connections */}
+      <ConnectorLayer
+        items={items}
+        offset={offset}
+        selectedConnectorId={selectedConnectorId}
+        onSelectConnector={onSelectConnector}
+        onDeleteConnector={onDeleteConnector}
+      />
+
       <motion.div
         className="canvas-inner absolute inset-0"
         style={{
           transform: `translate(${offset.x}px, ${offset.y}px)`,
         }}
       >
-        {items.map((item) => (
+        {nonConnectorItems.map((item) => (
           <BoardItem
             key={item.id}
             item={item}
             isSelected={selectedItemId === item.id}
-            onSelect={() => onSelectItem(item.id)}
+            isConnectMode={isConnectMode}
+            isConnectStart={connectStartItemId === item.id}
+            onSelect={() => handleItemSelect(item.id)}
             onDragEnd={(x, y) => handleItemDragEnd(item.id, x, y)}
             onResize={(w, h) => handleItemResize(item.id, w, h)}
             onContentChange={(content) => handleContentChange(item.id, content)}

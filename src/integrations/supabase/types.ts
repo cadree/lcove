@@ -262,11 +262,18 @@ export type Database = {
           content: Json
           created_at: string
           created_by: string | null
+          end_anchor: string | null
+          end_item_id: string | null
           h: number
           id: string
           is_trashed: boolean
           parent_item_id: string | null
           rotation: number
+          start_anchor: string | null
+          start_item_id: string | null
+          stroke_color: string
+          stroke_style: string
+          stroke_width: number
           title: string | null
           type: string
           updated_at: string
@@ -280,11 +287,18 @@ export type Database = {
           content?: Json
           created_at?: string
           created_by?: string | null
+          end_anchor?: string | null
+          end_item_id?: string | null
           h?: number
           id?: string
           is_trashed?: boolean
           parent_item_id?: string | null
           rotation?: number
+          start_anchor?: string | null
+          start_item_id?: string | null
+          stroke_color?: string
+          stroke_style?: string
+          stroke_width?: number
           title?: string | null
           type: string
           updated_at?: string
@@ -298,11 +312,18 @@ export type Database = {
           content?: Json
           created_at?: string
           created_by?: string | null
+          end_anchor?: string | null
+          end_item_id?: string | null
           h?: number
           id?: string
           is_trashed?: boolean
           parent_item_id?: string | null
           rotation?: number
+          start_anchor?: string | null
+          start_item_id?: string | null
+          stroke_color?: string
+          stroke_style?: string
+          stroke_width?: number
           title?: string | null
           type?: string
           updated_at?: string
@@ -320,8 +341,22 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "board_items_end_item_id_fkey"
+            columns: ["end_item_id"]
+            isOneToOne: false
+            referencedRelation: "board_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "board_items_parent_item_id_fkey"
             columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "board_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "board_items_start_item_id_fkey"
+            columns: ["start_item_id"]
             isOneToOne: false
             referencedRelation: "board_items"
             referencedColumns: ["id"]
