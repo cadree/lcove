@@ -259,9 +259,10 @@ export function useContactContracts(pipelineItemId: string | null) {
       
       if (error) throw error;
 
-      // Call edge function to send the contract
+      // Call edge function to send the contract - pass current origin for signing URL
+      const appUrl = window.location.origin;
       const { error: sendError } = await supabase.functions.invoke('send-contract', {
-        body: { contractId, via, recipient },
+        body: { contractId, via, recipient, appUrl },
       });
       
       if (sendError) {

@@ -229,9 +229,9 @@ serve(async (req) => {
   }
 
   try {
-    const { contractId, via, recipient } = await req.json();
+    const { contractId, via, recipient, appUrl } = await req.json();
 
-    console.log(`Sending contract ${contractId} via ${via} to ${recipient}`);
+    console.log(`Sending contract ${contractId} via ${via} to ${recipient}, appUrl: ${appUrl}`);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -252,11 +252,11 @@ serve(async (req) => {
       });
     }
 
-    // Generate signing URL - use Supabase URL to derive app URL
-    const supabaseUrlStr = Deno.env.get("SUPABASE_URL") || "";
-    // Default to lovable preview URL or production
-    const appUrl = Deno.env.get("APP_URL") || "https://wjbyvlgsxscwukkolehg.lovableproject.com";
-    const signUrl = `${appUrl}/sign-contract/${contract.id}`;
+    // Generate signing URL - use appUrl passed from frontend, or fallback
+    const baseUrl = appUrl || Deno.env.get("APP_URL") || "https://wjbyvlgsxscwukkolehg.lovableproject.com";
+    const signUrl = `${baseUrl}/sign-contract/${contract.id}`;
+    
+    console.log(`Generated sign URL: ${signUrl}`);
 
     if (via === "email") {
       const resendApiKey = Deno.env.get("RESEND_API_KEY");
