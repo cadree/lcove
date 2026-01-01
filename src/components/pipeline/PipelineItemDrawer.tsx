@@ -369,6 +369,18 @@ export function PipelineItemDrawer({
 
           <Separator className="my-4" />
 
+          {/* Contracts Section */}
+          <div className="mb-6">
+            <ContactContractsSection 
+              pipelineItemId={item.id}
+              contactName={item.name}
+              contactEmail={item.email || undefined}
+              contactPhone={item.phone || undefined}
+            />
+          </div>
+
+          <Separator className="my-4" />
+
           {/* Notes Section */}
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-2">
