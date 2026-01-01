@@ -63,8 +63,11 @@ export const BoardCanvas = memo(function BoardCanvas({
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [scale, setScale] = useState(1);
   const startPanRef = useRef({ x: 0, y: 0 });
   const [isDragOver, setIsDragOver] = useState(false);
+  const initialPinchDistanceRef = useRef<number | null>(null);
+  const initialScaleRef = useRef<number>(1);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('canvas-inner')) {
@@ -104,11 +107,17 @@ export const BoardCanvas = memo(function BoardCanvas({
     setIsPanning(false);
   }, []);
 
-  // Touch handlers for mobile canvas panning (two-finger pan)
+  // Touch handlers for mobile canvas panning and zooming (two-finger)
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const getPinchDistance = (touches: React.TouchList) => {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
   
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    // Two-finger touch for panning
+    // Two-finger touch for panning and zooming
     if (e.touches.length === 2) {
       e.preventDefault();
       const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
@@ -116,25 +125,47 @@ export const BoardCanvas = memo(function BoardCanvas({
       setIsPanning(true);
       startPanRef.current = { x: midX - offset.x, y: midY - offset.y };
       touchStartRef.current = { x: midX, y: midY };
+      initialPinchDistanceRef.current = getPinchDistance(e.touches);
+      initialScaleRef.current = scale;
     }
-  }, [offset]);
+  }, [offset, scale]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (isPanning && e.touches.length === 2) {
+    if (e.touches.length === 2) {
       e.preventDefault();
       const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      const newOffset = {
-        x: midX - startPanRef.current.x,
-        y: midY - startPanRef.current.y,
-      };
-      setOffset(newOffset);
+      
+      // Pan
+      if (isPanning) {
+        const newOffset = {
+          x: midX - startPanRef.current.x,
+          y: midY - startPanRef.current.y,
+        };
+        setOffset(newOffset);
+      }
+      
+      // Pinch to zoom
+      if (initialPinchDistanceRef.current !== null) {
+        const currentDistance = getPinchDistance(e.touches);
+        const scaleChange = currentDistance / initialPinchDistanceRef.current;
+        const newScale = Math.min(Math.max(initialScaleRef.current * scaleChange, 0.25), 3);
+        setScale(newScale);
+      }
     }
   }, [isPanning]);
 
   const handleTouchEnd = useCallback(() => {
     setIsPanning(false);
     touchStartRef.current = null;
+    initialPinchDistanceRef.current = null;
+  }, []);
+
+  // Mouse wheel zoom
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setScale(prev => Math.min(Math.max(prev + delta, 0.25), 3));
   }, []);
 
   const handleItemDragEnd = useCallback((id: string, x: number, y: number) => {
@@ -236,13 +267,14 @@ export const BoardCanvas = memo(function BoardCanvas({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
+      onWheel={handleWheel}
       onContextMenu={(e) => e.preventDefault()}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       style={{
         backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`,
-        backgroundSize: '20px 20px',
+        backgroundSize: `${20 * scale}px ${20 * scale}px`,
         backgroundPosition: `${offset.x}px ${offset.y}px`,
         backgroundColor: '#3a3a3a',
       }}
@@ -256,9 +288,9 @@ export const BoardCanvas = memo(function BoardCanvas({
       />
 
       <div
-        className="canvas-inner absolute inset-0"
+        className="canvas-inner absolute inset-0 origin-top-left"
         style={{
-          transform: `translate(${offset.x}px, ${offset.y}px)`,
+          transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
         }}
       >
         {nonConnectorItems.map((item) => (

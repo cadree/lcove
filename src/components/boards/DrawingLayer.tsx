@@ -70,7 +70,7 @@ export function DrawingLayer({ isActive, offset, onClose }: DrawingLayerProps) {
     ctx.stroke();
   };
 
-  const getCanvasPoint = useCallback((e: React.MouseEvent): Point => {
+  const getCanvasPoint = useCallback((e: React.MouseEvent | React.Touch): Point => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
 
@@ -81,6 +81,7 @@ export function DrawingLayer({ isActive, offset, onClose }: DrawingLayerProps) {
     };
   }, []);
 
+  // Mouse handlers
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
     e.stopPropagation();
@@ -108,14 +109,44 @@ export function DrawingLayer({ isActive, offset, onClose }: DrawingLayerProps) {
     setCurrentStroke([]);
   }, [isDrawing, currentStroke, strokeColor, strokeWidth]);
 
-  const handleClear = useCallback((e: React.MouseEvent) => {
+  // Touch handlers for mobile drawing
+  const handleCanvasTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDrawing(true);
+    const point = getCanvasPoint(e.touches[0]);
+    setCurrentStroke([point]);
+  }, [getCanvasPoint]);
+
+  const handleCanvasTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDrawing || e.touches.length !== 1) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const point = getCanvasPoint(e.touches[0]);
+    setCurrentStroke((prev) => [...prev, point]);
+  }, [isDrawing, getCanvasPoint]);
+
+  const handleCanvasTouchEnd = useCallback(() => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+    if (currentStroke.length > 1) {
+      setStrokes((prev) => [
+        ...prev,
+        { points: currentStroke, color: strokeColor, width: strokeWidth },
+      ]);
+    }
+    setCurrentStroke([]);
+  }, [isDrawing, currentStroke, strokeColor, strokeWidth]);
+
+  const handleClear = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
     e.preventDefault();
     setStrokes([]);
     setCurrentStroke([]);
   }, []);
 
-  const handleColorClick = useCallback((e: React.MouseEvent, color: string) => {
+  const handleColorClick = useCallback((e: React.MouseEvent | React.TouchEvent, color: string) => {
     e.stopPropagation();
     e.preventDefault();
     setStrokeColor(color);
@@ -126,13 +157,13 @@ export function DrawingLayer({ isActive, offset, onClose }: DrawingLayerProps) {
     setStrokeWidth(Number(e.target.value));
   }, []);
 
-  const handleDone = useCallback((e: React.MouseEvent) => {
+  const handleDone = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
     e.preventDefault();
     onClose();
   }, [onClose]);
 
-  const handleToolbarMouseDown = useCallback((e: React.MouseEvent) => {
+  const handleToolbarMouseDown = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
   }, []);
 
@@ -203,12 +234,16 @@ export function DrawingLayer({ isActive, offset, onClose }: DrawingLayerProps) {
       {/* Canvas - for drawing only */}
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full cursor-crosshair"
+        className="absolute inset-0 w-full h-full cursor-crosshair touch-none"
         style={{ zIndex: 55 }}
         onMouseDown={handleCanvasMouseDown}
         onMouseMove={handleCanvasMouseMove}
         onMouseUp={handleCanvasMouseUp}
         onMouseLeave={handleCanvasMouseUp}
+        onTouchStart={handleCanvasTouchStart}
+        onTouchMove={handleCanvasTouchMove}
+        onTouchEnd={handleCanvasTouchEnd}
+        onTouchCancel={handleCanvasTouchEnd}
       />
     </div>
   );
