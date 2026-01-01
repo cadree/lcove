@@ -59,11 +59,14 @@ export const BoardItem = memo(function BoardItem({
   const elementRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
   const [isDraggingState, setIsDraggingState] = useState(false);
+  const [isTouching, setIsTouching] = useState(false);
   const positionRef = useRef({ x: item.x, y: item.y });
   const startPosRef = useRef({ x: 0, y: 0 });
   const startMouseRef = useRef({ x: 0, y: 0 });
   const hasDraggedRef = useRef(false);
   const rafRef = useRef<number | null>(null);
+  const touchStartTimeRef = useRef<number>(0);
+  const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sync position from props only when not dragging
   useEffect(() => {
@@ -87,10 +90,13 @@ export const BoardItem = memo(function BoardItem({
   const moveDrag = useCallback((clientX: number, clientY: number) => {
     if (!isDraggingRef.current) return;
     
-    hasDraggedRef.current = true;
-    
     const deltaX = clientX - startMouseRef.current.x;
     const deltaY = clientY - startMouseRef.current.y;
+    
+    // Lower threshold for mobile - start moving after 3px
+    if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+      hasDraggedRef.current = true;
+    }
     
     const newX = startPosRef.current.x + deltaX;
     const newY = startPosRef.current.y + deltaY;
@@ -115,6 +121,12 @@ export const BoardItem = memo(function BoardItem({
     
     isDraggingRef.current = false;
     setIsDraggingState(false);
+    setIsTouching(false);
+
+    if (longPressTimeoutRef.current) {
+      clearTimeout(longPressTimeoutRef.current);
+      longPressTimeoutRef.current = null;
+    }
 
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current);
@@ -182,18 +194,51 @@ export const BoardItem = memo(function BoardItem({
     if (isConnectMode || isInteractive || e.touches.length !== 1) return;
     
     e.stopPropagation();
+    setIsTouching(true);
+    touchStartTimeRef.current = Date.now();
     
     const touch = e.touches[0];
-    startDrag(touch.clientX, touch.clientY);
+    const touchX = touch.clientX;
+    const touchY = touch.clientY;
+    
+    // Start drag immediately on touch for instant response
+    startDrag(touchX, touchY);
+    
+    // Select card after short hold if not dragging
+    longPressTimeoutRef.current = setTimeout(() => {
+      if (!hasDraggedRef.current) {
+        onSelect();
+      }
+    }, 200);
 
     const handleTouchMove = (moveEvent: TouchEvent) => {
       if (moveEvent.touches.length !== 1) return;
+      
+      // Cancel long press on any movement
+      if (longPressTimeoutRef.current) {
+        clearTimeout(longPressTimeoutRef.current);
+        longPressTimeoutRef.current = null;
+      }
+      
       moveEvent.preventDefault();
       const moveTouch = moveEvent.touches[0];
       moveDrag(moveTouch.clientX, moveTouch.clientY);
     };
 
-    const handleTouchEnd = () => {
+    const handleTouchEnd = (endEvent: TouchEvent) => {
+      if (longPressTimeoutRef.current) {
+        clearTimeout(longPressTimeoutRef.current);
+        longPressTimeoutRef.current = null;
+      }
+      
+      const touchDuration = Date.now() - touchStartTimeRef.current;
+      
+      // Quick tap (under 200ms) without drag = select
+      if (touchDuration < 200 && !hasDraggedRef.current) {
+        endEvent.preventDefault();
+        onSelect();
+      }
+      
       endDrag();
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
@@ -203,7 +248,7 @@ export const BoardItem = memo(function BoardItem({
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd);
     document.addEventListener('touchcancel', handleTouchEnd);
-  }, [isConnectMode, startDrag, moveDrag, endDrag]);
+  }, [isConnectMode, startDrag, moveDrag, endDrag, onSelect]);
 
   const getItemStyles = useCallback(() => {
     switch (item.type) {
@@ -397,14 +442,15 @@ export const BoardItem = memo(function BoardItem({
       onTouchStart={handleTouchStart}
       onClick={handleClick}
       className={cn(
-        "absolute rounded-lg will-change-transform",
+        "absolute rounded-lg will-change-transform select-none",
         isDraggingState ? "" : "shadow-lg",
         isConnectMode ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing",
         getItemStyles(),
         isSelected && "ring-2 ring-primary/80",
         isConnectStart && "ring-2 ring-primary ring-offset-2 ring-offset-[#3a3a3a]",
         isConnectMode && !isConnectStart && "hover:ring-2 hover:ring-primary/50",
-        isDraggingState && "opacity-95 z-[9999] shadow-2xl"
+        isDraggingState && "opacity-95 z-[9999] shadow-2xl scale-[1.02]",
+        isTouching && !isDraggingState && "ring-2 ring-primary/40"
       )}
       style={{
         width: item.w,
@@ -414,16 +460,19 @@ export const BoardItem = memo(function BoardItem({
         backfaceVisibility: 'hidden',
         WebkitBackfaceVisibility: 'hidden',
         touchAction: 'none',
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
       }}
     >
-      {/* Milanote-style line handle - appears on hover/select */}
+      {/* Milanote-style line handle - larger for mobile */}
       {(isSelected || isConnectMode) && item.type !== 'connector' && item.type !== 'line' && (
         <div
-          className="absolute -top-1 -right-1 w-5 h-5 bg-white border-2 border-primary rounded-full cursor-crosshair z-20 flex items-center justify-center shadow-md hover:scale-110 transition-transform"
+          className="absolute -top-2 -right-2 w-7 h-7 bg-white border-2 border-primary rounded-full cursor-crosshair z-20 flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-transform"
           style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}
           onClick={(e) => {
             e.stopPropagation();
-            onSelect(); // This triggers connect mode in parent
+            onSelect();
           }}
           onTouchEnd={(e) => {
             e.stopPropagation();
@@ -431,16 +480,16 @@ export const BoardItem = memo(function BoardItem({
             onSelect();
           }}
         >
-          <div className="w-1.5 h-1.5 bg-primary rounded-full" />
+          <div className="w-2 h-2 bg-primary rounded-full" />
         </div>
       )}
 
-      {/* Delete button - moved to top left */}
+      {/* Delete button - larger touch target for mobile */}
       {isSelected && (
         <Button
           variant="destructive"
           size="icon"
-          className="absolute -top-2 -left-2 h-6 w-6 rounded-full z-10 min-h-[24px]"
+          className="absolute -top-3 -left-3 h-8 w-8 rounded-full z-10 min-h-[32px] shadow-lg"
           onClick={handleDeleteClick}
           onTouchEnd={(e) => {
             e.stopPropagation();
@@ -448,7 +497,7 @@ export const BoardItem = memo(function BoardItem({
             onDelete();
           }}
         >
-          <Trash2 className="w-3 h-3" />
+          <Trash2 className="w-4 h-4" />
         </Button>
       )}
 
