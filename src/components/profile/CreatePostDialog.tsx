@@ -24,6 +24,10 @@ import {
   Settings,
   Smile,
   Loader2,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  LayoutGrid,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +37,8 @@ interface CreatePostDialogProps {
   onCreatePost: (data: {
     content?: string;
     file?: File;
-    mediaType?: 'photo' | 'video' | 'text';
+    files?: File[];
+    mediaType?: 'photo' | 'video' | 'text' | 'collage';
     location?: string;
     altText?: string;
     commentsEnabled?: boolean;
@@ -46,6 +51,7 @@ const STEPS = ['upload', 'preview', 'caption', 'metadata', 'publish'] as const;
 type Step = typeof STEPS[number];
 
 const MAX_CAPTION_LENGTH = 2200;
+const MAX_COLLAGE_IMAGES = 10;
 
 export function CreatePostDialog({
   open,
@@ -55,9 +61,10 @@ export function CreatePostDialog({
   userName,
 }: CreatePostDialogProps) {
   const [currentStep, setCurrentStep] = useState<Step>('upload');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
-  const [mediaType, setMediaType] = useState<'photo' | 'video' | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
+  const [mediaType, setMediaType] = useState<'photo' | 'video' | 'collage' | null>(null);
+  const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
   const [caption, setCaption] = useState("");
   const [location, setLocation] = useState("");
   const [altText, setAltText] = useState("");
@@ -66,12 +73,14 @@ export function CreatePostDialog({
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const multiImageInputRef = useRef<HTMLInputElement>(null);
 
   const resetForm = () => {
     setCurrentStep('upload');
-    setSelectedFile(null);
-    setMediaPreview(null);
+    setSelectedFiles([]);
+    setMediaPreviews([]);
     setMediaType(null);
+    setCurrentPreviewIndex(0);
     setCaption("");
     setLocation("");
     setAltText("");
@@ -83,15 +92,80 @@ export function CreatePostDialog({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setSelectedFile(file);
+    setSelectedFiles([file]);
     setMediaType(type);
     
     const reader = new FileReader();
     reader.onloadend = () => {
-      setMediaPreview(reader.result as string);
+      setMediaPreviews([reader.result as string]);
       setCurrentStep('preview');
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleMultiFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).slice(0, MAX_COLLAGE_IMAGES);
+    if (files.length === 0) return;
+
+    setSelectedFiles(files);
+    setMediaType(files.length > 1 ? 'collage' : 'photo');
+
+    const previews: string[] = [];
+    let loadedCount = 0;
+
+    files.forEach((file, index) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        previews[index] = reader.result as string;
+        loadedCount++;
+        if (loadedCount === files.length) {
+          setMediaPreviews(previews);
+          setCurrentStep('preview');
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleAddMoreImages = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newFiles = Array.from(e.target.files || []);
+    const totalFiles = [...selectedFiles, ...newFiles].slice(0, MAX_COLLAGE_IMAGES);
+    
+    if (totalFiles.length === selectedFiles.length) return;
+
+    const newFilesToAdd = totalFiles.slice(selectedFiles.length);
+    
+    newFilesToAdd.forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setMediaPreviews(prev => [...prev, reader.result as string].slice(0, MAX_COLLAGE_IMAGES));
+      };
+      reader.readAsDataURL(file);
+    });
+
+    setSelectedFiles(totalFiles);
+    if (totalFiles.length > 1) {
+      setMediaType('collage');
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    const newFiles = selectedFiles.filter((_, i) => i !== index);
+    const newPreviews = mediaPreviews.filter((_, i) => i !== index);
+    
+    setSelectedFiles(newFiles);
+    setMediaPreviews(newPreviews);
+    
+    if (newFiles.length === 0) {
+      setMediaType(null);
+      setCurrentStep('upload');
+    } else if (newFiles.length === 1) {
+      setMediaType('photo');
+    }
+    
+    if (currentPreviewIndex >= newPreviews.length) {
+      setCurrentPreviewIndex(Math.max(0, newPreviews.length - 1));
+    }
   };
 
   const handleClose = () => {
@@ -118,7 +192,8 @@ export function CreatePostDialog({
     try {
       await onCreatePost({
         content: caption || undefined,
-        file: selectedFile || undefined,
+        file: selectedFiles[0] || undefined,
+        files: selectedFiles.length > 1 ? selectedFiles : undefined,
         mediaType: mediaType || 'text',
         location: location || undefined,
         altText: altText || undefined,
@@ -135,7 +210,7 @@ export function CreatePostDialog({
   const getStepTitle = () => {
     switch (currentStep) {
       case 'upload': return 'Create new post';
-      case 'preview': return 'Preview';
+      case 'preview': return mediaPreviews.length > 1 ? `Preview (${currentPreviewIndex + 1}/${mediaPreviews.length})` : 'Preview';
       case 'caption': return 'Write a caption';
       case 'metadata': return 'Add details';
       case 'publish': return 'Share';
@@ -145,7 +220,7 @@ export function CreatePostDialog({
 
   const canProceed = () => {
     switch (currentStep) {
-      case 'upload': return !!selectedFile;
+      case 'upload': return selectedFiles.length > 0;
       case 'preview': return true;
       case 'caption': return true;
       case 'metadata': return true;
@@ -216,15 +291,19 @@ export function CreatePostDialog({
                 <h3 className="text-xl font-medium text-foreground mb-2">
                   Drag photos and videos here
                 </h3>
-                <p className="text-muted-foreground text-sm mb-6">
+                <p className="text-muted-foreground text-sm mb-6 text-center">
                   Share your creative work with the community
                 </p>
-                <div className="flex gap-3">
-                  <Button onClick={() => imageInputRef.current?.click()}>
+                <div className="flex flex-col gap-3 w-full max-w-xs">
+                  <Button onClick={() => imageInputRef.current?.click()} className="w-full">
                     <Image className="w-4 h-4 mr-2" />
                     Select Photo
                   </Button>
-                  <Button variant="outline" onClick={() => videoInputRef.current?.click()}>
+                  <Button variant="outline" onClick={() => multiImageInputRef.current?.click()} className="w-full">
+                    <LayoutGrid className="w-4 h-4 mr-2" />
+                    Create Collage (Multiple Photos)
+                  </Button>
+                  <Button variant="outline" onClick={() => videoInputRef.current?.click()} className="w-full">
                     <Video className="w-4 h-4 mr-2" />
                     Select Video
                   </Button>
@@ -238,6 +317,14 @@ export function CreatePostDialog({
                   className="hidden"
                 />
                 <input
+                  ref={multiImageInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleMultiFileSelect}
+                  className="hidden"
+                />
+                <input
                   ref={videoInputRef}
                   type="file"
                   accept="video/*"
@@ -248,7 +335,7 @@ export function CreatePostDialog({
             )}
 
             {/* Step 2: Preview */}
-            {currentStep === 'preview' && mediaPreview && (
+            {currentStep === 'preview' && mediaPreviews.length > 0 && (
               <motion.div
                 key="preview"
                 initial={{ opacity: 0, x: 20 }}
@@ -256,34 +343,112 @@ export function CreatePostDialog({
                 exit={{ opacity: 0, x: -20 }}
                 className="relative"
               >
-                <div className="aspect-square bg-black flex items-center justify-center overflow-hidden">
-                  {mediaType === 'photo' ? (
-                    <img 
-                      src={mediaPreview} 
-                      alt="Preview" 
-                      className="w-full h-full object-contain"
-                    />
-                  ) : (
+                <div className="aspect-square bg-black flex items-center justify-center overflow-hidden relative">
+                  {mediaType === 'video' ? (
                     <video 
-                      src={mediaPreview} 
+                      src={mediaPreviews[0]} 
                       controls 
                       className="w-full h-full object-contain"
                     />
+                  ) : (
+                    <img 
+                      src={mediaPreviews[currentPreviewIndex]} 
+                      alt="Preview" 
+                      className="w-full h-full object-contain"
+                    />
+                  )}
+
+                  {/* Navigation arrows for collage */}
+                  {mediaPreviews.length > 1 && (
+                    <>
+                      {currentPreviewIndex > 0 && (
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/80"
+                          onClick={() => setCurrentPreviewIndex(prev => prev - 1)}
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {currentPreviewIndex < mediaPreviews.length - 1 && (
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/80"
+                          onClick={() => setCurrentPreviewIndex(prev => prev + 1)}
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </>
+                  )}
+
+                  {/* Dots indicator */}
+                  {mediaPreviews.length > 1 && (
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+                      {mediaPreviews.map((_, index) => (
+                        <button
+                          key={index}
+                          className={cn(
+                            "w-2 h-2 rounded-full transition-colors",
+                            index === currentPreviewIndex ? "bg-primary" : "bg-white/50"
+                          )}
+                          onClick={() => setCurrentPreviewIndex(index)}
+                        />
+                      ))}
+                    </div>
                   )}
                 </div>
+
+                {/* Remove current image button */}
                 <Button
                   variant="ghost"
                   size="icon"
                   className="absolute top-2 right-2 bg-background/80 hover:bg-background"
-                  onClick={() => {
-                    setSelectedFile(null);
-                    setMediaPreview(null);
-                    setMediaType(null);
-                    setCurrentStep('upload');
-                  }}
+                  onClick={() => handleRemoveImage(currentPreviewIndex)}
                 >
                   <X className="w-4 h-4" />
                 </Button>
+
+                {/* Thumbnail strip for collage */}
+                {mediaPreviews.length > 1 && (
+                  <div className="flex gap-2 p-3 overflow-x-auto bg-muted/30">
+                    {mediaPreviews.map((preview, index) => (
+                      <button
+                        key={index}
+                        className={cn(
+                          "w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors relative group",
+                          index === currentPreviewIndex ? "border-primary" : "border-transparent"
+                        )}
+                        onClick={() => setCurrentPreviewIndex(index)}
+                      >
+                        <img src={preview} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveImage(index);
+                          }}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </button>
+                    ))}
+                    {selectedFiles.length < MAX_COLLAGE_IMAGES && (
+                      <label className="w-16 h-16 rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors flex-shrink-0">
+                        <Plus className="w-6 h-6 text-muted-foreground" />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleAddMoreImages}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
+                )}
               </motion.div>
             )}
 
@@ -297,21 +462,26 @@ export function CreatePostDialog({
                 className="p-4"
               >
                 {/* Mini preview */}
-                {mediaPreview && (
+                {mediaPreviews.length > 0 && (
                   <div className="flex items-start gap-3 mb-4 p-3 bg-muted/30 rounded-lg">
-                    <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
-                      {mediaType === 'photo' ? (
-                        <img src={mediaPreview} alt="Preview" className="w-full h-full object-cover" />
+                    <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 relative">
+                      {mediaType === 'video' ? (
+                        <video src={mediaPreviews[0]} className="w-full h-full object-cover" />
                       ) : (
-                        <video src={mediaPreview} className="w-full h-full object-cover" />
+                        <img src={mediaPreviews[0]} alt="Preview" className="w-full h-full object-cover" />
+                      )}
+                      {mediaPreviews.length > 1 && (
+                        <div className="absolute top-1 right-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
+                          +{mediaPreviews.length - 1}
+                        </div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-foreground font-medium truncate">
-                        {selectedFile?.name}
+                        {selectedFiles[0]?.name}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {mediaType === 'photo' ? 'Photo' : 'Video'}
+                        {mediaType === 'collage' ? `${mediaPreviews.length} photos` : mediaType === 'photo' ? 'Photo' : 'Video'}
                       </p>
                     </div>
                   </div>
@@ -459,12 +629,50 @@ export function CreatePostDialog({
                   </div>
 
                   {/* Media */}
-                  {mediaPreview && (
-                    <div className="aspect-square bg-black">
-                      {mediaType === 'photo' ? (
-                        <img src={mediaPreview} alt="Preview" className="w-full h-full object-contain" />
+                  {mediaPreviews.length > 0 && (
+                    <div className="aspect-square bg-black relative">
+                      {mediaType === 'video' ? (
+                        <video src={mediaPreviews[0]} controls className="w-full h-full object-contain" />
                       ) : (
-                        <video src={mediaPreview} controls className="w-full h-full object-contain" />
+                        <>
+                          <img src={mediaPreviews[currentPreviewIndex]} alt="Preview" className="w-full h-full object-contain" />
+                          {mediaPreviews.length > 1 && (
+                            <>
+                              {currentPreviewIndex > 0 && (
+                                <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/80"
+                                  onClick={() => setCurrentPreviewIndex(prev => prev - 1)}
+                                >
+                                  <ChevronLeft className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {currentPreviewIndex < mediaPreviews.length - 1 && (
+                                <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/80"
+                                  onClick={() => setCurrentPreviewIndex(prev => prev + 1)}
+                                >
+                                  <ChevronRight className="w-4 h-4" />
+                                </Button>
+                              )}
+                              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+                                {mediaPreviews.map((_, index) => (
+                                  <button
+                                    key={index}
+                                    className={cn(
+                                      "w-2 h-2 rounded-full transition-colors",
+                                      index === currentPreviewIndex ? "bg-primary" : "bg-white/50"
+                                    )}
+                                    onClick={() => setCurrentPreviewIndex(index)}
+                                  />
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </>
                       )}
                     </div>
                   )}
@@ -480,9 +688,9 @@ export function CreatePostDialog({
                   )}
                 </div>
 
-                <div className="text-center text-sm text-muted-foreground">
-                  <p>Your post will appear on your profile and in the feed.</p>
-                </div>
+                <p className="text-sm text-muted-foreground text-center">
+                  Your post will be shared with the community
+                </p>
               </motion.div>
             )}
           </AnimatePresence>

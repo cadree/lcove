@@ -464,12 +464,12 @@ const Profile = () => {
         {/* Dynamic Sections based on layout */}
         {visibleSections.map(section => renderSection(section))}
 
-        {/* Floating Create Button - Mobile */}
+        {/* Floating Create Button - Always visible */}
         {isOwnProfile && (
-          <div className="fixed bottom-24 right-5 z-40 flex flex-col gap-2 sm:hidden">
+          <div className="fixed bottom-24 right-5 z-40 flex flex-col gap-2">
             <Button
               size="icon"
-              className="w-14 h-14 rounded-full shadow-lg"
+              className="w-14 h-14 rounded-full shadow-lg bg-primary hover:bg-primary/90"
               onClick={() => setShowCreatePostDialog(true)}
             >
               <Plus className="w-6 h-6" />

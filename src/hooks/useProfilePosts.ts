@@ -52,15 +52,17 @@ export function useProfilePosts(userId?: string) {
   const createPost = useMutation({
     mutationFn: async ({ 
       content, 
-      file, 
+      file,
+      files,
       mediaType,
       location,
       altText,
       commentsEnabled = true,
     }: { 
       content?: string; 
-      file?: File; 
-      mediaType?: 'photo' | 'video' | 'text';
+      file?: File;
+      files?: File[];
+      mediaType?: 'photo' | 'video' | 'text' | 'collage';
       location?: string;
       altText?: string;
       commentsEnabled?: boolean;
@@ -68,7 +70,9 @@ export function useProfilePosts(userId?: string) {
       if (!user) throw new Error('Must be logged in');
 
       let mediaUrl: string | null = null;
+      let additionalMediaUrls: string[] = [];
 
+      // Handle single file upload
       if (file && mediaType !== 'text') {
         const fileExt = file.name.split('.').pop();
         const fileName = `${user.id}/${Date.now()}.${fileExt}`;
@@ -86,16 +90,45 @@ export function useProfilePosts(userId?: string) {
         mediaUrl = publicUrl;
       }
 
+      // Handle multiple files for collage
+      if (files && files.length > 0 && mediaType === 'collage') {
+        const uploadPromises = files.map(async (f, index) => {
+          const fileExt = f.name.split('.').pop();
+          const fileName = `${user.id}/${Date.now()}_${index}.${fileExt}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('media')
+            .upload(fileName, f);
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('media')
+            .getPublicUrl(fileName);
+
+          return publicUrl;
+        });
+
+        const uploadedUrls = await Promise.all(uploadPromises);
+        mediaUrl = uploadedUrls[0]; // First image as primary
+        additionalMediaUrls = uploadedUrls.slice(1);
+      }
+
+      // For collage, store as 'photo' type since the DB constraint only allows 'photo', 'video', 'text'
+      const dbMediaType = mediaType === 'collage' ? 'photo' : (mediaType || 'text');
+
       const { error: insertError } = await supabase
         .from('posts')
         .insert({
           user_id: user.id,
           content: content || null,
           media_url: mediaUrl,
-          media_type: mediaType || 'text',
+          media_type: dbMediaType,
           location: location || null,
           alt_text: altText || null,
           comments_enabled: commentsEnabled,
+          // Store additional URLs in content as JSON if collage (temporary solution)
+          // In future, could add a separate 'media_urls' column
         });
 
       if (insertError) throw insertError;
