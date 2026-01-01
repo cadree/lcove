@@ -7,6 +7,7 @@ import { BoardItemNote } from "./BoardItemNote";
 import { BoardItemTodo } from "./BoardItemTodo";
 import { BoardItemLink } from "./BoardItemLink";
 import { BoardItemImage } from "./BoardItemImage";
+import { BoardItemLine } from "./BoardItemLine";
 import { cn } from "@/lib/utils";
 import { Json } from "@/integrations/supabase/types";
 
@@ -42,10 +43,12 @@ export function BoardItem({
         return "bg-white shadow-lg";
       case 'image':
         return "bg-[#1a1a1a] shadow-lg overflow-hidden";
+      case 'line':
+        return "bg-transparent";
       case 'column':
         return "bg-white/5 border border-dashed border-white/20";
       case 'board_ref':
-        return "bg-[#f5f5f4] shadow-lg";
+        return "bg-[#f5f4f3] shadow-lg";
       default:
         return "bg-white shadow-lg";
     }
@@ -78,6 +81,13 @@ export function BoardItem({
       case 'image':
         return (
           <BoardItemImage
+            content={item.content}
+            onChange={onContentChange}
+          />
+        );
+      case 'line':
+        return (
+          <BoardItemLine
             content={item.content}
             onChange={onContentChange}
           />

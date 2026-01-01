@@ -73,7 +73,7 @@ export function BoardItemTodo({ content, onChange }: BoardItemTodoProps) {
             onChange={(e) => handleTextChange(index, e.target.value)}
             onBlur={handleTextBlur}
             placeholder="Add item..."
-            className={`flex-1 h-7 text-sm border-none bg-transparent p-0 focus-visible:ring-0 ${
+            className={`flex-1 h-7 text-sm border-none bg-transparent p-0 focus-visible:ring-0 text-foreground placeholder:text-muted-foreground/50 ${
               item.done ? "line-through text-muted-foreground" : ""
             }`}
           />

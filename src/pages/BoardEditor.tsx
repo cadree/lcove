@@ -9,6 +9,7 @@ import { BoardSidebar } from "@/components/boards/BoardSidebar";
 import { useBoard, useBoards } from "@/hooks/useBoards";
 import { useBoardItems, BoardItemType } from "@/hooks/useBoardItems";
 import { useAuth } from "@/contexts/AuthContext";
+import { Json } from "@/integrations/supabase/types";
 
 const BoardEditor = () => {
   const { boardId } = useParams<{ boardId: string }>();
@@ -22,27 +23,31 @@ const BoardEditor = () => {
   const [editedTitle, setEditedTitle] = useState("");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
-  const handleAddItem = async (type: BoardItemType) => {
+  const handleAddItem = async (type: BoardItemType, customContent?: Json, customX?: number, customY?: number) => {
     if (!boardId) return;
     
     // Calculate center position based on viewport
-    const centerX = 100 + Math.random() * 400;
-    const centerY = 100 + Math.random() * 300;
+    const centerX = customX ?? 100 + Math.random() * 400;
+    const centerY = customY ?? 100 + Math.random() * 300;
     
-    const defaultContent = type === 'note' 
-      ? { text: '' }
-      : type === 'todo' 
-        ? { items: [{ text: '', done: false }] }
-        : type === 'link'
-          ? { url: '', title: '' }
-          : {};
+    const defaultContent = customContent ?? (
+      type === 'note' 
+        ? { text: '' }
+        : type === 'todo' 
+          ? { items: [{ text: '', done: false }] }
+          : type === 'link'
+            ? { url: '', title: '' }
+            : type === 'line'
+              ? { color: '#ffffff', thickness: 2 }
+              : {}
+    );
 
     const dimensions = {
       note: { w: 200, h: 180 },
       todo: { w: 240, h: 200 },
       link: { w: 200, h: 100 },
       image: { w: 240, h: 200 },
-      line: { w: 100, h: 2 },
+      line: { w: 200, h: 8 },
       column: { w: 280, h: 400 },
       board_ref: { w: 160, h: 140 },
     };
@@ -63,6 +68,10 @@ const BoardEditor = () => {
       parent_item_id: null,
       created_by: user?.id || null,
     });
+  };
+
+  const handleCreateItem = (type: BoardItemType, content: Json, x: number, y: number) => {
+    handleAddItem(type, content, x, y);
   };
 
   const handleTitleSave = () => {
@@ -175,6 +184,7 @@ const BoardEditor = () => {
             onSelectItem={setSelectedItemId}
             onUpdateItem={(id, updates) => updateItem.mutate({ id, ...updates })}
             onDeleteItem={(id) => deleteItem.mutate(id)}
+            onCreateItem={handleCreateItem}
           />
         </div>
       </div>
