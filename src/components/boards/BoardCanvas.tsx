@@ -1,8 +1,7 @@
-import { useRef, useState, useCallback } from "react";
-import { motion } from "framer-motion";
+import { useRef, useState, useCallback, memo } from "react";
 import { BoardItem as BoardItemType, BoardItemType as ItemType } from "@/hooks/useBoardItems";
-import { BoardItem } from "./BoardItem";
-import { ConnectorLayer } from "./ConnectorLayer";
+import { BoardItemOptimized } from "./BoardItemOptimized";
+import { ConnectorLayerOptimized } from "./ConnectorLayerOptimized";
 import { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -22,7 +21,7 @@ interface BoardCanvasProps {
   onItemClickForConnect?: (itemId: string) => Promise<boolean>;
 }
 
-export function BoardCanvas({
+export const BoardCanvas = memo(function BoardCanvas({
   items,
   selectedItemId,
   selectedConnectorId,
@@ -39,74 +38,72 @@ export function BoardCanvas({
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [startPan, setStartPan] = useState({ x: 0, y: 0 });
+  const startPanRef = useRef({ x: 0, y: 0 });
   const [isDragOver, setIsDragOver] = useState(false);
 
-  const handleCanvasClick = (e: React.MouseEvent) => {
+  const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('canvas-inner')) {
       onSelectItem(null);
       onSelectConnector(null);
     }
-  };
+  }, [onSelectItem, onSelectConnector]);
 
   const handleItemSelect = useCallback(async (itemId: string) => {
-    // If in connect mode, handle connection logic
     if (isConnectMode && onItemClickForConnect) {
       const handled = await onItemClickForConnect(itemId);
       if (handled) return;
     }
-    // Otherwise, normal selection
     onSelectConnector(null);
     onSelectItem(itemId);
   }, [isConnectMode, onItemClickForConnect, onSelectItem, onSelectConnector]);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    // Middle mouse button or right click for panning
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if ((e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('canvas-inner')) && (e.button === 1 || e.button === 2)) {
       e.preventDefault();
       setIsPanning(true);
-      setStartPan({ x: e.clientX - offset.x, y: e.clientY - offset.y });
+      startPanRef.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
     }
-  };
+  }, [offset]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanning) {
-      setOffset({
-        x: e.clientX - startPan.x,
-        y: e.clientY - startPan.y,
-      });
+      const newOffset = {
+        x: e.clientX - startPanRef.current.x,
+        y: e.clientY - startPanRef.current.y,
+      };
+      setOffset(newOffset);
     }
-  }, [isPanning, startPan]);
+  }, [isPanning]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     setIsPanning(false);
-  };
+  }, []);
 
-  const handleItemDragEnd = (id: string, x: number, y: number) => {
+  const handleItemDragEnd = useCallback((id: string, x: number, y: number) => {
     onUpdateItem(id, { x, y });
-  };
+  }, [onUpdateItem]);
 
-  const handleItemResize = (id: string, w: number, h: number) => {
+  const handleItemResize = useCallback((id: string, w: number, h: number) => {
     onUpdateItem(id, { w, h });
-  };
+  }, [onUpdateItem]);
 
-  const handleContentChange = (id: string, content: Json) => {
+  const handleContentChange = useCallback((id: string, content: Json) => {
     onUpdateItem(id, { content });
-  };
+  }, [onUpdateItem]);
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(true);
-  };
+  }, []);
 
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
-  };
+  }, []);
 
-  const handleDrop = async (e: React.DragEvent) => {
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
@@ -162,7 +159,7 @@ export function BoardCanvas({
         toast.error(`Failed to upload ${file.name}`);
       }
     }
-  };
+  }, [offset, onCreateItem]);
 
   // Filter out connector items from regular rendering
   const nonConnectorItems = items.filter(item => item.type !== 'connector');
@@ -190,7 +187,7 @@ export function BoardCanvas({
       }}
     >
       {/* Connector Layer - renders SVG connections */}
-      <ConnectorLayer
+      <ConnectorLayerOptimized
         items={items}
         offset={offset}
         selectedConnectorId={selectedConnectorId}
@@ -198,14 +195,14 @@ export function BoardCanvas({
         onDeleteConnector={onDeleteConnector}
       />
 
-      <motion.div
+      <div
         className="canvas-inner absolute inset-0"
         style={{
           transform: `translate(${offset.x}px, ${offset.y}px)`,
         }}
       >
         {nonConnectorItems.map((item) => (
-          <BoardItem
+          <BoardItemOptimized
             key={item.id}
             item={item}
             isSelected={selectedItemId === item.id}
@@ -218,7 +215,7 @@ export function BoardCanvas({
             onDelete={() => onDeleteItem(item.id)}
           />
         ))}
-      </motion.div>
+      </div>
     </div>
   );
-}
+});
