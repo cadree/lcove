@@ -104,10 +104,10 @@ serve(async (req) => {
 
     if (prefError && prefError.code !== "PGRST116") {
       console.error("Error fetching preferences:", prefError);
-      throw prefError;
+      // Don't throw - continue with defaults if we can't fetch preferences
     }
 
-    // Check if messages notifications are enabled
+    // Check if messages notifications are enabled (default to TRUE if no prefs exist)
     const messagesEnabled = preferences?.messages_enabled ?? true;
     if (!messagesEnabled) {
       console.log("Messages notifications disabled for user");
@@ -117,6 +117,7 @@ serve(async (req) => {
       });
     }
 
+    // Default to enabled for email/push if no preferences exist
     const emailEnabled = preferences?.email_enabled ?? true;
     const smsEnabled = preferences?.sms_enabled ?? false;
     const pushEnabled = preferences?.push_enabled ?? true;

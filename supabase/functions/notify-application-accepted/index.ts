@@ -103,14 +103,14 @@ serve(async (req) => {
       .eq("user_id", applicant_id)
       .single();
 
-    // Get notification preferences
+    // Get notification preferences (default to enabled if not set)
     const { data: prefs } = await supabase
       .from("notification_preferences")
       .select("*")
       .eq("user_id", applicant_id)
       .single();
 
-    // Check if application updates are enabled (default to true)
+    // Check if application updates are enabled (default to true if no prefs)
     if (prefs?.application_updates_enabled === false) {
       console.log("Application update notifications disabled for user:", applicant_id);
       return new Response(
@@ -118,6 +118,11 @@ serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Default all delivery methods to true if no preferences exist
+    const emailEnabled = prefs?.email_enabled ?? true;
+    const smsEnabled = prefs?.sms_enabled ?? false;
+    const pushEnabled = prefs?.push_enabled ?? true;
 
     const notificationTitle = "Application Accepted!";
     const notificationBody = `Congratulations! You've been accepted as ${role_title} for "${project_title}"`;
@@ -141,8 +146,8 @@ serve(async (req) => {
       results.push({ channel: "in_app", status: "sent" });
     }
 
-    // Send email if enabled
-    if (prefs?.email_enabled && userData.user.email) {
+    // Send email if enabled (now using local variable)
+    if (emailEnabled && userData.user.email) {
       try {
         const emailResponse = await fetch("https://api.resend.com/emails", {
           method: "POST",
@@ -172,8 +177,8 @@ serve(async (req) => {
       }
     }
 
-    // Send SMS if enabled
-    if (prefs?.sms_enabled && profile?.phone && TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
+    // Send SMS if enabled (now using local variable)
+    if (smsEnabled && profile?.phone && TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
       try {
         const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
         const smsBody = `🎉 ${notificationTitle} ${notificationBody}`;
@@ -205,8 +210,8 @@ serve(async (req) => {
       }
     }
 
-    // Send push notification if enabled
-    if (prefs?.push_enabled) {
+    // Send push notification if enabled (now using local variable)
+    if (pushEnabled) {
       try {
         const pushResponse = await supabase.functions.invoke("send-push-notification", {
           body: {
