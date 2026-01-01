@@ -87,20 +87,57 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
   const isUpcoming = eventDate > new Date();
   const timeUntilEvent = isUpcoming ? formatDistanceToNow(eventDate, { addSuffix: true }) : null;
 
-  const handleRSVP = (status: string) => {
+  const handleRSVP = async (status: string) => {
     if (!user) {
       toast.error('Please log in to RSVP');
       return;
     }
     rsvp({ eventId: event.id, status });
+    
+    // If marking as interested, also enable reminder and create a notification
+    if (status === 'interested') {
+      try {
+        // Create an event reminder notification
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: user.id,
+            type: 'event_reminder',
+            title: 'Event Interest Noted',
+            body: `You're interested in "${event.title}"`,
+            data: { event_id: event.id },
+          });
+      } catch (err) {
+        console.error('Error creating notification:', err);
+      }
+    }
   };
 
-  const handleToggleReminder = () => {
+  const handleToggleReminder = async () => {
     if (!user || !event.user_rsvp) return;
+    const newEnabled = !event.user_rsvp.reminder_enabled;
     toggleReminder({ 
       eventId: event.id, 
-      enabled: !event.user_rsvp.reminder_enabled 
+      enabled: newEnabled 
     });
+    
+    // Create or remove notification based on reminder preference
+    try {
+      if (newEnabled) {
+        // Add event reminder notification
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: user.id,
+            type: 'event_reminder',
+            title: 'Reminder Set',
+            body: `You'll be reminded about "${event.title}"`,
+            data: { event_id: event.id },
+          });
+      }
+    } catch (err) {
+      console.error('Error managing reminder notification:', err);
+    }
   };
 
   const handleNotifyMe = async () => {
@@ -111,6 +148,22 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
     // If not RSVPed, set as interested with reminder
     if (!event.user_rsvp) {
       rsvp({ eventId: event.id, status: 'interested' });
+      
+      // Create notification for the event
+      try {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: user.id,
+            type: 'event_reminder',
+            title: 'Event Reminder Set',
+            body: `You'll be notified about "${event.title}"`,
+            data: { event_id: event.id },
+          });
+      } catch (err) {
+        console.error('Error creating notification:', err);
+      }
+      
       toast.success('You will be notified about this event');
     }
   };
@@ -133,15 +186,22 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
           eventId: event.id,
           eventTitle: event.title,
           ticketPrice: event.ticket_price,
-          userId: user.id,
-          userEmail: user.email,
+          quantity: 1,
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
+      }
+
+      console.log('Checkout response:', data);
 
       if (data?.url) {
-        window.open(data.url, '_blank');
+        // Redirect to Stripe checkout
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
       }
     } catch (error) {
       console.error('Error purchasing ticket:', error);

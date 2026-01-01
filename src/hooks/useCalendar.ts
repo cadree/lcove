@@ -276,23 +276,44 @@ export function useRSVP() {
         .eq('user_id', user.id)
         .maybeSingle();
 
+      // Enable reminder by default for 'interested' status
+      const reminderEnabled = status === 'interested' ? true : undefined;
+
       if (existing) {
+        const updateData: Record<string, unknown> = { status };
+        if (reminderEnabled !== undefined) {
+          updateData.reminder_enabled = reminderEnabled;
+        }
         const { error } = await supabase
           .from('event_rsvps')
-          .update({ status })
+          .update(updateData)
           .eq('id', existing.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from('event_rsvps')
-          .insert({ event_id: eventId, user_id: user.id, status });
+          .insert({ 
+            event_id: eventId, 
+            user_id: user.id, 
+            status,
+            reminder_enabled: status === 'interested' ? true : false,
+          });
         if (error) throw error;
       }
     },
-    onSuccess: (_, { eventId }) => {
+    onSuccess: (_, { eventId, status }) => {
       queryClient.invalidateQueries({ queryKey: ['event', eventId] });
       queryClient.invalidateQueries({ queryKey: ['events'] });
-      toast.success('RSVP updated!');
+      
+      if (status === 'interested') {
+        toast.success('Marked as interested! Reminder enabled.');
+      } else if (status === 'going') {
+        toast.success("You're going!");
+      } else if (status === 'not_going') {
+        toast.success('Status updated');
+      } else {
+        toast.success('RSVP updated!');
+      }
     },
     onError: (error) => {
       toast.error('Failed to update RSVP');
@@ -312,9 +333,9 @@ export function useRSVP() {
       
       if (error) throw error;
     },
-    onSuccess: (_, { eventId }) => {
+    onSuccess: (_, { eventId, enabled }) => {
       queryClient.invalidateQueries({ queryKey: ['event', eventId] });
-      toast.success('Reminder preference updated');
+      toast.success(enabled ? 'Reminder enabled!' : 'Reminder disabled');
     },
   });
 
