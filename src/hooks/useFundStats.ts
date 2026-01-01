@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
 
@@ -22,9 +23,52 @@ export interface FundStats {
     collected: number;
     distributed: number;
   }>;
+  allocations: {
+    communityGrants: number;
+    eventsActivations: number;
+    education: number;
+    infrastructure: number;
+    operations: number;
+  };
 }
 
 export function useFundStats() {
+  const queryClient = useQueryClient();
+
+  // Set up real-time subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel('fund-stats-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'membership_contributions'
+        },
+        () => {
+          // Invalidate and refetch when contributions change
+          queryClient.invalidateQueries({ queryKey: ['fund-stats'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'memberships'
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['fund-stats'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   return useQuery({
     queryKey: ['fund-stats'],
     queryFn: async (): Promise<FundStats> => {
@@ -41,6 +85,15 @@ export function useFundStats() {
       
       // Calculate distributed based on allocation percentages (excluding operations)
       const lifetimeTotalDistributed = lifetimeTotalCollected * 0.9; // 90% goes to community (excl. 10% operations)
+      
+      // Calculate actual dollar allocations
+      const allocations = {
+        communityGrants: lifetimeTotalDistributed * 0.4,
+        eventsActivations: lifetimeTotalDistributed * 0.2,
+        education: lifetimeTotalDistributed * 0.15,
+        infrastructure: lifetimeTotalDistributed * 0.15,
+        operations: lifetimeTotalCollected * 0.1,
+      };
       
       // Unique contributors as "creators supported"
       const uniqueContributors = new Set(lifetimeContributions?.map(c => c.user_id));
@@ -114,8 +167,10 @@ export function useFundStats() {
           memberCount: newMembersThisMonth || 0,
         },
         monthlyTrend,
+        allocations,
       };
     },
-    staleTime: 60000, // Cache for 1 minute
+    staleTime: 30000, // Cache for 30 seconds
+    refetchInterval: 60000, // Auto-refetch every minute
   });
 }
