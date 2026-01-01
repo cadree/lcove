@@ -311,20 +311,39 @@ export const BoardItem = memo(function BoardItem({
     onDelete();
   }, [onDelete]);
 
+  const resizeRafRef = useRef<number | null>(null);
+  const resizeSizeRef = useRef({ w: item.w, h: item.h });
+
+  // Sync resize ref
+  useEffect(() => {
+    resizeSizeRef.current = { w: item.w, h: item.h };
+  }, [item.w, item.h]);
+
   const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
     const startX = e.clientX;
     const startY = e.clientY;
     const startW = item.w;
     const startH = item.h;
 
     const handleMove = (moveEvent: MouseEvent) => {
-      const newW = Math.max(100, startW + moveEvent.clientX - startX);
-      const newH = Math.max(60, startH + moveEvent.clientY - startY);
-      onResize(newW, newH);
+      moveEvent.preventDefault();
+      const newW = Math.max(80, startW + moveEvent.clientX - startX);
+      const newH = Math.max(50, startH + moveEvent.clientY - startY);
+      
+      resizeSizeRef.current = { w: newW, h: newH };
+      
+      if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current);
+      resizeRafRef.current = requestAnimationFrame(() => {
+        onResize(newW, newH);
+        window.dispatchEvent(new CustomEvent('board-item-drag', { detail: { moving: true } }));
+      });
     };
 
     const handleUp = () => {
+      if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current);
+      window.dispatchEvent(new CustomEvent('board-item-drag', { detail: { moving: false } }));
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleUp);
     };
@@ -333,7 +352,7 @@ export const BoardItem = memo(function BoardItem({
     document.addEventListener('mouseup', handleUp);
   }, [item.w, item.h, onResize]);
 
-  // Touch-friendly resize
+  // Touch-friendly resize with improved responsiveness
   const handleResizeTouchStart = useCallback((e: React.TouchEvent) => {
     e.stopPropagation();
     const touch = e.touches[0];
@@ -345,18 +364,29 @@ export const BoardItem = memo(function BoardItem({
     const handleTouchMove = (moveEvent: TouchEvent) => {
       moveEvent.preventDefault();
       const moveTouch = moveEvent.touches[0];
-      const newW = Math.max(100, startW + moveTouch.clientX - startX);
-      const newH = Math.max(60, startH + moveTouch.clientY - startY);
-      onResize(newW, newH);
+      const newW = Math.max(80, startW + moveTouch.clientX - startX);
+      const newH = Math.max(50, startH + moveTouch.clientY - startY);
+      
+      resizeSizeRef.current = { w: newW, h: newH };
+      
+      if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current);
+      resizeRafRef.current = requestAnimationFrame(() => {
+        onResize(newW, newH);
+        window.dispatchEvent(new CustomEvent('board-item-drag', { detail: { moving: true } }));
+      });
     };
 
     const handleTouchEnd = () => {
+      if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current);
+      window.dispatchEvent(new CustomEvent('board-item-drag', { detail: { moving: false } }));
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('touchcancel', handleTouchEnd);
     };
 
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd);
+    document.addEventListener('touchcancel', handleTouchEnd);
   }, [item.w, item.h, onResize]);
 
   return (
@@ -424,14 +454,16 @@ export const BoardItem = memo(function BoardItem({
 
       {renderContent()}
 
-      {/* Resize handle */}
+      {/* Resize handle - larger touch target */}
       {isSelected && (
         <div
-          className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize"
+          className="absolute -bottom-2 -right-2 w-10 h-10 cursor-se-resize flex items-center justify-center z-10"
           onMouseDown={handleResizeMouseDown}
           onTouchStart={handleResizeTouchStart}
         >
-          <div className="absolute bottom-1 right-1 w-2.5 h-2.5 border-r-2 border-b-2 border-primary/60 rounded-br" />
+          <div className="w-5 h-5 bg-white border-2 border-primary rounded-sm shadow-md flex items-center justify-center">
+            <div className="w-2 h-2 border-r-2 border-b-2 border-primary/70" />
+          </div>
         </div>
       )}
     </div>
