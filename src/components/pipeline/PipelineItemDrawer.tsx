@@ -198,21 +198,16 @@ export function PipelineItemDrawer({
             <div className="space-y-3">
               {/* Avatar edit */}
               <div className="flex items-center gap-3">
-                <Avatar className="w-14 h-14 border-2 border-border">
-                  <AvatarImage src={editAvatarUrl || undefined} />
-                  <AvatarFallback className="bg-primary/10 text-primary">
-                    {initials || <Camera className="w-5 h-5" />}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 space-y-1">
-                  <Label htmlFor="edit-avatar" className="text-xs">Avatar URL</Label>
-                  <Input
-                    id="edit-avatar"
-                    value={editAvatarUrl}
-                    onChange={(e) => setEditAvatarUrl(e.target.value)}
-                    placeholder="https://example.com/photo.jpg"
-                    className="text-sm"
-                  />
+                <ContactAvatarUpload
+                  avatarUrl={editAvatarUrl}
+                  name={editName || item.name}
+                  pipelineItemId={item.id}
+                  onAvatarChange={setEditAvatarUrl}
+                  size="lg"
+                  editable={true}
+                />
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground">Click the photo to change</p>
                 </div>
               </div>
               <div className="space-y-1">
@@ -282,12 +277,16 @@ export function PipelineItemDrawer({
           ) : (
             <>
               <div className="flex items-center gap-3">
-                <Avatar className="w-14 h-14 border-2 border-border">
-                  <AvatarImage src={item.avatar_url || undefined} />
-                  <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
+                <ContactAvatarUpload
+                  avatarUrl={item.avatar_url}
+                  name={item.name}
+                  pipelineItemId={item.id}
+                  onAvatarChange={(url) => {
+                    onUpdate(item.id, { avatar_url: url });
+                  }}
+                  size="lg"
+                  editable={true}
+                />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <SheetTitle className="text-left text-xl">{item.name}</SheetTitle>
