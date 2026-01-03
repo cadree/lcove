@@ -38,19 +38,33 @@ const statusColors: Record<string, string> = {
 };
 
 const WalletPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const { credits, isLoading: creditsLoading } = useCredits();
   const { ledger, isLoading: ledgerLoading } = useCreditLedger();
-  const { methods, setupPayoutMethod, setDefaultMethod, deleteMethod, isSettingUp } = usePayoutMethods();
-  const { payouts, requestPayout, isRequesting } = usePayouts();
-  const { transactions } = useTransactions();
+  const { methods, isLoading: methodsLoading, setupPayoutMethod, setDefaultMethod, deleteMethod, isSettingUp } = usePayoutMethods();
+  const { payouts, isLoading: payoutsLoading, requestPayout, isRequesting } = usePayouts();
+  const { transactions, isLoading: transactionsLoading } = useTransactions();
 
   const [payoutAmount, setPayoutAmount] = useState('');
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
   const [payoutDialogOpen, setPayoutDialogOpen] = useState(false);
+
+  // Show loading while auth is initializing
+  if (authLoading) {
+    return (
+      <PageLayout>
+        <div className="p-4 sm:p-6 pb-32 max-w-4xl mx-auto space-y-6">
+          <Skeleton className="h-12 w-48" />
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </PageLayout>
+    );
+  }
 
   // Handle Stripe setup callback
   useEffect(() => {
