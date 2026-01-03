@@ -1,12 +1,9 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Zap } from "lucide-react";
 import { useEnergy } from "@/hooks/useEnergy";
 import { cn } from "@/lib/utils";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import EnergyDetailSheet from "./EnergyDetailSheet";
 
 interface EnergyIndicatorProps {
   className?: string;
@@ -14,9 +11,10 @@ interface EnergyIndicatorProps {
 
 const EnergyIndicator = ({ className }: EnergyIndicatorProps) => {
   const { currentEnergy, maxEnergy, energyState, isLoading } = useEnergy();
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   if (isLoading) {
-    return <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />;
+    return <div className="w-9 h-9 rounded-full bg-muted animate-pulse" />;
   }
 
   const stateColors = {
@@ -36,35 +34,36 @@ const EnergyIndicator = ({ className }: EnergyIndicatorProps) => {
   };
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
+    <>
+      <motion.button
+        type="button"
+        onClick={() => setSheetOpen(true)}
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        whileTap={{ scale: 0.95 }}
+        className={cn(
+          "relative flex items-center justify-center w-9 h-9 rounded-full cursor-pointer transition-colors",
+          stateColors[energyState],
+          stateGlows[energyState],
+          "hover:opacity-80 active:opacity-70",
+          className
+        )}
+      >
         <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className={cn(
-            "relative flex items-center justify-center w-9 h-9 rounded-full cursor-help transition-colors",
-            stateColors[energyState],
-            stateGlows[energyState],
-            className
-          )}
+          animate={energyState === "full" ? { scale: [1, 1.15, 1] } : {}}
+          transition={{ repeat: Infinity, duration: 1.5 }}
         >
-          <motion.div
-            animate={energyState === "full" ? { scale: [1, 1.15, 1] } : {}}
-            transition={{ repeat: Infinity, duration: 1.5 }}
-          >
-            <Zap className="w-4 h-4" />
-          </motion.div>
-          
-          {/* Mini percentage badge */}
-          <span className="absolute -bottom-0.5 -right-0.5 text-[9px] font-bold bg-background rounded-full px-1 border border-border">
-            {Math.round((currentEnergy / maxEnergy) * 100)}
-          </span>
+          <Zap className="w-4 h-4" />
         </motion.div>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>Energy: {currentEnergy}/{maxEnergy}</p>
-      </TooltipContent>
-    </Tooltip>
+        
+        {/* Mini percentage badge */}
+        <span className="absolute -bottom-0.5 -right-0.5 text-[9px] font-bold bg-background rounded-full px-1 border border-border">
+          {Math.round((currentEnergy / maxEnergy) * 100)}
+        </span>
+      </motion.button>
+
+      <EnergyDetailSheet open={sheetOpen} onOpenChange={setSheetOpen} />
+    </>
   );
 };
 
