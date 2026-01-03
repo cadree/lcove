@@ -204,12 +204,24 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
         payload: { offer, senderId: user.id },
       });
 
-      // Set timeout for connection
-      setTimeout(() => {
+      // Set timeout for connection - retry if no answer received
+      const connectionTimeout = setTimeout(() => {
         if (peerConnectionRef.current?.connectionState !== 'connected' && !hasVideo) {
-          console.log('[Viewer] Connection timeout, still trying...');
+          console.log('[Viewer] Connection timeout, retrying...');
+          // Resend offer in case host wasn't ready
+          if (channelRef.current) {
+            console.log('[Viewer] Resending offer to host');
+            channelRef.current.send({
+              type: 'broadcast',
+              event: 'offer',
+              payload: { offer: pc.localDescription, senderId: user.id },
+            });
+          }
         }
-      }, 15000);
+      }, 5000);
+
+      // Clear timeout when component unmounts
+      return () => clearTimeout(connectionTimeout);
 
     } catch (err: any) {
       console.error('[Viewer] Error connecting to stream:', err);

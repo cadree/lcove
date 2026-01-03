@@ -300,6 +300,22 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
     });
   };
 
+  // Setup signaling channel as soon as camera is ready
+  useEffect(() => {
+    if (cameraState === 'ready' && localStreamRef.current && user) {
+      console.log('[Host] Camera ready, setting up signaling channel early');
+      setupSignaling();
+    }
+    
+    return () => {
+      // Cleanup signaling if camera state changes
+      if (channelRef.current && cameraState !== 'ready') {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [cameraState, user, setupSignaling]);
+
   // Go live
   const startStream = async () => {
     if (!user || cameraState !== 'ready' || !localStreamRef.current) return;
@@ -307,8 +323,12 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
     setIsGoingLive(true);
 
     try {
-      // Set up signaling channel FIRST
-      setupSignaling();
+      // Ensure signaling is set up (it should already be from the effect above)
+      if (!channelRef.current) {
+        setupSignaling();
+        // Small delay to ensure channel is ready
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
       
       // Start recording
       startRecording(localStreamRef.current);
