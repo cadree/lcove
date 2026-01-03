@@ -1714,6 +1714,42 @@ export type Database = {
         }
         Relationships: []
       }
+      energy_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string
+          description: string | null
+          id: string
+          source: string
+          source_id: string | null
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          source: string
+          source_id?: string | null
+          transaction_type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          source?: string
+          source_id?: string | null
+          transaction_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       escrow_holdings: {
         Row: {
           amount: number
@@ -4984,6 +5020,45 @@ export type Database = {
           id?: string
           lifetime_earned?: number
           lifetime_spent?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_energy: {
+        Row: {
+          created_at: string
+          current_energy: number
+          id: string
+          last_activity_at: string | null
+          last_regen_at: string
+          max_energy: number
+          streak_days: number
+          streak_multiplier: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_energy?: number
+          id?: string
+          last_activity_at?: string | null
+          last_regen_at?: string
+          max_energy?: number
+          streak_days?: number
+          streak_multiplier?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_energy?: number
+          id?: string
+          last_activity_at?: string | null
+          last_regen_at?: string
+          max_energy?: number
+          streak_days?: number
+          streak_multiplier?: number
           updated_at?: string
           user_id?: string
         }

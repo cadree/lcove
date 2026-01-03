@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import { Menu, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { EnergyIndicator } from "@/components/energy";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface HomeTopBarProps {
   onMenuClick?: () => void;
@@ -9,6 +11,8 @@ interface HomeTopBarProps {
 }
 
 const HomeTopBar = ({ onMenuClick, subtitle = "Discover" }: HomeTopBarProps) => {
+  const { user } = useAuth();
+
   return (
     <motion.header
       initial={{ y: -20, opacity: 0 }}
@@ -43,16 +47,19 @@ const HomeTopBar = ({ onMenuClick, subtitle = "Discover" }: HomeTopBarProps) => 
           </span>
         </div>
 
-        {/* Right - Notifications */}
-        <Link to="/notifications">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="w-10 h-10 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/40"
-          >
-            <Bell className="w-5 h-5" />
-          </Button>
-        </Link>
+        {/* Right - Energy + Notifications */}
+        <div className="flex items-center gap-2">
+          {user && <EnergyIndicator />}
+          <Link to="/notifications">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-10 h-10 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/40"
+            >
+              <Bell className="w-5 h-5" />
+            </Button>
+          </Link>
+        </div>
       </div>
     </motion.header>
   );
