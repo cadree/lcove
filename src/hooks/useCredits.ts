@@ -140,22 +140,22 @@ export const usePayoutMethods = () => {
   });
 
   const setupPayoutMethod = useMutation({
-    mutationFn: async (type: 'checkout_setup' | 'setup_intent') => {
+    mutationFn: async (type: 'checkout_setup' | 'setup_intent' | 'sync') => {
       const { data, error } = await supabase.functions.invoke('setup-payout-method', {
         body: { type }
       });
 
       if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      if (data?.error) throw new Error(data.error);
       return data;
     },
     onSuccess: (data) => {
-      if (data.url) {
+      if (data?.url) {
         // Use location.href for reliable redirect (avoids popup blockers)
         window.location.href = data.url;
       }
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({ title: 'Failed to setup payout method', description: error.message, variant: 'destructive' });
     },
   });
