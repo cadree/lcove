@@ -25,8 +25,10 @@ export const PageHeader = ({
   const handleBack = () => {
     if (backPath) {
       navigate(backPath);
-    } else {
+    } else if (window.history.length > 1) {
       navigate(-1);
+    } else {
+      navigate('/home');
     }
   };
   return <motion.div initial={{
