@@ -6,9 +6,10 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Search, MapPin, Briefcase, Users, Loader2 } from "lucide-react";
+import { Search, MapPin, Briefcase, Users, Loader2, Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { NewMembersSection } from "@/components/directory/NewMembersSection";
+import { FriendsDrawer } from "@/components/friends/FriendsDrawer";
 import { computeCityKey, computeCityDisplay } from "@/lib/cityNormalization";
 
 interface Profile {
@@ -175,6 +176,13 @@ const Directory = () => {
           description="Find creatives by name, city, or interests"
           icon={<Users className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
           className="mb-6"
+          actions={
+            <FriendsDrawer>
+              <Button variant="glass" size="icon" className="w-10 h-10" title="Friends">
+                <Heart className="w-4 h-4" />
+              </Button>
+            </FriendsDrawer>
+          }
         />
 
         {/* Search Bar */}

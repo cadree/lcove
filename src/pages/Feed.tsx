@@ -1,27 +1,40 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import StoriesRow from "@/components/stories/StoriesRow";
 import PostCreator from "@/components/feed/PostCreator";
 import FeedPost from "@/components/feed/FeedPost";
+import { FeedFilters } from "@/components/feed/FeedFilters";
+import { FriendsDrawer } from "@/components/friends/FriendsDrawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import { Filter, Shuffle, Loader2, Sparkles, Compass } from "lucide-react";
+import { Filter, Shuffle, Loader2, Sparkles, Compass, Users } from "lucide-react";
 import { usePosts } from "@/hooks/usePosts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 
-const categories = ["All", "Photo", "Video", "Text"];
-
 const Feed = () => {
   const [activeCategory, setActiveCategory] = useState("All");
+  const [postTypeFilter, setPostTypeFilter] = useState<'all' | 'regular' | 'portfolio'>('all');
+  const [regionFilter, setRegionFilter] = useState<string | null>(null);
   const [shuffledPosts, setShuffledPosts] = useState<typeof posts>([]);
   const [isShuffled, setIsShuffled] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
   const { user } = useAuth();
   const { profile } = useProfile(user?.id);
   const { posts, isLoading } = usePosts();
+
+  // Get unique regions from posts
+  const availableRegions = useMemo(() => {
+    const regions = new Set<string>();
+    posts.forEach(post => {
+      if (post.profile?.city) {
+        regions.add(post.profile.city);
+      }
+    });
+    return Array.from(regions).sort();
+  }, [posts]);
 
   const handleShuffle = () => {
     const shuffled = [...posts].sort(() => Math.random() - 0.5);
@@ -31,14 +44,29 @@ const Feed = () => {
 
   const postsToDisplay = isShuffled ? shuffledPosts : posts;
 
-  const filteredPosts = activeCategory === "All" 
-    ? postsToDisplay 
-    : postsToDisplay.filter(post => {
-        if (activeCategory === "Photo") return post.media_type === 'photo';
-        if (activeCategory === "Video") return post.media_type === 'video';
-        if (activeCategory === "Text") return post.media_type === 'text' || (!post.media_url && post.content);
-        return true;
-      });
+  const filteredPosts = postsToDisplay.filter(post => {
+    // Media type filter
+    let matchesCategory = activeCategory === "All";
+    if (!matchesCategory) {
+      if (activeCategory === "Photo") matchesCategory = post.media_type === 'photo';
+      else if (activeCategory === "Video") matchesCategory = post.media_type === 'video';
+      else if (activeCategory === "Text") matchesCategory = post.media_type === 'text' || (!post.media_url && !!post.content);
+    }
+
+    // Post type filter
+    let matchesPostType = postTypeFilter === 'all';
+    if (!matchesPostType) {
+      matchesPostType = post.post_type === postTypeFilter;
+    }
+
+    // Region filter
+    let matchesRegion = regionFilter === null;
+    if (!matchesRegion) {
+      matchesRegion = post.profile?.city === regionFilter;
+    }
+
+    return matchesCategory && matchesPostType && matchesRegion;
+  });
 
   return (
     <PageLayout>
@@ -53,6 +81,16 @@ const Feed = () => {
           className="mt-3 mb-5"
           actions={
             <div className="flex gap-2">
+              <FriendsDrawer>
+                <Button 
+                  variant="glass" 
+                  size="icon" 
+                  className="w-10 h-10"
+                  title="Friends"
+                >
+                  <Users className="w-4 h-4" />
+                </Button>
+              </FriendsDrawer>
               <Button 
                 variant={isShuffled ? "default" : "glass"} 
                 size="icon" 
@@ -89,7 +127,7 @@ const Feed = () => {
           </motion.div>
         )}
 
-        {/* Category Filters */}
+        {/* Filters */}
         <AnimatePresence>
           {showFilters && (
             <motion.div
@@ -97,25 +135,16 @@ const Feed = () => {
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.2 }}
-              className="flex gap-2 overflow-x-auto pb-4 mb-5 scrollbar-hide"
             >
-              {categories.map((category, index) => (
-                <motion.div
-                  key={category}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 + index * 0.05 }}
-                >
-                  <Button
-                    variant={activeCategory === category ? "default" : "glass"}
-                    size="sm"
-                    onClick={() => setActiveCategory(category)}
-                    className="whitespace-nowrap"
-                  >
-                    {category}
-                  </Button>
-                </motion.div>
-              ))}
+              <FeedFilters
+                activeCategory={activeCategory}
+                setActiveCategory={setActiveCategory}
+                postTypeFilter={postTypeFilter}
+                setPostTypeFilter={setPostTypeFilter}
+                regionFilter={regionFilter}
+                setRegionFilter={setRegionFilter}
+                availableRegions={availableRegions}
+              />
             </motion.div>
           )}
         </AnimatePresence>

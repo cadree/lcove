@@ -9,10 +9,12 @@ interface Post {
   content: string | null;
   media_url: string | null;
   media_type: 'photo' | 'video' | 'text' | null;
+  post_type: 'regular' | 'portfolio';
   created_at: string;
   profile?: {
     display_name: string | null;
     avatar_url: string | null;
+    city: string | null;
   };
   reactions?: { emoji: string; count: number }[];
   user_reaction?: string | null;
@@ -33,11 +35,11 @@ export function usePosts() {
 
       if (error) throw error;
 
-      // Get profiles for post creators
+      // Get profiles for post creators (include city for region filtering)
       const userIds = [...new Set(postsData?.map(p => p.user_id) || [])];
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('user_id, display_name, avatar_url')
+        .select('user_id, display_name, avatar_url, city')
         .in('user_id', userIds);
 
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]));
@@ -67,7 +69,8 @@ export function usePosts() {
 
       return (postsData || []).map(post => ({
         ...post,
-        profile: profileMap.get(post.user_id) || { display_name: null, avatar_url: null },
+        post_type: post.post_type || 'regular',
+        profile: profileMap.get(post.user_id) || { display_name: null, avatar_url: null, city: null },
         reactions: Array.from(reactionsByPost.get(post.id)?.entries() || []).map(([emoji, count]) => ({ emoji, count })),
         user_reaction: userReactions.get(post.id) || null,
       })) as Post[];
