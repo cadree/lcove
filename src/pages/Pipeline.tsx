@@ -84,7 +84,9 @@ const PipelinePage = () => {
         tiktokUrl: data.tiktokUrl,
         websiteUrl: data.websiteUrl,
         notes: data.notes,
-        priority: data.priority
+        priority: data.priority,
+        avatarUrl: data.avatarUrl,
+        linkedUserId: data.linkedUserId
       });
       setShowAddDialog(false);
       setAddToStageId(null);
