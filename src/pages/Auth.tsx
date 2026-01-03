@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, User, Phone } from 'lucide-react';
+import etherBearLogo from '@/assets/ether-bear-logo.png';
 
 const signupSchema = z.object({
   email: z.string().email('Please enter a valid email').max(255),
@@ -212,11 +213,23 @@ const Auth = () => {
         className="w-full max-w-md"
       >
         <div className="text-center mb-10">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.1 }}
+            className="mb-4"
+          >
+            <img 
+              src={etherBearLogo} 
+              alt="Ether" 
+              className="h-24 w-auto mx-auto object-contain"
+            />
+          </motion.div>
           <motion.h1 
-            className="font-display text-5xl font-medium text-gradient-pink mb-3"
+            className="font-display text-3xl font-medium text-foreground mb-2"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
+            transition={{ delay: 0.15 }}
           >
             {getTitle()}
           </motion.h1>
