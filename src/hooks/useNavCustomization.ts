@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { 
   Home, MessageCircle, FolderKanban, Search, User, 
   Calendar, Wallet, Settings, Bell, Users, Video, 
-  ShoppingBag, Kanban, BookOpen, Radio, Store, Heart
+  ShoppingBag, Kanban, BookOpen, Radio, Store, Heart, Compass
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -15,6 +15,7 @@ export interface NavItem {
 
 export const allNavItems: NavItem[] = [
   { id: "home", icon: Home, label: "Home", path: "/home" },
+  { id: "feed", icon: Compass, label: "Feed", path: "/feed" },
   { id: "messages", icon: MessageCircle, label: "Messages", path: "/messages" },
   { id: "projects", icon: FolderKanban, label: "Projects", path: "/projects" },
   { id: "directory", icon: Search, label: "Directory", path: "/directory" },
