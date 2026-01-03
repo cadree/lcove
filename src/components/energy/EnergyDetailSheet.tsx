@@ -318,30 +318,26 @@ const EnergyDetailSheet = ({ open, onOpenChange }: EnergyDetailSheetProps) => {
             {/* How to Earn */}
             <div className="space-y-3">
               <h3 className="text-sm font-medium">How to Earn Energy</h3>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="p-2 rounded-lg bg-muted/20">
-                  <span className="text-muted-foreground">Easy Task</span>
-                  <span className="float-right font-medium">+{ENERGY_GAINS.task_complete_easy}</span>
+              <div className="grid grid-cols-1 gap-2 text-xs">
+                <div className="p-2 rounded-lg bg-muted/20 flex justify-between">
+                  <span className="text-muted-foreground">Complete a task</span>
+                  <span className="font-medium text-emerald-400">+{ENERGY_GAINS.task_complete}</span>
                 </div>
-                <div className="p-2 rounded-lg bg-muted/20">
-                  <span className="text-muted-foreground">Medium Task</span>
-                  <span className="float-right font-medium">+{ENERGY_GAINS.task_complete_medium}</span>
+                <div className="p-2 rounded-lg bg-muted/20 flex justify-between">
+                  <span className="text-muted-foreground">Plan event or meeting</span>
+                  <span className="font-medium text-emerald-400">+{ENERGY_GAINS.event_create}</span>
                 </div>
-                <div className="p-2 rounded-lg bg-muted/20">
-                  <span className="text-muted-foreground">Hard Task</span>
-                  <span className="float-right font-medium">+{ENERGY_GAINS.task_complete_hard}</span>
+                <div className="p-2 rounded-lg bg-muted/20 flex justify-between">
+                  <span className="text-muted-foreground">Create a project</span>
+                  <span className="font-medium text-emerald-400">+{ENERGY_GAINS.project_create}</span>
                 </div>
-                <div className="p-2 rounded-lg bg-muted/20">
-                  <span className="text-muted-foreground">Deep Work</span>
-                  <span className="float-right font-medium">+{ENERGY_GAINS.deep_work}</span>
+                <div className="p-2 rounded-lg bg-muted/20 flex justify-between">
+                  <span className="text-muted-foreground">Join a project</span>
+                  <span className="font-medium text-emerald-400">+{ENERGY_GAINS.project_join}</span>
                 </div>
-                <div className="p-2 rounded-lg bg-muted/20">
-                  <span className="text-muted-foreground">Milestone</span>
-                  <span className="float-right font-medium">+{ENERGY_GAINS.project_milestone}</span>
-                </div>
-                <div className="p-2 rounded-lg bg-muted/20">
-                  <span className="text-muted-foreground">Collaboration</span>
-                  <span className="float-right font-medium">+{ENERGY_GAINS.collaboration_join}</span>
+                <div className="p-2 rounded-lg bg-muted/20 flex justify-between">
+                  <span className="text-muted-foreground">Attend an event</span>
+                  <span className="font-medium text-emerald-400">+{ENERGY_GAINS.event_attend}</span>
                 </div>
               </div>
             </div>

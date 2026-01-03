@@ -5,17 +5,27 @@ import { useEffect } from "react";
 
 // Energy gain amounts by source
 export const ENERGY_GAINS = {
+  // Tasks - 5 points
+  task_complete: 5,
   task_complete_easy: 5,
-  task_complete_medium: 10,
-  task_complete_hard: 20,
-  project_milestone: 25,
-  project_complete: 50,
-  post_update: 5,
+  task_complete_medium: 5,
+  task_complete_hard: 5,
+  
+  // Calendar/Planning - 5 points
+  event_create: 5,
+  meeting_schedule: 5,
+  calendar_plan: 5,
+  
+  // Projects & Events - 10 points
+  project_create: 10,
+  project_join: 10,
+  event_attend: 10,
   collaboration_join: 10,
-  event_attend: 15,
-  streak_bonus: 5, // per day of streak
+  
+  // Legacy/other
+  post_update: 5,
+  streak_bonus: 5,
   micro_action: 2,
-  deep_work: 30,
 } as const;
 
 // Energy spend amounts
@@ -28,7 +38,7 @@ export const ENERGY_COSTS = {
 
 // Constants
 const PASSIVE_REGEN_RATE = 1; // energy per hour
-const OVERNIGHT_REGEN = 30; // bonus energy for 8+ hours away
+const OVERNIGHT_REGEN = 10; // smaller bonus for overnight
 const LOW_ENERGY_THRESHOLD = 20;
 const CRITICAL_ENERGY_THRESHOLD = 10;
 
@@ -76,11 +86,14 @@ export function useEnergy() {
 
       if (error) throw error;
 
-      // If no record exists, create one
+      // If no record exists, create one with 0 energy
       if (!data) {
         const { data: newEnergy, error: insertError } = await supabase
           .from("user_energy")
-          .insert({ user_id: user.id })
+          .insert({ 
+            user_id: user.id,
+            current_energy: 0  // Start at 0
+          })
           .select()
           .single();
 
