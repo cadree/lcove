@@ -106,7 +106,22 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
 
     // WebRTC streaming (P2P with OPUS audio)
     if (stream.stream_type === 'webrtc') {
-      // HOST VIEW: Always show host controls if user is host and stream is not ended
+      // REPLAY VIEW: Anyone can watch a replay (host or viewer)
+      if (streamStatus === 'ended' && hasReplay) {
+        return (
+          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary/20 to-background">
+            <video 
+              src={stream.replay_url!} 
+              controls 
+              className="w-full h-full object-contain"
+              autoPlay
+              playsInline
+            />
+          </div>
+        );
+      }
+      
+      // HOST VIEW: Show host controls if user is host and stream is draft or live
       if (isHost && streamStatus !== 'ended') {
         return (
           <WebRTCStreamHost 
@@ -117,26 +132,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
         );
       }
       
-      // VIEWER: Stream has replay
-      if (streamStatus === 'ended' && hasReplay) {
-        return (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
-            <div className="text-center p-6 w-full">
-              <PlayCircle className="h-16 w-16 text-primary mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Stream Replay</h3>
-              <p className="text-muted-foreground mb-4">Watch the recorded stream</p>
-              <video 
-                src={stream.replay_url!} 
-                controls 
-                className="w-full max-w-lg mx-auto rounded-lg"
-                autoPlay
-              />
-            </div>
-          </div>
-        );
-      }
-      
-      // VIEWER: Stream ended without replay
+      // VIEWER/HOST: Stream ended without replay
       if (streamStatus === 'ended') {
         return (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted/20 to-background">
