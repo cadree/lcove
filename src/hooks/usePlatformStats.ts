@@ -5,6 +5,7 @@ export interface PlatformStats {
   totalCreatives: number;
   totalProjects: number;
   totalCities: number;
+  totalEvents: number;
 }
 
 export function usePlatformStats() {
@@ -22,6 +23,11 @@ export function usePlatformStats() {
         .select('*', { count: 'exact', head: true })
         .in('status', ['open', 'in_progress', 'completed']);
 
+      // Fetch total events count
+      const { count: eventsCount } = await supabase
+        .from('events')
+        .select('*', { count: 'exact', head: true });
+
       // Fetch unique cities count
       const { data: citiesData } = await supabase
         .from('profiles')
@@ -34,6 +40,7 @@ export function usePlatformStats() {
         totalCreatives: profilesCount || 0,
         totalProjects: projectsCount || 0,
         totalCities: uniqueCities.size,
+        totalEvents: eventsCount || 0,
       };
     },
     staleTime: 60000, // Cache for 1 minute
