@@ -34,10 +34,10 @@ export function LandingNav() {
               Community
             </button>
             <button 
-              onClick={() => navigate("/feed")}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => navigate("/fund")}
+              className="text-sm text-primary hover:text-primary/80 transition-colors font-medium"
             >
-              Feed
+              Fund
             </button>
             <button 
               onClick={() => navigate("/projects")}
