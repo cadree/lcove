@@ -28,6 +28,7 @@ import {
   DrawerDescription,
 } from "@/components/ui/drawer";
 import { usePlatformStats } from "@/hooks/usePlatformStats";
+import { useAuth } from "@/contexts/AuthContext";
 
 const appIcons = [
   { title: "Feed", icon: Compass, link: "/feed" },
@@ -53,6 +54,7 @@ const exploreItems = [
 const Index = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { data: stats } = usePlatformStats();
+  const { user } = useAuth();
 
   const statChips = [
     { value: stats?.totalCreatives || "—", label: "Creators" },
@@ -73,14 +75,16 @@ const Index = () => {
       
       {/* Main Content */}
       <main className="relative pb-28 space-y-4">
-        {/* Hero Card */}
-        <WidgetHeroCard 
-          badge="Welcome"
-          headline="Create. Connect. Collaborate."
-          subtext="Your creative journey starts here"
-          ctaText="Get Started"
-          ctaLink="/auth"
-        />
+        {/* Hero Card - only for guests */}
+        {!user && (
+          <WidgetHeroCard 
+            badge="Welcome"
+            headline="Create. Connect. Collaborate."
+            subtext="Your creative journey starts here"
+            ctaText="Get Started"
+            ctaLink="/auth"
+          />
+        )}
 
         {/* Stats Row */}
         <WidgetStatChip stats={statChips} />
@@ -117,22 +121,24 @@ const Index = () => {
           </div>
         </section>
 
-        {/* Explore Section */}
-        <section className="pt-4">
-          <WidgetSectionHeader 
-            title="Explore"
-            link="/feed"
-          />
-          <div className="space-y-1 px-0">
-            {exploreItems.map((item, index) => (
-              <WidgetListRow 
-                key={item.title}
-                {...item}
-                index={index}
-              />
-            ))}
-          </div>
-        </section>
+        {/* Explore Section - only for guests */}
+        {!user && (
+          <section className="pt-4">
+            <WidgetSectionHeader 
+              title="Explore"
+              link="/feed"
+            />
+            <div className="space-y-1 px-0">
+              {exploreItems.map((item, index) => (
+                <WidgetListRow 
+                  key={item.title}
+                  {...item}
+                  index={index}
+                />
+              ))}
+            </div>
+          </section>
+        )}
       </main>
 
       {/* Bottom Navigation */}
