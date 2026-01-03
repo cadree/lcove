@@ -6,6 +6,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import OnboardingIntro from '@/components/onboarding/OnboardingIntro';
+import OnboardingName from '@/components/onboarding/OnboardingName';
 import OnboardingPassions from '@/components/onboarding/OnboardingPassions';
 import OnboardingCity from '@/components/onboarding/OnboardingCity';
 import OnboardingSkills from '@/components/onboarding/OnboardingSkills';
@@ -14,7 +15,9 @@ import OnboardingQuestionnaire from '@/components/onboarding/OnboardingQuestionn
 import OnboardingConnections from '@/components/onboarding/OnboardingConnections';
 import OnboardingCompletion from '@/components/onboarding/OnboardingCompletion';
 import OnboardingDenied from '@/components/onboarding/OnboardingDenied';
+
 export interface OnboardingData {
+  displayName: string;
   passions: string[];
   passionSeriousness: number;
   city: string;
@@ -24,25 +27,17 @@ export interface OnboardingData {
   roles: string[];
   questionnaireResponses: Record<number, 'A' | 'B' | 'C'>;
 }
-const Onboarding = () => {
-  const {
-    user,
-    loading: authLoading
-  } = useAuth();
-  const {
-    profile,
-    loading: profileLoading,
-    updateProfile
-  } = useProfile();
-  const navigate = useNavigate();
-  const {
-    toast
-  } = useToast();
 
-  // Initialize step based on profile state - if already completed, start at connections step
+const Onboarding = () => {
+  const { user, loading: authLoading } = useAuth();
+  const { profile, loading: profileLoading, updateProfile } = useProfile();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
   const [currentStep, setCurrentStep] = useState(0);
   const [initialized, setInitialized] = useState(false);
   const [data, setData] = useState<OnboardingData>({
+    displayName: '',
     passions: [],
     passionSeriousness: 5,
     city: '',
@@ -53,18 +48,25 @@ const Onboarding = () => {
     questionnaireResponses: {}
   });
   const [accessLevel, setAccessLevel] = useState<'level_1' | 'level_2' | 'level_3' | null>(null);
+
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/auth');
     }
   }, [user, authLoading, navigate]);
 
-  // Handle redirect for completed onboarding users - redirect to feed, not restart
+  // Pre-fill name from profile if available
+  useEffect(() => {
+    if (profile?.display_name && !data.displayName) {
+      setData(prev => ({ ...prev, displayName: profile.display_name || '' }));
+    }
+  }, [profile]);
+
+  // Handle redirect for completed onboarding users
   useEffect(() => {
     if (!profileLoading && !initialized && profile) {
       setInitialized(true);
       if (profile.onboarding_completed) {
-        // If onboarding is already complete, redirect to feed (don't restart)
         if (profile.access_status === 'denied' || profile.access_level === 'level_1') {
           navigate('/locked');
         } else {
@@ -76,8 +78,8 @@ const Onboarding = () => {
 
   // Scoring: A=1, B=2, C=3 points per question
   // Threshold: >= 20 points (out of 30 max for 10 questions) = Level 2 (Accepted)
-  // Below 20 = Level 1 (Denied)
   const ACCEPTANCE_THRESHOLD = 20;
+
   const calculateMindsetLevel = (responses: Record<number, 'A' | 'B' | 'C'>): {
     level: 1 | 2;
     score: number;
@@ -85,78 +87,77 @@ const Onboarding = () => {
     const score = Object.values(responses).reduce((sum, ans) => {
       return sum + (ans === 'A' ? 1 : ans === 'B' ? 2 : 3);
     }, 0);
-
-    // Level 2 = Accepted (score >= threshold), Level 1 = Denied
     const level = score >= ACCEPTANCE_THRESHOLD ? 2 : 1;
-    return {
-      level,
-      score
-    };
+    return { level, score };
   };
+
   const handleComplete = async () => {
     if (!user) return;
-    const {
-      level,
-      score
-    } = calculateMindsetLevel(data.questionnaireResponses);
+
+    // Final validation - name is required
+    if (!data.displayName.trim()) {
+      toast({
+        title: 'Name required',
+        description: 'Please go back and enter your name to complete onboarding.',
+        variant: 'destructive'
+      });
+      setCurrentStep(1); // Go back to name step
+      return;
+    }
+
+    const { level, score } = calculateMindsetLevel(data.questionnaireResponses);
     setAccessLevel(level === 2 ? 'level_2' : 'level_1');
+
     try {
       // Save questionnaire responses
       await supabase.from('questionnaire_responses').upsert({
         user_id: user.id,
         responses: data.questionnaireResponses,
         total_score: score
-      }, {
-        onConflict: 'user_id'
-      });
+      }, { onConflict: 'user_id' });
 
       // Save passions
-      const {
-        data: passions
-      } = await supabase.from('passions').select('id, name').in('name', data.passions);
+      const { data: passions } = await supabase
+        .from('passions')
+        .select('id, name')
+        .in('name', data.passions);
       if (passions && passions.length > 0) {
-        await supabase.from('user_passions').upsert(passions.map(p => ({
-          user_id: user.id,
-          passion_id: p.id
-        })), {
-          onConflict: 'user_id,passion_id'
-        });
+        await supabase.from('user_passions').upsert(
+          passions.map(p => ({ user_id: user.id, passion_id: p.id })),
+          { onConflict: 'user_id,passion_id' }
+        );
       }
 
       // Save skills
-      const {
-        data: skills
-      } = await supabase.from('skills').select('id, name').in('name', data.skills);
+      const { data: skills } = await supabase
+        .from('skills')
+        .select('id, name')
+        .in('name', data.skills);
       if (skills && skills.length > 0) {
-        await supabase.from('user_skills').upsert(skills.map(s => ({
-          user_id: user.id,
-          skill_id: s.id
-        })), {
-          onConflict: 'user_id,skill_id'
-        });
+        await supabase.from('user_skills').upsert(
+          skills.map(s => ({ user_id: user.id, skill_id: s.id })),
+          { onConflict: 'user_id,skill_id' }
+        );
       }
 
       // Save creative roles
-      const {
-        data: roles
-      } = await supabase.from('creative_roles').select('id, name').in('name', data.roles);
+      const { data: roles } = await supabase
+        .from('creative_roles')
+        .select('id, name')
+        .in('name', data.roles);
       if (roles && roles.length > 0) {
-        await supabase.from('user_creative_roles').upsert(roles.map(r => ({
-          user_id: user.id,
-          role_id: r.id
-        })), {
-          onConflict: 'user_id,role_id'
-        });
+        await supabase.from('user_creative_roles').upsert(
+          roles.map(r => ({ user_id: user.id, role_id: r.id })),
+          { onConflict: 'user_id,role_id' }
+        );
       }
 
-      // Determine access status based on mindset level
       const accessStatus = level === 2 ? 'active' : 'denied';
-
-      // Set session flag to prevent AccessGate from redirecting back during navigation
       sessionStorage.setItem('onboarding_just_completed', 'true');
 
-      // Update profile with all onboarding data (including normalized city fields)
+      // Update profile with all onboarding data INCLUDING display_name
       await updateProfile({
+        display_name: data.displayName.trim(),
         city: data.city,
         city_display: data.cityDisplay,
         city_key: data.cityKey,
@@ -169,9 +170,9 @@ const Onboarding = () => {
       });
 
       if (level === 1) {
-        setCurrentStep(8); // Show denied screen
+        setCurrentStep(9); // Show denied screen
       } else {
-        setCurrentStep(6); // Show connections screen (optional step)
+        setCurrentStep(7); // Show connections screen
       }
     } catch (error) {
       console.error('Error saving onboarding data:', error);
@@ -182,36 +183,45 @@ const Onboarding = () => {
       });
     }
   };
+
   const updateData = (updates: Partial<OnboardingData>) => {
-    setData(prev => ({
-      ...prev,
-      ...updates
-    }));
+    setData(prev => ({ ...prev, ...updates }));
   };
+
   const nextStep = () => setCurrentStep(prev => prev + 1);
   const prevStep = () => setCurrentStep(prev => Math.max(0, prev - 1));
+
   if (authLoading || profileLoading) {
-    return <div className="min-h-screen bg-background flex items-center justify-center">
-        <motion.div animate={{
-        rotate: 360
-      }} transition={{
-        duration: 1,
-        repeat: Infinity,
-        ease: 'linear'
-      }} className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full" />
-      </div>;
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full"
+        />
+      </div>
+    );
   }
+
   const steps = [
     <OnboardingIntro key="intro" onNext={nextStep} />,
+    <OnboardingName 
+      key="name" 
+      displayName={data.displayName} 
+      updateName={(name) => updateData({ displayName: name })} 
+      onNext={nextStep} 
+      onBack={prevStep} 
+    />,
     <OnboardingPassions key="passions" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingCity key="city" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingSkills key="skills" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingRoles key="roles" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingQuestionnaire key="questionnaire" data={data} updateData={updateData} onComplete={handleComplete} onBack={prevStep} />,
-    <OnboardingConnections key="connections" onComplete={() => setCurrentStep(7)} onBack={prevStep} />,
+    <OnboardingConnections key="connections" onComplete={() => setCurrentStep(8)} onBack={prevStep} />,
     <OnboardingCompletion key="completion" accessLevel={accessLevel} />,
     <OnboardingDenied key="denied" />
   ];
+
   return (
     <div className="min-h-screen bg-background">
       <AnimatePresence mode="wait">
@@ -228,4 +238,5 @@ const Onboarding = () => {
     </div>
   );
 };
+
 export default Onboarding;
