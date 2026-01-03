@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
   Settings, MapPin, Camera, Loader2, Sparkles, 
-  ArrowLeft, MessageCircle, Edit, Shield, BadgeCheck, UserPlus, UserMinus 
+  ArrowLeft, MessageCircle, Edit, Shield, BadgeCheck, UserPlus, UserMinus, Users 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -15,6 +15,7 @@ import { ProfileEffects } from './ProfileEffects';
 import type { ProfileCustomization } from '@/hooks/useProfileCustomization';
 import { useCreatorVerification } from '@/hooks/useCreatorVerification';
 import { useFavorites } from '@/hooks/useFavorites';
+import { FriendsDrawer } from '@/components/friends/FriendsDrawer';
 import type { ThemePreset } from '@/lib/profileThemes';
 import { THEME_PRESETS } from '@/lib/profileThemes';
 
@@ -63,9 +64,10 @@ export function ProfileHeader({
   const navigate = useNavigate();
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
-  const { isFavorite, toggleFavorite, addFavorite, removeFavorite } = useFavorites();
+  const { favorites, isFavorite, toggleFavorite } = useFavorites();
 
   const isUserFavorite = isFavorite(userId);
+  const friendsCount = favorites?.length || 0;
 
   const themePreset = (customization?.theme_preset as ThemePreset) || 'clean_modern';
   const theme = THEME_PRESETS[themePreset];
@@ -236,10 +238,22 @@ export function ProfileHeader({
                 </Badge>
               )}
             </div>
-            <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1">
-              <MapPin className="w-3.5 h-3.5" />
-              {city}
-            </p>
+            
+            <div className="flex items-center gap-3 mt-1">
+              <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5" />
+                {city}
+              </p>
+              
+              {isOwnProfile && (
+                <FriendsDrawer>
+                  <button className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors">
+                    <Users className="w-3.5 h-3.5" />
+                    <span className="font-medium">{friendsCount}</span> friends
+                  </button>
+                </FriendsDrawer>
+              )}
+            </div>
           </div>
         </motion.div>
 

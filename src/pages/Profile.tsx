@@ -30,7 +30,6 @@ import { useProfile } from "@/hooks/useProfile";
 import { useConversations } from "@/hooks/useConversations";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
-import { useFavorites } from "@/hooks/useFavorites";
 import { useProfileCustomization } from "@/hooks/useProfileCustomization";
 import { useProfilePosts } from "@/hooks/useProfilePosts";
 import { useProfileBlogs, BlogPost } from "@/hooks/useProfileBlogs";
@@ -52,7 +51,6 @@ const Profile = () => {
   
   const { profile, loading, updateProfile } = useProfile(targetUserId);
   const { credits } = useCredits();
-  const { favorites } = useFavorites();
   const { customization, isOwner, saveCustomization } = useProfileCustomization(targetUserId);
   const { posts, isLoading: postsLoading, createPost, deletePost } = useProfilePosts(targetUserId);
   const { blogs, isLoading: blogsLoading, createBlog, deleteBlog } = useProfileBlogs(targetUserId);
@@ -162,8 +160,6 @@ const Profile = () => {
             credits={credits?.balance || 0}
             projectCount={0}
             eventCount={0}
-            friendsCount={isOwnProfile ? favorites.length : undefined}
-            isOwnProfile={isOwnProfile}
           />
         );
       case 'about':
