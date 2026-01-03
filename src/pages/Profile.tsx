@@ -25,6 +25,7 @@ import { ProfileFolders } from "@/components/profile/ProfileFolders";
 import { ProfileQuickLinks } from "@/components/profile/ProfileQuickLinks";
 import { FolderDetailView } from "@/components/profile/FolderDetailView";
 import { ProfileLayoutEditor } from "@/components/profile/ProfileLayoutEditor";
+import { ProfileFriendsSection } from "@/components/profile/ProfileFriendsSection";
 import { useProfile } from "@/hooks/useProfile";
 import { useConversations } from "@/hooks/useConversations";
 import { useAuth } from "@/contexts/AuthContext";
@@ -149,6 +150,9 @@ const Profile = () => {
   // Render a section based on its ID
   const renderSection = (section: ProfileSection) => {
     switch (section.id) {
+      case 'friends':
+        if (!isOwnProfile) return null;
+        return <ProfileFriendsSection key="friends" />;
       case 'stats':
         return (
           <ProfileStats
