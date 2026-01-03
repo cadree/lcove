@@ -75,7 +75,7 @@ const PostCreator = ({
           <Textarea placeholder="What's on your mind?" value={content} onChange={e => {
           setContent(e.target.value);
           if (e.target.value.length > 0) setIsExpanded(true);
-        }} onFocus={() => setIsExpanded(true)} className="min-h-[60px] resize-none bg-transparent border-none text-foreground placeholder:text-muted-foreground focus-visible:ring-0 p-0" />
+        }} onFocus={() => setIsExpanded(true)} className="min-h-[60px] resize-none bg-transparent border-none text-foreground placeholder:text-muted-foreground focus-visible:ring-0 px-3 py-2" />
         </div>
       </div>
 
