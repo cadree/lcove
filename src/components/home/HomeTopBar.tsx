@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { EnergyIndicator } from "@/components/energy";
 import { useAuth } from "@/contexts/AuthContext";
+import etherBearLogo from "@/assets/ether-bear-logo.png";
 
 interface HomeTopBarProps {
   onMenuClick?: () => void;
@@ -37,14 +38,13 @@ const HomeTopBar = ({ onMenuClick, subtitle = "Discover" }: HomeTopBarProps) => 
           <Menu className="w-5 h-5" />
         </Button>
 
-        {/* Center - Brand */}
+        {/* Center - Brand with Logo */}
         <div className="flex flex-col items-center">
-          <span className="font-display text-lg font-semibold tracking-wide text-foreground">
-            ETHER
-          </span>
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            {subtitle}
-          </span>
+          <img 
+            src={etherBearLogo} 
+            alt="Ether" 
+            className="h-10 w-auto object-contain"
+          />
         </div>
 
         {/* Right - Energy + Notifications */}
