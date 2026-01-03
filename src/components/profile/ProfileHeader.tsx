@@ -163,7 +163,18 @@ export function ProfileHeader({
         {/* Top Actions */}
         <div className="absolute top-4 left-4 right-4 flex justify-between z-10">
           {!isOwnProfile ? (
-            <Button variant="glass" size="icon" className="w-10 h-10" onClick={() => navigate(-1)}>
+            <Button 
+              variant="glass" 
+              size="icon" 
+              className="w-10 h-10" 
+              onClick={() => {
+                if (window.history.length > 1) {
+                  navigate(-1);
+                } else {
+                  navigate('/home');
+                }
+              }}
+            >
               <ArrowLeft className="w-5 h-5" />
             </Button>
           ) : (
