@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useProjectJoinEnergy } from '@/hooks/useProjectJoinEnergy';
 
 const Projects: React.FC = () => {
   const { user } = useAuth();
@@ -19,6 +20,9 @@ const Projects: React.FC = () => {
   const { projects, myProjects, isLoading } = useProjects(statusFilter);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  
+  // Check and award energy for accepted project applications
+  useProjectJoinEnergy();
 
   const handleProjectClick = (project: Project) => {
     setSelectedProject(project);

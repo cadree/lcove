@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useEnergy, ENERGY_GAINS } from '@/hooks/useEnergy';
 
 export interface Project {
   id: string;
@@ -50,6 +51,7 @@ export const useProjects = (status?: string) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { earnEnergy } = useEnergy();
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['projects', status],
@@ -190,10 +192,22 @@ export const useProjects = (status?: string) => {
 
       return project;
     },
-    onSuccess: () => {
+    onSuccess: async (project) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['my-projects'] });
       toast({ title: 'Project created successfully!' });
+      
+      // Award energy points for creating a project
+      try {
+        await earnEnergy({
+          amount: ENERGY_GAINS.project_create,
+          source: 'project_create',
+          sourceId: project.id,
+          description: `Created project: ${project.title}`,
+        });
+      } catch (err) {
+        console.error('Failed to award energy for project creation:', err);
+      }
     },
     onError: (error) => {
       toast({ title: 'Failed to create project', description: error.message, variant: 'destructive' });
@@ -229,6 +243,7 @@ export const useProjectApplications = (projectId?: string) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { earnEnergy } = useEnergy();
 
   const { data: applications = [], isLoading } = useQuery({
     queryKey: ['project-applications', projectId],
@@ -478,11 +493,28 @@ export const useProjectApplications = (projectId?: string) => {
         }).catch(err => console.error('Failed to send acceptance notification:', err));
       }
     },
-    onSuccess: (_, { status }) => {
+    onSuccess: async (_, { status, applicationId }) => {
       queryClient.invalidateQueries({ queryKey: ['project-applications'] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       toast({ title: status === 'accepted' ? 'Application accepted!' : 'Application rejected' });
+      
+      // Award energy points to the applicant when their application is accepted
+      if (status === 'accepted') {
+        // Get application to find applicant_id
+        const { data: application } = await supabase
+          .from('project_applications')
+          .select('applicant_id, project_id')
+          .eq('id', applicationId)
+          .single();
+        
+        if (application) {
+          // We can't directly award energy to another user from here,
+          // but we can trigger it through the database or edge function
+          // For now, we'll log this - the applicant will get energy when they view their acceptance
+          console.log('Application accepted for user:', application.applicant_id);
+        }
+      }
     },
     onError: (error) => {
       toast({ title: 'Failed to review application', description: error.message, variant: 'destructive' });
