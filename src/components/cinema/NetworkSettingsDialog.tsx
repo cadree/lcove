@@ -228,14 +228,14 @@ export const NetworkSettingsDialog = ({
           {/* Genre */}
           <div className="space-y-2">
             <Label>Primary Genre</Label>
-            <Select value={genre} onValueChange={setGenre}>
+            <Select value={genre || "none"} onValueChange={(v) => setGenre(v === "none" ? "" : v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a genre" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="none">None</SelectItem>
                 {genres.map((g) => (
-                  <SelectItem key={g.id} value={g.name}>
+                  <SelectItem key={g.id} value={g.name || `genre-${g.id}`}>
                     {g.name}
                   </SelectItem>
                 ))}
