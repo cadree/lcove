@@ -41,16 +41,32 @@ export function usePortfolioFolders(userId?: string) {
 
       if (error) throw error;
 
-      // Get post counts for each folder
+      // Get item counts for each folder (from both posts and portfolio_items)
       const folderIds = folders.map(f => f.id);
       if (folderIds.length > 0) {
+        // Count posts assigned to folders
         const { data: posts } = await supabase
           .from('posts')
           .select('folder_id')
           .in('folder_id', folderIds);
 
+        // Count portfolio_items (direct uploads + external links)
+        const { data: portfolioItems } = await supabase
+          .from('portfolio_items')
+          .select('folder_id')
+          .in('folder_id', folderIds);
+
         const counts: Record<string, number> = {};
+        
+        // Count posts
         posts?.forEach(p => {
+          if (p.folder_id) {
+            counts[p.folder_id] = (counts[p.folder_id] || 0) + 1;
+          }
+        });
+        
+        // Count portfolio items
+        portfolioItems?.forEach(p => {
           if (p.folder_id) {
             counts[p.folder_id] = (counts[p.folder_id] || 0) + 1;
           }
