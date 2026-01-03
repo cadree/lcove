@@ -15,6 +15,7 @@ interface Post {
     display_name: string | null;
     avatar_url: string | null;
     city: string | null;
+    city_display: string | null;
   };
   reactions?: { emoji: string; count: number }[];
   user_reaction?: string | null;
@@ -39,7 +40,7 @@ export function usePosts() {
       const userIds = [...new Set(postsData?.map(p => p.user_id) || [])];
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('user_id, display_name, avatar_url, city')
+        .select('user_id, display_name, avatar_url, city, city_display')
         .in('user_id', userIds);
 
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]));
@@ -70,7 +71,7 @@ export function usePosts() {
       return (postsData || []).map(post => ({
         ...post,
         post_type: post.post_type || 'regular',
-        profile: profileMap.get(post.user_id) || { display_name: null, avatar_url: null, city: null },
+        profile: profileMap.get(post.user_id) || { display_name: null, avatar_url: null, city: null, city_display: null },
         reactions: Array.from(reactionsByPost.get(post.id)?.entries() || []).map(([emoji, count]) => ({ emoji, count })),
         user_reaction: userReactions.get(post.id) || null,
       })) as Post[];
