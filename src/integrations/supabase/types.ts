@@ -3597,6 +3597,7 @@ export type Database = {
           location: string | null
           media_type: string | null
           media_url: string | null
+          post_type: string
           user_id: string
         }
         Insert: {
@@ -3610,6 +3611,7 @@ export type Database = {
           location?: string | null
           media_type?: string | null
           media_url?: string | null
+          post_type?: string
           user_id: string
         }
         Update: {
@@ -3623,6 +3625,7 @@ export type Database = {
           location?: string | null
           media_type?: string | null
           media_url?: string | null
+          post_type?: string
           user_id?: string
         }
         Relationships: [

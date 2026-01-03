@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
   Settings, MapPin, Camera, Loader2, Sparkles, 
-  ArrowLeft, MessageCircle, Edit, Shield, BadgeCheck 
+  ArrowLeft, MessageCircle, Edit, Shield, BadgeCheck, UserPlus, UserMinus 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { ProfileEffects } from './ProfileEffects';
 import type { ProfileCustomization } from '@/hooks/useProfileCustomization';
 import { useCreatorVerification } from '@/hooks/useCreatorVerification';
+import { useFavorites } from '@/hooks/useFavorites';
 import type { ThemePreset } from '@/lib/profileThemes';
 import { THEME_PRESETS } from '@/lib/profileThemes';
 
@@ -62,6 +63,9 @@ export function ProfileHeader({
   const navigate = useNavigate();
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const { isFavorite, toggleFavorite, addFavorite, removeFavorite } = useFavorites();
+
+  const isUserFavorite = isFavorite(userId);
 
   const themePreset = (customization?.theme_preset as ThemePreset) || 'clean_modern';
   const theme = THEME_PRESETS[themePreset];
@@ -256,14 +260,33 @@ export function ProfileHeader({
               Edit Profile
             </Button>
           ) : (
-            <Button 
-              variant="default" 
-              className="flex-1 h-11"
-              onClick={onMessageClick}
-            >
-              <MessageCircle className="w-4 h-4 mr-2" />
-              Message
-            </Button>
+            <>
+              <Button 
+                variant="default" 
+                className="flex-1 h-11"
+                onClick={onMessageClick}
+              >
+                <MessageCircle className="w-4 h-4 mr-2" />
+                Message
+              </Button>
+              <Button 
+                variant={isUserFavorite ? "outline" : "secondary"}
+                className="h-11"
+                onClick={() => toggleFavorite(userId)}
+              >
+                {isUserFavorite ? (
+                  <>
+                    <UserMinus className="w-4 h-4 mr-2" />
+                    Remove
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Add Friend
+                  </>
+                )}
+              </Button>
+            </>
           )}
         </motion.div>
       </div>
