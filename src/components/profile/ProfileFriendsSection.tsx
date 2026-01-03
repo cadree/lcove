@@ -23,11 +23,7 @@ export function ProfileFriendsSection() {
 
   const { favorites, isLoading: favoritesLoading } = useFavorites();
 
-  // ✅ Normalize favorites into a string[] of friend user IDs
-  // Supports common shapes:
-  // 1) favorites: string[]
-  // 2) favorites: { friendIds: string[] }
-  // 3) favorites: Array<{ friend_user_id: string }> or Array<{ friendId: string }> etc.
+  // Normalize favorites into a string[] of friend user IDs
   const friendIds: string[] = useMemo(() => {
     if (!favorites) return [];
 
@@ -65,8 +61,7 @@ export function ProfileFriendsSection() {
     return [];
   }, [favorites]);
 
-  // ✅ Always default friendProfiles to [] so `.length` never crashes
-  const { friendProfiles = [], isLoading: profilesLoading, error: profilesError } = useFriendProfiles(friendIds);
+  const { friendProfiles = [], isLoading: profilesLoading } = useFriendProfiles(friendIds);
 
   const isLoading = favoritesLoading || profilesLoading;
 
@@ -90,23 +85,6 @@ export function ProfileFriendsSection() {
           {[1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="w-16 h-16 rounded-full" />
           ))}
-        </div>
-      </motion.div>
-    );
-  }
-
-  // Error state (don’t silently show 0)
-  if (profilesError) {
-    return (
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="px-5 py-4">
-        <Header />
-        <div className="rounded-xl bg-muted/30 border border-border/50 p-4 text-sm text-muted-foreground">
-          Couldn’t load friends right now.
-          <div className="mt-3">
-            <Button size="sm" variant="secondary" onClick={() => navigate("/directory")}>
-              Find Creators
-            </Button>
-          </div>
         </div>
       </motion.div>
     );
@@ -137,14 +115,11 @@ export function ProfileFriendsSection() {
 
       <ScrollArea className="w-full">
         <div className="flex gap-3 pb-2">
-          {friendProfiles.map((friend: any) => {
-            const id: string = friend.user_id || friend.userId || friend.id || friend.profile_id || "";
-
-            const name: string = friend.display_name || friend.displayName || friend.username || "User";
-
-            const avatarUrl: string | undefined = friend.avatar_url || friend.avatarUrl || undefined;
-
-            const firstLetter = typeof name === "string" && name.length > 0 ? name.charAt(0).toUpperCase() : "?";
+          {friendProfiles.map((friend) => {
+            const id = friend.user_id || "";
+            const name = friend.display_name || "User";
+            const avatarUrl = friend.avatar_url || undefined;
+            const firstLetter = name.charAt(0).toUpperCase() || "?";
 
             return (
               <div
