@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { 
   Users, 
   Calendar, 
@@ -9,15 +8,12 @@ import {
   Store,
   Wallet,
   MessageCircle,
-  Compass,
-  Sparkles
+  Compass
 } from "lucide-react";
 import HomeTopBar from "@/components/home/HomeTopBar";
-import WidgetHeroCard from "@/components/home/WidgetHeroCard";
 import WidgetStatChip from "@/components/home/WidgetStatChip";
 import WidgetAppIcon from "@/components/home/WidgetAppIcon";
 import WidgetMiniCard from "@/components/home/WidgetMiniCard";
-import WidgetListRow from "@/components/home/WidgetListRow";
 import WidgetSectionHeader from "@/components/home/WidgetSectionHeader";
 import BottomNav from "@/components/navigation/BottomNav";
 import {
@@ -28,7 +24,6 @@ import {
   DrawerDescription,
 } from "@/components/ui/drawer";
 import { usePlatformStats } from "@/hooks/usePlatformStats";
-import { useAuth } from "@/contexts/AuthContext";
 
 const appIcons = [
   { title: "Feed", icon: Compass, link: "/feed" },
@@ -45,16 +40,10 @@ const quickAccessCards = [
   { title: "Messages", subtitle: "Conversations", tag: "Chat", icon: MessageCircle, link: "/messages" },
 ];
 
-const exploreItems = [
-  { title: "Directory", subtitle: "Find collaborators", icon: Users, link: "/directory" },
-  { title: "Feed", subtitle: "Community updates", icon: Compass, link: "/feed" },
-  { title: "Featured", subtitle: "Spotlight creators", icon: Sparkles, link: "/directory" },
-];
 
 const Index = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { data: stats } = usePlatformStats();
-  const { user } = useAuth();
 
   const statChips = [
     { value: stats?.totalCreatives || "—", label: "Creators" },
@@ -62,6 +51,7 @@ const Index = () => {
     { value: stats?.totalCities || "—", label: "Cities" },
   ];
 
+  // This page is now exclusively for authenticated users (AccessGate handles redirect)
   return (
     <div className="min-h-screen bg-background">
       {/* Subtle ambient gradient */}
@@ -73,19 +63,8 @@ const Index = () => {
         subtitle="Home"
       />
       
-      {/* Main Content */}
+      {/* Main Content - Dashboard for authenticated users only */}
       <main className="relative pb-28 space-y-4">
-        {/* Hero Card - only for guests */}
-        {!user && (
-          <WidgetHeroCard 
-            badge="Welcome"
-            headline="Create. Connect. Collaborate."
-            subtext="Your creative journey starts here"
-            ctaText="Get Started"
-            ctaLink="/auth"
-          />
-        )}
-
         {/* Stats Row */}
         <WidgetStatChip stats={statChips} />
 
@@ -120,25 +99,6 @@ const Index = () => {
             ))}
           </div>
         </section>
-
-        {/* Explore Section - only for guests */}
-        {!user && (
-          <section className="pt-4">
-            <WidgetSectionHeader 
-              title="Explore"
-              link="/feed"
-            />
-            <div className="space-y-1 px-0">
-              {exploreItems.map((item, index) => (
-                <WidgetListRow 
-                  key={item.title}
-                  {...item}
-                  index={index}
-                />
-              ))}
-            </div>
-          </section>
-        )}
       </main>
 
       {/* Bottom Navigation */}

@@ -9,8 +9,11 @@ interface AccessGateProps {
   children: React.ReactNode;
 }
 
-// Routes that don't require access gate checks
-const PUBLIC_ROUTES = ['/', '/auth', '/onboarding', '/locked', '/admin/onboarding', '/denied', '/admin'];
+// Routes that don't require access gate checks (for unauthenticated users)
+const PUBLIC_ROUTES = ['/', '/landing', '/auth', '/onboarding', '/locked', '/admin/onboarding', '/denied', '/admin'];
+
+// Routes that should redirect authenticated users to /home
+const LANDING_ROUTES = ['/', '/landing'];
 
 const AccessGate = ({ children }: AccessGateProps) => {
   const { user, loading: authLoading } = useAuth();
@@ -21,15 +24,25 @@ const AccessGate = ({ children }: AccessGateProps) => {
   const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
 
   const isPublicRoute = PUBLIC_ROUTES.includes(location.pathname) || location.pathname.startsWith('/admin/onboarding');
+  const isLandingRoute = LANDING_ROUTES.includes(location.pathname);
 
   useEffect(() => {
-    // Skip checks for public routes
-    if (isPublicRoute) return;
-    
-    // Wait for auth and profile to load
-    if (authLoading || profileLoading) return;
+    // Wait for auth to load first
+    if (authLoading) return;
 
-    // If not logged in, redirect to auth
+    // If user is authenticated and on a landing route, redirect to /home
+    if (user && isLandingRoute) {
+      navigate('/home', { replace: true });
+      return;
+    }
+
+    // Skip other checks for public routes (unauthenticated users)
+    if (isPublicRoute && !user) return;
+    
+    // Wait for profile to load for authenticated users
+    if (profileLoading) return;
+
+    // If not logged in and not on public route, redirect to auth
     if (!user) {
       navigate('/auth');
       return;
@@ -73,7 +86,7 @@ const AccessGate = ({ children }: AccessGateProps) => {
         }
       }
     }
-  }, [user, profile, authLoading, profileLoading, isPublicRoute, navigate, location.pathname, hasSeenWelcome]);
+  }, [user, profile, authLoading, profileLoading, isPublicRoute, isLandingRoute, navigate, location.pathname, hasSeenWelcome]);
 
   // Show loading state while checking auth/profile
   if (!isPublicRoute && (authLoading || profileLoading)) {
