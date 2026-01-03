@@ -1,9 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
+import etherBearLogo from "@/assets/ether-bear-logo.png";
 
 export function LandingNav() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   return (
     <motion.header
@@ -15,9 +18,11 @@ export function LandingNav() {
       <div className="container px-4 sm:px-6 lg:px-8 py-4">
         <nav className="glass-strong rounded-2xl px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-              <span className="text-primary font-display font-bold text-lg">E</span>
-            </div>
+            <img 
+              src={etherBearLogo} 
+              alt="Ether" 
+              className="w-8 h-8 object-contain"
+            />
             <span className="font-display text-xl font-medium hidden sm:inline">Ether</span>
           </div>
           
@@ -49,21 +54,33 @@ export function LandingNav() {
           </div>
           
           <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => navigate("/auth")}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Sign In
-            </Button>
-            <Button 
-              size="sm"
-              onClick={() => navigate("/auth")}
-              className="glow-pink-sm"
-            >
-              Get Started
-            </Button>
+            {user ? (
+              <Button 
+                size="sm"
+                onClick={() => navigate("/home")}
+                className="glow-pink-sm"
+              >
+                Go to Dashboard
+              </Button>
+            ) : (
+              <>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => navigate("/auth")}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  Sign In
+                </Button>
+                <Button 
+                  size="sm"
+                  onClick={() => navigate("/auth")}
+                  className="glow-pink-sm"
+                >
+                  Get Started
+                </Button>
+              </>
+            )}
           </div>
         </nav>
       </div>

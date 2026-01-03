@@ -14,7 +14,7 @@ export interface NavItem {
 }
 
 export const allNavItems: NavItem[] = [
-  { id: "home", icon: Home, label: "Home", path: "/" },
+  { id: "home", icon: Home, label: "Home", path: "/home" },
   { id: "messages", icon: MessageCircle, label: "Messages", path: "/messages" },
   { id: "projects", icon: FolderKanban, label: "Projects", path: "/projects" },
   { id: "directory", icon: Search, label: "Directory", path: "/directory" },
