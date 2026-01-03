@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { useEnergy, ENERGY_GAINS } from "@/hooks/useEnergy";
 
 export interface CalendarEvent {
   id: string;
@@ -264,6 +265,7 @@ export function useCalendarItems(filters?: { city?: string; state?: string; type
 export function useRSVP() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { earnEnergy } = useEnergy();
 
   const rsvpMutation = useMutation({
     mutationFn: async ({ eventId, status }: { eventId: string; status: string }) => {
@@ -301,7 +303,7 @@ export function useRSVP() {
         if (error) throw error;
       }
     },
-    onSuccess: (_, { eventId, status }) => {
+    onSuccess: async (_, { eventId, status }) => {
       queryClient.invalidateQueries({ queryKey: ['event', eventId] });
       queryClient.invalidateQueries({ queryKey: ['events'] });
       
@@ -309,6 +311,18 @@ export function useRSVP() {
         toast.success('Marked as interested! Reminder enabled.');
       } else if (status === 'going') {
         toast.success("You're going!");
+        
+        // Award energy for attending an event
+        try {
+          await earnEnergy({
+            amount: ENERGY_GAINS.event_attend,
+            source: 'event_attend',
+            sourceId: eventId,
+            description: 'Committed to attending an event',
+          });
+        } catch (err) {
+          console.error('Failed to award energy for event attendance:', err);
+        }
       } else if (status === 'not_going') {
         toast.success('Status updated');
       } else {
@@ -349,6 +363,7 @@ export function useRSVP() {
 export function useCreatePersonalItem() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { earnEnergy } = useEnergy();
 
   return useMutation({
     mutationFn: async (item: Omit<PersonalCalendarItem, 'id' | 'user_id' | 'created_at'>) => {
@@ -360,9 +375,20 @@ export function useCreatePersonalItem() {
       
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['personal-calendar-items'] });
       toast.success('Personal event added to calendar');
+      
+      // Award energy for planning on calendar
+      try {
+        await earnEnergy({
+          amount: ENERGY_GAINS.calendar_plan,
+          source: 'calendar_plan',
+          description: 'Added personal event to calendar',
+        });
+      } catch (err) {
+        console.error('Failed to award energy for calendar planning:', err);
+      }
     },
     onError: (error) => {
       toast.error('Failed to add event');
@@ -393,6 +419,7 @@ export function useDeletePersonalItem() {
 export function useCreateEvent() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { earnEnergy } = useEnergy();
 
   return useMutation({
     mutationFn: async (event: Omit<CalendarEvent, 'id' | 'creator_id' | 'created_at' | 'rsvp_count' | 'user_rsvp'>) => {
@@ -426,9 +453,21 @@ export function useCreateEvent() {
 
       return createdEvent;
     },
-    onSuccess: () => {
+    onSuccess: async (createdEvent) => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
       toast.success('Event created!');
+      
+      // Award energy for creating an event
+      try {
+        await earnEnergy({
+          amount: ENERGY_GAINS.event_create,
+          source: 'event_create',
+          sourceId: createdEvent.id,
+          description: `Created event: ${createdEvent.title}`,
+        });
+      } catch (err) {
+        console.error('Failed to award energy for event creation:', err);
+      }
     },
     onError: (error) => {
       toast.error('Failed to create event');

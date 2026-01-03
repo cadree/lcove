@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEnergy, ENERGY_GAINS } from "@/hooks/useEnergy";
 
 export interface ContactTask {
   id: string;
@@ -15,6 +16,7 @@ export interface ContactTask {
 export function useContactTasks(pipelineItemId: string | null) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { earnEnergy } = useEnergy();
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['contact-tasks', pipelineItemId],
@@ -67,11 +69,25 @@ export function useContactTasks(pipelineItemId: string | null) {
         .single();
       
       if (error) throw error;
-      return data;
+      return { data, isDone };
     },
-    onSuccess: () => {
+    onSuccess: async ({ data, isDone }) => {
       queryClient.invalidateQueries({ queryKey: ['contact-tasks', pipelineItemId] });
       queryClient.invalidateQueries({ queryKey: ['my-day-tasks'] });
+      
+      // Award energy points when completing a task
+      if (isDone) {
+        try {
+          await earnEnergy({
+            amount: ENERGY_GAINS.task_complete,
+            source: 'task_complete',
+            sourceId: data.id,
+            description: `Completed task: ${data.title}`,
+          });
+        } catch (err) {
+          console.error('Failed to award energy for task:', err);
+        }
+      }
     },
   });
 
