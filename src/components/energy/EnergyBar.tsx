@@ -86,11 +86,10 @@ const EnergyBar = ({ variant = "compact", className, showTooltip = true }: Energ
       <div className="border-t border-border pt-2">
         <p className="text-xs text-muted-foreground mb-2">Earn energy by:</p>
         <ul className="text-xs space-y-1 text-muted-foreground">
-          <li>• Completing tasks (+{ENERGY_GAINS.task_complete_easy}-{ENERGY_GAINS.task_complete_hard})</li>
-          <li>• Finishing milestones (+{ENERGY_GAINS.project_milestone})</li>
-          <li>• Posting updates (+{ENERGY_GAINS.post_update})</li>
-          <li>• Collaborating (+{ENERGY_GAINS.collaboration_join})</li>
-          <li>• Deep work sessions (+{ENERGY_GAINS.deep_work})</li>
+          <li>• Completing tasks (+{ENERGY_GAINS.task_complete})</li>
+          <li>• Planning events/meetings (+{ENERGY_GAINS.event_create})</li>
+          <li>• Creating/joining projects (+{ENERGY_GAINS.project_create})</li>
+          <li>• Attending events (+{ENERGY_GAINS.event_attend})</li>
         </ul>
       </div>
 
