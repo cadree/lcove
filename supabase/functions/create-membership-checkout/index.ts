@@ -18,14 +18,14 @@ interface TierConfig {
 // Membership tiers configuration
 const MEMBERSHIP_TIERS: Record<string, TierConfig> = {
   community: {
-    product_id: "prod_Tcm8CF5h96j35w",
-    price_id: "price_1SfWag770V7F1fLCPHVUn370",
+    product_id: "prod_Tiqd9bhgTKWRRo",
+    price_id: "price_1SlOwh2O6q4dMrYLAwRO57NB",
     name: "Community Member",
     min_amount: 500, // $5 minimum in cents
   },
   elite: {
-    product_id: "prod_TcmEthbJUKGwjv",
-    price_id: "price_1SfWff770V7F1fLC8GootmUb",
+    product_id: "prod_TiqeFdKIv2xWou",
+    price_id: "price_1SlOwv2O6q4dMrYLVppF6w4f",
     name: "Elite Member",
     amount: 2500, // $25 fixed in cents
   },
