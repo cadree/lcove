@@ -12,37 +12,27 @@ export function usePlatformStats() {
   return useQuery({
     queryKey: ['platform-stats'],
     queryFn: async (): Promise<PlatformStats> => {
-      // Fetch total profiles count
-      const { count: profilesCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
+      // Use RPC function to get stats without RLS restrictions
+      // This is safe because it only returns aggregate counts
+      const { data, error } = await supabase.rpc('get_platform_stats');
 
-      // Fetch total projects count (open, in_progress, or completed)
-      const { count: projectsCount } = await supabase
-        .from('projects')
-        .select('*', { count: 'exact', head: true })
-        .in('status', ['open', 'in_progress', 'completed']);
+      if (error) {
+        console.error('Failed to fetch platform stats:', error);
+        throw error;
+      }
 
-      // Fetch total events count
-      const { count: eventsCount } = await supabase
-        .from('events')
-        .select('*', { count: 'exact', head: true });
-
-      // Fetch unique cities count
-      const { data: citiesData } = await supabase
-        .from('profiles')
-        .select('city')
-        .not('city', 'is', null);
-
-      const uniqueCities = new Set(citiesData?.map(p => p.city?.toLowerCase().trim()).filter(Boolean));
+      // The RPC returns an array with one row
+      const stats = data?.[0];
 
       return {
-        totalCreatives: profilesCount || 0,
-        totalProjects: projectsCount || 0,
-        totalCities: uniqueCities.size,
-        totalEvents: eventsCount || 0,
+        totalCreatives: Number(stats?.total_creators) || 0,
+        totalProjects: Number(stats?.total_projects) || 0,
+        totalCities: Number(stats?.total_cities) || 0,
+        totalEvents: Number(stats?.total_events) || 0,
       };
     },
-    staleTime: 60000, // Cache for 1 minute
+    staleTime: 30000, // Cache for 30 seconds
+    refetchOnWindowFocus: true, // Refresh on tab focus
+    refetchInterval: 60000, // Auto-refresh every 60 seconds
   });
 }

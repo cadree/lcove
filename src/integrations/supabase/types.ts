@@ -5404,6 +5404,15 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_platform_stats: {
+        Args: never
+        Returns: {
+          total_cities: number
+          total_creators: number
+          total_events: number
+          total_projects: number
+        }[]
+      }
       get_user_emails_for_admin: {
         Args: never
         Returns: {

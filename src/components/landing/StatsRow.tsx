@@ -1,26 +1,15 @@
 import { motion } from "framer-motion";
 import { usePlatformStats } from "@/hooks/usePlatformStats";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function StatsRow() {
-  const { data: stats, isLoading } = usePlatformStats();
+  const { data: stats, isLoading, isError } = usePlatformStats();
 
   const displayStats = [
-    { 
-      label: "Creators", 
-      value: isLoading ? "..." : stats?.totalCreatives?.toLocaleString() || "0"
-    },
-    { 
-      label: "Projects", 
-      value: isLoading ? "..." : stats?.totalProjects?.toLocaleString() || "0"
-    },
-    { 
-      label: "Cities", 
-      value: isLoading ? "..." : stats?.totalCities?.toLocaleString() || "0"
-    },
-    { 
-      label: "Events", 
-      value: isLoading ? "..." : stats?.totalEvents?.toLocaleString() || "0"
-    },
+    { label: "Creators", value: stats?.totalCreatives },
+    { label: "Projects", value: stats?.totalProjects },
+    { label: "Cities", value: stats?.totalCities },
+    { label: "Events", value: stats?.totalEvents },
   ];
 
   return (
@@ -37,7 +26,13 @@ export function StatsRow() {
               className="text-center"
             >
               <div className="font-display text-4xl sm:text-5xl lg:text-6xl font-medium text-gradient-pink mb-2">
-                {stat.value}
+                {isLoading ? (
+                  <Skeleton className="h-12 sm:h-14 lg:h-16 w-20 mx-auto bg-muted/20" />
+                ) : isError ? (
+                  "—"
+                ) : (
+                  stat.value?.toLocaleString() ?? "0"
+                )}
               </div>
               <div className="text-sm text-muted-foreground">{stat.label}</div>
             </motion.div>
