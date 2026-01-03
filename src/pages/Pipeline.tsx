@@ -15,6 +15,7 @@ import { PipelineItemDrawer } from "@/components/pipeline/PipelineItemDrawer";
 import { AddContactDialog, ContactFormData } from "@/components/pipeline/AddContactDialog";
 import { PipelineSelector } from "@/components/pipeline/PipelineSelector";
 import { PipelineItem } from "@/actions/pipelineActions";
+import { EnergyIndicator } from "@/components/energy";
 import { toast } from "sonner";
 
 const PipelinePage = () => {
@@ -245,6 +246,7 @@ const PipelinePage = () => {
 
             {/* Actions */}
             <div className="flex items-center gap-2">
+              <EnergyIndicator />
               <Button
                 variant="outline"
                 size="sm"
