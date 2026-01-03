@@ -12,6 +12,7 @@ export interface LiveStream {
   stream_type: 'webrtc' | 'youtube' | 'twitch' | 'soundcloud' | 'obs_rtmp';
   external_url: string | null;
   thumbnail_url: string | null;
+  thumbnail_focal_point: { x: number; y: number } | null;
   is_live: boolean;
   started_at: string | null;
   ended_at: string | null;
@@ -57,7 +58,11 @@ export const useLiveStreams = (liveOnly = false) => {
       
       const { data, error } = await query;
       if (error) throw error;
-      return data as LiveStream[];
+      // Transform the data to match our interface
+      return (data || []).map(item => ({
+        ...item,
+        thumbnail_focal_point: item.thumbnail_focal_point as { x: number; y: number } | null,
+      })) as LiveStream[];
     },
   });
 
@@ -95,7 +100,11 @@ export const useStream = (streamId: string | undefined) => {
         .eq('id', streamId)
         .single();
       if (error) throw error;
-      return data as LiveStream;
+      // Transform the data to match our interface
+      return {
+        ...data,
+        thumbnail_focal_point: data.thumbnail_focal_point as { x: number; y: number } | null,
+      } as LiveStream;
     },
     enabled: !!streamId,
   });

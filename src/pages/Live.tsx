@@ -59,6 +59,11 @@ const MyStreamCard: React.FC<{
                   src={stream.thumbnail_url} 
                   alt={stream.title}
                   className="w-full h-full object-cover"
+                  style={{
+                    objectPosition: stream.thumbnail_focal_point 
+                      ? `${stream.thumbnail_focal_point.x}% ${stream.thumbnail_focal_point.y}%`
+                      : 'center'
+                  }}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
@@ -183,6 +188,11 @@ const FeaturedLiveCard: React.FC<{
               src={stream.thumbnail_url} 
               alt={stream.title}
               className="w-full h-full object-cover"
+              style={{
+                objectPosition: stream.thumbnail_focal_point 
+                  ? `${stream.thumbnail_focal_point.x}% ${stream.thumbnail_focal_point.y}%`
+                  : 'center'
+              }}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-red-500/30 to-primary/10">

@@ -2202,6 +2202,7 @@ export type Database = {
           rtmp_stream_key: string | null
           started_at: string | null
           stream_type: string
+          thumbnail_focal_point: Json | null
           thumbnail_url: string | null
           ticket_price: number | null
           title: string
@@ -2230,6 +2231,7 @@ export type Database = {
           rtmp_stream_key?: string | null
           started_at?: string | null
           stream_type: string
+          thumbnail_focal_point?: Json | null
           thumbnail_url?: string | null
           ticket_price?: number | null
           title: string
@@ -2258,6 +2260,7 @@ export type Database = {
           rtmp_stream_key?: string | null
           started_at?: string | null
           stream_type?: string
+          thumbnail_focal_point?: Json | null
           thumbnail_url?: string | null
           ticket_price?: number | null
           title?: string
