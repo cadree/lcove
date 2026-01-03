@@ -8,7 +8,8 @@ import {
   Store,
   Wallet,
   MessageCircle,
-  Compass
+  Compass,
+  Heart
 } from "lucide-react";
 import HomeTopBar from "@/components/home/HomeTopBar";
 import WidgetStatChip from "@/components/home/WidgetStatChip";
@@ -28,7 +29,7 @@ import { usePlatformStats } from "@/hooks/usePlatformStats";
 const appIcons = [
   { title: "Feed", icon: Compass, link: "/feed" },
   { title: "Projects", icon: FolderKanban, link: "/projects" },
-  { title: "Calendar", icon: Calendar, link: "/calendar" },
+  { title: "Fund", icon: Heart, link: "/fund" },
   { title: "Community", icon: Users, link: "/community" },
   { title: "Live", icon: Radio, link: "/live" },
 ];
@@ -116,6 +117,7 @@ const Index = () => {
               { title: "Feed", link: "/feed" },
               { title: "Directory", link: "/directory" },
               { title: "Projects", link: "/projects" },
+              { title: "Community Fund", link: "/fund" },
               { title: "Calendar", link: "/calendar" },
               { title: "Live", link: "/live" },
               { title: "Cinema", link: "/cinema" },
