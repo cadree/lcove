@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { LiveStream, useSaveReplay, useDeleteStream } from '@/hooks/useLiveStreams';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Image, Upload, X, Loader2, Trash2, Save } from 'lucide-react';
+import { Image, Upload, X, Loader2, Trash2, Save, Move } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,8 +41,11 @@ export const EditStreamDialog: React.FC<EditStreamDialogProps> = ({
   const [description, setDescription] = useState('');
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [focalPoint, setFocalPoint] = useState({ x: 50, y: 50 });
+  const [isAdjustingFocal, setIsAdjustingFocal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
   
   const deleteStream = useDeleteStream();
 
@@ -51,7 +54,9 @@ export const EditStreamDialog: React.FC<EditStreamDialogProps> = ({
       setTitle(stream.title);
       setDescription(stream.description || '');
       setThumbnailPreview(stream.thumbnail_url || null);
+      setFocalPoint(stream.thumbnail_focal_point || { x: 50, y: 50 });
       setThumbnailFile(null);
+      setIsAdjustingFocal(false);
     }
   }, [stream]);
 
@@ -65,6 +70,7 @@ export const EditStreamDialog: React.FC<EditStreamDialogProps> = ({
     }
     
     setThumbnailFile(file);
+    setFocalPoint({ x: 50, y: 50 }); // Reset focal point for new image
     const reader = new FileReader();
     reader.onloadend = () => {
       setThumbnailPreview(reader.result as string);
@@ -75,6 +81,21 @@ export const EditStreamDialog: React.FC<EditStreamDialogProps> = ({
   const removeThumbnail = () => {
     setThumbnailFile(null);
     setThumbnailPreview(null);
+    setFocalPoint({ x: 50, y: 50 });
+    setIsAdjustingFocal(false);
+  };
+
+  const handleFocalPointClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isAdjustingFocal || !imageContainerRef.current) return;
+    
+    const rect = imageContainerRef.current.getBoundingClientRect();
+    const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+    const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+    
+    setFocalPoint({
+      x: Math.max(0, Math.min(100, x)),
+      y: Math.max(0, Math.min(100, y)),
+    });
   };
 
   const handleSave = async () => {
@@ -114,6 +135,7 @@ export const EditStreamDialog: React.FC<EditStreamDialogProps> = ({
           title,
           description: description || null,
           thumbnail_url: thumbnailUrl,
+          thumbnail_focal_point: focalPoint,
         })
         .eq('id', stream.id);
       
@@ -156,22 +178,59 @@ export const EditStreamDialog: React.FC<EditStreamDialogProps> = ({
         <div className="space-y-6 py-4">
           {/* Cover Art */}
           <div className="space-y-2">
-            <Label>Cover Art</Label>
+            <div className="flex items-center justify-between">
+              <Label>Cover Art</Label>
+              {thumbnailPreview && (
+                <Button
+                  variant={isAdjustingFocal ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setIsAdjustingFocal(!isAdjustingFocal)}
+                >
+                  <Move className="h-3 w-3 mr-1" />
+                  {isAdjustingFocal ? 'Done' : 'Adjust Focus'}
+                </Button>
+              )}
+            </div>
             {thumbnailPreview ? (
-              <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
+              <div 
+                ref={imageContainerRef}
+                className={`relative aspect-video rounded-lg overflow-hidden bg-muted ${isAdjustingFocal ? 'cursor-crosshair ring-2 ring-primary' : ''}`}
+                onClick={handleFocalPointClick}
+              >
                 <img
                   src={thumbnailPreview}
                   alt="Cover preview"
                   className="w-full h-full object-cover"
+                  style={{
+                    objectPosition: `${focalPoint.x}% ${focalPoint.y}%`
+                  }}
                 />
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="absolute top-2 right-2 h-8 w-8"
-                  onClick={removeThumbnail}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                {/* Focal point indicator */}
+                {isAdjustingFocal && (
+                  <>
+                    <div 
+                      className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                      style={{ left: `${focalPoint.x}%`, top: `${focalPoint.y}%` }}
+                    >
+                      <div className="w-full h-full rounded-full border-2 border-white shadow-lg bg-primary/30 animate-pulse" />
+                      <div className="absolute top-1/2 left-1/2 w-2 h-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md" />
+                    </div>
+                    <div className="absolute inset-0 bg-black/20 pointer-events-none" />
+                    <p className="absolute bottom-2 left-2 right-2 text-center text-xs text-white bg-black/60 rounded px-2 py-1">
+                      Click to set the focus point
+                    </p>
+                  </>
+                )}
+                {!isAdjustingFocal && (
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2 h-8 w-8"
+                    onClick={removeThumbnail}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             ) : (
               <label className="flex flex-col items-center justify-center aspect-video rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 cursor-pointer transition-colors bg-muted/50">
