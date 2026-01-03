@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 import PageLayout from "@/components/layout/PageLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import StoriesRow from "@/components/stories/StoriesRow";
@@ -13,6 +14,7 @@ import { Filter, Shuffle, Loader2, Sparkles, Compass, Users } from "lucide-react
 import { usePosts } from "@/hooks/usePosts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
+import { supabase } from "@/integrations/supabase/client";
 
 const Feed = () => {
   const [activeCategory, setActiveCategory] = useState("All");
@@ -25,16 +27,23 @@ const Feed = () => {
   const { profile } = useProfile(user?.id);
   const { posts, isLoading } = usePosts();
 
-  // Get unique regions from posts
-  const availableRegions = useMemo(() => {
-    const regions = new Set<string>();
-    posts.forEach(post => {
-      if (post.profile?.city) {
-        regions.add(post.profile.city);
-      }
-    });
-    return Array.from(regions).sort();
-  }, [posts]);
+  // Fetch all distinct cities from profiles
+  const { data: availableRegions = [] } = useQuery({
+    queryKey: ["all-regions"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("city_display")
+        .not("city_display", "is", null)
+        .neq("city_display", "");
+      
+      if (error) throw error;
+      
+      // Get unique cities
+      const uniqueCities = [...new Set(data?.map(p => p.city_display).filter(Boolean) as string[])];
+      return uniqueCities.sort();
+    },
+  });
 
   const handleShuffle = () => {
     const shuffled = [...posts].sort(() => Math.random() - 0.5);
@@ -59,10 +68,11 @@ const Feed = () => {
       matchesPostType = post.post_type === postTypeFilter;
     }
 
-    // Region filter
+    // Region filter - check both city and city_display for compatibility
     let matchesRegion = regionFilter === null;
     if (!matchesRegion) {
-      matchesRegion = post.profile?.city === regionFilter;
+      const postCity = post.profile?.city_display || post.profile?.city;
+      matchesRegion = postCity === regionFilter;
     }
 
     return matchesCategory && matchesPostType && matchesRegion;
