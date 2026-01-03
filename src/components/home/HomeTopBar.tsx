@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
-import { Menu, Bell } from "lucide-react";
+import { Menu, Bell, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { EnergyIndicator } from "@/components/energy";
 import { useAuth } from "@/contexts/AuthContext";
 import etherBearLogo from "@/assets/ether-bear-logo.png";
@@ -13,6 +13,9 @@ interface HomeTopBarProps {
 
 const HomeTopBar = ({ onMenuClick, subtitle = "Discover" }: HomeTopBarProps) => {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isOnMembership = location.pathname === "/membership";
 
   return (
     <motion.header
@@ -47,8 +50,19 @@ const HomeTopBar = ({ onMenuClick, subtitle = "Discover" }: HomeTopBarProps) => 
           />
         </div>
 
-        {/* Right - Energy + Notifications */}
+        {/* Right - Contribute + Energy + Notifications */}
         <div className="flex items-center gap-2">
+          {!isOnMembership && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 px-3 rounded-xl text-primary hover:text-primary hover:bg-primary/10 gap-1.5"
+              onClick={() => navigate("/membership")}
+            >
+              <Heart className="w-4 h-4" />
+              <span className="text-xs font-medium hidden sm:inline">Contribute</span>
+            </Button>
+          )}
           {user && <EnergyIndicator />}
           <Link to="/notifications">
             <Button

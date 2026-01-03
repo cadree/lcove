@@ -1,12 +1,15 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { Settings2 } from "lucide-react";
+import { Settings2, Heart } from "lucide-react";
 import { useNavCustomization } from "@/hooks/useNavCustomization";
 import { NavCustomizationSheet } from "./NavCustomizationSheet";
 
 const BottomNav = () => {
   const { activeNavItems } = useNavCustomization();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isOnMembership = location.pathname === "/membership";
 
   return (
     <motion.nav
@@ -18,12 +21,12 @@ const BottomNav = () => {
         paddingBottom: 'max(env(safe-area-inset-bottom, 16px), 16px)',
         paddingLeft: 'env(safe-area-inset-left, 0px)',
         paddingRight: 'env(safe-area-inset-right, 0px)',
-        touchAction: 'none', // Prevent scroll interference
+        touchAction: 'none',
       }}
     >
       <div 
         className="relative glass-strong rounded-full px-2 py-2 shadow-elevated flex flex-row items-center justify-center pointer-events-auto mx-4 gap-0.5"
-        style={{ touchAction: 'manipulation' }} // Allow taps but prevent zoom/scroll
+        style={{ touchAction: 'manipulation' }}
       >
         {/* Subtle top highlight */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-foreground/10 to-transparent rounded-t-full" />
@@ -75,6 +78,24 @@ const BottomNav = () => {
             )}
           </NavLink>
         ))}
+
+        {/* Contribute button - always visible except on /membership */}
+        {!isOnMembership && (
+          <button
+            onClick={() => navigate("/membership")}
+            className="relative flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all duration-300 text-primary hover:bg-primary/10 active:bg-primary/20 flex-shrink-0 select-none"
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <motion.div
+              whileTap={{ scale: 0.9 }}
+              transition={{ duration: 0.15 }}
+              className="flex flex-col items-center gap-0.5"
+            >
+              <Heart className="w-5 h-5" strokeWidth={1.5} />
+              <span className="text-[8px] font-medium">Give</span>
+            </motion.div>
+          </button>
+        )}
 
         {/* Settings gear for customization */}
         <NavCustomizationSheet>
