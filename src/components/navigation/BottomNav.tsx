@@ -18,9 +18,13 @@ const BottomNav = () => {
         paddingBottom: 'max(env(safe-area-inset-bottom, 16px), 16px)',
         paddingLeft: 'env(safe-area-inset-left, 0px)',
         paddingRight: 'env(safe-area-inset-right, 0px)',
+        touchAction: 'none', // Prevent scroll interference
       }}
     >
-      <div className="relative glass-strong rounded-full px-2 py-2 shadow-elevated flex flex-row items-center justify-center pointer-events-auto mx-4 gap-0.5">
+      <div 
+        className="relative glass-strong rounded-full px-2 py-2 shadow-elevated flex flex-row items-center justify-center pointer-events-auto mx-4 gap-0.5"
+        style={{ touchAction: 'manipulation' }} // Allow taps but prevent zoom/scroll
+      >
         {/* Subtle top highlight */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-foreground/10 to-transparent rounded-t-full" />
         
@@ -31,12 +35,13 @@ const BottomNav = () => {
             to={item.path}
             className={({ isActive }) =>
               cn(
-                "relative flex flex-col items-center justify-center w-14 h-12 rounded-xl transition-all duration-300 ease-smooth flex-shrink-0",
+                "relative flex flex-col items-center justify-center w-14 h-12 rounded-xl transition-all duration-300 ease-smooth flex-shrink-0 tap-target select-none",
                 isActive
                   ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-muted-foreground hover:text-foreground active:text-foreground"
               )
             }
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
           >
             {({ isActive }) => (
               <>
@@ -48,8 +53,8 @@ const BottomNav = () => {
                   />
                 )}
                 <motion.div
-                  whileTap={{ scale: 0.9 }}
-                  transition={{ duration: 0.15 }}
+                  whileTap={{ scale: 0.92 }}
+                  transition={{ duration: 0.1 }}
                   className="flex flex-col items-center gap-0.5"
                 >
                   <item.icon
@@ -74,7 +79,8 @@ const BottomNav = () => {
         {/* Settings gear for customization */}
         <NavCustomizationSheet>
           <button
-            className="relative flex flex-col items-center justify-center w-10 h-12 rounded-xl transition-all duration-300 text-muted-foreground hover:text-foreground flex-shrink-0"
+            className="relative flex flex-col items-center justify-center w-10 h-12 rounded-xl transition-all duration-300 text-muted-foreground hover:text-foreground active:text-foreground flex-shrink-0 select-none"
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
           >
             <motion.div
               whileTap={{ scale: 0.9, rotate: 90 }}

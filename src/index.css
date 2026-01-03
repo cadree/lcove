@@ -97,12 +97,15 @@
   html {
     scroll-behavior: smooth;
     -webkit-tap-highlight-color: transparent;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-body);
     letter-spacing: -0.01em;
+    overscroll-behavior-y: contain;
   }
 
   h1, h2, h3, h4, h5, h6 {
