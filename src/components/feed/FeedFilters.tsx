@@ -34,11 +34,11 @@ export function FeedFilters({
         value={postTypeFilter} 
         onValueChange={(val) => setPostTypeFilter(val as 'all' | 'regular' | 'portfolio')}
       >
-        <SelectTrigger className="w-[120px] h-9 glass border-0">
-          <Filter className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+        <SelectTrigger className="w-[130px] h-9 glass border-0 pl-3 gap-2">
+          <Filter className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
           <SelectValue placeholder="Type" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-popover">
           <SelectItem value="all">All Posts</SelectItem>
           <SelectItem value="regular">Regular</SelectItem>
           <SelectItem value="portfolio">Portfolio</SelectItem>
@@ -50,11 +50,11 @@ export function FeedFilters({
         value={regionFilter || "all"} 
         onValueChange={(val) => setRegionFilter(val === "all" ? null : val)}
       >
-        <SelectTrigger className="w-[140px] h-9 glass border-0">
-          <MapPin className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+        <SelectTrigger className="w-[150px] h-9 glass border-0 pl-3 gap-2">
+          <MapPin className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
           <SelectValue placeholder="Region" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-popover">
           <SelectItem value="all">All Regions</SelectItem>
           {availableRegions.map((region) => (
             <SelectItem key={region} value={region}>
