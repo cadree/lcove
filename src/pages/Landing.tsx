@@ -2,12 +2,10 @@ import { useState } from "react";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingHero } from "@/components/landing/LandingHero";
 import { PersonaCards } from "@/components/landing/PersonaCards";
-import { BenefitsGrid } from "@/components/landing/BenefitsGrid";
+import { BenefitsCarousel } from "@/components/landing/BenefitsCarousel";
 import { TestimonialsSection } from "@/components/landing/TestimonialsSection";
 import { StatsRow } from "@/components/landing/StatsRow";
-import { HowItWorks } from "@/components/landing/HowItWorks";
 import { TrustSection } from "@/components/landing/TrustSection";
-import { FinalCTA } from "@/components/landing/FinalCTA";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { CreatorApplicationDialog } from "@/components/landing/CreatorApplicationDialog";
 
@@ -22,11 +20,9 @@ const Landing = () => {
         <LandingHero />
         <StatsRow />
         <PersonaCards />
-        <BenefitsGrid />
-        <HowItWorks />
+        <BenefitsCarousel />
         <TestimonialsSection />
         <TrustSection />
-        <FinalCTA onOpenCreatorApplication={() => setCreatorDialogOpen(true)} />
       </main>
       
       <LandingFooter />
