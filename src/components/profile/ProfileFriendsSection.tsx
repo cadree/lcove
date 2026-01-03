@@ -1,9 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Users, ChevronRight } from "lucide-react";
+import { Users } from "lucide-react";
 import { useFriendProfiles } from "@/hooks/useFriendProfiles";
 import { useFavorites } from "@/hooks/useFavorites";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -44,23 +44,24 @@ export function ProfileFriendsSection() {
         animate={{ opacity: 1, y: 0 }}
         className="px-5 py-4"
       >
-        <Card className="bg-muted/30 border-border/50 p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <Users className="w-5 h-5 text-primary" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-medium text-foreground">No friends yet</h3>
-              <p className="text-xs text-muted-foreground">
-                Visit the Directory to find and add friends
-              </p>
-            </div>
-            <ChevronRight 
-              className="w-4 h-4 text-muted-foreground cursor-pointer" 
-              onClick={() => navigate('/directory')}
-            />
+        <div className="flex items-center gap-2 mb-3">
+          <Users className="w-4 h-4 text-foreground" />
+          <h3 className="font-medium text-foreground">Friends</h3>
+        </div>
+        <div className="flex flex-col items-center justify-center py-8 px-4 rounded-xl bg-muted/30 border border-border/50 text-center">
+          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+            <Users className="w-6 h-6 text-primary" />
           </div>
-        </Card>
+          <p className="text-sm text-muted-foreground mb-4">
+            You haven't added any friends yet.
+          </p>
+          <Button 
+            size="sm" 
+            onClick={() => navigate('/directory')}
+          >
+            Find Creators
+          </Button>
+        </div>
       </motion.div>
     );
   }
