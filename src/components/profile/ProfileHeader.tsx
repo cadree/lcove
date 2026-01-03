@@ -167,13 +167,7 @@ export function ProfileHeader({
               variant="glass" 
               size="icon" 
               className="w-10 h-10" 
-              onClick={() => {
-                if (window.history.length > 1) {
-                  navigate(-1);
-                } else {
-                  navigate('/home');
-                }
-              }}
+              onClick={() => navigate('/home')}
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
