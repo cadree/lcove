@@ -9,7 +9,8 @@ import {
   Wallet,
   MessageCircle,
   Compass,
-  Heart
+  Heart,
+  Folder
 } from "lucide-react";
 import HomeTopBar from "@/components/home/HomeTopBar";
 import WidgetStatChip from "@/components/home/WidgetStatChip";
@@ -28,9 +29,9 @@ import { usePlatformStats } from "@/hooks/usePlatformStats";
 
 const appIcons = [
   { title: "Feed", icon: Compass, link: "/feed" },
+  { title: "Portfolios", icon: Folder, link: "/portfolios" },
   { title: "Projects", icon: FolderKanban, link: "/projects" },
   { title: "Fund", icon: Heart, link: "/fund" },
-  { title: "Community", icon: Users, link: "/community" },
   { title: "Live", icon: Radio, link: "/live" },
 ];
 

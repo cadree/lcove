@@ -43,6 +43,7 @@ import Today from "./pages/Today";
 import Boards from "./pages/Boards";
 import BoardEditor from "./pages/BoardEditor";
 import SignContract from "./pages/SignContract";
+import Portfolios from "./pages/Portfolios";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -100,6 +101,7 @@ const App = () => (
                 <Route path="/boards" element={<Boards />} />
                 <Route path="/boards/:boardId" element={<BoardEditor />} />
                 <Route path="/sign-contract/:contractId" element={<SignContract />} />
+                <Route path="/portfolios" element={<Portfolios />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
