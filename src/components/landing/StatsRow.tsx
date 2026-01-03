@@ -7,19 +7,19 @@ export function StatsRow() {
   const displayStats = [
     { 
       label: "Creators", 
-      value: isLoading ? "..." : (stats?.totalCreatives?.toLocaleString() || "2,400+")
+      value: isLoading ? "..." : stats?.totalCreatives?.toLocaleString() || "0"
     },
     { 
       label: "Projects", 
-      value: isLoading ? "..." : (stats?.totalProjects?.toLocaleString() || "850+")
+      value: isLoading ? "..." : stats?.totalProjects?.toLocaleString() || "0"
     },
     { 
       label: "Cities", 
-      value: isLoading ? "..." : (stats?.totalCities?.toLocaleString() || "150+")
+      value: isLoading ? "..." : stats?.totalCities?.toLocaleString() || "0"
     },
     { 
       label: "Events", 
-      value: "500+"
+      value: isLoading ? "..." : stats?.totalEvents?.toLocaleString() || "0"
     },
   ];
 

@@ -3357,6 +3357,39 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_reviews: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_approved: boolean
+          is_featured: boolean
+          rating: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_approved?: boolean
+          is_featured?: boolean
+          rating: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_approved?: boolean
+          is_featured?: boolean
+          rating?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       portfolio_folders: {
         Row: {
           cover_image_url: string | null
