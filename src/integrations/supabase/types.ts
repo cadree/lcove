@@ -4408,6 +4408,7 @@ export type Database = {
           is_active: boolean | null
           logo_url: string | null
           name: string
+          peerspace_url: string | null
           shopify_access_token: string | null
           shopify_store_url: string | null
           updated_at: string
@@ -4423,6 +4424,7 @@ export type Database = {
           is_active?: boolean | null
           logo_url?: string | null
           name: string
+          peerspace_url?: string | null
           shopify_access_token?: string | null
           shopify_store_url?: string | null
           updated_at?: string
@@ -4438,6 +4440,7 @@ export type Database = {
           is_active?: boolean | null
           logo_url?: string | null
           name?: string
+          peerspace_url?: string | null
           shopify_access_token?: string | null
           shopify_store_url?: string | null
           updated_at?: string

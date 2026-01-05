@@ -14,6 +14,8 @@ export interface Store {
   accepts_credits: boolean;
   accepts_cash: boolean;
   shopify_store_url: string | null;
+  shopify_access_token: string | null;
+  peerspace_url: string | null;
   created_at: string;
   updated_at: string;
 }

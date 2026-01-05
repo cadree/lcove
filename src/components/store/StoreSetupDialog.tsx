@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCreateStore, useUpdateStore, Store } from '@/hooks/useStore';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -13,8 +13,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Upload, Store as StoreIcon } from 'lucide-react';
+import { Upload, Store as StoreIcon, Link, ExternalLink } from 'lucide-react';
 
 interface StoreSetupDialogProps {
   open: boolean;
@@ -26,13 +27,38 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
   const createStore = useCreateStore();
   const updateStore = useUpdateStore();
 
-  const [name, setName] = useState(store?.name || '');
-  const [description, setDescription] = useState(store?.description || '');
-  const [logoUrl, setLogoUrl] = useState(store?.logo_url || '');
-  const [coverImageUrl, setCoverImageUrl] = useState(store?.cover_image_url || '');
-  const [acceptsCredits, setAcceptsCredits] = useState(store?.accepts_credits ?? true);
-  const [acceptsCash, setAcceptsCash] = useState(store?.accepts_cash ?? true);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
+  const [coverImageUrl, setCoverImageUrl] = useState('');
+  const [acceptsCredits, setAcceptsCredits] = useState(true);
+  const [acceptsCash, setAcceptsCash] = useState(true);
+  const [shopifyUrl, setShopifyUrl] = useState('');
+  const [peerspaceUrl, setPeerspaceUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+
+  // Sync state with store prop when it changes
+  useEffect(() => {
+    if (store) {
+      setName(store.name || '');
+      setDescription(store.description || '');
+      setLogoUrl(store.logo_url || '');
+      setCoverImageUrl(store.cover_image_url || '');
+      setAcceptsCredits(store.accepts_credits ?? true);
+      setAcceptsCash(store.accepts_cash ?? true);
+      setShopifyUrl(store.shopify_store_url || '');
+      setPeerspaceUrl(store.peerspace_url || '');
+    } else {
+      setName('');
+      setDescription('');
+      setLogoUrl('');
+      setCoverImageUrl('');
+      setAcceptsCredits(true);
+      setAcceptsCash(true);
+      setShopifyUrl('');
+      setPeerspaceUrl('');
+    }
+  }, [store, open]);
 
   const handleImageUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -79,6 +105,8 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
       cover_image_url: coverImageUrl || null,
       accepts_credits: acceptsCredits,
       accepts_cash: acceptsCash,
+      shopify_store_url: shopifyUrl.trim() || null,
+      peerspace_url: peerspaceUrl.trim() || null,
     };
 
     try {
@@ -95,7 +123,7 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <StoreIcon className="w-5 h-5 text-primary" />
@@ -211,6 +239,72 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
                 checked={acceptsCredits}
                 onCheckedChange={setAcceptsCredits}
               />
+            </div>
+          </div>
+
+          {/* External Integrations */}
+          <Separator />
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Link className="w-4 h-4 text-primary" />
+              <Label className="text-base font-medium">External Integrations</Label>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Connect your existing Shopify or Peerspace accounts to sync products and listings.
+            </p>
+
+            {/* Shopify */}
+            <div className="space-y-2">
+              <Label htmlFor="shopify" className="flex items-center gap-2">
+                Shopify Store URL
+                {shopifyUrl && (
+                  <a
+                    href={shopifyUrl.startsWith('http') ? shopifyUrl : `https://${shopifyUrl}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </Label>
+              <Input
+                id="shopify"
+                value={shopifyUrl}
+                onChange={(e) => setShopifyUrl(e.target.value)}
+                placeholder="mystore.myshopify.com"
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter your Shopify store URL to display a link on your profile
+              </p>
+            </div>
+
+            {/* Peerspace */}
+            <div className="space-y-2">
+              <Label htmlFor="peerspace" className="flex items-center gap-2">
+                Peerspace Profile URL
+                {peerspaceUrl && (
+                  <a
+                    href={peerspaceUrl.startsWith('http') ? peerspaceUrl : `https://${peerspaceUrl}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </Label>
+              <Input
+                id="peerspace"
+                value={peerspaceUrl}
+                onChange={(e) => setPeerspaceUrl(e.target.value)}
+                placeholder="peerspace.com/pages/listings/..."
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter your Peerspace profile or listing URL
+              </p>
             </div>
           </div>
 
