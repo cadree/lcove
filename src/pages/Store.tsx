@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMyStore, useStoreItems, useMyStoreItems, StoreItem, Store as StoreType } from '@/hooks/useStore';
+import { useMyStore, useStoreItems, useMyStoreItems, useDeleteStoreItem, StoreItem, Store as StoreType } from '@/hooks/useStore';
 import { supabase } from '@/integrations/supabase/client';
 import PageLayout from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -19,6 +19,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Package,
   Wrench,
   Building2,
@@ -29,6 +39,7 @@ import {
   ShoppingBag,
   Sparkles,
   ArrowLeft,
+  Trash2,
 } from 'lucide-react';
 
 const Store = () => {
@@ -39,6 +50,7 @@ const Store = () => {
   
   const { data: myStore, isLoading: isLoadingStore } = useMyStore();
   const { data: myItems } = useMyStoreItems();
+  const deleteItem = useDeleteStoreItem();
   const [activeTab, setActiveTab] = useState<'products' | 'services' | 'rentals' | 'my-store'>('products');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState<StoreItem | null>(null);
@@ -46,6 +58,8 @@ const Store = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [storeSetupOpen, setStoreSetupOpen] = useState(false);
   const [editItem, setEditItem] = useState<StoreItem | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<StoreItem | null>(null);
 
   // Fetch the specific store if viewing another user's store
   const { data: viewingStore } = useQuery({
@@ -116,6 +130,19 @@ const Store = () => {
   const handleCreateNew = () => {
     setEditItem(null);
     setCreateDialogOpen(true);
+  };
+
+  const handleDeleteItem = (item: StoreItem) => {
+    setItemToDelete(item);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (itemToDelete) {
+      await deleteItem.mutateAsync(itemToDelete.id);
+      setDeleteDialogOpen(false);
+      setItemToDelete(null);
+    }
   };
 
   const tabConfig = [
@@ -312,17 +339,28 @@ const Store = () => {
                             showSeller={tabId !== 'my-store' && !storeIdParam}
                           />
                           {tabId === 'my-store' && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditItem(item);
-                              }}
-                            >
-                              Edit
-                            </Button>
+                            <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditItem(item);
+                                }}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteItem(item);
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           )}
                         </motion.div>
                       ))}
@@ -357,6 +395,27 @@ const Store = () => {
         onOpenChange={setStoreSetupOpen}
         store={myStore}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Item</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{itemToDelete?.title}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageLayout>
   );
 };
