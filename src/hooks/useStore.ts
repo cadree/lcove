@@ -374,7 +374,7 @@ export const useUpdateStoreItem = () => {
   });
 };
 
-// Delete store item
+// Delete store item (soft delete by setting is_active to false)
 export const useDeleteStoreItem = () => {
   const queryClient = useQueryClient();
 
@@ -382,7 +382,7 @@ export const useDeleteStoreItem = () => {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('store_items')
-        .delete()
+        .update({ is_active: false })
         .eq('id', id);
 
       if (error) throw error;
