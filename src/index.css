@@ -106,7 +106,14 @@
     font-family: var(--font-body);
     letter-spacing: -0.01em;
     overscroll-behavior-y: contain;
+
+    /* ✅ iOS Safe Area Support */
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
   }
+}
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
