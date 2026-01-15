@@ -13,7 +13,7 @@ const Landing = () => {
   const [creatorDialogOpen, setCreatorDialogOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <LandingNav />
       
       <main className="pt-20">
