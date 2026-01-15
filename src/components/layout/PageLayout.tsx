@@ -17,14 +17,14 @@ const PageLayout = ({
   const {
     user
   } = useAuth();
-  return <div className="min-h-screen bg-background">
+  return <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Subtle ambient gradient */}
       <div className="fixed inset-0 bg-gradient-to-b from-primary/[0.02] via-transparent to-transparent pointer-events-none" />
       
       {/* Notification Bell - top right corner when logged in */}
       {user && showNotificationBell && !hideNav}
       
-      <main className={`relative ${hideNav ? '' : 'pb-28'} ${className}`}>
+      <main className={`relative safe-area-top ${hideNav ? 'safe-area-bottom' : 'pb-28'} ${className}`}>
         {children}
       </main>
       

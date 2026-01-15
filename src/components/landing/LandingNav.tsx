@@ -14,6 +14,9 @@ export function LandingNav() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
       className="fixed top-0 left-0 right-0 z-50"
+      style={{
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+      }}
     >
       <div className="container px-4 sm:px-6 lg:px-8 py-4">
         <nav className="glass-strong rounded-2xl px-4 sm:px-6 py-3 flex items-center justify-between">

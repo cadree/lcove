@@ -55,7 +55,7 @@ const Index = () => {
 
   // This page is now exclusively for authenticated users (AccessGate handles redirect)
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Subtle ambient gradient */}
       <div className="fixed inset-0 bg-gradient-to-b from-primary/[0.02] via-transparent to-transparent pointer-events-none" />
       
@@ -66,7 +66,7 @@ const Index = () => {
       />
       
       {/* Main Content - Dashboard for authenticated users only */}
-      <main className="relative pb-28 space-y-4">
+      <main className="relative pb-28 space-y-4 safe-area-x">
         {/* Stats Row */}
         <WidgetStatChip stats={statChips} />
 
