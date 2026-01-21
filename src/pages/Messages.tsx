@@ -15,6 +15,7 @@ const Messages = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const chatParam = searchParams.get('chat');
+  const actionParam = searchParams.get('action');
   const [selectedConversation, setSelectedConversation] = useState<string | null>(chatParam);
   const [showNewChat, setShowNewChat] = useState(false);
 
@@ -26,6 +27,14 @@ const Messages = () => {
       setSearchParams({}, { replace: true });
     }
   }, [chatParam, setSearchParams]);
+
+  // Handle action param from FAB
+  useEffect(() => {
+    if (actionParam === 'new' && user) {
+      setShowNewChat(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [actionParam, user, setSearchParams]);
 
   if (!user) {
     return (

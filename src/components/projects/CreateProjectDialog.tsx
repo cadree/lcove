@@ -20,12 +20,23 @@ interface RoleInput {
 }
 
 interface CreateProjectDialogProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({ children }) => {
+export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({ 
+  children, 
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange 
+}) => {
   const { createProject, isCreating } = useProjects();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  
+  // Support both controlled and uncontrolled modes
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? controlledOnOpenChange! : setInternalOpen;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [projectType, setProjectType] = useState<ProjectType>('volunteer');
@@ -150,7 +161,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({ childr
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+      {children && <DialogTrigger asChild>{children}</DialogTrigger>}
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto pb-24 sm:pb-8">
         <DialogHeader>
           <DialogTitle>Create New Project</DialogTitle>

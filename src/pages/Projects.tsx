@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, FolderKanban, Filter, Rocket, Lightbulb } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PageLayout from '@/components/layout/PageLayout';
@@ -16,13 +17,23 @@ import { useProjectJoinEnergy } from '@/hooks/useProjectJoinEnergy';
 
 const Projects: React.FC = () => {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState('all');
   const { projects, myProjects, isLoading } = useProjects(statusFilter);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   
   // Check and award energy for accepted project applications
   useProjectJoinEnergy();
+
+  // Handle action params from FAB
+  useEffect(() => {
+    if (searchParams.get('action') === 'create' && user) {
+      setCreateDialogOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, user, setSearchParams]);
 
   const handleProjectClick = (project: Project) => {
     setSelectedProject(project);
@@ -40,8 +51,8 @@ const Projects: React.FC = () => {
           backPath="/"
           actions={
             user && (
-              <CreateProjectDialog>
-                <Button data-create-project>
+              <CreateProjectDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+                <Button data-create-project onClick={() => setCreateDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   New Project
                 </Button>

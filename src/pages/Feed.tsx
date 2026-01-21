@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import PageLayout from "@/components/layout/PageLayout";
@@ -17,6 +18,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 
 const Feed = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeCategory, setActiveCategory] = useState("All");
   const [postTypeFilter, setPostTypeFilter] = useState<'all' | 'regular' | 'portfolio'>('all');
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
@@ -26,6 +28,23 @@ const Feed = () => {
   const { user } = useAuth();
   const { profile } = useProfile(user?.id);
   const { posts, isLoading } = usePosts();
+  const postCreatorRef = useRef<HTMLTextAreaElement>(null);
+
+  // Handle action params from FAB
+  useEffect(() => {
+    if (searchParams.get('action') === 'create-post' && user) {
+      // Focus the post creator after a brief delay
+      setTimeout(() => {
+        const textarea = document.querySelector<HTMLTextAreaElement>('[placeholder*="mind"]');
+        if (textarea) {
+          textarea.focus();
+          textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 300);
+      // Clear the action param
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, user, setSearchParams]);
 
   // Fetch all distinct cities from profiles
   const { data: availableRegions = [] } = useQuery({

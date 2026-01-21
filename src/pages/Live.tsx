@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageLayout from '@/components/layout/PageLayout';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
@@ -241,6 +241,7 @@ const FeaturedLiveCard: React.FC<{
 
 const Live = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { streams: liveStreams, isLoading: loadingLive } = useLiveStreams(true);
   const { streams: allStreams, isLoading: loadingAll } = useLiveStreams(false);
@@ -249,6 +250,14 @@ const Live = () => {
   const [selectedStreamId, setSelectedStreamId] = useState<string | null>(null);
   const [editingStream, setEditingStream] = useState<LiveStream | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Handle action param from FAB
+  useEffect(() => {
+    if (searchParams.get('action') === 'create' && user) {
+      setShowCreate(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, user, setSearchParams]);
 
   const myStreams = allStreams.filter(s => s.host_id === user?.id);
   const otherStreams = allStreams.filter(s => s.host_id !== user?.id);

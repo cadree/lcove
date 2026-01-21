@@ -59,7 +59,7 @@ const CITIES = [
 const CalendarPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<ViewType>('month');
   const [selectedCity, setSelectedCity] = useState('All Cities');
@@ -78,6 +78,7 @@ const CalendarPage = () => {
     const eventId = searchParams.get('event');
     const ticketSuccess = searchParams.get('ticket_success');
     const ticketCancelled = searchParams.get('ticket_cancelled');
+    const action = searchParams.get('action');
 
     if (eventId) {
       setSelectedEventId(eventId);
@@ -91,7 +92,16 @@ const CalendarPage = () => {
     if (ticketCancelled === 'true') {
       toast.error('Ticket purchase was cancelled.');
     }
-  }, [searchParams]);
+
+    // Handle action param from FAB
+    if (action === 'create' && user) {
+      setCommunityEventOpen(true);
+      // Clear the action param
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('action');
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [searchParams, user, setSearchParams]);
 
   const calendarItems = useCalendarItems({
     city: selectedCity,
