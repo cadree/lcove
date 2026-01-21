@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import BottomNav from "@/components/navigation/BottomNav";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { GlobalFAB } from "@/components/navigation/GlobalFAB";
 import { useAuth } from "@/contexts/AuthContext";
 interface PageLayoutProps {
   children: ReactNode;
@@ -28,7 +29,12 @@ const PageLayout = ({
         {children}
       </main>
       
-      {!hideNav && <BottomNav />}
+      {!hideNav && (
+        <>
+          <GlobalFAB />
+          <BottomNav />
+        </>
+      )}
     </div>;
 };
 export default PageLayout;
