@@ -1,15 +1,20 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
-  PenSquare, 
+  Image, 
   Video, 
   FolderPlus, 
   MessageSquarePlus, 
   Users, 
   CalendarPlus, 
-  Store 
+  Store,
+  Film
 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { motion } from "framer-motion";
+import { CreatePostDialog } from "@/components/profile/CreatePostDialog";
+import { useProfile } from "@/hooks/useProfile";
+import { usePosts } from "@/hooks/usePosts";
 
 interface FABActionSheetProps {
   open: boolean;
@@ -27,6 +32,9 @@ interface ActionItem {
 
 export function FABActionSheet({ open, onOpenChange }: FABActionSheetProps) {
   const navigate = useNavigate();
+  const [showPostDialog, setShowPostDialog] = useState(false);
+  const { profile } = useProfile();
+  const { createPost } = usePosts();
 
   const handleAction = (action: () => void) => {
     onOpenChange(false);
@@ -34,14 +42,45 @@ export function FABActionSheet({ open, onOpenChange }: FABActionSheetProps) {
     setTimeout(action, 150);
   };
 
+  const handleCreatePost = async (data: {
+    content?: string;
+    file?: File;
+    files?: File[];
+    mediaType?: 'photo' | 'video' | 'text' | 'collage';
+    location?: string;
+    altText?: string;
+    commentsEnabled?: boolean;
+  }) => {
+    // Map collage to photo for database constraint
+    const dbMediaType = data.mediaType === 'collage' ? 'photo' : (data.mediaType || 'text');
+    
+    // For collage, use first file (hook doesn't support multiple files yet)
+    const fileToUpload = data.file || (data.files && data.files.length > 0 ? data.files[0] : undefined);
+    
+    await createPost.mutateAsync({
+      content: data.content,
+      file: fileToUpload,
+      mediaType: dbMediaType as 'photo' | 'video' | 'text',
+    });
+    setShowPostDialog(false);
+  };
+
   const actions: ActionItem[] = [
     {
       id: "post",
-      icon: PenSquare,
+      icon: Image,
       label: "Create Post",
-      description: "Share with the community",
-      action: () => navigate("/feed?action=create-post"),
+      description: "Upload photo, video, or collage",
+      action: () => setShowPostDialog(true),
       color: "bg-pink-500/10 text-pink-500",
+    },
+    {
+      id: "cinema",
+      icon: Film,
+      label: "Cinema",
+      description: "Watch & manage networks",
+      action: () => navigate("/cinema"),
+      color: "bg-amber-500/10 text-amber-500",
     },
     {
       id: "live",
@@ -132,6 +171,15 @@ export function FABActionSheet({ open, onOpenChange }: FABActionSheetProps) {
           ))}
         </div>
       </SheetContent>
+
+      {/* Create Post Dialog */}
+      <CreatePostDialog
+        open={showPostDialog}
+        onOpenChange={setShowPostDialog}
+        userAvatar={profile?.avatar_url}
+        userName={profile?.display_name}
+        onCreatePost={handleCreatePost}
+      />
     </Sheet>
   );
 }

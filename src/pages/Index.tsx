@@ -17,7 +17,7 @@ import WidgetStatChip from "@/components/home/WidgetStatChip";
 import WidgetAppIcon from "@/components/home/WidgetAppIcon";
 import WidgetMiniCard from "@/components/home/WidgetMiniCard";
 import WidgetSectionHeader from "@/components/home/WidgetSectionHeader";
-import BottomNav from "@/components/navigation/BottomNav";
+import { GlobalFAB } from "@/components/navigation/GlobalFAB";
 import {
   Drawer,
   DrawerContent,
@@ -103,8 +103,8 @@ const Index = () => {
         </section>
       </main>
 
-      {/* Bottom Navigation */}
-      <BottomNav />
+      {/* Global FAB */}
+      <GlobalFAB />
 
       {/* Menu Drawer */}
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
