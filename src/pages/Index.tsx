@@ -1,185 +1,200 @@
 import { useState } from "react";
-import { 
-  Users, 
-  Calendar, 
-  FolderKanban, 
-  Radio, 
-  Film,
-  Store,
-  Wallet,
-  MessageCircle,
-  Compass,
-  Heart,
-  Folder,
-  Settings,
-  Briefcase
-} from "lucide-react";
-import HomeTopBar from "@/components/home/HomeTopBar";
-import WidgetStatChip from "@/components/home/WidgetStatChip";
-import WidgetAppIcon from "@/components/home/WidgetAppIcon";
-import WidgetMiniCard from "@/components/home/WidgetMiniCard";
-import WidgetSectionHeader from "@/components/home/WidgetSectionHeader";
-import { GlobalFAB } from "@/components/navigation/GlobalFAB";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerDescription,
-} from "@/components/ui/drawer";
-import { usePlatformStats } from "@/hooks/usePlatformStats";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import { Settings2, Home } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
+import { useHomeUsage } from "@/hooks/useHomeUsage";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { GlobalFAB } from "@/components/navigation/GlobalFAB";
+import EnergyIndicator from "@/components/energy/EnergyIndicator";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { HomeSearch } from "@/components/home/HomeSearch";
+import { HomeRecentSection } from "@/components/home/HomeRecentSection";
+import { HomeMostUsedSection } from "@/components/home/HomeMostUsedSection";
+import { HomePinnedSection } from "@/components/home/HomePinnedSection";
+import { HomeExploreSection } from "@/components/home/HomeExploreSection";
+import { HomeEditSheet } from "@/components/home/HomeEditSheet";
 
-// Primary navigation - most used features
-const primaryNav = [
-  { title: "Feed", icon: Compass, link: "/feed" },
-  { title: "Projects", icon: FolderKanban, link: "/projects" },
-  { title: "Messages", icon: MessageCircle, link: "/messages" },
-  { title: "Calendar", icon: Calendar, link: "/calendar" },
-];
-
-// Discover section - explore content
-const discoverCards = [
-  { title: "Portfolios", subtitle: "Browse work", tag: "Explore", icon: Folder, link: "/portfolios" },
-  { title: "Directory", subtitle: "Find creators", tag: "Connect", icon: Users, link: "/directory" },
-  { title: "Live", subtitle: "Watch streams", tag: "Live", icon: Radio, link: "/live" },
-  { title: "Cinema", subtitle: "Films & networks", tag: "Watch", icon: Film, link: "/cinema" },
-];
-
-// Tools section - manage your work
-const toolCards = [
-  { title: "Pipeline", subtitle: "Client management", tag: "CRM", icon: Briefcase, link: "/pipeline" },
-  { title: "My Store", subtitle: "Sell products", tag: "Shop", icon: Store, link: "/store" },
-  { title: "Wallet", subtitle: "Credits & earnings", tag: "Finance", icon: Wallet, link: "/wallet" },
-  { title: "Settings", subtitle: "Preferences", tag: "Config", icon: Settings, link: "/settings" },
-];
-
+import etherLogo from "@/assets/ether-logo.avif";
 
 const Index = () => {
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const { data: stats } = usePlatformStats();
+  const { user } = useAuth();
+  const { profile } = useProfile(user?.id);
+  const [isEditing, setIsEditing] = useState(false);
+  
+  const {
+    loading,
+    preferences,
+    scoredItems,
+    pinnedItems,
+    mostUsedItems,
+    recentItems,
+    trackClick,
+    togglePin,
+    toggleAutoReorder,
+    resetPersonalization,
+  } = useHomeUsage();
 
-  const statChips = [
-    { value: stats?.totalCreatives || "—", label: "Creators" },
-    { value: stats?.totalProjects || "—", label: "Projects" },
-    { value: stats?.totalCities || "—", label: "Cities" },
-  ];
+  const handleItemClick = (itemId: string) => {
+    if (!isEditing) {
+      trackClick(itemId);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Subtle ambient gradient */}
       <div className="fixed inset-0 bg-gradient-to-b from-primary/[0.02] via-transparent to-transparent pointer-events-none" />
       
-      {/* Top Bar */}
-      <HomeTopBar 
-        onMenuClick={() => setDrawerOpen(true)} 
-        subtitle="Home"
-      />
-      
+      {/* Header */}
+      <motion.header
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="sticky top-0 z-40 backdrop-blur-xl bg-background/80 border-b border-border/30 safe-area-top"
+      >
+        <div className="flex items-center justify-between px-4 h-14">
+          {/* Left - Profile Avatar */}
+          <Link to="/profile" className="tap-target" aria-label="Go to profile">
+            <Avatar className="h-9 w-9 ring-2 ring-primary/20 transition-all hover:ring-primary/40">
+              <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || "Profile"} />
+              <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                {profile?.display_name?.[0]?.toUpperCase() || "?"}
+              </AvatarFallback>
+            </Avatar>
+          </Link>
+
+          {/* Center - Logo + Title */}
+          <div className="flex items-center gap-2">
+            <img 
+              src={etherLogo} 
+              alt="Ether" 
+              className="h-6 w-6 rounded-lg"
+            />
+            <div className="flex items-center gap-1.5">
+              <Home className="h-4 w-4 text-primary" />
+              <span className="font-display text-lg font-medium text-foreground">Home</span>
+            </div>
+          </div>
+
+          {/* Right - Actions */}
+          <div className="flex items-center gap-1">
+            <EnergyIndicator />
+            <NotificationBell />
+          </div>
+        </div>
+      </motion.header>
+
       {/* Main Content */}
-      <main className="relative pb-28 space-y-6 safe-area-x">
-        {/* Stats Row */}
-        <WidgetStatChip stats={statChips} />
-
-        {/* Primary Navigation - Quick Launch */}
-        <section className="pt-2">
-          <WidgetSectionHeader title="Quick Launch" />
-          <div className="flex justify-center gap-5 px-4">
-            {primaryNav.map((item, index) => (
-              <WidgetAppIcon 
-                key={item.title}
-                {...item}
-                index={index}
-              />
-            ))}
-          </div>
-        </section>
-
-        {/* Discover Section */}
-        <section className="pt-2">
-          <WidgetSectionHeader 
-            title="Discover"
-            link="/directory"
-            linkText="See all"
-          />
-          <div className="grid grid-cols-2 gap-3 px-4">
-            {discoverCards.map((item, index) => (
-              <WidgetMiniCard 
-                key={item.title}
-                {...item}
-                index={index}
-              />
-            ))}
-          </div>
-        </section>
-
-        {/* Tools Section */}
-        <section className="pt-2">
-          <WidgetSectionHeader 
-            title="Your Tools"
-          />
-          <div className="grid grid-cols-2 gap-3 px-4">
-            {toolCards.map((item, index) => (
-              <WidgetMiniCard 
-                key={item.title}
-                {...item}
-                index={index}
-              />
-            ))}
-          </div>
-        </section>
-
-        {/* Community Fund CTA */}
-        <section className="px-4 pt-2">
-          <Link to="/fund" className="block">
-            <div className="glass rounded-2xl p-4 flex items-center gap-4 hover:bg-accent/30 transition-colors">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Heart className="w-6 h-6 text-primary" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-foreground">Community Fund</p>
-                <p className="text-sm text-muted-foreground">Support creator projects</p>
+      <main className="relative pb-32 safe-area-x">
+        {loading ? (
+          <div className="space-y-6 p-4">
+            <Skeleton className="h-12 w-full rounded-2xl" />
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-24" />
+              <div className="flex gap-2">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-12 w-28 rounded-xl" />
+                ))}
               </div>
             </div>
-          </Link>
-        </section>
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-20" />
+              <div className="grid grid-cols-2 gap-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} className="h-24 rounded-2xl" />
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6 pt-4">
+            {/* Search */}
+            <HomeSearch onNavigate={handleItemClick} />
+
+            {/* Edit Home Button */}
+            <div className="px-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-foreground gap-2"
+                onClick={() => setIsEditing(true)}
+              >
+                <Settings2 className="h-4 w-4" />
+                Edit Home
+              </Button>
+            </div>
+
+            {/* Pinned Section */}
+            {pinnedItems.length > 0 && (
+              <HomePinnedSection
+                items={pinnedItems}
+                onItemClick={handleItemClick}
+                isEditing={isEditing}
+                onTogglePin={togglePin}
+              />
+            )}
+
+            {/* Recent / Continue Section */}
+            {recentItems.length > 0 && (
+              <HomeRecentSection
+                items={recentItems}
+                onItemClick={handleItemClick}
+              />
+            )}
+
+            {/* Most Used / For You Section */}
+            {mostUsedItems.length > 0 && (
+              <HomeMostUsedSection
+                items={mostUsedItems}
+                onItemClick={handleItemClick}
+                isEditing={isEditing}
+                onTogglePin={togglePin}
+              />
+            )}
+
+            {/* Welcome message for new users */}
+            {recentItems.length === 0 && mostUsedItems.length === 0 && pinnedItems.length === 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="px-4"
+              >
+                <div className="rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 p-6 text-center">
+                  <h2 className="font-display text-xl font-medium text-foreground mb-2">
+                    Welcome to Ether
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Start exploring and your most-used features will appear here
+                  </p>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Explore Section */}
+            <HomeExploreSection
+              items={scoredItems}
+              onItemClick={handleItemClick}
+              isEditing={isEditing}
+              onTogglePin={togglePin}
+            />
+          </div>
+        )}
       </main>
 
       {/* Global FAB */}
       <GlobalFAB />
 
-      {/* Menu Drawer */}
-      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle className="font-display">Menu</DrawerTitle>
-            <DrawerDescription>Navigate Ether</DrawerDescription>
-          </DrawerHeader>
-          <div className="px-4 pb-8 space-y-2">
-            {[
-              { title: "Feed", link: "/feed" },
-              { title: "Directory", link: "/directory" },
-              { title: "Projects", link: "/projects" },
-              { title: "Community Fund", link: "/fund" },
-              { title: "Calendar", link: "/calendar" },
-              { title: "Live", link: "/live" },
-              { title: "Cinema", link: "/cinema" },
-              { title: "Mall", link: "/mall" },
-              { title: "Wallet", link: "/wallet" },
-              { title: "Settings", link: "/settings" },
-            ].map((item) => (
-              <a
-                key={item.title}
-                href={item.link}
-                className="block px-4 py-3 rounded-xl text-foreground hover:bg-accent/30 transition-colors tap-target"
-                onClick={() => setDrawerOpen(false)}
-              >
-                {item.title}
-              </a>
-            ))}
-          </div>
-        </DrawerContent>
-      </Drawer>
+      {/* Edit Sheet */}
+      <HomeEditSheet
+        open={isEditing}
+        onOpenChange={setIsEditing}
+        autoReorder={preferences.auto_reorder}
+        onToggleAutoReorder={toggleAutoReorder}
+        onReset={resetPersonalization}
+      />
     </div>
   );
 };
