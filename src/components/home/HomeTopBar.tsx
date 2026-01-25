@@ -1,9 +1,11 @@
 import { motion } from "framer-motion";
-import { Menu, Bell, Heart } from "lucide-react";
+import { Bell, Heart, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { EnergyIndicator } from "@/components/energy";
 import { useAuth } from "@/contexts/AuthContext";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useProfile } from "@/hooks/useProfile";
 
 interface HomeTopBarProps {
   onMenuClick?: () => void;
@@ -15,6 +17,7 @@ const HomeTopBar = ({
   subtitle = "Discover"
 }: HomeTopBarProps) => {
   const { user } = useAuth();
+  const { profile } = useProfile();
   const location = useLocation();
   const navigate = useNavigate();
   const isOnMembership = location.pathname === "/membership";
@@ -33,17 +36,15 @@ const HomeTopBar = ({
         {/* Subtle top highlight */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-foreground/10 to-transparent rounded-t-2xl" aria-hidden="true" />
         
-        {/* Left - Menu */}
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="w-10 h-10 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/40" 
-          onClick={onMenuClick}
-          aria-label="Open menu"
-          aria-haspopup="dialog"
-        >
-          <Menu className="w-5 h-5" aria-hidden="true" />
-        </Button>
+        {/* Left - Profile Avatar */}
+        <Link to="/profile" aria-label="View my profile">
+          <Avatar className="w-10 h-10 ring-2 ring-primary/20 hover:ring-primary/40 transition-all">
+            <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || "My profile"} />
+            <AvatarFallback className="bg-primary/10 text-primary">
+              <User className="w-5 h-5" />
+            </AvatarFallback>
+          </Avatar>
+        </Link>
 
         {/* Center - Brand with Logo */}
         <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center">
