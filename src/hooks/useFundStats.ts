@@ -30,12 +30,20 @@ export interface FundStats {
     infrastructure: number;
     operations: number;
   };
+  recentDistributions: Array<{
+    id: string;
+    category: string;
+    amount: number;
+    title: string;
+    recipient_name: string | null;
+    distributed_at: string;
+  }>;
 }
 
 export function useFundStats() {
   const queryClient = useQueryClient();
 
-  // Set up real-time subscription
+  // Set up real-time subscription for both contributions and distributions
   useEffect(() => {
     const channel = supabase
       .channel('fund-stats-realtime')
@@ -47,7 +55,6 @@ export function useFundStats() {
           table: 'membership_contributions'
         },
         () => {
-          // Invalidate and refetch when contributions change
           queryClient.invalidateQueries({ queryKey: ['fund-stats'] });
         }
       )
@@ -57,6 +64,17 @@ export function useFundStats() {
           event: '*',
           schema: 'public',
           table: 'memberships'
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['fund-stats'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'fund_distributions'
         },
         () => {
           queryClient.invalidateQueries({ queryKey: ['fund-stats'] });
@@ -76,28 +94,37 @@ export function useFundStats() {
       const monthStart = startOfMonth(now).toISOString();
       const monthEnd = endOfMonth(now).toISOString();
 
-      // Lifetime stats from membership_contributions
+      // Lifetime contributions collected
       const { data: lifetimeContributions } = await supabase
         .from('membership_contributions')
-        .select('amount, allocated_to, user_id');
+        .select('amount, user_id');
 
       const lifetimeTotalCollected = lifetimeContributions?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
       
-      // Calculate distributed based on allocation percentages (excluding operations)
-      const lifetimeTotalDistributed = lifetimeTotalCollected * 0.9; // 90% goes to community (excl. 10% operations)
-      
-      // Calculate actual dollar allocations
+      // Get REAL distribution data from fund_distributions table
+      const { data: allDistributions } = await supabase
+        .from('fund_distributions')
+        .select('*');
+
+      // Calculate actual allocations from real data
       const allocations = {
-        communityGrants: lifetimeTotalDistributed * 0.4,
-        eventsActivations: lifetimeTotalDistributed * 0.2,
-        education: lifetimeTotalDistributed * 0.15,
-        infrastructure: lifetimeTotalDistributed * 0.15,
-        operations: lifetimeTotalCollected * 0.1,
+        communityGrants: allDistributions?.filter(d => d.category === 'community_grants').reduce((sum, d) => sum + Number(d.amount), 0) || 0,
+        eventsActivations: allDistributions?.filter(d => d.category === 'events_activations').reduce((sum, d) => sum + Number(d.amount), 0) || 0,
+        education: allDistributions?.filter(d => d.category === 'education').reduce((sum, d) => sum + Number(d.amount), 0) || 0,
+        infrastructure: allDistributions?.filter(d => d.category === 'infrastructure').reduce((sum, d) => sum + Number(d.amount), 0) || 0,
+        operations: allDistributions?.filter(d => d.category === 'operations').reduce((sum, d) => sum + Number(d.amount), 0) || 0,
       };
-      
-      // Unique contributors as "creators supported"
-      const uniqueContributors = new Set(lifetimeContributions?.map(c => c.user_id));
-      
+
+      const lifetimeTotalDistributed = Object.values(allocations).reduce((sum, val) => sum + val, 0);
+
+      // Count grants awarded (distinct distributions in community_grants category)
+      const grantsAwarded = allDistributions?.filter(d => d.category === 'community_grants').length || 0;
+
+      // Unique recipients as "creators supported"
+      const uniqueRecipients = new Set(
+        allDistributions?.filter(d => d.recipient_id || d.recipient_name).map(d => d.recipient_id || d.recipient_name)
+      );
+
       // Get active memberships count
       const { count: memberCount } = await supabase
         .from('memberships')
@@ -112,8 +139,19 @@ export function useFundStats() {
         .lte('created_at', monthEnd);
 
       const monthlyTotalCollected = monthlyContributions?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
-      const monthlyTotalDistributed = monthlyTotalCollected * 0.9;
-      const monthlyUniqueContributors = new Set(monthlyContributions?.map(c => c.user_id));
+
+      // Monthly distributions
+      const { data: monthlyDistributions } = await supabase
+        .from('fund_distributions')
+        .select('*')
+        .gte('distributed_at', monthStart)
+        .lte('distributed_at', monthEnd);
+
+      const monthlyTotalDistributed = monthlyDistributions?.reduce((sum, d) => sum + Number(d.amount), 0) || 0;
+      const monthlyGrantsAwarded = monthlyDistributions?.filter(d => d.category === 'community_grants').length || 0;
+      const monthlyUniqueRecipients = new Set(
+        monthlyDistributions?.filter(d => d.recipient_id || d.recipient_name).map(d => d.recipient_id || d.recipient_name)
+      );
 
       // New members this month
       const { count: newMembersThisMonth } = await supabase
@@ -122,11 +160,7 @@ export function useFundStats() {
         .gte('created_at', monthStart)
         .lte('created_at', monthEnd);
 
-      // Calculate grants awarded (40% of distributed goes to grants, estimate ~$500 per grant average)
-      const lifetimeGrantsAwarded = Math.floor((lifetimeTotalDistributed * 0.4) / 500);
-      const monthlyGrantsAwarded = Math.floor((monthlyTotalDistributed * 0.4) / 500);
-
-      // Get 6-month trend data
+      // Get 6-month trend data with REAL distribution data
       const monthlyTrend = await Promise.all(
         Array.from({ length: 6 }, (_, i) => {
           const date = subMonths(now, 5 - i);
@@ -135,42 +169,60 @@ export function useFundStats() {
           const start = startOfMonth(date).toISOString();
           const end = endOfMonth(date).toISOString();
           
-          const { data } = await supabase
+          // Collected
+          const { data: contributions } = await supabase
             .from('membership_contributions')
             .select('amount')
             .gte('created_at', start)
             .lte('created_at', end);
 
-          const collected = data?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
+          const collected = contributions?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
           
+          // Distributed (from real data)
+          const { data: distributions } = await supabase
+            .from('fund_distributions')
+            .select('amount')
+            .gte('distributed_at', start)
+            .lte('distributed_at', end);
+
+          const distributed = distributions?.reduce((sum, d) => sum + Number(d.amount), 0) || 0;
+
           return {
             month: format(date, 'MMM'),
             collected,
-            distributed: collected * 0.9,
+            distributed,
           };
         })
       );
+
+      // Get recent distributions for display
+      const { data: recentDistributions } = await supabase
+        .from('fund_distributions')
+        .select('id, category, amount, title, recipient_name, distributed_at')
+        .order('distributed_at', { ascending: false })
+        .limit(5);
 
       return {
         lifetime: {
           totalCollected: lifetimeTotalCollected,
           totalDistributed: lifetimeTotalDistributed,
-          grantsAwarded: lifetimeGrantsAwarded || 0,
-          creatorsSupported: uniqueContributors.size,
+          grantsAwarded,
+          creatorsSupported: uniqueRecipients.size,
           memberCount: memberCount || 0,
         },
         monthly: {
           totalCollected: monthlyTotalCollected,
           totalDistributed: monthlyTotalDistributed,
-          grantsAwarded: monthlyGrantsAwarded || 0,
-          creatorsSupported: monthlyUniqueContributors.size,
+          grantsAwarded: monthlyGrantsAwarded,
+          creatorsSupported: monthlyUniqueRecipients.size,
           memberCount: newMembersThisMonth || 0,
         },
         monthlyTrend,
         allocations,
+        recentDistributions: recentDistributions || [],
       };
     },
-    staleTime: 30000, // Cache for 30 seconds
-    refetchInterval: 60000, // Auto-refetch every minute
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 }

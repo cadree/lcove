@@ -7,12 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, Users, Calendar, GraduationCap, Building2, Briefcase, Heart, Crown, ArrowRight, Wallet, CheckCircle2, PiggyBank, RefreshCw } from "lucide-react";
+import { TrendingUp, Users, Calendar, GraduationCap, Building2, Briefcase, Heart, Crown, ArrowRight, Wallet, CheckCircle2, PiggyBank, RefreshCw, DollarSign } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useMembership } from "@/hooks/useMembership";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFundStats } from "@/hooks/useFundStats";
+import { RecentDistributionsCard } from "@/components/fund/FundDistributions";
 import { toast } from "sonner";
 
 const ALLOCATION_DATA = [
@@ -504,6 +505,16 @@ export default function FundDashboard() {
                 </CardContent>
               </Card>
             )}
+          </motion.div>
+
+          {/* Recent Distributions - Real Data */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.52 }}
+            className="mt-8"
+          >
+            <RecentDistributionsCard recentDistributions={fundStats?.recentDistributions} />
           </motion.div>
 
           {/* How It Works Section */}

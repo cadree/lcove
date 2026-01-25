@@ -2130,6 +2130,51 @@ export type Database = {
         }
         Relationships: []
       }
+      fund_distributions: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          created_by: string
+          description: string | null
+          distributed_at: string
+          id: string
+          proof_url: string | null
+          recipient_id: string | null
+          recipient_name: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          distributed_at?: string
+          id?: string
+          proof_url?: string | null
+          recipient_id?: string | null
+          recipient_name?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          distributed_at?: string
+          id?: string
+          proof_url?: string | null
+          recipient_id?: string | null
+          recipient_name?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       group_expense_contributions: {
         Row: {
           amount_owed: number
