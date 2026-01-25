@@ -1,12 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
-import { Image, User, Loader2, Play } from "lucide-react";
+import { Image, User, Loader2, Play, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import PageLayout from "@/components/layout/PageLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Button } from "@/components/ui/button";
+import { CreatePostDialog } from "@/components/profile/CreatePostDialog";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 interface PortfolioPost {
   id: string;
@@ -24,10 +29,13 @@ interface PortfolioPost {
 }
 
 const Portfolios = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+
   const { data: posts, isLoading } = useQuery({
     queryKey: ["community-portfolio-posts"],
     queryFn: async () => {
-      // Get portfolio posts from all users
       const { data: portfolioPosts, error } = await supabase
         .from("posts")
         .select("id, media_url, media_type, content, user_id, created_at")
@@ -37,12 +45,10 @@ const Portfolios = () => {
 
       if (error) throw error;
 
-      // Get unique user IDs
       const userIds = [...new Set(portfolioPosts?.map((p) => p.user_id) || [])];
       
       if (userIds.length === 0) return [];
 
-      // Fetch profiles for all users
       const { data: profiles } = await supabase
         .from("profiles")
         .select("id, display_name, avatar_url, city")
@@ -57,9 +63,129 @@ const Portfolios = () => {
     },
   });
 
+  const { data: profile } = useQuery({
+    queryKey: ["current-user-profile", user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data } = await supabase
+        .from("profiles")
+        .select("display_name, avatar_url")
+        .eq("id", user.id)
+        .single();
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const createPortfolioPost = useMutation({
+    mutationFn: async ({ 
+      content, 
+      file,
+      files,
+      mediaType,
+      location,
+      altText,
+      commentsEnabled = true,
+    }: { 
+      content?: string; 
+      file?: File;
+      files?: File[];
+      mediaType?: 'photo' | 'video' | 'text' | 'collage';
+      location?: string;
+      altText?: string;
+      commentsEnabled?: boolean;
+    }) => {
+      if (!user) throw new Error('Must be logged in');
+
+      let mediaUrl: string | null = null;
+
+      if (file && mediaType !== 'text') {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('media')
+          .upload(fileName, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('media')
+          .getPublicUrl(fileName);
+
+        mediaUrl = publicUrl;
+      }
+
+      if (files && files.length > 0 && mediaType === 'collage') {
+        const fileExt = files[0].name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}_0.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('media')
+          .upload(fileName, files[0]);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('media')
+          .getPublicUrl(fileName);
+
+        mediaUrl = publicUrl;
+      }
+
+      const dbMediaType = mediaType === 'collage' ? 'photo' : (mediaType || 'text');
+
+      const { error: insertError } = await supabase
+        .from('posts')
+        .insert({
+          user_id: user.id,
+          content: content || null,
+          media_url: mediaUrl,
+          media_type: dbMediaType,
+          post_type: 'portfolio',
+          location: location || null,
+          alt_text: altText || null,
+          comments_enabled: commentsEnabled,
+        });
+
+      if (insertError) throw insertError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["community-portfolio-posts"] });
+      toast.success('Portfolio work shared!');
+      setShowCreateDialog(false);
+    },
+    onError: (error) => {
+      toast.error('Failed to share work');
+      console.error(error);
+    },
+  });
+
+  const handleCreatePost = async (data: {
+    content?: string;
+    file?: File;
+    files?: File[];
+    mediaType?: 'photo' | 'video' | 'text' | 'collage';
+    location?: string;
+    altText?: string;
+    commentsEnabled?: boolean;
+  }) => {
+    await createPortfolioPost.mutateAsync(data);
+  };
+
   return (
     <PageLayout>
-      <PageHeader title="Portfolios" />
+      <PageHeader 
+        title="Portfolios" 
+        actions={
+          user && (
+            <Button size="sm" onClick={() => setShowCreateDialog(true)}>
+              <Plus className="w-4 h-4 mr-1" />
+              Share Work
+            </Button>
+          )
+        }
+      />
       <div className="space-y-6 px-4">
         <p className="text-muted-foreground text-sm px-1">
           Explore creative work from the community
@@ -80,7 +206,6 @@ const Portfolios = () => {
               >
                 <Link to={`/profile/${post.user_id}`}>
                   <div className="glass rounded-2xl overflow-hidden hover:bg-accent/30 transition-colors group">
-                    {/* Media */}
                     <div className="aspect-square relative bg-accent/20">
                       {post.media_url ? (
                         post.media_type === "video" ? (
@@ -108,11 +233,9 @@ const Portfolios = () => {
                           <Image className="w-10 h-10 text-muted-foreground/50" />
                         </div>
                       )}
-                      {/* Overlay gradient */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
 
-                    {/* Creator Info */}
                     <div className="p-3 flex items-center gap-2">
                       <Avatar className="w-7 h-7">
                         <AvatarImage src={post.creator?.avatar_url || undefined} />
@@ -144,6 +267,14 @@ const Portfolios = () => {
           />
         )}
       </div>
+
+      <CreatePostDialog 
+        open={showCreateDialog} 
+        onOpenChange={setShowCreateDialog}
+        onCreatePost={handleCreatePost}
+        userAvatar={profile?.avatar_url}
+        userName={profile?.display_name}
+      />
     </PageLayout>
   );
 };
