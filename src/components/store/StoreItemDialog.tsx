@@ -283,46 +283,13 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
             </div>
 
             {/* Purchase Options for Products/Services */}
-            {item.type !== 'rental' && (item.price > 0 || item.credits_price > 0) && (
+            {item.type !== 'rental' && (
               <div className="space-y-3 pt-3 border-t border-border">
-                <div className="flex gap-2">
-                  {item.price > 0 && (
-                    <Button
-                      variant={paymentType === 'cash' ? 'default' : 'outline'}
-                      className="flex-1"
-                      onClick={() => setPaymentType('cash')}
-                    >
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Pay ${item.price}
-                    </Button>
-                  )}
-                  {item.credits_price > 0 && (
-                    <Button
-                      variant={paymentType === 'credits' ? 'default' : 'outline'}
-                      className="flex-1"
-                      onClick={() => setPaymentType('credits')}
-                      disabled={!canPayWithCredits}
-                    >
-                      <Coins className="w-4 h-4 mr-2" />
-                      {item.credits_price} LC
-                      {!canPayWithCredits && ' (Insufficient)'}
-                    </Button>
-                  )}
-                </div>
-                <Button
-                  className="w-full"
-                  size="lg"
-                  onClick={handlePurchase}
-                  disabled={isPurchasing || (item.type === 'product' && item.inventory_count === 0)}
-                >
-                  {isPurchasing ? 'Processing...' : 'Purchase Now'}
-                </Button>
-                
-                {/* External Store Links */}
-                {store?.shopify_store_url && (
+                {/* Check if external store is configured - show as primary action */}
+                {store?.shopify_store_url ? (
                   <Button
-                    variant="outline"
                     className="w-full"
+                    size="lg"
                     asChild
                   >
                     <a
@@ -336,11 +303,10 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
                       Shop on Shopify
                     </a>
                   </Button>
-                )}
-                {store?.peerspace_url && (
+                ) : store?.peerspace_url ? (
                   <Button
-                    variant="outline"
                     className="w-full"
+                    size="lg"
                     asChild
                   >
                     <a
@@ -354,27 +320,53 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
                       Book on Peerspace
                     </a>
                   </Button>
-                )}
+                ) : (item.price > 0 || item.credits_price > 0) ? (
+                  <>
+                    <div className="flex gap-2">
+                      {item.price > 0 && (
+                        <Button
+                          variant={paymentType === 'cash' ? 'default' : 'outline'}
+                          className="flex-1"
+                          onClick={() => setPaymentType('cash')}
+                        >
+                          <CreditCard className="w-4 h-4 mr-2" />
+                          Pay ${item.price}
+                        </Button>
+                      )}
+                      {item.credits_price > 0 && (
+                        <Button
+                          variant={paymentType === 'credits' ? 'default' : 'outline'}
+                          className="flex-1"
+                          onClick={() => setPaymentType('credits')}
+                          disabled={!canPayWithCredits}
+                        >
+                          <Coins className="w-4 h-4 mr-2" />
+                          {item.credits_price} LC
+                          {!canPayWithCredits && ' (Insufficient)'}
+                        </Button>
+                      )}
+                    </div>
+                    <Button
+                      className="w-full"
+                      size="lg"
+                      onClick={handlePurchase}
+                      disabled={isPurchasing || (item.type === 'product' && item.inventory_count === 0)}
+                    >
+                      {isPurchasing ? 'Processing...' : 'Purchase Now'}
+                    </Button>
+                  </>
+                ) : null}
               </div>
             )}
 
             {/* Inquiry Form for Rentals */}
             {item.type === 'rental' && (
               <div className="space-y-3 pt-3 border-t border-border">
-                <Button
-                  className="w-full"
-                  size="lg"
-                  onClick={() => setShowBooking(true)}
-                >
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Request Booking
-                </Button>
-                
-                {/* External Store Links for Rentals */}
-                {store?.peerspace_url && (
+                {/* Check if external store is configured - show as primary action */}
+                {store?.peerspace_url ? (
                   <Button
-                    variant="outline"
                     className="w-full"
+                    size="lg"
                     asChild
                   >
                     <a
@@ -388,11 +380,10 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
                       Book on Peerspace
                     </a>
                   </Button>
-                )}
-                {store?.shopify_store_url && (
+                ) : store?.shopify_store_url ? (
                   <Button
-                    variant="outline"
                     className="w-full"
+                    size="lg"
                     asChild
                   >
                     <a
@@ -406,41 +397,55 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
                       Shop on Shopify
                     </a>
                   </Button>
+                ) : (
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    onClick={() => setShowBooking(true)}
+                  >
+                    <Calendar className="w-4 h-4 mr-2" />
+                    Request Booking
+                  </Button>
                 )}
                 
-                <div className="text-center text-sm text-muted-foreground">or</div>
-                
-                <h4 className="font-medium flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4" />
-                  Send an Inquiry
-                </h4>
-                <div className="space-y-2">
-                  <Label htmlFor="preferred-dates">Preferred Dates (optional)</Label>
-                  <Input
-                    id="preferred-dates"
-                    placeholder="e.g., Dec 20-22, flexible weekends"
-                    value={preferredDates}
-                    onChange={(e) => setPreferredDates(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="inquiry-message">Message</Label>
-                  <Textarea
-                    id="inquiry-message"
-                    placeholder="Tell the owner about your needs..."
-                    value={inquiryMessage}
-                    onChange={(e) => setInquiryMessage(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleSendInquiry}
-                  disabled={createInquiry.isPending}
-                >
-                  {createInquiry.isPending ? 'Sending...' : 'Send Inquiry'}
-                </Button>
+                {/* Only show inquiry form when no external URL */}
+                {!store?.peerspace_url && !store?.shopify_store_url && (
+                  <>
+                    <div className="text-center text-sm text-muted-foreground">or</div>
+                    
+                    <h4 className="font-medium flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4" />
+                      Send an Inquiry
+                    </h4>
+                    <div className="space-y-2">
+                      <Label htmlFor="preferred-dates">Preferred Dates (optional)</Label>
+                      <Input
+                        id="preferred-dates"
+                        placeholder="e.g., Dec 20-22, flexible weekends"
+                        value={preferredDates}
+                        onChange={(e) => setPreferredDates(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="inquiry-message">Message</Label>
+                      <Textarea
+                        id="inquiry-message"
+                        placeholder="Tell the owner about your needs..."
+                        value={inquiryMessage}
+                        onChange={(e) => setInquiryMessage(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleSendInquiry}
+                      disabled={createInquiry.isPending}
+                    >
+                      {createInquiry.isPending ? 'Sending...' : 'Send Inquiry'}
+                    </Button>
+                  </>
+                )}
               </div>
             )}
           </div>
