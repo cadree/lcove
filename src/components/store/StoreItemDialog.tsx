@@ -31,6 +31,7 @@ import {
   MessageSquare,
   Sparkles,
   Calendar,
+  ExternalLink,
 } from 'lucide-react';
 import { StudioBookingDialog } from '@/components/studio/StudioBookingDialog';
 import { StudioReviews } from '@/components/studio/StudioReviews';
@@ -316,6 +317,44 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
                 >
                   {isPurchasing ? 'Processing...' : 'Purchase Now'}
                 </Button>
+                
+                {/* External Store Links */}
+                {store?.shopify_store_url && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    asChild
+                  >
+                    <a
+                      href={store.shopify_store_url.startsWith('http') 
+                        ? store.shopify_store_url 
+                        : `https://${store.shopify_store_url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Shop on Shopify
+                    </a>
+                  </Button>
+                )}
+                {store?.peerspace_url && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    asChild
+                  >
+                    <a
+                      href={store.peerspace_url.startsWith('http') 
+                        ? store.peerspace_url 
+                        : `https://${store.peerspace_url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Book on Peerspace
+                    </a>
+                  </Button>
+                )}
               </div>
             )}
 
@@ -330,6 +369,44 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
                   <Calendar className="w-4 h-4 mr-2" />
                   Request Booking
                 </Button>
+                
+                {/* External Store Links for Rentals */}
+                {store?.peerspace_url && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    asChild
+                  >
+                    <a
+                      href={store.peerspace_url.startsWith('http') 
+                        ? store.peerspace_url 
+                        : `https://${store.peerspace_url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Book on Peerspace
+                    </a>
+                  </Button>
+                )}
+                {store?.shopify_store_url && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    asChild
+                  >
+                    <a
+                      href={store.shopify_store_url.startsWith('http') 
+                        ? store.shopify_store_url 
+                        : `https://${store.shopify_store_url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Shop on Shopify
+                    </a>
+                  </Button>
+                )}
                 
                 <div className="text-center text-sm text-muted-foreground">or</div>
                 
