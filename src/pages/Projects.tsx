@@ -170,7 +170,10 @@ const Projects: React.FC = () => {
         <ProjectDetail
           project={selectedProject}
           open={detailOpen}
-          onClose={() => setDetailOpen(false)}
+          onClose={() => {
+            setDetailOpen(false);
+            setSelectedProject(null);
+          }}
         />
       </div>
     </PageLayout>
