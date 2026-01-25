@@ -1,9 +1,8 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import PageLayout from "@/components/layout/PageLayout";
-import { PageHeader } from "@/components/layout/PageHeader";
 import StoriesRow from "@/components/stories/StoriesRow";
 import PostCreator from "@/components/feed/PostCreator";
 import FeedPost from "@/components/feed/FeedPost";
@@ -11,7 +10,8 @@ import { FeedFilters } from "@/components/feed/FeedFilters";
 import { FriendsDrawer } from "@/components/friends/FriendsDrawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import { Filter, Shuffle, Loader2, Sparkles, Compass, Users } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Filter, Shuffle, Loader2, Sparkles, Compass, Users, User, Bell, Home } from "lucide-react";
 import { usePosts } from "@/hooks/usePosts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -100,47 +100,76 @@ const Feed = () => {
   return (
     <PageLayout>
       <div className="px-4 sm:px-6 pt-4">
+        {/* Compact Header with Profile + Actions */}
+        <motion.header
+          initial={{ y: -10, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="flex items-center justify-between mb-4"
+        >
+          {/* Left - Profile Avatar */}
+          <Link to="/profile" aria-label="View my profile">
+            <Avatar className="w-10 h-10 ring-2 ring-primary/20 hover:ring-primary/40 transition-all">
+              <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || "My profile"} />
+              <AvatarFallback className="bg-primary/10 text-primary">
+                <User className="w-5 h-5" />
+              </AvatarFallback>
+            </Avatar>
+          </Link>
+
+          {/* Center - Title */}
+          <div className="flex items-center gap-2">
+            <Compass className="w-5 h-5 text-primary" />
+            <h1 className="text-lg font-semibold">Feed</h1>
+          </div>
+
+          {/* Right - Quick Actions */}
+          <div className="flex items-center gap-1">
+            <Link to="/home" aria-label="Go home">
+              <Button variant="ghost" size="icon" className="w-9 h-9 rounded-xl">
+                <Home className="w-4 h-4" />
+              </Button>
+            </Link>
+            <Link to="/notifications" aria-label="Notifications">
+              <Button variant="ghost" size="icon" className="w-9 h-9 rounded-xl">
+                <Bell className="w-4 h-4" />
+              </Button>
+            </Link>
+          </div>
+        </motion.header>
+
         {/* Stories Row */}
         <StoriesRow />
 
-        {/* Header */}
-        <PageHeader
-          title="Feed"
-          icon={<Compass className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
-          className="mt-3 mb-5"
-          actions={
-            <div className="flex gap-2">
-              <FriendsDrawer>
-                <Button 
-                  variant="glass" 
-                  size="icon" 
-                  className="w-10 h-10"
-                  title="Friends"
-                >
-                  <Users className="w-4 h-4" />
-                </Button>
-              </FriendsDrawer>
-              <Button 
-                variant={isShuffled ? "default" : "glass"} 
-                size="icon" 
-                className="w-10 h-10"
-                onClick={handleShuffle}
-                title="Shuffle feed"
-              >
-                <Shuffle className="w-4 h-4" />
-              </Button>
-              <Button 
-                variant={showFilters ? "default" : "glass"} 
-                size="icon" 
-                className="w-10 h-10"
-                onClick={() => setShowFilters(!showFilters)}
-                title="Toggle filters"
-              >
-                <Filter className="w-4 h-4" />
-              </Button>
-            </div>
-          }
-        />
+        {/* Action Bar */}
+        <div className="flex items-center justify-between mt-4 mb-4">
+          <FriendsDrawer>
+            <Button variant="glass" size="sm" className="gap-2">
+              <Users className="w-4 h-4" />
+              <span className="text-xs">Friends</span>
+            </Button>
+          </FriendsDrawer>
+          
+          <div className="flex gap-2">
+            <Button 
+              variant={isShuffled ? "default" : "glass"} 
+              size="icon" 
+              className="w-9 h-9"
+              onClick={handleShuffle}
+              title="Shuffle feed"
+            >
+              <Shuffle className="w-4 h-4" />
+            </Button>
+            <Button 
+              variant={showFilters ? "default" : "glass"} 
+              size="icon" 
+              className="w-9 h-9"
+              onClick={() => setShowFilters(!showFilters)}
+              title="Toggle filters"
+            >
+              <Filter className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
 
         {/* Post Creator */}
         {user && (
