@@ -133,44 +133,49 @@ export function FABActionSheet({ open, onOpenChange }: FABActionSheetProps) {
   ];
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent 
-        side="bottom" 
-        className="rounded-t-3xl px-4 pb-8"
-        style={{
-          paddingBottom: "calc(2rem + env(safe-area-inset-bottom, 0px))",
-        }}
-      >
-        {/* Handle indicator */}
-        <div className="flex justify-center pt-2 pb-4">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-        </div>
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent 
+          side="bottom" 
+          className="rounded-t-3xl px-4 pb-8"
+          style={{
+            paddingBottom: "calc(2rem + env(safe-area-inset-bottom, 0px))",
+          }}
+          aria-labelledby="fab-sheet-title"
+        >
+          {/* Handle indicator */}
+          <div className="flex justify-center pt-2 pb-4" aria-hidden="true">
+            <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+          </div>
 
-        {/* Title */}
-        <h2 className="text-lg font-semibold text-center mb-4">Quick Actions</h2>
+          {/* Title */}
+          <h2 id="fab-sheet-title" className="text-lg font-semibold text-center mb-4">Quick Actions</h2>
 
-        {/* Actions Grid */}
-        <div className="grid grid-cols-2 gap-3">
-          {actions.map((item, index) => (
-            <motion.button
-              key={item.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              onClick={() => handleAction(item.action)}
-              className="flex items-center gap-3 p-4 rounded-2xl bg-secondary/50 hover:bg-secondary/80 active:scale-95 transition-all text-left touch-manipulation"
-            >
-              <div className={`w-11 h-11 rounded-xl ${item.color} flex items-center justify-center flex-shrink-0`}>
-                <item.icon className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="font-medium text-sm truncate">{item.label}</p>
-                <p className="text-xs text-muted-foreground truncate">{item.description}</p>
-              </div>
-            </motion.button>
-          ))}
-        </div>
-      </SheetContent>
+          {/* Actions Grid */}
+          <div className="grid grid-cols-2 gap-3" role="menu" aria-label="Quick actions">
+            {actions.map((item, index) => (
+              <motion.button
+                key={item.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                onClick={() => handleAction(item.action)}
+                className="flex items-center gap-3 p-4 rounded-2xl bg-secondary/50 hover:bg-secondary/80 active:scale-95 transition-all text-left touch-manipulation tap-target"
+                role="menuitem"
+                aria-label={`${item.label}: ${item.description}`}
+              >
+                <div className={`w-11 h-11 rounded-xl ${item.color} flex items-center justify-center flex-shrink-0`} aria-hidden="true">
+                  <item.icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate">{item.label}</p>
+                  <p className="text-xs text-muted-foreground truncate">{item.description}</p>
+                </div>
+              </motion.button>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Create Post Dialog */}
       <CreatePostDialog
@@ -180,6 +185,6 @@ export function FABActionSheet({ open, onOpenChange }: FABActionSheetProps) {
         userName={profile?.display_name}
         onCreatePost={handleCreatePost}
       />
-    </Sheet>
+    </>
   );
 }

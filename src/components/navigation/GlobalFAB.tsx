@@ -23,31 +23,30 @@ export function GlobalFAB() {
   return (
     <>
       {/* FAB Button */}
-      <motion.button
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0, opacity: 0 }}
-        whileTap={{ scale: 0.9 }}
-        onClick={() => setIsOpen(true)}
-        className="fixed z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center touch-manipulation"
-        style={{
-          right: "1rem",
-          bottom: "calc(5.5rem + env(safe-area-inset-bottom, 0px))",
-        }}
-        aria-label="Open actions menu"
-      >
-        <AnimatePresence mode="wait">
+      <AnimatePresence>
+        <motion.button
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0, opacity: 0 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setIsOpen(true)}
+          className="fixed z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-elevated flex items-center justify-center touch-manipulation tap-target"
+          style={{
+            right: "max(1rem, env(safe-area-inset-right, 1rem))",
+            bottom: "max(1.5rem, env(safe-area-inset-bottom, 1.5rem))",
+          }}
+          aria-label="Open quick actions menu"
+          aria-expanded={isOpen}
+          aria-haspopup="dialog"
+        >
           <motion.div
-            key={isOpen ? "close" : "open"}
-            initial={{ rotate: -90, opacity: 0 }}
-            animate={{ rotate: 0, opacity: 1 }}
-            exit={{ rotate: 90, opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            animate={{ rotate: isOpen ? 45 : 0 }}
+            transition={{ duration: 0.2 }}
           >
-            <Plus className={`h-7 w-7 transition-transform duration-200 ${isOpen ? "rotate-45" : ""}`} />
+            <Plus className="h-7 w-7" aria-hidden="true" />
           </motion.div>
-        </AnimatePresence>
-      </motion.button>
+        </motion.button>
+      </AnimatePresence>
 
       {/* Action Sheet */}
       <FABActionSheet open={isOpen} onOpenChange={setIsOpen} />
