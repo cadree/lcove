@@ -74,3 +74,15 @@ verify_jwt = false
 
 [functions.notify-content-submission]
 verify_jwt = false
+
+[functions.transfer-credits]
+verify_jwt = true
+
+[functions.verify-contribution]
+verify_jwt = true
+
+[functions.send-contract]
+verify_jwt = true
+
+[functions.send-invoice]
+verify_jwt = true
