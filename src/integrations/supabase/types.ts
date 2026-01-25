@@ -3628,6 +3628,36 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_treasury: {
+        Row: {
+          amount: number
+          created_at: string
+          credits_amount: number
+          description: string | null
+          id: string
+          source_id: string
+          source_type: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          credits_amount?: number
+          description?: string | null
+          id?: string
+          source_id: string
+          source_type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          credits_amount?: number
+          description?: string | null
+          id?: string
+          source_id?: string
+          source_type?: string
+        }
+        Relationships: []
+      }
       portfolio_folders: {
         Row: {
           cover_image_url: string | null
@@ -4578,7 +4608,10 @@ export type Database = {
           item_id: string
           notes: string | null
           payment_type: string
+          platform_fee: number | null
           quantity: number
+          seller_amount: number | null
+          seller_payout_status: string | null
           status: string
           store_id: string
           stripe_payment_intent_id: string | null
@@ -4593,7 +4626,10 @@ export type Database = {
           item_id: string
           notes?: string | null
           payment_type: string
+          platform_fee?: number | null
           quantity?: number
+          seller_amount?: number | null
+          seller_payout_status?: string | null
           status?: string
           store_id: string
           stripe_payment_intent_id?: string | null
@@ -4608,7 +4644,10 @@ export type Database = {
           item_id?: string
           notes?: string | null
           payment_type?: string
+          platform_fee?: number | null
           quantity?: number
+          seller_amount?: number | null
+          seller_payout_status?: string | null
           status?: string
           store_id?: string
           stripe_payment_intent_id?: string | null
@@ -4643,9 +4682,12 @@ export type Database = {
           is_active: boolean | null
           logo_url: string | null
           name: string
+          payout_enabled: boolean | null
+          payout_method: string | null
           peerspace_url: string | null
           shopify_access_token: string | null
           shopify_store_url: string | null
+          stripe_connect_account_id: string | null
           updated_at: string
           user_id: string
         }
@@ -4659,9 +4701,12 @@ export type Database = {
           is_active?: boolean | null
           logo_url?: string | null
           name: string
+          payout_enabled?: boolean | null
+          payout_method?: string | null
           peerspace_url?: string | null
           shopify_access_token?: string | null
           shopify_store_url?: string | null
+          stripe_connect_account_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -4675,9 +4720,12 @@ export type Database = {
           is_active?: boolean | null
           logo_url?: string | null
           name?: string
+          payout_enabled?: boolean | null
+          payout_method?: string | null
           peerspace_url?: string | null
           shopify_access_token?: string | null
           shopify_store_url?: string | null
+          stripe_connect_account_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -4909,8 +4957,11 @@ export type Database = {
           owner_id: string
           owner_notes: string | null
           payment_type: string | null
+          platform_fee: number | null
           requested_date: string
           requester_id: string
+          seller_amount: number | null
+          seller_payout_status: string | null
           start_time: string | null
           status: string
           stripe_payment_intent_id: string | null
@@ -4928,8 +4979,11 @@ export type Database = {
           owner_id: string
           owner_notes?: string | null
           payment_type?: string | null
+          platform_fee?: number | null
           requested_date: string
           requester_id: string
+          seller_amount?: number | null
+          seller_payout_status?: string | null
           start_time?: string | null
           status?: string
           stripe_payment_intent_id?: string | null
@@ -4947,8 +5001,11 @@ export type Database = {
           owner_id?: string
           owner_notes?: string | null
           payment_type?: string | null
+          platform_fee?: number | null
           requested_date?: string
           requester_id?: string
+          seller_amount?: number | null
+          seller_payout_status?: string | null
           start_time?: string | null
           status?: string
           stripe_payment_intent_id?: string | null

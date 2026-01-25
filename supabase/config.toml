@@ -86,3 +86,12 @@ verify_jwt = true
 
 [functions.send-invoice]
 verify_jwt = true
+
+[functions.create-store-connect-account]
+verify_jwt = true
+
+[functions.check-store-connect-status]
+verify_jwt = true
+
+[functions.purchase-studio-booking]
+verify_jwt = true

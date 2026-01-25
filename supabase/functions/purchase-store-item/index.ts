@@ -7,6 +7,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const PLATFORM_FEE_PERCENT = 20;
+
+const logStep = (step: string, details?: unknown) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[PURCHASE-STORE-ITEM] ${step}${detailsStr}`);
+};
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -24,6 +31,8 @@ serve(async (req) => {
   );
 
   try {
+    logStep("Function started");
+
     // Authenticate user
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -37,16 +46,18 @@ serve(async (req) => {
       throw new Error("Authentication failed");
     }
 
+    logStep("User authenticated", { userId: user.id });
+
     const { itemId, paymentType, quantity = 1 } = await req.json();
 
     if (!itemId || !paymentType) {
       throw new Error("Missing required fields: itemId, paymentType");
     }
 
-    // Get the store item
+    // Get the store item with store details including Connect info
     const { data: item, error: itemError } = await supabaseClient
       .from("store_items")
-      .select("*, store:stores(*)")
+      .select("*, store:stores(*, stripe_connect_account_id, payout_enabled)")
       .eq("id", itemId)
       .single();
 
@@ -67,7 +78,12 @@ serve(async (req) => {
       throw new Error("Store not found");
     }
 
-    console.log(`Processing ${paymentType} purchase for item ${itemId} by user ${user.id}`);
+    logStep(`Processing ${paymentType} purchase for item ${itemId}`, { 
+      itemTitle: item.title,
+      storeId: store.id,
+      hasConnect: !!store.stripe_connect_account_id,
+      payoutEnabled: store.payout_enabled
+    });
 
     if (paymentType === "credits") {
       // Check if store accepts credits
@@ -80,6 +96,12 @@ serve(async (req) => {
       }
 
       const totalCredits = item.credits_price * quantity;
+      
+      // Calculate 80/20 split for credits
+      const sellerCredits = Math.floor(totalCredits * 0.80);
+      const platformCredits = totalCredits - sellerCredits;
+
+      logStep("Credit split calculated", { totalCredits, sellerCredits, platformCredits });
 
       // Check user's credit balance
       const { data: userCredits, error: creditsError } = await supabaseClient
@@ -93,7 +115,7 @@ serve(async (req) => {
         throw new Error(`Insufficient credits. You have ${balance} LC, but need ${totalCredits} LC`);
       }
 
-      // Create the order
+      // Create the order with fee breakdown
       const { data: order, error: orderError } = await supabaseAdmin
         .from("store_orders")
         .insert({
@@ -105,6 +127,9 @@ serve(async (req) => {
           credits_spent: totalCredits,
           payment_type: "credits",
           status: "confirmed",
+          seller_amount: sellerCredits,
+          platform_fee: platformCredits,
+          seller_payout_status: "completed",
         })
         .select()
         .single();
@@ -125,23 +150,34 @@ serve(async (req) => {
         reference_id: order.id,
       });
 
-      // Add credits to seller
-      const { data: sellerCredits } = await supabaseAdmin
+      // Add 80% credits to seller
+      const { data: sellerCreditsData } = await supabaseAdmin
         .from("user_credits")
         .select("balance")
         .eq("user_id", store.user_id)
         .single();
 
-      const sellerBalance = sellerCredits?.balance || 0;
+      const sellerBalance = sellerCreditsData?.balance || 0;
       await supabaseAdmin.from("credit_ledger").insert({
         user_id: store.user_id,
-        amount: totalCredits,
-        balance_after: sellerBalance + totalCredits,
+        amount: sellerCredits,
+        balance_after: sellerBalance + sellerCredits,
         type: "sale",
-        description: `Sale: ${item.title}`,
+        description: `Sale (80%): ${item.title}`,
         reference_type: "store_order",
         reference_id: order.id,
       });
+
+      // Record platform fee in treasury
+      await supabaseAdmin.from("platform_treasury").insert({
+        source_type: "store_order",
+        source_id: order.id,
+        amount: 0,
+        credits_amount: platformCredits,
+        description: `Platform fee (20%): ${item.title}`,
+      });
+
+      logStep("Credit payment completed", { orderId: order.id, sellerCredits, platformCredits });
 
       // Update inventory if applicable
       if (item.type === "product" && item.inventory_count !== null) {
@@ -167,6 +203,16 @@ serve(async (req) => {
       }
 
       const totalPrice = item.price * quantity;
+      
+      // Calculate fee amounts in cents
+      const platformFeeAmount = Math.round(totalPrice * 100 * (PLATFORM_FEE_PERCENT / 100));
+      const sellerAmount = (totalPrice * 100) - platformFeeAmount;
+
+      logStep("Cash split calculated", { 
+        totalPrice, 
+        platformFeeAmount: platformFeeAmount / 100, 
+        sellerAmount: sellerAmount / 100 
+      });
 
       // Initialize Stripe
       const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
@@ -192,6 +238,9 @@ serve(async (req) => {
           credits_spent: 0,
           payment_type: "cash",
           status: "pending",
+          seller_amount: sellerAmount / 100,
+          platform_fee: platformFeeAmount / 100,
+          seller_payout_status: store.payout_enabled ? "processing" : "pending_setup",
         })
         .select()
         .single();
@@ -201,8 +250,8 @@ serve(async (req) => {
         throw new Error("Failed to create order");
       }
 
-      // Create Stripe checkout session
-      const session = await stripe.checkout.sessions.create({
+      // Build checkout session config
+      const sessionConfig: Stripe.Checkout.SessionCreateParams = {
         customer: customerId,
         customer_email: customerId ? undefined : user.email!,
         line_items: [
@@ -227,13 +276,41 @@ serve(async (req) => {
           item_id: itemId,
           buyer_id: user.id,
         },
-      });
+      };
+
+      // If seller has Stripe Connect enabled, use application fee for automatic 80/20 split
+      if (store.stripe_connect_account_id && store.payout_enabled) {
+        sessionConfig.payment_intent_data = {
+          application_fee_amount: platformFeeAmount,
+          transfer_data: {
+            destination: store.stripe_connect_account_id,
+          },
+        };
+        logStep("Using Stripe Connect with application fee", { 
+          platformFeeAmount, 
+          connectAccountId: store.stripe_connect_account_id 
+        });
+      }
+
+      // Create Stripe checkout session
+      const session = await stripe.checkout.sessions.create(sessionConfig);
 
       // Update order with stripe payment intent
       await supabaseAdmin
         .from("store_orders")
         .update({ stripe_payment_intent_id: session.payment_intent as string })
         .eq("id", order.id);
+
+      // Record platform fee in treasury
+      await supabaseAdmin.from("platform_treasury").insert({
+        source_type: "store_order",
+        source_id: order.id,
+        amount: platformFeeAmount / 100,
+        credits_amount: 0,
+        description: `Platform fee (20%): ${item.title}`,
+      });
+
+      logStep("Checkout session created", { sessionUrl: session.url, orderId: order.id });
 
       return new Response(
         JSON.stringify({ url: session.url, orderId: order.id }),
@@ -246,7 +323,7 @@ serve(async (req) => {
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("Purchase error:", message);
+    logStep("ERROR", { message });
     return new Response(
       JSON.stringify({ error: message }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
