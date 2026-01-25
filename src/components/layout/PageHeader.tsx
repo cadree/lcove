@@ -47,10 +47,7 @@ export const PageHeader = ({
         {icon && <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0" aria-hidden="true">
             {icon}
           </div>}
-        <div>
-          
-          {description}
-        </div>
+        
       </div>
       {actions && <nav className="flex items-center gap-2" aria-label="Page actions">
           {actions}
