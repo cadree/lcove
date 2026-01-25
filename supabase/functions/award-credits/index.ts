@@ -71,6 +71,7 @@ serve(async (req) => {
     const newBalance = currentBalance + amount;
 
     // Create ledger entry (trigger will update user_credits)
+    // Admin awards are always Earned credit, not Genesis
     const { data: ledgerEntry, error: ledgerError } = await supabaseClient
       .from('credit_ledger')
       .insert({
@@ -81,6 +82,9 @@ serve(async (req) => {
         description,
         reference_type,
         reference_id,
+        credit_type: 'earned',
+        genesis_amount: 0,
+        earned_amount: amount,
       })
       .select()
       .single();

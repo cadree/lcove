@@ -61,11 +61,18 @@ const WalletPage: React.FC = () => {
     const setupResult = searchParams.get('setup');
     if (setupResult === 'success') {
       toast({ title: 'Payment method added successfully!' });
-      supabase.functions.invoke('setup-payout-method', {
-        body: { type: 'sync' }
-      }).then(() => {
-        queryClient.invalidateQueries({ queryKey: ['payout-methods'] });
-      });
+      // Sync payment methods and wait for completion
+      const syncPaymentMethods = async () => {
+        try {
+          await supabase.functions.invoke('setup-payout-method', {
+            body: { type: 'sync' }
+          });
+          await queryClient.invalidateQueries({ queryKey: ['payout-methods'] });
+        } catch (error) {
+          console.error('Failed to sync payment methods:', error);
+        }
+      };
+      syncPaymentMethods();
       searchParams.delete('setup');
       setSearchParams(searchParams, { replace: true });
     } else if (setupResult === 'cancelled') {

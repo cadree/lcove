@@ -45,29 +45,34 @@ serve(async (req) => {
 
     // If using credits, convert from credit balance
     if (use_credits) {
-      // Check user's credit balance
+      // Check user's EARNED credit balance - only earned credits can be paid out
       const { data: credits } = await supabaseClient
         .from('user_credits')
-        .select('balance')
+        .select('balance, earned_balance, genesis_balance')
         .eq('user_id', user.id)
         .single();
 
-      const creditBalance = credits?.balance || 0;
+      const earnedBalance = credits?.earned_balance || 0;
       
-      if (creditBalance < amount) {
-        throw new Error(`Insufficient credit balance. You have ${creditBalance} LC, need ${amount} LC`);
+      if (earnedBalance < amount) {
+        throw new Error(`Insufficient Earned Credit. You have ${earnedBalance} Earned LC, need ${amount} LC. Only Earned Credit can be withdrawn.`);
       }
 
-      // Deduct credits
-      const newBalance = creditBalance - amount;
+      // Deduct from earned credits only
+      const newEarnedBalance = earnedBalance - amount;
+      const newTotalBalance = (credits?.balance || 0) - amount;
+      
       await supabaseClient.from('credit_ledger').insert({
         user_id: user.id,
         amount: -amount,
-        balance_after: newBalance,
+        balance_after: newTotalBalance,
         type: 'payout_conversion',
-        description: `Converted ${amount} LC to payout`,
+        description: `Converted ${amount} Earned LC to payout`,
         reference_type: project_id ? 'project' : null,
         reference_id: project_id || null,
+        credit_type: 'earned',
+        genesis_amount: 0,
+        earned_amount: -amount,
       });
 
       // Create payout record

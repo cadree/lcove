@@ -35,7 +35,7 @@ export const TransferCreditsDialog: React.FC<TransferCreditsDialogProps> = ({
   const isValidAmount = numAmount > 0 && numAmount <= balance;
 
   const handleTransfer = () => {
-    if (!selectedUser || !isValidAmount) return;
+    if (!selectedUser || !isValidAmount || isPending) return;
 
     transfer({
       recipient_id: selectedUser.id,
@@ -48,6 +48,10 @@ export const TransferCreditsDialog: React.FC<TransferCreditsDialogProps> = ({
         setAmount('');
         setMessage('');
         setSearchQuery('');
+      },
+      onError: (error) => {
+        // Error is already handled by the hook's toast, but we keep the dialog open
+        console.error('Transfer failed:', error);
       }
     });
   };
