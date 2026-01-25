@@ -114,16 +114,41 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
     }
   }, []);
 
+  // ICE candidate queue per peer (for candidates received before remote description)
+  const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+
   // Create peer connection for a viewer
   const createPeerConnection = useCallback((viewerId: string): RTCPeerConnection => {
     console.log('[Host] Creating peer connection for viewer:', viewerId);
+    
+    // Initialize pending candidates queue for this viewer
+    pendingCandidatesRef.current.set(viewerId, []);
     
     const pc = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        // OpenRelay TURN servers for NAT traversal (free tier)
+        {
+          urls: 'turn:openrelay.metered.ca:80',
+          username: 'openrelayproject',
+          credential: 'openrelayproject',
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject',
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+          username: 'openrelayproject',
+          credential: 'openrelayproject',
+        },
       ],
+      iceCandidatePoolSize: 10,
     });
 
     // Add local stream tracks
@@ -154,12 +179,25 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
       console.log('[Host] Peer connection state for', viewerId, ':', pc.connectionState);
       if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
         peersRef.current.delete(viewerId);
+        pendingCandidatesRef.current.delete(viewerId);
         pc.close();
       }
     };
 
     return pc;
   }, [user]);
+
+  // Broadcast host-ready signal to all waiting viewers
+  const broadcastHostReady = useCallback(() => {
+    if (channelRef.current && user) {
+      console.log('[Host] Broadcasting host-ready signal');
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'host-ready',
+        payload: { hostId: user.id, streamId },
+      });
+    }
+  }, [user, streamId]);
 
   // Setup signaling channel for host
   const setupSignaling = useCallback(() => {
@@ -171,6 +209,19 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
       config: { broadcast: { self: false } }
     });
     channelRef.current = channel;
+
+    // Listen for viewer-join requests (viewers asking if host is ready)
+    channel.on('broadcast', { event: 'viewer-join' }, ({ payload }: any) => {
+      console.log('[Host] Viewer asking to join:', payload.viewerId);
+      // Respond with host-ready if we have the camera
+      if (localStreamRef.current) {
+        channel.send({
+          type: 'broadcast',
+          event: 'host-ready',
+          payload: { hostId: user.id, streamId },
+        });
+      }
+    });
 
     // Listen for offers from viewers
     channel.on('broadcast', { event: 'offer' }, async ({ payload }: any) => {
@@ -190,6 +241,18 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
 
         // Set remote description (viewer's offer)
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        
+        // Process any pending ICE candidates for this viewer
+        const pendingCandidates = pendingCandidatesRef.current.get(senderId) || [];
+        console.log('[Host] Processing', pendingCandidates.length, 'pending ICE candidates for viewer:', senderId);
+        for (const candidate of pendingCandidates) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (err) {
+            console.error('[Host] Error adding pending ICE candidate:', err);
+          }
+        }
+        pendingCandidatesRef.current.set(senderId, []);
         
         // Create and send answer
         const answer = await pc.createAnswer();
@@ -227,13 +290,23 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
         } catch (err) {
           console.error('[Host] Error adding ICE candidate:', err);
         }
+      } else {
+        // Queue the candidate for later processing
+        console.log('[Host] Queuing ICE candidate for viewer:', senderId);
+        const pending = pendingCandidatesRef.current.get(senderId) || [];
+        pending.push(candidate);
+        pendingCandidatesRef.current.set(senderId, pending);
       }
     });
 
     channel.subscribe((status) => {
       console.log('[Host] Signaling channel status:', status);
+      if (status === 'SUBSCRIBED') {
+        // Broadcast that host is ready when channel is subscribed
+        broadcastHostReady();
+      }
     });
-  }, [streamId, user, createPeerConnection]);
+  }, [streamId, user, createPeerConnection, broadcastHostReady]);
 
   // Start recording
   const startRecording = (stream: MediaStream) => {
@@ -345,6 +418,13 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
       if (error) throw error;
 
       setIsStreaming(true);
+      
+      // Broadcast host-ready again now that we're officially live
+      // This helps any viewers who joined during the transition
+      setTimeout(() => {
+        broadcastHostReady();
+      }, 100);
+      
       toast({ title: 'You are now live!' });
     } catch (err: any) {
       console.error('[Host] Error going live:', err);

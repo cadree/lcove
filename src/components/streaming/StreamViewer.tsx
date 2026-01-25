@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WebRTCStreamViewer } from './WebRTCStreamViewer';
 import { WebRTCStreamHost } from './WebRTCStreamHost';
+import { ReplayPlayer } from './ReplayPlayer';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -109,15 +110,11 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
       // REPLAY VIEW: Anyone can watch a replay (host or viewer)
       if (streamStatus === 'ended' && hasReplay) {
         return (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary/20 to-background">
-            <video 
-              src={stream.replay_url!} 
-              controls 
-              className="w-full h-full object-contain"
-              autoPlay
-              playsInline
-            />
-          </div>
+          <ReplayPlayer 
+            src={stream.replay_url!}
+            poster={stream.thumbnail_url}
+            className="w-full h-full"
+          />
         );
       }
       
