@@ -19,6 +19,9 @@ export interface StudioBooking {
   message: string | null;
   owner_notes: string | null;
   stripe_payment_intent_id: string | null;
+  seller_amount: number | null;
+  platform_fee: number | null;
+  seller_payout_status: string | null;
   created_at: string;
   updated_at: string;
   item?: {
@@ -172,6 +175,42 @@ export const useUpdateBookingStatus = () => {
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['studio-bookings'] });
       toast({ title: `Booking ${status}` });
+    },
+  });
+};
+
+export const usePurchaseStudioBooking = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ bookingId, paymentType }: { 
+      bookingId: string; 
+      paymentType: 'cash' | 'credits';
+    }) => {
+      const { data, error } = await supabase.functions.invoke('purchase-studio-booking', {
+        body: { bookingId, paymentType },
+      });
+
+      if (error) throw new Error(error.message);
+      return data as { success?: boolean; url?: string; bookingId: string };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['studio-bookings'] });
+      
+      if (data.url) {
+        // Redirect to Stripe checkout
+        window.open(data.url, '_blank');
+      } else if (data.success) {
+        toast({ title: 'Booking payment complete!' });
+      }
+    },
+    onError: (error) => {
+      toast({ 
+        title: 'Payment failed', 
+        description: error.message, 
+        variant: 'destructive' 
+      });
     },
   });
 };
