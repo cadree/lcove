@@ -27,6 +27,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const retryCountRef = useRef(0);
+  const offerSentRef = useRef(false); // Track if we've already sent an offer
   const maxRetries = 5;
 
   const [isConnecting, setIsConnecting] = useState(true);
@@ -54,6 +55,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
     }
     
     pendingCandidatesRef.current = [];
+    offerSentRef.current = false;
     setHostReady(false);
   }, []);
 
@@ -70,6 +72,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
     setConnectionState('connecting');
     setHasVideo(false);
     pendingCandidatesRef.current = [];
+    offerSentRef.current = false;
 
     try {
       console.log('[Viewer] Connecting to stream:', streamId, 'Host:', hostId);
@@ -171,8 +174,11 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
         console.log('[Viewer] Host is ready:', payload);
         if (payload.hostId === hostId) {
           setHostReady(true);
-          // Send offer when host is ready
-          sendOffer(pc, channel);
+          // Send offer when host is ready (only if we haven't sent one yet)
+          if (!offerSentRef.current) {
+            console.log('[Viewer] Sending offer after host-ready signal');
+            sendOffer(pc, channel);
+          }
         }
       });
 
@@ -276,39 +282,34 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
         payload: { viewerId: user.id },
       });
 
-      // Also send initial offer immediately (in case host is already broadcasting)
-      await sendOffer(pc, channel);
+      // Wait a bit for host-ready signal before sending initial offer
+      // This gives time for the host to respond if already live
+      reconnectTimeoutRef.current = setTimeout(async () => {
+        // Only send offer if we haven't received host-ready yet
+        if (!offerSentRef.current && peerConnectionRef.current) {
+          console.log('[Viewer] No host-ready received yet, sending initial offer');
+          await sendOffer(pc, channel);
+        }
+      }, 1000);
 
-      // Set up retry mechanism with exponential backoff
-      const setupRetryTimeout = (attempt: number) => {
-        const delay = Math.min(3000 * Math.pow(1.5, attempt), 15000);
-        reconnectTimeoutRef.current = setTimeout(() => {
-          if (peerConnectionRef.current?.connectionState !== 'connected' && !hasVideo && isLive) {
-            if (attempt < 3) {
-              console.log(`[Viewer] Connection timeout, resending offer (attempt ${attempt + 1})`);
-              if (channelRef.current && peerConnectionRef.current?.localDescription) {
-                channelRef.current.send({
-                  type: 'broadcast',
-                  event: 'offer',
-                  payload: { offer: peerConnectionRef.current.localDescription, senderId: user.id },
-                });
-              }
-              setupRetryTimeout(attempt + 1);
-            } else {
-              console.log('[Viewer] Max offer retries reached, full reconnect');
-              retryCountRef.current++;
-              if (retryCountRef.current < maxRetries) {
-                connect();
-              } else {
-                setError('Unable to connect to stream');
-                setIsConnecting(false);
-              }
-            }
+      // Set up connection timeout with retry mechanism
+      const connectionTimeout = setTimeout(() => {
+        if (peerConnectionRef.current?.connectionState !== 'connected' && !hasVideo && isLive) {
+          console.log('[Viewer] Connection timeout, attempting reconnect...');
+          retryCountRef.current++;
+          if (retryCountRef.current < maxRetries) {
+            connect();
+          } else {
+            setError('Unable to connect to stream after multiple attempts');
+            setIsConnecting(false);
           }
-        }, delay);
-      };
+        }
+      }, 15000); // 15 second timeout for initial connection
 
-      setupRetryTimeout(0);
+      // Store timeout to clear on cleanup
+      const existingTimeout = reconnectTimeoutRef.current;
+      reconnectTimeoutRef.current = connectionTimeout;
+      if (existingTimeout) clearTimeout(existingTimeout);
 
     } catch (err: any) {
       console.error('[Viewer] Error connecting to stream:', err);
@@ -320,8 +321,15 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
 
   const sendOffer = async (pc: RTCPeerConnection, channel: ReturnType<typeof supabase.channel>) => {
     try {
-      // Only create offer if we haven't already
+      // Only create offer if we haven't already sent one
+      if (offerSentRef.current) {
+        console.log('[Viewer] Offer already sent, skipping duplicate');
+        return;
+      }
+      
+      // Only create offer if signaling state allows
       if (pc.signalingState === 'stable') {
+        offerSentRef.current = true;
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         
@@ -334,6 +342,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       }
     } catch (err) {
       console.error('[Viewer] Error creating/sending offer:', err);
+      offerSentRef.current = false; // Reset on error to allow retry
     }
   };
 
