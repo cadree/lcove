@@ -42,7 +42,7 @@ const Projects: React.FC = () => {
 
   return (
     <PageLayout>
-      <div className="p-4 sm:p-6 pb-32">
+      <div className="p-4 sm:p-6 pb-32 touch-manipulation">
         {/* Header */}
         <PageHeader
           title="Projects"

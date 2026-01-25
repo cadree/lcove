@@ -66,7 +66,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent side="right" className="w-full sm:max-w-xl p-0 overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-xl p-0 overflow-y-auto pb-safe touch-manipulation">
         <SheetHeader className="p-6 pb-4 border-b border-border sticky top-0 bg-background z-10">
           <div className="flex items-start justify-between">
             <div>
@@ -87,10 +87,10 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                       <Trash2 className="h-5 w-5" />
                     </Button>
                   </AlertDialogTrigger>
-                  <AlertDialogContent>
+                  <AlertDialogContent aria-describedby="delete-project-description">
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete Project</AlertDialogTitle>
-                      <AlertDialogDescription>
+                      <AlertDialogDescription id="delete-project-description">
                         Are you sure you want to delete "{project.title}"? This will remove all roles and applications. This action cannot be undone.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
@@ -275,11 +275,11 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                     rows={3}
                   />
                   <div className="flex gap-2">
-                    <Button onClick={handleApply} disabled={isApplying} className="flex-1">
+                    <Button onClick={handleApply} disabled={isApplying} className="flex-1 min-h-[44px]">
                       <Send className="h-4 w-4 mr-2" />
                       {isApplying ? 'Sending...' : 'Submit Application'}
                     </Button>
-                    <Button variant="outline" onClick={() => setSelectedRole(null)}>
+                    <Button variant="outline" onClick={() => setSelectedRole(null)} className="min-h-[44px]">
                       Cancel
                     </Button>
                   </div>
@@ -322,26 +322,26 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                         </p>
                       )}
 
-                      {app.status === 'pending' && (
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => reviewApplication({ applicationId: app.id, status: 'accepted' })}
-                            className="flex-1"
-                          >
-                            <Check className="h-4 w-4 mr-1" />
-                            Accept
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => reviewApplication({ applicationId: app.id, status: 'rejected' })}
-                            className="flex-1"
-                          >
-                            <XIcon className="h-4 w-4 mr-1" />
-                            Reject
-                          </Button>
-                        </div>
+                        {app.status === 'pending' && (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => reviewApplication({ applicationId: app.id, status: 'accepted' })}
+                              className="flex-1 min-h-[44px]"
+                            >
+                              <Check className="h-4 w-4 mr-1" />
+                              Accept
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => reviewApplication({ applicationId: app.id, status: 'rejected' })}
+                              className="flex-1 min-h-[44px]"
+                            >
+                              <XIcon className="h-4 w-4 mr-1" />
+                              Reject
+                            </Button>
+                          </div>
                       )}
                     </div>
                   ))
