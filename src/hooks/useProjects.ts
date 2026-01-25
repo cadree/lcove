@@ -262,7 +262,7 @@ export const useProjects = (status?: string) => {
     isLoading,
     createProject: createProject.mutate,
     updateProjectStatus: updateProjectStatus.mutate,
-    deleteProject: deleteProject.mutate,
+    deleteProject: deleteProject.mutateAsync,
     isCreating: createProject.isPending,
     isDeleting: deleteProject.isPending,
   };
