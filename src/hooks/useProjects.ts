@@ -233,25 +233,50 @@ export const useProjects = (status?: string) => {
     mutationFn: async (projectId: string) => {
       if (!user?.id) throw new Error('Not authenticated');
 
-      // First delete related data (roles, applications)
-      await supabase.from('project_applications').delete().eq('project_id', projectId);
-      await supabase.from('project_roles').delete().eq('project_id', projectId);
+      // First delete related data (applications, then roles)
+      const { error: appError } = await supabase
+        .from('project_applications')
+        .delete()
+        .eq('project_id', projectId);
+      
+      if (appError) {
+        console.error('Failed to delete applications:', appError);
+        throw new Error('Failed to delete project applications');
+      }
 
-      // Then delete the project
-      const { error } = await supabase
+      const { error: rolesError } = await supabase
+        .from('project_roles')
+        .delete()
+        .eq('project_id', projectId);
+      
+      if (rolesError) {
+        console.error('Failed to delete roles:', rolesError);
+        throw new Error('Failed to delete project roles');
+      }
+
+      // Delete the project and verify it was deleted
+      const { data, error } = await supabase
         .from('projects')
         .delete()
         .eq('id', projectId)
-        .eq('creator_id', user.id); // Ensure only creator can delete
+        .eq('creator_id', user.id)
+        .select();
 
       if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        throw new Error('Project could not be deleted. You may not have permission.');
+      }
+
+      return data[0];
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['my-projects'] });
-      toast({ title: 'Project deleted' });
+      toast({ title: 'Project deleted successfully' });
     },
     onError: (error) => {
+      console.error('Delete project error:', error);
       toast({ title: 'Failed to delete project', description: error.message, variant: 'destructive' });
     },
   });
