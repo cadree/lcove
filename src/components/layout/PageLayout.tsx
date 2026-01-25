@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { GlobalFAB } from "@/components/navigation/GlobalFAB";
+import BottomNav from "@/components/navigation/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface PageLayoutProps {
@@ -22,11 +23,14 @@ const PageLayout = ({
       {/* Subtle ambient gradient */}
       <div className="fixed inset-0 bg-gradient-to-b from-primary/[0.02] via-transparent to-transparent pointer-events-none" />
       
-      <main className={`relative safe-area-top ${hideNav ? 'safe-area-bottom' : 'pb-24'} ${className}`}>
+      <main className={`relative safe-area-top ${hideNav ? 'safe-area-bottom' : 'pb-28'} ${className}`}>
         {children}
       </main>
       
-      {/* Global FAB - replaces old bottom nav */}
+      {/* Bottom Navigation - visible on all pages when authenticated */}
+      {!hideNav && user && <BottomNav />}
+      
+      {/* Global FAB for quick actions */}
       {!hideNav && <GlobalFAB />}
     </div>
   );
