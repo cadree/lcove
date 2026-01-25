@@ -1594,41 +1594,171 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_contributions: {
+        Row: {
+          amount_earned: number | null
+          amount_requested: number
+          contribution_type: string
+          created_at: string
+          description: string | null
+          id: string
+          reference_id: string | null
+          reference_type: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          amount_earned?: number | null
+          amount_requested: number
+          contribution_type: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          amount_earned?: number | null
+          amount_requested?: number
+          contribution_type?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_contributions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "credit_contributions_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      credit_earning_limits: {
+        Row: {
+          created_at: string
+          daily_earned: number
+          id: string
+          last_daily_reset: string
+          last_weekly_reset: string
+          reputation_multiplier: number
+          updated_at: string
+          user_id: string
+          weekly_earned: number
+        }
+        Insert: {
+          created_at?: string
+          daily_earned?: number
+          id?: string
+          last_daily_reset?: string
+          last_weekly_reset?: string
+          reputation_multiplier?: number
+          updated_at?: string
+          user_id: string
+          weekly_earned?: number
+        }
+        Update: {
+          created_at?: string
+          daily_earned?: number
+          id?: string
+          last_daily_reset?: string
+          last_weekly_reset?: string
+          reputation_multiplier?: number
+          updated_at?: string
+          user_id?: string
+          weekly_earned?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_earning_limits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       credit_ledger: {
         Row: {
           amount: number
           balance_after: number
           created_at: string
+          credit_type: string
           description: string
+          earned_amount: number | null
+          genesis_amount: number | null
           id: string
           reference_id: string | null
           reference_type: string | null
           type: string
           user_id: string
+          verification_type: string | null
+          verified_by: string | null
         }
         Insert: {
           amount: number
           balance_after: number
           created_at?: string
+          credit_type?: string
           description: string
+          earned_amount?: number | null
+          genesis_amount?: number | null
           id?: string
           reference_id?: string | null
           reference_type?: string | null
           type: string
           user_id: string
+          verification_type?: string | null
+          verified_by?: string | null
         }
         Update: {
           amount?: number
           balance_after?: number
           created_at?: string
+          credit_type?: string
           description?: string
+          earned_amount?: number | null
+          genesis_amount?: number | null
           id?: string
           reference_id?: string | null
           reference_type?: string | null
           type?: string
           user_id?: string
+          verification_type?: string | null
+          verified_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "credit_ledger_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       dance_videos: {
         Row: {
@@ -5101,6 +5231,10 @@ export type Database = {
         Row: {
           balance: number
           created_at: string
+          earned_balance: number
+          genesis_balance: number
+          genesis_burned: number
+          genesis_lifetime_minted: number
           id: string
           lifetime_earned: number
           lifetime_spent: number
@@ -5110,6 +5244,10 @@ export type Database = {
         Insert: {
           balance?: number
           created_at?: string
+          earned_balance?: number
+          genesis_balance?: number
+          genesis_burned?: number
+          genesis_lifetime_minted?: number
           id?: string
           lifetime_earned?: number
           lifetime_spent?: number
@@ -5119,6 +5257,10 @@ export type Database = {
         Update: {
           balance?: number
           created_at?: string
+          earned_balance?: number
+          genesis_balance?: number
+          genesis_burned?: number
+          genesis_lifetime_minted?: number
           id?: string
           lifetime_earned?: number
           lifetime_spent?: number
