@@ -54,8 +54,9 @@ const Index = () => {
     }} animate={{
       opacity: 1,
       y: 0
-    }} className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-background/95 border-b border-border/30"
-        style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 0px)' }}>
+    }} className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-background/95 border-b border-border/30" style={{
+      paddingTop: 'max(env(safe-area-inset-top, 0px), 0px)'
+    }}>
         <div className="flex items-center justify-between px-4 h-14">
           {/* Left - Profile Avatar */}
           <Link to="/profile" className="tap-target" aria-label="Go to profile">
@@ -81,10 +82,12 @@ const Index = () => {
       </motion.header>
 
       {/* Spacer for fixed header */}
-      <div className="h-14" style={{ marginTop: 'max(env(safe-area-inset-top, 0px), 0px)' }} />
+      <div className="h-14" style={{
+      marginTop: 'max(env(safe-area-inset-top, 0px), 0px)'
+    }} />
 
       {/* Main Content */}
-      <main className="relative pb-40 safe-area-x">
+      <main className="relative pb-40 safe-area-x rounded-sm">
         {loading ? <div className="space-y-6 p-4">
             <Skeleton className="h-12 w-full rounded-2xl" />
             <div className="space-y-3">
