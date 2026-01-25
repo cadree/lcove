@@ -40,6 +40,7 @@ import {
   Sparkles,
   ArrowLeft,
   Trash2,
+  ExternalLink,
 } from 'lucide-react';
 
 const Store = () => {
@@ -185,6 +186,38 @@ const Store = () => {
                     </p>
                     {viewingStore.description && (
                       <p className="text-sm text-muted-foreground mt-1">{viewingStore.description}</p>
+                    )}
+                    {(viewingStore.shopify_store_url || viewingStore.peerspace_url) && (
+                      <div className="flex gap-2 mt-3">
+                        {viewingStore.shopify_store_url && (
+                          <Button variant="outline" size="sm" asChild>
+                            <a 
+                              href={viewingStore.shopify_store_url.startsWith('http') 
+                                ? viewingStore.shopify_store_url 
+                                : `https://${viewingStore.shopify_store_url}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <ExternalLink className="w-4 h-4 mr-2" />
+                              Shop on Shopify
+                            </a>
+                          </Button>
+                        )}
+                        {viewingStore.peerspace_url && (
+                          <Button variant="outline" size="sm" asChild>
+                            <a 
+                              href={viewingStore.peerspace_url.startsWith('http') 
+                                ? viewingStore.peerspace_url 
+                                : `https://${viewingStore.peerspace_url}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <ExternalLink className="w-4 h-4 mr-2" />
+                              Book on Peerspace
+                            </a>
+                          </Button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
