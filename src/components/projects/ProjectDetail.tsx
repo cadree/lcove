@@ -97,9 +97,13 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
                       <AlertDialogAction
-                        onClick={() => {
-                          deleteProject(project.id);
-                          onClose();
+                        onClick={async () => {
+                          try {
+                            await deleteProject(project.id);
+                            onClose();
+                          } catch (e) {
+                            console.error('Delete failed:', e);
+                          }
                         }}
                         disabled={isDeleting}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
