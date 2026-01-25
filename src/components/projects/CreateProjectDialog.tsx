@@ -162,9 +162,15 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {children && <DialogTrigger asChild>{children}</DialogTrigger>}
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto pb-24 sm:pb-8">
+      <DialogContent 
+        className="max-w-2xl max-h-[80vh] overflow-y-auto pb-24 sm:pb-8"
+        aria-describedby="create-project-description"
+      >
         <DialogHeader>
           <DialogTitle>Create New Project</DialogTitle>
+          <p id="create-project-description" className="text-sm text-muted-foreground">
+            Set up your project details, budget, and roles needed.
+          </p>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">

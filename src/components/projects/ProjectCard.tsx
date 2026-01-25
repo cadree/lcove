@@ -44,7 +44,11 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
   return (
     <div
       onClick={onClick}
-      className="group bg-card border border-border rounded-xl p-5 cursor-pointer transition-all duration-300 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5"
+      className="group bg-card border border-border rounded-xl p-5 cursor-pointer transition-all duration-300 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 touch-manipulation active:scale-[0.98]"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
+      aria-label={`View project: ${project.title}`}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-4">
