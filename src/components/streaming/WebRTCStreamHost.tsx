@@ -45,6 +45,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const hostReadyIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const [isStreaming, setIsStreaming] = useState(initialIsLive);
   const [cameraState, setCameraState] = useState<CameraState>('requesting');
@@ -389,6 +390,31 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
     };
   }, [cameraState, user, setupSignaling]);
 
+  // Periodic host-ready broadcast while streaming
+  useEffect(() => {
+    if (isStreaming && channelRef.current) {
+      console.log('[Host] Starting periodic host-ready broadcasts');
+      
+      // Broadcast immediately
+      broadcastHostReady();
+      
+      // Then broadcast every 3 seconds while live
+      hostReadyIntervalRef.current = setInterval(() => {
+        if (channelRef.current && isStreaming) {
+          console.log('[Host] Periodic host-ready broadcast');
+          broadcastHostReady();
+        }
+      }, 3000);
+    }
+    
+    return () => {
+      if (hostReadyIntervalRef.current) {
+        clearInterval(hostReadyIntervalRef.current);
+        hostReadyIntervalRef.current = null;
+      }
+    };
+  }, [isStreaming, broadcastHostReady]);
+
   // Go live
   const startStream = async () => {
     if (!user || cameraState !== 'ready' || !localStreamRef.current) return;
@@ -406,7 +432,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
       // Start recording
       startRecording(localStreamRef.current);
 
-      // Update stream status in database
+      // Update stream status in database FIRST
       const { error } = await supabase
         .from('live_streams')
         .update({ 
@@ -417,13 +443,16 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
 
       if (error) throw error;
 
+      // Set streaming state - this triggers the periodic broadcast effect
       setIsStreaming(true);
       
-      // Broadcast host-ready again now that we're officially live
-      // This helps any viewers who joined during the transition
-      setTimeout(() => {
-        broadcastHostReady();
-      }, 100);
+      // Also broadcast immediately multiple times with small delays
+      // to ensure all waiting viewers receive it
+      for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+          broadcastHostReady();
+        }, i * 200);
+      }
       
       toast({ title: 'You are now live!' });
     } catch (err: any) {
@@ -447,6 +476,12 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
   const stopStream = async (saveAsReplay: boolean) => {
     try {
       setIsSaving(saveAsReplay);
+      
+      // Stop periodic host-ready broadcasts
+      if (hostReadyIntervalRef.current) {
+        clearInterval(hostReadyIntervalRef.current);
+        hostReadyIntervalRef.current = null;
+      }
       
       let replayUrl: string | null = null;
       
