@@ -17,7 +17,7 @@ import { HomeMostUsedSection } from "@/components/home/HomeMostUsedSection";
 import { HomePinnedSection } from "@/components/home/HomePinnedSection";
 import { HomeExploreSection } from "@/components/home/HomeExploreSection";
 import { HomeEditSheet } from "@/components/home/HomeEditSheet";
-import etherLogo from "@/assets/ether-logo.avif";
+import HomeSupportBar from "@/components/home/HomeSupportBar";
 const Index = () => {
   const {
     user
@@ -47,14 +47,15 @@ const Index = () => {
       {/* Subtle ambient gradient */}
       <div className="fixed inset-0 bg-gradient-to-b from-primary/[0.02] via-transparent to-transparent pointer-events-none" />
       
-      {/* Header */}
+      {/* Header - Always visible */}
       <motion.header initial={{
       opacity: 0,
       y: -10
     }} animate={{
       opacity: 1,
       y: 0
-    }} className="sticky top-0 z-40 backdrop-blur-xl bg-background/80 border-b border-border/30 safe-area-top">
+    }} className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-background/95 border-b border-border/30"
+        style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 0px)' }}>
         <div className="flex items-center justify-between px-4 h-14">
           {/* Left - Profile Avatar */}
           <Link to="/profile" className="tap-target" aria-label="Go to profile">
@@ -79,8 +80,11 @@ const Index = () => {
         </div>
       </motion.header>
 
+      {/* Spacer for fixed header */}
+      <div className="h-14" style={{ marginTop: 'max(env(safe-area-inset-top, 0px), 0px)' }} />
+
       {/* Main Content */}
-      <main className="relative pb-32 safe-area-x">
+      <main className="relative pb-40 safe-area-x">
         {loading ? <div className="space-y-6 p-4">
             <Skeleton className="h-12 w-full rounded-2xl" />
             <div className="space-y-3">
@@ -138,6 +142,9 @@ const Index = () => {
             <HomeExploreSection items={scoredItems} onItemClick={handleItemClick} isEditing={isEditing} onTogglePin={togglePin} />
           </div>}
       </main>
+
+      {/* Bottom Support Bar - Always visible */}
+      <HomeSupportBar />
 
       {/* Global FAB */}
       <GlobalFAB />
