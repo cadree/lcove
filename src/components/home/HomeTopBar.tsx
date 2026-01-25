@@ -41,8 +41,8 @@ const HomeTopBar = ({
         </Button>
 
         {/* Center - Brand with Logo */}
-        <div className="flex flex-col items-center">
-          <img alt="Ether" className="h-10 w-auto object-contain" src="/lovable-uploads/0996c910-39b6-4669-aa9f-26a5a2e9a5f2.png" />
+        <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center">
+          <img alt="Ether" className="h-14 w-auto object-contain" src="/lovable-uploads/0996c910-39b6-4669-aa9f-26a5a2e9a5f2.png" />
         </div>
 
         {/* Right - Contribute + Energy + Notifications */}
