@@ -2129,6 +2129,66 @@ export type Database = {
           },
         ]
       }
+      home_preferences: {
+        Row: {
+          auto_reorder: boolean
+          created_at: string
+          id: string
+          recent_visits: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_reorder?: boolean
+          created_at?: string
+          id?: string
+          recent_visits?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_reorder?: boolean
+          created_at?: string
+          id?: string
+          recent_visits?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      home_usage: {
+        Row: {
+          click_count: number
+          created_at: string
+          id: string
+          is_pinned: boolean
+          item_id: string
+          last_clicked_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          click_count?: number
+          created_at?: string
+          id?: string
+          is_pinned?: boolean
+          item_id: string
+          last_clicked_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          click_count?: number
+          created_at?: string
+          id?: string
+          is_pinned?: boolean
+          item_id?: string
+          last_clicked_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       itinerary_items: {
         Row: {
           created_at: string
