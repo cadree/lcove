@@ -66,13 +66,9 @@ const Index = () => {
             </Avatar>
           </Link>
 
-          {/* Center - Logo + Title */}
-          <div className="flex items-center gap-2">
-            <img alt="Ether" className="h-6 w-6 rounded-lg object-contain" src="/lovable-uploads/5e878a07-e67b-473c-ae6d-1fcb2027bd79.png" />
-            <div className="flex items-center gap-1.5">
-              
-              
-            </div>
+          {/* Center - Logo */}
+          <div className="absolute left-1/2 -translate-x-1/2">
+            <img alt="Ether" className="h-14 w-auto object-contain" src="/lovable-uploads/5e878a07-e67b-473c-ae6d-1fcb2027bd79.png" />
           </div>
 
           {/* Right - Actions */}
