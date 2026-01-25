@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { X, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2 } from 'lucide-react';
+import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2 } from 'lucide-react';
 import { Project, ProjectRole, useProjectApplications, useProjects } from '@/hooks/useProjects';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -117,11 +117,13 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
               )}
               <Button 
                 variant="ghost" 
-                size="icon" 
+                size="sm" 
                 onClick={onClose}
-                className="shrink-0 -mt-1 -mr-2"
+                className="shrink-0 -mt-1 -mr-2 gap-1"
+                aria-label="Close project details"
               >
-                <X className="h-5 w-5" />
+                <ArrowLeft className="h-4 w-4" />
+                Back
               </Button>
             </div>
           </div>
