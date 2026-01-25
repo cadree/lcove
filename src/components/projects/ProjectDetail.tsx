@@ -100,9 +100,10 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                         onClick={async () => {
                           try {
                             await deleteProject(project.id);
-                            onClose();
                           } catch (e) {
                             console.error('Delete failed:', e);
+                          } finally {
+                            onClose();
                           }
                         }}
                         disabled={isDeleting}
