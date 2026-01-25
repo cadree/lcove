@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { X, DollarSign, Calendar, Users, Check, XIcon, Clock, Send } from 'lucide-react';
-import { Project, ProjectRole, useProjectApplications } from '@/hooks/useProjects';
+import { X, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2 } from 'lucide-react';
+import { Project, ProjectRole, useProjectApplications, useProjects } from '@/hooks/useProjects';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 
 interface ProjectDetailProps {
@@ -30,6 +31,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
   const [selectedRole, setSelectedRole] = useState<ProjectRole | null>(null);
   const [applicationMessage, setApplicationMessage] = useState('');
   const { applications, applyToProject, reviewApplication, isApplying } = useProjectApplications(project?.id);
+  const { deleteProject, isDeleting } = useProjects();
 
   if (!project) return null;
 
@@ -73,14 +75,50 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
               </Badge>
               <SheetTitle className="text-xl">{project.title}</SheetTitle>
             </div>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={onClose}
-              className="shrink-0 -mt-1 -mr-2"
-            >
-              <X className="h-5 w-5" />
-            </Button>
+            <div className="flex items-center gap-1">
+              {isCreator && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="shrink-0 -mt-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Project</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete "{project.title}"? This will remove all roles and applications. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => {
+                          deleteProject(project.id);
+                          onClose();
+                        }}
+                        disabled={isDeleting}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {isDeleting ? 'Deleting...' : 'Delete'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={onClose}
+                className="shrink-0 -mt-1 -mr-2"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
         </SheetHeader>
 

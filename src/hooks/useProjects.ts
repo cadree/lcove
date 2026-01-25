@@ -229,13 +229,42 @@ export const useProjects = (status?: string) => {
     },
   });
 
+  const deleteProject = useMutation({
+    mutationFn: async (projectId: string) => {
+      if (!user?.id) throw new Error('Not authenticated');
+
+      // First delete related data (roles, applications)
+      await supabase.from('project_applications').delete().eq('project_id', projectId);
+      await supabase.from('project_roles').delete().eq('project_id', projectId);
+
+      // Then delete the project
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId)
+        .eq('creator_id', user.id); // Ensure only creator can delete
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['my-projects'] });
+      toast({ title: 'Project deleted' });
+    },
+    onError: (error) => {
+      toast({ title: 'Failed to delete project', description: error.message, variant: 'destructive' });
+    },
+  });
+
   return {
     projects,
     myProjects,
     isLoading,
     createProject: createProject.mutate,
     updateProjectStatus: updateProjectStatus.mutate,
+    deleteProject: deleteProject.mutate,
     isCreating: createProject.isPending,
+    isDeleting: deleteProject.isPending,
   };
 };
 
