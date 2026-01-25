@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
-import { Bell, Heart, User } from "lucide-react";
+import { Bell, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { EnergyIndicator } from "@/components/energy";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -18,9 +18,7 @@ const HomeTopBar = ({
 }: HomeTopBarProps) => {
   const { user } = useAuth();
   const { profile } = useProfile();
-  const location = useLocation();
   const navigate = useNavigate();
-  const isOnMembership = location.pathname === "/membership";
   
   return (
     <motion.header
@@ -55,20 +53,8 @@ const HomeTopBar = ({
           />
         </div>
 
-        {/* Right - Contribute + Energy + Notifications */}
+        {/* Right - Energy + Notifications */}
         <nav className="flex items-center gap-2" aria-label="Quick actions">
-          {!isOnMembership && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-9 px-3 rounded-xl text-primary hover:text-primary hover:bg-primary/10 gap-1.5" 
-              onClick={() => navigate("/membership")}
-              aria-label="Contribute to community"
-            >
-              <Heart className="w-4 h-4" aria-hidden="true" />
-              <span className="text-xs font-medium hidden sm:inline">Contribute</span>
-            </Button>
-          )}
           {user && <EnergyIndicator />}
           <Link to="/notifications" aria-label="View notifications">
             <Button 
