@@ -10,7 +10,9 @@ import {
   MessageCircle,
   Compass,
   Heart,
-  Folder
+  Folder,
+  Settings,
+  Briefcase
 } from "lucide-react";
 import HomeTopBar from "@/components/home/HomeTopBar";
 import WidgetStatChip from "@/components/home/WidgetStatChip";
@@ -26,20 +28,30 @@ import {
   DrawerDescription,
 } from "@/components/ui/drawer";
 import { usePlatformStats } from "@/hooks/usePlatformStats";
+import { Link } from "react-router-dom";
 
-const appIcons = [
+// Primary navigation - most used features
+const primaryNav = [
   { title: "Feed", icon: Compass, link: "/feed" },
-  { title: "Portfolios", icon: Folder, link: "/portfolios" },
   { title: "Projects", icon: FolderKanban, link: "/projects" },
-  { title: "Fund", icon: Heart, link: "/fund" },
-  { title: "Live", icon: Radio, link: "/live" },
+  { title: "Messages", icon: MessageCircle, link: "/messages" },
+  { title: "Calendar", icon: Calendar, link: "/calendar" },
 ];
 
-const quickAccessCards = [
+// Discover section - explore content
+const discoverCards = [
+  { title: "Portfolios", subtitle: "Browse work", tag: "Explore", icon: Folder, link: "/portfolios" },
+  { title: "Directory", subtitle: "Find creators", tag: "Connect", icon: Users, link: "/directory" },
+  { title: "Live", subtitle: "Watch streams", tag: "Live", icon: Radio, link: "/live" },
   { title: "Cinema", subtitle: "Films & networks", tag: "Watch", icon: Film, link: "/cinema" },
-  { title: "Mall", subtitle: "Creator stores", tag: "Shop", icon: Store, link: "/mall" },
-  { title: "Wallet", subtitle: "Credits & payments", tag: "Manage", icon: Wallet, link: "/wallet" },
-  { title: "Messages", subtitle: "Conversations", tag: "Chat", icon: MessageCircle, link: "/messages" },
+];
+
+// Tools section - manage your work
+const toolCards = [
+  { title: "Pipeline", subtitle: "Client management", tag: "CRM", icon: Briefcase, link: "/pipeline" },
+  { title: "My Store", subtitle: "Sell products", tag: "Shop", icon: Store, link: "/store" },
+  { title: "Wallet", subtitle: "Credits & earnings", tag: "Finance", icon: Wallet, link: "/wallet" },
+  { title: "Settings", subtitle: "Preferences", tag: "Config", icon: Settings, link: "/settings" },
 ];
 
 
@@ -53,7 +65,6 @@ const Index = () => {
     { value: stats?.totalCities || "—", label: "Cities" },
   ];
 
-  // This page is now exclusively for authenticated users (AccessGate handles redirect)
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Subtle ambient gradient */}
@@ -65,16 +76,16 @@ const Index = () => {
         subtitle="Home"
       />
       
-      {/* Main Content - Dashboard for authenticated users only */}
-      <main className="relative pb-28 space-y-4 safe-area-x">
+      {/* Main Content */}
+      <main className="relative pb-28 space-y-6 safe-area-x">
         {/* Stats Row */}
         <WidgetStatChip stats={statChips} />
 
-        {/* App Icons Section */}
+        {/* Primary Navigation - Quick Launch */}
         <section className="pt-2">
           <WidgetSectionHeader title="Quick Launch" />
-          <div className="flex justify-center gap-4 px-4">
-            {appIcons.map((item, index) => (
+          <div className="flex justify-center gap-5 px-4">
+            {primaryNav.map((item, index) => (
               <WidgetAppIcon 
                 key={item.title}
                 {...item}
@@ -84,15 +95,15 @@ const Index = () => {
           </div>
         </section>
 
-        {/* Quick Access Cards */}
-        <section className="pt-4">
+        {/* Discover Section */}
+        <section className="pt-2">
           <WidgetSectionHeader 
-            title="Quick Access"
-            link="/feed"
-            linkText="More"
+            title="Discover"
+            link="/directory"
+            linkText="See all"
           />
           <div className="grid grid-cols-2 gap-3 px-4">
-            {quickAccessCards.map((item, index) => (
+            {discoverCards.map((item, index) => (
               <WidgetMiniCard 
                 key={item.title}
                 {...item}
@@ -100,6 +111,37 @@ const Index = () => {
               />
             ))}
           </div>
+        </section>
+
+        {/* Tools Section */}
+        <section className="pt-2">
+          <WidgetSectionHeader 
+            title="Your Tools"
+          />
+          <div className="grid grid-cols-2 gap-3 px-4">
+            {toolCards.map((item, index) => (
+              <WidgetMiniCard 
+                key={item.title}
+                {...item}
+                index={index}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* Community Fund CTA */}
+        <section className="px-4 pt-2">
+          <Link to="/fund" className="block">
+            <div className="glass rounded-2xl p-4 flex items-center gap-4 hover:bg-accent/30 transition-colors">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Heart className="w-6 h-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-foreground">Community Fund</p>
+                <p className="text-sm text-muted-foreground">Support creator projects</p>
+              </div>
+            </div>
+          </Link>
         </section>
       </main>
 
