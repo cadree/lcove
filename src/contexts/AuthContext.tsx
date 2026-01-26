@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { getAuthRedirectUrl } from '@/lib/capacitorStorage';
+import { logAuthEvent, logAuthError, logSessionState } from '@/lib/authDebug';
 
 interface AuthContextType {
   user: User | null;
@@ -22,26 +23,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    logAuthEvent('AuthProvider initializing');
+
+    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        logAuthEvent(`Auth state change: ${event}`, {
+          hasSession: !!session,
+          userId: session?.user?.id,
+        });
+        
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        // Log session details
+        if (session) {
+          logSessionState(
+            true,
+            session.user.id,
+            session.expires_at
+          );
+        } else {
+          logSessionState(false);
+        }
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        logAuthError('getSession failed', error);
+      } else {
+        logAuthEvent('Initial session check', {
+          hasSession: !!session,
+          userId: session?.user?.id,
+        });
+      }
+      
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      logAuthEvent('AuthProvider cleanup');
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string) => {
     const redirectUrl = getAuthRedirectUrl('/');
-    console.log('[Auth] Sign up with redirect URL:', redirectUrl);
+    logAuthEvent('Sign up attempt', { 
+      email: email.replace(/(.{2}).*(@.*)/, '$1***$2'),
+      redirectUrl 
+    });
+    
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -49,40 +86,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         emailRedirectTo: redirectUrl
       }
     });
+    
     if (error) {
-      console.error('[Auth] Sign up error:', error);
+      logAuthError('Sign up failed', error);
+    } else {
+      logAuthEvent('Sign up successful');
     }
+    
     return { error };
   };
 
   const signIn = async (email: string, password: string) => {
+    logAuthEvent('Sign in attempt', { 
+      email: email.replace(/(.{2}).*(@.*)/, '$1***$2') 
+    });
+    
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+    
+    if (error) {
+      logAuthError('Sign in failed', error);
+    } else {
+      logAuthEvent('Sign in successful');
+    }
+    
     return { error };
   };
 
   const signOut = async () => {
+    logAuthEvent('Sign out');
     await supabase.auth.signOut();
   };
 
   const resetPassword = async (email: string) => {
     const redirectUrl = getAuthRedirectUrl('/auth?reset=true');
-    console.log('[Auth] Password reset with redirect URL:', redirectUrl);
+    logAuthEvent('Password reset request', { 
+      email: email.replace(/(.{2}).*(@.*)/, '$1***$2'),
+      redirectUrl 
+    });
+    
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: redirectUrl,
     });
+    
     if (error) {
-      console.error('[Auth] Password reset error:', error);
+      logAuthError('Password reset failed', error);
+    } else {
+      logAuthEvent('Password reset email sent');
     }
+    
     return { error };
   };
 
   const updatePassword = async (newPassword: string) => {
+    logAuthEvent('Password update attempt');
+    
     const { error } = await supabase.auth.updateUser({
       password: newPassword
     });
+    
+    if (error) {
+      logAuthError('Password update failed', error);
+    } else {
+      logAuthEvent('Password updated successfully');
+    }
+    
     return { error };
   };
 

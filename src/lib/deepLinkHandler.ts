@@ -1,6 +1,44 @@
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
+import { logAuthEvent, logAuthError } from './authDebug';
+
+/**
+ * Parse auth parameters from a deep link URL
+ * Handles both fragment-based (#) and query-based (?) tokens
+ */
+const parseAuthParams = (url: string): URLSearchParams | null => {
+  try {
+    const hashIndex = url.indexOf('#');
+    const queryIndex = url.indexOf('?');
+    
+    if (hashIndex !== -1) {
+      // Fragment-based tokens (implicit flow)
+      return new URLSearchParams(url.substring(hashIndex + 1));
+    } else if (queryIndex !== -1) {
+      // Query-based tokens (PKCE flow)
+      return new URLSearchParams(url.substring(queryIndex + 1));
+    }
+    
+    return null;
+  } catch (error) {
+    logAuthError('parseAuthParams', error);
+    return null;
+  }
+};
+
+/**
+ * Check if a URL contains authentication tokens or codes
+ */
+const isAuthUrl = (url: string): boolean => {
+  return (
+    url.includes('access_token') ||
+    url.includes('refresh_token') ||
+    url.includes('code=') ||
+    url.includes('error=') ||
+    url.includes('error_description=')
+  );
+};
 
 /**
  * Setup deep link handler for authentication callbacks on native platforms
@@ -8,92 +46,103 @@ import { supabase } from '@/integrations/supabase/client';
  */
 export const setupDeepLinkHandler = (): (() => void) | undefined => {
   if (!Capacitor.isNativePlatform()) {
+    logAuthEvent('Deep link handler skipped - not native platform');
     return undefined;
   }
 
-  console.log('[DeepLink] Setting up handler for native platform');
+  logAuthEvent('Setting up deep link handler', { platform: Capacitor.getPlatform() });
 
   const handleUrlOpen = async ({ url }: { url: string }) => {
-    console.log('[DeepLink] Received URL:', url);
+    logAuthEvent('Deep link received', { url: url.substring(0, 100) + '...' });
 
     try {
-      // Check if this is an auth callback URL
-      if (url.includes('access_token') || url.includes('refresh_token') || url.includes('code=')) {
-        // Extract the fragment or query string
-        const hashIndex = url.indexOf('#');
-        const queryIndex = url.indexOf('?');
-        
-        let params: URLSearchParams;
-        
-        if (hashIndex !== -1) {
-          // Fragment-based tokens (implicit flow)
-          params = new URLSearchParams(url.substring(hashIndex + 1));
-        } else if (queryIndex !== -1) {
-          // Query-based tokens (PKCE flow)
-          params = new URLSearchParams(url.substring(queryIndex + 1));
-        } else {
-          console.log('[DeepLink] No tokens found in URL');
-          return;
+      // Check for auth errors first
+      if (url.includes('error=')) {
+        const params = parseAuthParams(url);
+        if (params) {
+          const error = params.get('error');
+          const errorDescription = params.get('error_description');
+          logAuthError('Auth callback error', { error, errorDescription });
         }
+        return;
+      }
 
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-        const code = params.get('code');
+      // Check if this is an auth callback URL
+      if (!isAuthUrl(url)) {
+        logAuthEvent('URL is not an auth callback, ignoring');
+        return;
+      }
 
-        if (accessToken && refreshToken) {
-          // Direct token flow
-          console.log('[DeepLink] Setting session from tokens');
-          const { error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
+      const params = parseAuthParams(url);
+      if (!params) {
+        logAuthEvent('No auth params found in URL');
+        return;
+      }
 
-          if (error) {
-            console.error('[DeepLink] Session error:', error);
-          } else {
-            console.log('[DeepLink] Session set successfully');
-          }
-        } else if (code) {
-          // PKCE flow - exchange code for session
-          console.log('[DeepLink] Exchanging code for session');
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+      const code = params.get('code');
 
-          if (error) {
-            console.error('[DeepLink] Code exchange error:', error);
-          } else {
-            console.log('[DeepLink] Session established from code');
-          }
+      if (accessToken && refreshToken) {
+        // Direct token flow (implicit)
+        logAuthEvent('Setting session from tokens');
+        const { data, error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (error) {
+          logAuthError('setSession failed', error);
+        } else {
+          logAuthEvent('Session set successfully', { userId: data.user?.id });
+        }
+      } else if (code) {
+        // PKCE flow - exchange code for session
+        logAuthEvent('Exchanging code for session');
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+        if (error) {
+          logAuthError('exchangeCodeForSession failed', error);
+        } else {
+          logAuthEvent('Session established from code', { userId: data.user?.id });
         }
       }
 
       // Handle password reset URLs
       if (url.includes('type=recovery') || url.includes('reset=true')) {
-        console.log('[DeepLink] Password reset URL detected');
-        // Navigate to the reset password page
-        // The app will handle this through the auth state change
+        logAuthEvent('Password reset URL detected');
+        // Navigate to reset password page - handled by auth state change
       }
 
       // Handle email confirmation URLs
       if (url.includes('type=signup') || url.includes('type=email')) {
-        console.log('[DeepLink] Email confirmation URL detected');
-        // The session will be set automatically
+        logAuthEvent('Email confirmation URL detected');
+        // Session will be set automatically
       }
     } catch (error) {
-      console.error('[DeepLink] Error handling URL:', error);
+      logAuthError('Deep link handler error', error);
     }
   };
 
-  // Add the listener
+  // Add the URL open listener
   App.addListener('appUrlOpen', handleUrlOpen);
 
-  // Also handle the app state resume to check for pending auth
+  // Handle app state resume to check for pending auth
   App.addListener('appStateChange', async ({ isActive }) => {
     if (isActive) {
-      console.log('[DeepLink] App became active, checking session');
-      // Attempt to refresh the session when app becomes active
-      const { error } = await supabase.auth.getSession();
-      if (error) {
-        console.error('[DeepLink] Session refresh error:', error);
+      logAuthEvent('App became active, checking session');
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          logAuthError('Session check on resume failed', error);
+        } else {
+          logAuthEvent('Session check on resume', { 
+            hasSession: !!data.session,
+            userId: data.session?.user?.id 
+          });
+        }
+      } catch (error) {
+        logAuthError('Session check exception', error);
       }
     }
   });
@@ -101,7 +150,7 @@ export const setupDeepLinkHandler = (): (() => void) | undefined => {
   // Return cleanup function
   return () => {
     App.removeAllListeners();
-    console.log('[DeepLink] Removed all listeners');
+    logAuthEvent('Removed all app listeners');
   };
 };
 
@@ -116,14 +165,15 @@ export const initializeCapacitorApp = async (): Promise<void> => {
 
   try {
     // Get any launch URL (app was opened via deep link)
-    const { url } = await App.getLaunchUrl() || {};
+    const launchUrl = await App.getLaunchUrl();
     
-    if (url) {
-      console.log('[DeepLink] App launched with URL:', url);
-      // Process the launch URL
-      // This will be handled by the appUrlOpen listener
+    if (launchUrl?.url) {
+      logAuthEvent('App launched with URL', { url: launchUrl.url.substring(0, 100) });
+      // The appUrlOpen listener will handle this
+    } else {
+      logAuthEvent('App launched normally (no deep link)');
     }
   } catch (error) {
-    console.error('[DeepLink] Error getting launch URL:', error);
+    logAuthError('Error getting launch URL', error);
   }
 };
