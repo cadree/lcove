@@ -24,8 +24,9 @@ export function useUserBlocks() {
       
       if (blockedIds.length === 0) return [];
 
+      // Use profiles_public view to protect sensitive fields
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', blockedIds);
 

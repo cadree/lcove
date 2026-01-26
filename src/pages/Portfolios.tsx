@@ -49,8 +49,9 @@ const Portfolios = () => {
       
       if (userIds.length === 0) return [];
 
+      // Use profiles_public view to protect sensitive fields (phone)
       const { data: profiles } = await supabase
-        .from("profiles")
+        .from("profiles_public")
         .select("id, display_name, avatar_url, city")
         .in("id", userIds);
 

@@ -49,10 +49,10 @@ export function useMessages(conversationId: string | null) {
 
       if (error) throw error;
 
-      // Get profiles for senders
+      // Get profiles for senders using profiles_public view
       const senderIds = [...new Set(messagesData?.map(m => m.sender_id) || [])];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', senderIds);
 
@@ -302,8 +302,9 @@ export function useMessages(conversationId: string | null) {
 
           if (data?.length) {
             const userIds = data.map(t => t.user_id);
+            // Use profiles_public view to protect sensitive fields
             const { data: profiles } = await supabase
-              .from('profiles')
+              .from('profiles_public')
               .select('user_id, display_name, avatar_url')
               .in('user_id', userIds);
 

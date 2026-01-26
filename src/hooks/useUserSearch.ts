@@ -9,7 +9,6 @@ interface SearchedUser {
   avatar_url: string | null;
   city: string | null;
   bio: string | null;
-  phone: string | null;
   social_links: {
     instagram?: string;
     twitter?: string;
@@ -25,9 +24,10 @@ export function useUserSearch(searchQuery: string, enabled: boolean = true) {
     queryFn: async () => {
       if (!searchQuery || searchQuery.length < 2) return [];
       
+      // Use profiles_public view to protect sensitive fields (phone)
       const { data, error } = await supabase
-        .from('profiles')
-        .select('id, user_id, display_name, avatar_url, city, bio, phone, social_links')
+        .from('profiles_public')
+        .select('id, user_id, display_name, avatar_url, city, bio, social_links')
         .ilike('display_name', `%${searchQuery}%`)
         .limit(10);
 

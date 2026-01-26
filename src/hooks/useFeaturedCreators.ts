@@ -45,10 +45,10 @@ export function useFeaturedCreators(featureType?: 'weekly' | 'monthly' | 'spotli
 
       if (!data || data.length === 0) return [];
 
-      // Fetch profiles separately
+      // Fetch profiles separately using profiles_public view to protect sensitive fields
       const userIds = data.map(f => f.user_id);
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url, bio, city')
         .in('user_id', userIds);
 

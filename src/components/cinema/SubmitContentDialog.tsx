@@ -168,11 +168,11 @@ export const SubmitContentDialog = ({
     setSubmitting(true);
 
     try {
-      // Get user's profile for the submitter name
+      // Get user's profile for the submitter name - user's own profile so we can use profiles table
       const { data: profile } = await supabase
         .from('profiles')
         .select('display_name')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
 
       const submitterName = profile?.display_name || 'A creator';

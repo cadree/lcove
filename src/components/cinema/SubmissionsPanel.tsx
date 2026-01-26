@@ -70,10 +70,10 @@ export const SubmissionsPanel = ({ networkId }: SubmissionsPanelProps) => {
 
       if (error) throw error;
 
-      // Fetch submitter profiles
+      // Fetch submitter profiles using profiles_public view
       const submitterIds = [...new Set((data || []).map(s => s.submitter_id))];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', submitterIds);
 

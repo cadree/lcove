@@ -15,8 +15,9 @@ export function useFriendProfiles(friendIds: string[]) {
     queryFn: async () => {
       if (friendIds.length === 0) return [];
 
+      // Use profiles_public view to protect sensitive fields (phone)
       const { data, error } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url, city, bio')
         .in('user_id', friendIds);
 

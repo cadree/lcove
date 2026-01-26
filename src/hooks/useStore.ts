@@ -158,10 +158,10 @@ export const useStoreItems = (type?: 'product' | 'service' | 'rental', storeId?:
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;
 
-      // Fetch profiles for each store owner
+      // Fetch profiles for each store owner using profiles_public view
       const storeUserIds = [...new Set(data?.map(item => (item.store as any)?.user_id).filter(Boolean))];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', storeUserIds);
 
@@ -196,10 +196,10 @@ export const useStoreItem = (itemId: string | undefined) => {
 
       if (error) throw error;
 
-      // Fetch profile for store owner
+      // Fetch profile for store owner using profiles_public view
       if (data?.store) {
         const { data: profile } = await supabase
-          .from('profiles')
+          .from('profiles_public')
           .select('user_id, display_name, avatar_url')
           .eq('user_id', (data.store as any).user_id)
           .single();

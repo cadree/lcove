@@ -94,10 +94,10 @@ export function useConversations() {
         projectMap = new Map(projects?.map(p => [p.id, p as ProjectInfo]) || []);
       }
 
-      // Get profiles for all participants
+      // Get profiles for all participants using profiles_public view
       const userIds = [...new Set(allParticipants?.map(p => p.user_id) || [])];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', userIds);
 

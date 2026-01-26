@@ -77,10 +77,10 @@ export const useProjects = (status?: string) => {
         .select('*')
         .in('project_id', projectIds);
 
-      // Fetch creator profiles
+      // Fetch creator profiles using profiles_public view
       const creatorIds = [...new Set(data.map(p => p.creator_id))];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', creatorIds);
 
@@ -312,10 +312,10 @@ export const useProjectApplications = (projectId?: string) => {
 
       if (error) throw error;
 
-      // Fetch applicant profiles
+      // Fetch applicant profiles using profiles_public view
       const applicantIds = [...new Set(data.map(a => a.applicant_id))];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', applicantIds);
 
@@ -519,9 +519,9 @@ export const useProjectApplications = (projectId?: string) => {
                 project_role_name: finalRoleTitle
               } as any);
 
-            // Send welcome message to the group
+            // Send welcome message to the group - use profiles_public view
             const { data: applicantProfile } = await supabase
-              .from('profiles')
+              .from('profiles_public')
               .select('display_name')
               .eq('user_id', application.applicant_id)
               .single();

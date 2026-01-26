@@ -24,9 +24,9 @@ export function useProfilePosts(userId?: string) {
 
       if (error) throw error;
 
-      // Get profile for the user
+      // Get profile for the user using profiles_public view
       const { data: profile } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('display_name, avatar_url')
         .eq('user_id', targetUserId)
         .single();

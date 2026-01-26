@@ -39,9 +39,9 @@ export function usePlatformReviews() {
       // Get unique user IDs
       const userIds = [...new Set(reviews.map(r => r.user_id))];
 
-      // Fetch profiles for these users
+      // Fetch profiles for these users using profiles_public view
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('id, display_name, avatar_url, city')
         .in('id', userIds);
 
