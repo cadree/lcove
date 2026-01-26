@@ -11,7 +11,9 @@ const config: CapacitorConfig = {
   ios: {
     contentInset: 'always',
     preferredContentMode: 'mobile',
-    allowsLinkPreview: false
+    allowsLinkPreview: false,
+    // Enable URL scheme handling for auth deep links
+    scheme: 'app.lovable.e07d9c457fd949f78f3cc7d5998be668'
   },
   android: {
     allowMixedContent: true
@@ -36,6 +38,12 @@ const config: CapacitorConfig = {
     Keyboard: {
       resize: 'body',
       resizeOnFullScreen: true
+    },
+    CapacitorCookies: {
+      enabled: true
+    },
+    CapacitorHttp: {
+      enabled: true
     }
   }
 };

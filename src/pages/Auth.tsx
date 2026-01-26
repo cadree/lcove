@@ -113,11 +113,24 @@ const Auth = () => {
       if (mode === 'login') {
         const { error } = await signIn(email, password);
         if (error) {
+          console.error('[Auth] Login error:', error);
+          
+          // Map Supabase errors to user-friendly messages
+          let errorMessage = error.message;
+          
+          if (error.message === 'Invalid login credentials') {
+            errorMessage = 'Email or password is incorrect';
+          } else if (error.message.includes('Load failed') || error.message.includes('Failed to fetch')) {
+            errorMessage = 'Network error. Please check your connection and try again.';
+          } else if (error.message.includes('NetworkError')) {
+            errorMessage = 'Unable to connect to server. Please check your internet connection.';
+          } else if (error.message.includes('timeout')) {
+            errorMessage = 'Request timed out. Please try again.';
+          }
+          
           toast({
             title: 'Login failed',
-            description: error.message === 'Invalid login credentials' 
-              ? 'Email or password is incorrect' 
-              : error.message,
+            description: errorMessage,
             variant: 'destructive',
           });
         } else {

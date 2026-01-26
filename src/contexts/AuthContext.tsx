@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthRedirectUrl } from '@/lib/capacitorStorage';
 
 interface AuthContextType {
   user: User | null;
@@ -39,7 +40,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signUp = async (email: string, password: string) => {
-    const redirectUrl = `${window.location.origin}/`;
+    const redirectUrl = getAuthRedirectUrl('/');
+    console.log('[Auth] Sign up with redirect URL:', redirectUrl);
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -47,6 +49,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         emailRedirectTo: redirectUrl
       }
     });
+    if (error) {
+      console.error('[Auth] Sign up error:', error);
+    }
     return { error };
   };
 
@@ -63,10 +68,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetPassword = async (email: string) => {
-    const redirectUrl = `${window.location.origin}/auth?reset=true`;
+    const redirectUrl = getAuthRedirectUrl('/auth?reset=true');
+    console.log('[Auth] Password reset with redirect URL:', redirectUrl);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: redirectUrl,
     });
+    if (error) {
+      console.error('[Auth] Password reset error:', error);
+    }
     return { error };
   };
 
