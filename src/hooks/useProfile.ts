@@ -30,7 +30,7 @@ export interface Profile {
   mindset_level: number | null;
   access_status: 'pending' | 'active' | 'denied' | 'banned' | null;
   onboarding_score: number | null;
-  // Contact info
+  // Contact info - only available for own profile
   phone: string | null;
   social_links: SocialLinks | null;
 }
@@ -41,6 +41,7 @@ export const useProfile = (userId?: string) => {
   const [loading, setLoading] = useState(true);
 
   const targetUserId = userId || user?.id;
+  const isOwnProfile = targetUserId === user?.id;
 
   useEffect(() => {
     if (targetUserId) {
@@ -49,40 +50,56 @@ export const useProfile = (userId?: string) => {
       setProfile(null);
       setLoading(false);
     }
-  }, [targetUserId]);
+  }, [targetUserId, isOwnProfile]);
 
   const fetchProfile = async () => {
     if (!targetUserId) return;
     
     setLoading(true);
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', targetUserId)
-      .single();
+    
+    let data: Record<string, unknown> | null = null;
+    let error: Error | null = null;
+    
+    // Use profiles table for own profile (has access to phone), profiles_public for others
+    if (isOwnProfile) {
+      const result = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', targetUserId)
+        .single();
+      data = result.data as Record<string, unknown> | null;
+      error = result.error;
+    } else {
+      const result = await supabase
+        .from('profiles_public')
+        .select('*')
+        .eq('user_id', targetUserId)
+        .single();
+      data = result.data as Record<string, unknown> | null;
+      error = result.error;
+    }
 
     if (!error && data) {
-      // Cast data and provide defaults for fields that might not exist in DB yet
-      const rawData = data as Record<string, unknown>;
       const profileData: Profile = {
-        id: rawData.id as string,
-        user_id: rawData.user_id as string,
-        display_name: rawData.display_name as string | null,
-        city: rawData.city as string | null,
-        city_display: rawData.city_display as string | null,
-        city_key: rawData.city_key as string | null,
-        bio: rawData.bio as string | null,
-        avatar_url: rawData.avatar_url as string | null,
-        passion_seriousness: rawData.passion_seriousness as number | null,
-        access_level: rawData.access_level as Profile['access_level'],
-        onboarding_completed: rawData.onboarding_completed as boolean | null,
-        created_at: rawData.created_at as string,
-        updated_at: rawData.updated_at as string,
-        mindset_level: (rawData.mindset_level as number | null) ?? null,
-        access_status: (rawData.access_status as Profile['access_status']) ?? 'pending',
-        onboarding_score: (rawData.onboarding_score as number | null) ?? null,
-        phone: (rawData.phone as string | null) ?? null,
-        social_links: (rawData.social_links as SocialLinks | null) ?? null,
+        id: data.id as string,
+        user_id: data.user_id as string,
+        display_name: data.display_name as string | null,
+        city: data.city as string | null,
+        city_display: data.city_display as string | null,
+        city_key: data.city_key as string | null,
+        bio: data.bio as string | null,
+        avatar_url: data.avatar_url as string | null,
+        passion_seriousness: data.passion_seriousness as number | null,
+        access_level: data.access_level as Profile['access_level'],
+        onboarding_completed: data.onboarding_completed as boolean | null,
+        created_at: data.created_at as string,
+        updated_at: data.updated_at as string,
+        mindset_level: (data.mindset_level as number | null) ?? null,
+        access_status: (data.access_status as Profile['access_status']) ?? 'pending',
+        onboarding_score: (data.onboarding_score as number | null) ?? null,
+        // Phone is only available for own profile (not in profiles_public view)
+        phone: isOwnProfile ? ((data.phone as string | null) ?? null) : null,
+        social_links: (data.social_links as SocialLinks | null) ?? null,
       };
       setProfile(profileData);
     }

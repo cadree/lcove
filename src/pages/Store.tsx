@@ -76,10 +76,10 @@ const Store = () => {
       
       if (error) throw error;
       
-      // Fetch owner profile
+      // Fetch owner profile using profiles_public view
       if (data) {
         const { data: profile } = await supabase
-          .from('profiles')
+          .from('profiles_public')
           .select('display_name, avatar_url, city')
           .eq('user_id', data.user_id)
           .single();

@@ -43,10 +43,10 @@ export function useStories() {
 
       if (error) throw error;
 
-      // Get profiles for story creators
+      // Get profiles for story creators using profiles_public view
       const userIds = [...new Set(storiesData?.map(s => s.user_id) || [])];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', userIds);
 

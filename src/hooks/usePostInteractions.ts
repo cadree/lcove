@@ -58,10 +58,10 @@ export function usePostInteractions(postId: string) {
 
       if (error) throw error;
 
-      // Get profiles for commenters
+      // Get profiles for commenters using profiles_public view
       const userIds = [...new Set(commentsData?.map(c => c.user_id) || [])];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', userIds);
 

@@ -1649,10 +1649,24 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
           {
+            foreignKeyName: "credit_contributions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "credit_contributions_verified_by_fkey"
             columns: ["verified_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "credit_contributions_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["user_id"]
           },
         ]
@@ -1697,6 +1711,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "credit_earning_limits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles_public"
             referencedColumns: ["user_id"]
           },
         ]
@@ -1756,6 +1777,13 @@ export type Database = {
             columns: ["verified_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "credit_ledger_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["user_id"]
           },
         ]
@@ -5693,6 +5721,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      profiles_public: {
+        Row: {
+          access_level: Database["public"]["Enums"]["access_level"] | null
+          access_status: string | null
+          avatar_url: string | null
+          bio: string | null
+          city: string | null
+          city_display: string | null
+          city_key: string | null
+          created_at: string | null
+          display_name: string | null
+          id: string | null
+          is_suspended: boolean | null
+          mindset_level: number | null
+          onboarding_completed: boolean | null
+          onboarding_level: number | null
+          onboarding_score: number | null
+          passion_seriousness: number | null
+          social_links: Json | null
+          suspended_at: string | null
+          suspension_reason: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          access_level?: Database["public"]["Enums"]["access_level"] | null
+          access_status?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          city?: string | null
+          city_display?: string | null
+          city_key?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          id?: string | null
+          is_suspended?: boolean | null
+          mindset_level?: number | null
+          onboarding_completed?: boolean | null
+          onboarding_level?: number | null
+          onboarding_score?: number | null
+          passion_seriousness?: number | null
+          social_links?: Json | null
+          suspended_at?: string | null
+          suspension_reason?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          access_level?: Database["public"]["Enums"]["access_level"] | null
+          access_status?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          city?: string | null
+          city_display?: string | null
+          city_key?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          id?: string | null
+          is_suspended?: boolean | null
+          mindset_level?: number | null
+          onboarding_completed?: boolean | null
+          onboarding_level?: number | null
+          onboarding_score?: number | null
+          passion_seriousness?: number | null
+          social_links?: Json | null
+          suspended_at?: string | null
+          suspension_reason?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
     }
     Functions: {

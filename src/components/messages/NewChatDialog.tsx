@@ -34,8 +34,9 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
     queryFn: async () => {
       if (!user) return [];
 
+      // Use profiles_public view to protect sensitive fields
       let query = supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .neq('user_id', user.id)
         .limit(20);

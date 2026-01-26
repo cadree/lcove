@@ -73,10 +73,10 @@ const Mall = () => {
 
       if (error) throw error;
 
-      // Fetch profiles for store owners
+      // Fetch profiles for store owners using profiles_public view
       const userIds = storesData?.map(s => s.user_id) || [];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url, city')
         .in('user_id', userIds);
 

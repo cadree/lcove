@@ -55,9 +55,9 @@ const Directory = () => {
   const fetchProfiles = async () => {
     setLoading(true);
     
-    // Fetch profiles
+    // Fetch profiles using profiles_public view to protect sensitive fields
     const { data: profilesData, error: profilesError } = await supabase
-      .from('profiles')
+      .from('profiles_public')
       .select('id, user_id, display_name, avatar_url, city, city_display, city_key, bio, created_at')
       .eq('onboarding_completed', true)
       .order('created_at', { ascending: false });

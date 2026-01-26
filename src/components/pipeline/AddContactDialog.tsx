@@ -131,11 +131,11 @@ export function AddContactDialog({
   };
 
   const handleSelectUser = (user: SearchedUser) => {
-    // Auto-fill from the selected user's profile
+    // Auto-fill from the selected user's profile (phone is not available from search for privacy)
     setName(user.display_name || "");
     setAvatarUrl(user.avatar_url || "");
     setLinkedUserId(user.user_id);
-    setPhone(user.phone || "");
+    // Phone is not exposed in user search for privacy - user must enter manually
     
     // Fill social links if available
     if (user.social_links) {

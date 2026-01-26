@@ -66,7 +66,7 @@ const Feed = () => {
       const {
         data,
         error
-      } = await supabase.from("profiles").select("city_display").not("city_display", "is", null).neq("city_display", "");
+      } = await supabase.from("profiles_public").select("city_display").not("city_display", "is", null).neq("city_display", "");
       if (error) throw error;
 
       // Get unique cities
