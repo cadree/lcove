@@ -1,21 +1,29 @@
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
+import { logStorageOperation } from './authDebug';
 
 /**
  * Capacitor-compatible storage adapter for Supabase Auth
  * Uses Capacitor Preferences on native platforms (iOS/Android)
  * Falls back to localStorage on web
+ * 
+ * This adapter implements the Supabase SupportedStorage interface
+ * which requires synchronous-looking methods that can return promises
  */
 export const capacitorStorage = {
   getItem: async (key: string): Promise<string | null> => {
     try {
       if (Capacitor.isNativePlatform()) {
         const { value } = await Preferences.get({ key });
+        logStorageOperation('get', key, true, value || undefined);
         return value;
       }
-      return localStorage.getItem(key);
+      const value = localStorage.getItem(key);
+      logStorageOperation('get', key, true, value || undefined);
+      return value;
     } catch (error) {
       console.error('[CapacitorStorage] getItem error:', error);
+      logStorageOperation('get', key, false);
       // Fallback to localStorage if Preferences fails
       try {
         return localStorage.getItem(key);
@@ -29,11 +37,14 @@ export const capacitorStorage = {
     try {
       if (Capacitor.isNativePlatform()) {
         await Preferences.set({ key, value });
+        logStorageOperation('set', key, true, value);
       } else {
         localStorage.setItem(key, value);
+        logStorageOperation('set', key, true, value);
       }
     } catch (error) {
       console.error('[CapacitorStorage] setItem error:', error);
+      logStorageOperation('set', key, false);
       // Fallback to localStorage if Preferences fails
       try {
         localStorage.setItem(key, value);
@@ -47,11 +58,14 @@ export const capacitorStorage = {
     try {
       if (Capacitor.isNativePlatform()) {
         await Preferences.remove({ key });
+        logStorageOperation('remove', key, true);
       } else {
         localStorage.removeItem(key);
+        logStorageOperation('remove', key, true);
       }
     } catch (error) {
       console.error('[CapacitorStorage] removeItem error:', error);
+      logStorageOperation('remove', key, false);
       // Fallback to localStorage if Preferences fails
       try {
         localStorage.removeItem(key);

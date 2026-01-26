@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { z } from 'zod';
+import { Capacitor } from '@capacitor/core';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, User, Phone } from 'lucide-react';
+import { logAuthEvent, logAuthError } from '@/lib/authDebug';
+import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, User, Phone, Wifi, WifiOff } from 'lucide-react';
 import etherBearLogo from '@/assets/ether-bear-logo.png';
 
 const signupSchema = z.object({
@@ -32,6 +34,71 @@ const passwordSchema = z.object({
 
 type AuthMode = 'login' | 'signup' | 'forgot' | 'reset';
 
+/**
+ * Map Supabase auth errors to user-friendly messages
+ */
+const getAuthErrorMessage = (error: Error): { title: string; description: string } => {
+  const message = error.message.toLowerCase();
+  
+  // Network errors
+  if (message.includes('load failed') || message.includes('failed to fetch')) {
+    return {
+      title: 'Connection Error',
+      description: 'Unable to reach the server. Please check your internet connection and try again.',
+    };
+  }
+  if (message.includes('network') || message.includes('networkerror')) {
+    return {
+      title: 'Network Error',
+      description: 'Your device appears to be offline. Please check your connection.',
+    };
+  }
+  if (message.includes('timeout')) {
+    return {
+      title: 'Request Timeout',
+      description: 'The server took too long to respond. Please try again.',
+    };
+  }
+  
+  // Auth errors
+  if (message.includes('invalid login credentials')) {
+    return {
+      title: 'Invalid Credentials',
+      description: 'Email or password is incorrect. Please try again.',
+    };
+  }
+  if (message.includes('email not confirmed')) {
+    return {
+      title: 'Email Not Confirmed',
+      description: 'Please check your email and click the confirmation link.',
+    };
+  }
+  if (message.includes('already registered') || message.includes('already exists')) {
+    return {
+      title: 'Account Exists',
+      description: 'This email is already registered. Please log in instead.',
+    };
+  }
+  if (message.includes('rate limit') || message.includes('too many requests')) {
+    return {
+      title: 'Too Many Attempts',
+      description: 'Please wait a moment before trying again.',
+    };
+  }
+  if (message.includes('password') && message.includes('weak')) {
+    return {
+      title: 'Weak Password',
+      description: 'Please choose a stronger password with at least 6 characters.',
+    };
+  }
+  
+  // Default fallback with actual error for debugging
+  return {
+    title: 'Authentication Error',
+    description: error.message || 'An unexpected error occurred. Please try again.',
+  };
+};
+
 const Auth = () => {
   const [searchParams] = useSearchParams();
   const isResetMode = searchParams.get('reset') === 'true';
@@ -45,13 +112,39 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; displayName?: string; phone?: string }>({});
   const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   const { signIn, signUp, user, resetPassword, updatePassword } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Track online/offline status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Log platform info on mount
+  useEffect(() => {
+    logAuthEvent('Auth page mounted', {
+      platform: Capacitor.getPlatform(),
+      isNative: Capacitor.isNativePlatform(),
+      isOnline: navigator.onLine,
+      mode,
+    });
+  }, []);
+
   useEffect(() => {
     if (user && mode !== 'reset') {
+      logAuthEvent('User authenticated, navigating to onboarding');
       navigate('/onboarding');
     }
   }, [user, navigate, mode]);
@@ -107,52 +200,38 @@ const Auth = () => {
     
     if (!validateForm()) return;
 
+    // Check online status before attempting auth
+    if (!navigator.onLine) {
+      toast({
+        title: 'No Internet Connection',
+        description: 'Please check your connection and try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
+    logAuthEvent(`Auth attempt: ${mode}`, { email: email.replace(/(.{2}).*(@.*)/, '$1***$2') });
 
     try {
       if (mode === 'login') {
         const { error } = await signIn(email, password);
         if (error) {
-          console.error('[Auth] Login error:', error);
-          
-          // Map Supabase errors to user-friendly messages
-          let errorMessage = error.message;
-          
-          if (error.message === 'Invalid login credentials') {
-            errorMessage = 'Email or password is incorrect';
-          } else if (error.message.includes('Load failed') || error.message.includes('Failed to fetch')) {
-            errorMessage = 'Network error. Please check your connection and try again.';
-          } else if (error.message.includes('NetworkError')) {
-            errorMessage = 'Unable to connect to server. Please check your internet connection.';
-          } else if (error.message.includes('timeout')) {
-            errorMessage = 'Request timed out. Please try again.';
-          }
-          
-          toast({
-            title: 'Login failed',
-            description: errorMessage,
-            variant: 'destructive',
-          });
+          logAuthError('Login failed', error);
+          const { title, description } = getAuthErrorMessage(error);
+          toast({ title, description, variant: 'destructive' });
         } else {
+          logAuthEvent('Login successful');
           navigate('/onboarding');
         }
       } else if (mode === 'signup') {
         const { error } = await signUp(email, password);
         if (error) {
-          if (error.message.includes('already registered')) {
-            toast({
-              title: 'Account exists',
-              description: 'This email is already registered. Please log in instead.',
-              variant: 'destructive',
-            });
-          } else {
-            toast({
-              title: 'Sign up failed',
-              description: error.message,
-              variant: 'destructive',
-            });
-          }
+          logAuthError('Signup failed', error);
+          const { title, description } = getAuthErrorMessage(error);
+          toast({ title, description, variant: 'destructive' });
         } else {
+          logAuthEvent('Signup successful');
           // Save display name and phone to profile after signup
           const { data: { user: newUser } } = await supabase.auth.getUser();
           if (newUser) {
@@ -166,12 +245,11 @@ const Auth = () => {
       } else if (mode === 'forgot') {
         const { error } = await resetPassword(email);
         if (error) {
-          toast({
-            title: 'Reset failed',
-            description: error.message,
-            variant: 'destructive',
-          });
+          logAuthError('Password reset failed', error);
+          const { title, description } = getAuthErrorMessage(error);
+          toast({ title, description, variant: 'destructive' });
         } else {
+          logAuthEvent('Password reset email sent');
           setResetEmailSent(true);
           toast({
             title: 'Check your email',
@@ -181,12 +259,11 @@ const Auth = () => {
       } else if (mode === 'reset') {
         const { error } = await updatePassword(password);
         if (error) {
-          toast({
-            title: 'Password update failed',
-            description: error.message,
-            variant: 'destructive',
-          });
+          logAuthError('Password update failed', error);
+          const { title, description } = getAuthErrorMessage(error);
+          toast({ title, description, variant: 'destructive' });
         } else {
+          logAuthEvent('Password updated successfully');
           toast({
             title: 'Password updated',
             description: 'You can now log in with your new password.',
@@ -196,6 +273,13 @@ const Auth = () => {
           navigate('/auth');
         }
       }
+    } catch (err) {
+      logAuthError('Unexpected auth error', err);
+      toast({
+        title: 'Unexpected Error',
+        description: 'Something went wrong. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -220,6 +304,18 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 safe-area-all">
+      {/* Offline indicator */}
+      {!isOnline && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="fixed top-4 left-4 right-4 bg-destructive/90 text-destructive-foreground px-4 py-2 rounded-lg flex items-center justify-center gap-2 z-50"
+        >
+          <WifiOff className="h-4 w-4" />
+          <span className="text-sm">No internet connection</span>
+        </motion.div>
+      )}
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -424,7 +520,7 @@ const Auth = () => {
 
               <Button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !isOnline}
                 className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-medium glow-pink"
               >
                 {isLoading ? (
@@ -433,6 +529,11 @@ const Auth = () => {
                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                     className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full"
                   />
+                ) : !isOnline ? (
+                  <>
+                    <WifiOff className="mr-2 h-4 w-4" />
+                    Offline
+                  </>
                 ) : (
                   <>
                     {mode === 'login' && 'Enter'}
@@ -464,16 +565,13 @@ const Auth = () => {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="text-center mt-4 text-sm text-muted-foreground"
+                  className="mt-6 text-center text-xs text-muted-foreground"
                 >
-                  {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
-                  <button
-                    type="button"
-                    onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-                    className="text-primary hover:underline font-medium"
-                  >
-                    {mode === 'login' ? 'Sign up' : 'Log in'}
-                  </button>
+                  {mode === 'login' ? (
+                    "Don't have an account? Use the Sign Up tab above."
+                  ) : (
+                    "By signing up, you agree to our community guidelines."
+                  )}
                 </motion.p>
               </AnimatePresence>
             </>
