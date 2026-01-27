@@ -182,13 +182,15 @@ function EditableTask({ task, onToggle, onUpdate, onDelete }: EditableTaskProps)
       </div>
       <button
         onClick={() => setIsEditing(true)}
-        className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-1 hover:text-primary"
+        className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0 p-1.5 hover:text-primary touch-manipulation"
+        aria-label="Edit task"
       >
         <Pencil className="w-4 h-4" />
       </button>
       <button
         onClick={() => onDelete(task.id)}
-        className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-1 hover:text-destructive"
+        className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0 p-1.5 hover:text-destructive touch-manipulation"
+        aria-label="Delete task"
       >
         <Trash2 className="w-4 h-4" />
       </button>
