@@ -703,7 +703,7 @@ export function ContactContractsSection({ pipelineItemId, contactName, contactEm
           {contracts.map((contract) => (
             <div
               key={contract.id}
-              className="p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
+              className="p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors group"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
@@ -723,7 +723,7 @@ export function ContactContractsSection({ pipelineItemId, contactName, contactEm
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 shrink-0">
                   {contract.status === 'draft' && (
                     <Button
                       variant="outline"
@@ -742,8 +742,9 @@ export function ContactContractsSection({ pipelineItemId, contactName, contactEm
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7"
+                    className="h-7 w-7 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity touch-manipulation"
                     onClick={() => handleDelete(contract.id)}
+                    aria-label="Delete contract"
                   >
                     <Trash2 className="w-3 h-3 text-destructive" />
                   </Button>

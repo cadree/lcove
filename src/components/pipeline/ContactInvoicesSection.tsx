@@ -426,7 +426,7 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
           {invoices.map((invoice) => (
             <div
               key={invoice.id}
-              className="p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
+              className="p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors group"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
@@ -444,7 +444,7 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 shrink-0">
                   {invoice.status === 'draft' && (
                     <Button
                       variant="outline"
@@ -475,7 +475,7 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7"
+                    className="h-7 w-7 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity touch-manipulation"
                     onClick={() => handleDelete(invoice.id)}
                     role="button"
                     aria-label="Delete invoice"

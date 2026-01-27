@@ -34,26 +34,27 @@ export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionP
     // Initialize upload queue
     setUploadQueue(fileArray.map(f => ({ fileName: f.name, progress: 0 })));
 
-    let successCount = 0;
-    let failCount = 0;
+    // Reset input immediately so user can select more files while uploading
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
 
-    for (let i = 0; i < fileArray.length; i++) {
-      const file = fileArray[i];
+    // Upload all files in parallel using Promise.allSettled for better error handling
+    const uploadPromises = fileArray.map(async (file, index) => {
       const isVideo = file.type.startsWith('video/');
       const isImage = file.type.startsWith('image/');
 
       if (!isVideo && !isImage) {
-        failCount++;
         setUploadQueue(prev => prev.map((p, idx) => 
-          idx === i ? { ...p, progress: -1 } : p
+          idx === index ? { ...p, progress: -1 } : p
         ));
-        continue;
+        return { success: false, index };
       }
 
       try {
-        // Simulate progress
+        // Show progress
         setUploadQueue(prev => prev.map((p, idx) => 
-          idx === i ? { ...p, progress: 50 } : p
+          idx === index ? { ...p, progress: 30 } : p
         ));
         
         await uploadMedia({
@@ -62,33 +63,43 @@ export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionP
         });
         
         setUploadQueue(prev => prev.map((p, idx) => 
-          idx === i ? { ...p, progress: 100 } : p
+          idx === index ? { ...p, progress: 100 } : p
         ));
-        successCount++;
-      } catch {
+        return { success: true, index };
+      } catch (error) {
+        console.error(`Failed to upload ${file.name}:`, error);
         setUploadQueue(prev => prev.map((p, idx) => 
-          idx === i ? { ...p, progress: -1 } : p
+          idx === index ? { ...p, progress: -1 } : p
         ));
+        return { success: false, index };
+      }
+    });
+
+    // Wait for all uploads to complete
+    const results = await Promise.allSettled(uploadPromises);
+    
+    let successCount = 0;
+    let failCount = 0;
+    
+    results.forEach(result => {
+      if (result.status === 'fulfilled' && result.value.success) {
+        successCount++;
+      } else {
         failCount++;
       }
-    }
+    });
     
     // Clear queue after short delay
     setTimeout(() => {
       setUploadQueue([]);
       setUploadingCount(0);
-    }, 1000);
+    }, 1500);
     
     if (successCount > 0) {
       toast.success(`${successCount} file(s) uploaded`);
     }
     if (failCount > 0) {
       toast.error(`${failCount} file(s) failed`);
-    }
-
-    // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
     }
   };
 
@@ -125,7 +136,7 @@ export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionP
           variant="ghost"
           size="sm"
           onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
+          disabled={false}
           role="button"
           aria-label="Upload media"
         >
@@ -220,13 +231,13 @@ export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionP
                     <StickyNote className="w-3 h-3 text-primary" />
                   </div>
                 )}
-                {/* Delete button on hover */}
+                {/* Delete button - always visible on mobile */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDelete(item.id);
                   }}
-                  className="absolute top-1 right-1 p-1.5 bg-destructive/90 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive"
+                  className="absolute top-1 right-1 p-1.5 bg-destructive/90 rounded-full opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-destructive touch-manipulation"
                   aria-label="Delete media"
                 >
                   <Trash2 className="w-3 h-3 text-destructive-foreground" />
