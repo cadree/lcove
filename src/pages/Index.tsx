@@ -83,7 +83,13 @@ const Index = () => {
       <main className="pt-[calc(3.5rem+env(safe-area-inset-top))] px-4 space-y-6">
         <HomeSearch />
 
-        <HomeEditSheet open={isEditing} onOpenChange={setIsEditing} />
+        <HomeEditSheet 
+          open={isEditing} 
+          onOpenChange={setIsEditing} 
+          autoReorder={home.preferences.auto_reorder}
+          onToggleAutoReorder={home.toggleAutoReorder}
+          onReset={home.resetPersonalization}
+        />
 
         <HomePinnedSection
           items={home.pinnedItems}
