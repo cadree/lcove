@@ -443,13 +443,13 @@ export function PipelineItemDrawer({
         </ScrollArea>
 
         {/* Action Buttons */}
-        <div className="pt-4 border-t border-border flex gap-2">
+        <div className="pt-4 pb-safe border-t border-border flex gap-2 relative z-10 bg-background">
           {isEditing ? (
             <>
-              <Button variant="outline" onClick={handleCancel} disabled={isSaving} className="flex-1">
+              <Button variant="outline" onClick={handleCancel} disabled={isSaving} className="flex-1 touch-manipulation">
                 Cancel
               </Button>
-              <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+              <Button onClick={handleSave} disabled={isSaving} className="flex-1 touch-manipulation">
                 {isSaving ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
@@ -462,12 +462,12 @@ export function PipelineItemDrawer({
             </>
           ) : (
             <>
-              <Button variant="outline" onClick={() => setIsEditing(true)} className="flex-1">
+              <Button variant="outline" onClick={() => setIsEditing(true)} className="flex-1 touch-manipulation">
                 Edit
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="icon" disabled={isDeleting}>
+                  <Button variant="destructive" size="icon" disabled={isDeleting} className="touch-manipulation">
                     {isDeleting ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
@@ -483,8 +483,8 @@ export function PipelineItemDrawer({
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    <AlertDialogCancel className="touch-manipulation">Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 touch-manipulation">
                       Delete
                     </AlertDialogAction>
                   </AlertDialogFooter>
