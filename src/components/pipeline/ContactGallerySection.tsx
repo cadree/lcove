@@ -152,15 +152,15 @@ export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionP
         </div>
       ) : media.length === 0 ? (
         <div 
-          className="text-center py-6 bg-muted/30 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+          className="text-center py-8 bg-muted/30 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors border-2 border-dashed border-border/50"
           onClick={() => fileInputRef.current?.click()}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
         >
-          <Image className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-          <p className="text-sm text-muted-foreground">Add photos or videos</p>
-          <p className="text-xs text-muted-foreground/60 mt-1">Select multiple files at once</p>
+          <ImagePlus className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+          <p className="text-sm font-medium text-muted-foreground">Add photos or videos</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">No limit — add as many as you need</p>
         </div>
       ) : (
         <div className="space-y-3">
