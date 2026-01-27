@@ -1172,6 +1172,8 @@ export type Database = {
       }
       contact_tasks: {
         Row: {
+          archived_at: string | null
+          completed_at: string | null
           created_at: string
           due_at: string | null
           id: string
@@ -1181,6 +1183,8 @@ export type Database = {
           title: string
         }
         Insert: {
+          archived_at?: string | null
+          completed_at?: string | null
           created_at?: string
           due_at?: string | null
           id?: string
@@ -1190,6 +1194,8 @@ export type Database = {
           title: string
         }
         Update: {
+          archived_at?: string | null
+          completed_at?: string | null
           created_at?: string
           due_at?: string | null
           id?: string
@@ -5091,6 +5097,54 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "store_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_events: {
+        Row: {
+          contact_name: string | null
+          created_at: string
+          event_type: string
+          id: string
+          owner_user_id: string
+          pipeline_item_id: string | null
+          task_id: string | null
+          task_title: string
+        }
+        Insert: {
+          contact_name?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          owner_user_id: string
+          pipeline_item_id?: string | null
+          task_id?: string | null
+          task_title: string
+        }
+        Update: {
+          contact_name?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          owner_user_id?: string
+          pipeline_item_id?: string | null
+          task_id?: string | null
+          task_title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_events_pipeline_item_id_fkey"
+            columns: ["pipeline_item_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_events_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "contact_tasks"
             referencedColumns: ["id"]
           },
         ]
