@@ -30,20 +30,48 @@ const Index = () => {
     pinnedItems,
     mostUsedItems,
     recentItems,
+    trackClick,import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { ChevronLeft } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
+import { useHomeUsage } from "@/hooks/useHomeUsage";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import EnergyIndicator from "@/components/energy/EnergyIndicator";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { HomeSearch } from "@/components/home/HomeSearch";
+import { HomeRecentSection } from "@/components/home/HomeRecentSection";
+import { HomeMostUsedSection } from "@/components/home/HomeMostUsedSection";
+import { HomePinnedSection } from "@/components/home/HomePinnedSection";
+import { HomeExploreSection } from "@/components/home/HomeExploreSection";
+import { HomeEditSheet } from "@/components/home/HomeEditSheet";
+import BottomNav from "@/components/navigation/BottomNav";
+
+const Index = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { profile } = useProfile(user?.id);
+  const [isEditing, setIsEditing] = useState(false);
+
+  const {
+    loading,
+    scoredItems,
+    pinnedItems,
+    mostUsedItems,
+    recentItems,
     trackClick,
     togglePin,
-    toggleAutoReorder,
-    resetPersonalization,
   } = useHomeUsage();
 
   const handleBack = () => {
-    navigate("/menu"); // iOS-safe explicit route
+    // iOS-safe explicit route (change if you want a different destination)
+    navigate("/menu");
   };
 
   const handleItemClick = (itemId: string) => {
-    if (!isEditing) {
-      trackClick(itemId);
-    }
+    if (!isEditing) trackClick(itemId);
   };
 
   return (
@@ -73,7 +101,10 @@ const Index = () => {
 
             <Link to="/profile" className="tap-target" aria-label="Go to profile">
               <Avatar className="h-9 w-9 ring-2 ring-primary/20 transition-all hover:ring-primary/40">
-                <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || "Profile"} />
+                <AvatarImage
+                  src={profile?.avatar_url || undefined}
+                  alt={profile?.display_name || "Profile"}
+                />
                 <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
                   {profile?.display_name?.[0]?.toUpperCase() || "?"}
                 </AvatarFallback>
@@ -102,13 +133,10 @@ const Index = () => {
       <main className="pt-[calc(3.5rem+env(safe-area-inset-top))] px-4 space-y-6">
         <HomeSearch />
 
-        <HomeEditSheet
-          open={isEditing}
-          onOpenChange={setIsEditing}
-          preferences={preferences}
-          onToggleAutoReorder={toggleAutoReorder}
-          onResetPersonalization={resetPersonalization}
-        />
+        {/* NOTE:
+            HomeEditSheetProps in your project does NOT accept "preferences".
+            Keeping it minimal to avoid TS build breaks. */}
+        <HomeEditSheet open={isEditing} onOpenChange={setIsEditing} />
 
         <HomePinnedSection
           items={pinnedItems}
@@ -117,11 +145,25 @@ const Index = () => {
           onItemClick={handleItemClick}
         />
 
-        <HomeRecentSection items={recentItems} isEditing={isEditing} onItemClick={handleItemClick} />
+        {/* NOTE:
+            HomeRecentSectionProps does NOT accept "isEditing" in your project.
+            We pass only supported props. */}
+        <HomeRecentSection items={recentItems} onItemClick={handleItemClick} />
 
-        <HomeMostUsedSection items={mostUsedItems} isEditing={isEditing} onItemClick={handleItemClick} />
+        <HomeMostUsedSection
+          items={mostUsedItems}
+          isEditing={isEditing}
+          onItemClick={handleItemClick}
+        />
 
-        <HomeExploreSection items={scoredItems} loading={loading} onItemClick={handleItemClick} />
+        {/* NOTE:
+            HomeExploreSectionProps does NOT accept "loading" in your project.
+            If you want a loading state, we can add it outside this component. */}
+        {loading ? (
+          <div className="text-sm text-muted-foreground px-1">Loading…</div>
+        ) : (
+          <HomeExploreSection items={scoredItems} onItemClick={handleItemClick} />
+        )}
       </main>
 
       {/* Bottom navigation */}
