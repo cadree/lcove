@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowRight, ArrowLeft, Check } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, RefreshCw, AlertCircle } from 'lucide-react';
 import { OnboardingData } from '@/pages/Onboarding';
 
 interface Props {
@@ -21,21 +21,46 @@ interface Skill {
 const OnboardingSkills = ({ data, updateData, onNext, onBack }: Props) => {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchSkills = async () => {
-      const { data: skillsData } = await supabase
+  const fetchSkills = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      console.log('[OnboardingSkills] Fetching skills from Supabase...');
+      console.log('[OnboardingSkills] Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+      
+      const { data: skillsData, error: fetchError } = await supabase
         .from('skills')
-        .select('*')
+        .select('id, name, category')
         .order('category', { ascending: true });
       
-      if (skillsData) {
+      if (fetchError) {
+        console.error('[OnboardingSkills] Supabase error:', fetchError);
+        setError(`Failed to load skills: ${fetchError.message}`);
+        setSkills([]);
+      } else if (!skillsData || skillsData.length === 0) {
+        console.warn('[OnboardingSkills] No skills found in database');
+        setError('No skills available. Please try again later.');
+        setSkills([]);
+      } else {
+        console.log('[OnboardingSkills] Loaded skills:', skillsData.length);
         setSkills(skillsData);
+        setError(null);
       }
+    } catch (err) {
+      console.error('[OnboardingSkills] Unexpected error:', err);
+      setError('An unexpected error occurred. Please try again.');
+      setSkills([]);
+    } finally {
       setLoading(false);
-    };
-    fetchSkills();
+    }
   }, []);
+
+  useEffect(() => {
+    fetchSkills();
+  }, [fetchSkills]);
 
   const toggleSkill = (name: string) => {
     const current = data.skills;
@@ -71,13 +96,49 @@ const OnboardingSkills = ({ data, updateData, onNext, onBack }: Props) => {
         </motion.div>
 
         {loading ? (
-          <div className="flex justify-center py-20">
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
               className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full"
             />
+            <p className="text-sm text-muted-foreground">Loading skills...</p>
           </div>
+        ) : error ? (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center justify-center py-20 gap-4"
+          >
+            <AlertCircle className="w-12 h-12 text-destructive/70" />
+            <p className="text-muted-foreground text-center max-w-sm">{error}</p>
+            <Button
+              onClick={fetchSkills}
+              variant="outline"
+              className="gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Retry
+            </Button>
+          </motion.div>
+        ) : skills.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center justify-center py-20 gap-4"
+          >
+            <p className="text-muted-foreground text-center">
+              No skills found. You can skip this step for now.
+            </p>
+            <Button
+              onClick={fetchSkills}
+              variant="outline"
+              className="gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Retry
+            </Button>
+          </motion.div>
         ) : (
           <motion.div
             initial={{ opacity: 0 }}
@@ -115,14 +176,16 @@ const OnboardingSkills = ({ data, updateData, onNext, onBack }: Props) => {
           </motion.div>
         )}
 
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="mt-6 text-sm text-muted-foreground text-center"
-        >
-          {data.skills.length}/10 selected
-        </motion.p>
+        {!loading && !error && skills.length > 0 && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="mt-6 text-sm text-muted-foreground text-center"
+          >
+            {data.skills.length}/10 selected
+          </motion.p>
+        )}
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background to-transparent">
