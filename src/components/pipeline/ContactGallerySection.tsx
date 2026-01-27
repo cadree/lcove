@@ -192,31 +192,46 @@ export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionP
               <div
                 key={item.id}
                 className="relative aspect-square rounded-lg overflow-hidden cursor-pointer group"
-                onClick={() => {
-                  setSelectedMedia(item);
-                  setEditingNotes(item.notes || "");
-                }}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && setSelectedMedia(item)}
               >
-                {item.media_type === 'video' ? (
-                  <div className="w-full h-full bg-muted flex items-center justify-center">
-                    <Video className="w-6 h-6 text-muted-foreground" />
-                  </div>
-                ) : (
-                  <img
-                    src={item.media_url}
-                    alt="Contact media"
-                    className="w-full h-full object-cover"
-                  />
-                )}
+                <div 
+                  onClick={() => {
+                    setSelectedMedia(item);
+                    setEditingNotes(item.notes || "");
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && setSelectedMedia(item)}
+                  className="w-full h-full"
+                >
+                  {item.media_type === 'video' ? (
+                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                      <Video className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <img
+                      src={item.media_url}
+                      alt="Contact media"
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                </div>
                 {item.notes && (
-                  <div className="absolute bottom-1 right-1 bg-background/80 rounded p-0.5">
+                  <div className="absolute bottom-1 left-1 bg-background/80 rounded p-0.5">
                     <StickyNote className="w-3 h-3 text-primary" />
                   </div>
                 )}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                {/* Delete button on hover */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(item.id);
+                  }}
+                  className="absolute top-1 right-1 p-1.5 bg-destructive/90 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive"
+                  aria-label="Delete media"
+                >
+                  <Trash2 className="w-3 h-3 text-destructive-foreground" />
+                </button>
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors pointer-events-none" />
               </div>
             ))}
             
