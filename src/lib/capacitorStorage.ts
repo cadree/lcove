@@ -77,6 +77,53 @@ export const capacitorStorage = {
 };
 
 /**
+ * Clear ALL auth-related storage keys (critical for iOS logout)
+ * Supabase stores session data in keys prefixed with 'sb-'
+ */
+export const clearAllAuthStorage = async (): Promise<void> => {
+  const authKeys = [
+    'sb-wjbyvlgsxscwukkolehg-auth-token',
+    'sb-wjbyvlgsxscwukkolehg-auth-token-code-verifier',
+    'supabase.auth.token',
+  ];
+
+  console.log('[CapacitorStorage] Clearing all auth storage keys...');
+
+  try {
+    if (Capacitor.isNativePlatform()) {
+      // Clear known auth keys from Capacitor Preferences
+      for (const key of authKeys) {
+        await Preferences.remove({ key });
+        logStorageOperation('clear', key, true);
+      }
+      
+      // Also try to clear any other sb- prefixed keys by getting all keys
+      // Note: Capacitor Preferences doesn't have a keys() method, so we clear known ones
+      console.log('[CapacitorStorage] Native auth storage cleared');
+    } else {
+      // Clear from localStorage on web
+      for (const key of authKeys) {
+        localStorage.removeItem(key);
+      }
+      
+      // Also clear any other sb- prefixed keys from localStorage
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      
+      console.log('[CapacitorStorage] Web auth storage cleared:', keysToRemove);
+    }
+  } catch (error) {
+    console.error('[CapacitorStorage] Error clearing auth storage:', error);
+  }
+};
+
+/**
  * Check if we're running on a native platform
  */
 export const isNativePlatform = (): boolean => {

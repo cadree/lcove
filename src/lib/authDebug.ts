@@ -63,7 +63,7 @@ export const logSessionState = (
 };
 
 export const logStorageOperation = (
-  operation: 'get' | 'set' | 'remove',
+  operation: 'get' | 'set' | 'remove' | 'clear',
   key: string,
   success: boolean,
   valuePreview?: string
