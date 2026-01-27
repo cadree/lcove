@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { FileText, Clock, ArrowRight, PlusCircle, StickyNote, Trash2, Save, Loader2, MoveRight, Mail, Phone, Globe, Camera, Link2 } from "lucide-react";
+import { FileText, Clock, ArrowRight, PlusCircle, StickyNote, Trash2, Save, Loader2, MoveRight, Mail, Phone, Globe, Camera, Link2, ArrowLeft } from "lucide-react";
 import { PipelineItem, PipelineEvent, PipelineStage } from "@/actions/pipelineActions";
 import { ContactTasksSection } from "./ContactTasksSection";
 import { ContactGallerySection } from "./ContactGallerySection";
@@ -162,6 +162,17 @@ export function PipelineItemDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md">
         <SheetHeader className="pb-4">
+          {/* Back Button for iOS */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+            className="w-fit -ml-2 mb-2 gap-1 text-muted-foreground hover:text-foreground touch-manipulation"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back</span>
+          </Button>
+
           {/* Move to Stage Selector */}
           <div className="flex items-center gap-2 mb-3">
             <MoveRight className="w-4 h-4 text-muted-foreground" />
