@@ -190,7 +190,7 @@ export function ContactQuotesSection({ pipelineItemId }: ContactQuotesSectionPro
           {quotes.map((quote) => (
             <div
               key={quote.id}
-              className="p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
+              className="p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors group"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
@@ -206,7 +206,7 @@ export function ContactQuotesSection({ pipelineItemId }: ContactQuotesSectionPro
                   )}
                   <p className="text-sm font-semibold mt-1">{formatCurrency(quote.amount, quote.currency)}</p>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 shrink-0">
                   <Select value={quote.status} onValueChange={(v) => handleStatusChange(quote, v as ContactQuote['status'])}>
                     <SelectTrigger className="h-7 w-24 text-xs">
                       <SelectValue />
@@ -221,7 +221,7 @@ export function ContactQuotesSection({ pipelineItemId }: ContactQuotesSectionPro
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7"
+                    className="h-7 w-7 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity touch-manipulation"
                     onClick={() => handleDelete(quote.id)}
                     role="button"
                     aria-label="Delete quote"
