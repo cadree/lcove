@@ -31,30 +31,48 @@ export function useStories() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, refetch, error } = useQuery({
     queryKey: ['stories'],
     queryFn: async () => {
+      console.log('[useStories] Fetching stories...');
+      
       // Get all non-expired stories
-      const { data: storiesData, error } = await supabase
+      const { data: storiesData, error: storiesError } = await supabase
         .from('stories')
         .select('*')
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (storiesError) {
+        console.error('[useStories] Error fetching stories:', storiesError);
+        throw storiesError;
+      }
 
-      // Get profiles for story creators using profiles_public view
-      const userIds = [...new Set(storiesData?.map(s => s.user_id) || [])];
-      const { data: profiles } = await supabase
+      console.log('[useStories] Fetched', storiesData?.length || 0, 'stories');
+
+      if (!storiesData || storiesData.length === 0) {
+        return { stories: [], grouped: {} };
+      }
+
+      // Get profiles for story creators using profiles_public view to protect sensitive fields
+      const userIds = [...new Set(storiesData.map(s => s.user_id))];
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', userIds);
 
-      const profileMap = new Map(profiles?.map(p => [p.user_id, p]));
+      if (profilesError) {
+        console.error('[useStories] Error fetching profiles:', profilesError);
+        // Don't throw - continue with empty profiles
+      }
+
+      console.log('[useStories] Fetched', profiles?.length || 0, 'profiles for story creators');
+
+      const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
 
       // Get view counts for each story (only for own stories)
       const storiesWithProfiles = await Promise.all(
-        (storiesData || []).map(async (story) => {
+        storiesData.map(async (story) => {
           let viewCount = 0;
           let hasViewed = false;
 
@@ -99,6 +117,8 @@ export function useStories() {
 
       return { stories: storiesWithProfiles, grouped: groupedByUser };
     },
+    retry: 2,
+    retryDelay: 1000,
   });
 
   // Set up realtime subscription for story views
@@ -214,6 +234,7 @@ export function useStories() {
     stories: data?.stories || [],
     groupedStories: data?.grouped || {},
     isLoading,
+    error,
     uploadStory,
     recordView,
     addReaction,

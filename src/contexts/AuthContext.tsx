@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { getAuthRedirectUrl } from '@/lib/capacitorStorage';
+import { getAuthRedirectUrl, clearAllAuthStorage } from '@/lib/capacitorStorage';
 import { logAuthEvent, logAuthError, logSessionState } from '@/lib/authDebug';
 
 interface AuthContextType {
@@ -116,8 +116,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    logAuthEvent('Sign out');
+    logAuthEvent('Sign out - clearing all auth storage');
+    
+    // Clear Supabase session first
     await supabase.auth.signOut();
+    
+    // Explicitly clear all auth storage (critical for iOS/Capacitor)
+    await clearAllAuthStorage();
+    
+    // Reset local state immediately
+    setUser(null);
+    setSession(null);
+    
+    logAuthEvent('Sign out complete - all storage cleared');
   };
 
   const resetPassword = async (email: string) => {

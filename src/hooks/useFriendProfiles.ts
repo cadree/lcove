@@ -10,10 +10,12 @@ interface FriendProfile {
 }
 
 export function useFriendProfiles(friendIds: string[]) {
-  const { data: friendProfiles = [], isLoading } = useQuery({
+  const { data: friendProfiles = [], isLoading, error, refetch } = useQuery({
     queryKey: ['friend-profiles', friendIds],
     queryFn: async () => {
       if (friendIds.length === 0) return [];
+
+      console.log('[useFriendProfiles] Fetching profiles for', friendIds.length, 'friends');
 
       // Use profiles_public view to protect sensitive fields (phone)
       const { data, error } = await supabase
@@ -21,14 +23,23 @@ export function useFriendProfiles(friendIds: string[]) {
         .select('user_id, display_name, avatar_url, city, bio')
         .in('user_id', friendIds);
 
-      if (error) throw error;
+      if (error) {
+        console.error('[useFriendProfiles] Error fetching profiles:', error);
+        throw error;
+      }
+      
+      console.log('[useFriendProfiles] Successfully fetched', data?.length || 0, 'profiles');
       return (data || []) as FriendProfile[];
     },
     enabled: friendIds.length > 0,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   return {
     friendProfiles,
     isLoading,
+    error,
+    refetch,
   };
 }

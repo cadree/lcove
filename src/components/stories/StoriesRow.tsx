@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Star, Filter } from 'lucide-react';
+import { Plus, Star, Filter, AlertCircle, RefreshCw } from 'lucide-react';
 import { useStories } from '@/hooks/useStories';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,13 +9,16 @@ import StoryViewer from './StoryViewer';
 import StoryUpload from './StoryUpload';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+
 const StoriesRow = () => {
   const {
     user
   } = useAuth();
   const {
     groupedStories,
-    isLoading
+    isLoading,
+    error: storiesError,
+    refetch
   } = useStories();
   const {
     favorites,
@@ -45,10 +48,35 @@ const StoriesRow = () => {
       setSelectedUserId(null);
     }
   };
+
+  const handleRetry = async () => {
+    await refetch();
+  };
+
+  // Loading state
   if (isLoading) {
-    return <div className="flex gap-3 overflow-x-auto py-4 px-1 scrollbar-hide">
-        {[...Array(6)].map((_, i) => <div key={i} className="w-16 h-16 rounded-full bg-muted animate-pulse shrink-0" />)}
-      </div>;
+    return (
+      <div className="flex gap-3 overflow-x-auto py-4 px-1 scrollbar-hide">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="w-16 h-16 rounded-full bg-muted animate-pulse shrink-0" />
+        ))}
+      </div>
+    );
+  }
+
+  // Error state
+  if (storiesError) {
+    console.error('[StoriesRow] Error loading stories:', storiesError);
+    return (
+      <div className="flex items-center justify-center gap-2 py-4 px-4">
+        <AlertCircle className="w-4 h-4 text-destructive" />
+        <span className="text-sm text-muted-foreground">Failed to load stories</span>
+        <Button variant="ghost" size="sm" onClick={handleRetry} className="h-7 px-2">
+          <RefreshCw className="w-3.5 h-3.5 mr-1" />
+          Retry
+        </Button>
+      </div>
+    );
   }
   return <>
       <div className="flex items-center gap-2 px-1 pt-2">
