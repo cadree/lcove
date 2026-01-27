@@ -160,7 +160,7 @@ export function PipelineItemDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-md">
+      <SheetContent className="w-full sm:max-w-md flex flex-col h-full">
         <SheetHeader className="pb-4">
           {/* Back Button for iOS */}
           <Button
@@ -346,7 +346,7 @@ export function PipelineItemDrawer({
           )}
         </SheetHeader>
 
-        <ScrollArea className="h-[calc(100vh-320px)] pr-4">
+        <ScrollArea className="flex-1 pr-4">
           {/* Tasks Section */}
           <div className="mb-6">
             <ContactTasksSection pipelineItemId={item.id} />
@@ -443,13 +443,22 @@ export function PipelineItemDrawer({
         </ScrollArea>
 
         {/* Action Buttons */}
-        <div className="pt-4 pb-safe border-t border-border flex gap-2 relative z-10 bg-background">
+        <div className="pt-4 pb-safe border-t border-border flex gap-2 relative z-10 bg-background sticky bottom-0">
           {isEditing ? (
             <>
-              <Button variant="outline" onClick={handleCancel} disabled={isSaving} className="flex-1 touch-manipulation">
+              <Button 
+                variant="outline" 
+                onClick={handleCancel} 
+                disabled={isSaving} 
+                className="flex-1 touch-manipulation border-border text-foreground hover:bg-accent"
+              >
                 Cancel
               </Button>
-              <Button onClick={handleSave} disabled={isSaving} className="flex-1 touch-manipulation">
+              <Button 
+                onClick={handleSave} 
+                disabled={isSaving} 
+                className="flex-1 touch-manipulation bg-primary text-primary-foreground hover:bg-primary/90"
+              >
                 {isSaving ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
@@ -462,12 +471,21 @@ export function PipelineItemDrawer({
             </>
           ) : (
             <>
-              <Button variant="outline" onClick={() => setIsEditing(true)} className="flex-1 touch-manipulation">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditing(true)} 
+                className="flex-1 touch-manipulation border-primary text-primary hover:bg-primary/10"
+              >
                 Edit
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="icon" disabled={isDeleting} className="touch-manipulation">
+                  <Button 
+                    variant="destructive" 
+                    size="icon" 
+                    disabled={isDeleting} 
+                    className="touch-manipulation bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
                     {isDeleting ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
