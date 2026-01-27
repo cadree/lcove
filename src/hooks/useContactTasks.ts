@@ -11,6 +11,8 @@ export interface ContactTask {
   due_at: string | null;
   is_done: boolean;
   created_at: string;
+  archived_at: string | null;
+  completed_at: string | null;
 }
 
 export function useContactTasks(pipelineItemId: string | null) {
@@ -18,6 +20,7 @@ export function useContactTasks(pipelineItemId: string | null) {
   const queryClient = useQueryClient();
   const { earnEnergy } = useEnergy();
 
+  // Active tasks (not archived)
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['contact-tasks', pipelineItemId],
     queryFn: async () => {
@@ -27,7 +30,27 @@ export function useContactTasks(pipelineItemId: string | null) {
         .from('contact_tasks')
         .select('*')
         .eq('pipeline_item_id', pipelineItemId)
+        .is('archived_at', null)
         .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      return data as ContactTask[];
+    },
+    enabled: !!user && !!pipelineItemId,
+  });
+
+  // Archived tasks
+  const { data: archivedTasks = [], isLoading: isLoadingArchived } = useQuery({
+    queryKey: ['contact-tasks-archived', pipelineItemId],
+    queryFn: async () => {
+      if (!pipelineItemId) return [];
+      
+      const { data, error } = await supabase
+        .from('contact_tasks')
+        .select('*')
+        .eq('pipeline_item_id', pipelineItemId)
+        .not('archived_at', 'is', null)
+        .order('archived_at', { ascending: false });
       
       if (error) throw error;
       return data as ContactTask[];
@@ -56,6 +79,30 @@ export function useContactTasks(pipelineItemId: string | null) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contact-tasks', pipelineItemId] });
       queryClient.invalidateQueries({ queryKey: ['my-day-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task-events'] });
+    },
+  });
+
+  const updateTask = useMutation({
+    mutationFn: async ({ taskId, title, dueAt }: { taskId: string; title?: string; dueAt?: string | null }) => {
+      const updates: Record<string, unknown> = {};
+      if (title !== undefined) updates.title = title;
+      if (dueAt !== undefined) updates.due_at = dueAt;
+      
+      const { data, error } = await supabase
+        .from('contact_tasks')
+        .update(updates)
+        .eq('id', taskId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contact-tasks', pipelineItemId] });
+      queryClient.invalidateQueries({ queryKey: ['my-day-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task-events'] });
     },
   });
 
@@ -74,6 +121,7 @@ export function useContactTasks(pipelineItemId: string | null) {
     onSuccess: async ({ data, isDone }) => {
       queryClient.invalidateQueries({ queryKey: ['contact-tasks', pipelineItemId] });
       queryClient.invalidateQueries({ queryKey: ['my-day-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task-events'] });
       
       // Award energy points when completing a task
       if (isDone) {
@@ -91,6 +139,98 @@ export function useContactTasks(pipelineItemId: string | null) {
     },
   });
 
+  const archiveTask = useMutation({
+    mutationFn: async (taskId: string) => {
+      const { error } = await supabase
+        .from('contact_tasks')
+        .update({ archived_at: new Date().toISOString() })
+        .eq('id', taskId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contact-tasks', pipelineItemId] });
+      queryClient.invalidateQueries({ queryKey: ['contact-tasks-archived', pipelineItemId] });
+      queryClient.invalidateQueries({ queryKey: ['my-day-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task-events'] });
+    },
+  });
+
+  const archiveCompletedTasks = useMutation({
+    mutationFn: async () => {
+      if (!pipelineItemId) throw new Error("Missing pipeline item");
+      
+      const { error } = await supabase
+        .from('contact_tasks')
+        .update({ archived_at: new Date().toISOString() })
+        .eq('pipeline_item_id', pipelineItemId)
+        .eq('is_done', true)
+        .is('archived_at', null);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contact-tasks', pipelineItemId] });
+      queryClient.invalidateQueries({ queryKey: ['contact-tasks-archived', pipelineItemId] });
+      queryClient.invalidateQueries({ queryKey: ['my-day-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task-events'] });
+    },
+  });
+
+  const restoreTask = useMutation({
+    mutationFn: async (taskId: string) => {
+      const { error } = await supabase
+        .from('contact_tasks')
+        .update({ archived_at: null })
+        .eq('id', taskId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contact-tasks', pipelineItemId] });
+      queryClient.invalidateQueries({ queryKey: ['contact-tasks-archived', pipelineItemId] });
+      queryClient.invalidateQueries({ queryKey: ['my-day-tasks'] });
+    },
+  });
+
+  const clearCompletedTasks = useMutation({
+    mutationFn: async () => {
+      if (!pipelineItemId) throw new Error("Missing pipeline item");
+      
+      const { error } = await supabase
+        .from('contact_tasks')
+        .delete()
+        .eq('pipeline_item_id', pipelineItemId)
+        .eq('is_done', true)
+        .is('archived_at', null);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contact-tasks', pipelineItemId] });
+      queryClient.invalidateQueries({ queryKey: ['my-day-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task-events'] });
+    },
+  });
+
+  const clearArchivedTasks = useMutation({
+    mutationFn: async () => {
+      if (!pipelineItemId) throw new Error("Missing pipeline item");
+      
+      const { error } = await supabase
+        .from('contact_tasks')
+        .delete()
+        .eq('pipeline_item_id', pipelineItemId)
+        .not('archived_at', 'is', null);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contact-tasks-archived', pipelineItemId] });
+      queryClient.invalidateQueries({ queryKey: ['task-events'] });
+    },
+  });
+
   const deleteTask = useMutation({
     mutationFn: async (taskId: string) => {
       const { error } = await supabase
@@ -102,21 +242,38 @@ export function useContactTasks(pipelineItemId: string | null) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contact-tasks', pipelineItemId] });
+      queryClient.invalidateQueries({ queryKey: ['contact-tasks-archived', pipelineItemId] });
       queryClient.invalidateQueries({ queryKey: ['my-day-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task-events'] });
     },
   });
 
+  // Separate completed from incomplete tasks
+  const incompleteTasks = tasks.filter(t => !t.is_done);
+  const completedTasks = tasks.filter(t => t.is_done);
+
   return {
     tasks,
+    incompleteTasks,
+    completedTasks,
+    archivedTasks,
     isLoading,
+    isLoadingArchived,
     createTask: createTask.mutateAsync,
+    updateTask: updateTask.mutateAsync,
     toggleTask: toggleTask.mutateAsync,
+    archiveTask: archiveTask.mutateAsync,
+    archiveCompletedTasks: archiveCompletedTasks.mutateAsync,
+    restoreTask: restoreTask.mutateAsync,
+    clearCompletedTasks: clearCompletedTasks.mutateAsync,
+    clearArchivedTasks: clearArchivedTasks.mutateAsync,
     deleteTask: deleteTask.mutateAsync,
     isCreating: createTask.isPending,
+    isArchiving: archiveCompletedTasks.isPending,
   };
 }
 
-// Hook for My Day dashboard - gets ALL incomplete tasks
+// Hook for My Day dashboard - gets ALL incomplete tasks (not archived)
 export function useMyDayTasks() {
   const { user } = useAuth();
 
@@ -135,6 +292,7 @@ export function useMyDayTasks() {
           )
         `)
         .eq('is_done', false)
+        .is('archived_at', null)
         .order('due_at', { ascending: true, nullsFirst: false });
       
       if (error) throw error;

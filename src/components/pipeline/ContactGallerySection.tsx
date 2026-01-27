@@ -1,9 +1,9 @@
 import { useState, useRef } from "react";
-import { Image, Video, Upload, X, Loader2, StickyNote, Trash2 } from "lucide-react";
+import { Image, Video, Upload, X, Loader2, StickyNote, Trash2, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
 import { useContactMedia, ContactMedia } from "@/hooks/useContactMedia";
 import { toast } from "sonner";
 
@@ -11,37 +11,80 @@ interface ContactGallerySectionProps {
   pipelineItemId: string;
 }
 
+interface UploadProgress {
+  fileName: string;
+  progress: number;
+}
+
 export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionProps) {
   const { media, isLoading, uploadMedia, updateNotes, deleteMedia, isUploading } = useContactMedia(pipelineItemId);
   const [selectedMedia, setSelectedMedia] = useState<ContactMedia | null>(null);
   const [editingNotes, setEditingNotes] = useState("");
+  const [uploadQueue, setUploadQueue] = useState<UploadProgress[]>([]);
+  const [uploadingCount, setUploadingCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
-    // Handle multiple file uploads
-    for (const file of Array.from(files)) {
+    const fileArray = Array.from(files);
+    setUploadingCount(fileArray.length);
+    
+    // Initialize upload queue
+    setUploadQueue(fileArray.map(f => ({ fileName: f.name, progress: 0 })));
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < fileArray.length; i++) {
+      const file = fileArray[i];
       const isVideo = file.type.startsWith('video/');
       const isImage = file.type.startsWith('image/');
 
       if (!isVideo && !isImage) {
-        toast.error(`Skipped ${file.name}: not an image or video`);
+        failCount++;
+        setUploadQueue(prev => prev.map((p, idx) => 
+          idx === i ? { ...p, progress: -1 } : p
+        ));
         continue;
       }
 
       try {
+        // Simulate progress
+        setUploadQueue(prev => prev.map((p, idx) => 
+          idx === i ? { ...p, progress: 50 } : p
+        ));
+        
         await uploadMedia({
           file,
           mediaType: isVideo ? 'video' : 'image',
         });
-      } catch (error) {
-        toast.error(`Failed to upload ${file.name}`);
+        
+        setUploadQueue(prev => prev.map((p, idx) => 
+          idx === i ? { ...p, progress: 100 } : p
+        ));
+        successCount++;
+      } catch {
+        setUploadQueue(prev => prev.map((p, idx) => 
+          idx === i ? { ...p, progress: -1 } : p
+        ));
+        failCount++;
       }
     }
     
-    toast.success(`${files.length} file(s) uploaded`);
+    // Clear queue after short delay
+    setTimeout(() => {
+      setUploadQueue([]);
+      setUploadingCount(0);
+    }, 1000);
+    
+    if (successCount > 0) {
+      toast.success(`${successCount} file(s) uploaded`);
+    }
+    if (failCount > 0) {
+      toast.error(`${failCount} file(s) failed`);
+    }
 
     // Reset input
     if (fileInputRef.current) {
@@ -117,40 +160,77 @@ export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionP
         >
           <Image className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
           <p className="text-sm text-muted-foreground">Add photos or videos</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">Select multiple files at once</p>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-2">
-          {media.map((item) => (
+        <div className="space-y-3">
+          {/* Upload progress */}
+          {uploadQueue.length > 0 && (
+            <div className="p-3 bg-muted/30 rounded-lg space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                Uploading {uploadingCount} file(s)...
+              </p>
+              {uploadQueue.map((item, idx) => (
+                <div key={idx} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="truncate max-w-[150px]">{item.fileName}</span>
+                    <span className={item.progress === -1 ? "text-destructive" : item.progress === 100 ? "text-primary" : ""}>
+                      {item.progress === -1 ? "Failed" : item.progress === 100 ? "Done" : `${item.progress}%`}
+                    </span>
+                  </div>
+                  {item.progress >= 0 && item.progress < 100 && (
+                    <Progress value={item.progress} className="h-1" />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Media grid */}
+          <div className="grid grid-cols-3 gap-2">
+            {media.map((item) => (
+              <div
+                key={item.id}
+                className="relative aspect-square rounded-lg overflow-hidden cursor-pointer group"
+                onClick={() => {
+                  setSelectedMedia(item);
+                  setEditingNotes(item.notes || "");
+                }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && setSelectedMedia(item)}
+              >
+                {item.media_type === 'video' ? (
+                  <div className="w-full h-full bg-muted flex items-center justify-center">
+                    <Video className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                ) : (
+                  <img
+                    src={item.media_url}
+                    alt="Contact media"
+                    className="w-full h-full object-cover"
+                  />
+                )}
+                {item.notes && (
+                  <div className="absolute bottom-1 right-1 bg-background/80 rounded p-0.5">
+                    <StickyNote className="w-3 h-3 text-primary" />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+              </div>
+            ))}
+            
+            {/* Add more button */}
             <div
-              key={item.id}
-              className="relative aspect-square rounded-lg overflow-hidden cursor-pointer group"
-              onClick={() => {
-                setSelectedMedia(item);
-                setEditingNotes(item.notes || "");
-              }}
+              className="aspect-square rounded-lg border-2 border-dashed border-border/50 flex items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
+              onClick={() => fileInputRef.current?.click()}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && setSelectedMedia(item)}
+              onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
             >
-              {item.media_type === 'video' ? (
-                <div className="w-full h-full bg-muted flex items-center justify-center">
-                  <Video className="w-6 h-6 text-muted-foreground" />
-                </div>
-              ) : (
-                <img
-                  src={item.media_url}
-                  alt="Contact media"
-                  className="w-full h-full object-cover"
-                />
-              )}
-              {item.notes && (
-                <div className="absolute bottom-1 right-1 bg-background/80 rounded p-0.5">
-                  <StickyNote className="w-3 h-3 text-amber-500" />
-                </div>
-              )}
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+              <ImagePlus className="w-6 h-6 text-muted-foreground" />
             </div>
-          ))}
+          </div>
         </div>
       )}
 
