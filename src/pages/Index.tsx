@@ -23,63 +23,20 @@ const Index = () => {
   const { profile } = useProfile(user?.id);
   const [isEditing, setIsEditing] = useState(false);
 
-  const {
-    loading,
-    preferences,
-    scoredItems,
-    pinnedItems,
-    mostUsedItems,
-    recentItems,
-    trackClick,import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { ChevronLeft } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
-import { useProfile } from "@/hooks/useProfile";
-import { useHomeUsage } from "@/hooks/useHomeUsage";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import EnergyIndicator from "@/components/energy/EnergyIndicator";
-import { NotificationBell } from "@/components/notifications/NotificationBell";
-import { HomeSearch } from "@/components/home/HomeSearch";
-import { HomeRecentSection } from "@/components/home/HomeRecentSection";
-import { HomeMostUsedSection } from "@/components/home/HomeMostUsedSection";
-import { HomePinnedSection } from "@/components/home/HomePinnedSection";
-import { HomeExploreSection } from "@/components/home/HomeExploreSection";
-import { HomeEditSheet } from "@/components/home/HomeEditSheet";
-import BottomNav from "@/components/navigation/BottomNav";
-
-const Index = () => {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const { profile } = useProfile(user?.id);
-  const [isEditing, setIsEditing] = useState(false);
-
-  const {
-    loading,
-    scoredItems,
-    pinnedItems,
-    mostUsedItems,
-    recentItems,
-    trackClick,
-    togglePin,
-  } = useHomeUsage();
+  const home = useHomeUsage();
 
   const handleBack = () => {
-    // iOS-safe explicit route (change if you want a different destination)
     navigate("/menu");
   };
 
   const handleItemClick = (itemId: string) => {
-    if (!isEditing) trackClick(itemId);
+    if (!isEditing) home.trackClick(itemId);
   };
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden pb-24">
-      {/* Ambient background */}
       <div className="fixed inset-0 bg-gradient-to-b from-primary/[0.02] via-transparent to-transparent pointer-events-none" />
 
-      {/* Header */}
       <motion.header
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -87,7 +44,6 @@ const Index = () => {
         style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 0px)" }}
       >
         <div className="flex items-center justify-between px-4 h-14 relative">
-          {/* Left - Back + Avatar */}
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -101,10 +57,7 @@ const Index = () => {
 
             <Link to="/profile" className="tap-target" aria-label="Go to profile">
               <Avatar className="h-9 w-9 ring-2 ring-primary/20 transition-all hover:ring-primary/40">
-                <AvatarImage
-                  src={profile?.avatar_url || undefined}
-                  alt={profile?.display_name || "Profile"}
-                />
+                <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || "Profile"} />
                 <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
                   {profile?.display_name?.[0]?.toUpperCase() || "?"}
                 </AvatarFallback>
@@ -112,7 +65,6 @@ const Index = () => {
             </Link>
           </div>
 
-          {/* Center - Logo */}
           <div className="absolute left-1/2 -translate-x-1/2">
             <img
               alt="Ether"
@@ -121,7 +73,6 @@ const Index = () => {
             />
           </div>
 
-          {/* Right - Actions */}
           <div className="flex items-center gap-1">
             <EnergyIndicator />
             <NotificationBell />
@@ -129,44 +80,29 @@ const Index = () => {
         </div>
       </motion.header>
 
-      {/* Page content */}
       <main className="pt-[calc(3.5rem+env(safe-area-inset-top))] px-4 space-y-6">
         <HomeSearch />
 
-        {/* NOTE:
-            HomeEditSheetProps in your project does NOT accept "preferences".
-            Keeping it minimal to avoid TS build breaks. */}
         <HomeEditSheet open={isEditing} onOpenChange={setIsEditing} />
 
         <HomePinnedSection
-          items={pinnedItems}
+          items={home.pinnedItems}
           isEditing={isEditing}
-          onTogglePin={togglePin}
+          onTogglePin={home.togglePin}
           onItemClick={handleItemClick}
         />
 
-        {/* NOTE:
-            HomeRecentSectionProps does NOT accept "isEditing" in your project.
-            We pass only supported props. */}
-        <HomeRecentSection items={recentItems} onItemClick={handleItemClick} />
+        <HomeRecentSection items={home.recentItems} onItemClick={handleItemClick} />
 
-        <HomeMostUsedSection
-          items={mostUsedItems}
-          isEditing={isEditing}
-          onItemClick={handleItemClick}
-        />
+        <HomeMostUsedSection items={home.mostUsedItems} isEditing={isEditing} onItemClick={handleItemClick} />
 
-        {/* NOTE:
-            HomeExploreSectionProps does NOT accept "loading" in your project.
-            If you want a loading state, we can add it outside this component. */}
-        {loading ? (
+        {home.loading ? (
           <div className="text-sm text-muted-foreground px-1">Loading…</div>
         ) : (
-          <HomeExploreSection items={scoredItems} onItemClick={handleItemClick} />
+          <HomeExploreSection items={home.scoredItems} onItemClick={handleItemClick} />
         )}
       </main>
 
-      {/* Bottom navigation */}
       <BottomNav />
     </div>
   );
