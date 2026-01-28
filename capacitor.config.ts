@@ -1,6 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
+<<<<<<< HEAD
   appId: 'app.lovable.e07d9c457fd949f78f3cc7d5998be668',
   appName: 'ETHER',
   webDir: 'dist',
@@ -43,6 +44,19 @@ const config: CapacitorConfig = {
     CapacitorCookies: {
       enabled: true
     },
+=======
+  appId: 'com.lcove.ether',
+  appName: 'ETHER',
+  webDir: 'dist',
+  bundledWebRuntime: false,
+
+  server: {
+    url: 'https://etherbylcove.com',
+    cleartext: true
+  },
+
+  plugins: {
+>>>>>>> ebb7643 (prep iOS rebuild – env, capacitor, deps)
     CapacitorHttp: {
       enabled: true
     }
@@ -50,3 +64,7 @@ const config: CapacitorConfig = {
 };
 
 export default config;
+<<<<<<< HEAD
+=======
+
+>>>>>>> ebb7643 (prep iOS rebuild – env, capacitor, deps)
