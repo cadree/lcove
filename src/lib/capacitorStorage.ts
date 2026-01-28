@@ -82,8 +82,8 @@ export const capacitorStorage = {
  */
 export const clearAllAuthStorage = async (): Promise<void> => {
   const authKeys = [
-    'sb-waafzlorvnozeujjhvxu-auth-token',
-    'sb-waafzlorvnozeujjhvxu-auth-token-code-verifier',
+    'sb-wjbyvlgsxscwukkolehg-auth-token',
+    'sb-wjbyvlgsxscwukkolehg-auth-token-code-verifier',
     'supabase.auth.token',
   ];
 
