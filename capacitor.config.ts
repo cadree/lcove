@@ -4,10 +4,11 @@ const config: CapacitorConfig = {
   appId: 'app.lovable.e07d9c457fd949f78f3cc7d5998be668',
   appName: 'ETHER',
   webDir: 'dist',
-  server: {
-    url: 'https://e07d9c45-7fd9-49f7-8f3c-c7d5998be668.lovableproject.com?forceHideBadge=true',
-    cleartext: true
-  },
+  // NOTE: Remove 'server' block for App Store/TestFlight production builds
+  // server: {
+  //   url: 'https://e07d9c45-7fd9-49f7-8f3c-c7d5998be668.lovableproject.com?forceHideBadge=true',
+  //   cleartext: true
+  // },
   ios: {
     contentInset: 'always',
     preferredContentMode: 'mobile',
