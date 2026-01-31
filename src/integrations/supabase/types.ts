@@ -623,62 +623,91 @@ export type Database = {
       brand_partnerships: {
         Row: {
           about_business: string | null
+          address: string | null
+          application_id: string | null
           brand_logo_url: string | null
           brand_name: string
+          city: string | null
           contact_email: string | null
+          country: string | null
           created_at: string
           description: string | null
           display_order: number
           exclusive_offer: string | null
           featured: boolean | null
+          gallery_images: string[] | null
           id: string
           is_active: boolean
           offer_code: string | null
           offer_terms: string | null
+          owner_user_id: string | null
           partnership_type: string
           social_links: Json | null
+          state: string | null
           updated_at: string
           website_url: string | null
         }
         Insert: {
           about_business?: string | null
+          address?: string | null
+          application_id?: string | null
           brand_logo_url?: string | null
           brand_name: string
+          city?: string | null
           contact_email?: string | null
+          country?: string | null
           created_at?: string
           description?: string | null
           display_order?: number
           exclusive_offer?: string | null
           featured?: boolean | null
+          gallery_images?: string[] | null
           id?: string
           is_active?: boolean
           offer_code?: string | null
           offer_terms?: string | null
+          owner_user_id?: string | null
           partnership_type?: string
           social_links?: Json | null
+          state?: string | null
           updated_at?: string
           website_url?: string | null
         }
         Update: {
           about_business?: string | null
+          address?: string | null
+          application_id?: string | null
           brand_logo_url?: string | null
           brand_name?: string
+          city?: string | null
           contact_email?: string | null
+          country?: string | null
           created_at?: string
           description?: string | null
           display_order?: number
           exclusive_offer?: string | null
           featured?: boolean | null
+          gallery_images?: string[] | null
           id?: string
           is_active?: boolean
           offer_code?: string | null
           offer_terms?: string | null
+          owner_user_id?: string | null
           partnership_type?: string
           social_links?: Json | null
+          state?: string | null
           updated_at?: string
           website_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "brand_partnerships_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "partner_applications"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       calendar_reminders: {
         Row: {
