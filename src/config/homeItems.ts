@@ -16,6 +16,7 @@ import {
   User,
   Sparkles,
   ShoppingBag,
+  Handshake,
   type LucideIcon,
 } from "lucide-react";
 
@@ -52,6 +53,7 @@ export const homeItems: HomeItem[] = [
   { id: "wallet", label: "Wallet", route: "/wallet", icon: Wallet, category: "business", description: "Earnings" },
   { id: "mall", label: "Mall", route: "/mall", icon: ShoppingBag, category: "business", description: "Shop" },
   { id: "fund", label: "Fund", route: "/fund", icon: Heart, category: "business", description: "Community fund" },
+  { id: "brand-partners", label: "Partners", route: "/brand-partners", icon: Handshake, category: "business", description: "Brand deals" },
   
   // Profile & Settings
   { id: "profile", label: "Profile", route: "/profile", icon: User, category: "profile", description: "Your page" },
