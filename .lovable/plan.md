@@ -1,213 +1,117 @@
 
 
-# Complete Data Migration to External Supabase Project
+# Privacy Policy Page for iOS App Store and Android Play Store
 
 ## Overview
 
-Migrating all data from your current Lovable Cloud backend (`wjbyvlgsxscwukkolehg`) to your external project (`waafzlorvnozeujjhvxu`).
-
-## Current Data Summary
-
-| Category | Count |
-|----------|-------|
-| Tables | 121 tables |
-| User Profiles | 31 users |
-| Posts | 5 |
-| Messages | 19 |
-| Conversations | 9 |
-| Events | 3 |
-| Projects | 1 |
-| Stores | 2 |
-| Pipeline Items | 12 |
-| Storage Files | 151 total (media: 113, contact-media: 26, contact-avatars: 7, board-uploads: 5) |
-| Edge Functions | 32 functions |
+Creating a comprehensive Privacy Policy page that meets the requirements for both Apple App Store and Google Play Store submissions. This is a mandatory requirement for app store approval.
 
 ---
 
-## Important Limitation
+## What Will Be Created
 
-**Lovable cannot directly connect to or modify your external Supabase project.** The migration requires manual execution using:
-- Supabase Dashboard SQL Editor
-- Supabase CLI for edge functions and storage
-- Direct database access for data export/import
+### 1. New Privacy Policy Page (`src/pages/Privacy.tsx`)
 
----
+A professionally formatted privacy policy covering all required sections:
 
-## Step-by-Step Migration Checklist
+| Section | Description |
+|---------|-------------|
+| **Information We Collect** | Personal info, usage data, device info, content you create |
+| **How We Use Your Information** | Account management, communications, personalization, analytics |
+| **Information Sharing** | Third-party services, legal requirements, business transfers |
+| **Data Security** | Encryption, access controls, security measures |
+| **Your Rights** | Access, correction, deletion, data portability |
+| **Children's Privacy** | Age restrictions (13+/16+ where applicable) |
+| **Third-Party Services** | Payment processing, analytics, authentication |
+| **Data Retention** | How long data is kept |
+| **Contact Information** | How to reach support |
+| **Changes to Policy** | Update notification process |
 
-### Phase 1: Schema Migration (Run in SQL Editor)
+### 2. New Terms of Service Page (`src/pages/Terms.tsx`)
 
-Execute these SQL files in your external project's SQL Editor (`https://supabase.com/dashboard/project/waafzlorvnozeujjhvxu/sql`):
+A companion terms page (often required alongside privacy policy):
 
-1. **Run `01-schema.sql`** - Creates all 121 tables and enums
-2. **Run `02-functions.sql`** - Creates 21 database functions
-3. **Run `03-triggers.sql`** - Sets up all triggers
-4. **Run `04-views.sql`** - Creates database views
-5. **Run `05-rls-policies.sql`** - Applies ~125 Row Level Security policies
-6. **Run `06-storage.sql`** - Creates storage buckets with policies
-7. **Run `08-realtime.sql`** - Enables realtime on key tables
+- User responsibilities and conduct
+- Content ownership and licensing
+- Account termination policies
+- Limitation of liability
+- Dispute resolution
 
-### Phase 2: Data Migration
+### 3. Route Configuration (`src/App.tsx`)
 
-**Option A: Fresh Start (Recommended for Beta Apps)**
-- Skip data migration
-- Users will need to re-register
-- Cleanest approach for iOS launch
+Add routes for both pages:
+- `/privacy` - Privacy Policy
+- `/terms` - Terms of Service
 
-**Option B: Export and Import Data**
-Since Lovable manages your current database, you have two options:
+### 4. Footer Updates (`src/components/landing/LandingFooter.tsx`)
 
-1. **Via Supabase CLI (if you have direct access)**
-   ```bash
-   # Export from current project
-   pg_dump postgresql://postgres:[SERVICE_ROLE_KEY]@db.wjbyvlgsxscwukkolehg.supabase.co:5432/postgres \
-     --data-only --no-owner > data-export.sql
-   
-   # Import to new project
-   psql postgresql://postgres:[SERVICE_ROLE_KEY]@db.waafzlorvnozeujjhvxu.supabase.co:5432/postgres \
-     < data-export.sql
-   ```
-
-2. **Manual Table-by-Table Export**
-   Use the Supabase Table Editor to export each table as CSV and import into the new project.
-
-### Phase 3: Storage Migration
-
-Download files from current buckets and upload to the new project:
-
-```bash
-# Install Supabase CLI
-npm install -g supabase
-
-# Login
-supabase login
-
-# Download from source (requires service role access)
-supabase storage download media/* --project-ref wjbyvlgsxscwukkolehg -o ./backup/media
-
-# Upload to target
-supabase storage upload ./backup/media media/ --project-ref waafzlorvnozeujjhvxu
-```
-
-Repeat for: `contact-media`, `contact-avatars`, `board-uploads`
-
-### Phase 4: Edge Function Deployment
-
-```bash
-cd supabase/functions
-supabase link --project-ref waafzlorvnozeujjhvxu
-supabase functions deploy
-```
-
-### Phase 5: Configure Secrets
-
-In your new Supabase Dashboard → Edge Functions → Secrets, add:
-
-| Secret | Get Value From |
-|--------|----------------|
-| `STRIPE_SECRET_KEY` | Stripe Dashboard → API Keys |
-| `RESEND_API_KEY` | Resend Dashboard |
-| `MUX_TOKEN_ID` | Mux Dashboard |
-| `MUX_TOKEN_SECRET` | Mux Dashboard |
-| `TWILIO_ACCOUNT_SID` | Twilio Console |
-| `TWILIO_AUTH_TOKEN` | Twilio Console |
-| `TWILIO_PHONE_NUMBER` | Your Twilio number |
-| `VAPID_PRIVATE_KEY` | Generate new or copy existing |
-| `VAPID_PUBLIC_KEY` | Generate new or copy existing |
-
-### Phase 6: Configure Auth URLs
-
-In Supabase Dashboard → Authentication → URL Configuration:
-
-**Site URL:**
-```
-https://lcove.lovable.app
-```
-
-**Redirect URLs (add all):**
-```
-app.lovable.e07d9c457fd949f78f3cc7d5998be668://
-capacitor://localhost
-https://id-preview--e07d9c45-7fd9-49f7-8f3c-c7d5998be668.lovable.app
-https://lcove.lovable.app
-```
-
-### Phase 7: Update App Environment
-
-**This step requires exporting your project to GitHub:**
-
-1. Export project from Lovable to GitHub
-2. Clone the repository locally
-3. Update the `.env` file:
-   ```env
-   VITE_SUPABASE_URL=https://waafzlorvnozeujjhvxu.supabase.co
-   VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhYWZ6bG9ydm5vemV1ampodnh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYzODk5NzQsImV4cCI6MjA4MTk2NTk3NH0.KpcERd3mctTaR5UUU_Ev6hhpDLc4dNua4Nd5kqVbZBI
-   VITE_SUPABASE_PROJECT_ID=waafzlorvnozeujjhvxu
-   ```
-4. Commit and push changes
-
-### Phase 8: User Authentication Migration
-
-Users cannot be directly migrated due to password hashing. Options:
-
-1. **Password Reset Flow (Recommended)**
-   - Send password reset emails to all users
-   - Users set new passwords on the new system
-
-2. **Contact Supabase Support**
-   - For enterprise needs, Supabase can assist with auth user migration
+Add legal links to the Support section:
+- Privacy Policy link
+- Terms of Service link
 
 ---
 
-## Technical Details
+## App Store Compliance Checklist
 
-### Files Already Prepared
+The privacy policy will address:
 
-All migration SQL files are in the `/migration` directory:
-- `01-schema.sql` (2,117 lines) - Complete schema
-- `02-functions.sql` (465 lines) - 21 database functions
-- `03-triggers.sql` - All triggers
-- `04-views.sql` - Database views
-- `05-rls-policies.sql` - ~125 RLS policies
-- `06-storage.sql` (136 lines) - 4 storage buckets + policies
-- `08-realtime.sql` - Realtime configuration
+- What personal data is collected
+- How data is used and processed
+- Third-party data sharing practices
+- User rights regarding their data
+- Data retention and deletion policies
+- Security measures in place
+- Contact information for privacy inquiries
+- Children's privacy (COPPA/GDPR-K compliance)
+- California Consumer Privacy Act (CCPA) considerations
+- GDPR compliance for EU users
 
-### Code Changes Required After Migration
+---
 
-Once on the external project, update in `capacitorStorage.ts`:
+## Technical Implementation
 
-```typescript
-// Update storage keys to match new project
-const authKeys = [
-  'sb-waafzlorvnozeujjhvxu-auth-token',
-  'sb-waafzlorvnozeujjhvxu-auth-token-code-verifier',
-  'supabase.auth.token',
-];
+### Files to Create
+```
+src/pages/Privacy.tsx      - Full privacy policy page
+src/pages/Terms.tsx        - Terms of service page
 ```
 
----
+### Files to Modify
+```
+src/App.tsx                          - Add /privacy and /terms routes
+src/components/landing/LandingFooter.tsx - Add legal links
+```
 
-## Verification Checklist
-
-After migration, verify:
-
-- [ ] Schema created (121 tables visible in Table Editor)
-- [ ] Functions deployed (check Database → Functions)
-- [ ] RLS policies active (check Table Editor → Policies)
-- [ ] Storage buckets created (4 buckets)
-- [ ] Edge functions deployed (32 functions)
-- [ ] Auth sign-in works
-- [ ] Auth sign-up creates user with profile
-- [ ] iOS deep links work for auth
-- [ ] Data appears in app (if migrated)
+### Design Approach
+- Uses existing `PageLayout` and `PageHeader` components for consistency
+- Clean, readable typography with proper heading hierarchy
+- Collapsible sections using Accordion for easy navigation
+- Mobile-optimized with proper safe-area handling
+- Accessible with proper ARIA labels and semantic HTML
+- Last updated date displayed prominently
 
 ---
 
-## Alternative: Keep Using Lovable Cloud
+## Privacy Policy Content Tailored for Ether
 
-If the migration complexity is too high, consider:
-- Continue using Lovable Cloud for development and production
-- Lovable Cloud provides the same Supabase capabilities
-- No manual migration steps required
-- You can always export later when needed
+The policy will be specifically written for your app's features:
+
+1. **Social Features**: Posts, messages, profiles
+2. **Creator Tools**: Pipeline, invoices, contracts, stores
+3. **Media Storage**: Photos, videos, documents
+4. **Payment Processing**: Stripe integration for purchases
+5. **Push Notifications**: Device tokens and preferences
+6. **Location Data**: City-based directory features
+7. **Authentication**: Email, password, session management
+
+---
+
+## Estimated Changes
+
+| File | Lines Added/Modified |
+|------|---------------------|
+| `src/pages/Privacy.tsx` | ~400 new lines |
+| `src/pages/Terms.tsx` | ~300 new lines |
+| `src/App.tsx` | ~4 lines |
+| `src/components/landing/LandingFooter.tsx` | ~6 lines |
 
