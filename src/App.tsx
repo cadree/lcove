@@ -44,6 +44,8 @@ import Boards from "./pages/Boards";
 import BoardEditor from "./pages/BoardEditor";
 import SignContract from "./pages/SignContract";
 import Portfolios from "./pages/Portfolios";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -102,6 +104,8 @@ const App = () => (
                 <Route path="/boards/:boardId" element={<BoardEditor />} />
                 <Route path="/sign-contract/:contractId" element={<SignContract />} />
                 <Route path="/portfolios" element={<Portfolios />} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

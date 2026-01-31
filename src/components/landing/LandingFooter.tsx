@@ -43,6 +43,14 @@ export function LandingFooter() {
               <li><Link to="/auth" className="hover:text-foreground transition-colors">Sign In</Link></li>
             </ul>
           </div>
+          
+          <div>
+            <h4 className="font-display font-medium mb-4">Legal</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li><Link to="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link></li>
+              <li><Link to="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link></li>
+            </ul>
+          </div>
         </div>
         
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-8 border-t border-border/30">
