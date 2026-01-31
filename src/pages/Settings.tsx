@@ -16,6 +16,8 @@ import {
   Loader2,
   Lock,
   LogOut,
+  FileText,
+  Scale,
   Archive,
   Activity,
   BarChart3,
@@ -871,11 +873,59 @@ const Settings = () => {
           </motion.section>
         )}
 
+        {/* Legal Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.38 }}
+          className="glass-strong rounded-2xl p-6 mb-6"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Scale className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-medium text-foreground">Legal</h2>
+              <p className="text-sm text-muted-foreground">Privacy policy and terms of service</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <Link 
+              to="/privacy" 
+              className="flex items-center justify-between p-4 rounded-xl bg-background/50 hover:bg-background/80 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <FileText className="w-5 h-5 text-muted-foreground" />
+                <div>
+                  <p className="font-medium text-foreground">Privacy Policy</p>
+                  <p className="text-sm text-muted-foreground">How we handle your data</p>
+                </div>
+              </div>
+              <ArrowRight className="w-5 h-5 text-muted-foreground" />
+            </Link>
+
+            <Link 
+              to="/terms" 
+              className="flex items-center justify-between p-4 rounded-xl bg-background/50 hover:bg-background/80 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Scale className="w-5 h-5 text-muted-foreground" />
+                <div>
+                  <p className="font-medium text-foreground">Terms of Service</p>
+                  <p className="text-sm text-muted-foreground">Rules and guidelines</p>
+                </div>
+              </div>
+              <ArrowRight className="w-5 h-5 text-muted-foreground" />
+            </Link>
+          </div>
+        </motion.section>
+
         {/* Log Out Section */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.42 }}
           className="glass-strong rounded-2xl p-6"
         >
           <div className="flex items-center gap-3 mb-6">
