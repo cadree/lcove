@@ -95,3 +95,6 @@ verify_jwt = true
 
 [functions.purchase-studio-booking]
 verify_jwt = true
+
+[functions.notify-partner-accepted]
+verify_jwt = false

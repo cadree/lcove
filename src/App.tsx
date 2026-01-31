@@ -49,6 +49,7 @@ import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import BrandPartners from "./pages/BrandPartners";
 import Collectives from "./pages/Collectives";
+import PartnerPortal from "./pages/PartnerPortal";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -111,6 +112,7 @@ const App = () => (
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/brand-partners" element={<BrandPartners />} />
+                <Route path="/partner-portal" element={<PartnerPortal />} />
                 <Route path="/collectives" element={<Collectives />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />

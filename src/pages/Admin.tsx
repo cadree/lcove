@@ -3,7 +3,7 @@ import {
   Shield, Users, AlertTriangle, CheckCircle, XCircle, Clock, History, Search, 
   ArrowLeft, Ban, UserCheck, ClipboardList, Trash2, Eye, Phone, Mail, MapPin, 
   Briefcase, Heart, Star, Send, Coins, Download, MessageSquare, ShieldCheck, ShieldOff,
-  MessageCircle
+  MessageCircle, Building2
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/layout/PageLayout';
@@ -47,6 +47,7 @@ import {
 } from '@/hooks/useAdminExtended';
 import { formatDistanceToNow } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
+import { PartnerApplicationsTab } from '@/components/admin/PartnerApplicationsTab';
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
@@ -407,9 +408,10 @@ const Admin: React.FC = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="users" className="px-4">
-          <TabsList className="w-full grid grid-cols-5">
+          <TabsList className="w-full grid grid-cols-6">
             <TabsTrigger value="users"><Users className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="pending"><Clock className="h-4 w-4" /></TabsTrigger>
+            <TabsTrigger value="partners"><Building2 className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="messages"><MessageSquare className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="flagged"><AlertTriangle className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="history"><History className="h-4 w-4" /></TabsTrigger>
@@ -726,6 +728,22 @@ const Admin: React.FC = () => {
                 </div>
               )}
             </ScrollArea>
+          </TabsContent>
+
+          {/* Partner Applications Tab */}
+          <TabsContent value="partners" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Partner Applications
+                </CardTitle>
+                <CardDescription>Review and manage brand partner applications</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <PartnerApplicationsTab />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Mass Messages Tab */}

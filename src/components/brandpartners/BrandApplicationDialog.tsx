@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Loader2, Building2 } from "lucide-react";
 
@@ -30,51 +31,91 @@ export function BrandApplicationDialog({
   open,
   onOpenChange,
 }: BrandApplicationDialogProps) {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    brandName: "",
-    contactName: "",
-    email: "",
+    businessName: "",
+    category: "service",
+    contactEmail: "",
+    contactPhone: "",
     website: "",
-    partnershipType: "collaborator",
-    proposedOffer: "",
-    message: "",
+    city: "",
+    state: "",
+    country: "",
+    address: "",
+    description: "",
+    contribution: "",
+    memberBenefits: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!user) {
+      toast.error("Please sign in to submit an application");
+      return;
+    }
+    
     setLoading(true);
 
     try {
-      // For now, we'll insert into creator_applications table as a brand application
-      // In a full implementation, you'd have a dedicated brand_applications table
-      const { error } = await supabase.from("creator_applications").insert({
-        name: `${formData.brandName} (Brand) - ${formData.contactName}`,
-        email: formData.email,
-        portfolio_url: formData.website,
-        message: `Partnership Type: ${formData.partnershipType}\n\nProposed Offer: ${formData.proposedOffer}\n\n${formData.message}`,
+      const { error } = await supabase.from("partner_applications").insert({
+        user_id: user.id,
+        business_name: formData.businessName,
+        category: formData.category,
+        contact_email: formData.contactEmail,
+        contact_phone: formData.contactPhone || null,
+        website_url: formData.website || null,
+        city: formData.city || null,
+        state: formData.state || null,
+        country: formData.country || null,
+        address: formData.address || null,
+        description: formData.description || null,
+        contribution: formData.contribution || null,
+        member_benefits: formData.memberBenefits || null,
         status: "pending",
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error("You already have a pending application");
+        }
+        throw error;
+      }
 
-      toast.success("Application submitted! We'll be in touch soon.");
+      toast.success("Application submitted! We'll review it and get back to you soon.");
       onOpenChange(false);
       setFormData({
-        brandName: "",
-        contactName: "",
-        email: "",
+        businessName: "",
+        category: "service",
+        contactEmail: "",
+        contactPhone: "",
         website: "",
-        partnershipType: "collaborator",
-        proposedOffer: "",
-        message: "",
+        city: "",
+        state: "",
+        country: "",
+        address: "",
+        description: "",
+        contribution: "",
+        memberBenefits: "",
       });
     } catch (error: any) {
-      toast.error("Failed to submit application: " + error.message);
+      toast.error(error.message || "Failed to submit application");
     } finally {
       setLoading(false);
     }
   };
+
+  const categories = [
+    { value: 'studio', label: 'Studio', icon: '🎬' },
+    { value: 'venue', label: 'Venue', icon: '🏛️' },
+    { value: 'cafe', label: 'Café', icon: '☕' },
+    { value: 'housing', label: 'Housing', icon: '🏠' },
+    { value: 'equipment', label: 'Equipment', icon: '📷' },
+    { value: 'transport', label: 'Transport', icon: '🚗' },
+    { value: 'service', label: 'Service', icon: '✨' },
+    { value: 'other', label: 'Other', icon: '📦' },
+  ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -94,42 +135,63 @@ export function BrandApplicationDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="brandName">Brand Name</Label>
-              <Input
-                id="brandName"
-                required
-                value={formData.brandName}
-                onChange={(e) =>
-                  setFormData({ ...formData, brandName: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="contactName">Contact Name</Label>
-              <Input
-                id="contactName"
-                required
-                value={formData.contactName}
-                onChange={(e) =>
-                  setFormData({ ...formData, contactName: e.target.value })
-                }
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="businessName">Business Name *</Label>
+            <Input
+              id="businessName"
+              required
+              value={formData.businessName}
+              onChange={(e) =>
+                setFormData({ ...formData, businessName: e.target.value })
+              }
+            />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Business Email</Label>
-            <Input
-              id="email"
-              type="email"
-              required
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
+            <Label htmlFor="category">Category *</Label>
+            <Select
+              value={formData.category}
+              onValueChange={(value) =>
+                setFormData({ ...formData, category: value })
               }
-            />
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.value} value={cat.value}>
+                    {cat.icon} {cat.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="contactEmail">Contact Email *</Label>
+              <Input
+                id="contactEmail"
+                type="email"
+                required
+                value={formData.contactEmail}
+                onChange={(e) =>
+                  setFormData({ ...formData, contactEmail: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contactPhone">Contact Phone</Label>
+              <Input
+                id="contactPhone"
+                type="tel"
+                value={formData.contactPhone}
+                onChange={(e) =>
+                  setFormData({ ...formData, contactPhone: e.target.value })
+                }
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -145,54 +207,88 @@ export function BrandApplicationDialog({
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="partnershipType">Partnership Type</Label>
-            <Select
-              value={formData.partnershipType}
-              onValueChange={(value) =>
-                setFormData({ ...formData, partnershipType: value })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sponsor">
-                  Sponsor - Premium visibility & exclusive perks
-                </SelectItem>
-                <SelectItem value="collaborator">
-                  Collaborator - Joint initiatives & events
-                </SelectItem>
-                <SelectItem value="supporter">
-                  Supporter - Community benefits & discounts
-                </SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="city">City</Label>
+              <Input
+                id="city"
+                value={formData.city}
+                onChange={(e) =>
+                  setFormData({ ...formData, city: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="state">State/Province</Label>
+              <Input
+                id="state"
+                value={formData.state}
+                onChange={(e) =>
+                  setFormData({ ...formData, state: e.target.value })
+                }
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="proposedOffer">
-              Proposed Exclusive Offer for Members
-            </Label>
+            <Label htmlFor="country">Country</Label>
             <Input
-              id="proposedOffer"
-              placeholder="e.g., 20% off all services"
-              value={formData.proposedOffer}
+              id="country"
+              value={formData.country}
               onChange={(e) =>
-                setFormData({ ...formData, proposedOffer: e.target.value })
+                setFormData({ ...formData, country: e.target.value })
               }
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="message">Additional Message (optional)</Label>
-            <Textarea
-              id="message"
-              placeholder="Tell us about your brand and partnership goals..."
-              rows={3}
-              value={formData.message}
+            <Label htmlFor="address">Full Address</Label>
+            <Input
+              id="address"
+              value={formData.address}
               onChange={(e) =>
-                setFormData({ ...formData, message: e.target.value })
+                setFormData({ ...formData, address: e.target.value })
+              }
+              placeholder="Street address for your location"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">About Your Business</Label>
+            <Textarea
+              id="description"
+              placeholder="Tell us about your business and what you do..."
+              rows={3}
+              value={formData.description}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="contribution">How will you contribute?</Label>
+            <Textarea
+              id="contribution"
+              placeholder="How can you contribute to our creative community?"
+              rows={2}
+              value={formData.contribution}
+              onChange={(e) =>
+                setFormData({ ...formData, contribution: e.target.value })
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="memberBenefits">
+              Proposed Exclusive Offer for Members
+            </Label>
+            <Input
+              id="memberBenefits"
+              placeholder="e.g., 20% off all services"
+              value={formData.memberBenefits}
+              onChange={(e) =>
+                setFormData({ ...formData, memberBenefits: e.target.value })
               }
             />
           </div>
