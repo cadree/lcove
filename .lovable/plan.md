@@ -1,89 +1,309 @@
 
-# Add Dedicated Privacy Access on Home Page
+# Brand Partners Page & Collectives Builder
 
 ## Overview
 
-Adding a visible, dedicated "Legal" section to the Home page so users can easily navigate to the Privacy Policy and Terms of Service pages directly from `/home`. This ensures compliance visibility for iOS App Store and Google Play Store requirements.
+This plan implements two key features from the landing page PersonaCards:
+
+1. **Brand Partners Page** - A dedicated page showcasing all brand partners with their exclusive community offerings and business information
+2. **Collectives Builder** - A guided onboarding flow for creators to build their own sub-communities within the app
 
 ---
 
-## Current Structure
+## Feature 1: Brand Partners Page
 
-The Home page (`src/pages/Index.tsx`) displays:
-- Header with avatar, logo, energy, notifications
-- Search bar
-- Pinned, Recent, Most Used sections
-- Explore section with categorized navigation items
+### Current State
+- The "Partner with Us" button on PersonaCards navigates to `/partners`
+- The `/partners` page exists but is for **local partners** (studios, venues, cafes) - not brand partners
+- `brand_partnerships` table exists with sponsor/collaborator/supporter types
+- `BrandPartners` component displays brand partners in the discovery section
 
-The navigation items are defined in `src/config/homeItems.ts` and grouped by categories: `core`, `discover`, `create`, `business`, `profile`.
+### Implementation
 
----
+**New Page: `/brand-partners`**
 
-## Implementation Plan
+Create a dedicated page that showcases brands offering exclusive benefits to the community.
 
-### Option A: Add Legal Section to Home Page (Recommended)
+| File | Action |
+|------|--------|
+| `src/pages/BrandPartners.tsx` | New - Main brand partners page |
+| `src/hooks/useBrandPartnerships.ts` | Update - Add expanded queries for partner profiles |
+| `src/components/landing/PersonaCards.tsx` | Update - Change Brands ctaAction to `/brand-partners` |
+| `src/App.tsx` | Update - Add route |
 
-Add a new "Legal & Support" section at the bottom of the Home page, before the BottomNav, containing links to Privacy Policy and Terms of Service.
-
-**Files to Modify:**
-
-| File | Changes |
-|------|---------|
-| `src/pages/Index.tsx` | Add a new Legal section component before `<BottomNav />` |
-
-**Implementation Details:**
+**Page Structure:**
 
 ```text
-┌─────────────────────────────────────┐
-│           Home Page                 │
-├─────────────────────────────────────┤
-│  [Header: Avatar, Logo, Bells]      │
-│  [Search Bar]                       │
-│  [Pinned Section]                   │
-│  [Recent Section]                   │
-│  [Most Used Section]                │
-│  [Explore Section]                  │
-│                                     │
-│  ┌─────────────────────────────────┐│
-│  │  📋 Legal & Support             ││
-│  │  ├── 📄 Privacy Policy          ││
-│  │  └── ⚖️ Terms of Service        ││
-│  └─────────────────────────────────┘│
-│                                     │
-│  [Bottom Navigation]                │
-└─────────────────────────────────────┘
+┌────────────────────────────────────────┐
+│  Header: "Brand Partners"              │
+│  Subtitle: Exclusive community offers  │
+├────────────────────────────────────────┤
+│  ┌──────────────────────────────────┐  │
+│  │  Become a Brand Partner CTA      │  │
+│  │  [Apply to Partner]              │  │
+│  └──────────────────────────────────┘  │
+├────────────────────────────────────────┤
+│  Filter: [All] [Sponsors] [Collab]     │
+├────────────────────────────────────────┤
+│  Brand Card Grid:                      │
+│  ┌─────────────┐ ┌─────────────┐      │
+│  │ Brand Logo  │ │ Brand Logo  │      │
+│  │ Name        │ │ Name        │      │
+│  │ Type badge  │ │ Type badge  │      │
+│  │ Exclusive   │ │ Exclusive   │      │
+│  │ Offer       │ │ Offer       │      │
+│  └─────────────┘ └─────────────┘      │
+└────────────────────────────────────────┘
 ```
 
-**Code to Add in `src/pages/Index.tsx`:**
+**Brand Detail Sheet:**
+- Brand logo and cover image
+- Partnership type badge (Sponsor/Collaborator/Supporter)
+- Exclusive community offerings section
+- About the business section
+- Website and social links
+- "Claim Offer" or "Learn More" CTA
 
-A new section with two Link components:
-- Privacy Policy link → `/privacy`
-- Terms of Service link → `/terms`
+**Database Changes:**
 
-Styled consistently with the existing glass card design used throughout the app.
+Extend `brand_partnerships` table with additional columns for business info:
+
+```sql
+ALTER TABLE brand_partnerships ADD COLUMN IF NOT EXISTS 
+  about_business TEXT,
+  exclusive_offer TEXT,
+  offer_code TEXT,
+  offer_terms TEXT,
+  social_links JSONB DEFAULT '{}',
+  contact_email TEXT,
+  featured BOOLEAN DEFAULT false;
+```
 
 ---
 
-## Visual Design
+## Feature 2: Collectives Builder
 
-The Legal section will:
-- Use the same `rounded-xl border border-border/40 bg-card/40 backdrop-blur-sm` styling as other sections
-- Include a small header "Legal & Support"
-- Display two tappable rows with icons:
-  - `FileText` icon for Privacy Policy
-  - `Scale` icon for Terms of Service
-- Show chevron arrows indicating navigation
+### Current State
+- "Start a Collective" button goes to `/auth`
+- Group chats exist with `is_community_hub`, `visibility`, `topic`, `description` fields
+- `conversation_participants` has `role` (owner/moderator/member)
+- `useCommunityGroups` and `useJoinGroup` hooks already exist
+
+### Implementation
+
+**New Page: `/collectives`**
+
+A dedicated hub for discovering and creating collectives (sub-communities).
+
+| File | Action |
+|------|--------|
+| `src/pages/Collectives.tsx` | New - Main collectives discovery/creation page |
+| `src/components/collectives/CreateCollectiveDialog.tsx` | New - Multi-step collective creation wizard |
+| `src/components/collectives/CollectiveCard.tsx` | New - Display card for collectives |
+| `src/hooks/useCollectives.ts` | New - Hooks for collective CRUD |
+| `src/components/landing/PersonaCards.tsx` | Update - Change Collectives ctaAction to `/collectives` |
+| `src/App.tsx` | Update - Add route |
+
+**Page Structure:**
+
+```text
+┌────────────────────────────────────────┐
+│  Header: "Collectives"                 │
+│  Subtitle: Build your creative tribe   │
+├────────────────────────────────────────┤
+│  ┌──────────────────────────────────┐  │
+│  │  Start Your Collective CTA       │  │
+│  │  [Create Collective]             │  │
+│  └──────────────────────────────────┘  │
+├────────────────────────────────────────┤
+│  Tabs: [Discover] [My Collectives]     │
+├────────────────────────────────────────┤
+│  Topic Filter Pills:                   │
+│  [All] [Models] [DJs] [Filmmakers]...  │
+├────────────────────────────────────────┤
+│  Collective Cards:                     │
+│  ┌─────────────────────────────────┐   │
+│  │ Avatar  Name         [Join]    │   │
+│  │         Topic badge            │   │
+│  │         XX members             │   │
+│  │         Description...         │   │
+│  └─────────────────────────────────┘   │
+└────────────────────────────────────────┘
+```
+
+**Create Collective Dialog (Multi-step Wizard):**
+
+```text
+Step 1: Basics
+┌────────────────────────────────────┐
+│  Collective Name                   │
+│  [___________________________]     │
+│                                    │
+│  Topic/Focus                       │
+│  [Models ▼]                        │
+│                                    │
+│  Description                       │
+│  [___________________________]     │
+│  [___________________________]     │
+└────────────────────────────────────┘
+
+Step 2: Privacy & Access
+┌────────────────────────────────────┐
+│  Who can join?                     │
+│  ○ Public - Anyone can join        │
+│  ○ Discoverable - Request to join  │
+│  ○ Private - Invite only           │
+│                                    │
+│  Max Members                       │
+│  [100]                             │
+└────────────────────────────────────┘
+
+Step 3: Branding
+┌────────────────────────────────────┐
+│  Upload Avatar                     │
+│  [+]                               │
+│                                    │
+│  Cover Image (optional)            │
+│  [+]                               │
+└────────────────────────────────────┘
+
+Step 4: Invite Members
+┌────────────────────────────────────┐
+│  Search users to invite...         │
+│  [___________________________]     │
+│                                    │
+│  Selected:                         │
+│  [@user1] [@user2] [x]             │
+└────────────────────────────────────┘
+```
+
+**Collective Topics (predefined):**
+- Models
+- Dancers
+- DJs
+- Filmmakers
+- Photographers
+- Musicians
+- Travelers
+- Writers
+- Artists
+- General
+
+**Database Changes:**
+
+Add topic enum and collective-specific fields:
+
+```sql
+-- Add collective topic enum
+DO $$ BEGIN
+  CREATE TYPE collective_topic AS ENUM (
+    'models', 'dancers', 'djs', 'filmmakers', 
+    'photographers', 'musicians', 'travelers', 
+    'writers', 'artists', 'general'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Add columns to conversations for collectives
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS
+  cover_image_url TEXT,
+  collective_topic collective_topic DEFAULT 'general',
+  join_requests_enabled BOOLEAN DEFAULT false;
+
+-- Create join requests table
+CREATE TABLE IF NOT EXISTS collective_join_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  message TEXT,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  reviewed_by UUID REFERENCES auth.users(id),
+  reviewed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(conversation_id, user_id)
+);
+
+-- RLS for join requests
+ALTER TABLE collective_join_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own requests" ON collective_join_requests
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Collective admins can view requests" ON collective_join_requests
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM conversation_participants cp
+      WHERE cp.conversation_id = collective_join_requests.conversation_id
+        AND cp.user_id = auth.uid()
+        AND cp.role IN ('owner', 'moderator')
+    )
+  );
+
+CREATE POLICY "Users can create requests" ON collective_join_requests
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Admins can update requests" ON collective_join_requests
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM conversation_participants cp
+      WHERE cp.conversation_id = collective_join_requests.conversation_id
+        AND cp.user_id = auth.uid()
+        AND cp.role IN ('owner', 'moderator')
+    )
+  );
+```
 
 ---
 
 ## Summary of Changes
 
-| File | Lines Changed |
-|------|--------------|
-| `src/pages/Index.tsx` | ~35 new lines |
+| Category | Files Changed |
+|----------|---------------|
+| New Pages | `BrandPartners.tsx`, `Collectives.tsx` |
+| New Components | `CreateCollectiveDialog.tsx`, `CollectiveCard.tsx`, `BrandPartnerCard.tsx`, `BrandPartnerSheet.tsx`, `BrandApplicationDialog.tsx` |
+| New Hooks | `useCollectives.ts` |
+| Updated Hooks | `useBrandPartnerships.ts` |
+| Updated Components | `PersonaCards.tsx` |
+| Updated Config | `App.tsx` (routes) |
+| Database | 2 migrations (brand_partnerships columns, collectives tables) |
 
-This approach:
-- Makes legal pages visible directly from `/home`
-- Follows existing UI patterns for consistency
-- Meets App Store requirements for accessible legal documentation
-- Does not require changes to the navigation config since these are static legal pages, not feature destinations
+---
+
+## Technical Details
+
+### useCollectives Hook
+
+```typescript
+// Key functions to implement:
+- useCollectives(topic?: string) - List discoverable collectives
+- useMyCollectives() - User's created/joined collectives
+- useCreateCollective() - Create new collective
+- useJoinRequestMutation() - Request to join
+- useManageJoinRequest() - Approve/reject requests
+```
+
+### Brand Partners Hook Extension
+
+```typescript
+// Extended queries:
+- useBrandPartnerships() - Already exists, enhance with filtering
+- useFeaturedBrandPartners() - For homepage highlights
+- useCreateBrandApplication() - New brand application flow
+```
+
+### Route Updates
+
+```typescript
+// Add to App.tsx routes:
+<Route path="/brand-partners" element={<BrandPartners />} />
+<Route path="/collectives" element={<Collectives />} />
+```
+
+### PersonaCards Navigation Updates
+
+```typescript
+// Update ctaAction values:
+Brands: "/brand-partners"
+Collectives: "/collectives"
+```
