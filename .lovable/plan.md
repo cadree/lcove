@@ -1,117 +1,89 @@
 
-
-# Privacy Policy Page for iOS App Store and Android Play Store
+# Add Dedicated Privacy Access on Home Page
 
 ## Overview
 
-Creating a comprehensive Privacy Policy page that meets the requirements for both Apple App Store and Google Play Store submissions. This is a mandatory requirement for app store approval.
+Adding a visible, dedicated "Legal" section to the Home page so users can easily navigate to the Privacy Policy and Terms of Service pages directly from `/home`. This ensures compliance visibility for iOS App Store and Google Play Store requirements.
 
 ---
 
-## What Will Be Created
+## Current Structure
 
-### 1. New Privacy Policy Page (`src/pages/Privacy.tsx`)
+The Home page (`src/pages/Index.tsx`) displays:
+- Header with avatar, logo, energy, notifications
+- Search bar
+- Pinned, Recent, Most Used sections
+- Explore section with categorized navigation items
 
-A professionally formatted privacy policy covering all required sections:
-
-| Section | Description |
-|---------|-------------|
-| **Information We Collect** | Personal info, usage data, device info, content you create |
-| **How We Use Your Information** | Account management, communications, personalization, analytics |
-| **Information Sharing** | Third-party services, legal requirements, business transfers |
-| **Data Security** | Encryption, access controls, security measures |
-| **Your Rights** | Access, correction, deletion, data portability |
-| **Children's Privacy** | Age restrictions (13+/16+ where applicable) |
-| **Third-Party Services** | Payment processing, analytics, authentication |
-| **Data Retention** | How long data is kept |
-| **Contact Information** | How to reach support |
-| **Changes to Policy** | Update notification process |
-
-### 2. New Terms of Service Page (`src/pages/Terms.tsx`)
-
-A companion terms page (often required alongside privacy policy):
-
-- User responsibilities and conduct
-- Content ownership and licensing
-- Account termination policies
-- Limitation of liability
-- Dispute resolution
-
-### 3. Route Configuration (`src/App.tsx`)
-
-Add routes for both pages:
-- `/privacy` - Privacy Policy
-- `/terms` - Terms of Service
-
-### 4. Footer Updates (`src/components/landing/LandingFooter.tsx`)
-
-Add legal links to the Support section:
-- Privacy Policy link
-- Terms of Service link
+The navigation items are defined in `src/config/homeItems.ts` and grouped by categories: `core`, `discover`, `create`, `business`, `profile`.
 
 ---
 
-## App Store Compliance Checklist
+## Implementation Plan
 
-The privacy policy will address:
+### Option A: Add Legal Section to Home Page (Recommended)
 
-- What personal data is collected
-- How data is used and processed
-- Third-party data sharing practices
-- User rights regarding their data
-- Data retention and deletion policies
-- Security measures in place
-- Contact information for privacy inquiries
-- Children's privacy (COPPA/GDPR-K compliance)
-- California Consumer Privacy Act (CCPA) considerations
-- GDPR compliance for EU users
+Add a new "Legal & Support" section at the bottom of the Home page, before the BottomNav, containing links to Privacy Policy and Terms of Service.
 
----
+**Files to Modify:**
 
-## Technical Implementation
+| File | Changes |
+|------|---------|
+| `src/pages/Index.tsx` | Add a new Legal section component before `<BottomNav />` |
 
-### Files to Create
-```
-src/pages/Privacy.tsx      - Full privacy policy page
-src/pages/Terms.tsx        - Terms of service page
+**Implementation Details:**
+
+```text
+┌─────────────────────────────────────┐
+│           Home Page                 │
+├─────────────────────────────────────┤
+│  [Header: Avatar, Logo, Bells]      │
+│  [Search Bar]                       │
+│  [Pinned Section]                   │
+│  [Recent Section]                   │
+│  [Most Used Section]                │
+│  [Explore Section]                  │
+│                                     │
+│  ┌─────────────────────────────────┐│
+│  │  📋 Legal & Support             ││
+│  │  ├── 📄 Privacy Policy          ││
+│  │  └── ⚖️ Terms of Service        ││
+│  └─────────────────────────────────┘│
+│                                     │
+│  [Bottom Navigation]                │
+└─────────────────────────────────────┘
 ```
 
-### Files to Modify
-```
-src/App.tsx                          - Add /privacy and /terms routes
-src/components/landing/LandingFooter.tsx - Add legal links
-```
+**Code to Add in `src/pages/Index.tsx`:**
 
-### Design Approach
-- Uses existing `PageLayout` and `PageHeader` components for consistency
-- Clean, readable typography with proper heading hierarchy
-- Collapsible sections using Accordion for easy navigation
-- Mobile-optimized with proper safe-area handling
-- Accessible with proper ARIA labels and semantic HTML
-- Last updated date displayed prominently
+A new section with two Link components:
+- Privacy Policy link → `/privacy`
+- Terms of Service link → `/terms`
+
+Styled consistently with the existing glass card design used throughout the app.
 
 ---
 
-## Privacy Policy Content Tailored for Ether
+## Visual Design
 
-The policy will be specifically written for your app's features:
-
-1. **Social Features**: Posts, messages, profiles
-2. **Creator Tools**: Pipeline, invoices, contracts, stores
-3. **Media Storage**: Photos, videos, documents
-4. **Payment Processing**: Stripe integration for purchases
-5. **Push Notifications**: Device tokens and preferences
-6. **Location Data**: City-based directory features
-7. **Authentication**: Email, password, session management
+The Legal section will:
+- Use the same `rounded-xl border border-border/40 bg-card/40 backdrop-blur-sm` styling as other sections
+- Include a small header "Legal & Support"
+- Display two tappable rows with icons:
+  - `FileText` icon for Privacy Policy
+  - `Scale` icon for Terms of Service
+- Show chevron arrows indicating navigation
 
 ---
 
-## Estimated Changes
+## Summary of Changes
 
-| File | Lines Added/Modified |
-|------|---------------------|
-| `src/pages/Privacy.tsx` | ~400 new lines |
-| `src/pages/Terms.tsx` | ~300 new lines |
-| `src/App.tsx` | ~4 lines |
-| `src/components/landing/LandingFooter.tsx` | ~6 lines |
+| File | Lines Changed |
+|------|--------------|
+| `src/pages/Index.tsx` | ~35 new lines |
 
+This approach:
+- Makes legal pages visible directly from `/home`
+- Follows existing UI patterns for consistency
+- Meets App Store requirements for accessible legal documentation
+- Does not require changes to the navigation config since these are static legal pages, not feature destinations
