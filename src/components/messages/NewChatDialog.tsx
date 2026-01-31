@@ -87,10 +87,48 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md bg-card border-border">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">New Message</DialogTitle>
+          <DialogTitle className="font-display text-xl">
+            {isGroup ? 'New Group Chat' : 'New Message'}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Toggle between DM and Group */}
+          <div className="flex gap-2">
+            <Button
+              variant={!isGroup ? 'default' : 'outline'}
+              size="sm"
+              className="flex-1"
+              onClick={() => {
+                setIsGroup(false);
+                if (selectedUsers.length > 1) {
+                  setSelectedUsers([]);
+                }
+              }}
+            >
+              Direct Message
+            </Button>
+            <Button
+              variant={isGroup ? 'default' : 'outline'}
+              size="sm"
+              className="flex-1 gap-2"
+              onClick={() => setIsGroup(true)}
+            >
+              <Users className="w-4 h-4" />
+              Group Chat
+            </Button>
+          </div>
+
+          {/* Group Name Input */}
+          {isGroup && (
+            <Input
+              placeholder="Group name (required)"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              className="bg-muted/30 border-border/50"
+            />
+          )}
+
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -124,27 +162,11 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
             </div>
           )}
 
-          {/* Group Options */}
-          {selectedUsers.length > 1 && (
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={isGroup}
-                  onChange={(e) => setIsGroup(e.target.checked)}
-                  className="rounded"
-                />
-                Create as group
-              </label>
-              {isGroup && (
-                <Input
-                  placeholder="Group name"
-                  value={groupName}
-                  onChange={(e) => setGroupName(e.target.value)}
-                  className="bg-muted/30 border-border/50"
-                />
-              )}
-            </div>
+          {/* Helper text for group */}
+          {isGroup && selectedUsers.length < 2 && (
+            <p className="text-xs text-muted-foreground">
+              Select at least 2 people to create a group chat
+            </p>
           )}
 
           {/* User List */}
@@ -159,7 +181,14 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
               users.map(u => (
                 <button
                   key={u.user_id}
-                  onClick={() => toggleUser(u.user_id)}
+                  onClick={() => {
+                    if (!isGroup && selectedUsers.length === 1 && !selectedUsers.includes(u.user_id)) {
+                      // For DM, replace selection
+                      setSelectedUsers([u.user_id]);
+                    } else {
+                      toggleUser(u.user_id);
+                    }
+                  }}
                   className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
                     selectedUsers.includes(u.user_id)
                       ? 'bg-primary/10'
@@ -195,9 +224,14 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
             <Button
               className="flex-1"
               onClick={handleCreate}
-              disabled={selectedUsers.length === 0 || createDirectConversation.isPending || createGroupConversation.isPending}
+              disabled={
+                selectedUsers.length === 0 || 
+                (isGroup && (selectedUsers.length < 2 || !groupName.trim())) ||
+                createDirectConversation.isPending || 
+                createGroupConversation.isPending
+              }
             >
-              {selectedUsers.length > 1 ? 'Create Group' : 'Start Chat'}
+              {isGroup ? 'Create Group' : 'Start Chat'}
             </Button>
           </div>
         </div>
