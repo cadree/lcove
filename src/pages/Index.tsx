@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { FileText, Scale, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -82,6 +83,34 @@ const Index = () => {
         <HomeMostUsedSection items={home.mostUsedItems} isEditing={isEditing} onItemClick={handleItemClick} />
 
         {home.loading ? <div className="text-sm text-muted-foreground px-1">Loading…</div> : <HomeExploreSection items={home.scoredItems} onItemClick={handleItemClick} />}
+
+        {/* Legal & Support Section */}
+        <section className="mt-6">
+          <h3 className="text-sm font-medium text-muted-foreground mb-3 px-1">Legal & Support</h3>
+          <div className="rounded-xl border border-border/40 bg-card/40 backdrop-blur-sm overflow-hidden">
+            <Link
+              to="/privacy"
+              className="flex items-center justify-between px-4 py-3.5 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <FileText className="h-5 w-5 text-muted-foreground" />
+                <span className="text-sm font-medium">Privacy Policy</span>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </Link>
+            <div className="border-t border-border/30" />
+            <Link
+              to="/terms"
+              className="flex items-center justify-between px-4 py-3.5 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Scale className="h-5 w-5 text-muted-foreground" />
+                <span className="text-sm font-medium">Terms of Service</span>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </Link>
+          </div>
+        </section>
       </main>
 
       <BottomNav />
