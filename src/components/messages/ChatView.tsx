@@ -5,7 +5,7 @@ import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
 import { 
   ArrowLeft, MoreVertical, Phone, Video, Trash2, 
   Check, CheckCheck, Play, Pause, Image as ImageIcon,
-  Users, Calendar, Info, ChevronDown, ChevronUp
+  Users, Calendar, Info, ChevronDown, ChevronUp, LogOut
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/hooks/useMessages';
@@ -38,7 +38,7 @@ interface ChatViewProps {
 const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { conversations, toggleMute } = useConversations();
+  const { conversations, toggleMute, leaveConversation } = useConversations();
   const { 
     messages, 
     isLoading, 
@@ -239,6 +239,21 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
               >
                 {isMuted ? 'Unmute notifications' : 'Mute notifications'}
               </DropdownMenuItem>
+              {conversation?.type === 'group' && (
+                <DropdownMenuItem 
+                  className="text-destructive"
+                  onClick={() => {
+                    leaveConversation.mutate(conversationId, {
+                      onSuccess: () => {
+                        onBack();
+                      }
+                    });
+                  }}
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Leave group
+                </DropdownMenuItem>
+              )}
               {otherUserId && conversation?.type === 'direct' && (
                 <DropdownMenuItem 
                   className="text-destructive"
@@ -369,7 +384,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                           </Avatar>
                         )}
 
-                        <div className={`group ${isOwn ? 'items-end' : 'items-start'}`}>
+                        <div className={`group flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
                           {/* Sender name with role for group chats */}
                           {!isOwn && conversation?.type === 'group' && (
                             <div className="flex items-center gap-2 mb-1">
@@ -436,13 +451,13 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                             )}
                           </div>
 
-                          {/* Delete option for own messages */}
+                          {/* Delete option for own messages - always visible on mobile */}
                           {isOwn && (
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => deleteMessage.mutate(msg.id)}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 text-muted-foreground hover:text-destructive"
+                              className="md:opacity-0 md:group-hover:opacity-100 transition-opacity w-6 h-6 text-muted-foreground hover:text-destructive active:text-destructive"
                             >
                               <Trash2 className="w-3 h-3" />
                             </Button>
