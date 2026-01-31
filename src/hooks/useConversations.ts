@@ -271,6 +271,28 @@ export function useConversations() {
     },
   });
 
+  // Leave group conversation
+  const leaveConversation = useMutation({
+    mutationFn: async (conversationId: string) => {
+      if (!user) throw new Error('Must be logged in');
+
+      const { error } = await supabase
+        .from('conversation_participants')
+        .delete()
+        .eq('conversation_id', conversationId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      toast.success('You left the group');
+    },
+    onError: () => {
+      toast.error('Failed to leave group');
+    },
+  });
+
   // Real-time subscription for conversation updates
   useEffect(() => {
     if (!user) return;
@@ -295,6 +317,7 @@ export function useConversations() {
     createDirectConversation,
     createGroupConversation,
     toggleMute,
+    leaveConversation,
     refetch,
   };
 }
