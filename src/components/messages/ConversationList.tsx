@@ -4,9 +4,11 @@ import { formatDistanceToNow } from 'date-fns';
 import { Search, Plus, Users, MoreVertical, BellOff, Bell, MessageSquare } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConversations } from '@/hooks/useConversations';
+import { usePresence } from '@/hooks/usePresence';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { OnlineIndicator } from '@/components/ui/online-indicator';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,7 +25,14 @@ interface ConversationListProps {
 const ConversationList = ({ selectedId, onSelect, onNewChat }: ConversationListProps) => {
   const { user } = useAuth();
   const { conversations, isLoading, toggleMute } = useConversations();
+  const { isOnline } = usePresence();
   const [search, setSearch] = useState('');
+
+  const getOtherUserId = (conv: typeof conversations[0]) => {
+    if (conv.type !== 'direct') return null;
+    const otherParticipant = conv.participants?.find(p => p.user_id !== user?.id);
+    return otherParticipant?.user_id || null;
+  };
 
   const getConversationName = (conv: typeof conversations[0]) => {
     if (conv.type === 'group') return conv.name || 'Group';
@@ -149,6 +158,14 @@ const ConversationList = ({ selectedId, onSelect, onNewChat }: ConversationListP
                       )}
                     </AvatarFallback>
                   </Avatar>
+                  {/* Online indicator for direct messages */}
+                  {conv.type === 'direct' && getOtherUserId(conv) && (
+                    <OnlineIndicator 
+                      isOnline={isOnline(getOtherUserId(conv)!)} 
+                      size="md"
+                      className="absolute bottom-0 right-0"
+                    />
+                  )}
                   {conv.unread_count > 0 && (
                     <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center font-medium">
                       {conv.unread_count > 9 ? '9+' : conv.unread_count}
