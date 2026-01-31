@@ -11,9 +11,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/hooks/useMessages';
 import { useConversations } from '@/hooks/useConversations';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
+import { usePresence } from '@/hooks/usePresence';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { OnlineIndicator } from '@/components/ui/online-indicator';
 import MessageComposer from './MessageComposer';
 import { toast } from 'sonner';
 import {
@@ -47,6 +49,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
     typingUsers 
   } = useMessages(conversationId);
   const { blockUser } = useUserBlocks();
+  const { isOnline } = usePresence();
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
@@ -136,12 +139,22 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
           <ArrowLeft className="w-5 h-5" />
         </Button>
 
-        <Avatar className="w-10 h-10 border-2 border-border/50">
-          <AvatarImage src={getConversationAvatar() || undefined} />
-          <AvatarFallback className="bg-muted text-muted-foreground">
-            {getConversationName().charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+        <div className="relative">
+          <Avatar className="w-10 h-10 border-2 border-border/50">
+            <AvatarImage src={getConversationAvatar() || undefined} />
+            <AvatarFallback className="bg-muted text-muted-foreground">
+              {getConversationName().charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          {/* Online indicator for direct messages */}
+          {conversation?.type === 'direct' && otherUserId && (
+            <OnlineIndicator 
+              isOnline={isOnline(otherUserId)} 
+              size="md"
+              className="absolute bottom-0 right-0"
+            />
+          )}
+        </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -158,11 +171,15 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
             >
               {typingUsers.map(t => t.profile?.display_name || 'Someone').join(', ')} typing...
             </motion.p>
-          ) : isProjectChat && (
+          ) : conversation?.type === 'direct' && otherUserId ? (
+            <p className="text-xs text-muted-foreground">
+              {isOnline(otherUserId) ? 'Online' : 'Offline'}
+            </p>
+          ) : isProjectChat ? (
             <p className="text-xs text-muted-foreground">
               {conversation?.participants?.length || 0} team members
             </p>
-          )}
+          ) : null}
         </div>
 
         <div className="flex gap-1">

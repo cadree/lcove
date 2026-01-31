@@ -5,9 +5,11 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConversations } from '@/hooks/useConversations';
+import { usePresence } from '@/hooks/usePresence';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { OnlineIndicator } from '@/components/ui/online-indicator';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +26,7 @@ interface NewChatDialogProps {
 const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDialogProps) => {
   const { user } = useAuth();
   const { createDirectConversation, createGroupConversation } = useConversations();
+  const { isOnline } = usePresence();
   const [search, setSearch] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [groupName, setGroupName] = useState('');
@@ -195,15 +198,27 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
                       : 'hover:bg-accent/30'
                   }`}
                 >
-                  <Avatar className="w-10 h-10">
-                    <AvatarImage src={u.avatar_url || undefined} />
-                    <AvatarFallback className="bg-muted text-muted-foreground">
-                      {u.display_name?.charAt(0).toUpperCase() || '?'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="flex-1 text-left font-medium text-foreground">
-                    {u.display_name || 'User'}
-                  </span>
+                  <div className="relative">
+                    <Avatar className="w-10 h-10">
+                      <AvatarImage src={u.avatar_url || undefined} />
+                      <AvatarFallback className="bg-muted text-muted-foreground">
+                        {u.display_name?.charAt(0).toUpperCase() || '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <OnlineIndicator 
+                      isOnline={isOnline(u.user_id)} 
+                      size="sm"
+                      className="absolute bottom-0 right-0"
+                    />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <span className="font-medium text-foreground">
+                      {u.display_name || 'User'}
+                    </span>
+                    {isOnline(u.user_id) && (
+                      <span className="text-xs text-emerald-500 block">Online</span>
+                    )}
+                  </div>
                   {selectedUsers.includes(u.user_id) && (
                     <Check className="w-5 h-5 text-primary" />
                   )}

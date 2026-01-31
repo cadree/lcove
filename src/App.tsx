@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NavCustomizationProvider } from "@/hooks/useNavCustomization";
+import { PresenceProvider } from "@/hooks/usePresence";
 import AccessGate from "@/components/auth/AccessGate";
 import Index from "./pages/Index";
 import Landing from "./pages/Landing";
@@ -61,9 +62,10 @@ const App = () => (
     <TooltipProvider>
       <BrowserRouter>
         <AuthProvider>
-          <NavCustomizationProvider>
-            <AccessGate>
-              <Toaster />
+          <PresenceProvider>
+            <NavCustomizationProvider>
+              <AccessGate>
+                <Toaster />
               <Sonner />
               <Routes>
                 <Route path="/" element={<Landing />} />
@@ -109,8 +111,9 @@ const App = () => (
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </AccessGate>
-          </NavCustomizationProvider>
+              </AccessGate>
+            </NavCustomizationProvider>
+          </PresenceProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
