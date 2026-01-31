@@ -29,7 +29,7 @@ const personas = [
       "Streamlined project collaboration",
     ],
     cta: "Partner with Us",
-    ctaAction: "/partners",
+    ctaAction: "/brand-partners",
   },
   {
     icon: Users,
@@ -42,7 +42,7 @@ const personas = [
       "Community fund and governance",
     ],
     cta: "Start a Collective",
-    ctaAction: "/auth",
+    ctaAction: "/collectives",
   },
 ];
 

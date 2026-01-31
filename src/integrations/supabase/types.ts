@@ -622,38 +622,59 @@ export type Database = {
       }
       brand_partnerships: {
         Row: {
+          about_business: string | null
           brand_logo_url: string | null
           brand_name: string
+          contact_email: string | null
           created_at: string
           description: string | null
           display_order: number
+          exclusive_offer: string | null
+          featured: boolean | null
           id: string
           is_active: boolean
+          offer_code: string | null
+          offer_terms: string | null
           partnership_type: string
+          social_links: Json | null
           updated_at: string
           website_url: string | null
         }
         Insert: {
+          about_business?: string | null
           brand_logo_url?: string | null
           brand_name: string
+          contact_email?: string | null
           created_at?: string
           description?: string | null
           display_order?: number
+          exclusive_offer?: string | null
+          featured?: boolean | null
           id?: string
           is_active?: boolean
+          offer_code?: string | null
+          offer_terms?: string | null
           partnership_type?: string
+          social_links?: Json | null
           updated_at?: string
           website_url?: string | null
         }
         Update: {
+          about_business?: string | null
           brand_logo_url?: string | null
           brand_name?: string
+          contact_email?: string | null
           created_at?: string
           description?: string | null
           display_order?: number
+          exclusive_offer?: string | null
+          featured?: boolean | null
           id?: string
           is_active?: boolean
+          offer_code?: string | null
+          offer_terms?: string | null
           partnership_type?: string
+          social_links?: Json | null
           updated_at?: string
           website_url?: string | null
         }
@@ -768,6 +789,47 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collective_join_requests: {
+        Row: {
+          conversation_id: string
+          created_at: string | null
+          id: string
+          message: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          message?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          message?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collective_join_requests_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
         ]
@@ -1421,11 +1483,14 @@ export type Database = {
       conversations: {
         Row: {
           avatar_url: string | null
+          collective_topic: string | null
+          cover_image_url: string | null
           created_at: string
           created_by: string
           description: string | null
           id: string
           is_community_hub: boolean | null
+          join_requests_enabled: boolean | null
           max_members: number | null
           name: string | null
           project_id: string | null
@@ -1436,11 +1501,14 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          collective_topic?: string | null
+          cover_image_url?: string | null
           created_at?: string
           created_by: string
           description?: string | null
           id?: string
           is_community_hub?: boolean | null
+          join_requests_enabled?: boolean | null
           max_members?: number | null
           name?: string | null
           project_id?: string | null
@@ -1451,11 +1519,14 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          collective_topic?: string | null
+          cover_image_url?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
           id?: string
           is_community_hub?: boolean | null
+          join_requests_enabled?: boolean | null
           max_members?: number | null
           name?: string | null
           project_id?: string | null
