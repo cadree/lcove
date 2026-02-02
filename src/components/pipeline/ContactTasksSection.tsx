@@ -159,12 +159,14 @@ function EditableTask({ task, onToggle, onUpdate, onDelete, onView }: EditableTa
         {task.is_done ? (
           <CheckCircle2 className="w-5 h-5 text-primary" />
         ) : (
-                  <Circle className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
-                )}
-              </button>
-              <div className="flex-1 min-w-0">
-                <p className={cn(
-                  "text-sm truncate",
+          <Circle className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
+        )}
+      </button>
+      <div 
+        className="flex-1 min-w-0 cursor-pointer"
+        onClick={() => onView(task)}
+      >
+        <p className={cn(
           "text-sm truncate",
           task.is_done && "line-through text-muted-foreground"
         )}>
@@ -182,27 +184,29 @@ function EditableTask({ task, onToggle, onUpdate, onDelete, onView }: EditableTa
           </p>
         )}
       </div>
-      <button
-        onClick={() => onView(task)}
-        className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0 p-1.5 hover:text-primary touch-manipulation"
-        aria-label="View task"
-      >
-        <Eye className="w-4 h-4" />
-      </button>
-      <button
-        onClick={() => setIsEditing(true)}
-        className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0 p-1.5 hover:text-primary touch-manipulation"
-        aria-label="Edit task"
-      >
-        <Pencil className="w-4 h-4" />
-      </button>
-      <button
-        onClick={() => onDelete(task.id)}
-        className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0 p-1.5 hover:text-destructive touch-manipulation"
-        aria-label="Delete task"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
+      <div className="flex items-center shrink-0">
+        <button
+          onClick={() => onView(task)}
+          className="p-1.5 hover:text-primary touch-manipulation"
+          aria-label="View full task"
+        >
+          <Eye className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => setIsEditing(true)}
+          className="p-1.5 hover:text-primary touch-manipulation"
+          aria-label="Quick edit task"
+        >
+          <Pencil className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => onDelete(task.id)}
+          className="p-1.5 hover:text-destructive touch-manipulation"
+          aria-label="Delete task"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 }
