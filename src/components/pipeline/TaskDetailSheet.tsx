@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format, parseISO } from "date-fns";
 import { FileDown, Pencil, Calendar, X, Save, Loader2 } from "lucide-react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -153,10 +153,12 @@ export function TaskDetailSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-lg">
-        <SheetHeader className="space-y-0 pb-4">
-          <div className="flex items-center justify-between">
-            <SheetTitle className="text-lg">Task Details</SheetTitle>
-            <div className="flex items-center gap-2">
+        <SheetHeader className="space-y-1 pb-4">
+          <SheetTitle className="text-lg">Task Details</SheetTitle>
+          <SheetDescription className="sr-only">
+            View, edit, or export this task to PDF
+          </SheetDescription>
+          <div className="flex items-center gap-2 pt-2">
               {!isEditing ? (
                 <>
                   <Button
@@ -201,7 +203,6 @@ export function TaskDetailSheet({
                   </Button>
                 </>
               )}
-            </div>
           </div>
         </SheetHeader>
 
