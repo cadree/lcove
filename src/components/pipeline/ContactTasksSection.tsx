@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { format, isToday, isTomorrow, isPast, parseISO } from "date-fns";
-import { CheckCircle2, Circle, Plus, Trash2, Calendar, Loader2, Pencil, Archive, Activity, ChevronDown, ChevronRight } from "lucide-react";
+import { CheckCircle2, Circle, Plus, Trash2, Calendar, Loader2, Pencil, Archive, ChevronDown, ChevronRight, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useContactTasks, ContactTask } from "@/hooks/useContactTasks";
 import { TaskVisualizerSheet } from "./TaskVisualizerSheet";
 import { CompletedTasksArchive } from "./CompletedTasksArchive";
+import { TaskDetailSheet } from "./TaskDetailSheet";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -22,9 +23,10 @@ interface EditableTaskProps {
   onToggle: (task: ContactTask) => void;
   onUpdate: (taskId: string, title: string, dueAt: string | null) => Promise<void>;
   onDelete: (taskId: string) => void;
+  onView: (task: ContactTask) => void;
 }
 
-function EditableTask({ task, onToggle, onUpdate, onDelete }: EditableTaskProps) {
+function EditableTask({ task, onToggle, onUpdate, onDelete, onView }: EditableTaskProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const [editDueDate, setEditDueDate] = useState<Date | undefined>(
@@ -181,6 +183,13 @@ function EditableTask({ task, onToggle, onUpdate, onDelete }: EditableTaskProps)
         )}
       </div>
       <button
+        onClick={() => onView(task)}
+        className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0 p-1.5 hover:text-primary touch-manipulation"
+        aria-label="View task"
+      >
+        <Eye className="w-4 h-4" />
+      </button>
+      <button
         onClick={() => setIsEditing(true)}
         className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0 p-1.5 hover:text-primary touch-manipulation"
         aria-label="Edit task"
@@ -221,6 +230,13 @@ export function ContactTasksSection({ pipelineItemId }: ContactTasksSectionProps
   const [newTaskDueDate, setNewTaskDueDate] = useState<Date | undefined>();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showCompleted, setShowCompleted] = useState(true);
+  const [selectedTask, setSelectedTask] = useState<ContactTask | null>(null);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
+
+  const handleViewTask = (task: ContactTask) => {
+    setSelectedTask(task);
+    setShowTaskDetail(true);
+  };
 
   const handleAddTask = async () => {
     if (!newTaskTitle.trim()) return;
@@ -378,6 +394,7 @@ export function ContactTasksSection({ pipelineItemId }: ContactTasksSectionProps
               onToggle={handleToggle}
               onUpdate={handleUpdate}
               onDelete={handleDelete}
+              onView={handleViewTask}
             />
           ))}
 
@@ -446,6 +463,7 @@ export function ContactTasksSection({ pipelineItemId }: ContactTasksSectionProps
                     onToggle={handleToggle}
                     onUpdate={handleUpdate}
                     onDelete={handleDelete}
+                    onView={handleViewTask}
                   />
                 ))}
               </CollapsibleContent>
@@ -453,6 +471,17 @@ export function ContactTasksSection({ pipelineItemId }: ContactTasksSectionProps
           )}
         </div>
       )}
+
+      {/* Task Detail Sheet */}
+      <TaskDetailSheet
+        task={selectedTask}
+        open={showTaskDetail}
+        onOpenChange={(open) => {
+          setShowTaskDetail(open);
+          if (!open) setSelectedTask(null);
+        }}
+        onUpdate={handleUpdate}
+      />
     </div>
   );
 }
