@@ -108,11 +108,11 @@ serve(async (req) => {
 
     if (tipError) throw tipError;
 
-    // Update stream total tips
-    const { error: updateError } = await supabaseClient
-      .from("live_streams")
-      .update({ total_tips: stream_id })
-      .eq("id", stream_id);
+    // Update stream total tips using RPC to avoid race conditions
+    const { error: updateError } = await supabaseClient.rpc('increment_stream_tips', {
+      p_stream_id: stream_id,
+      p_tip_amount: amount
+    });
 
     // Create notification for host
     await supabaseClient.from("notifications").insert({

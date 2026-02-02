@@ -36,6 +36,17 @@ serve(async (req) => {
 
     console.log("Fetching user profile and skills for:", user.id);
 
+    // Sanitize user input to prevent prompt injection attacks
+    const sanitizeForPrompt = (text: string | null | undefined, maxLen = 500): string => {
+      if (!text) return '';
+      return text
+        .replace(/[\r\n]+/g, ' ')     // Remove newlines
+        .replace(/["'`]/g, '')        // Remove quotes
+        .replace(/[{}\[\]]/g, '')     // Remove special chars
+        .substring(0, maxLen)         // Limit length
+        .trim();
+    };
+
     // Get user's profile, skills, roles, and passions
     const [profileRes, skillsRes, rolesRes, passionsRes] = await Promise.all([
       supabase.from("profiles").select("*").eq("user_id", user.id).single(),
@@ -95,20 +106,31 @@ Your job is to match creators with suitable project opportunities based on their
 
 Analyze the user's profile and the available projects, then return the top matches with scores and reasons.`;
 
-    const userPrompt = `User Profile:
-- Skills: ${userSkills.join(", ") || "None specified"}
-- Creative Roles: ${userRoles.join(", ") || "None specified"}
-- Interests/Passions: ${userPassions.join(", ") || "None specified"}
-- City: ${userCity || "Not specified"}
+    // Sanitize user data to prevent prompt injection
+    const safeSkills = userSkills.map(s => sanitizeForPrompt(s, 50)).join(", ") || "None specified";
+    const safeRoles = userRoles.map(r => sanitizeForPrompt(r, 50)).join(", ") || "None specified";
+    const safePassions = userPassions.map(p => sanitizeForPrompt(p, 50)).join(", ") || "None specified";
+    const safeCity = sanitizeForPrompt(userCity, 100) || "Not specified";
 
-Available Projects:
-${projectsWithRoles.map((p: any, i: number) => `
-Project ${i + 1}: "${p.title}"
-- Description: ${p.description || "No description"}
-- Budget: ${p.total_budget} ${p.currency}
-- Open Roles: ${p.project_roles?.filter((r: any) => !r.is_locked && r.slots_filled < r.slots_available)
-  .map((r: any) => `${r.role_name} ($${r.payout_amount})`).join(", ")}
-`).join("\n")}
+    const userPrompt = `<user_profile>
+Skills: ${safeSkills}
+Creative Roles: ${safeRoles}
+Interests: ${safePassions}
+City: ${safeCity}
+</user_profile>
+
+<available_projects>
+${projectsWithRoles.slice(0, 20).map((p: any, i: number) => `
+<project index="${i + 1}">
+Title: ${sanitizeForPrompt(p.title, 100)}
+Description: ${sanitizeForPrompt(p.description, 300) || "No description"}
+Budget: ${p.total_budget} ${p.currency}
+Open Roles: ${p.project_roles?.filter((r: any) => !r.is_locked && r.slots_filled < r.slots_available)
+  .slice(0, 5)
+  .map((r: any) => `${sanitizeForPrompt(r.role_name, 50)} ($${r.payout_amount})`).join(", ")}
+</project>
+`).join("")}
+</available_projects>
 
 Return the best matching projects for this user.`;
 

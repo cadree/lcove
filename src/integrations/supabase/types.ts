@@ -5994,6 +5994,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_stream_tips: {
+        Args: { p_stream_id: string; p_tip_amount: number }
+        Returns: undefined
+      }
       is_board_member: {
         Args: { p_board_id: string; p_user_id: string }
         Returns: boolean
