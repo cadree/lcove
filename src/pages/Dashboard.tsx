@@ -87,6 +87,19 @@ export default function Dashboard() {
       </motion.header>
 
       <main className="px-4 py-6 space-y-6">
+        {/* View All Events Link */}
+        <Button
+          variant="outline"
+          className="w-full justify-between"
+          onClick={() => navigate("/dashboard/events")}
+        >
+          <span className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            View All Events
+          </span>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+
         {/* KPI Cards */}
         <section className="grid grid-cols-2 gap-3">
           <KPICard
