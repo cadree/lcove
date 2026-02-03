@@ -404,6 +404,32 @@ const Profile = () => {
         );
       case 'calendar':
         if (!isOwnProfile) return null;
+        return (
+          <motion.div
+            key="calendar"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="px-5 py-4"
+          >
+            <Card 
+              className="bg-muted/30 border-border/50 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => navigate('/calendar')}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-medium text-foreground">Calendar</h3>
+                  <p className="text-xs text-muted-foreground">View your schedule</p>
+                </div>
+                <ArrowLeft className="w-4 h-4 text-muted-foreground rotate-180" />
+              </div>
+            </Card>
+          </motion.div>
+        );
+      case 'events_dashboard':
+        if (!isOwnProfile) return null;
         return <ProfileEventsDashboard key="events_dashboard" />;
       default:
         return null;
