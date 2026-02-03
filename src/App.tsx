@@ -50,6 +50,7 @@ import Terms from "./pages/Terms";
 import BrandPartners from "./pages/BrandPartners";
 import Collectives from "./pages/Collectives";
 import PartnerPortal from "./pages/PartnerPortal";
+import Dashboard from "./pages/Dashboard";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -114,6 +115,7 @@ const App = () => (
                 <Route path="/brand-partners" element={<BrandPartners />} />
                 <Route path="/partner-portal" element={<PartnerPortal />} />
                 <Route path="/collectives" element={<Collectives />} />
+                <Route path="/dashboard" element={<Dashboard />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
