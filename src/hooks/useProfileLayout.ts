@@ -21,11 +21,12 @@ export const DEFAULT_SECTIONS: ProfileSection[] = [
   { id: 'portfolio', label: 'Portfolio', visible: true, size: 'medium', order: 5 },
   { id: 'store', label: 'My Store', visible: true, size: 'medium', order: 6 },
   { id: 'calendar', label: 'Calendar', visible: true, size: 'medium', order: 7 },
-  { id: 'creator_modules', label: 'Creator Modules', visible: true, size: 'medium', order: 8 },
-  { id: 'music', label: 'Music Player', visible: true, size: 'medium', order: 9 },
-  { id: 'posts_tabs', label: 'Posts & Blogs', visible: true, size: 'large', order: 10 },
-  { id: 'reviews', label: 'Reviews', visible: true, size: 'medium', order: 11 },
-  { id: 'quick_links', label: 'Quick Links', visible: true, size: 'small', order: 12 },
+  { id: 'events_dashboard', label: 'My Events', visible: true, size: 'large', order: 8 },
+  { id: 'creator_modules', label: 'Creator Modules', visible: true, size: 'medium', order: 9 },
+  { id: 'music', label: 'Music Player', visible: true, size: 'medium', order: 10 },
+  { id: 'posts_tabs', label: 'Posts & Blogs', visible: true, size: 'large', order: 11 },
+  { id: 'reviews', label: 'Reviews', visible: true, size: 'medium', order: 12 },
+  { id: 'quick_links', label: 'Quick Links', visible: true, size: 'small', order: 13 },
 ];
 
 const parseLayoutFromJson = (json: Json | null): ProfileSection[] => {
