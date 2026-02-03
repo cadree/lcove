@@ -7,6 +7,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[VERIFY-TICKET-PAYMENT] ${step}${detailsStr}`);
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -33,7 +38,7 @@ serve(async (req) => {
       throw new Error("Session ID is required");
     }
 
-    console.log(`Verifying payment for session: ${sessionId}`);
+    logStep("Verifying payment", { sessionId });
 
     // Retrieve the checkout session from Stripe
     const session = await stripe.checkout.sessions.retrieve(sessionId);
@@ -52,7 +57,11 @@ serve(async (req) => {
     }
 
     const userId = session.metadata?.user_id;
+    const creatorId = session.metadata?.creator_id;
     const eventIdFromSession = session.metadata?.event_id || eventId;
+    const ticketAmount = session.amount_total ? session.amount_total / 100 : 0;
+
+    logStep("Payment verified", { userId, creatorId, eventId: eventIdFromSession, amount: ticketAmount });
 
     if (!userId || userId === 'guest') {
       return new Response(
@@ -78,16 +87,16 @@ serve(async (req) => {
       .eq('user_id', userId);
 
     if (rsvpError) {
-      console.error('Error updating RSVP:', rsvpError);
+      logStep("Error updating RSVP", { error: rsvpError.message });
       throw rsvpError;
     }
 
-    // Create transaction record
+    // Create transaction record for buyer
     const { error: txError } = await supabaseClient
       .from('transactions')
       .insert({
         user_id: userId,
-        amount: session.amount_total ? session.amount_total / 100 : 0,
+        amount: ticketAmount,
         currency: session.currency?.toUpperCase() || 'USD',
         type: 'event_ticket',
         status: 'completed',
@@ -100,10 +109,55 @@ serve(async (req) => {
       });
 
     if (txError) {
-      console.error('Error creating transaction:', txError);
+      logStep("Error creating buyer transaction", { error: txError.message });
     }
 
-    console.log(`Payment verified and RSVP updated for user: ${userId}`);
+    // Check if creator has Connect enabled and credit them
+    if (creatorId) {
+      const { data: creatorProfile } = await supabaseClient
+        .from("profiles")
+        .select("stripe_connect_account_id, payout_enabled")
+        .eq("user_id", creatorId)
+        .single();
+
+      // If creator has Connect enabled, payment already went to them via Stripe
+      // If not, we credit their earned_balance (80% of ticket price)
+      if (!creatorProfile?.stripe_connect_account_id || !creatorProfile?.payout_enabled) {
+        const creatorEarnings = Math.floor(ticketAmount * 0.80 * 100); // 80% in credits (1 credit = $0.01)
+        
+        logStep("Crediting creator earned_balance", { 
+          creatorId, 
+          credits: creatorEarnings,
+          ticketAmount 
+        });
+
+        // Award credits to creator
+        const { error: creditError } = await supabaseClient
+          .from('credit_ledger')
+          .insert({
+            user_id: creatorId,
+            amount: creatorEarnings,
+            balance_after: 0, // Will be updated by trigger
+            type: 'earn',
+            credit_type: 'earned',
+            earned_amount: creatorEarnings,
+            genesis_amount: 0,
+            description: `Event ticket sale (80% of $${ticketAmount.toFixed(2)})`,
+            reference_type: 'event_ticket_sale',
+            reference_id: eventIdFromSession,
+          });
+
+        if (creditError) {
+          logStep("Error crediting creator", { error: creditError.message });
+        } else {
+          logStep("Creator credited successfully", { credits: creatorEarnings });
+        }
+      } else {
+        logStep("Creator has Connect enabled, payment handled via Stripe split");
+      }
+    }
+
+    logStep("Payment verified and RSVP updated", { userId });
 
     return new Response(
       JSON.stringify({ 
@@ -117,7 +171,7 @@ serve(async (req) => {
     );
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("Error verifying payment:", errorMessage);
+    logStep("ERROR", { message: errorMessage });
     return new Response(
       JSON.stringify({ error: errorMessage }),
       {

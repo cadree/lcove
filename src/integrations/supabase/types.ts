@@ -4271,8 +4271,10 @@ export type Database = {
           onboarding_level: number | null
           onboarding_score: number | null
           passion_seriousness: number | null
+          payout_enabled: boolean | null
           phone: string | null
           social_links: Json | null
+          stripe_connect_account_id: string | null
           suspended_at: string | null
           suspension_reason: string | null
           updated_at: string | null
@@ -4295,8 +4297,10 @@ export type Database = {
           onboarding_level?: number | null
           onboarding_score?: number | null
           passion_seriousness?: number | null
+          payout_enabled?: boolean | null
           phone?: string | null
           social_links?: Json | null
+          stripe_connect_account_id?: string | null
           suspended_at?: string | null
           suspension_reason?: string | null
           updated_at?: string | null
@@ -4319,8 +4323,10 @@ export type Database = {
           onboarding_level?: number | null
           onboarding_score?: number | null
           passion_seriousness?: number | null
+          payout_enabled?: boolean | null
           phone?: string | null
           social_links?: Json | null
+          stripe_connect_account_id?: string | null
           suspended_at?: string | null
           suspension_reason?: string | null
           updated_at?: string | null

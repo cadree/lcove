@@ -208,10 +208,12 @@ Add a "Payout Settings" section to the Event Dashboard:
 
 ## Verification Checklist After Implementation
 
-- [ ] Event host can complete Stripe Connect onboarding
-- [ ] Paid ticket purchases split 80/20 (host/platform)
-- [ ] Credit ticket purchases split 80/20 (host/platform)
-- [ ] Host sees actual received revenue in dashboard
-- [ ] Host can request payout to their bank/card
-- [ ] Platform treasury records 20% fee correctly
+- [x] Database schema updated with stripe_connect_account_id and payout_enabled on profiles
+- [x] Event host can complete Stripe Connect onboarding (create-event-connect-account)
+- [x] Paid ticket purchases split 80/20 (host/platform) via Stripe Connect
+- [x] Credit ticket purchases split 80/20 (host/platform) via award-credits
+- [x] verify-ticket-payment credits host's earned_balance if no Connect
+- [x] Payout Settings UI added to Dashboard showing Connect status and balances
+- [ ] Host can request payout to their bank/card (via Stripe Express Dashboard)
+- [ ] End-to-end testing of full payment flow
 

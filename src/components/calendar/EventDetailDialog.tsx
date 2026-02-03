@@ -224,6 +224,25 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
 
     setIsPurchasing(true);
     try {
+      // First ensure user has an RSVP
+      const { data: existingRsvp } = await supabase
+        .from('event_rsvps')
+        .select('id')
+        .eq('event_id', event.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (!existingRsvp) {
+        // Create RSVP first
+        await supabase
+          .from('event_rsvps')
+          .insert({
+            event_id: event.id,
+            user_id: user.id,
+            status: 'going',
+          });
+      }
+
       // Mark ticket as purchased using credits
       const { error } = await supabase
         .from('event_rsvps')
@@ -236,7 +255,7 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
 
       if (error) throw error;
 
-      // Deduct credits via the edge function
+      // Deduct credits from buyer
       await supabase.functions.invoke('award-credits', {
         body: {
           userId: user.id,
@@ -246,6 +265,22 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
           referenceId: event.id
         }
       });
+
+      // Award 80% of credits to event creator
+      if (event.creator_id && event.creator_id !== user.id) {
+        const creatorCredits = Math.floor((event.credits_price || 0) * 0.80);
+        if (creatorCredits > 0) {
+          await supabase.functions.invoke('award-credits', {
+            body: {
+              userId: event.creator_id,
+              amount: creatorCredits,
+              description: `Ticket sale: ${event.title}`,
+              referenceType: 'event_ticket_sale',
+              referenceId: event.id
+            }
+          });
+        }
+      }
 
       toast.success('Ticket purchased with credits!');
       refetch();

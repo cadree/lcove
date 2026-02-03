@@ -7,6 +7,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[PURCHASE-EVENT-TICKET] ${step}${detailsStr}`);
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -23,10 +28,10 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    // Create Supabase client
+    // Create Supabase client with service role for reading creator info
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
     // Get user from auth header
@@ -53,7 +58,44 @@ serve(async (req) => {
       throw new Error("Invalid ticket price: A valid ticket price is required for paid events");
     }
 
-    console.log(`Creating checkout session for event: ${eventId}, price: ${ticketPrice}`);
+    logStep("Creating checkout session", { eventId, price: ticketPrice, userId });
+
+    // Fetch event with creator's connect account info
+    const { data: event, error: eventError } = await supabaseClient
+      .from("events")
+      .select(`
+        id,
+        title,
+        creator_id,
+        ticket_price
+      `)
+      .eq("id", eventId)
+      .single();
+
+    if (eventError) {
+      logStep("Error fetching event", { error: eventError.message });
+    }
+
+    // Fetch creator's profile for connect info
+    let creatorConnectId: string | null = null;
+    let creatorPayoutEnabled = false;
+
+    if (event?.creator_id) {
+      const { data: creatorProfile } = await supabaseClient
+        .from("profiles")
+        .select("stripe_connect_account_id, payout_enabled")
+        .eq("user_id", event.creator_id)
+        .single();
+
+      if (creatorProfile) {
+        creatorConnectId = creatorProfile.stripe_connect_account_id;
+        creatorPayoutEnabled = creatorProfile.payout_enabled === true;
+        logStep("Creator profile found", { 
+          hasConnect: !!creatorConnectId, 
+          payoutEnabled: creatorPayoutEnabled 
+        });
+      }
+    }
 
     // Check if customer exists
     let customerId = undefined;
@@ -67,8 +109,8 @@ serve(async (req) => {
     // Get the origin for redirect URLs
     const origin = req.headers.get("origin") || "http://localhost:5173";
 
-    // Create Stripe checkout session
-    const session = await stripe.checkout.sessions.create({
+    // Build the checkout session config
+    const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       customer: customerId,
       customer_email: customerId ? undefined : userEmail,
       payment_method_types: ["card"],
@@ -91,11 +133,34 @@ serve(async (req) => {
       metadata: {
         event_id: eventId,
         user_id: userId || 'guest',
+        creator_id: event?.creator_id || '',
         type: "event_ticket",
       },
-    });
+    };
 
-    console.log(`Checkout session created: ${session.id}`);
+    // If creator has Stripe Connect enabled, split the payment 80/20
+    if (creatorConnectId && creatorPayoutEnabled) {
+      const platformFeeAmount = Math.round(ticketPrice * 100 * 0.20); // 20% platform fee
+      logStep("Using Stripe Connect split", { 
+        creatorConnectId, 
+        platformFee: platformFeeAmount / 100,
+        creatorPayout: (ticketPrice * 100 - platformFeeAmount) / 100
+      });
+
+      sessionConfig.payment_intent_data = {
+        application_fee_amount: platformFeeAmount,
+        transfer_data: {
+          destination: creatorConnectId,
+        },
+      };
+    } else {
+      logStep("No Connect account, payment goes to platform");
+    }
+
+    // Create Stripe checkout session
+    const session = await stripe.checkout.sessions.create(sessionConfig);
+
+    logStep("Checkout session created", { sessionId: session.id, hasConnect: !!creatorConnectId });
 
     // If user is logged in, create or update their RSVP to pending payment
     if (userId) {
@@ -127,7 +192,7 @@ serve(async (req) => {
     );
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("Error creating checkout session:", errorMessage);
+    logStep("ERROR", { message: errorMessage });
     return new Response(
       JSON.stringify({ error: errorMessage }),
       {
