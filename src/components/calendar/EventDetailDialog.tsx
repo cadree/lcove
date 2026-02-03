@@ -26,7 +26,6 @@ import {
   Check,
   X,
   Share2,
-  CalendarPlus,
   Copy,
   Twitter,
   ExternalLink,
@@ -47,6 +46,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EventAttendeesDialog } from "./EventAttendeesDialog";
+import { AddToCalendarButtons } from "./AddToCalendarButtons";
 
 interface EventDetailDialogProps {
   eventId: string | null;
@@ -257,54 +257,6 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
     }
   };
 
-  const generateCalendarUrl = (type: 'google' | 'apple' | 'outlook') => {
-    const startDate = new Date(event.start_date);
-    const endDate = event.end_date ? new Date(event.end_date) : new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
-    
-    const formatDate = (date: Date) => date.toISOString().replace(/-|:|\.\d{3}/g, '');
-    
-    const title = encodeURIComponent(event.title);
-    const location = encodeURIComponent(`${event.venue || ''}, ${event.city}${event.state ? `, ${event.state}` : ''}`);
-    const details = encodeURIComponent(event.description || '');
-
-    if (type === 'google') {
-      return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${formatDate(startDate)}/${formatDate(endDate)}&location=${location}&details=${details}`;
-    }
-    
-    if (type === 'outlook') {
-      return `https://outlook.live.com/calendar/0/deeplink/compose?subject=${title}&startdt=${startDate.toISOString()}&enddt=${endDate.toISOString()}&location=${location}&body=${details}`;
-    }
-
-    // Apple Calendar uses ICS format
-    const icsContent = `BEGIN:VCALENDAR
-VERSION:2.0
-BEGIN:VEVENT
-DTSTART:${formatDate(startDate)}
-DTEND:${formatDate(endDate)}
-SUMMARY:${event.title}
-LOCATION:${event.venue || ''}, ${event.city}
-DESCRIPTION:${event.description || ''}
-END:VEVENT
-END:VCALENDAR`;
-    
-    return `data:text/calendar;charset=utf-8,${encodeURIComponent(icsContent)}`;
-  };
-
-  const handleAddToCalendar = (type: 'google' | 'apple' | 'outlook') => {
-    const url = generateCalendarUrl(type);
-    
-    if (type === 'apple') {
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${event.title.replace(/\s+/g, '-')}.ics`;
-      link.click();
-    } else {
-      window.open(url, '_blank');
-    }
-    
-    toast.success('Opening calendar...');
-  };
-
   const handleShare = async (method: 'copy' | 'twitter' | 'native') => {
     const eventUrl = `${window.location.origin}/calendar?event=${event.id}`;
     const shareText = `Check out "${event.title}" on ${format(eventDate, 'MMMM d')}!`;
@@ -462,28 +414,20 @@ END:VCALENDAR`;
               
               {/* Quick Actions */}
               <div className="flex gap-1 shrink-0">
-                {/* Add to Calendar */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <CalendarPlus className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="glass-strong border-border/30">
-                    <DropdownMenuItem onClick={() => handleAddToCalendar('google')}>
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Google Calendar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleAddToCalendar('apple')}>
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Apple Calendar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleAddToCalendar('outlook')}>
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Outlook
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {/* Add to Calendar - using the compact variant */}
+                <AddToCalendarButtons
+                  event={{
+                    title: event.title,
+                    description: event.description,
+                    startDate: new Date(event.start_date),
+                    endDate: event.end_date ? new Date(event.end_date) : null,
+                    location: event.venue 
+                      ? `${event.venue}, ${event.address || ''} ${event.city}${event.state ? `, ${event.state}` : ''}`
+                      : `${event.city}${event.state ? `, ${event.state}` : ''}`,
+                    url: `${window.location.origin}/calendar?event=${event.id}`,
+                  }}
+                  variant="compact"
+                />
 
                 {/* Share */}
                 <DropdownMenu>
@@ -769,9 +713,26 @@ END:VCALENDAR`;
 
             {/* Ticket Purchased Confirmation */}
             {event.user_rsvp?.ticket_purchased && (
-              <div className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-green-500/20 text-green-400">
-                <Check className="w-5 h-5" />
-                <span className="font-medium">Ticket Secured!</span>
+              <div className="space-y-4">
+                <div className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-green-500/20 text-green-400">
+                  <Check className="w-5 h-5" />
+                  <span className="font-medium">Ticket Secured!</span>
+                </div>
+                
+                {/* Add to Calendar section for ticket holders */}
+                <AddToCalendarButtons
+                  event={{
+                    title: event.title,
+                    description: event.description,
+                    startDate: new Date(event.start_date),
+                    endDate: event.end_date ? new Date(event.end_date) : null,
+                    location: event.venue 
+                      ? `${event.venue}, ${event.address || ''} ${event.city}${event.state ? `, ${event.state}` : ''}`
+                      : `${event.city}${event.state ? `, ${event.state}` : ''}`,
+                    url: `${window.location.origin}/calendar?event=${event.id}`,
+                  }}
+                  variant="full"
+                />
               </div>
             )}
 
