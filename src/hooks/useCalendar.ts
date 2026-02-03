@@ -24,6 +24,7 @@ export interface CalendarEvent {
   is_public: boolean | null;
   project_id: string | null;
   external_url: string | null;
+  timezone: string | null;
   created_at: string;
   rsvp_count?: number;
   user_rsvp?: EventRSVP | null;

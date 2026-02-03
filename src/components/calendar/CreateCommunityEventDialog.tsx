@@ -75,8 +75,13 @@ export function CreateCommunityEventDialog({
     defaultDate ? format(defaultDate, "yyyy-MM-dd") : ''
   );
   const [startTimeValue, setStartTimeValue] = useState('');
-  const [endDateValue, setEndDateValue] = useState('');
+  const [endDateValue, setEndDateValue] = useState(
+    defaultDate ? format(defaultDate, "yyyy-MM-dd") : ''
+  );
   const [endTimeValue, setEndTimeValue] = useState('');
+  const [timezone, setTimezone] = useState(
+    Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York'
+  );
   const [capacity, setCapacity] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   
@@ -89,6 +94,18 @@ export function CreateCommunityEventDialog({
   const [ticketPrice, setTicketPrice] = useState('');
   const [creditsPrice, setCreditsPrice] = useState('');
   const [externalUrl, setExternalUrl] = useState('');
+
+// Common timezones for selection
+const TIMEZONES = [
+  { value: 'America/New_York', label: 'Eastern Time (ET)' },
+  { value: 'America/Chicago', label: 'Central Time (CT)' },
+  { value: 'America/Denver', label: 'Mountain Time (MT)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+  { value: 'America/Phoenix', label: 'Arizona (MST)' },
+  { value: 'America/Anchorage', label: 'Alaska (AKT)' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii (HST)' },
+  { value: 'UTC', label: 'UTC' },
+];
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -152,16 +169,19 @@ export function CreateCommunityEventDialog({
       return;
     }
 
-    if (!startDateValue) {
-      toast.error('Please select a start date');
+    if (!startDateValue || !startTimeValue) {
+      toast.error('Please select a start date and time');
+      return;
+    }
+
+    if (!endDateValue || !endTimeValue) {
+      toast.error('Please select an end date and time');
       return;
     }
 
     // Combine date and time
-    const startDateTime = `${startDateValue}T${startTimeValue || '00:00'}:00`;
-    const endDateTime = endDateValue
-      ? `${endDateValue}T${endTimeValue || '23:59'}:00`
-      : null;
+    const startDateTime = `${startDateValue}T${startTimeValue}:00`;
+    const endDateTime = `${endDateValue}T${endTimeValue}:00`;
 
     createEvent.mutate({
       title: title.trim(),
@@ -172,7 +192,8 @@ export function CreateCommunityEventDialog({
       state: state || null,
       country: 'USA',
       start_date: new Date(startDateTime).toISOString(),
-      end_date: endDateTime ? new Date(endDateTime).toISOString() : null,
+      end_date: new Date(endDateTime).toISOString(),
+      timezone,
       image_url: imageUrl || null,
       ticket_type: ticketType,
       ticket_price: ticketType === 'paid' || ticketType === 'hybrid' ? parseFloat(ticketPrice) || null : null,
@@ -229,6 +250,7 @@ export function CreateCommunityEventDialog({
     setStartTimeValue('');
     setEndDateValue('');
     setEndTimeValue('');
+    setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York');
     setCapacity('');
     setIsPublic(true);
     setImageUrl('');
@@ -319,73 +341,113 @@ export function CreateCommunityEventDialog({
             </Label>
             
             <div className="space-y-3">
-              <Input
-                value={venue}
-                onChange={(e) => setVenue(e.target.value)}
-                placeholder="Venue name"
-                className="glass"
-              />
-              <Input
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Street address"
-                className="glass"
-              />
-              <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">Venue Name (optional)</Label>
                 <Input
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="City *"
+                  value={venue}
+                  onChange={(e) => setVenue(e.target.value)}
+                  placeholder="e.g., The Grand Hall"
                   className="glass"
                 />
-                <Select value={state} onValueChange={setState}>
-                  <SelectTrigger className="glass">
-                    <SelectValue placeholder="State" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {US_STATES.map(s => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">Address (optional)</Label>
+                <Input
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="e.g., 123 Main St"
+                  className="glass"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">City *</Label>
+                  <Input
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="City"
+                    className="glass"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">State</Label>
+                  <Select value={state} onValueChange={setState}>
+                    <SelectTrigger className="glass">
+                      <SelectValue placeholder="State" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {US_STATES.map(s => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Date & Time */}
-          <div className="space-y-3">
-            <Label>Start Date & Time *</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="date"
-                value={startDateValue}
-                onChange={(e) => setStartDateValue(e.target.value)}
-                className="glass"
-              />
-              <Input
-                type="time"
-                value={startTimeValue}
-                onChange={(e) => setStartTimeValue(e.target.value)}
-                className="glass"
-              />
-            </div>
-          </div>
+          <div className="space-y-3 p-4 rounded-lg bg-muted/20 border border-border">
+            <Label className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-primary" />
+              Date & Time
+            </Label>
 
-          <div className="space-y-3">
-            <Label>End Date & Time</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="date"
-                value={endDateValue}
-                onChange={(e) => setEndDateValue(e.target.value)}
-                className="glass"
-              />
-              <Input
-                type="time"
-                value={endTimeValue}
-                onChange={(e) => setEndTimeValue(e.target.value)}
-                className="glass"
-              />
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">Start Date & Time *</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    type="date"
+                    value={startDateValue}
+                    onChange={(e) => setStartDateValue(e.target.value)}
+                    className="glass"
+                    required
+                  />
+                  <Input
+                    type="time"
+                    value={startTimeValue}
+                    onChange={(e) => setStartTimeValue(e.target.value)}
+                    className="glass"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">End Date & Time *</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    type="date"
+                    value={endDateValue}
+                    onChange={(e) => setEndDateValue(e.target.value)}
+                    className="glass"
+                    required
+                  />
+                  <Input
+                    type="time"
+                    value={endTimeValue}
+                    onChange={(e) => setEndTimeValue(e.target.value)}
+                    className="glass"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">Timezone *</Label>
+                <Select value={timezone} onValueChange={setTimezone}>
+                  <SelectTrigger className="glass">
+                    <SelectValue placeholder="Select timezone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIMEZONES.map(tz => (
+                      <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
