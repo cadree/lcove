@@ -266,9 +266,9 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
         }
       });
 
-      // Award 80% of credits to event creator
+      // Award 95% of credits to event creator
       if (event.creator_id && event.creator_id !== user.id) {
-        const creatorCredits = Math.floor((event.credits_price || 0) * 0.80);
+        const creatorCredits = Math.floor((event.credits_price || 0) * 0.95);
         if (creatorCredits > 0) {
           await supabase.functions.invoke('award-credits', {
             body: {
