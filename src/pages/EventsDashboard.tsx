@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, parseISO } from "date-fns";
 import {
@@ -32,6 +33,7 @@ import {
 } from "@/components/ui/popover";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEventDashboard } from "@/hooks/useEventDashboard";
+import { CreateCommunityEventDialog } from "@/components/calendar/CreateCommunityEventDialog";
 import BottomNav from "@/components/navigation/BottomNav";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -52,10 +54,12 @@ interface EventWithStats {
 
 export default function EventsDashboard() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const { events, rsvps, isLoading } = useEventDashboard();
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   // Enrich events with RSVP/ticket counts
   const eventsWithStats: EventWithStats[] = useMemo(() => {
@@ -170,7 +174,7 @@ export default function EventsDashboard() {
             </div>
           </div>
           <Button
-            onClick={() => navigate("/calendar")}
+            onClick={() => setShowCreateDialog(true)}
             size="sm"
             className="gap-2"
           >
@@ -228,6 +232,18 @@ export default function EventsDashboard() {
           />
         )}
       </main>
+
+      <CreateCommunityEventDialog 
+        open={showCreateDialog} 
+        onOpenChange={(open) => {
+          setShowCreateDialog(open);
+          if (!open) {
+            // Refresh dashboard data when dialog closes
+            queryClient.invalidateQueries({ queryKey: ['dashboard-events'] });
+            queryClient.invalidateQueries({ queryKey: ['events'] });
+          }
+        }}
+      />
 
       <BottomNav />
     </div>
