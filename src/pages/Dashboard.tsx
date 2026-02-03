@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEventDashboard } from "@/hooks/useEventDashboard";
+import { PayoutSettings } from "@/components/dashboard/PayoutSettings";
 import BottomNav from "@/components/navigation/BottomNav";
 import {
   AreaChart,
@@ -135,6 +136,9 @@ export default function Dashboard() {
             color="purple"
           />
         </section>
+
+        {/* Payout Settings */}
+        <PayoutSettings />
 
         {/* Sales Chart */}
         <Card className="border-border/40 bg-card/60 backdrop-blur-sm">
