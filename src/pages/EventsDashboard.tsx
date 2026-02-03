@@ -15,6 +15,7 @@ import {
   Share2,
   Copy,
   Users,
+  Rss,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,6 +35,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useEventDashboard } from "@/hooks/useEventDashboard";
 import { CreateCommunityEventDialog } from "@/components/calendar/CreateCommunityEventDialog";
+import { CalendarFeedSettings } from "@/components/calendar/CalendarFeedSettings";
 import BottomNav from "@/components/navigation/BottomNav";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -57,7 +59,7 @@ export default function EventsDashboard() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { events, rsvps, isLoading } = useEventDashboard();
-  const [view, setView] = useState<"calendar" | "list">("calendar");
+  const [view, setView] = useState<"calendar" | "list" | "settings">("calendar");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
@@ -183,12 +185,12 @@ export default function EventsDashboard() {
           </Button>
         </div>
 
-        {/* View Toggle */}
-        <div className="px-4 pb-3">
+        {/* View Toggle + Settings */}
+        <div className="px-4 pb-3 flex items-center justify-between">
           <ToggleGroup
             type="single"
             value={view}
-            onValueChange={(v) => v && setView(v as "calendar" | "list")}
+            onValueChange={(v) => v && setView(v as "calendar" | "list" | "settings")}
             className="justify-start"
           >
             <ToggleGroupItem value="calendar" aria-label="Calendar view" className="gap-2">
@@ -198,6 +200,10 @@ export default function EventsDashboard() {
             <ToggleGroupItem value="list" aria-label="List view" className="gap-2">
               <List className="h-4 w-4" />
               List
+            </ToggleGroupItem>
+            <ToggleGroupItem value="settings" aria-label="Settings" className="gap-2">
+              <Rss className="h-4 w-4" />
+              Feed
             </ToggleGroupItem>
           </ToggleGroup>
         </div>
@@ -222,7 +228,7 @@ export default function EventsDashboard() {
             onShare={handleShare}
             onDuplicate={handleDuplicate}
           />
-        ) : (
+        ) : view === "list" ? (
           <ListView
             events={sortedEvents}
             onEventClick={(eventId) => navigate(`/dashboard/events/${eventId}`)}
@@ -230,6 +236,8 @@ export default function EventsDashboard() {
             onShare={handleShare}
             onDuplicate={handleDuplicate}
           />
+        ) : (
+          <CalendarFeedSettings />
         )}
       </main>
 
