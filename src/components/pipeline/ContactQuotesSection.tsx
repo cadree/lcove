@@ -221,8 +221,12 @@ export function ContactQuotesSection({ pipelineItemId }: ContactQuotesSectionPro
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity touch-manipulation"
-                    onClick={() => handleDelete(quote.id)}
+                    className="h-7 w-7 touch-manipulation"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      handleDelete(quote.id);
+                    }}
                     role="button"
                     aria-label="Delete quote"
                   >
