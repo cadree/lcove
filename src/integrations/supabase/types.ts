@@ -2136,11 +2136,14 @@ export type Database = {
           id: string
           image_url: string | null
           is_public: boolean | null
+          organization_id: string | null
           project_id: string | null
           start_date: string
           state: string | null
+          status: string | null
           ticket_price: number | null
           ticket_type: string
+          timezone: string | null
           title: string
           updated_at: string
           venue: string | null
@@ -2159,11 +2162,14 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_public?: boolean | null
+          organization_id?: string | null
           project_id?: string | null
           start_date: string
           state?: string | null
+          status?: string | null
           ticket_price?: number | null
           ticket_type?: string
+          timezone?: string | null
           title: string
           updated_at?: string
           venue?: string | null
@@ -2182,16 +2188,26 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_public?: boolean | null
+          organization_id?: string | null
           project_id?: string | null
           start_date?: string
           state?: string | null
+          status?: string | null
           ticket_price?: number | null
           ticket_type?: string
+          timezone?: string | null
           title?: string
           updated_at?: string
           venue?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "events_project_id_fkey"
             columns: ["project_id"]
@@ -3219,6 +3235,68 @@ export type Database = {
           title?: string
           type?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      organization_members: {
+        Row: {
+          created_at: string
+          id: string
+          organization_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          organization_id: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          organization_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          owner_id?: string
+          updated_at?: string
         }
         Relationships: []
       }
