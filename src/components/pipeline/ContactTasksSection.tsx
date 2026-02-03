@@ -186,21 +186,30 @@ function EditableTask({ task, onToggle, onUpdate, onDelete, onView }: EditableTa
       </div>
       <div className="flex items-center shrink-0">
         <button
-          onClick={() => onView(task)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onView(task);
+          }}
           className="p-1.5 hover:text-primary touch-manipulation"
           aria-label="View full task"
         >
           <Eye className="w-4 h-4" />
         </button>
         <button
-          onClick={() => setIsEditing(true)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsEditing(true);
+          }}
           className="p-1.5 hover:text-primary touch-manipulation"
           aria-label="Quick edit task"
         >
           <Pencil className="w-4 h-4" />
         </button>
         <button
-          onClick={() => onDelete(task.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(task.id);
+          }}
           className="p-1.5 hover:text-destructive touch-manipulation"
           aria-label="Delete task"
         >
