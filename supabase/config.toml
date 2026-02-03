@@ -98,3 +98,6 @@ verify_jwt = true
 
 [functions.notify-partner-accepted]
 verify_jwt = false
+
+[functions.host-calendar-feed]
+verify_jwt = false

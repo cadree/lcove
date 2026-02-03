@@ -2514,6 +2514,33 @@ export type Database = {
         }
         Relationships: []
       }
+      host_calendar_feeds: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          last_accessed_at: string | null
+          token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_accessed_at?: string | null
+          token?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_accessed_at?: string | null
+          token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       itinerary_items: {
         Row: {
           created_at: string
