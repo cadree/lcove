@@ -138,9 +138,9 @@ serve(async (req) => {
       },
     };
 
-    // If creator has Stripe Connect enabled, split the payment 80/20
+    // If creator has Stripe Connect enabled, split the payment 95/5
     if (creatorConnectId && creatorPayoutEnabled) {
-      const platformFeeAmount = Math.round(ticketPrice * 100 * 0.20); // 20% platform fee
+      const platformFeeAmount = Math.round(ticketPrice * 100 * 0.05); // 5% platform fee
       logStep("Using Stripe Connect split", { 
         creatorConnectId, 
         platformFee: platformFeeAmount / 100,

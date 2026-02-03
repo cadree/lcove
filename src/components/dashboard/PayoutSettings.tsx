@@ -106,7 +106,7 @@ export function PayoutSettings() {
                 <div>
                   <p className="text-sm font-medium">Payouts Not Enabled</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Set up Stripe Connect to receive 80% of ticket sales directly to your bank account.
+                    Set up Stripe Connect to receive 95% of ticket sales directly to your bank account.
                   </p>
                 </div>
               </div>
@@ -199,7 +199,7 @@ export function PayoutSettings() {
               </div>
               <div className="text-right">
                 <Badge variant="secondary" className="text-xs">
-                  You: 80% • Platform: 20%
+                  You: 95% • Platform: 5%
                 </Badge>
               </div>
             </div>
