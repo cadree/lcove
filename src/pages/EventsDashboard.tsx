@@ -9,27 +9,65 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  MoreHorizontal,
+  Edit,
+  Share2,
+  Copy,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEventDashboard } from "@/hooks/useEventDashboard";
 import BottomNav from "@/components/navigation/BottomNav";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+
+interface EventWithStats {
+  id: string;
+  title: string;
+  start_date: string;
+  end_date: string | null;
+  image_url: string | null;
+  ticket_type: string;
+  status: string | null;
+  city: string;
+  rsvpCount?: number;
+  ticketCount?: number;
+}
 
 export default function EventsDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { events, isLoading } = useEventDashboard();
+  const { events, rsvps, isLoading } = useEventDashboard();
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  if (!user) {
-    navigate("/auth");
-    return null;
-  }
+  // Enrich events with RSVP/ticket counts
+  const eventsWithStats: EventWithStats[] = useMemo(() => {
+    return (events || []).map(event => {
+      const eventRsvps = rsvps?.filter(r => r.event_id === event.id) || [];
+      return {
+        ...event,
+        rsvpCount: eventRsvps.filter(r => r.status === 'going' || r.status === 'interested').length,
+        ticketCount: eventRsvps.filter(r => r.ticket_purchased).length,
+      };
+    });
+  }, [events, rsvps]);
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -39,8 +77,8 @@ export default function EventsDashboard() {
     return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   }, [currentMonth]);
 
-  const getEventsForDay = (day: Date) => {
-    return events?.filter(event => {
+  const getEventsForDay = (day: Date): EventWithStats[] => {
+    return eventsWithStats.filter(event => {
       const eventStart = parseISO(event.start_date);
       const eventEnd = event.end_date ? parseISO(event.end_date) : eventStart;
       return (
@@ -48,14 +86,64 @@ export default function EventsDashboard() {
         isSameDay(eventEnd, day) ||
         (day >= eventStart && day <= eventEnd)
       );
-    }) || [];
+    });
   };
 
   const sortedEvents = useMemo(() => {
-    return [...(events || [])].sort(
+    return [...eventsWithStats].sort(
       (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
     );
-  }, [events]);
+  }, [eventsWithStats]);
+
+  const handleShare = async (event: EventWithStats) => {
+    const url = `${window.location.origin}/calendar?event=${event.id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: event.title,
+          text: `Check out this event: ${event.title}`,
+          url,
+        });
+      } catch {
+        // User cancelled
+      }
+    } else {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copied to clipboard");
+    }
+  };
+
+  const handleDuplicate = async (event: EventWithStats) => {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .insert({
+          title: `${event.title} (Copy)`,
+          start_date: event.start_date,
+          end_date: event.end_date,
+          image_url: event.image_url,
+          ticket_type: event.ticket_type,
+          city: event.city,
+          status: 'draft',
+          creator_id: user.id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      toast.success("Event duplicated!");
+      navigate(`/dashboard/events/${data.id}`);
+    } catch (error) {
+      console.error('Duplicate error:', error);
+      toast.error("Failed to duplicate event");
+    }
+  };
+
+  // Auth check after all hooks
+  if (!user) {
+    navigate("/auth");
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -126,11 +214,17 @@ export default function EventsDashboard() {
             onPrevMonth={() => setCurrentMonth(subMonths(currentMonth, 1))}
             onNextMonth={() => setCurrentMonth(addMonths(currentMonth, 1))}
             onEventClick={(eventId) => navigate(`/dashboard/events/${eventId}`)}
+            onEdit={(eventId) => navigate(`/dashboard/events/${eventId}`)}
+            onShare={handleShare}
+            onDuplicate={handleDuplicate}
           />
         ) : (
           <ListView
             events={sortedEvents}
             onEventClick={(eventId) => navigate(`/dashboard/events/${eventId}`)}
+            onEdit={(eventId) => navigate(`/dashboard/events/${eventId}`)}
+            onShare={handleShare}
+            onDuplicate={handleDuplicate}
           />
         )}
       </main>
@@ -140,19 +234,36 @@ export default function EventsDashboard() {
   );
 }
 
+// Helper to get display status
+function getEventDisplayStatus(event: EventWithStats): { label: string; variant: 'draft' | 'live' | 'ended' | 'cancelled' } {
+  const now = new Date();
+  const start = new Date(event.start_date);
+  const end = event.end_date ? new Date(event.end_date) : start;
+
+  if (event.status === 'cancelled') return { label: 'Cancelled', variant: 'cancelled' };
+  if (event.status === 'draft') return { label: 'Draft', variant: 'draft' };
+  if (now > end) return { label: 'Ended', variant: 'ended' };
+  if (now >= start && now <= end) return { label: 'Live', variant: 'live' };
+  return { label: 'Upcoming', variant: 'live' };
+}
+
+const statusColors = {
+  draft: 'bg-amber-500/20 text-amber-600 border-amber-500/30',
+  live: 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30',
+  ended: 'bg-muted text-muted-foreground border-border',
+  cancelled: 'bg-destructive/20 text-destructive border-destructive/30',
+};
+
 interface CalendarViewProps {
   currentMonth: Date;
   calendarDays: Date[];
-  getEventsForDay: (day: Date) => Array<{
-    id: string;
-    title: string;
-    start_date: string;
-    image_url: string | null;
-    ticket_type: string;
-  }>;
+  getEventsForDay: (day: Date) => EventWithStats[];
   onPrevMonth: () => void;
   onNextMonth: () => void;
   onEventClick: (eventId: string) => void;
+  onEdit: (eventId: string) => void;
+  onShare: (event: EventWithStats) => void;
+  onDuplicate: (event: EventWithStats) => void;
 }
 
 function CalendarView({
@@ -162,6 +273,9 @@ function CalendarView({
   onPrevMonth,
   onNextMonth,
   onEventClick,
+  onEdit,
+  onShare,
+  onDuplicate,
 }: CalendarViewProps) {
   const today = new Date();
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -202,7 +316,7 @@ function CalendarView({
             <div
               key={index}
               className={cn(
-                "min-h-[80px] p-1 rounded-lg border border-border/30 transition-colors",
+                "min-h-[90px] p-1 rounded-lg border border-border/30 transition-colors",
                 isCurrentMonth ? "bg-card/60" : "bg-muted/20 opacity-50",
                 isToday && "ring-2 ring-primary/50"
               )}
@@ -217,20 +331,14 @@ function CalendarView({
               </div>
               <div className="space-y-0.5">
                 {dayEvents.slice(0, 2).map((event) => (
-                  <button
+                  <EventBlock
                     key={event.id}
+                    event={event}
                     onClick={() => onEventClick(event.id)}
-                    className="w-full text-left"
-                  >
-                    <div
-                      className={cn(
-                        "text-[10px] px-1 py-0.5 rounded truncate font-medium",
-                        "bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
-                      )}
-                    >
-                      {event.title}
-                    </div>
-                  </button>
+                    onEdit={() => onEdit(event.id)}
+                    onShare={() => onShare(event)}
+                    onDuplicate={() => onDuplicate(event)}
+                  />
                 ))}
                 {dayEvents.length > 2 && (
                   <div className="text-[9px] text-muted-foreground px-1">
@@ -246,71 +354,188 @@ function CalendarView({
   );
 }
 
-interface ListViewProps {
-  events: Array<{
-    id: string;
-    title: string;
-    start_date: string;
-    end_date: string | null;
-    image_url: string | null;
-    city: string;
-    ticket_type: string;
-    status: string | null;
-  }>;
-  onEventClick: (eventId: string) => void;
+interface EventBlockProps {
+  event: EventWithStats;
+  onClick: () => void;
+  onEdit: () => void;
+  onShare: () => void;
+  onDuplicate: () => void;
 }
 
-function ListView({ events, onEventClick }: ListViewProps) {
+function EventBlock({ event, onClick, onEdit, onShare, onDuplicate }: EventBlockProps) {
+  const status = getEventDisplayStatus(event);
+  const totalCount = (event.rsvpCount || 0) + (event.ticketCount || 0);
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className="w-full text-left group">
+          <div
+            className={cn(
+              "text-[10px] px-1.5 py-1 rounded border transition-colors",
+              "bg-primary/10 border-primary/20 hover:bg-primary/20"
+            )}
+          >
+            <div className="flex items-center justify-between gap-1">
+              <span className="font-medium truncate flex-1">{event.title}</span>
+              <MoreHorizontal className="h-3 w-3 opacity-0 group-hover:opacity-60 shrink-0" />
+            </div>
+            <div className="flex items-center gap-1 mt-0.5">
+              <span
+                className={cn(
+                  "text-[8px] px-1 py-0 rounded border",
+                  statusColors[status.variant]
+                )}
+              >
+                {status.label}
+              </span>
+              {totalCount > 0 && (
+                <span className="text-[8px] text-muted-foreground flex items-center gap-0.5">
+                  <Users className="h-2 w-2" />
+                  {totalCount}
+                </span>
+              )}
+            </div>
+          </div>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-48 p-2" align="start">
+        <div className="space-y-1">
+          <p className="text-sm font-medium truncate px-2 py-1">{event.title}</p>
+          <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground">
+            <Badge variant="outline" className={cn("text-[10px]", statusColors[status.variant])}>
+              {status.label}
+            </Badge>
+            {totalCount > 0 && (
+              <span className="flex items-center gap-1">
+                <Users className="h-3 w-3" />
+                {event.ticketCount || 0} tickets · {event.rsvpCount || 0} RSVPs
+              </span>
+            )}
+          </div>
+          <div className="border-t border-border my-1" />
+          <button
+            onClick={(e) => { e.stopPropagation(); onClick(); }}
+            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors"
+          >
+            View Details
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors"
+          >
+            <Edit className="h-3.5 w-3.5" />
+            Edit
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onShare(); }}
+            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors"
+          >
+            <Share2 className="h-3.5 w-3.5" />
+            Share
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
+            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Duplicate
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+interface ListViewProps {
+  events: EventWithStats[];
+  onEventClick: (eventId: string) => void;
+  onEdit: (eventId: string) => void;
+  onShare: (event: EventWithStats) => void;
+  onDuplicate: (event: EventWithStats) => void;
+}
+
+function ListView({ events, onEventClick, onEdit, onShare, onDuplicate }: ListViewProps) {
   const now = new Date();
 
   const upcomingEvents = events.filter((e) => new Date(e.start_date) > now);
   const pastEvents = events.filter((e) => new Date(e.start_date) <= now);
 
-  const EventCard = ({ event }: { event: ListViewProps["events"][0] }) => (
-    <button
-      onClick={() => onEventClick(event.id)}
-      className="w-full text-left p-3 rounded-xl border border-border/40 bg-card/60 backdrop-blur-sm hover:bg-muted/30 transition-colors"
-    >
-      <div className="flex gap-3">
-        {event.image_url ? (
-          <img
-            src={event.image_url}
-            alt={event.title}
-            className="w-16 h-16 rounded-lg object-cover shrink-0"
-          />
-        ) : (
-          <div className="w-16 h-16 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <Calendar className="h-6 w-6 text-primary" />
-          </div>
-        )}
-        <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-sm truncate">{event.title}</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {format(new Date(event.start_date), "EEE, MMM d · h:mm a")}
-          </p>
-          <p className="text-xs text-muted-foreground">{event.city}</p>
-          <div className="flex items-center gap-2 mt-1.5">
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-              {event.ticket_type}
-            </Badge>
-            {event.status && (
-              <Badge
-                variant="outline"
-                className={cn(
-                  "text-[10px] px-1.5 py-0",
-                  event.status === "published" && "border-emerald-500/30 text-emerald-500",
-                  event.status === "draft" && "border-amber-500/30 text-amber-500",
-                  event.status === "cancelled" && "border-destructive/30 text-destructive"
-                )}
-              >
-                {event.status}
-              </Badge>
+  const EventCard = ({ event }: { event: EventWithStats }) => {
+    const status = getEventDisplayStatus(event);
+    const totalCount = (event.rsvpCount || 0) + (event.ticketCount || 0);
+
+    return (
+      <div className="relative p-3 rounded-xl border border-border/40 bg-card/60 backdrop-blur-sm">
+        <button
+          onClick={() => onEventClick(event.id)}
+          className="w-full text-left"
+        >
+          <div className="flex gap-3">
+            {event.image_url ? (
+              <img
+                src={event.image_url}
+                alt={event.title}
+                className="w-16 h-16 rounded-lg object-cover shrink-0"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Calendar className="h-6 w-6 text-primary" />
+              </div>
             )}
+            <div className="flex-1 min-w-0 pr-8">
+              <h3 className="font-medium text-sm truncate">{event.title}</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {format(new Date(event.start_date), "EEE, MMM d · h:mm a")}
+              </p>
+              <p className="text-xs text-muted-foreground">{event.city}</p>
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <Badge
+                  variant="outline"
+                  className={cn("text-[10px] px-1.5 py-0", statusColors[status.variant])}
+                >
+                  {status.label}
+                </Badge>
+                {totalCount > 0 && (
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Users className="h-3 w-3" />
+                    {event.ticketCount || 0} tickets · {event.rsvpCount || 0} RSVPs
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
+        </button>
+
+        {/* Quick Actions */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 h-8 w-8"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onEdit(event.id)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onShare(event)}>
+              <Share2 className="h-4 w-4 mr-2" />
+              Share
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onDuplicate(event)}>
+              <Copy className="h-4 w-4 mr-2" />
+              Duplicate
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-    </button>
-  );
+    );
+  };
 
   if (events.length === 0) {
     return (
