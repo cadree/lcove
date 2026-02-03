@@ -160,6 +160,7 @@ const Profile = () => {
             credits={credits?.balance || 0}
             projectCount={0}
             eventCount={0}
+            isOwnProfile={isOwnProfile}
           />
         );
       case 'about':
