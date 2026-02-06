@@ -92,7 +92,7 @@ export function useAcceptPartnerApplication() {
           city: application.city,
           state: application.state,
           country: application.country,
-          is_active: false, // Not active until partner customizes their profile
+          is_active: true, // Immediately visible on brand partners page
         });
 
       if (partnerError) throw partnerError;
