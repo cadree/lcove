@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,28 +24,45 @@ export function PartnerApplicationsTab() {
   const [selectedType, setSelectedType] = useState<'sponsor' | 'collaborator' | 'supporter'>('collaborator');
   const [rejectReason, setRejectReason] = useState('');
 
+  // Keep a stable ref so the handler always sees the latest value
+  const acceptDialogRef = useRef<PartnerApplication | null>(null);
+  acceptDialogRef.current = acceptDialog;
+
   const { data: applications, isLoading } = usePartnerApplications(filter);
   const acceptMutation = useAcceptPartnerApplication();
   const rejectMutation = useRejectPartnerApplication();
 
   const handleAccept = () => {
-    if (acceptDialog) {
-      acceptMutation.mutate({
-        applicationId: acceptDialog.id,
-        partnershipType: selectedType,
-      });
-      setAcceptDialog(null);
+    const app = acceptDialogRef.current;
+    if (app) {
+      acceptMutation.mutate(
+        {
+          applicationId: app.id,
+          partnershipType: selectedType,
+        },
+        {
+          onSettled: () => {
+            setAcceptDialog(null);
+          },
+        }
+      );
     }
   };
 
   const handleReject = () => {
     if (rejectDialog && rejectReason) {
-      rejectMutation.mutate({
-        applicationId: rejectDialog.id,
-        reason: rejectReason,
-      });
-      setRejectDialog(null);
-      setRejectReason('');
+      rejectMutation.mutate(
+        {
+          applicationId: rejectDialog.id,
+          reason: rejectReason,
+        },
+        {
+          onSettled: () => {
+            setRejectDialog(null);
+            setRejectReason('');
+          },
+        }
+      );
     }
   };
 
@@ -222,8 +239,8 @@ export function PartnerApplicationsTab() {
       </ScrollArea>
 
       {/* Accept Dialog */}
-      <Dialog open={!!acceptDialog} onOpenChange={() => setAcceptDialog(null)}>
-        <DialogContent>
+      <Dialog open={!!acceptDialog} onOpenChange={(open) => { if (!open && !acceptMutation.isPending) setAcceptDialog(null); }}>
+        <DialogContent onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Accept Partner Application</DialogTitle>
             <DialogDescription>
@@ -233,11 +250,11 @@ export function PartnerApplicationsTab() {
           <div className="space-y-4">
             <div>
               <Label>Partnership Type</Label>
-              <Select value={selectedType} onValueChange={(v: any) => setSelectedType(v)}>
+              <Select value={selectedType} onValueChange={(v: 'sponsor' | 'collaborator' | 'supporter') => setSelectedType(v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" className="z-[100]">
                   <SelectItem value="sponsor">Sponsor - Premium visibility & exclusive perks</SelectItem>
                   <SelectItem value="collaborator">Collaborator - Joint initiatives & events</SelectItem>
                   <SelectItem value="supporter">Supporter - Community benefits & discounts</SelectItem>
@@ -246,17 +263,17 @@ export function PartnerApplicationsTab() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAcceptDialog(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setAcceptDialog(null)} disabled={acceptMutation.isPending}>Cancel</Button>
             <Button onClick={handleAccept} disabled={acceptMutation.isPending}>
-              Accept Partner
+              {acceptMutation.isPending ? 'Accepting...' : 'Accept Partner'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Reject Dialog */}
-      <Dialog open={!!rejectDialog} onOpenChange={() => setRejectDialog(null)}>
-        <DialogContent>
+      <Dialog open={!!rejectDialog} onOpenChange={(open) => { if (!open && !rejectMutation.isPending) { setRejectDialog(null); setRejectReason(''); } }}>
+        <DialogContent onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Reject Partner Application</DialogTitle>
             <DialogDescription>
@@ -273,13 +290,13 @@ export function PartnerApplicationsTab() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectDialog(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setRejectDialog(null); setRejectReason(''); }} disabled={rejectMutation.isPending}>Cancel</Button>
             <Button 
               variant="destructive" 
               onClick={handleReject} 
               disabled={!rejectReason || rejectMutation.isPending}
             >
-              Reject Application
+              {rejectMutation.isPending ? 'Rejecting...' : 'Reject Application'}
             </Button>
           </DialogFooter>
         </DialogContent>
