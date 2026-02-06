@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -12,25 +13,31 @@ import {
   usePartnerApplications, 
   useAcceptPartnerApplication, 
   useRejectPartnerApplication,
+  useRemovePartnership,
   PartnerApplication 
 } from '@/hooks/usePartnerApplicationsAdmin';
-import { Building2, Globe, Mail, Phone, MapPin, CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react';
+import { useBrandPartnerships, type BrandPartnership } from '@/hooks/useBrandPartnerships';
+import { Building2, Globe, Mail, Phone, MapPin, CheckCircle, XCircle, Clock, ExternalLink, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 export function PartnerApplicationsTab() {
   const [filter, setFilter] = useState<'pending' | 'accepted' | 'rejected' | undefined>('pending');
   const [acceptDialog, setAcceptDialog] = useState<PartnerApplication | null>(null);
   const [rejectDialog, setRejectDialog] = useState<PartnerApplication | null>(null);
+  const [removePartnerDialog, setRemovePartnerDialog] = useState<BrandPartnership | null>(null);
   const [selectedType, setSelectedType] = useState<'sponsor' | 'collaborator' | 'supporter'>('collaborator');
   const [rejectReason, setRejectReason] = useState('');
+  const [viewTab, setViewTab] = useState<'applications' | 'active'>('applications');
 
   // Keep a stable ref so the handler always sees the latest value
   const acceptDialogRef = useRef<PartnerApplication | null>(null);
   acceptDialogRef.current = acceptDialog;
 
   const { data: applications, isLoading } = usePartnerApplications(filter);
+  const { data: activePartners, isLoading: loadingPartners } = useBrandPartnerships();
   const acceptMutation = useAcceptPartnerApplication();
   const rejectMutation = useRejectPartnerApplication();
+  const removeMutation = useRemovePartnership();
 
   const handleAccept = () => {
     const app = acceptDialogRef.current;
@@ -93,6 +100,89 @@ export function PartnerApplicationsTab() {
 
   return (
     <div className="space-y-4">
+      {/* View Toggle */}
+      <div className="flex gap-2 mb-2">
+        <Badge
+          variant={viewTab === 'applications' ? 'default' : 'outline'}
+          className="cursor-pointer"
+          onClick={() => setViewTab('applications')}
+        >
+          Applications
+        </Badge>
+        <Badge
+          variant={viewTab === 'active' ? 'default' : 'outline'}
+          className="cursor-pointer"
+          onClick={() => setViewTab('active')}
+        >
+          Active Partners ({activePartners?.length || 0})
+        </Badge>
+      </div>
+
+      {viewTab === 'active' ? (
+        /* Active Partners List */
+        <ScrollArea className="h-[500px]">
+          {loadingPartners ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => <Skeleton key={i} className="h-24" />)}
+            </div>
+          ) : activePartners && activePartners.length > 0 ? (
+            <div className="space-y-3">
+              {activePartners.map(partner => (
+                <Card key={partner.id}>
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-3">
+                        {partner.brand_logo_url ? (
+                          <img src={partner.brand_logo_url} alt="" className="w-10 h-10 rounded-lg object-contain" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Building2 className="h-5 w-5 text-primary" />
+                          </div>
+                        )}
+                        <div>
+                          <div className="font-semibold">{partner.brand_name}</div>
+                          <div className="text-xs text-muted-foreground capitalize">{partner.partnership_type}</div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setRemovePartnerDialog(partner)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Remove
+                      </Button>
+                    </div>
+                    {partner.description && (
+                      <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{partner.description}</p>
+                    )}
+                    <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
+                      {partner.contact_email && (
+                        <span className="flex items-center gap-1">
+                          <Mail className="h-3 w-3" />{partner.contact_email}
+                        </span>
+                      )}
+                      {partner.website_url && (
+                        <a href={partner.website_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
+                          <Globe className="h-3 w-3" />Website
+                        </a>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No active partners</p>
+            </div>
+          )}
+        </ScrollArea>
+      ) : (
+        /* Applications View */
+        <>
       {/* Filter */}
       <div className="flex gap-2">
         <Badge
@@ -237,6 +327,8 @@ export function PartnerApplicationsTab() {
           </div>
         )}
       </ScrollArea>
+        </>
+      )}
 
       {/* Accept Dialog */}
       <Dialog open={!!acceptDialog} onOpenChange={(open) => { if (!open && !acceptMutation.isPending) setAcceptDialog(null); }}>
@@ -301,6 +393,33 @@ export function PartnerApplicationsTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Remove Partnership Dialog */}
+      <AlertDialog open={!!removePartnerDialog} onOpenChange={(open) => { if (!open) setRemovePartnerDialog(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Partnership</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove "{removePartnerDialog?.brand_name}" from the brand partners list. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (removePartnerDialog) {
+                  removeMutation.mutate(removePartnerDialog.id, {
+                    onSettled: () => setRemovePartnerDialog(null),
+                  });
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove Partnership
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
