@@ -155,3 +155,27 @@ export function useRejectPartnerApplication() {
     },
   });
 }
+
+export function useRemovePartnership() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (partnershipId: string) => {
+      const { error } = await supabase
+        .from('brand_partnerships')
+        .delete()
+        .eq('id', partnershipId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['brand-partnerships'] });
+      queryClient.invalidateQueries({ queryKey: ['partner-applications'] });
+      queryClient.invalidateQueries({ queryKey: ['my-partnership'] });
+      toast.success('Partnership removed successfully');
+    },
+    onError: (error: any) => {
+      toast.error('Failed to remove partnership: ' + error.message);
+    },
+  });
+}

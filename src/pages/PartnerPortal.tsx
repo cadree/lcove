@@ -13,6 +13,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
+} from '@/components/ui/alert-dialog';
+import { 
   ArrowLeft, Building2, Upload, Save, Globe, MapPin, Image as ImageIcon, 
   CheckCircle, AlertCircle, Loader2, Trash2
 } from 'lucide-react';
@@ -220,6 +224,30 @@ export default function PartnerPortal() {
     
     updateMutation.mutate({ gallery_images: newImages.length > 0 ? newImages : null });
   };
+
+  // Delete partnership
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!partnership) throw new Error('No partnership found');
+      
+      const { error } = await supabase
+        .from('brand_partnerships')
+        .delete()
+        .eq('id', partnership.id)
+        .eq('owner_user_id', user!.id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-partnership'] });
+      queryClient.invalidateQueries({ queryKey: ['brand-partnerships'] });
+      toast.success('Partnership removed successfully');
+      navigate('/brand-partners');
+    },
+    onError: (error: any) => {
+      toast.error('Failed to remove partnership: ' + error.message);
+    },
+  });
 
   if (!user) {
     return (
@@ -545,6 +573,45 @@ export default function PartnerPortal() {
                 </span>
               </Button>
             </label>
+          </CardContent>
+        </Card>
+
+        {/* Danger Zone */}
+        <Card className="mb-6 border-destructive/30">
+          <CardHeader>
+            <CardTitle className="text-lg text-destructive">Danger Zone</CardTitle>
+            <CardDescription>Permanently remove your partnership</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              This will permanently remove your partnership listing, profile, and all associated data. This action cannot be undone.
+            </p>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="gap-2">
+                  <Trash2 className="h-4 w-4" />
+                  Remove Partnership
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove Partnership?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete your "{partnership.brand_name}" partnership listing and all associated data. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deleteMutation.mutate()}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    disabled={deleteMutation.isPending}
+                  >
+                    {deleteMutation.isPending ? 'Removing...' : 'Yes, Remove'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>
 
