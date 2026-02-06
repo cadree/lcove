@@ -18,6 +18,7 @@ export interface BrandPartnership {
   social_links: Record<string, string> | null;
   contact_email: string | null;
   featured: boolean;
+  gallery_images: string[] | null;
 }
 
 export function useBrandPartnerships(filter?: 'sponsor' | 'collaborator' | 'supporter') {
