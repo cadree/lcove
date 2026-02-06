@@ -146,7 +146,7 @@ export default function PartnerPortal() {
     // Upload logo if changed
     if (logoFile) {
       const ext = logoFile.name.split('.').pop();
-      const path = `partner-logos/${partnership.id}.${ext}`;
+      const path = `${user!.id}/partner-logos/${partnership.id}.${ext}`;
       
       const { error: uploadError } = await supabase.storage
         .from('media')
@@ -164,7 +164,7 @@ export default function PartnerPortal() {
     // Upload gallery images
     for (const file of galleryFiles) {
       const ext = file.name.split('.').pop();
-      const path = `partner-gallery/${partnership.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const path = `${user!.id}/partner-gallery/${partnership.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       
       const { error: uploadError } = await supabase.storage
         .from('media')
