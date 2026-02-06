@@ -69,7 +69,7 @@ export function useAcceptPartnerApplication() {
       const { error: updateError } = await supabase
         .from('partner_applications')
         .update({
-          status: 'accepted',
+          status: 'approved',
           reviewed_at: new Date().toISOString(),
         })
         .eq('id', applicationId);
