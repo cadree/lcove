@@ -156,7 +156,7 @@ export default function EventDetail() {
   });
 
   const handleShare = async () => {
-    const url = `${window.location.origin}/calendar?event=${eventId}`;
+    const url = `${window.location.origin}/event/${eventId}`;
     if (navigator.share) {
       try {
         await navigator.share({
@@ -174,7 +174,7 @@ export default function EventDetail() {
   };
 
   const handleCopyLink = () => {
-    const url = `${window.location.origin}/calendar?event=${eventId}`;
+    const url = `${window.location.origin}/event/${eventId}`;
     navigator.clipboard.writeText(url);
     toast.success("Link copied to clipboard");
   };

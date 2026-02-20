@@ -23,7 +23,7 @@ const AccessGate = ({ children }: AccessGateProps) => {
   const [showWelcome, setShowWelcome] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
 
-  const isPublicRoute = PUBLIC_ROUTES.includes(location.pathname) || location.pathname.startsWith('/admin/onboarding');
+  const isPublicRoute = PUBLIC_ROUTES.includes(location.pathname) || location.pathname.startsWith('/admin/onboarding') || location.pathname.startsWith('/event/');
   const isLandingRoute = LANDING_ROUTES.includes(location.pathname);
 
   useEffect(() => {

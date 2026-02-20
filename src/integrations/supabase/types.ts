@@ -2079,37 +2079,43 @@ export type Database = {
           created_at: string
           credits_spent: number | null
           event_id: string
+          guest_email: string | null
+          guest_name: string | null
           id: string
           reminder_enabled: boolean | null
           status: string
           stripe_payment_id: string | null
           ticket_purchased: boolean | null
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
           credits_spent?: number | null
           event_id: string
+          guest_email?: string | null
+          guest_name?: string | null
           id?: string
           reminder_enabled?: boolean | null
           status?: string
           stripe_payment_id?: string | null
           ticket_purchased?: boolean | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
           credits_spent?: number | null
           event_id?: string
+          guest_email?: string | null
+          guest_name?: string | null
           id?: string
           reminder_enabled?: boolean | null
           status?: string
           stripe_payment_id?: string | null
           ticket_purchased?: boolean | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
