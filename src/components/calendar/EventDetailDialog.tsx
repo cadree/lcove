@@ -293,7 +293,7 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
   };
 
   const handleShare = async (method: 'copy' | 'twitter' | 'native') => {
-    const eventUrl = `${window.location.origin}/calendar?event=${event.id}`;
+    const eventUrl = `${window.location.origin}/event/${event.id}`;
     const shareText = `Check out "${event.title}" on ${format(eventDate, 'MMMM d')}!`;
 
     if (method === 'copy') {

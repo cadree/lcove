@@ -504,9 +504,12 @@ function OrdersTab({ orders, attendeeProfiles, event, isLoading }: OrdersTabProp
 interface AttendeesTabProps {
   attendees: Array<{
     id: string;
-    user_id: string;
+    user_id: string | null;
     status: string;
     ticket_purchased: boolean | null;
+    guest_name?: string | null;
+    guest_email?: string | null;
+    guest_phone?: string | null;
     created_at: string;
   }>;
   attendeeProfiles: Record<string, { display_name: string | null; avatar_url: string | null }>;
@@ -515,17 +518,25 @@ interface AttendeesTabProps {
 
 function AttendeesTab({ attendees, attendeeProfiles, isLoading }: AttendeesTabProps) {
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "going" | "interested" | "ticketed">("all");
+  const [filter, setFilter] = useState<"all" | "going" | "interested" | "ticketed" | "guests">("all");
+
+  const getAttendeeName = (a: AttendeesTabProps['attendees'][0]) => {
+    if (a.user_id && attendeeProfiles[a.user_id]) {
+      return attendeeProfiles[a.user_id].display_name || "Unknown";
+    }
+    return a.guest_name || "Guest";
+  };
 
   const filteredAttendees = attendees.filter(a => {
-    const profile = attendeeProfiles[a.user_id];
-    const name = profile?.display_name || "";
-    const matchesSearch = name.toLowerCase().includes(search.toLowerCase());
+    const name = getAttendeeName(a);
+    const email = a.guest_email || "";
+    const matchesSearch = name.toLowerCase().includes(search.toLowerCase()) || email.toLowerCase().includes(search.toLowerCase());
     
     if (filter === "all") return matchesSearch;
     if (filter === "going") return matchesSearch && a.status === "going";
     if (filter === "interested") return matchesSearch && a.status === "interested";
     if (filter === "ticketed") return matchesSearch && a.ticket_purchased;
+    if (filter === "guests") return matchesSearch && !a.user_id;
     return matchesSearch;
   });
 
@@ -534,6 +545,7 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading }: AttendeesTabPr
     going: attendees.filter(a => a.status === "going").length,
     interested: attendees.filter(a => a.status === "interested").length,
     ticketed: attendees.filter(a => a.ticket_purchased).length,
+    guests: attendees.filter(a => !a.user_id).length,
   };
 
   if (isLoading) {
@@ -547,7 +559,7 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading }: AttendeesTabPr
   return (
     <div className="space-y-4">
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-5 gap-2">
         <button
           onClick={() => setFilter("all")}
           className={cn(
@@ -562,20 +574,20 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading }: AttendeesTabPr
           onClick={() => setFilter("going")}
           className={cn(
             "p-2 rounded-lg border text-center transition-all",
-            filter === "going" ? "border-emerald-500 bg-emerald-500/10" : "border-border/40 bg-card/60"
+            filter === "going" ? "border-primary bg-primary/10" : "border-border/40 bg-card/60"
           )}
         >
-          <p className="text-lg font-bold text-emerald-500">{stats.going}</p>
+          <p className="text-lg font-bold">{stats.going}</p>
           <p className="text-[10px] text-muted-foreground">Going</p>
         </button>
         <button
           onClick={() => setFilter("interested")}
           className={cn(
             "p-2 rounded-lg border text-center transition-all",
-            filter === "interested" ? "border-amber-500 bg-amber-500/10" : "border-border/40 bg-card/60"
+            filter === "interested" ? "border-primary bg-primary/10" : "border-border/40 bg-card/60"
           )}
         >
-          <p className="text-lg font-bold text-amber-500">{stats.interested}</p>
+          <p className="text-lg font-bold">{stats.interested}</p>
           <p className="text-[10px] text-muted-foreground">Interested</p>
         </button>
         <button
@@ -585,8 +597,18 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading }: AttendeesTabPr
             filter === "ticketed" ? "border-primary bg-primary/10" : "border-border/40 bg-card/60"
           )}
         >
-          <p className="text-lg font-bold text-primary">{stats.ticketed}</p>
+          <p className="text-lg font-bold">{stats.ticketed}</p>
           <p className="text-[10px] text-muted-foreground">Ticketed</p>
+        </button>
+        <button
+          onClick={() => setFilter("guests")}
+          className={cn(
+            "p-2 rounded-lg border text-center transition-all",
+            filter === "guests" ? "border-primary bg-primary/10" : "border-border/40 bg-card/60"
+          )}
+        >
+          <p className="text-lg font-bold">{stats.guests}</p>
+          <p className="text-[10px] text-muted-foreground">Guests</p>
         </button>
       </div>
 
@@ -616,21 +638,36 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading }: AttendeesTabPr
       ) : (
         <div className="space-y-2">
           {filteredAttendees.map(attendee => {
-            const profile = attendeeProfiles[attendee.user_id];
+            const isGuest = !attendee.user_id;
+            const profile = attendee.user_id ? attendeeProfiles[attendee.user_id] : null;
+            const displayName = isGuest ? attendee.guest_name || "Guest" : profile?.display_name || "Unknown";
+            const avatarUrl = profile?.avatar_url || undefined;
+
             return (
               <Card key={attendee.id} className="border-border/40 bg-card/60">
                 <CardContent className="p-3 flex items-center gap-3">
                   <Avatar className="h-10 w-10">
-                    <AvatarImage src={profile?.avatar_url || undefined} />
-                    <AvatarFallback>{profile?.display_name?.[0] || "?"}</AvatarFallback>
+                    <AvatarImage src={avatarUrl} />
+                    <AvatarFallback>{displayName[0] || "?"}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">
-                      {profile?.display_name || "Unknown"}
-                    </p>
-                    <p className="text-xs text-muted-foreground capitalize">
-                      {attendee.status} · {format(new Date(attendee.created_at), "MMM d")}
-                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-medium text-sm truncate">{displayName}</p>
+                      {isGuest && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 bg-muted/50">Guest</Badge>
+                      )}
+                    </div>
+                    {isGuest ? (
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        {attendee.guest_email && <p>{attendee.guest_email}</p>}
+                        {attendee.guest_phone && <p>{attendee.guest_phone}</p>}
+                        <p className="capitalize">{attendee.status} · {format(new Date(attendee.created_at), "MMM d")}</p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground capitalize">
+                        {attendee.status} · {format(new Date(attendee.created_at), "MMM d")}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {attendee.ticket_purchased && (

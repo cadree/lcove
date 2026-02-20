@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
@@ -13,6 +13,8 @@ import {
   ExternalLink,
   Share2,
   Copy,
+  LogIn,
+  Phone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,17 +23,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 export default function PublicEventPage() {
   const { eventId } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
   const [rsvpSuccess, setRsvpSuccess] = useState(false);
 
   // Fetch event (public – anon can read)
@@ -88,6 +92,7 @@ export default function PublicEventPage() {
         status: "going",
         guest_name: guestName.trim(),
         guest_email: guestEmail.trim().toLowerCase(),
+        guest_phone: guestPhone.trim() || null,
       });
       if (error) {
         if (error.code === "23505") {
@@ -189,7 +194,6 @@ export default function PublicEventPage() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="border-border/50 shadow-xl bg-card/95 backdrop-blur-md">
             <CardContent className="p-5 space-y-4">
-              {/* Title & status */}
               <div>
                 <div className="flex items-start justify-between gap-3">
                   <h1 className="text-xl sm:text-2xl font-display font-bold leading-tight">{event.title}</h1>
@@ -199,12 +203,9 @@ export default function PublicEventPage() {
                 </div>
               </div>
 
-              {/* Date & time */}
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4 text-primary shrink-0" />
-                <span>
-                  {format(new Date(event.start_date), "EEEE, MMMM d, yyyy")}
-                </span>
+                <span>{format(new Date(event.start_date), "EEEE, MMMM d, yyyy")}</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4 text-primary shrink-0" />
@@ -214,17 +215,13 @@ export default function PublicEventPage() {
                 </span>
               </div>
 
-              {/* Location */}
               {(event.venue || event.city) && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <MapPin className="h-4 w-4 text-primary shrink-0" />
-                  <span>
-                    {[event.venue, event.address, event.city, event.state].filter(Boolean).join(", ")}
-                  </span>
+                  <span>{[event.venue, event.address, event.city, event.state].filter(Boolean).join(", ")}</span>
                 </div>
               )}
 
-              {/* Attendees */}
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Users className="h-4 w-4 text-primary shrink-0" />
                 <span>
@@ -233,15 +230,11 @@ export default function PublicEventPage() {
                 </span>
               </div>
 
-              {/* Ticket info */}
               <div className="flex items-center gap-2 text-sm">
                 <Ticket className="h-4 w-4 text-primary shrink-0" />
-                <span className="font-medium">
-                  {isFree ? "Free Event" : `$${event.ticket_price}`}
-                </span>
+                <span className="font-medium">{isFree ? "Free Event" : `$${event.ticket_price}`}</span>
               </div>
 
-              {/* Organizer */}
               {organizer && (
                 <div className="flex items-center gap-3 pt-2 border-t border-border/30">
                   <Avatar className="h-8 w-8">
@@ -255,21 +248,14 @@ export default function PublicEventPage() {
                 </div>
               )}
 
-              {/* Description */}
               {event.description && (
                 <div className="pt-2 border-t border-border/30">
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">{event.description}</p>
                 </div>
               )}
 
-              {/* External link */}
               {event.external_url && (
-                <a
-                  href={event.external_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-primary hover:underline"
-                >
+                <a href={event.external_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline">
                   <ExternalLink className="h-4 w-4" />
                   Event Link
                 </a>
@@ -278,14 +264,14 @@ export default function PublicEventPage() {
           </Card>
         </motion.div>
 
-        {/* RSVP Section */}
+        {/* RSVP Section for free events */}
         {!isPast && isFree && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
             <Card className="mt-4 border-border/50 shadow-lg bg-card/95 backdrop-blur-md">
               <CardContent className="p-5">
                 {rsvpSuccess ? (
                   <div className="text-center py-4 space-y-3">
-                    <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto" />
+                    <CheckCircle2 className="h-12 w-12 text-primary mx-auto" />
                     <h3 className="text-lg font-display font-semibold">You're on the list!</h3>
                     <p className="text-sm text-muted-foreground">
                       We've saved your RSVP for <strong>{event.title}</strong>.
@@ -293,20 +279,23 @@ export default function PublicEventPage() {
                   </div>
                 ) : (
                   <>
-                    <h3 className="text-lg font-display font-semibold mb-4">RSVP to this event</h3>
+                    <h3 className="text-lg font-display font-semibold mb-1">RSVP to this event</h3>
+                    <p className="text-xs text-muted-foreground mb-4">Fill in your info below, or sign in to RSVP with your profile.</p>
+
                     <form onSubmit={handleGuestRsvp} className="space-y-3">
                       <div>
-                        <Label htmlFor="guest-name" className="text-xs">Your Name</Label>
+                        <Label htmlFor="guest-name" className="text-xs">Full Name *</Label>
                         <Input
                           id="guest-name"
                           value={guestName}
                           onChange={(e) => setGuestName(e.target.value)}
                           placeholder="Enter your full name"
                           required
+                          maxLength={100}
                         />
                       </div>
                       <div>
-                        <Label htmlFor="guest-email" className="text-xs">Email Address</Label>
+                        <Label htmlFor="guest-email" className="text-xs">Email Address *</Label>
                         <Input
                           id="guest-email"
                           type="email"
@@ -314,6 +303,21 @@ export default function PublicEventPage() {
                           onChange={(e) => setGuestEmail(e.target.value)}
                           placeholder="you@example.com"
                           required
+                          maxLength={255}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="guest-phone" className="text-xs flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          Phone Number
+                        </Label>
+                        <Input
+                          id="guest-phone"
+                          type="tel"
+                          value={guestPhone}
+                          onChange={(e) => setGuestPhone(e.target.value)}
+                          placeholder="(555) 123-4567"
+                          maxLength={20}
                         />
                       </div>
                       <Button
@@ -324,6 +328,22 @@ export default function PublicEventPage() {
                         {guestRsvpMutation.isPending ? "Submitting…" : "RSVP – I'm Going!"}
                       </Button>
                     </form>
+
+                    <div className="relative my-4">
+                      <Separator />
+                      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3 text-xs text-muted-foreground">
+                        or
+                      </span>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2"
+                      onClick={() => navigate(`/auth?redirect=/calendar?event=${eventId}`)}
+                    >
+                      <LogIn className="h-4 w-4" />
+                      Sign in to RSVP with your profile
+                    </Button>
                   </>
                 )}
               </CardContent>
@@ -341,7 +361,8 @@ export default function PublicEventPage() {
                 <p className="text-sm text-muted-foreground">
                   Sign in to the app to purchase tickets for this event.
                 </p>
-                <Button variant="outline" onClick={() => window.location.href = `/auth?redirect=/calendar?event=${eventId}`}>
+                <Button variant="outline" className="gap-2" onClick={() => navigate(`/auth?redirect=/calendar?event=${eventId}`)}>
+                  <LogIn className="h-4 w-4" />
                   Sign In to Buy Tickets
                 </Button>
               </CardContent>

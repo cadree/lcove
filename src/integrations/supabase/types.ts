@@ -2081,6 +2081,7 @@ export type Database = {
           event_id: string
           guest_email: string | null
           guest_name: string | null
+          guest_phone: string | null
           id: string
           reminder_enabled: boolean | null
           status: string
@@ -2095,6 +2096,7 @@ export type Database = {
           event_id: string
           guest_email?: string | null
           guest_name?: string | null
+          guest_phone?: string | null
           id?: string
           reminder_enabled?: boolean | null
           status?: string
@@ -2109,6 +2111,7 @@ export type Database = {
           event_id?: string
           guest_email?: string | null
           guest_name?: string | null
+          guest_phone?: string | null
           id?: string
           reminder_enabled?: boolean | null
           status?: string
