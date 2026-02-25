@@ -69,7 +69,7 @@ export const usePushNotifications = () => {
         
         if (swRegistration) {
           // Check for existing push subscription
-          const subscription = await swRegistration.pushManager.getSubscription();
+          const subscription = await (swRegistration as any).pushManager.getSubscription();
           
           if (subscription) {
             // Verify subscription is in database
@@ -170,7 +170,7 @@ export const usePushNotifications = () => {
 
     try {
       // Check for existing subscription first
-      let subscription = await registration.pushManager.getSubscription();
+      let subscription = await (registration as any).pushManager.getSubscription();
       
       if (subscription) {
         console.log('Using existing push subscription');
@@ -179,7 +179,7 @@ export const usePushNotifications = () => {
 
       // Create new subscription
       console.log('Creating new push subscription...');
-      subscription = await registration.pushManager.subscribe({
+      subscription = await (registration as any).pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToArrayBuffer(VAPID_PUBLIC_KEY),
       });
@@ -263,7 +263,7 @@ export const usePushNotifications = () => {
 
     try {
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
+      const subscription = await (registration as any).pushManager.getSubscription();
       
       if (subscription) {
         // Unsubscribe from push manager
