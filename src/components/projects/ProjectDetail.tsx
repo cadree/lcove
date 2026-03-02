@@ -305,11 +305,20 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                   className="shrink-0 -mt-1"
                   onClick={async () => {
                     const url = `${window.location.origin}/project/${project.id}`;
-                    if (navigator.share) {
-                      try { await navigator.share({ title: project.title, text: `Check out this project: ${project.title}`, url }); } catch {}
-                    } else {
+                    try {
+                      if (navigator.share) {
+                        await navigator.share({ title: project.title, text: `Check out this project: ${project.title}`, url });
+                        return;
+                      }
+                    } catch {
+                      // share failed or was cancelled, fall through to clipboard
+                    }
+                    try {
                       await navigator.clipboard.writeText(url);
-                      toast({ title: 'Link copied!' });
+                      toast({ title: 'Link copied to clipboard!' });
+                    } catch {
+                      // clipboard also failed, show the URL for manual copy
+                      window.prompt('Copy this link:', url);
                     }
                   }}
                   aria-label="Share project"

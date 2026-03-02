@@ -1,11 +1,13 @@
 import React from 'react';
 import { format } from 'date-fns';
-import { Calendar, DollarSign, Users, Clock, ChevronRight, Paperclip, Target } from 'lucide-react';
+import { Calendar, DollarSign, Users, Clock, ChevronRight, Paperclip, Target, Share2 } from 'lucide-react';
 import { Project } from '@/hooks/useProjects';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface ProjectCardProps {
   project: Project;
@@ -77,8 +79,34 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
           {project.description && (
             <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{project.description}</p>
           )}
-        </div>
-        <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+         </div>
+         <div className="flex items-center gap-1">
+           <Button
+             variant="ghost"
+             size="icon"
+             className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+             onClick={async (e) => {
+               e.stopPropagation();
+               const url = `${window.location.origin}/project/${project.id}`;
+               try {
+                 if (navigator.share) {
+                   await navigator.share({ title: project.title, url });
+                   return;
+                 }
+               } catch {}
+               try {
+                 await navigator.clipboard.writeText(url);
+                 toast.success('Link copied!');
+               } catch {
+                 window.prompt('Copy this link:', url);
+               }
+             }}
+             aria-label="Share project"
+           >
+             <Share2 className="h-3.5 w-3.5" />
+           </Button>
+           <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+         </div>
       </div>
 
       {/* Progress bar */}

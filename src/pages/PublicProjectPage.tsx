@@ -75,19 +75,27 @@ export default function PublicProjectPage() {
 
   const handleShare = async () => {
     const url = window.location.href;
-    if (navigator.share) {
-      try {
+    try {
+      if (navigator.share) {
         await navigator.share({ title: project?.title, text: `Check out this project: ${project?.title}`, url });
-      } catch {}
-    } else {
+        return;
+      }
+    } catch {}
+    try {
       await navigator.clipboard.writeText(url);
       toast.success("Link copied!");
+    } catch {
+      window.prompt("Copy this link:", url);
     }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(window.location.href);
-    toast.success("Link copied!");
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success("Link copied!");
+    } catch {
+      window.prompt("Copy this link:", window.location.href);
+    }
   };
 
   if (isLoading) {
