@@ -672,7 +672,9 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                             </Avatar>
                             <div>
                               <p className="font-medium">{app.applicant?.display_name || 'Anonymous'}</p>
-                              <p className="text-xs text-muted-foreground">Applied for {app.role?.role_name} • {format(new Date(app.created_at), 'MMM d')}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {app.message?.startsWith('[Custom Role Proposal:') ? 'Proposed custom role' : `Applied for ${app.role?.role_name}`} • {format(new Date(app.created_at), 'MMM d')}
+                              </p>
                             </div>
                           </div>
                           <Badge className={cn(
@@ -681,7 +683,22 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                             app.status === 'rejected' && 'bg-red-500/20 text-red-400'
                           )}>{app.status}</Badge>
                         </div>
-                        {app.message && <p className="text-sm text-muted-foreground mb-3 bg-muted/30 rounded p-2">"{app.message}"</p>}
+                        {app.message && (() => {
+                          const customMatch = app.message.match(/^\[Custom Role Proposal:\s*(.+?)\]\s*(.*)/s);
+                          if (customMatch) {
+                            return (
+                              <div className="mb-3 space-y-2">
+                                <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                                  Proposed Role: {customMatch[1].trim()}
+                                </Badge>
+                                {customMatch[2]?.trim() && (
+                                  <p className="text-sm text-muted-foreground bg-muted/30 rounded p-2">"{customMatch[2].trim()}"</p>
+                                )}
+                              </div>
+                            );
+                          }
+                          return <p className="text-sm text-muted-foreground mb-3 bg-muted/30 rounded p-2">"{app.message}"</p>;
+                        })()}
                         {app.status === 'pending' && (
                           <div className="flex gap-2">
                             <Button size="sm" onClick={() => reviewApplication({ applicationId: app.id, status: 'accepted' })} className="flex-1 min-h-[44px]"><Check className="h-4 w-4 mr-1" /> Accept</Button>
