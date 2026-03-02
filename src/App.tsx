@@ -54,6 +54,7 @@ import Dashboard from "./pages/Dashboard";
 import EventsDashboard from "./pages/EventsDashboard";
 import EventDetail from "./pages/EventDetail";
 import PublicEventPage from "./pages/PublicEventPage";
+import PublicProjectPage from "./pages/PublicProjectPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -122,6 +123,7 @@ const App = () => (
                 <Route path="/dashboard/events" element={<EventsDashboard />} />
                 <Route path="/dashboard/events/:eventId" element={<EventDetail />} />
                 <Route path="/event/:eventId" element={<PublicEventPage />} />
+                <Route path="/project/:projectId" element={<PublicProjectPage />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
