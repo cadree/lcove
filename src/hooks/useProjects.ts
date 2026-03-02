@@ -536,11 +536,44 @@ export const useProjectApplications = (projectId?: string) => {
       // Get application details first
       const { data: application, error: appError } = await supabase
         .from('project_applications')
-        .select('applicant_id, project_id, role_id')
+        .select('applicant_id, project_id, role_id, message')
         .eq('id', applicationId)
         .single();
 
       if (appError) throw appError;
+
+      // Handle custom role proposals: create a new role and reassign the application
+      if (status === 'accepted' && application?.message) {
+        const customRoleMatch = application.message.match(/^\[Custom Role Proposal:\s*(.+?)\]/);
+        if (customRoleMatch) {
+          const customRoleName = customRoleMatch[1].trim();
+
+          // Create a new project_role for this custom proposal
+          const { data: newRole, error: newRoleError } = await supabase
+            .from('project_roles')
+            .insert({
+              project_id: application.project_id,
+              role_name: customRoleName,
+              description: 'Custom role proposed by applicant',
+              payout_amount: 0,
+              slots_available: 1,
+              slots_filled: 0,
+            })
+            .select()
+            .single();
+
+          if (newRoleError) throw newRoleError;
+
+          // Reassign the application to the new role BEFORE status update
+          // so the trigger increments the correct role
+          const { error: reassignError } = await supabase
+            .from('project_applications')
+            .update({ role_id: newRole.id })
+            .eq('id', applicationId);
+
+          if (reassignError) throw reassignError;
+        }
+      }
 
       const { error } = await supabase
         .from('project_applications')
