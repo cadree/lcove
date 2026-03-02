@@ -120,7 +120,8 @@ export default function PublicEventPage() {
     guestRsvpMutation.mutate();
   };
 
-  const shareUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-page/e/${eventId}`;
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
+  const shareUrl = `${supabaseUrl}/functions/v1/share-page/e/${eventId}`;
 
   const handleShare = async () => {
     try {

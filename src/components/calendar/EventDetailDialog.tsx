@@ -293,7 +293,8 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
   };
 
   const handleShare = async (method: 'copy' | 'twitter' | 'native') => {
-    const shareUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-page/e/${event.id}`;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
+    const shareUrl = `${supabaseUrl}/functions/v1/share-page/e/${event.id}`;
     const shareText = `Check out "${event.title}" on ${format(eventDate, 'MMMM d')}!`;
 
     if (method === 'copy') {

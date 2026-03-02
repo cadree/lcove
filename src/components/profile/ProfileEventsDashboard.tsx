@@ -97,7 +97,8 @@ export function ProfileEventsDashboard() {
   }, [eventsWithStats]);
 
   const handleShare = async (event: EventWithStats) => {
-    const shareUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-page/e/${event.id}`;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
+    const shareUrl = `${supabaseUrl}/functions/v1/share-page/e/${event.id}`;
     try {
       if (navigator.share) {
         await navigator.share({ title: event.title, text: `Check out this event: ${event.title}`, url: shareUrl });

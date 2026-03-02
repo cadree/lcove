@@ -87,7 +87,8 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
               onClick={async (e) => {
                e.stopPropagation();
-               const shareUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-page/p/${project.id}`;
+               const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
+               const shareUrl = `${supabaseUrl}/functions/v1/share-page/p/${project.id}`;
                try {
                  if (navigator.share) {
                    await navigator.share({ title: project.title, url: shareUrl });

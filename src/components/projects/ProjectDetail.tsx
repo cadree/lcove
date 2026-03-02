@@ -304,7 +304,8 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                   size="icon"
                   className="shrink-0 -mt-1"
                   onClick={async () => {
-                    const shareUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-page/p/${project.id}`;
+                    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
+                    const shareUrl = `${supabaseUrl}/functions/v1/share-page/p/${project.id}`;
                     try {
                       if (navigator.share) {
                         await navigator.share({ title: project.title, text: `Check out this project: ${project.title}`, url: shareUrl });
