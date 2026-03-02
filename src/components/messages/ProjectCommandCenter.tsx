@@ -4,12 +4,20 @@ import { format, formatDistanceToNow, isPast } from 'date-fns';
 import {
   ChevronDown, ChevronUp, MapPin, Wrench, Package, DollarSign,
   Target, Calendar, Users, Image as ImageIcon, FileText, Play,
-  ExternalLink, Clock, CheckCircle2, Circle, AlertCircle, Sparkles
+  ExternalLink, Clock, CheckCircle2, Circle, AlertCircle, Sparkles,
+  Edit2, Plus, ClipboardList
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ProjectChatData } from '@/hooks/useProjectChatData';
+import { useCreateMilestone, useUpdateMilestoneStatus } from '@/hooks/useProjectMilestones';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import ProjectChecklist from './ProjectChecklist';
 
 interface ProjectCommandCenterProps {
   project: ProjectChatData;
@@ -44,6 +52,16 @@ const MilestoneStatusIcon = ({ status }: { status: string }) => {
 const ProjectCommandCenter = ({ project, isOwner }: ProjectCommandCenterProps) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [showAllAttachments, setShowAllAttachments] = useState(false);
+  const [editingTimeline, setEditingTimeline] = useState(false);
+  const [timelineStart, setTimelineStart] = useState(project.timeline_start || '');
+  const [timelineEnd, setTimelineEnd] = useState(project.timeline_end || '');
+  const [addingMilestone, setAddingMilestone] = useState(false);
+  const [newMilestoneTitle, setNewMilestoneTitle] = useState('');
+  const [newMilestoneDue, setNewMilestoneDue] = useState('');
+
+  const queryClient = useQueryClient();
+  const createMilestone = useCreateMilestone();
+  const updateMilestoneStatus = useUpdateMilestoneStatus();
 
   const nextMilestone = getNextMilestone(project.milestones);
   const filledRoles = project.roles.reduce((s, r) => s + r.slots_filled, 0);
@@ -58,42 +76,79 @@ const ProjectCommandCenter = ({ project, isOwner }: ProjectCommandCenterProps) =
     return formatDistanceToNow(d, { addSuffix: false }) + ' left';
   })();
 
+  // Timeline update mutation
+  const updateTimeline = useMutation({
+    mutationFn: async ({ start, end }: { start: string; end: string }) => {
+      const { error } = await supabase.from('projects')
+        .update({ timeline_start: start || null, timeline_end: end || null })
+        .eq('id', project.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-chat-data', project.id] });
+      setEditingTimeline(false);
+      toast.success('Timeline updated');
+    },
+    onError: () => toast.error('Failed to update timeline'),
+  });
+
+  const handleAddMilestone = () => {
+    if (!newMilestoneTitle.trim()) return;
+    createMilestone.mutate({
+      project_id: project.id,
+      title: newMilestoneTitle.trim(),
+      amount: 0,
+      due_date: newMilestoneDue || undefined,
+    }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['project-chat-data', project.id] });
+        setNewMilestoneTitle('');
+        setNewMilestoneDue('');
+        setAddingMilestone(false);
+      },
+    });
+  };
+
+  const cycleMilestoneStatus = (ms: ProjectChatData['milestones'][0]) => {
+    if (!isOwner) return;
+    const order = ['pending', 'in_progress', 'submitted', 'approved', 'paid'];
+    const idx = order.indexOf(ms.status);
+    const next = order[Math.min(idx + 1, order.length - 1)];
+    if (next === ms.status) return;
+    updateMilestoneStatus.mutate({
+      milestoneId: ms.id,
+      status: next as any,
+      projectId: project.id,
+    }, {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ['project-chat-data', project.id] }),
+    });
+  };
+
   return (
     <div className="border-b border-border/50 bg-card/30">
       {/* Cover Image */}
       {project.cover_image_url && (
         <div className="relative h-32 w-full overflow-hidden">
-          <img
-            src={project.cover_image_url}
-            alt={project.title}
-            className="w-full h-full object-cover"
-          />
+          <img src={project.cover_image_url} alt={project.title} className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-card/80" />
         </div>
       )}
 
-      {/* Header Bar - Always Visible */}
+      {/* Header Bar */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/20 transition-colors"
       >
         <div className="flex items-center gap-3 min-w-0">
           <Sparkles className="w-4 h-4 text-primary shrink-0" />
-          <span className="font-semibold text-sm text-foreground truncate">
-            Project Command Center
-          </span>
+          <span className="font-semibold text-sm text-foreground truncate">Project Command Center</span>
           {countdownText && (
             <Badge variant="outline" className="text-[10px] shrink-0">
-              <Clock className="w-3 h-3 mr-1" />
-              {countdownText}
+              <Clock className="w-3 h-3 mr-1" />{countdownText}
             </Badge>
           )}
         </div>
-        {isExpanded ? (
-          <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
-        ) : (
-          <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-        )}
+        {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
       </button>
 
       {/* Expandable Content */}
@@ -107,8 +162,7 @@ const ProjectCommandCenter = ({ project, isOwner }: ProjectCommandCenterProps) =
             className="overflow-hidden"
           >
             <div className="px-4 pb-4 space-y-4 max-h-[60vh] overflow-y-auto">
-
-              {/* Vision / Description */}
+              {/* Vision */}
               {project.description && (
                 <Section icon={<Target className="w-4 h-4 text-primary" />} title="Vision">
                   <p className="text-sm text-muted-foreground leading-relaxed">{project.description}</p>
@@ -130,71 +184,88 @@ const ProjectCommandCenter = ({ project, isOwner }: ProjectCommandCenterProps) =
                     ))}
                   </div>
                   {project.attachments.length > 6 && !showAllAttachments && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="mt-2 w-full text-xs text-muted-foreground"
-                      onClick={(e) => { e.stopPropagation(); setShowAllAttachments(true); }}
-                    >
+                    <Button variant="ghost" size="sm" className="mt-2 w-full text-xs text-muted-foreground"
+                      onClick={(e) => { e.stopPropagation(); setShowAllAttachments(true); }}>
                       View all {project.attachments.length} items
                     </Button>
                   )}
                 </Section>
               )}
 
-              {/* Location / Venue */}
-              {project.venue && (
-                <InfoRow icon={<MapPin className="w-3.5 h-3.5" />} label="Venue" value={project.venue} />
-              )}
+              {/* Checklist System */}
+              <Section icon={<ClipboardList className="w-4 h-4 text-primary" />} title="Checklist">
+                <ProjectChecklist projectId={project.id} isOwner={isOwner} />
+              </Section>
 
-              {/* Equipment */}
-              {project.equipment_needed && (
-                <InfoRow icon={<Wrench className="w-3.5 h-3.5" />} label="Equipment" value={project.equipment_needed} />
-              )}
+              {/* Location */}
+              {project.venue && <InfoRow icon={<MapPin className="w-3.5 h-3.5" />} label="Venue" value={project.venue} />}
+              {project.equipment_needed && <InfoRow icon={<Wrench className="w-3.5 h-3.5" />} label="Equipment" value={project.equipment_needed} />}
+              {project.props_needed && <InfoRow icon={<Package className="w-3.5 h-3.5" />} label="Props Needed" value={project.props_needed} />}
 
-              {/* Props */}
-              {project.props_needed && (
-                <InfoRow icon={<Package className="w-3.5 h-3.5" />} label="Props Needed" value={project.props_needed} />
-              )}
-
-              {/* Sponsorship & Vendors */}
+              {/* Sponsorship badges */}
               <div className="flex flex-wrap gap-2">
                 {project.sponsorship_needed && (
-                  <Badge variant="secondary" className="text-xs">
-                    <AlertCircle className="w-3 h-3 mr-1" /> Sponsorship Needed
-                  </Badge>
+                  <Badge variant="secondary" className="text-xs"><AlertCircle className="w-3 h-3 mr-1" /> Sponsorship Needed</Badge>
                 )}
                 {project.vendors_needed && (
-                  <Badge variant="secondary" className="text-xs">
-                    <Package className="w-3 h-3 mr-1" /> Vendors Needed
-                  </Badge>
+                  <Badge variant="secondary" className="text-xs"><Package className="w-3 h-3 mr-1" /> Vendors Needed</Badge>
                 )}
               </div>
 
               {/* Timeline */}
-              {(project.timeline_start || project.timeline_end) && (
-                <InfoRow
-                  icon={<Calendar className="w-3.5 h-3.5" />}
-                  label="Timeline"
-                  value={`${project.timeline_start ? format(new Date(project.timeline_start), 'MMM d') : '?'} → ${project.timeline_end ? format(new Date(project.timeline_end), 'MMM d, yyyy') : '?'}`}
-                />
+              {(project.timeline_start || project.timeline_end || isOwner) && (
+                <Section icon={<Calendar className="w-4 h-4 text-primary" />} title="Timeline"
+                  action={isOwner ? (
+                    <Button variant="ghost" size="icon" className="w-5 h-5" onClick={() => setEditingTimeline(!editingTimeline)}>
+                      <Edit2 className="w-3 h-3" />
+                    </Button>
+                  ) : undefined}
+                >
+                  {editingTimeline ? (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Input type="date" value={timelineStart} onChange={e => setTimelineStart(e.target.value)} className="h-8 text-xs" />
+                        <Input type="date" value={timelineEnd} onChange={e => setTimelineEnd(e.target.value)} className="h-8 text-xs" />
+                      </div>
+                      <Button size="sm" className="text-xs" onClick={() => updateTimeline.mutate({ start: timelineStart, end: timelineEnd })}>
+                        Save
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {project.timeline_start ? format(new Date(project.timeline_start), 'MMM d') : '?'} → {project.timeline_end ? format(new Date(project.timeline_end), 'MMM d, yyyy') : '?'}
+                    </p>
+                  )}
+                </Section>
               )}
 
               {/* Milestones */}
-              {project.milestones.length > 0 && (
-                <Section icon={<Target className="w-4 h-4 text-primary" />} title="Milestones">
+              {(project.milestones.length > 0 || isOwner) && (
+                <Section icon={<Target className="w-4 h-4 text-primary" />} title="Milestones"
+                  action={isOwner ? (
+                    <Button variant="ghost" size="icon" className="w-5 h-5" onClick={() => setAddingMilestone(!addingMilestone)}>
+                      <Plus className="w-3 h-3" />
+                    </Button>
+                  ) : undefined}
+                >
                   <div className="space-y-2">
                     {project.milestones.map(ms => (
-                      <div key={ms.id} className="flex items-center gap-2">
+                      <div key={ms.id} className={`flex items-center gap-2 ${isOwner ? 'cursor-pointer hover:bg-muted/20 rounded px-1 -mx-1' : ''}`}
+                        onClick={() => cycleMilestoneStatus(ms)}>
                         <MilestoneStatusIcon status={ms.status} />
                         <span className="text-sm flex-1 truncate">{ms.title}</span>
                         {ms.due_date && (
-                          <span className="text-[10px] text-muted-foreground">
-                            {format(new Date(ms.due_date), 'MMM d')}
-                          </span>
+                          <span className="text-[10px] text-muted-foreground">{format(new Date(ms.due_date), 'MMM d')}</span>
                         )}
                       </div>
                     ))}
+                    {addingMilestone && (
+                      <div className="space-y-2 p-2 rounded bg-muted/20">
+                        <Input placeholder="Milestone title" value={newMilestoneTitle} onChange={e => setNewMilestoneTitle(e.target.value)} className="h-8 text-xs" />
+                        <Input type="date" value={newMilestoneDue} onChange={e => setNewMilestoneDue(e.target.value)} className="h-8 text-xs" />
+                        <Button size="sm" className="text-xs" onClick={handleAddMilestone}>Add</Button>
+                      </div>
+                    )}
                   </div>
                 </Section>
               )}
@@ -215,11 +286,8 @@ const ProjectCommandCenter = ({ project, isOwner }: ProjectCommandCenterProps) =
 
               {/* Budget */}
               {(project.total_budget > 0 || project.budget_range) && (
-                <InfoRow
-                  icon={<DollarSign className="w-3.5 h-3.5" />}
-                  label="Budget"
-                  value={project.budget_range || `${project.currency} ${project.total_budget.toLocaleString()}`}
-                />
+                <InfoRow icon={<DollarSign className="w-3.5 h-3.5" />} label="Budget"
+                  value={project.budget_range || `${project.currency} ${project.total_budget.toLocaleString()}`} />
               )}
 
               {/* Roles */}
@@ -229,10 +297,7 @@ const ProjectCommandCenter = ({ project, isOwner }: ProjectCommandCenterProps) =
                     {project.roles.map(role => (
                       <div key={role.id} className="flex items-center justify-between">
                         <span className="text-sm truncate">{role.role_name}</span>
-                        <Badge
-                          variant={role.slots_filled >= role.slots_available ? 'default' : 'outline'}
-                          className="text-[10px]"
-                        >
+                        <Badge variant={role.slots_filled >= role.slots_available ? 'default' : 'outline'} className="text-[10px]">
                           {role.slots_filled}/{role.slots_available}
                         </Badge>
                       </div>
@@ -250,11 +315,12 @@ const ProjectCommandCenter = ({ project, isOwner }: ProjectCommandCenterProps) =
 
 /* ─── Sub-components ───────────────────────── */
 
-const Section = ({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) => (
+const Section = ({ icon, title, children, action }: { icon: React.ReactNode; title: string; children: React.ReactNode; action?: React.ReactNode }) => (
   <div>
     <div className="flex items-center gap-2 mb-2">
       {icon}
-      <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground">{title}</h4>
+      <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground flex-1">{title}</h4>
+      {action}
     </div>
     {children}
   </div>
@@ -269,15 +335,41 @@ const InfoRow = ({ icon, label, value }: { icon: React.ReactNode; label: string;
 );
 
 const AttachmentThumbnail = ({ attachment }: { attachment: ProjectChatData['attachments'][0] }) => {
+  const [showEmbed, setShowEmbed] = useState(false);
   const ytId = getYouTubeId(attachment.file_url);
 
   if (ytId) {
     return (
-      <a href={`https://www.youtube.com/watch?v=${ytId}`} target="_blank" rel="noopener noreferrer" className="block relative aspect-video rounded-lg overflow-hidden bg-muted group">
-        <img src={`https://img.youtube.com/vi/${ytId}/mqdefault.jpg`} alt={attachment.file_name} className="w-full h-full object-cover" />
-        <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
-          <Play className="w-6 h-6 text-white" />
-        </div>
+      <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
+        {showEmbed ? (
+          <iframe
+            src={`https://www.youtube.com/embed/${ytId}?autoplay=1`}
+            className="w-full h-full"
+            allowFullScreen
+            allow="autoplay; encrypted-media"
+            title={attachment.file_name}
+          />
+        ) : (
+          <button onClick={() => setShowEmbed(true)} className="block w-full h-full group">
+            <img src={`https://img.youtube.com/vi/${ytId}/mqdefault.jpg`} alt={attachment.file_name} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
+              <Play className="w-8 h-8 text-white" />
+            </div>
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (attachment.file_type === 'pdf' || attachment.file_type === 'doc') {
+    return (
+      <a href={attachment.file_url} target="_blank" rel="noopener noreferrer"
+        className="block aspect-square rounded-lg overflow-hidden bg-muted/50 border border-border/50 hover:bg-muted transition-colors">
+        <iframe
+          src={`https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(attachment.file_url)}`}
+          className="w-full h-full pointer-events-none"
+          title={attachment.file_name}
+        />
       </a>
     );
   }
@@ -290,17 +382,17 @@ const AttachmentThumbnail = ({ attachment }: { attachment: ProjectChatData['atta
     );
   }
 
-  if (attachment.file_type === 'pdf' || attachment.file_type === 'doc') {
+  if (attachment.file_type === 'video') {
     return (
-      <a href={attachment.file_url} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center justify-center aspect-square rounded-lg bg-muted/50 border border-border/50 hover:bg-muted transition-colors p-2">
-        <FileText className="w-6 h-6 text-primary mb-1" />
-        <span className="text-[10px] text-muted-foreground text-center truncate w-full">{attachment.file_name}</span>
-      </a>
+      <div className="aspect-video rounded-lg overflow-hidden bg-muted">
+        <video src={attachment.file_url} controls className="w-full h-full object-cover" />
+      </div>
     );
   }
 
   return (
-    <a href={attachment.file_url} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center justify-center aspect-square rounded-lg bg-muted/50 border border-border/50 hover:bg-muted transition-colors p-2">
+    <a href={attachment.file_url} target="_blank" rel="noopener noreferrer"
+      className="flex flex-col items-center justify-center aspect-square rounded-lg bg-muted/50 border border-border/50 hover:bg-muted transition-colors p-2">
       <ExternalLink className="w-5 h-5 text-muted-foreground mb-1" />
       <span className="text-[10px] text-muted-foreground text-center truncate w-full">{attachment.file_name}</span>
     </a>
