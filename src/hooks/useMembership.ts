@@ -80,7 +80,21 @@ export const useMembership = () => {
 
       if (error) throw error;
       if (data?.url) {
-        window.location.href = data.url;
+        // Try window.open first, then location.href, then show manual link
+        const win = window.open(data.url, "_blank");
+        if (!win || win.closed) {
+          try {
+            window.location.href = data.url;
+          } catch {
+            toast.info("Click the link to complete checkout", {
+              duration: 15000,
+              action: {
+                label: "Open Checkout",
+                onClick: () => window.open(data.url, "_blank"),
+              },
+            });
+          }
+        }
       }
     } catch (error) {
       console.error("Error starting checkout:", error);
@@ -108,7 +122,20 @@ export const useMembership = () => {
 
       if (error) throw error;
       if (data?.url) {
-        window.location.href = data.url;
+        const win = window.open(data.url, "_blank");
+        if (!win || win.closed) {
+          try {
+            window.location.href = data.url;
+          } catch {
+            toast.info("Click the link to manage your subscription", {
+              duration: 15000,
+              action: {
+                label: "Open Portal",
+                onClick: () => window.open(data.url, "_blank"),
+              },
+            });
+          }
+        }
       }
     } catch (error) {
       console.error("Error opening portal:", error);
