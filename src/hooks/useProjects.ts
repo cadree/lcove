@@ -280,6 +280,37 @@ export const useProjects = (status?: string) => {
           });
       }
 
+      // Auto-create project groupchat
+      try {
+        const { data: newConversation, error: convError } = await supabase
+          .from('conversations')
+          .insert({
+            type: 'group',
+            name: data.title,
+            description: data.description || `Project group chat for ${data.title}`,
+            avatar_url: data.cover_image_url || null,
+            created_by: user.id,
+            visibility: 'private',
+            project_id: project.id
+          } as any)
+          .select('id')
+          .single();
+
+        if (!convError && newConversation) {
+          // Add creator as owner participant
+          await supabase
+            .from('conversation_participants')
+            .insert({
+              conversation_id: newConversation.id,
+              user_id: user.id,
+              role: 'owner',
+              project_role_name: 'Project Creator'
+            } as any);
+        }
+      } catch (chatErr) {
+        console.error('Failed to create project groupchat:', chatErr);
+      }
+
       // Get creator name for notification
       const { data: profile } = await supabase
         .from('profiles')
@@ -589,7 +620,7 @@ export const useProjectApplications = (projectId?: string) => {
         const finalProjectTitle = projectTitle || project?.title || 'a project';
         const finalRoleTitle = roleTitle || role?.role_name || 'a role';
 
-        // Check if project group chat already exists
+        // Find existing project group chat
         let { data: existingConversation } = await (supabase
           .from('conversations')
           .select('id') as any)
@@ -597,44 +628,11 @@ export const useProjectApplications = (projectId?: string) => {
           .eq('type', 'group')
           .maybeSingle();
 
-        let conversationId = existingConversation?.id;
-
-        // Create project group chat if it doesn't exist
-        if (!conversationId && project) {
-          const { data: newConversation, error: convError } = await supabase
-            .from('conversations')
-            .insert({
-              type: 'group',
-              name: finalProjectTitle,
-              description: project.description || `Project group chat for ${finalProjectTitle}`,
-              avatar_url: project.cover_image_url,
-              created_by: project.creator_id,
-              visibility: 'private',
-              project_id: application.project_id
-            } as any)
-            .select('id')
-            .single();
-
-          if (convError) {
-            console.error('Failed to create project conversation:', convError);
-          } else {
-            conversationId = newConversation?.id;
-
-            // Add project creator as owner
-            await supabase
-              .from('conversation_participants')
-              .insert({
-                conversation_id: conversationId,
-                user_id: project.creator_id,
-                role: 'owner',
-                project_role_name: 'Project Creator'
-              } as any);
-          }
-        }
+        const conversationId = existingConversation?.id;
 
         // Add accepted applicant to the group chat
         if (conversationId) {
-          // Check if user is already a participant
+          // Check if user is already a participant (prevent duplicates)
           const { data: existingParticipant } = await supabase
             .from('conversation_participants')
             .select('id')
@@ -652,7 +650,7 @@ export const useProjectApplications = (projectId?: string) => {
                 project_role_name: finalRoleTitle
               } as any);
 
-            // Send welcome message to the group - use profiles_public view
+            // Send system join message
             const { data: applicantProfile } = await supabase
               .from('profiles_public')
               .select('display_name')
@@ -664,7 +662,7 @@ export const useProjectApplications = (projectId?: string) => {
               .insert({
                 conversation_id: conversationId,
                 sender_id: project?.creator_id || user?.id,
-                content: `🎉 Welcome ${applicantProfile?.display_name || 'New member'} to the team as ${finalRoleTitle}!`
+                content: `🎉 ${applicantProfile?.display_name || 'New member'} joined the project as ${finalRoleTitle}`
               });
           }
         }
