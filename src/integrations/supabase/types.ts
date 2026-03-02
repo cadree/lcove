@@ -6182,6 +6182,14 @@ export type Database = {
       }
     }
     Functions: {
+      accept_custom_role_proposal: {
+        Args: {
+          p_application_id: string
+          p_custom_role_name: string
+          p_reviewer_id: string
+        }
+        Returns: string
+      }
       calculate_reputation_score: {
         Args: { p_user_id: string }
         Returns: number
