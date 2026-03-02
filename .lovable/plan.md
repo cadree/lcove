@@ -1,147 +1,82 @@
 
-# Projects Feature Upgrade Plan
 
-This is a major expansion of the Projects system across database, creation flow, detail view, and public visibility. Due to the scope, this will be broken into phases.
+# Projects Section Audit & Fix Plan
 
----
+## Issues Identified
 
-## Phase 1: Database Schema Additions
-
-New tables and columns needed via migration:
-
-### `projects` table -- new columns:
-- `expected_outcome` (text) -- Portfolio piece, Paid production, Experimental, Community collab
-- `budget_range` (text) -- e.g. "$0-500", "$500-2000", etc.
-- `equipment_needed` (text)
-- `location_secured` (boolean, default false)
-- `venue` (text)
-- `props_needed` (text)
-- `sponsorship_needed` (boolean, default false)
-- `vendors_needed` (boolean, default false)
-- `progress_percent` (integer, default 0)
-- `is_moodboard_public` (boolean, default false)
-- `deliverables` (jsonb) -- array of deliverable objects (type, publish_date, publish_location)
-- `allow_custom_roles` (boolean, default false)
-
-### New table: `project_attachments`
-- `id` (uuid, PK)
-- `project_id` (uuid, FK to projects)
-- `uploaded_by` (uuid, FK reference)
-- `file_url` (text)
-- `file_name` (text)
-- `file_type` (text) -- image, pdf, video, doc, link, zip
-- `file_size` (bigint, nullable)
-- `created_at` (timestamptz)
-
-RLS: Creator can insert/delete own attachments. Authenticated users can select attachments for any project.
-
-### New table: `project_updates`
-- `id` (uuid, PK)
-- `project_id` (uuid, FK)
-- `author_id` (uuid)
-- `content` (text)
-- `created_at` (timestamptz)
-
-RLS: Creator can insert. Authenticated users can select.
-
-### Modify `project_milestones` -- add a `phase` column:
-- `phase` (text, nullable) -- pre_production, production, post_production, final_delivery, custom
-
-### Add calendar event on project creation
-- Insert a public event into the `events` table when a project is created (using the project's timeline).
+1. **No file preview for non-image files** -- PDFs, docs, ZIPs only show a generic icon with no meaningful preview
+2. **Download button opens in new tab instead of downloading** -- The current `<a href target="_blank">` just navigates; it doesn't trigger a file download
+3. **YouTube links not playable** -- Video links are displayed as static icons instead of embedded players
+4. **No image lightbox/fullscreen view** -- Clicking an image does nothing; users can't zoom in
+5. **Project Card missing cover image preview** -- Cards don't show uploaded images as a visual banner
 
 ---
 
-## Phase 2: Enhanced Create Project Dialog
+## Fix 1: File Preview Thumbnails
 
-Update `CreateProjectDialog.tsx` to add the following sections in order:
-
-1. **Expected Outcome** -- multi-select chips: Portfolio piece, Paid production, Experimental, Community collab
-2. **Visual References / Mood Board** (upgrade existing):
-   - Support multiple file uploads (images, PDFs, videos, docs, ZIPs)
-   - Support pasting external links (Google Drive, Figma, YouTube)
-   - Show preview thumbnails with file type badges
-   - Drag-and-drop area
-   - "Make Mood Board Public" toggle
-3. **Budget & Resources** section:
-   - Budget Range dropdown
-   - Equipment Needed (text)
-   - Location Secured toggle + Venue text input
-   - Props Needed (text)
-   - Sponsorship Needed toggle
-   - Vendors Needed toggle
-4. **Roles** -- add "Allow applicants to define their own role" toggle
-5. **Timeline with Milestones**:
-   - Keep start/end dates
-   - Add milestone entries: Pre-production, Production, Post-production, Final Delivery
-   - Allow adding custom milestones with title + due date
-6. **Deliverables** section:
-   - What will be delivered (multi-select): Photos, Film, Edited reels, Final garment, Event
-   - Expected publish date
-   - Where it will be published (text)
+Enhance the Mood Board tab in `ProjectDetail.tsx`:
+- **Images**: Show full preview thumbnails (already works, keep as-is)
+- **PDFs**: Show a PDF icon with the filename clearly visible and a "Preview" badge
+- **Videos (uploaded)**: Show a play icon overlay on a muted-foreground background
+- **YouTube/video links**: Embed a YouTube iframe player or show a clickable thumbnail that opens the video
+- **Links (Figma, Drive)**: Show a recognizable icon (Figma logo placeholder, Drive icon) with the URL domain
 
 ---
 
-## Phase 3: Enhanced Project Detail View
+## Fix 2: Working Download Button
 
-Update `ProjectDetail.tsx` to show all new data:
-
-1. **Mood Board / Attachments tab** -- grid of uploaded files with:
-   - Preview thumbnails (images inline, icons for docs/PDFs)
-   - File type badges
-   - Download button for collaborators
-2. **Budget & Resources section** -- display equipment, venue, sponsorship needs
-3. **Expected Outcome badges**
-4. **Timeline with Milestones visual** -- vertical timeline showing phases with status indicators
-5. **Deliverables section** -- list of expected outputs
-6. **Progress Tracking**:
-   - Status badge (already exists)
-   - Progress slider (owner only can edit)
-   - Update log tab -- chronological list of project updates
-7. **Custom role application** -- if `allow_custom_roles` is true, show a text input where applicants can propose their own role name
+Replace the current `<a href target="_blank">` with a proper download mechanism:
+- For storage files: Use `download` attribute on the anchor tag plus set the filename
+- For external links: Open in new tab (can't force download on external URLs)
+- Add a visible "Download" label next to the icon for clarity
 
 ---
 
-## Phase 4: Calendar Integration
+## Fix 3: Embedded YouTube Player
 
-When a project is created with a `timeline_start`:
-- Automatically insert a public event into the `events` table
-- Title: project title
-- Date: timeline_start
-- Description: project description
-- Link back to the project
+When an attachment has `file_type === 'video'` and the `file_url` contains `youtube.com` or `youtu.be`:
+- Extract the YouTube video ID from the URL
+- Render an embedded `<iframe>` player with the YouTube embed URL
+- For non-YouTube video links, show a clickable link that opens in a new tab
 
 ---
 
-## Phase 5: Project Card Updates
+## Fix 4: Image Preview on Project Cards
 
-Update `ProjectCard.tsx` to show:
-- Progress bar (using `progress_percent`)
-- Expected outcome badge
-- Attachment count indicator
+Update `ProjectCard.tsx`:
+- If `cover_image_url` exists, show it as a banner image at the top of the card
+- Use `object-cover` with a fixed aspect ratio for consistency
+
+---
+
+## Fix 5: Full Audit Fixes
+
+- **Custom role proposal** -- The "Propose Your Own Role" section collects input but never submits it (no submit button or mutation). Add a submit handler.
+- **Attachment upload by collaborators** -- Currently only the creator uploads during creation. Add an upload button in the Mood Board tab for the creator to add more files after creation.
+- **Progress slider debounce** -- The progress slider fires on every change. Add a debounced save to avoid excessive API calls.
 
 ---
 
 ## Technical Details
 
-### Files to create:
-- `src/hooks/useProjectAttachments.ts` -- CRUD for attachments
-- `src/hooks/useProjectUpdates.ts` -- CRUD for update log
-
 ### Files to modify:
-- `src/integrations/supabase/types.ts` -- auto-updated after migration
-- `src/components/projects/CreateProjectDialog.tsx` -- major expansion
-- `src/components/projects/ProjectDetail.tsx` -- major expansion
-- `src/components/projects/ProjectCard.tsx` -- minor updates
-- `src/hooks/useProjects.ts` -- add new fields to create/query
-- `src/hooks/useProjectMilestones.ts` -- add phase field
+- `src/components/projects/ProjectDetail.tsx` -- Major: fix download, add YouTube embed, improve file previews, add post-creation upload, fix custom role submit
+- `src/components/projects/ProjectCard.tsx` -- Minor: add cover image banner
+- `src/hooks/useProjectAttachments.ts` -- Already has upload/delete mutations (no changes needed)
 
-### Database migration:
-- One migration adding all new columns, tables, and RLS policies
-- Storage: use existing `media` bucket with path `project-attachments/{user_id}/...`
+### YouTube embed helper:
+```text
+function getYouTubeId(url: string): string | null {
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([a-zA-Z0-9_-]{11})/);
+  return match ? match[1] : null;
+}
+```
 
-### Considerations:
-- File uploads use the existing `media` storage bucket with user-id-prefixed paths for RLS compliance
-- Deliverables stored as JSONB to keep schema flexible
-- Progress percent is manually set by project owner via a slider
-- Calendar event creation happens in the `createProject` mutation after project insert
+### Download approach:
+```text
+For storage files: <a href={url} download={filename}>
+For external links: <a href={url} target="_blank" rel="noopener">
+```
+
+### No database changes required -- all fixes are frontend-only.
+
