@@ -293,6 +293,44 @@ export function useConversations() {
     },
   });
 
+  // Delete entire conversation (remove all messages then conversation)
+  const deleteConversation = useMutation({
+    mutationFn: async (conversationId: string) => {
+      if (!user) throw new Error('Must be logged in');
+
+      // Delete all messages in conversation
+      const { error: msgError } = await supabase
+        .from('messages')
+        .delete()
+        .eq('conversation_id', conversationId);
+
+      if (msgError) throw msgError;
+
+      // Delete all participants
+      const { error: partError } = await supabase
+        .from('conversation_participants')
+        .delete()
+        .eq('conversation_id', conversationId);
+
+      if (partError) throw partError;
+
+      // Delete the conversation itself
+      const { error: convError } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversationId);
+
+      if (convError) throw convError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      toast.success('Conversation deleted');
+    },
+    onError: () => {
+      toast.error('Failed to delete conversation');
+    },
+  });
+
   // Real-time subscription for conversation updates
   useEffect(() => {
     if (!user) return;
@@ -323,6 +361,7 @@ export function useConversations() {
     createGroupConversation,
     toggleMute,
     leaveConversation,
+    deleteConversation,
     refetch,
   };
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
-import { Search, Plus, Users, MoreVertical, BellOff, Bell, MessageSquare } from 'lucide-react';
+import { Search, Plus, Users, MoreVertical, BellOff, Bell, MessageSquare, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConversations } from '@/hooks/useConversations';
 import { usePresence } from '@/hooks/usePresence';
@@ -20,11 +20,12 @@ interface ConversationListProps {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onNewChat: () => void;
+  onDeleteConversation?: (id: string) => void;
 }
 
-const ConversationList = ({ selectedId, onSelect, onNewChat }: ConversationListProps) => {
+const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversation }: ConversationListProps) => {
   const { user } = useAuth();
-  const { conversations, isLoading, toggleMute } = useConversations();
+  const { conversations, isLoading, toggleMute, deleteConversation } = useConversations();
   const { isOnline } = usePresence();
   const [search, setSearch] = useState('');
 
@@ -217,6 +218,21 @@ const ConversationList = ({ selectedId, onSelect, onNewChat }: ConversationListP
                           Mute
                         </>
                       )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm('Delete this entire conversation? This cannot be undone.')) {
+                          deleteConversation.mutate(conv.id);
+                          if (selectedId === conv.id && onDeleteConversation) {
+                            onDeleteConversation(conv.id);
+                          }
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Chat
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

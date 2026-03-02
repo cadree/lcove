@@ -80,6 +80,7 @@ const Messages = () => {
             selectedId={selectedConversation}
             onSelect={setSelectedConversation}
             onNewChat={() => setShowNewChat(true)}
+            onDeleteConversation={() => setSelectedConversation(null)}
           />
         </motion.div>
 
