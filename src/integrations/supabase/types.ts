@@ -4394,6 +4394,47 @@ export type Database = {
           },
         ]
       }
+      project_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_type: string
+          file_url: string
+          id: string
+          project_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_type?: string
+          file_url: string
+          id?: string
+          project_id: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string
+          file_url?: string
+          id?: string
+          project_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_attachments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_milestones: {
         Row: {
           amount: number
@@ -4405,6 +4446,7 @@ export type Database = {
           due_date: string | null
           id: string
           paid_at: string | null
+          phase: string | null
           project_id: string
           role_id: string | null
           status: string
@@ -4423,6 +4465,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           paid_at?: string | null
+          phase?: string | null
           project_id: string
           role_id?: string | null
           status?: string
@@ -4441,6 +4484,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           paid_at?: string | null
+          phase?: string | null
           project_id?: string
           role_id?: string | null
           status?: string
@@ -4510,48 +4554,116 @@ export type Database = {
           },
         ]
       }
+      project_updates: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          project_id: string
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string
+          id?: string
+          project_id: string
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_updates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
+          allow_custom_roles: boolean
+          budget_range: string | null
           cover_image_url: string | null
           created_at: string
           creator_id: string
           currency: string
+          deliverables: Json | null
           description: string | null
+          equipment_needed: string | null
+          expected_outcome: string | null
           id: string
+          is_moodboard_public: boolean
+          location_secured: boolean
+          progress_percent: number
+          props_needed: string | null
+          sponsorship_needed: boolean
           status: string
           timeline_end: string | null
           timeline_start: string | null
           title: string
           total_budget: number
           updated_at: string
+          vendors_needed: boolean
+          venue: string | null
         }
         Insert: {
+          allow_custom_roles?: boolean
+          budget_range?: string | null
           cover_image_url?: string | null
           created_at?: string
           creator_id: string
           currency?: string
+          deliverables?: Json | null
           description?: string | null
+          equipment_needed?: string | null
+          expected_outcome?: string | null
           id?: string
+          is_moodboard_public?: boolean
+          location_secured?: boolean
+          progress_percent?: number
+          props_needed?: string | null
+          sponsorship_needed?: boolean
           status?: string
           timeline_end?: string | null
           timeline_start?: string | null
           title: string
           total_budget?: number
           updated_at?: string
+          vendors_needed?: boolean
+          venue?: string | null
         }
         Update: {
+          allow_custom_roles?: boolean
+          budget_range?: string | null
           cover_image_url?: string | null
           created_at?: string
           creator_id?: string
           currency?: string
+          deliverables?: Json | null
           description?: string | null
+          equipment_needed?: string | null
+          expected_outcome?: string | null
           id?: string
+          is_moodboard_public?: boolean
+          location_secured?: boolean
+          progress_percent?: number
+          props_needed?: string | null
+          sponsorship_needed?: boolean
           status?: string
           timeline_end?: string | null
           timeline_start?: string | null
           title?: string
           total_budget?: number
           updated_at?: string
+          vendors_needed?: boolean
+          venue?: string | null
         }
         Relationships: []
       }

@@ -12,6 +12,7 @@ export interface ProjectMilestone {
   amount: number;
   currency: string;
   status: 'pending' | 'in_progress' | 'submitted' | 'approved' | 'paid';
+  phase: string | null;
   due_date: string | null;
   submitted_at: string | null;
   approved_at: string | null;
