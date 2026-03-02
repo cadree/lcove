@@ -1,155 +1,83 @@
 
 
-# Project Groupchat Upgrades -- Implementation Plan
+## Plan: Fix Share Buttons + Add Rich Open Graph Link Previews
 
-This is a large, multi-part feature set. To keep it manageable and shippable, I'll break it into phases with clear deliverables.
+### Part 1: Fix Broken Share Buttons
 
----
+**Problem**: The share buttons in "My Events" (ProfileEventsDashboard) and EventsDashboard use the old sharing pattern without the multi-layered fallback chain, and they link to `/calendar?event=` instead of the public `/event/` route.
 
-## Phase 1: Database Schema (Migration)
-
-Create a new `project_checklist_items` table and an `item_suggestions` table to support the structured checklist and suggestion systems.
-
-### New Tables
-
-**`project_checklist_items`**
-- `id` (uuid, PK)
-- `project_id` (uuid, FK to projects, NOT NULL)
-- `category` (text, NOT NULL) -- 'props', 'equipment', 'other'
-- `name` (text, NOT NULL)
-- `assigned_user_id` (uuid, nullable, FK concept)
-- `status` (text, default 'unclaimed') -- 'unclaimed', 'claimed', 'completed'
-- `notes` (text, nullable)
-- `created_by` (uuid, NOT NULL)
-- `created_at`, `updated_at` (timestamptz)
-- RLS: participants of the project's groupchat can SELECT; owner can INSERT/UPDATE/DELETE; any participant can UPDATE own assignment
-
-**`project_item_suggestions`**
-- `id` (uuid, PK)
-- `project_id` (uuid, NOT NULL)
-- `suggested_by` (uuid, NOT NULL)
-- `category` (text, NOT NULL)
-- `name` (text, NOT NULL)
-- `notes` (text, nullable)
-- `status` (text, default 'pending') -- 'pending', 'approved', 'denied'
-- `reviewed_by` (uuid, nullable)
-- `created_at` (timestamptz)
-
-Enable realtime on both tables.
+**Fix** (3 files):
+- `src/components/profile/ProfileEventsDashboard.tsx` -- Update `handleShare` to use `/event/${event.id}` URL and the standard fallback chain (try `navigator.share`, then `clipboard.writeText`, then `window.prompt`)
+- `src/pages/EventsDashboard.tsx` -- Same fix as above
+- `src/pages/PublicEventPage.tsx` -- Apply the same fallback chain to `handleShare` and `handleCopy`
 
 ---
 
-## Phase 2: Fix Moodboard and File Previews
+### Part 2: Rich Open Graph (OG) Link Previews
 
-### File: `src/components/messages/ProjectCommandCenter.tsx`
+**Challenge**: This is a client-side React SPA. Social crawlers (iMessage, Discord, X, Facebook) do NOT execute JavaScript, so they can't see dynamically-rendered meta tags. The only solution is a server-rendered HTML response.
 
-**YouTube**: Change from link-only thumbnail to an inline `<iframe>` embed that actually plays. Use `https://www.youtube.com/embed/{id}` with `allowFullScreen`. Keep the thumbnail as fallback with a play button that swaps to iframe on click.
+**Approach**: Create a backend function called `share-page` that:
+1. Receives a request like `/share-page/e/{eventId}` or `/share-page/p/{projectId}`
+2. Fetches entity data from the database
+3. Returns a full HTML page with correct OG meta tags
+4. Includes a JavaScript redirect so real users are sent to the SPA immediately
+5. Social crawlers (which don't run JS) get the OG tags they need
 
-**PDFs**: Replace the plain FileText icon with a Google Docs Viewer iframe preview:
+**Supported entity types**:
+| Type | Path | SPA redirect |
+|------|------|-------------|
+| Event | `/share-page/e/{id}` | `/event/{id}` |
+| Project | `/share-page/p/{id}` | `/project/{id}` |
+| Profile | `/share-page/u/{id}` | `/profile/{id}` |
+
+**What the edge function does**:
+- Parse the path to determine entity type and ID
+- Query the database for the entity's title, description, and image
+- Return HTML with proper OG tags (og:title, og:description, og:image, og:url, twitter:card)
+- Use a branded default image if no cover image exists (the existing `/favicon.png`)
+- For missing/private entities, return generic ETHER branding with no sensitive info leaked
+- Include `<meta http-equiv="refresh">` and `<script>window.location.href=...</script>` to redirect real users
+
+**Share URL generation update**:
+All share actions across the app will generate URLs pointing to the edge function:
 ```
-https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(fileUrl)}
+https://{supabase-url}/functions/v1/share-page/e/{eventId}
 ```
-Render inside a small aspect-ratio container. Click opens full URL in new tab.
 
-**Images**: Already working -- verify storage URLs are from the public `media` bucket (they are). No changes needed.
+This URL is what gets pasted into iMessage, Discord, etc. Crawlers see OG tags; real users get redirected to the SPA.
 
-**Video in chat messages**: The `ChatView.tsx` already renders `<video>` for `media_type === 'video'`. The `MessageComposer` already accepts `video/*` in the file input. This is already functional.
+**Files to update for share URL generation**:
+- `src/components/profile/ProfileEventsDashboard.tsx`
+- `src/pages/EventsDashboard.tsx`
+- `src/pages/PublicEventPage.tsx`
+- `src/components/projects/ProjectDetail.tsx`
+- `src/components/projects/ProjectCard.tsx`
+- `src/pages/PublicProjectPage.tsx`
 
----
+**New files**:
+- `supabase/functions/share-page/index.ts` -- The edge function
+- Config entry in `supabase/config.toml` with `verify_jwt = false` (must be publicly accessible)
 
-## Phase 3: Structured Checklist System
+**OG Image Standard**:
+- Use entity cover image directly when available (absolute URL from storage)
+- Fall back to `/favicon.png` hosted on the published domain
+- All images will be publicly accessible URLs
 
-### New Hook: `src/hooks/useProjectChecklist.ts`
-- `useProjectChecklist(projectId)` -- query all checklist items for a project
-- `useCreateChecklistItem()` -- owner-only mutation
-- `useClaimChecklistItem()` -- any participant can claim unclaimed items
-- `useCompleteChecklistItem()` -- assigned user can mark complete
-- `useDeleteChecklistItem()` -- owner-only
-- Realtime subscription on `project_checklist_items`
+**Privacy/Security**:
+- Only public events (`is_public = true`) and published projects get full OG tags
+- Private/draft items get generic "View on ETHER" metadata with the default brand image
+- No sensitive data (budgets, participant info) in OG tags
 
-### New Component: `src/components/messages/ProjectChecklist.tsx`
-- Renders inside `ProjectCommandCenter` under Equipment and Props sections
-- Groups items by `category` (Props, Equipment, Other)
-- Each item shows: name, status badge, assigned user avatar+name, notes
-- "Take Responsibility" button on unclaimed items
-- "Mark Complete" button for the assigned user
-- Owner sees delete/edit controls
-- "+ Suggest Item" button for non-owner members (opens a small inline form)
+### Technical Details
 
-### New Hook: `src/hooks/useItemSuggestions.ts`
-- `useItemSuggestions(projectId)` -- owner sees pending suggestions
-- `useSuggestItem()` -- any member can suggest
-- `useReviewSuggestion()` -- owner approves/denies; on approve, auto-creates checklist item
+**Edge function `share-page/index.ts`** structure:
+```text
+Request --> Parse path (/e/, /p/, /u/)
+        --> Query DB for entity
+        --> Build OG HTML response
+        --> Return with Content-Type: text/html
+```
 
----
-
-## Phase 4: Owner Timeline Editing
-
-### File: `src/components/messages/ProjectCommandCenter.tsx`
-- When `isOwner` is true, show edit icons next to Timeline and Milestones sections
-- Clicking edit opens an inline form or small dialog to:
-  - Edit start/end dates (date pickers)
-  - Add new milestones (title + due date)
-  - Change milestone status (dropdown)
-- Uses existing `useProjectMilestones` mutations (`useCreateMilestone`, `useUpdateMilestoneStatus`) from `src/hooks/useProjectMilestones.ts`
-- Timeline date changes update the project record directly via a new `useUpdateProjectTimeline` mutation in `useProjectChatData.ts`
-- On save, send a system message to the groupchat: "Timeline updated by [Owner]"
-- Invalidate `project-chat-data` query on success
-
----
-
-## Phase 5: Fix "Unknown" Profile Name Bug
-
-### File: `src/components/messages/ChatView.tsx` (line 335)
-- Current code shows `msg.profile?.display_name || 'Unknown'`
-- The `useMessages` hook already joins `profiles_public` -- the issue is likely that some users don't have a `profiles` row or `display_name` is null
-- Fix: Change fallback from `'Unknown'` to a more descriptive fallback that tries the participant list profile too
-- In `useMessages.ts`, if `profiles_public` returns null for display_name, fall back to checking `conversation_participants` profile data
-- Also ensure `handle_new_user()` trigger creates a profile row on signup (already exists in DB functions)
-
----
-
-## Phase 6: Presence Indicators in Groupchat Header
-
-### File: `src/components/messages/ChatView.tsx`
-- Already imports `usePresence` and `OnlineIndicator`
-- For project chats, add a small row of participant avatars with online indicators below the header
-- Show online count: "3 of 7 online"
-- Use existing `PresenceProvider` and `usePresence` hook
-
----
-
-## Phase 7: Notification Improvements
-
-### File: `src/hooks/useProjectChecklist.ts`
-- On checklist claim/complete, insert into `notifications` table for relevant users
-- On suggestion submitted, notify owner
-- On suggestion approved/denied, notify suggester
-
-### File: `src/components/messages/ProjectCommandCenter.tsx`
-- On milestone status change, insert notification for all participants
-- On timeline edit, insert notification for all participants
-
-This uses the existing `notifications` table and the existing `NotificationBell` component picks them up automatically.
-
----
-
-## Files Changed Summary
-
-### New files (4):
-1. `src/hooks/useProjectChecklist.ts` -- Checklist CRUD + realtime
-2. `src/hooks/useItemSuggestions.ts` -- Suggestion system
-3. `src/components/messages/ProjectChecklist.tsx` -- Checklist UI
-4. Database migration SQL -- New tables + RLS + realtime
-
-### Modified files (3):
-1. `src/components/messages/ProjectCommandCenter.tsx` -- YouTube iframe embeds, PDF viewer, checklist integration, owner edit controls for timeline/milestones
-2. `src/components/messages/ChatView.tsx` -- Presence bar for group chats, fix "Unknown" fallback
-3. `src/hooks/useProjectChatData.ts` -- Add `useUpdateProjectTimeline` mutation
-
-### Existing functionality preserved:
-- Video uploads already work via MessageComposer
-- Presence system already exists via `usePresence`
-- Profile creation trigger already exists (`handle_new_user`)
-- Realtime subscriptions for messages/participants already in place
+**Helper**: A shared `buildOgHtml()` function that takes title, description, imageUrl, canonicalUrl and returns a complete HTML string with all meta tags + redirect script.
 
