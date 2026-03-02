@@ -12,11 +12,13 @@ import { useMessages } from '@/hooks/useMessages';
 import { useConversations } from '@/hooks/useConversations';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { usePresence } from '@/hooks/usePresence';
+import { useProjectChatData } from '@/hooks/useProjectChatData';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { OnlineIndicator } from '@/components/ui/online-indicator';
 import MessageComposer from './MessageComposer';
+import ProjectCommandCenter from './ProjectCommandCenter';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -24,11 +26,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 
 interface ChatViewProps {
   conversationId: string;
@@ -51,11 +48,16 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   const { blockUser } = useUserBlocks();
   const { isOnline } = usePresence();
   
+  const conversation = conversations.find(c => c.id === conversationId);
+  const isProjectChat = !!(conversation as any)?.project_id;
+  const projectId = isProjectChat ? (conversation as any)?.project_id : null;
+  const { data: projectChatData } = useProjectChatData(projectId);
+  const isOwner = !!(projectChatData && user && projectChatData.creator_id === user.id);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [showProjectInfo, setShowProjectInfo] = useState(false);
 
-  const conversation = conversations.find(c => c.id === conversationId);
   
   // Get the other participant's user ID for direct messages
   const getOtherUserId = () => {
@@ -66,7 +68,6 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   
   const otherUserId = getOtherUserId();
   const isMuted = conversation?.participants?.find(p => p.user_id === user?.id)?.is_muted || false;
-  const isProjectChat = !!(conversation as any)?.project_id;
   const project = (conversation as any)?.project;
 
   const getConversationName = () => {
@@ -273,68 +274,10 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
         </div>
       </div>
 
-      {/* Project Info Panel */}
-      <AnimatePresence>
-        {isProjectChat && showProjectInfo && project && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="border-b border-border/50 bg-muted/30 overflow-hidden"
-          >
-            <div className="p-4 space-y-4">
-              {/* Project Details */}
-              <div>
-                <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
-                  <Info className="w-4 h-4 text-primary" />
-                  Project Details
-                </h4>
-                {project.description && (
-                  <p className="text-sm text-muted-foreground">{project.description}</p>
-                )}
-                {(project.timeline_start || project.timeline_end) && (
-                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                    <Calendar className="w-3 h-3" />
-                    <span>
-                      {project.timeline_start && format(new Date(project.timeline_start), 'MMM d')}
-                      {project.timeline_start && project.timeline_end && ' - '}
-                      {project.timeline_end && format(new Date(project.timeline_end), 'MMM d, yyyy')}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Team Members with Roles */}
-              <div>
-                <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
-                  <Users className="w-4 h-4 text-primary" />
-                  Team ({conversation?.participants?.length || 0})
-                </h4>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {conversation?.participants?.map((participant) => (
-                    <div key={participant.user_id} className="flex items-center gap-2">
-                      <Avatar className="w-6 h-6">
-                        <AvatarImage src={participant.profile?.avatar_url || undefined} />
-                        <AvatarFallback className="text-xs bg-muted">
-                          {participant.profile?.display_name?.charAt(0) || '?'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm flex-1 truncate">
-                        {participant.profile?.display_name || 'Unknown'}
-                      </span>
-                      {getParticipantRole(participant) && (
-                        <Badge variant="outline" className="text-xs">
-                          {getParticipantRole(participant)}
-                        </Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Project Command Center */}
+      {isProjectChat && projectChatData && (
+        <ProjectCommandCenter project={projectChatData} isOwner={isOwner} />
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">

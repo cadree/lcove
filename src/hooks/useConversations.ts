@@ -304,6 +304,11 @@ export function useConversations() {
         { event: '*', schema: 'public', table: 'messages' },
         () => refetch()
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'conversation_participants' },
+        () => refetch()
+      )
       .subscribe();
 
     return () => {
