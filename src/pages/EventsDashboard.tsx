@@ -102,20 +102,18 @@ export default function EventsDashboard() {
   }, [eventsWithStats]);
 
   const handleShare = async (event: EventWithStats) => {
-    const url = `${window.location.origin}/calendar?event=${event.id}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: event.title,
-          text: `Check out this event: ${event.title}`,
-          url,
-        });
-      } catch {
-        // User cancelled
+    const shareUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-page/e/${event.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: event.title, text: `Check out this event: ${event.title}`, url: shareUrl });
+        return;
       }
-    } else {
-      await navigator.clipboard.writeText(url);
-      toast.success("Link copied to clipboard");
+    } catch {}
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success("Link copied!");
+    } catch {
+      window.prompt("Copy this link:", shareUrl);
     }
   };
 

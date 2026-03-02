@@ -73,28 +73,29 @@ export default function PublicProjectPage() {
     enabled: !!projectId,
   });
 
+  const shareUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-page/p/${projectId}`;
+
   const handleShare = async () => {
-    const url = window.location.href;
     try {
       if (navigator.share) {
-        await navigator.share({ title: project?.title, text: `Check out this project: ${project?.title}`, url });
+        await navigator.share({ title: project?.title, text: `Check out this project: ${project?.title}`, url: shareUrl });
         return;
       }
     } catch {}
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(shareUrl);
       toast.success("Link copied!");
     } catch {
-      window.prompt("Copy this link:", url);
+      window.prompt("Copy this link:", shareUrl);
     }
   };
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(shareUrl);
       toast.success("Link copied!");
     } catch {
-      window.prompt("Copy this link:", window.location.href);
+      window.prompt("Copy this link:", shareUrl);
     }
   };
 
