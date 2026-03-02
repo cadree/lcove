@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { format } from 'date-fns';
-import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, Play, ExternalLink, Upload, X, Eye, Image as ImageIcon, Camera } from 'lucide-react';
+import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, Play, ExternalLink, Upload, X, Eye, Image as ImageIcon, Camera, Share2, Copy } from 'lucide-react';
 import { Project, ProjectRole, useProjectApplications, useProjects } from '@/hooks/useProjects';
 import { useProjectAttachments, ProjectAttachment } from '@/hooks/useProjectAttachments';
 import { useProjectUpdates } from '@/hooks/useProjectUpdates';
@@ -299,6 +299,23 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                 <SheetTitle className="text-xl">{project.title}</SheetTitle>
               </div>
               <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 -mt-1"
+                  onClick={async () => {
+                    const url = `${window.location.origin}/project/${project.id}`;
+                    if (navigator.share) {
+                      try { await navigator.share({ title: project.title, text: `Check out this project: ${project.title}`, url }); } catch {}
+                    } else {
+                      await navigator.clipboard.writeText(url);
+                      toast({ title: 'Link copied!' });
+                    }
+                  }}
+                  aria-label="Share project"
+                >
+                  <Share2 className="h-4 w-4" />
+                </Button>
                 {isCreator && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>

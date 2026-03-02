@@ -276,6 +276,48 @@ export default function PublicEventPage() {
                     <p className="text-sm text-muted-foreground">
                       We've saved your RSVP for <strong>{event.title}</strong>.
                     </p>
+                    {/* Add to Google Calendar */}
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2 mt-2"
+                      onClick={() => {
+                        const start = new Date(event.start_date);
+                        const end = event.end_date ? new Date(event.end_date) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
+                        const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+                        const location = [event.venue, event.address, event.city, event.state].filter(Boolean).join(', ');
+                        const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${fmt(start)}/${fmt(end)}&details=${encodeURIComponent(event.description || '')}&location=${encodeURIComponent(location)}`;
+                        window.open(gcalUrl, '_blank', 'noopener');
+                      }}
+                    >
+                      <Calendar className="h-4 w-4" />
+                      Add to Google Calendar
+                    </Button>
+                    {/* Download .ics */}
+                    <Button
+                      variant="ghost"
+                      className="w-full gap-2 text-sm"
+                      onClick={() => {
+                        const start = new Date(event.start_date);
+                        const end = event.end_date ? new Date(event.end_date) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
+                        const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+                        const location = [event.venue, event.address, event.city, event.state].filter(Boolean).join(', ');
+                        const ics = [
+                          'BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT',
+                          `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`,
+                          `SUMMARY:${event.title}`, `LOCATION:${location}`,
+                          `DESCRIPTION:${(event.description || '').replace(/\n/g, '\\n')}`,
+                          'END:VEVENT', 'END:VCALENDAR'
+                        ].join('\r\n');
+                        const blob = new Blob([ics], { type: 'text/calendar' });
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(blob);
+                        a.download = `${event.title.replace(/\s+/g, '-')}.ics`;
+                        a.click();
+                      }}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Download .ics File
+                    </Button>
                   </div>
                 ) : (
                   <>
