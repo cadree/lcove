@@ -362,22 +362,17 @@ const AttachmentThumbnail = ({ attachment }: { attachment: ProjectChatData['atta
   }
 
   if (attachment.file_type === 'pdf' || attachment.file_type === 'doc') {
+    const viewerUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(attachment.file_url)}`;
     return (
-      <div className="relative aspect-square rounded-lg overflow-hidden bg-muted/50 border border-border/50 group">
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
+      <div className="relative aspect-square rounded-lg overflow-hidden bg-muted/50 border border-border/50 group cursor-pointer"
+        onClick={() => window.open(viewerUrl, '_blank', 'noopener,noreferrer')}>
+        <div className="flex flex-col items-center justify-center h-full p-2">
           <FileText className="w-8 h-8 text-primary mb-1" />
           <span className="text-[10px] text-muted-foreground text-center truncate w-full">{attachment.file_name}</span>
-        </div>
-        <a
-          href={attachment.file_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/40 transition-colors z-10"
-        >
-          <span className="opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-medium bg-primary/80 px-3 py-1.5 rounded-full">
-            Open File
+          <span className="mt-1 text-[10px] text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+            View / Download
           </span>
-        </a>
+        </div>
       </div>
     );
   }
