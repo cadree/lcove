@@ -364,14 +364,25 @@ const AttachmentThumbnail = ({ attachment }: { attachment: ProjectChatData['atta
   if (attachment.file_type === 'pdf' || attachment.file_type === 'doc') {
     const viewerUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(attachment.file_url)}`;
     return (
-      <div className="relative aspect-square rounded-lg overflow-hidden bg-muted/50 border border-border/50 group cursor-pointer"
-        onClick={() => window.open(viewerUrl, '_blank', 'noopener,noreferrer')}>
-        <div className="flex flex-col items-center justify-center h-full p-2">
-          <FileText className="w-8 h-8 text-primary mb-1" />
-          <span className="text-[10px] text-muted-foreground text-center truncate w-full">{attachment.file_name}</span>
-          <span className="mt-1 text-[10px] text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-            View / Download
+      <div className="relative aspect-square rounded-lg overflow-hidden bg-muted/50 border border-border/50 group">
+        {/* Inline preview iframe */}
+        <iframe
+          src={viewerUrl}
+          className="w-full h-full border-0 pointer-events-none"
+          title={attachment.file_name}
+        />
+        {/* Clickable overlay */}
+        <div
+          className="absolute inset-0 z-10 flex flex-col items-end justify-end p-1.5 cursor-pointer bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={() => window.open(viewerUrl, '_blank', 'noopener,noreferrer')}
+        >
+          <span className="text-[10px] text-white font-medium bg-primary/90 px-2 py-1 rounded-md flex items-center gap-1">
+            <ExternalLink className="w-3 h-3" /> Open
           </span>
+        </div>
+        {/* Always-visible file name label */}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-1.5 py-1 group-hover:opacity-0 transition-opacity">
+          <span className="text-[9px] text-white truncate block">{attachment.file_name}</span>
         </div>
       </div>
     );
