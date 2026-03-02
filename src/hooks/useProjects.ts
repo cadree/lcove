@@ -17,6 +17,18 @@ export interface Project {
   cover_image_url: string | null;
   created_at: string;
   updated_at: string;
+  expected_outcome: string | null;
+  budget_range: string | null;
+  equipment_needed: string | null;
+  location_secured: boolean;
+  venue: string | null;
+  props_needed: string | null;
+  sponsorship_needed: boolean;
+  vendors_needed: boolean;
+  progress_percent: number;
+  is_moodboard_public: boolean;
+  deliverables: any[] | null;
+  allow_custom_roles: boolean;
   roles?: ProjectRole[];
   creator?: { display_name: string | null; avatar_url: string | null };
 }
@@ -126,6 +138,20 @@ export const useProjects = (status?: string) => {
     enabled: !!user?.id,
   });
 
+  const updateProjectProgress = useMutation({
+    mutationFn: async ({ projectId, progress }: { projectId: string; progress: number }) => {
+      const { error } = await (supabase
+        .from('projects') as any)
+        .update({ progress_percent: progress })
+        .eq('id', projectId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['my-projects'] });
+    },
+  });
+
   const createProject = useMutation({
     mutationFn: async (data: {
       title: string;
@@ -135,12 +161,24 @@ export const useProjects = (status?: string) => {
       timeline_start?: string;
       timeline_end?: string;
       cover_image_url?: string;
+      expected_outcome?: string;
+      budget_range?: string;
+      equipment_needed?: string;
+      location_secured?: boolean;
+      venue?: string;
+      props_needed?: string;
+      sponsorship_needed?: boolean;
+      vendors_needed?: boolean;
+      is_moodboard_public?: boolean;
+      deliverables?: any[];
+      allow_custom_roles?: boolean;
       roles: { role_name: string; description?: string; payout_amount: number; slots_available: number }[];
+      milestones?: { title: string; phase?: string; due_date?: string }[];
     }) => {
       if (!user?.id) throw new Error('Not authenticated');
 
-      const { data: project, error } = await supabase
-        .from('projects')
+      const { data: project, error } = await (supabase
+        .from('projects') as any)
         .insert({
           creator_id: user.id,
           title: data.title,
@@ -150,6 +188,17 @@ export const useProjects = (status?: string) => {
           timeline_start: data.timeline_start,
           timeline_end: data.timeline_end,
           cover_image_url: data.cover_image_url,
+          expected_outcome: data.expected_outcome,
+          budget_range: data.budget_range,
+          equipment_needed: data.equipment_needed,
+          location_secured: data.location_secured || false,
+          venue: data.venue,
+          props_needed: data.props_needed,
+          sponsorship_needed: data.sponsorship_needed || false,
+          vendors_needed: data.vendors_needed || false,
+          is_moodboard_public: data.is_moodboard_public || false,
+          deliverables: data.deliverables || [],
+          allow_custom_roles: data.allow_custom_roles || false,
           status: 'open'
         })
         .select()
@@ -170,6 +219,47 @@ export const useProjects = (status?: string) => {
           })));
 
         if (rolesError) throw rolesError;
+      }
+
+      // Create milestones
+      if (data.milestones && data.milestones.length > 0) {
+        const { error: msError } = await (supabase
+          .from('project_milestones') as any)
+          .insert(data.milestones.map(ms => ({
+            project_id: project.id,
+            title: ms.title,
+            phase: ms.phase,
+            due_date: ms.due_date,
+            amount: 0,
+          })));
+
+        if (msError) console.error('Failed to create milestones:', msError);
+      }
+
+      // Create calendar event if timeline_start exists
+      if (data.timeline_start) {
+        const { data: creatorProfile } = await supabase
+          .from('profiles')
+          .select('city')
+          .eq('user_id', user.id)
+          .single();
+
+        await supabase
+          .from('events')
+          .insert({
+            creator_id: user.id,
+            title: data.title,
+            description: data.description || `Project: ${data.title}`,
+            start_date: data.timeline_start,
+            end_date: data.timeline_end || data.timeline_start,
+            city: creatorProfile?.city || 'Global',
+            is_public: true,
+            ticket_type: 'free',
+            project_id: project.id,
+          })
+          .then(({ error: eventError }) => {
+            if (eventError) console.error('Failed to create calendar event:', eventError);
+          });
       }
 
       // Get creator name for notification
@@ -287,6 +377,7 @@ export const useProjects = (status?: string) => {
     isLoading,
     createProject: createProject.mutate,
     updateProjectStatus: updateProjectStatus.mutate,
+    updateProjectProgress: updateProjectProgress.mutate,
     deleteProject: deleteProject.mutateAsync,
     isCreating: createProject.isPending,
     isDeleting: deleteProject.isPending,
