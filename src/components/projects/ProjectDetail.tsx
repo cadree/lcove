@@ -206,35 +206,29 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
       );
     }
 
-    if (att.file_type === 'pdf') {
+    if (att.file_type === 'pdf' || att.file_type === 'doc') {
+      const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(att.file_url)}&embedded=true`;
+      const badgeColor = att.file_type === 'pdf' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400';
+      const bgColor = att.file_type === 'pdf' ? 'bg-red-500/5' : 'bg-amber-500/5';
       return (
-        <div className="w-full h-40 relative cursor-pointer" onClick={() => window.open(att.file_url, '_blank', 'noopener')}>
+        <div
+          className={cn("w-full h-40 relative cursor-pointer overflow-hidden", bgColor)}
+          onClick={() => window.open(att.file_url, '_blank', 'noopener')}
+        >
           <iframe
-            src={`${att.file_url}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+            src={viewerUrl}
             title={att.file_name}
-            className="w-full h-full pointer-events-none border-0"
+            className="w-full h-full pointer-events-none border-0 scale-100"
+            loading="lazy"
           />
-          <div className="absolute inset-0 bg-transparent" />
-          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-background/90 to-transparent p-2 flex items-end justify-between">
+          {/* Overlay to prevent interaction & show click-to-open */}
+          <div className="absolute inset-0 bg-transparent group-hover:bg-black/10 transition-colors" />
+          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-background to-transparent p-2 flex items-end justify-between">
             <span className="text-[10px] text-muted-foreground font-medium truncate max-w-[70%]">{att.file_name}</span>
-            <Badge className="text-[9px] bg-red-500/20 text-red-400">PDF</Badge>
+            <Badge className={cn("text-[9px]", badgeColor)}>{att.file_type.toUpperCase()}</Badge>
           </div>
-        </div>
-      );
-    }
-
-    if (att.file_type === 'doc') {
-      return (
-        <div className="w-full h-40 relative cursor-pointer" onClick={() => window.open(att.file_url, '_blank', 'noopener')}>
-          <iframe
-            src={`https://docs.google.com/gview?url=${encodeURIComponent(att.file_url)}&embedded=true`}
-            title={att.file_name}
-            className="w-full h-full pointer-events-none border-0"
-          />
-          <div className="absolute inset-0 bg-transparent" />
-          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-background/90 to-transparent p-2 flex items-end justify-between">
-            <span className="text-[10px] text-muted-foreground font-medium truncate max-w-[70%]">{att.file_name}</span>
-            <Badge className="text-[9px] bg-amber-500/20 text-amber-400">DOC</Badge>
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Badge className="text-[9px] bg-background/80 text-foreground">Click to open</Badge>
           </div>
         </div>
       );
