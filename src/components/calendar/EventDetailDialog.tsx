@@ -293,23 +293,27 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
   };
 
   const handleShare = async (method: 'copy' | 'twitter' | 'native') => {
-    const eventUrl = `${window.location.origin}/event/${event.id}`;
+    const shareUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-page/e/${event.id}`;
     const shareText = `Check out "${event.title}" on ${format(eventDate, 'MMMM d')}!`;
 
     if (method === 'copy') {
-      await navigator.clipboard.writeText(eventUrl);
-      toast.success('Link copied to clipboard!');
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success('Link copied to clipboard!');
+      } catch {
+        window.prompt('Copy this link:', shareUrl);
+      }
     } else if (method === 'twitter') {
-      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(eventUrl)}`, '_blank');
+      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank');
     } else if (method === 'native' && navigator.share) {
       try {
         await navigator.share({
           title: event.title,
           text: shareText,
-          url: eventUrl,
+          url: shareUrl,
         });
-      } catch (err) {
-        // User cancelled or error
+      } catch {
+        // User cancelled
       }
     }
   };
