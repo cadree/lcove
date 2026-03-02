@@ -103,13 +103,13 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
   const handleCustomRoleSubmit = () => {
     if (!customRoleName.trim()) return;
     // Apply with first available role and include custom role name in message
-    const firstOpenRole = project.roles?.find(r => !r.is_locked);
-    if (!firstOpenRole) {
-      toast({ title: 'No open roles available', variant: 'destructive' });
+    const placeholderRole = project.roles?.[0];
+    if (!placeholderRole) {
+      toast({ title: 'No roles defined for this project', variant: 'destructive' });
       return;
     }
     const msg = `[Custom Role Proposal: ${customRoleName}]\n${applicationMessage}`;
-    applyToProject({ projectId: project.id, roleId: firstOpenRole.id, message: msg }, {
+    applyToProject({ projectId: project.id, roleId: placeholderRole.id, message: msg }, {
       onSuccess: () => { setCustomRoleName(''); setApplicationMessage(''); toast({ title: 'Role proposal submitted!' }); }
     });
   };

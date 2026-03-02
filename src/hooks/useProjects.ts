@@ -696,6 +696,7 @@ export const useProjectApplications = (projectId?: string) => {
     onSuccess: async (_, { status, applicationId }) => {
       queryClient.invalidateQueries({ queryKey: ['project-applications'] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['my-projects'] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       toast({ title: status === 'accepted' ? 'Application accepted!' : 'Application rejected' });
       
