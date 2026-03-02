@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { format } from 'date-fns';
-import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, Play, ExternalLink, Upload, X, Eye, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, Play, ExternalLink, Upload, X, Eye, Image as ImageIcon, Camera } from 'lucide-react';
 import { Project, ProjectRole, useProjectApplications, useProjects } from '@/hooks/useProjects';
 import { useProjectAttachments, ProjectAttachment } from '@/hooks/useProjectAttachments';
 import { useProjectUpdates } from '@/hooks/useProjectUpdates';
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
+import { supabase } from '@/integrations/supabase/client';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -65,11 +66,13 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkName, setLinkName] = useState('');
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   const progressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { applications, applyToProject, reviewApplication, isApplying } = useProjectApplications(project?.id);
-  const { deleteProject, isDeleting, updateProjectProgress } = useProjects();
+  const { deleteProject, isDeleting, updateProjectProgress, updateProjectCoverImage } = useProjects();
   const { attachments, uploadAttachment, addLinkAttachment, deleteAttachment, isUploading } = useProjectAttachments(project?.id);
   const { updates, addUpdate, isPosting } = useProjectUpdates(project?.id);
   const { data: milestones = [] } = useProjectMilestones(project?.id);
@@ -161,6 +164,25 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
       URL.revokeObjectURL(url);
     } catch {
       window.open(att.file_url, '_blank', 'noopener');
+    }
+  };
+
+  const handleCoverImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !project.id || !user?.id) return;
+    setIsUploadingCover(true);
+    try {
+      const fileName = `${Date.now()}-${file.name}`;
+      const filePath = `${user.id}/project-covers/${fileName}`;
+      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
+      updateProjectCoverImage({ projectId: project.id, coverImageUrl: publicUrl });
+    } catch (err: any) {
+      toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsUploadingCover(false);
+      e.target.value = '';
     }
   };
 
@@ -309,11 +331,38 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
 
           <div className="p-6 space-y-6">
             {/* Cover image */}
-            {project.cover_image_url && (
-              <div className="rounded-xl overflow-hidden -mt-2">
+            <div className="rounded-xl overflow-hidden -mt-2 relative group">
+              {project.cover_image_url ? (
                 <img src={project.cover_image_url} alt={project.title} className="w-full h-40 object-cover" />
-              </div>
-            )}
+              ) : isCreator ? (
+                <div className="w-full h-32 bg-muted/30 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2">
+                  <Camera className="h-6 w-6 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Add a cover image</span>
+                </div>
+              ) : null}
+              {isCreator && (
+                <>
+                  <input
+                    ref={coverInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleCoverImageUpload}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => coverInputRef.current?.click()}
+                    disabled={isUploadingCover}
+                    className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 transition-colors cursor-pointer"
+                  >
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-medium flex items-center gap-1.5">
+                      <Camera className="h-4 w-4" />
+                      {isUploadingCover ? 'Uploading...' : project.cover_image_url ? 'Change Cover' : 'Add Cover'}
+                    </span>
+                  </button>
+                </>
+              )}
+            </div>
 
             {/* Creator */}
             <div className="flex items-center gap-3">

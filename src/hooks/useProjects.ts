@@ -152,6 +152,24 @@ export const useProjects = (status?: string) => {
     },
   });
 
+  const updateProjectCoverImage = useMutation({
+    mutationFn: async ({ projectId, coverImageUrl }: { projectId: string; coverImageUrl: string }) => {
+      const { error } = await (supabase
+        .from('projects') as any)
+        .update({ cover_image_url: coverImageUrl })
+        .eq('id', projectId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['my-projects'] });
+      toast({ title: 'Cover image updated' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to update cover image', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const createProject = useMutation({
     mutationFn: async (data: {
       title: string;
@@ -378,6 +396,8 @@ export const useProjects = (status?: string) => {
     createProject: createProject.mutate,
     updateProjectStatus: updateProjectStatus.mutate,
     updateProjectProgress: updateProjectProgress.mutate,
+    updateProjectCoverImage: updateProjectCoverImage.mutate,
+    isUpdatingCover: updateProjectCoverImage.isPending,
     deleteProject: deleteProject.mutateAsync,
     isCreating: createProject.isPending,
     isDeleting: deleteProject.isPending,
