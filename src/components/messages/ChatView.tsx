@@ -420,13 +420,13 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                             )}
                           </div>
 
-                          {/* Delete option for own messages - always visible on mobile */}
+                          {/* Delete option - always visible on mobile */}
                           {isOwn && (
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => deleteMessage.mutate(msg.id)}
-                              className="md:opacity-0 md:group-hover:opacity-100 transition-opacity w-6 h-6 text-muted-foreground hover:text-destructive active:text-destructive"
+                              className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity w-6 h-6 text-muted-foreground hover:text-destructive active:text-destructive"
                             >
                               <Trash2 className="w-3 h-3" />
                             </Button>
