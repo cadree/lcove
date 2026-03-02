@@ -85,22 +85,22 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
              variant="ghost"
              size="icon"
              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-             onClick={async (e) => {
+              onClick={async (e) => {
                e.stopPropagation();
-               const url = `${window.location.origin}/project/${project.id}`;
+               const shareUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-page/p/${project.id}`;
                try {
                  if (navigator.share) {
-                   await navigator.share({ title: project.title, url });
+                   await navigator.share({ title: project.title, url: shareUrl });
                    return;
                  }
                } catch {}
                try {
-                 await navigator.clipboard.writeText(url);
+                 await navigator.clipboard.writeText(shareUrl);
                  toast.success('Link copied!');
                } catch {
-                 window.prompt('Copy this link:', url);
+                 window.prompt('Copy this link:', shareUrl);
                }
-             }}
+              }}
              aria-label="Share project"
            >
              <Share2 className="h-3.5 w-3.5" />

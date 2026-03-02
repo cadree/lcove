@@ -120,21 +120,30 @@ export default function PublicEventPage() {
     guestRsvpMutation.mutate();
   };
 
+  const shareUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-page/e/${eventId}`;
+
   const handleShare = async () => {
-    const url = window.location.href;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: event?.title, text: `Check out this event: ${event?.title}`, url });
-      } catch {}
-    } else {
-      await navigator.clipboard.writeText(url);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: event?.title, text: `Check out this event: ${event?.title}`, url: shareUrl });
+        return;
+      }
+    } catch {}
+    try {
+      await navigator.clipboard.writeText(shareUrl);
       toast.success("Link copied!");
+    } catch {
+      window.prompt("Copy this link:", shareUrl);
     }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(window.location.href);
-    toast.success("Link copied!");
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success("Link copied!");
+    } catch {
+      window.prompt("Copy this link:", shareUrl);
+    }
   };
 
   const isPast = event ? new Date(event.end_date || event.start_date) < new Date() : false;
