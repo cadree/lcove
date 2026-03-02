@@ -73,7 +73,8 @@ export default function PublicProjectPage() {
     enabled: !!projectId,
   });
 
-  const shareUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-page/p/${projectId}`;
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
+  const shareUrl = `${supabaseUrl}/functions/v1/share-page/p/${projectId}`;
 
   const handleShare = async () => {
     try {
