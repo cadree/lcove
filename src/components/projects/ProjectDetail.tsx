@@ -208,10 +208,34 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
 
     if (att.file_type === 'pdf') {
       return (
-        <div className="w-full h-32 bg-red-500/5 flex flex-col items-center justify-center gap-2">
-          <FileText className="h-8 w-8 text-red-400" />
-          <span className="text-[10px] text-muted-foreground font-medium truncate max-w-[90%] px-2">{att.file_name}</span>
-          <Badge className="text-[9px] bg-red-500/20 text-red-400">PDF</Badge>
+        <div className="w-full h-40 relative cursor-pointer" onClick={() => window.open(att.file_url, '_blank', 'noopener')}>
+          <iframe
+            src={`${att.file_url}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+            title={att.file_name}
+            className="w-full h-full pointer-events-none border-0"
+          />
+          <div className="absolute inset-0 bg-transparent" />
+          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-background/90 to-transparent p-2 flex items-end justify-between">
+            <span className="text-[10px] text-muted-foreground font-medium truncate max-w-[70%]">{att.file_name}</span>
+            <Badge className="text-[9px] bg-red-500/20 text-red-400">PDF</Badge>
+          </div>
+        </div>
+      );
+    }
+
+    if (att.file_type === 'doc') {
+      return (
+        <div className="w-full h-40 relative cursor-pointer" onClick={() => window.open(att.file_url, '_blank', 'noopener')}>
+          <iframe
+            src={`https://docs.google.com/gview?url=${encodeURIComponent(att.file_url)}&embedded=true`}
+            title={att.file_name}
+            className="w-full h-full pointer-events-none border-0"
+          />
+          <div className="absolute inset-0 bg-transparent" />
+          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-background/90 to-transparent p-2 flex items-end justify-between">
+            <span className="text-[10px] text-muted-foreground font-medium truncate max-w-[70%]">{att.file_name}</span>
+            <Badge className="text-[9px] bg-amber-500/20 text-amber-400">DOC</Badge>
+          </div>
         </div>
       );
     }
