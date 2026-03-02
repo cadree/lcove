@@ -1,33 +1,52 @@
 
 
-# Fix Custom Role Proposals Not Creating Separate Roles
+# Fix Missing Custom Roles from Accepted Proposals
 
 ## Problem
-When a custom role proposal (e.g., "Gaffer") is accepted, it should become its own separate role rather than being attached to an existing role like "Director." The backend logic was added previously but has two issues that may prevent it from working correctly.
+The "DANCER" and "hdgd" custom role proposals were accepted, but no new roles were created. The applications still point to the original "DIRECTOR" and "filmer" roles, and those roles have incorrect `slots_filled` counts (DIRECTOR shows 2/1 instead of 1/1). This happened because the applications were accepted before the custom role creation code was deployed.
 
-## Root Cause Analysis
+## Two-Part Fix
 
-The custom role creation logic in `useProjects.ts` already exists and appears correct. However, there are two potential issues:
+### Part 1: Data Repair via Database
+Run a one-time data fix to:
+- Create the missing "DANCER" and "hdgd" roles for the project
+- Reassign the two accepted applications to their correct new roles
+- Fix the inflated `slots_filled` on the DIRECTOR role (reset from 2 to 1)
 
-1. **Missing cache invalidation**: After accepting a custom role, the `onSuccess` handler invalidates `['projects']` but not `['my-projects']`. This means the owner's project list may not refresh, so the newly created role won't appear until a full page reload.
+This will be done via a SQL migration that:
+1. Inserts two new `project_roles` rows for "DANCER" and "hdgd" with `slots_filled: 1, slots_available: 1, is_locked: true`
+2. Updates each application's `role_id` to point to the corresponding new role
+3. Decrements `slots_filled` on the DIRECTOR role back to 1
 
-2. **Submission fallback blocks proposals when all roles are locked**: The `handleCustomRoleSubmit` function in `ProjectDetail.tsx` requires at least one unlocked role to exist (`project.roles?.find(r => !r.is_locked)`). If all defined roles are filled and locked, custom role proposals can't be submitted at all -- even though the whole point of proposing a custom role is to create a new one.
+### Part 2: Add a SECURITY DEFINER Database Function
+To prevent any future RLS edge cases, create a database function `accept_custom_role_proposal` that runs with elevated privileges. This function will:
+- Accept an application ID and custom role name
+- Create the new `project_roles` row
+- Reassign the application's `role_id`
+- Update the application status to 'accepted'
+- Let the existing trigger handle `slots_filled` increment
 
-## Changes
-
-### 1. Fix `ProjectDetail.tsx` -- Remove dependency on existing open roles for custom proposals
-
-Currently, custom role proposals piggyback on the first open role's ID just to satisfy the `role_id` foreign key. Instead, we should still use any available role as a placeholder, but also allow submission even when all roles are locked (since the proposal will create its own role upon acceptance). Change the fallback to use ANY role (locked or not) since it's just a temporary placeholder.
-
-### 2. Fix `useProjects.ts` -- Add missing cache invalidation
-
-Add `['my-projects']` to the invalidation list in the `reviewApplication` `onSuccess` handler so the owner sees the new role immediately after accepting.
+Then update `useProjects.ts` to call this function via `supabase.rpc('accept_custom_role_proposal', ...)` instead of doing multiple client-side queries. This is more reliable and atomic.
 
 ## Technical Details
 
-### File: `src/components/projects/ProjectDetail.tsx` (lines 103-114)
-- Change `project.roles?.find(r => !r.is_locked)` to `project.roles?.[0]` so custom proposals can be submitted even when all existing roles are filled
-- Update the error message to "No roles defined for this project" (edge case where project has zero roles)
+### Database Migration
+```sql
+-- 1. Create missing custom roles
+-- 2. Reassign applications
+-- 3. Fix DIRECTOR slots_filled
+```
 
-### File: `src/hooks/useProjects.ts` (line 698)
-- Add `queryClient.invalidateQueries({ queryKey: ['my-projects'] })` to ensure the owner's project view refreshes with the new role
+### New Database Function: `accept_custom_role_proposal`
+Parameters: `p_application_id UUID, p_custom_role_name TEXT, p_reviewer_id UUID`
+- Validates the application exists and is pending
+- Validates the reviewer is the project creator
+- Creates new role row
+- Reassigns application role_id
+- Updates application status to 'accepted' (trigger handles slot increment)
+- Returns the new role ID
+
+### File: `src/hooks/useProjects.ts`
+- In `reviewApplication` mutation, when a custom role proposal is detected and status is 'accepted', call `supabase.rpc('accept_custom_role_proposal', {...})` instead of the current multi-step client-side logic
+- Keep the rest of the flow (group chat, notifications) unchanged
+
