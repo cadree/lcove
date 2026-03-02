@@ -46,12 +46,20 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
   return (
     <div
       onClick={onClick}
-      className="group bg-card border border-border rounded-xl p-5 cursor-pointer transition-all duration-300 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 touch-manipulation active:scale-[0.98]"
+      className="group bg-card border border-border rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 touch-manipulation active:scale-[0.98]"
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
       aria-label={`View project: ${project.title}`}
     >
+      {/* Cover image banner */}
+      {project.cover_image_url && (
+        <div className="relative w-full h-36">
+          <img src={project.cover_image_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        </div>
+      )}
+
+      <div className="p-5">
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex-1 min-w-0">
@@ -136,6 +144,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
             <div className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /><span>{format(new Date(project.timeline_end), 'MMM d')}</span></div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );
