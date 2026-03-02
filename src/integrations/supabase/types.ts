@@ -4435,6 +4435,97 @@ export type Database = {
           },
         ]
       }
+      project_checklist_items: {
+        Row: {
+          assigned_user_id: string | null
+          category: string
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          notes: string | null
+          project_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_user_id?: string | null
+          category: string
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+          notes?: string | null
+          project_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_user_id?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          project_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_checklist_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_item_suggestions: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          project_id: string
+          reviewed_by: string | null
+          status: string
+          suggested_by: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          project_id: string
+          reviewed_by?: string | null
+          status?: string
+          suggested_by: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          project_id?: string
+          reviewed_by?: string | null
+          status?: string
+          suggested_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_item_suggestions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_milestones: {
         Row: {
           amount: number

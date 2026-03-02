@@ -178,7 +178,11 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
             </p>
           ) : isProjectChat ? (
             <p className="text-xs text-muted-foreground">
-              {conversation?.participants?.length || 0} team members
+              {(() => {
+                const participants = conversation?.participants || [];
+                const onlineCount = participants.filter(p => isOnline(p.user_id)).length;
+                return `${onlineCount} of ${participants.length} online`;
+              })()}
             </p>
           ) : null}
         </div>
@@ -274,6 +278,28 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
         </div>
       </div>
 
+      {/* Presence Bar for Project Chats */}
+      {isProjectChat && conversation?.participants && conversation.participants.length > 0 && (
+        <div className="flex items-center gap-1.5 px-4 py-2 border-b border-border/30 bg-card/20 overflow-x-auto">
+          {conversation.participants.map(p => (
+            <div key={p.user_id} className="relative shrink-0">
+              <Avatar className="w-7 h-7">
+                <AvatarImage src={p.profile?.avatar_url || undefined} />
+                <AvatarFallback className="text-[10px] bg-muted">
+                  {p.profile?.display_name?.charAt(0)?.toUpperCase() || '?'}
+                </AvatarFallback>
+              </Avatar>
+              <OnlineIndicator
+                isOnline={isOnline(p.user_id)}
+                size="sm"
+                showOffline
+                className="absolute -bottom-0.5 -right-0.5"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Project Command Center */}
       {isProjectChat && projectChatData && (
         <ProjectCommandCenter project={projectChatData} isOwner={isOwner} />
@@ -332,7 +358,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                           {!isOwn && conversation?.type === 'group' && (
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-xs font-medium text-foreground">
-                                {msg.profile?.display_name || 'Unknown'}
+                                {msg.profile?.display_name || conversation?.participants?.find(p => p.user_id === msg.sender_id)?.profile?.display_name || 'Member'}
                               </span>
                               {senderRole && (
                                 <Badge variant="outline" className="text-[10px] py-0 h-4">
