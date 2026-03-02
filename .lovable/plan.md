@@ -1,82 +1,49 @@
 
 
-# Projects Section Audit & Fix Plan
+# Fix Project Detail View for Applicants & Public Viewers
 
-## Issues Identified
+## Problem Summary
 
-1. **No file preview for non-image files** -- PDFs, docs, ZIPs only show a generic icon with no meaningful preview
-2. **Download button opens in new tab instead of downloading** -- The current `<a href target="_blank">` just navigates; it doesn't trigger a file download
-3. **YouTube links not playable** -- Video links are displayed as static icons instead of embedded players
-4. **No image lightbox/fullscreen view** -- Clicking an image does nothing; users can't zoom in
-5. **Project Card missing cover image preview** -- Cards don't show uploaded images as a visual banner
+The project detail UI already renders all sections for all viewers. However, **milestone data is invisible to non-members** because the RLS policy restricts SELECT to only project creators and accepted collaborators. Applicants considering a project cannot see the timeline/milestones, which is critical context for applying.
 
----
+## Changes Required
 
-## Fix 1: File Preview Thumbnails
+### 1. Database Migration: Relax Milestones RLS
 
-Enhance the Mood Board tab in `ProjectDetail.tsx`:
-- **Images**: Show full preview thumbnails (already works, keep as-is)
-- **PDFs**: Show a PDF icon with the filename clearly visible and a "Preview" badge
-- **Videos (uploaded)**: Show a play icon overlay on a muted-foreground background
-- **YouTube/video links**: Embed a YouTube iframe player or show a clickable thumbnail that opens the video
-- **Links (Figma, Drive)**: Show a recognizable icon (Figma logo placeholder, Drive icon) with the URL domain
+The current milestones SELECT policy only allows creators and accepted applicants. We need to allow all authenticated users to view milestones for any project (milestones are non-sensitive project planning data).
 
----
+**SQL Migration:**
+- Drop the existing restrictive SELECT policy on `project_milestones`
+- Create a new policy allowing all authenticated users to SELECT milestones
 
-## Fix 2: Working Download Button
+This aligns with how `project_attachments` and `project_updates` already work (authenticated users can view all).
 
-Replace the current `<a href target="_blank">` with a proper download mechanism:
-- For storage files: Use `download` attribute on the anchor tag plus set the filename
-- For external links: Open in new tab (can't force download on external URLs)
-- Add a visible "Download" label next to the icon for clarity
+### 2. No UI Changes Needed
 
----
+After auditing `ProjectDetail.tsx` (lines 1-691), all detail sections are already rendered for all viewers:
+- Description, budget, resources, timeline, milestones, deliverables, outcomes -- all render unconditionally based on data presence
+- The "Files" tab is visible to everyone; upload controls are correctly gated behind `isCreator`
+- The "Applications" tab is correctly hidden from non-creators
+- The "Updates" tab shows updates to everyone; posting is gated behind `isCreator`
+- Delete buttons on attachments are gated behind `isCreator`
+- Progress slider is editable only by creator; read-only bar shown to others
 
-## Fix 3: Embedded YouTube Player
+The only reason applicants can't see milestones is the database-level RLS block. Once that's fixed, the existing UI will display all data correctly.
 
-When an attachment has `file_type === 'video'` and the `file_url` contains `youtube.com` or `youtu.be`:
-- Extract the YouTube video ID from the URL
-- Render an embedded `<iframe>` player with the YouTube embed URL
-- For non-YouTube video links, show a clickable link that opens in a new tab
+### Technical Details
 
----
+**Files to modify:** None (UI is correct)
 
-## Fix 4: Image Preview on Project Cards
+**Database migration:** One migration to update `project_milestones` SELECT policy
 
-Update `ProjectCard.tsx`:
-- If `cover_image_url` exists, show it as a banner image at the top of the card
-- Use `object-cover` with a fixed aspect ratio for consistency
-
----
-
-## Fix 5: Full Audit Fixes
-
-- **Custom role proposal** -- The "Propose Your Own Role" section collects input but never submits it (no submit button or mutation). Add a submit handler.
-- **Attachment upload by collaborators** -- Currently only the creator uploads during creation. Add an upload button in the Mood Board tab for the creator to add more files after creation.
-- **Progress slider debounce** -- The progress slider fires on every change. Add a debounced save to avoid excessive API calls.
-
----
-
-## Technical Details
-
-### Files to modify:
-- `src/components/projects/ProjectDetail.tsx` -- Major: fix download, add YouTube embed, improve file previews, add post-creation upload, fix custom role submit
-- `src/components/projects/ProjectCard.tsx` -- Minor: add cover image banner
-- `src/hooks/useProjectAttachments.ts` -- Already has upload/delete mutations (no changes needed)
-
-### YouTube embed helper:
 ```text
-function getYouTubeId(url: string): string | null {
-  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([a-zA-Z0-9_-]{11})/);
-  return match ? match[1] : null;
-}
+DROP POLICY "Project participants can view milestones" ON public.project_milestones;
+
+CREATE POLICY "Authenticated users can view milestones"
+  ON public.project_milestones FOR SELECT
+  TO authenticated
+  USING (true);
 ```
 
-### Download approach:
-```text
-For storage files: <a href={url} download={filename}>
-For external links: <a href={url} target="_blank" rel="noopener">
-```
-
-### No database changes required -- all fixes are frontend-only.
+This is a minimal, targeted fix. The milestone data (title, phase, due date, status) is not sensitive -- it's project planning information that helps applicants understand the scope.
 
