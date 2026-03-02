@@ -543,6 +543,7 @@ export const useProjectApplications = (projectId?: string) => {
       if (appError) throw appError;
 
       // Handle custom role proposals: create a new role and reassign the application
+      let newCustomRoleId: string | null = null;
       if (status === 'accepted' && application?.message) {
         const customRoleMatch = application.message.match(/^\[Custom Role Proposal:\s*(.+?)\]/);
         if (customRoleMatch) {
@@ -563,6 +564,7 @@ export const useProjectApplications = (projectId?: string) => {
             .single();
 
           if (newRoleError) throw newRoleError;
+          newCustomRoleId = newRole.id;
 
           // Reassign the application to the new role BEFORE status update
           // so the trigger increments the correct role
@@ -594,7 +596,7 @@ export const useProjectApplications = (projectId?: string) => {
         const { data: role } = await supabase
           .from('project_roles')
           .select('role_name')
-          .eq('id', application.role_id)
+          .eq('id', newCustomRoleId || application.role_id)
           .single();
 
         const finalProjectTitle = projectTitle || project?.title || 'a project';
