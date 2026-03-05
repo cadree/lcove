@@ -1,41 +1,23 @@
 
 
-## Issues Identified
+## Problem
 
-There are **two distinct problems** visible in the screenshots:
+The "View Full Project" button on the public project page navigates to `/projects?open=${projectId}`, which redirects users to the full projects list. The project may not appear in the list due to status filters, loading race conditions, or the user not being authenticated — so the detail sheet never opens.
 
-### Problem 1: "View Full Project" button doesn't auto-open the project
-The `PublicProjectPage` navigates to `/projects?open=${projectId}`, but `Projects.tsx` **never reads the `open` query parameter**. It only handles `action=create`. So users land on the generic projects list and have to manually find and click the project.
+## Solution
 
-### Problem 2: Non-authenticated users can't apply from the public page
-The "Sign In to Apply" button redirects to `/auth?redirect=/projects?open=${projectId}`, but the `?open=` param is part of the redirect URL's query string and likely gets mangled. After auth, the user still lands on the projects list with no project opened.
+Embed the `ProjectDetail` sheet directly in the `PublicProjectPage`. When "View Full Project" is clicked, open the sheet in-place instead of navigating away. This works for all users (authenticated or not) and eliminates the unreliable redirect flow.
 
----
+## Changes
 
-## Fix Plan
+### `src/pages/PublicProjectPage.tsx`
+1. Import `ProjectDetail` component
+2. Add state for `detailOpen` (boolean)
+3. Change the "View Full Project" button from `navigate(...)` to `setDetailOpen(true)`
+4. Remove the `user &&` gate so non-authenticated users can also view full details
+5. Render `<ProjectDetail project={...} open={detailOpen} onClose={...} />` at the bottom
+6. Map the fetched project data to match the `Project` type expected by `ProjectDetail`
 
-### 1. Add `open` query param handling in `Projects.tsx`
-Add a `useEffect` that reads `searchParams.get('open')`, finds the matching project in the loaded list, and auto-opens the `ProjectDetail` sheet.
-
-```
-useEffect → read "open" param → find project by ID → setSelectedProject + setDetailOpen(true) → clear param
-```
-
-This mirrors the existing pattern used in `Pipeline.tsx` for `openContact`.
-
-### 2. Fix the auth redirect URL encoding in `PublicProjectPage.tsx`
-The redirect URL `/projects?open=${projectId}` contains a `?` which breaks when used as a query param value. Encode it properly with `encodeURIComponent`.
-
-Change:
-```
-/auth?redirect=/projects?open=${projectId}
-```
-To:
-```
-/auth?redirect=${encodeURIComponent(`/projects?open=${projectId}`)}
-```
-
-### Files to modify:
-- `src/pages/Projects.tsx` — Add `open` param handling useEffect
-- `src/pages/PublicProjectPage.tsx` — Fix redirect URL encoding
+### Data mapping
+The public page fetches project data with `project_roles` included. The `ProjectDetail` component expects a `Project` type with a `roles` field. We need to ensure the shape matches — mapping `project_roles` to `roles` when passing to `ProjectDetail`.
 
