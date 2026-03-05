@@ -35,6 +35,20 @@ const Projects: React.FC = () => {
     }
   }, [searchParams, user, setSearchParams]);
 
+  // Handle open param from shared links
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (openId && !isLoading) {
+      const allProjects = [...projects, ...myProjects];
+      const found = allProjects.find(p => p.id === openId);
+      if (found) {
+        setSelectedProject(found);
+        setDetailOpen(true);
+      }
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, projects, myProjects, isLoading, setSearchParams]);
+
   const handleProjectClick = (project: Project) => {
     setSelectedProject(project);
     setDetailOpen(true);

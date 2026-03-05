@@ -280,7 +280,7 @@ export default function PublicProjectPage() {
                   View Full Project
                 </Button>
               ) : (
-                <Button variant="outline" className="gap-2" onClick={() => navigate(`/auth?redirect=/projects?open=${projectId}`)}>
+                <Button variant="outline" className="gap-2" onClick={() => navigate(`/auth?redirect=${encodeURIComponent(`/projects?open=${projectId}`)}`)}>
                   <LogIn className="h-4 w-4" />
                   Sign In to Apply
                 </Button>
