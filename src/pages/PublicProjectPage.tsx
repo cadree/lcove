@@ -28,6 +28,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ProjectDetail } from "@/components/projects/ProjectDetail";
+import type { Project } from "@/hooks/useProjects";
 
 const statusColors: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
@@ -53,6 +55,7 @@ export default function PublicProjectPage() {
 
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [applicationMessage, setApplicationMessage] = useState("");
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const { data: project, isLoading } = useQuery({
     queryKey: ["public-project", projectId],
@@ -465,20 +468,28 @@ export default function PublicProjectPage() {
           </motion.div>
         )}
 
-        {/* View Full Project (for authenticated users who want the full in-app experience) */}
-        {user && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-            <Button
-              variant="outline"
-              className="w-full gap-2"
-              onClick={() => navigate(`/projects?open=${projectId}`)}
-            >
-              <ChevronRight className="h-4 w-4" />
-              View Full Project Details
-            </Button>
-          </motion.div>
-        )}
+        {/* View Full Project */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <Button
+            variant="outline"
+            className="w-full gap-2"
+            onClick={() => setDetailOpen(true)}
+          >
+            <ChevronRight className="h-4 w-4" />
+            View Full Project Details
+          </Button>
+        </motion.div>
       </div>
+
+      {/* Embedded ProjectDetail sheet */}
+      <ProjectDetail
+        project={detailOpen ? ({
+          ...project,
+          roles: project.roles || project.project_roles || [],
+        } as Project) : null}
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+      />
     </div>
   );
 }
