@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { format } from 'date-fns';
-import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, Play, ExternalLink, Upload, X, Eye, Image as ImageIcon, Camera, Share2, Copy } from 'lucide-react';
+import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, Play, ExternalLink, Upload, X, Eye, Image as ImageIcon, Camera, Share2, Copy, Pencil } from 'lucide-react';
 import { Project, ProjectRole, useProjectApplications, useProjects } from '@/hooks/useProjects';
 import { useProjectAttachments, ProjectAttachment } from '@/hooks/useProjectAttachments';
 import { useProjectUpdates } from '@/hooks/useProjectUpdates';
@@ -19,6 +19,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { EditProjectDialog } from '@/components/projects/EditProjectDialog';
 
 interface ProjectDetailProps {
   project: Project | null;
@@ -67,6 +68,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
   const [linkUrl, setLinkUrl] = useState('');
   const [linkName, setLinkName] = useState('');
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const progressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -323,6 +325,17 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                 >
                   <Share2 className="h-4 w-4" />
                 </Button>
+                {isCreator && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 -mt-1"
+                    onClick={() => setEditDialogOpen(true)}
+                    aria-label="Edit project"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
                 {isCreator && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -776,6 +789,13 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Project Dialog */}
+      <EditProjectDialog
+        project={project}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+      />
     </>
   );
 };
