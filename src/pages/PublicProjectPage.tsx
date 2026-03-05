@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import {
@@ -11,9 +12,10 @@ import {
   Copy,
   LogIn,
   Target,
-  Clock,
-  Wrench,
   ChevronRight,
+  Send,
+  Check,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -46,6 +49,10 @@ export default function PublicProjectPage() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
+  const [applicationMessage, setApplicationMessage] = useState("");
 
   const { data: project, isLoading } = useQuery({
     queryKey: ["public-project", projectId],
@@ -53,15 +60,11 @@ export default function PublicProjectPage() {
       if (!projectId) throw new Error("No project ID");
       const { data, error } = await supabase
         .from("projects")
-        .select(`
-          *,
-          project_roles (*)
-        `)
+        .select(`*, project_roles (*)`)
         .eq("id", projectId)
         .single();
       if (error) throw error;
 
-      // Fetch creator profile
       const { data: creator } = await supabase
         .from("profiles_public")
         .select("display_name, avatar_url")
@@ -73,7 +76,77 @@ export default function PublicProjectPage() {
     enabled: !!projectId,
   });
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
+  // Fetch user's existing applications for this project
+  const { data: myApplications = [] } = useQuery({
+    queryKey: ["my-project-applications", projectId, user?.id],
+    queryFn: async () => {
+      if (!user?.id || !projectId) return [];
+      const { data, error } = await supabase
+        .from("project_applications")
+        .select("id, role_id, status")
+        .eq("project_id", projectId)
+        .eq("applicant_id", user.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id && !!projectId,
+  });
+
+  const applyMutation = useMutation({
+    mutationFn: async ({ roleId, message }: { roleId: string; message: string }) => {
+      if (!user?.id) throw new Error("Not authenticated");
+      const { error } = await supabase.from("project_applications").insert({
+        project_id: projectId!,
+        role_id: roleId,
+        applicant_id: user.id,
+        message: message || null,
+      });
+      if (error) throw error;
+
+      // Notify project owner
+      try {
+        const { data: proj } = await supabase
+          .from("projects")
+          .select("title, creator_id")
+          .eq("id", projectId!)
+          .single();
+        const { data: role } = await supabase
+          .from("project_roles")
+          .select("role_name")
+          .eq("id", roleId)
+          .single();
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("display_name")
+          .eq("user_id", user.id)
+          .single();
+        if (proj && role) {
+          await supabase.functions.invoke("notify-new-application", {
+            body: {
+              project_id: projectId,
+              project_creator_id: proj.creator_id,
+              project_title: proj.title,
+              role_title: role.role_name,
+              applicant_name: profile?.display_name || "Someone",
+            },
+          });
+        }
+      } catch {}
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-project-applications"] });
+      toast.success("Application submitted!");
+      setSelectedRoleId(null);
+      setApplicationMessage("");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to apply");
+    },
+  });
+
+  const supabaseUrl =
+    import.meta.env.VITE_SUPABASE_URL ||
+    `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
   const shareUrl = `${supabaseUrl}/functions/v1/share-page/p/${projectId}`;
 
   const handleShare = async () => {
@@ -98,6 +171,25 @@ export default function PublicProjectPage() {
     } catch {
       window.prompt("Copy this link:", shareUrl);
     }
+  };
+
+  const hasAppliedToRole = (roleId: string) =>
+    myApplications.some((a: any) => a.role_id === roleId);
+
+  const getApplicationStatus = (roleId: string) =>
+    myApplications.find((a: any) => a.role_id === roleId)?.status;
+
+  const handleApplyClick = (roleId: string) => {
+    if (!user) {
+      navigate(`/auth?redirect=${encodeURIComponent(`/project/${projectId}`)}`);
+      return;
+    }
+    setSelectedRoleId(selectedRoleId === roleId ? null : roleId);
+  };
+
+  const handleSubmitApplication = () => {
+    if (!selectedRoleId) return;
+    applyMutation.mutate({ roleId: selectedRoleId, message: applicationMessage });
   };
 
   if (isLoading) {
@@ -129,6 +221,8 @@ export default function PublicProjectPage() {
   const filledSlots = project.roles?.reduce((sum: number, r: any) => sum + r.slots_filled, 0) || 0;
   const totalSlots = project.roles?.reduce((sum: number, r: any) => sum + r.slots_available, 0) || 0;
   const outcomeLabels = project.expected_outcome?.split(", ").filter(Boolean) || [];
+  const openRoles = project.roles?.filter((r: any) => !r.is_locked) || [];
+  const isCreator = user?.id === project.creator_id;
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: project.currency || "USD", minimumFractionDigits: 0 }).format(amount);
@@ -156,7 +250,8 @@ export default function PublicProjectPage() {
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 -mt-12 relative z-10 pb-12">
+      <div className="max-w-lg mx-auto px-4 -mt-12 relative z-10 pb-12 space-y-4">
+        {/* Project Details Card */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="border-border/50 shadow-xl bg-card/95 backdrop-blur-md">
             <CardContent className="p-5 space-y-4">
@@ -231,23 +326,6 @@ export default function PublicProjectPage() {
                 <span>{filledSlots}/{totalSlots} roles filled</span>
               </div>
 
-              {/* Roles */}
-              {project.roles && project.roles.length > 0 && (
-                <div className="space-y-2 pt-2 border-t border-border/30">
-                  <h3 className="text-sm font-semibold">Open Roles</h3>
-                  {project.roles.map((role: any) => (
-                    <div key={role.id} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className={cn("w-2 h-2 rounded-full", role.is_locked ? "bg-muted-foreground" : "bg-primary")} />
-                        <span className={cn(role.is_locked ? "text-muted-foreground line-through" : "text-foreground")}>{role.role_name}</span>
-                        <span className="text-xs text-muted-foreground">({role.slots_filled}/{role.slots_available})</span>
-                      </div>
-                      <span className="text-primary font-medium">{formatCurrency(role.payout_amount)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
               {/* Creator */}
               {project.creator && (
                 <div className="flex items-center gap-3 pt-2 border-t border-border/30">
@@ -265,29 +343,141 @@ export default function PublicProjectPage() {
           </Card>
         </motion.div>
 
-        {/* CTA */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-          <Card className="mt-4 border-border/50 shadow-lg bg-card/95 backdrop-blur-md">
-            <CardContent className="p-5 text-center space-y-3">
-              <Users className="h-10 w-10 text-primary mx-auto" />
-              <h3 className="text-lg font-display font-semibold">Interested in this project?</h3>
-              <p className="text-sm text-muted-foreground">
-                {user ? "View the full project details and apply for a role." : "Sign in or join the community to apply for open roles."}
-              </p>
-              {user ? (
-                <Button className="gap-2" onClick={() => navigate(`/projects?open=${projectId}`)}>
-                  <ChevronRight className="h-4 w-4" />
-                  View Full Project
-                </Button>
-              ) : (
-                <Button variant="outline" className="gap-2" onClick={() => navigate(`/auth?redirect=${encodeURIComponent(`/projects?open=${projectId}`)}`)}>
-                  <LogIn className="h-4 w-4" />
-                  Sign In to Apply
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+        {/* Apply for Roles Card */}
+        {project.roles && project.roles.length > 0 && !isCreator && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+            <Card className="border-border/50 shadow-lg bg-card/95 backdrop-blur-md">
+              <CardContent className="p-5 space-y-4">
+                <h3 className="text-lg font-display font-semibold flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" /> Apply for a Role
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {user
+                    ? "Select a role below and submit your application."
+                    : "Sign in or create an account to apply for open roles."}
+                </p>
+
+                <div className="space-y-2">
+                  {project.roles.map((role: any) => {
+                    const applied = hasAppliedToRole(role.id);
+                    const appStatus = getApplicationStatus(role.id);
+                    const isFull = role.is_locked || role.slots_filled >= role.slots_available;
+                    const isSelected = selectedRoleId === role.id;
+
+                    return (
+                      <div key={role.id} className="space-y-2">
+                        <button
+                          type="button"
+                          disabled={isFull || applied}
+                          onClick={() => handleApplyClick(role.id)}
+                          className={cn(
+                            "w-full text-left rounded-lg border p-3 transition-all",
+                            isFull
+                              ? "border-border/30 opacity-50 cursor-not-allowed"
+                              : applied
+                              ? "border-primary/30 bg-primary/5 cursor-default"
+                              : isSelected
+                              ? "border-primary bg-primary/10 ring-1 ring-primary/30"
+                              : "border-border hover:border-primary/50 hover:bg-muted/30 cursor-pointer"
+                          )}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className={cn("w-2.5 h-2.5 rounded-full", isFull ? "bg-muted-foreground" : "bg-primary")} />
+                              <span className={cn("font-medium text-sm", isFull && "line-through text-muted-foreground")}>
+                                {role.role_name}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                ({role.slots_filled}/{role.slots_available})
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-primary font-semibold text-sm">{formatCurrency(role.payout_amount)}</span>
+                              {applied && (
+                                <Badge className={cn("text-[10px]",
+                                  appStatus === 'accepted' ? "bg-emerald-500/20 text-emerald-400" :
+                                  appStatus === 'rejected' ? "bg-red-500/20 text-red-400" :
+                                  "bg-amber-500/20 text-amber-400"
+                                )}>
+                                  {appStatus === 'accepted' ? 'Accepted' : appStatus === 'rejected' ? 'Rejected' : 'Applied'}
+                                </Badge>
+                              )}
+                              {isFull && !applied && <Lock className="h-3.5 w-3.5 text-muted-foreground" />}
+                            </div>
+                          </div>
+                          {role.description && (
+                            <p className="text-xs text-muted-foreground mt-1 ml-4.5">{role.description}</p>
+                          )}
+                        </button>
+
+                        {/* Application form (inline, shown when selected) */}
+                        {isSelected && user && !applied && !isFull && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="pl-4 space-y-2"
+                          >
+                            <Textarea
+                              value={applicationMessage}
+                              onChange={(e) => setApplicationMessage(e.target.value)}
+                              placeholder="Why are you a great fit for this role? (optional)"
+                              rows={3}
+                              className="text-sm"
+                            />
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={handleSubmitApplication}
+                                disabled={applyMutation.isPending}
+                                className="gap-1.5"
+                              >
+                                <Send className="h-3.5 w-3.5" />
+                                {applyMutation.isPending ? "Submitting..." : "Submit Application"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => { setSelectedRoleId(null); setApplicationMessage(""); }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </motion.div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Sign-in prompt for unauthenticated users */}
+                {!user && (
+                  <Button
+                    className="w-full gap-2"
+                    onClick={() => navigate(`/auth?redirect=${encodeURIComponent(`/project/${projectId}`)}`)}
+                  >
+                    <LogIn className="h-4 w-4" />
+                    Sign In to Apply
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* View Full Project (for authenticated users who want the full in-app experience) */}
+        {user && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => navigate(`/projects?open=${projectId}`)}
+            >
+              <ChevronRight className="h-4 w-4" />
+              View Full Project Details
+            </Button>
+          </motion.div>
+        )}
       </div>
     </div>
   );
