@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { format } from 'date-fns';
-import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, Play, ExternalLink, Upload, X, Eye, Image as ImageIcon, Camera, Share2, Copy, Pencil } from 'lucide-react';
+import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, Play, ExternalLink, Upload, X, Eye, Image as ImageIcon, Camera, Share2, Copy, Pencil, Mail, MessageCircle } from 'lucide-react';
 import { Project, ProjectRole, useProjectApplications, useProjects } from '@/hooks/useProjects';
 import { useProjectAttachments, ProjectAttachment } from '@/hooks/useProjectAttachments';
 import { useProjectUpdates } from '@/hooks/useProjectUpdates';
@@ -69,6 +69,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
   const [linkName, setLinkName] = useState('');
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const progressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -300,31 +301,78 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                 </div>
                 <SheetTitle className="text-xl">{project.title}</SheetTitle>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 relative">
                 <Button
                   variant="ghost"
                   size="icon"
                   className="shrink-0 -mt-1"
-                  onClick={async () => {
-                    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
-                    const shareUrl = `${supabaseUrl}/functions/v1/share-page/p/${project.id}`;
-                    try {
-                      if (navigator.share) {
-                        await navigator.share({ title: project.title, text: `Check out this project: ${project.title}`, url: shareUrl });
-                        return;
-                      }
-                    } catch {}
-                    try {
-                      await navigator.clipboard.writeText(shareUrl);
-                      toast({ title: 'Link copied to clipboard!' });
-                    } catch {
-                      window.prompt('Copy this link:', shareUrl);
-                    }
-                  }}
+                  onClick={() => setShareMenuOpen(prev => !prev)}
                   aria-label="Share project"
                 >
                   <Share2 className="h-4 w-4" />
                 </Button>
+                {shareMenuOpen && project && (
+                  <div className="absolute right-0 top-9 z-50 w-56 rounded-lg border border-border bg-popover p-1.5 shadow-lg animate-in fade-in-0 zoom-in-95">
+                    {(() => {
+                      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
+                      const url = `${supabaseUrl}/functions/v1/share-page/p/${project.id}`;
+                      const text = `Check out this project: ${project.title}`;
+                      return (
+                        <>
+                          <button
+                            className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(url);
+                                toast({ title: 'Link copied to clipboard!' });
+                              } catch {
+                                window.prompt('Copy this link:', url);
+                              }
+                              setShareMenuOpen(false);
+                            }}
+                          >
+                            <Copy className="h-4 w-4 text-muted-foreground" />
+                            Copy Link
+                          </button>
+                          <button
+                            className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
+                            onClick={() => {
+                              window.open(`mailto:?subject=${encodeURIComponent(project.title)}&body=${encodeURIComponent(text + '\n' + url)}`, '_blank');
+                              setShareMenuOpen(false);
+                            }}
+                          >
+                            <Mail className="h-4 w-4 text-muted-foreground" />
+                            Email
+                          </button>
+                          <button
+                            className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
+                            onClick={() => {
+                              window.open(`sms:?body=${encodeURIComponent(text + ' ' + url)}`, '_blank');
+                              setShareMenuOpen(false);
+                            }}
+                          >
+                            <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                            Text Message
+                          </button>
+                          {typeof navigator.share === 'function' && (
+                            <button
+                              className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
+                              onClick={async () => {
+                                try {
+                                  await navigator.share({ title: project.title, text, url });
+                                } catch {}
+                                setShareMenuOpen(false);
+                              }}
+                            >
+                              <Share2 className="h-4 w-4 text-muted-foreground" />
+                              More Options…
+                            </button>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
                 {isCreator && (
                   <Button
                     variant="ghost"
