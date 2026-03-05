@@ -368,6 +368,26 @@ export const useProjects = (status?: string) => {
     },
   });
 
+  const updateProject = useMutation({
+    mutationFn: async ({ projectId, updates }: { projectId: string; updates: Record<string, any> }) => {
+      if (!user?.id) throw new Error('Not authenticated');
+      const { error } = await (supabase.from('projects') as any)
+        .update(updates)
+        .eq('id', projectId)
+        .eq('creator_id', user.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['my-projects'] });
+      queryClient.invalidateQueries({ queryKey: ['public-project'] });
+      toast({ title: 'Project updated successfully!' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to update project', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const deleteProject = useMutation({
     mutationFn: async (projectId: string) => {
       if (!user?.id) throw new Error('Not authenticated');
@@ -428,6 +448,8 @@ export const useProjects = (status?: string) => {
     updateProjectStatus: updateProjectStatus.mutate,
     updateProjectProgress: updateProjectProgress.mutate,
     updateProjectCoverImage: updateProjectCoverImage.mutate,
+    updateProject: updateProject.mutate,
+    isUpdatingProject: updateProject.isPending,
     isUpdatingCover: updateProjectCoverImage.isPending,
     deleteProject: deleteProject.mutateAsync,
     isCreating: createProject.isPending,
