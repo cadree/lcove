@@ -73,6 +73,7 @@ export const useProjects = (status?: string) => {
       let query = supabase
         .from('projects')
         .select('*')
+        .eq('is_private', false)
         .order('created_at', { ascending: false });
 
       if (status && status !== 'all') {
