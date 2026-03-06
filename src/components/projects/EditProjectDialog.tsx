@@ -227,6 +227,44 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
             </div>
           </div>
 
+          {/* Project Visibility */}
+          <div className="space-y-3">
+            <Label className="flex items-center gap-2">Visibility</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setIsPrivate(false)}
+                className={cn(
+                  "p-3 rounded-lg border text-center transition-all text-sm",
+                  !isPrivate ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"
+                )}
+              >
+                <Globe className="h-4 w-4 mx-auto mb-1" />
+                Public
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPrivate(true)}
+                className={cn(
+                  "p-3 rounded-lg border text-center transition-all text-sm",
+                  isPrivate ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"
+                )}
+              >
+                <Lock className="h-4 w-4 mx-auto mb-1" />
+                Private Client
+              </button>
+            </div>
+            {isPrivate && (
+              <div className="flex items-center gap-2 p-3 border border-border rounded-lg">
+                <Switch checked={clientChatInProduction} onCheckedChange={setClientChatInProduction} />
+                <div>
+                  <Label className="text-sm">Include Client in Production Chat</Label>
+                  <p className="text-xs text-muted-foreground">Let clients see the main team chat</p>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Expected Outcome */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2"><Target className="h-4 w-4" /> Expected Outcome</Label>
