@@ -143,6 +143,51 @@ export const ClientDashboardView: React.FC<ClientDashboardViewProps> = ({ projec
         </div>
       )}
 
+      {/* Call Sheets */}
+      {callSheets.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium flex items-center gap-2">
+            <FileText className="h-4 w-4" /> Call Sheets
+          </h4>
+          {callSheets.map(cs => (
+            <div key={cs.id} className="border border-border rounded-lg p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-[10px]">
+                  {format(new Date(cs.shoot_date + 'T00:00:00'), 'MMM d, yyyy')}
+                </Badge>
+                {cs.general_location && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <MapPin className="h-3 w-3" /> {cs.general_location}
+                  </span>
+                )}
+              </div>
+              {cs.general_notes && (
+                <p className="text-xs text-muted-foreground bg-muted/20 rounded p-2">{cs.general_notes}</p>
+              )}
+              <div className="space-y-1.5">
+                {cs.role_entries.map((entry, i) => (
+                  <div key={i} className="bg-muted/10 rounded-lg p-2.5 text-sm">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-medium">{entry.role_name}</span>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        {entry.call_time && (
+                          <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {entry.call_time}</span>
+                        )}
+                        {entry.wrap_time && <span>→ {entry.wrap_time}</span>}
+                      </div>
+                    </div>
+                    {entry.location && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" /> {entry.location}</p>
+                    )}
+                    {entry.notes && <p className="text-xs text-muted-foreground mt-1">{entry.notes}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Deliverables */}
       {(project.deliverables as any[])?.filter(d => d?.type).length > 0 && (
         <div className="space-y-2">
