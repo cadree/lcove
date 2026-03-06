@@ -4489,6 +4489,50 @@ export type Database = {
           },
         ]
       }
+      project_call_sheets: {
+        Row: {
+          created_at: string
+          created_by: string
+          general_location: string | null
+          general_notes: string | null
+          id: string
+          project_id: string
+          role_entries: Json
+          shoot_date: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          general_location?: string | null
+          general_notes?: string | null
+          id?: string
+          project_id: string
+          role_entries?: Json
+          shoot_date: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          general_location?: string | null
+          general_notes?: string | null
+          id?: string
+          project_id?: string
+          role_entries?: Json
+          shoot_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_call_sheets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_checklist_items: {
         Row: {
           assigned_user_id: string | null
