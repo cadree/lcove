@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { format } from 'date-fns';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, Play, ExternalLink, Upload, X, Eye, Image as ImageIcon, Camera, Share2, Copy, Pencil, Mail, MessageCircle } from 'lucide-react';
 import { Project, ProjectRole, useProjectApplications, useProjects } from '@/hooks/useProjects';
 import { useProjectAttachments, ProjectAttachment } from '@/hooks/useProjectAttachments';
@@ -11,11 +12,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -70,15 +72,61 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
+  const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestPortfolio, setGuestPortfolio] = useState('');
+  const [guestMessage, setGuestMessage] = useState('');
+  const [showGuestSuccess, setShowGuestSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const progressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queryClient = useQueryClient();
 
   const { applications, applyToProject, reviewApplication, isApplying } = useProjectApplications(project?.id);
   const { deleteProject, isDeleting, updateProjectProgress, updateProjectCoverImage } = useProjects();
   const { attachments, uploadAttachment, addLinkAttachment, deleteAttachment, isUploading } = useProjectAttachments(project?.id);
   const { updates, addUpdate, isPosting } = useProjectUpdates(project?.id);
   const { data: milestones = [] } = useProjectMilestones(project?.id);
+
+  const guestApplyMutation = useMutation({
+    mutationFn: async ({ roleId }: { roleId: string }) => {
+      if (!project) throw new Error('No project');
+      const { error } = await supabase.from("guest_role_applications" as any).insert({
+        project_id: project.id,
+        role_id: roleId,
+        name: guestName.trim(),
+        email: guestEmail.trim(),
+        portfolio_link: guestPortfolio.trim() || null,
+        message: guestMessage.trim() || null,
+      } as any);
+      if (error) throw error;
+
+      const roleName = project.roles?.find((r) => r.id === roleId)?.role_name || "Unknown Role";
+      supabase.functions.invoke("notify-guest-application", {
+        body: {
+          project_id: project.id,
+          project_title: project.title,
+          role_name: roleName,
+          applicant_name: guestName.trim(),
+          applicant_email: guestEmail.trim(),
+          project_creator_id: project.creator_id,
+          portfolio_link: guestPortfolio.trim() || null,
+          message: guestMessage.trim() || null,
+        },
+      }).catch(() => {});
+    },
+    onSuccess: () => {
+      setShowGuestSuccess(true);
+      setSelectedRole(null);
+      setGuestName('');
+      setGuestEmail('');
+      setGuestPortfolio('');
+      setGuestMessage('');
+    },
+    onError: (error: any) => {
+      toast({ title: error.message || 'Failed to submit application', variant: 'destructive' });
+    },
+  });
 
   // Cleanup debounce timer on unmount
   useEffect(() => {
@@ -98,9 +146,21 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
 
   const handleApply = () => {
     if (!selectedRole) return;
-    applyToProject({ projectId: project.id, roleId: selectedRole.id, message: applicationMessage }, {
-      onSuccess: () => { setSelectedRole(null); setApplicationMessage(''); }
-    });
+    if (user) {
+      applyToProject({ projectId: project.id, roleId: selectedRole.id, message: applicationMessage }, {
+        onSuccess: () => { setSelectedRole(null); setApplicationMessage(''); }
+      });
+    } else {
+      if (!guestName.trim() || !guestEmail.trim()) {
+        toast({ title: 'Name and email are required', variant: 'destructive' });
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim())) {
+        toast({ title: 'Please enter a valid email', variant: 'destructive' });
+        return;
+      }
+      guestApplyMutation.mutate({ roleId: selectedRole.id });
+    }
   };
 
   const handleCustomRoleSubmit = () => {
@@ -646,10 +706,37 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                 {selectedRole && !isCreator && (
                   <div className="border border-primary rounded-lg p-4 space-y-3 animate-fade-in">
                     <h5 className="font-medium">Apply for {selectedRole.role_name}</h5>
-                    <Textarea value={applicationMessage} onChange={(e) => setApplicationMessage(e.target.value)} placeholder="Introduce yourself and why you're a great fit..." rows={3} />
+
+                    {/* Guest fields (unauthenticated) */}
+                    {!user && (
+                      <>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="detail-guest-name" className="text-xs">Name *</Label>
+                          <Input id="detail-guest-name" value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Your full name" className="text-sm h-9" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="detail-guest-email" className="text-xs">Email *</Label>
+                          <Input id="detail-guest-email" type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} placeholder="your@email.com" className="text-sm h-9" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="detail-guest-portfolio" className="text-xs">Portfolio / Instagram / Website</Label>
+                          <Input id="detail-guest-portfolio" value={guestPortfolio} onChange={(e) => setGuestPortfolio(e.target.value)} placeholder="https://your-portfolio.com" className="text-sm h-9" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="detail-guest-message" className="text-xs">Short message (optional)</Label>
+                          <Textarea id="detail-guest-message" value={guestMessage} onChange={(e) => setGuestMessage(e.target.value)} placeholder="Why are you a great fit for this role?" rows={3} className="text-sm" />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Authenticated message field */}
+                    {user && (
+                      <Textarea value={applicationMessage} onChange={(e) => setApplicationMessage(e.target.value)} placeholder="Introduce yourself and why you're a great fit..." rows={3} />
+                    )}
+
                     <div className="flex gap-2">
-                      <Button onClick={handleApply} disabled={isApplying} className="flex-1 min-h-[44px]">
-                        <Send className="h-4 w-4 mr-2" />{isApplying ? 'Sending...' : 'Submit Application'}
+                      <Button onClick={handleApply} disabled={isApplying || guestApplyMutation.isPending} className="flex-1 min-h-[44px]">
+                        <Send className="h-4 w-4 mr-2" />{(isApplying || guestApplyMutation.isPending) ? 'Sending...' : 'Submit Application'}
                       </Button>
                       <Button variant="outline" onClick={() => setSelectedRole(null)} className="min-h-[44px]">Cancel</Button>
                     </div>
@@ -843,6 +930,25 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
       />
+      {/* Guest Success Dialog */}
+      <Dialog open={showGuestSuccess} onOpenChange={setShowGuestSuccess}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Application Submitted!</DialogTitle>
+            <DialogDescription>
+              Your application has been sent to the project creator. They'll review it and reach out via email.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-2">
+            <Button onClick={() => { setShowGuestSuccess(false); window.location.href = '/auth'; }}>
+              Create a Profile
+            </Button>
+            <Button variant="outline" onClick={() => setShowGuestSuccess(false)}>
+              Continue as Guest
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
