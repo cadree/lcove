@@ -29,6 +29,8 @@ export interface Project {
   is_moodboard_public: boolean;
   deliverables: any[] | null;
   allow_custom_roles: boolean;
+  is_private: boolean;
+  client_chat_in_production: boolean;
   roles?: ProjectRole[];
   creator?: { display_name: string | null; avatar_url: string | null };
 }
