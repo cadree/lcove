@@ -58,6 +58,8 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [allowCustomRoles, setAllowCustomRoles] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [clientChatInProduction, setClientChatInProduction] = useState(false);
   const [roles, setRoles] = useState<RoleInput[]>([]);
   const [isSavingRoles, setIsSavingRoles] = useState(false);
 
