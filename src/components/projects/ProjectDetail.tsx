@@ -24,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { EditProjectDialog } from '@/components/projects/EditProjectDialog';
 import { ClientDashboardView } from '@/components/projects/ClientDashboardView';
 import { ClientInviteDialog } from '@/components/projects/ClientInviteDialog';
+import { CallSheetSection } from '@/components/projects/CallSheetSection';
 import { useQuery } from '@tanstack/react-query';
 
 interface ProjectDetailProps {
@@ -719,6 +720,9 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                 </div>
               </div>
             )}
+
+            {/* Call Sheet Section */}
+            <CallSheetSection projectId={project.id} roles={project.roles || []} isOwner={isCreator} />
 
             {/* Tabs: Roles, Mood Board, Applications, Updates */}
             <Tabs defaultValue="roles" className="w-full">
