@@ -86,6 +86,13 @@ serve(async (req) => {
 
     console.log("Notifying user of application acceptance:", applicant_id, "for project:", project_title);
 
+    // Fetch project timeline data for calendar integration
+    const { data: projectData } = await supabase
+      .from("projects")
+      .select("timeline_start, timeline_end, venue")
+      .eq("id", project_id)
+      .single();
+
     // Get user data
     const { data: userData, error: userError } = await supabase.auth.admin.getUserById(applicant_id);
     if (userError || !userData?.user) {
@@ -136,7 +143,13 @@ serve(async (req) => {
         type: "project_invite",
         title: notificationTitle,
         body: notificationBody,
-        data: { project_id, role_title }
+        data: {
+          project_id,
+          role_title,
+          timeline_start: projectData?.timeline_start || null,
+          timeline_end: projectData?.timeline_end || null,
+          venue: projectData?.venue || null,
+        }
       });
     
     if (notifError) {

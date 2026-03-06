@@ -8,6 +8,7 @@ interface NotificationItemProps {
   notification: Notification;
   onRead: (id: string) => void;
   onDelete: (id: string) => void;
+  onProjectInviteTap?: (notification: Notification) => void;
 }
 
 const getNotificationIcon = (type: NotificationType) => {
@@ -52,12 +53,16 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   notification,
   onRead,
   onDelete,
+  onProjectInviteTap,
 }) => {
   const isUnread = !notification.read_at;
 
   const handleClick = () => {
     if (isUnread) {
       onRead(notification.id);
+    }
+    if (notification.type === 'project_invite' && onProjectInviteTap) {
+      onProjectInviteTap(notification);
     }
   };
 

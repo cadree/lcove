@@ -1,8 +1,9 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Bell, Check, Trash2 } from 'lucide-react';
-import { useNotifications, NotificationType } from '@/hooks/useNotifications';
+import { useNotifications, Notification, NotificationType } from '@/hooks/useNotifications';
 import { NotificationItem } from './NotificationItem';
+import { ProjectAcceptedDialog } from '@/components/projects/ProjectAcceptedDialog';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -29,6 +30,20 @@ export const NotificationList: React.FC = () => {
   } = useNotifications();
 
   const [activeTab, setActiveTab] = React.useState('all');
+  const [acceptedDialog, setAcceptedDialog] = React.useState<{ open: boolean; projectId: string | null; roleTitle: string | null }>({
+    open: false,
+    projectId: null,
+    roleTitle: null,
+  });
+
+  const handleProjectInviteTap = (notification: Notification) => {
+    const data = notification.data as Record<string, any>;
+    setAcceptedDialog({
+      open: true,
+      projectId: data?.project_id || null,
+      roleTitle: data?.role_title || null,
+    });
+  };
 
   const filteredNotifications = activeTab === 'all'
     ? notifications
@@ -169,6 +184,7 @@ export const NotificationList: React.FC = () => {
                         notification={notification}
                         onRead={markAsRead}
                         onDelete={deleteNotification}
+                        onProjectInviteTap={handleProjectInviteTap}
                       />
                     ))}
                   </div>
@@ -178,6 +194,13 @@ export const NotificationList: React.FC = () => {
           )}
         </TabsContent>
       </Tabs>
+
+      <ProjectAcceptedDialog
+        projectId={acceptedDialog.projectId}
+        roleTitle={acceptedDialog.roleTitle}
+        open={acceptedDialog.open}
+        onOpenChange={(open) => setAcceptedDialog(prev => ({ ...prev, open }))}
+      />
     </div>
   );
 };
