@@ -268,21 +268,13 @@ interface CallSheetFormProps {
   onCancel: () => void;
   isPending: boolean;
 }
-  updateEntry: (i: number, field: keyof RoleEntry, value: string) => void;
-  addCustomEntry: () => void;
-  removeEntry: (i: number) => void;
-  onSave: () => void;
-  onCancel: () => void;
-  isPending: boolean;
-  roles: ProjectRole[];
-}
 
 const CallSheetForm: React.FC<CallSheetFormProps> = ({
   shootDate, setShootDate,
   generalLocation, setGeneralLocation,
   generalNotes, setGeneralNotes,
   roleEntries, updateEntry, addCustomEntry, removeEntry,
-  onSave, onCancel, isPending, roles,
+  onSave, onCancel, isPending,
 }) => (
   <div className="space-y-3">
     <div className="grid grid-cols-2 gap-2">
