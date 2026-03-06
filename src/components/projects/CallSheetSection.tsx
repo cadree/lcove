@@ -216,7 +216,6 @@ export const CallSheetSection: React.FC<CallSheetSectionProps> = ({ projectId, r
                 onCancel={cancel}
                 isPending={updateCallSheet.isPending}
               />
-              />
             </div>
           )}
         </div>
