@@ -4582,7 +4582,10 @@ export type Database = {
       }
       project_clients: {
         Row: {
-          client_user_id: string
+          client_email: string | null
+          client_name: string | null
+          client_token: string | null
+          client_user_id: string | null
           created_at: string
           id: string
           invited_by: string
@@ -4591,7 +4594,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          client_user_id: string
+          client_email?: string | null
+          client_name?: string | null
+          client_token?: string | null
+          client_user_id?: string | null
           created_at?: string
           id?: string
           invited_by: string
@@ -4600,7 +4606,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          client_user_id?: string
+          client_email?: string | null
+          client_name?: string | null
+          client_token?: string | null
+          client_user_id?: string | null
           created_at?: string
           id?: string
           invited_by?: string
@@ -6444,6 +6453,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_client_project_by_token: { Args: { p_token: string }; Returns: Json }
       get_platform_stats: {
         Args: never
         Returns: {

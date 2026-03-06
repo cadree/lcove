@@ -124,6 +124,7 @@ const App = () => (
                 <Route path="/dashboard/events/:eventId" element={<EventDetail />} />
                 <Route path="/event/:eventId" element={<PublicEventPage />} />
                 <Route path="/project/:projectId" element={<PublicProjectPage />} />
+                <Route path="/client/:token" element={<PublicClientPortal />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
