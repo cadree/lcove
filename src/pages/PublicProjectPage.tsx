@@ -207,7 +207,7 @@ export default function PublicProjectPage() {
     },
   });
 
-  const shareUrl = `https://etherbylcove.com/project/${projectId}`;
+  const shareUrl = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/share-page/p/${projectId}`;
 
   const handleShare = async () => {
     try {
