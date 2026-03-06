@@ -305,16 +305,12 @@ const CallSheetForm: React.FC<CallSheetFormProps> = ({
       {roleEntries.map((entry, i) => (
         <div key={i} className="bg-muted/20 rounded-lg p-2.5 space-y-2">
           <div className="flex items-center justify-between">
-            {roles.length > 0 && entry.role_name ? (
-              <span className="text-xs font-medium">{entry.role_name}</span>
-            ) : (
-              <Input
-                value={entry.role_name}
-                onChange={e => updateEntry(i, 'role_name', e.target.value)}
-                placeholder="Role name"
-                className="h-7 text-xs w-40"
-              />
-            )}
+            <Input
+              value={entry.role_name}
+              onChange={e => updateEntry(i, 'role_name', e.target.value)}
+              placeholder="Role name"
+              className="h-7 text-xs w-40"
+            />
             <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => removeEntry(i)}>
               <X className="h-3 w-3" />
             </Button>
