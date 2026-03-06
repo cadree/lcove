@@ -424,6 +424,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
               ))}
             </div>
           </div>
+          )}
 
           {/* Mood Board / Visual References */}
           <div className="space-y-3">
