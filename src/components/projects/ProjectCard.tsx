@@ -1,6 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
-import { Calendar, DollarSign, Users, Clock, ChevronRight, Paperclip, Target, Share2 } from 'lucide-react';
+import { Calendar, DollarSign, Users, Clock, ChevronRight, Paperclip, Target, Share2, Lock } from 'lucide-react';
 import { Project } from '@/hooks/useProjects';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
