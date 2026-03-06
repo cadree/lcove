@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const SITE_URL = "https://lcove.lovable.app";
+const SITE_URL = "https://etherbylcove.com";
 const SITE_NAME = "ETHER";
 const DEFAULT_OG_IMAGE = `${SITE_URL}/favicon.png`;
 const DEFAULT_DESCRIPTION = "View on ETHER – Creative Community OS";
