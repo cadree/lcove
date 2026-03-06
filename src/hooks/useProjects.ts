@@ -193,6 +193,7 @@ export const useProjects = (status?: string) => {
       is_moodboard_public?: boolean;
       deliverables?: any[];
       allow_custom_roles?: boolean;
+      is_private?: boolean;
       roles: { role_name: string; description?: string; payout_amount: number; slots_available: number }[];
       milestones?: { title: string; phase?: string; due_date?: string }[];
     }) => {
@@ -220,6 +221,7 @@ export const useProjects = (status?: string) => {
           is_moodboard_public: data.is_moodboard_public || false,
           deliverables: data.deliverables || [],
           allow_custom_roles: data.allow_custom_roles || false,
+          is_private: data.is_private || false,
           status: 'open'
         })
         .select()
