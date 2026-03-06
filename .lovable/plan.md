@@ -1,51 +1,96 @@
 
 
-## Plan: Post-Acceptance Onboarding Flow + Group Chat Notifications
+## Private Client Projects + Client Role Workflow
 
-### What Happens Today
-When a user is accepted into a project:
-1. They get added to the project group chat
-2. A join message is posted in the chat
-3. An in-app/email/SMS/push notification is sent via `notify-application-accepted`
-4. **No calendar sync prompt** -- they never get asked to add project timelines to their calendar
-5. **No email reminder opt-in** -- no prompt to enable timeline/milestone reminders
-6. **Group chat messages already trigger notifications** to all participants via `useMessages.ts` (in-app + email/SMS via `send-dm-notification`), so that part is working
+This is a large feature that adds a professional client-facing layer to the existing project system. Here's the breakdown:
 
-### What Needs to Change
+### Database Changes (Migration)
 
-#### 1. Create an "Accepted Into Project" Dialog Component
-A new component `ProjectAcceptedDialog.tsx` that appears when a user taps their "Application Accepted" notification (type `project_invite`). This dialog will contain:
+**1. Add columns to `projects` table:**
+- `is_private` (boolean, default false) -- toggles private client project mode
+- `client_chat_in_production` (boolean, default false) -- "Include Client in Production Chat" toggle
 
-- Congratulations message with project title and role
-- **"Add to Calendar"** section using the existing `AddToCalendarButtons` component (Google Calendar, Apple/ICS, Outlook) -- pre-populated with the project's `timeline_start` and `timeline_end`
-- **"Turn on Reminders"** toggle to enable email notifications for milestone deadlines and timeline due dates
-- **"Open Project Chat"** button that navigates to the group chat
-- A "Done" dismiss button
+**2. Create `project_clients` table:**
+```text
+project_clients
+├── id (uuid, PK)
+├── project_id (uuid, FK → projects)
+├── client_user_id (uuid, FK → auth.users)
+├── invited_by (uuid)
+├── status (text: 'invited', 'accepted', 'removed')
+├── created_at (timestamptz)
+└── updated_at (timestamptz)
+```
 
-#### 2. Update `NotificationItem.tsx` to Handle `project_invite` Taps
-When a user taps a `project_invite` notification, instead of just marking it read, open the new `ProjectAcceptedDialog` with the project data from the notification's `data` field (`project_id`, `role_title`).
+**3. RLS policies for `project_clients`:**
+- Project owners can INSERT/SELECT/UPDATE/DELETE
+- Clients can SELECT their own rows
+- Clients can UPDATE their own row (to accept invite)
 
-#### 3. Update `notify-application-accepted` Edge Function
-Add `timeline_start`, `timeline_end`, and `venue` to the notification `data` payload so the client has the info needed to generate calendar events without an extra fetch.
+**4. Update `projects` RLS:**
+- The existing public SELECT policy filters out `is_private = true` projects (only show public ones in Browse)
+- Private projects visible to creator + clients via separate policy
 
-#### 4. Group Chat Notifications (Already Working)
-The existing `useMessages.ts` sendMessage mutation already:
-- Creates in-app notifications for all participants
-- Invokes `send-dm-notification` for email/SMS delivery
+**5. Create a separate client chat:**
+- When a client is invited, auto-create a 1:1 or group conversation with `type = 'client'` (or reuse `type = 'direct'`) between owner and client, linked to the project via a new `client_project_id` column on conversations, or simply tag it with project_id + a `is_client_chat` boolean
 
-No changes needed here -- once a user is added as a participant, they automatically receive notifications for every message.
+Actually, simpler approach: add `is_client_chat` boolean (default false) to `conversations` table. When owner invites a client, create a conversation with `project_id`, `is_client_chat = true`, and add owner + client as participants.
 
-### Technical Details
+### Frontend Changes
 
-**New file**: `src/components/projects/ProjectAcceptedDialog.tsx`
-- Accepts `projectId`, `roleTitle`, `open`, `onOpenChange` props
-- Fetches project data (title, timeline, venue) via a lightweight query
-- Renders `AddToCalendarButtons` with project timeline data
-- Includes a notification preferences toggle for email reminders
+**1. `CreateProjectDialog.tsx` -- Add visibility toggle:**
+- New "Project Visibility" section with Public / Private Client toggle
+- When Private is selected, hide community-facing options (expected outcome chips)
+- Pass `is_private` to `createProject`
 
-**Modified files**:
-- `src/components/notifications/NotificationItem.tsx` -- Add click handler for `project_invite` type that opens the dialog
-- `src/components/notifications/NotificationList.tsx` -- Add state management for the acceptance dialog
-- `supabase/functions/notify-application-accepted/index.ts` -- Include timeline data in notification payload
-- `src/hooks/useProjects.ts` -- Pass timeline data to the edge function call
+**2. `EditProjectDialog.tsx` -- Add visibility + client toggle:**
+- Visibility toggle (Public ↔ Private)
+- "Include Client in Production Chat" switch
+
+**3. `useProjects.ts` -- Update queries:**
+- `projects` query (Browse): filter `is_private = false`
+- `myProjects` query: show all (including private)
+- `createProject`: pass `is_private`, `client_chat_in_production`
+- Add `inviteClient` mutation (insert into `project_clients`, create client chat, send notification)
+
+**4. `Projects.tsx` -- Add "Client Projects" tab:**
+- New tab visible to authenticated users showing their private projects (as creator) and projects where they are a client
+- Separate section with Lock icon
+
+**5. New component: `ClientInviteDialog.tsx`:**
+- Owner can search for users and send client invites
+- Shows current clients list with status
+
+**6. `ProjectDetail.tsx` -- Client-aware views:**
+- If current user is a client: show simplified read-only dashboard (title, progress, confirmed roles, supplies, props, files, timeline) -- hide applications tab, updates posting, budget editing, role applications
+- If current user is owner: show "Clients" tab with invite button, client list, "Include in Production Chat" toggle
+- Client gets a "Client Chat" button that opens their private chat with the owner
+
+**7. New component: `ClientDashboardView.tsx`:**
+- Simplified project view component for clients
+- Shows: title, progress bar, confirmed team roles (filled only), supplies list, props list, files/deliverables, timeline
+- Clean, professional layout optimized for client awareness
+
+**8. `ProjectCard.tsx`:**
+- Show a "Private" badge/lock icon on private projects
+- Fix the share URL (currently still using Supabase function URL)
+
+### Notification Flow
+- When owner invites a client: in-app notification + email via existing notification system
+- When client accepts: owner gets notified
+- Client chat messages use existing `send-dm-notification` flow
+
+### Summary of Files to Create/Modify
+
+| Action | File |
+|--------|------|
+| Migration | Add `is_private`, `client_chat_in_production` to projects; create `project_clients` table; add `is_client_chat` to conversations |
+| Create | `src/components/projects/ClientInviteDialog.tsx` |
+| Create | `src/components/projects/ClientDashboardView.tsx` |
+| Modify | `src/hooks/useProjects.ts` (queries, mutations, client logic) |
+| Modify | `src/components/projects/CreateProjectDialog.tsx` (visibility toggle) |
+| Modify | `src/components/projects/EditProjectDialog.tsx` (visibility + client toggle) |
+| Modify | `src/components/projects/ProjectDetail.tsx` (client view, client tab) |
+| Modify | `src/components/projects/ProjectCard.tsx` (private badge, fix share URL) |
+| Modify | `src/pages/Projects.tsx` (Client Projects tab) |
 
