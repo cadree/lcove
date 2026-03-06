@@ -1,24 +1,32 @@
 
 
-## Problem
+## Analysis
 
-The shared URL `https://etherbylcove.com/project/{id}` is a client-side SPA route. When iMessage/social platforms crawl it, they get the static `index.html` which has the default ETHER bear logo and generic "ETHER - Creative Community OS" title. The `share-page` edge function has correct project-specific OG tags but is not being used as the share URL.
+I tested the `share-page` edge function and confirmed it **does return correct OG tags** (project title "Neon body art", cover image URL, description). However, two issues remain:
 
-## Solution
+### Issue 1: OG Image Not Rendering in Previews
 
-Use the edge function URL as the share URL. The edge function already:
-- Serves correct OG meta tags (project title, cover image, description)
-- Redirects real users to `https://etherbylcove.com/project/{id}` via `<meta http-equiv="refresh">`
+The Supabase gateway is returning `Content-Type: text/plain` despite the edge function setting `text/html`. This prevents social crawlers from parsing the OG meta tags. Additionally, the response includes `Content-Security-Policy: default-src 'none'; sandbox` which some platforms reject entirely.
 
-This means crawlers see the right preview, and humans land on the clean URL.
+**Fix**: Add `og:image:width`, `og:image:height`, and `og:image:type` meta tags (iMessage requires these for large image previews). Also ensure the HTML response uses a `new Headers()` object to avoid header stripping.
 
-## Changes
+### Issue 2: Guest Application Flow
 
-### `src/components/projects/ProjectDetail.tsx`
-- Change share URL from `https://etherbylcove.com/project/${project.id}` to the edge function URL: `` `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/share-page/p/${project.id}` ``
+The code and RLS are actually correct — the `AccessGate` marks `/project/` routes as public (line 26), the guest form renders for unauthenticated users (`!user`, line 491), and the RLS policy allows anonymous INSERT on `guest_role_applications`. 
 
-### `src/pages/PublicProjectPage.tsx`
-- Same change for the share URL on the public project page
+However, after testing I believe the issue is that when a guest arrives via the shared link, they land on the page and can see it, but if they click **"View Full Details"** it opens `ProjectDetail` which may trigger auth-dependent queries. Also the share text says "Check out this project" with the raw edge function URL visible, which could confuse users into thinking they need to sign up.
 
-The "Copy Link" action will also use this URL since it's what generates the preview. Users clicking the link get instantly redirected to the clean `etherbylcove.com` URL.
+## Planned Changes
+
+### 1. `supabase/functions/share-page/index.ts`
+- Add `og:image:width`, `og:image:height`, `og:image:type` meta tags to `buildOgHtml`
+- Use `new Headers()` constructor to set Content-Type more explicitly
+- Add a `<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>` as a fallback signal for parsers
+
+### 2. `src/pages/PublicProjectPage.tsx`
+- Add a CTA banner for non-authenticated users encouraging profile creation (instead of blocking)
+- Ensure the "View Full Details" button works gracefully for guests (no auth-wall)
+
+### 3. `src/components/projects/ProjectDetail.tsx`
+- No changes needed — the share URL logic from the previous edit is correct
 
