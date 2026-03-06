@@ -74,6 +74,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
   const [linkName, setLinkName] = useState('');
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [clientInviteOpen, setClientInviteOpen] = useState(false);
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
