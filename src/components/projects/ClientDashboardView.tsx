@@ -7,6 +7,8 @@ import { useProjectMilestones } from '@/hooks/useProjectMilestones';
 import { useCallSheets } from '@/hooks/useCallSheets';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { AddToCalendarButtons } from '@/components/calendar/AddToCalendarButtons';
+import { generateProjectPdf } from '@/lib/generateProjectPdf';
 import { cn } from '@/lib/utils';
 
 interface ClientDashboardViewProps {
