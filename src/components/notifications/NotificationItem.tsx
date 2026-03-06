@@ -42,6 +42,8 @@ const getNotificationColor = (type: NotificationType) => {
       return 'bg-secondary/50';
     case 'project_invite':
       return 'bg-blue-500/10';
+    case 'project_client_invite':
+      return 'bg-purple-500/10';
     case 'event_reminder':
       return 'bg-amber-500/10';
     case 'live_stream':
