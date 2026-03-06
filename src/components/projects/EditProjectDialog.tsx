@@ -82,6 +82,8 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
       setStartDate(project.timeline_start ? project.timeline_start.split('T')[0] : '');
       setEndDate(project.timeline_end ? project.timeline_end.split('T')[0] : '');
       setAllowCustomRoles(project.allow_custom_roles || false);
+      setIsPrivate((project as any).is_private || false);
+      setClientChatInProduction((project as any).client_chat_in_production || false);
       setRoles(
         project.roles?.map(r => ({
           id: r.id,
