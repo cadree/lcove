@@ -228,6 +228,35 @@ const Projects: React.FC = () => {
                 )}
               </TabsContent>
             )}
+
+            {/* Client Projects Tab */}
+            {user && (
+              <TabsContent value="client-projects">
+                {clientProjects.length === 0 ? (
+                  <EmptyState
+                    icon={Lock}
+                    title="No client projects"
+                    description="When a creator invites you as a client on their project, it will appear here."
+                  />
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {clientProjects.map((project, index) => (
+                      <motion.div
+                        key={project.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <ProjectCard
+                          project={project}
+                          onClick={() => handleProjectClick(project)}
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            )}
           </Tabs>
         </motion.div>
 
