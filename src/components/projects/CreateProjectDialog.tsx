@@ -303,6 +303,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     setProjectType('volunteer');
     setTotalBudget('');
     setCreditsReward(25);
+    setIsPrivate(false);
     setSelectedOutcomes([]);
     setAttachments([]);
     setLinkUrl('');
