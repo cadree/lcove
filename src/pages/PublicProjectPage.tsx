@@ -177,22 +177,20 @@ export default function PublicProjectPage() {
       } as any);
       if (error) throw error;
 
-      // Notify via edge function
+      // Notify via edge function (fire-and-forget, don't block success)
       const roleName = project?.roles?.find((r: any) => r.id === roleId)?.role_name || "Unknown Role";
-      try {
-        await supabase.functions.invoke("notify-guest-application", {
-          body: {
-            project_id: projectId,
-            project_title: project?.title,
-            role_name: roleName,
-            applicant_name: guestName.trim(),
-            applicant_email: guestEmail.trim(),
-            project_creator_id: project?.creator_id,
-            portfolio_link: guestPortfolio.trim() || null,
-            message: guestMessage.trim() || null,
-          },
-        });
-      } catch {}
+      supabase.functions.invoke("notify-guest-application", {
+        body: {
+          project_id: projectId,
+          project_title: project?.title,
+          role_name: roleName,
+          applicant_name: guestName.trim(),
+          applicant_email: guestEmail.trim(),
+          project_creator_id: project?.creator_id,
+          portfolio_link: guestPortfolio.trim() || null,
+          message: guestMessage.trim() || null,
+        },
+      }).catch(() => {});
     },
     onSuccess: () => {
       setShowSuccessDialog(true);

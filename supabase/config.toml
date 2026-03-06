@@ -102,5 +102,8 @@ verify_jwt = false
 [functions.host-calendar-feed]
 verify_jwt = false
 
+[functions.notify-guest-application]
+verify_jwt = false
+
 [functions.share-page]
 verify_jwt = false
