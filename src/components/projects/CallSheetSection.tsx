@@ -267,6 +267,13 @@ interface CallSheetFormProps {
   onSave: () => void;
   onCancel: () => void;
   isPending: boolean;
+}
+  updateEntry: (i: number, field: keyof RoleEntry, value: string) => void;
+  addCustomEntry: () => void;
+  removeEntry: (i: number) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  isPending: boolean;
   roles: ProjectRole[];
 }
 
