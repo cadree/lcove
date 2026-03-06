@@ -136,6 +136,8 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
           timeline_start: startDate ? `${startDate}T00:00` : null,
           timeline_end: endDate ? `${endDate}T23:59` : null,
           allow_custom_roles: allowCustomRoles,
+          is_private: isPrivate,
+          client_chat_in_production: clientChatInProduction,
         },
       },
       {
