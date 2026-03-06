@@ -22,6 +22,9 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { EditProjectDialog } from '@/components/projects/EditProjectDialog';
+import { ClientDashboardView } from '@/components/projects/ClientDashboardView';
+import { ClientInviteDialog } from '@/components/projects/ClientInviteDialog';
+import { useQuery } from '@tanstack/react-query';
 
 interface ProjectDetailProps {
   project: Project | null;
