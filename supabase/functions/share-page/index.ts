@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
   const userAgent = req.headers.get("user-agent");
   const pathParts = url.pathname.replace(/^\/share-page\/?/, "").split("/").filter(Boolean);
 
-  const type = pathParts[0]; // e, p, u
+  const type = pathParts[0]; // e, p, u, c
   const id = pathParts[1];
 
   if (!type || !id) {
@@ -103,6 +103,7 @@ Deno.serve(async (req) => {
   if (type === "e") redirectUrl = `${SITE_URL}/event/${id}`;
   else if (type === "p") redirectUrl = `${SITE_URL}/project/${id}`;
   else if (type === "u") redirectUrl = `${SITE_URL}/profile/${id}`;
+  else if (type === "c") redirectUrl = `${SITE_URL}/client/${id}`;
 
   // If NOT a crawler, just do an immediate 302 redirect (bypasses CSP sandbox)
   if (!isCrawler(userAgent)) {
@@ -172,6 +173,19 @@ Deno.serve(async (req) => {
       } else {
         title = "Profile on ETHER";
         description = "View this creator on ETHER";
+      }
+    } else if (type === "c") {
+      // Client portal — fetch via token
+      const { data } = await supabase.rpc("get_client_project_by_token", { p_token: id });
+      if (data?.project) {
+        title = `${data.project.title} – Client Portal`;
+        description = data.project.description
+          ? data.project.description.slice(0, 155)
+          : "View project details on ETHER";
+        if (data.project.cover_image_url) imageUrl = data.project.cover_image_url;
+      } else {
+        title = "Client Portal on ETHER";
+        description = "View project details";
       }
     }
   } catch (err) {
