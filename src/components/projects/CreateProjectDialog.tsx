@@ -370,7 +370,40 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
             </div>
           </div>
 
-          {/* Expected Outcome */}
+          {/* Project Visibility */}
+          <div className="space-y-3">
+            <Label>Project Visibility</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setIsPrivate(false)}
+                className={cn(
+                  "p-3 rounded-lg border text-center transition-all text-sm",
+                  !isPrivate ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"
+                )}
+              >
+                <FolderKanban className="h-5 w-5 mx-auto mb-1" />
+                Public Project
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPrivate(true)}
+                className={cn(
+                  "p-3 rounded-lg border text-center transition-all text-sm",
+                  isPrivate ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"
+                )}
+              >
+                <Lock className="h-5 w-5 mx-auto mb-1" />
+                Private Client
+              </button>
+            </div>
+            {isPrivate && (
+              <p className="text-xs text-muted-foreground">This project will only be visible to you and invited clients. It won't appear in the public browse feed.</p>
+            )}
+          </div>
+
+          {/* Expected Outcome (only for public) */}
+          {!isPrivate && (
           <div className="space-y-2">
             <Label className="flex items-center gap-2"><Target className="h-4 w-4" /> Expected Outcome</Label>
             <div className="flex flex-wrap gap-2">
