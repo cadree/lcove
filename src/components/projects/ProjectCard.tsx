@@ -122,8 +122,8 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
                   }
                   document.body.removeChild(textarea);
                 }
-               }
-             aria-label="Share project"
+               }}
+              aria-label="Share project"
            >
              <Share2 className="h-3.5 w-3.5" />
            </Button>
