@@ -266,7 +266,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
       timeline_start: timelineStart,
       timeline_end: timelineEnd,
       cover_image_url: coverImageUrl,
-      expected_outcome: selectedOutcomes.join(', ') || undefined,
+      expected_outcome: isPrivate ? undefined : (selectedOutcomes.join(', ') || undefined),
       budget_range: budgetRange || undefined,
       equipment_needed: equipmentNeeded || undefined,
       location_secured: locationSecured,
@@ -277,6 +277,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
       is_moodboard_public: isMoodboardPublic,
       deliverables: validDeliverables,
       allow_custom_roles: allowCustomRoles,
+      is_private: isPrivate,
       roles: validRoles,
       milestones: validMilestones,
     }, {
