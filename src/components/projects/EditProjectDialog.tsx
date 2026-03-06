@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Pencil, Plus, Trash2, Target, MapPin, Wrench, Calendar } from 'lucide-react';
+import { Pencil, Plus, Trash2, Target, MapPin, Wrench, Calendar, Lock, Globe, Users2 } from 'lucide-react';
 import { Project, useProjects } from '@/hooks/useProjects';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
