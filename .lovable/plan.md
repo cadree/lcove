@@ -1,52 +1,51 @@
 
 
-## Audit Findings
+## Plan: Post-Acceptance Onboarding Flow + Group Chat Notifications
 
-### 1. OG Image Preview: Fundamentally broken
+### What Happens Today
+When a user is accepted into a project:
+1. They get added to the project group chat
+2. A join message is posted in the chat
+3. An in-app/email/SMS/push notification is sent via `notify-application-accepted`
+4. **No calendar sync prompt** -- they never get asked to add project timelines to their calendar
+5. **No email reminder opt-in** -- no prompt to enable timeline/milestone reminders
+6. **Group chat messages already trigger notifications** to all participants via `useMessages.ts` (in-app + email/SMS via `send-dm-notification`), so that part is working
 
-**Root cause**: The Supabase gateway **forces `Content-Type: text/plain`** on all edge function responses, regardless of what the function sets. I confirmed this by calling the edge function directly -- the response body contains correct HTML with the right project title, image, and description, but the gateway returns `Content-Type: text/plain`. Social crawlers (iMessage, Facebook, etc.) ignore OG tags in plain text responses.
+### What Needs to Change
 
-This means the entire edge-function-as-share-URL strategy cannot work. No amount of header manipulation inside the function will fix this -- it's a gateway-level override.
+#### 1. Create an "Accepted Into Project" Dialog Component
+A new component `ProjectAcceptedDialog.tsx` that appears when a user taps their "Application Accepted" notification (type `project_invite`). This dialog will contain:
 
-**Additionally**, the `index.html` `og:image` uses a relative path (`/favicon.png`) which crawlers can't resolve.
+- Congratulations message with project title and role
+- **"Add to Calendar"** section using the existing `AddToCalendarButtons` component (Google Calendar, Apple/ICS, Outlook) -- pre-populated with the project's `timeline_start` and `timeline_end`
+- **"Turn on Reminders"** toggle to enable email notifications for milestone deadlines and timeline due dates
+- **"Open Project Chat"** button that navigates to the group chat
+- A "Done" dismiss button
 
-**Fix**: 
-- Revert share URLs back to clean `https://etherbylcove.com/project/{id}` URLs everywhere (Copy Link, navigator.share, SMS, Email)
-- Update `index.html` OG tags to use absolute URLs (`https://etherbylcove.com/favicon.png`) so at minimum the default ETHER branding shows correctly in previews
-- The edge function can remain as-is for future use if a proxy/CDN is added later
+#### 2. Update `NotificationItem.tsx` to Handle `project_invite` Taps
+When a user taps a `project_invite` notification, instead of just marking it read, open the new `ProjectAcceptedDialog` with the project data from the notification's `data` field (`project_id`, `role_title`).
 
-### 2. Guest Application Flow: Working correctly
+#### 3. Update `notify-application-accepted` Edge Function
+Add `timeline_start`, `timeline_end`, and `venue` to the notification `data` payload so the client has the info needed to generate calendar events without an extra fetch.
 
-- `guest_role_applications` table exists with proper RLS: anonymous INSERT allowed, creator-only SELECT/UPDATE
-- Guest form fields (name, email, portfolio, message) render correctly for unauthenticated users
-- Success dialog shows "Create Profile" and "Continue as Guest" buttons
-- `AccessGate` correctly marks `/project/` routes as public
+#### 4. Group Chat Notifications (Already Working)
+The existing `useMessages.ts` sendMessage mutation already:
+- Creates in-app notifications for all participants
+- Invokes `send-dm-notification` for email/SMS delivery
 
-### 3. "View Full Details" button: Works but has auth caveat
+No changes needed here -- once a user is added as a participant, they automatically receive notifications for every message.
 
-The button opens `ProjectDetail` as a sheet, which uses `useProjectApplications`, `useProjectAttachments`, `useProjectUpdates`, and `useProjectMilestones` hooks. These all query with the Supabase client. For unauthenticated users, the `projects` table has a public SELECT policy (`Anyone can view open projects`), so basic data loads. However, the attachment/update queries may return empty for guests (which is acceptable -- those are workspace features).
+### Technical Details
 
-### 4. Share URL in clipboard/text: Shows ugly Supabase URL
+**New file**: `src/components/projects/ProjectAcceptedDialog.tsx`
+- Accepts `projectId`, `roleTitle`, `open`, `onOpenChange` props
+- Fetches project data (title, timeline, venue) via a lightweight query
+- Renders `AddToCalendarButtons` with project timeline data
+- Includes a notification preferences toggle for email reminders
 
-Currently `handleShare` and `handleCopy` in both `PublicProjectPage.tsx` and `ProjectDetail.tsx` copy the edge function URL (`https://wjbyvlgsxscwukkolehg.supabase.co/functions/v1/share-page/p/...`). This is ugly AND broken (doesn't produce previews). Must revert to clean URLs.
-
-## Planned Changes
-
-### `index.html`
-- Change `og:image` from `/favicon.png` to `https://etherbylcove.com/favicon.png` (absolute URL)
-- Change `twitter:image` similarly
-- Change `og:url` and `canonical` from `https://lcove.lovable.app` to `https://etherbylcove.com`
-
-### `src/pages/PublicProjectPage.tsx`
-- Remove `ogUrl` variable entirely
-- Change all share actions (Copy, Share, SMS, Email) to use `cleanUrl` (`https://etherbylcove.com/project/${projectId}`)
-
-### `src/components/projects/ProjectDetail.tsx`
-- Same change: remove `ogUrl`, use clean URL for all share actions
-
-### No changes needed
-- Edge function (`share-page/index.ts`) -- keep as-is for future proxy use
-- Database/RLS -- guest applications work correctly
-- `AccessGate` -- public routes configured correctly
-- Guest form UI -- fields and success dialog are correct
+**Modified files**:
+- `src/components/notifications/NotificationItem.tsx` -- Add click handler for `project_invite` type that opens the dialog
+- `src/components/notifications/NotificationList.tsx` -- Add state management for the acceptance dialog
+- `supabase/functions/notify-application-accepted/index.ts` -- Include timeline data in notification payload
+- `src/hooks/useProjects.ts` -- Pass timeline data to the edge function call
 
