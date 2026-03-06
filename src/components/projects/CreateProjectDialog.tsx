@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Plus, Trash2, DollarSign, Coins, Upload, X, Image, Link, FileText, Film, Package, Calendar, MapPin, Wrench, Users2, Target, Milestone } from 'lucide-react';
+import { Plus, Trash2, DollarSign, Coins, Upload, X, Image, Link, FileText, Film, Package, Calendar, MapPin, Wrench, Users2, Target, Milestone, Lock, FolderKanban } from 'lucide-react';
 import { useProjects } from '@/hooks/useProjects';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
