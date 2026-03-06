@@ -147,10 +147,7 @@ export default function PublicProjectPage() {
     },
   });
 
-  const supabaseUrl =
-    import.meta.env.VITE_SUPABASE_URL ||
-    `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
-  const shareUrl = `${supabaseUrl}/functions/v1/share-page/p/${projectId}`;
+  const shareUrl = `https://lcove.lovable.app/project/${projectId}`;
 
   const handleShare = async () => {
     try {
