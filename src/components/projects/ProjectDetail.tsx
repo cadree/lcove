@@ -314,7 +314,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                 {shareMenuOpen && project && (
                   <div className="absolute right-0 top-9 z-50 w-56 rounded-lg border border-border bg-popover p-1.5 shadow-lg animate-in fade-in-0 zoom-in-95">
                     {(() => {
-                      const url = `https://etherbylcove.com/project/${project.id}`;
+                      const url = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/share-page/p/${project.id}`;
                       const text = `Check out this project: ${project.title}`;
                       return (
                         <>
