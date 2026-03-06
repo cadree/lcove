@@ -36,10 +36,10 @@ export function usePosts() {
 
       if (error) throw error;
 
-      // Get profiles for post creators using profiles_public view to protect sensitive fields
+      // Get profiles for post creators
       const userIds = [...new Set(postsData?.map(p => p.user_id) || [])];
       const { data: profiles } = await supabase
-        .from('profiles_public')
+        .from('profiles')
         .select('user_id, display_name, avatar_url, city, city_display')
         .in('user_id', userIds);
 

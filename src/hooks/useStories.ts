@@ -54,10 +54,10 @@ export function useStories() {
         return { stories: [], grouped: {} };
       }
 
-      // Get profiles for story creators using profiles_public view to protect sensitive fields
+      // Get profiles for story creators
       const userIds = [...new Set(storiesData.map(s => s.user_id))];
       const { data: profiles, error: profilesError } = await supabase
-        .from('profiles_public')
+        .from('profiles')
         .select('user_id, display_name, avatar_url')
         .in('user_id', userIds);
 

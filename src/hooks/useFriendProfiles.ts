@@ -17,9 +17,8 @@ export function useFriendProfiles(friendIds: string[]) {
 
       console.log('[useFriendProfiles] Fetching profiles for', friendIds.length, 'friends');
 
-      // Use profiles_public view to protect sensitive fields (phone)
       const { data, error } = await supabase
-        .from('profiles_public')
+        .from('profiles')
         .select('user_id, display_name, avatar_url, city, bio')
         .in('user_id', friendIds);
 

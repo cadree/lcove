@@ -142,11 +142,11 @@ export function useEventWithRSVP(eventId: string) {
         userRsvp = rsvp;
       }
 
-      // Get organizer profile using profiles_public view
+      // Get organizer profile
       let organizer = null;
       if (event.creator_id) {
         const { data: profile } = await supabase
-          .from('profiles_public')
+          .from('profiles')
           .select('display_name, avatar_url')
           .eq('user_id', event.creator_id)
           .maybeSingle();
