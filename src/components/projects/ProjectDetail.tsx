@@ -24,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { EditProjectDialog } from '@/components/projects/EditProjectDialog';
 import { ClientDashboardView } from '@/components/projects/ClientDashboardView';
 import { ClientInviteDialog } from '@/components/projects/ClientInviteDialog';
+import { CallSheetSection } from '@/components/projects/CallSheetSection';
 import { useQuery } from '@tanstack/react-query';
 
 interface ProjectDetailProps {
