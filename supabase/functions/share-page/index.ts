@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
   const userAgent = req.headers.get("user-agent");
   const pathParts = url.pathname.replace(/^\/share-page\/?/, "").split("/").filter(Boolean);
 
-  const type = pathParts[0]; // e, p, u
+  const type = pathParts[0]; // e, p, u, c
   const id = pathParts[1];
 
   if (!type || !id) {
