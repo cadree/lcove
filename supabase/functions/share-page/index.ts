@@ -5,6 +5,35 @@ const SITE_NAME = "ETHER";
 const DEFAULT_OG_IMAGE = `${SITE_URL}/favicon.png`;
 const DEFAULT_DESCRIPTION = "View on ETHER – Creative Community OS";
 
+// Known crawler/bot user-agents that need OG tags
+const CRAWLER_PATTERNS = [
+  /facebookexternalhit/i,
+  /Facebot/i,
+  /Twitterbot/i,
+  /LinkedInBot/i,
+  /Slackbot/i,
+  /Discordbot/i,
+  /WhatsApp/i,
+  /TelegramBot/i,
+  /Googlebot/i,
+  /bingbot/i,
+  /Applebot/i,
+  /iMessageLinkPreviews/i,
+  /Snap URL Preview/i,
+  /redditbot/i,
+  /Embedly/i,
+  /Quora Link Preview/i,
+  /outbrain/i,
+  /Pinterest/i,
+  /Pinterestbot/i,
+  /Mediapartners-Google/i,
+];
+
+function isCrawler(userAgent: string | null): boolean {
+  if (!userAgent) return false;
+  return CRAWLER_PATTERNS.some((pattern) => pattern.test(userAgent));
+}
+
 function buildOgHtml(
   title: string,
   description: string,
@@ -36,38 +65,48 @@ function buildOgHtml(
   <meta name="twitter:title" content="${esc(title)}"/>
   <meta name="twitter:description" content="${esc(description)}"/>
   <meta name="twitter:image" content="${esc(imageUrl)}"/>
-
-  <!-- Redirect real users -->
-  <meta http-equiv="refresh" content="0;url=${esc(redirectUrl)}"/>
 </head>
 <body>
   <p>Redirecting to <a href="${esc(redirectUrl)}">${esc(title)}</a>…</p>
-  <script>window.location.href=${JSON.stringify(redirectUrl)};</script>
 </body>
 </html>`;
 }
 
 Deno.serve(async (req) => {
   const url = new URL(req.url);
-  // Path after /share-page/ e.g. /share-page/e/uuid
+  const userAgent = req.headers.get("user-agent");
   const pathParts = url.pathname.replace(/^\/share-page\/?/, "").split("/").filter(Boolean);
 
-  // Also handle when invoked via functions/v1/share-page/...
-  // Deno edge functions receive the path after the function name
   const type = pathParts[0]; // e, p, u
   const id = pathParts[1];
 
   if (!type || !id) {
-    const html = buildOgHtml(
-      SITE_NAME,
-      DEFAULT_DESCRIPTION,
-      DEFAULT_OG_IMAGE,
-      SITE_URL,
-      SITE_URL
-    );
-    return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+    // No valid path — redirect to home
+    if (isCrawler(userAgent)) {
+      const html = buildOgHtml(SITE_NAME, DEFAULT_DESCRIPTION, DEFAULT_OG_IMAGE, SITE_URL, SITE_URL);
+      return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+    }
+    return new Response(null, {
+      status: 302,
+      headers: { Location: SITE_URL },
+    });
   }
 
+  // Build the redirect URL first (we always need it)
+  let redirectUrl = SITE_URL;
+  if (type === "e") redirectUrl = `${SITE_URL}/event/${id}`;
+  else if (type === "p") redirectUrl = `${SITE_URL}/project/${id}`;
+  else if (type === "u") redirectUrl = `${SITE_URL}/profile/${id}`;
+
+  // If NOT a crawler, just do an immediate 302 redirect (bypasses CSP sandbox)
+  if (!isCrawler(userAgent)) {
+    return new Response(null, {
+      status: 302,
+      headers: { Location: redirectUrl },
+    });
+  }
+
+  // Crawler path — fetch data and serve OG tags
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -76,20 +115,15 @@ Deno.serve(async (req) => {
   let title = SITE_NAME;
   let description = DEFAULT_DESCRIPTION;
   let imageUrl = DEFAULT_OG_IMAGE;
-  let canonicalUrl = SITE_URL;
-  let redirectUrl = SITE_URL;
+  let canonicalUrl = redirectUrl;
 
   try {
     if (type === "e") {
-      // Event
       const { data } = await supabase
         .from("events")
         .select("title, description, image_url, is_public, venue, city")
         .eq("id", id)
         .maybeSingle();
-
-      redirectUrl = `${SITE_URL}/event/${id}`;
-      canonicalUrl = redirectUrl;
 
       if (data && data.is_public) {
         title = data.title || SITE_NAME;
@@ -102,15 +136,11 @@ Deno.serve(async (req) => {
         description = "Sign in to view this event";
       }
     } else if (type === "p") {
-      // Project
       const { data } = await supabase
         .from("projects")
         .select("title, description, cover_image_url, status")
         .eq("id", id)
         .maybeSingle();
-
-      redirectUrl = `${SITE_URL}/project/${id}`;
-      canonicalUrl = redirectUrl;
 
       if (data && data.status !== "draft") {
         title = data.title || SITE_NAME;
@@ -123,15 +153,11 @@ Deno.serve(async (req) => {
         description = "Sign in to view this project";
       }
     } else if (type === "u") {
-      // Profile
       const { data } = await supabase
         .from("profiles")
         .select("display_name, bio, avatar_url")
         .eq("user_id", id)
         .maybeSingle();
-
-      redirectUrl = `${SITE_URL}/profile/${id}`;
-      canonicalUrl = redirectUrl;
 
       if (data && data.display_name) {
         title = `${data.display_name} on ETHER`;
