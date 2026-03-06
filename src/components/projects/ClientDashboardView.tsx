@@ -1,9 +1,10 @@
 import React from 'react';
 import { format } from 'date-fns';
-import { BarChart3, Calendar, Users, MapPin, Wrench, Package, Download, FileText, Eye } from 'lucide-react';
+import { BarChart3, Calendar, Users, MapPin, Wrench, Package, Download, FileText, Eye, Clock } from 'lucide-react';
 import { Project } from '@/hooks/useProjects';
 import { useProjectAttachments } from '@/hooks/useProjectAttachments';
 import { useProjectMilestones } from '@/hooks/useProjectMilestones';
+import { useCallSheets } from '@/hooks/useCallSheets';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -15,6 +16,7 @@ interface ClientDashboardViewProps {
 export const ClientDashboardView: React.FC<ClientDashboardViewProps> = ({ project }) => {
   const { attachments } = useProjectAttachments(project.id);
   const { data: milestones = [] } = useProjectMilestones(project.id);
+  const { callSheets } = useCallSheets(project.id);
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: project.currency, minimumFractionDigits: 0 }).format(amount);
