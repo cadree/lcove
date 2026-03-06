@@ -55,7 +55,7 @@ import EventsDashboard from "./pages/EventsDashboard";
 import EventDetail from "./pages/EventDetail";
 import PublicEventPage from "./pages/PublicEventPage";
 import PublicProjectPage from "./pages/PublicProjectPage";
-import PublicClientPortal from "./pages/PublicClientPortal";
+import PublicClientPortal from "@/pages/PublicClientPortal";
 
 const queryClient = new QueryClient({
   defaultOptions: {
