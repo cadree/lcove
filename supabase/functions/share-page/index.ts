@@ -103,6 +103,7 @@ Deno.serve(async (req) => {
   if (type === "e") redirectUrl = `${SITE_URL}/event/${id}`;
   else if (type === "p") redirectUrl = `${SITE_URL}/project/${id}`;
   else if (type === "u") redirectUrl = `${SITE_URL}/profile/${id}`;
+  else if (type === "c") redirectUrl = `${SITE_URL}/client/${id}`;
 
   // If NOT a crawler, just do an immediate 302 redirect (bypasses CSP sandbox)
   if (!isCrawler(userAgent)) {
