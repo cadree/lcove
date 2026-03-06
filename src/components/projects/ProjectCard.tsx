@@ -88,24 +88,42 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
              variant="ghost"
              size="icon"
              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={async (e) => {
-               e.stopPropagation();
-               const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
-               const shareUrl = `${supabaseUrl}/functions/v1/share-page/p/${project.id}`;
-               try {
-                 if (navigator.share) {
-                   await navigator.share({ title: project.title, url: shareUrl });
-                   return;
-                 }
-               } catch {}
-               try {
-                 await navigator.clipboard.writeText(shareUrl);
-                 toast.success('Link copied!');
-               } catch {
-                 window.prompt('Copy this link:', shareUrl);
-               }
-              }}
-             aria-label="Share project"
+               onClick={async (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
+                const shareUrl = `${supabaseUrl}/functions/v1/share-page/p/${project.id}`;
+                let shared = false;
+                try {
+                  if (navigator.share) {
+                    await navigator.share({ title: project.title, url: shareUrl });
+                    shared = true;
+                  }
+                } catch (_) { /* user cancelled or not supported */ }
+                if (!shared) {
+                  try {
+                    await navigator.clipboard.writeText(shareUrl);
+                    toast.success('Link copied!');
+                    shared = true;
+                  } catch (_) { /* clipboard blocked */ }
+                }
+                if (!shared) {
+                  const textarea = document.createElement('textarea');
+                  textarea.value = shareUrl;
+                  textarea.style.position = 'fixed';
+                  textarea.style.opacity = '0';
+                  document.body.appendChild(textarea);
+                  textarea.select();
+                  try {
+                    document.execCommand('copy');
+                    toast.success('Link copied!');
+                  } catch (_) {
+                    window.prompt('Copy this link:', shareUrl);
+                  }
+                  document.body.removeChild(textarea);
+                }
+               }}
+              aria-label="Share project"
            >
              <Share2 className="h-3.5 w-3.5" />
            </Button>
