@@ -2,22 +2,27 @@
 
 ## Problem
 
-The "View Full Project" button on the public project page navigates to `/projects?open=${projectId}`, which redirects users to the full projects list. The project may not appear in the list due to status filters, loading race conditions, or the user not being authenticated — so the detail sheet never opens.
+The share button generates an edge function URL (`https://...supabase.co/functions/v1/share-page/p/{id}`) that iMessage treats as a downloadable text document instead of rendering a link preview. Recipients see raw HTML source code rather than a clickable link with OG metadata.
+
+## Root Cause
+
+iMessage and some other platforms don't properly unfurl Supabase edge function URLs. The `/functions/v1/` path pattern is not recognized as a standard webpage, so the HTML response gets displayed as a text file attachment instead of being parsed for OG tags.
 
 ## Solution
 
-Embed the `ProjectDetail` sheet directly in the `PublicProjectPage`. When "View Full Project" is clicked, open the sheet in-place instead of navigating away. This works for all users (authenticated or not) and eliminates the unreliable redirect flow.
+Change the shared URL to the **public app URL** (`https://lcove.lovable.app/project/{id}`) instead of the edge function URL. This ensures:
+- Recipients see a clean, recognizable link
+- The link is clickable and functional for all users
+- No raw HTML is displayed as a text document
+
+For OG previews specifically, keep the edge function available but use it only where platforms support it (e.g., the "More Options" native share could still use it).
 
 ## Changes
 
-### `src/pages/PublicProjectPage.tsx`
-1. Import `ProjectDetail` component
-2. Add state for `detailOpen` (boolean)
-3. Change the "View Full Project" button from `navigate(...)` to `setDetailOpen(true)`
-4. Remove the `user &&` gate so non-authenticated users can also view full details
-5. Render `<ProjectDetail project={...} open={detailOpen} onClose={...} />` at the bottom
-6. Map the fetched project data to match the `Project` type expected by `ProjectDetail`
+### `src/components/projects/ProjectDetail.tsx`
+- Change the share URL from the edge function URL to the published app URL: `https://lcove.lovable.app/project/${project.id}`
+- Update all share actions (Copy Link, Email, SMS, native share) to use this clean URL
 
-### Data mapping
-The public page fetches project data with `project_roles` included. The `ProjectDetail` component expects a `Project` type with a `roles` field. We need to ensure the shape matches — mapping `project_roles` to `roles` when passing to `ProjectDetail`.
+### `src/pages/PublicProjectPage.tsx`
+- If there are any share URLs here, update them consistently to use the public app URL
 
