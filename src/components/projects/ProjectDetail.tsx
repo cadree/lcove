@@ -495,6 +495,18 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
           </SheetHeader>
 
           <div className="p-6 space-y-6">
+            {/* Client simplified view */}
+            {isClient && !isCreator ? (
+              <>
+                {project.cover_image_url && (
+                  <div className="rounded-xl overflow-hidden -mt-2">
+                    <img src={project.cover_image_url} alt={project.title} className="w-full h-40 object-cover" />
+                  </div>
+                )}
+                <ClientDashboardView project={project} />
+              </>
+            ) : (
+            <>
             {/* Cover image */}
             <div className="rounded-xl overflow-hidden -mt-2 relative group">
               {project.cover_image_url ? (
