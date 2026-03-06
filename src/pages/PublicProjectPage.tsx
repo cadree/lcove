@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import {
   Calendar,
@@ -16,6 +16,8 @@ import {
   Send,
   Check,
   Lock,
+  ExternalLink,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,6 +26,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -57,6 +68,13 @@ export default function PublicProjectPage() {
   const [applicationMessage, setApplicationMessage] = useState("");
   const [detailOpen, setDetailOpen] = useState(false);
 
+  // Guest form state
+  const [guestName, setGuestName] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [guestPortfolio, setGuestPortfolio] = useState("");
+  const [guestMessage, setGuestMessage] = useState("");
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+
   const { data: project, isLoading } = useQuery({
     queryKey: ["public-project", projectId],
     queryFn: async () => {
@@ -68,18 +86,17 @@ export default function PublicProjectPage() {
         .single();
       if (error) throw error;
 
-      const { data: creator } = await supabase
-        .from("profiles_public")
-        .select("display_name, avatar_url")
-        .eq("user_id", data.creator_id)
-        .maybeSingle();
+      // Use security definer function to get creator profile (works for anon)
+      const { data: creatorRows } = await supabase
+        .rpc("get_public_creator_profile", { creator_user_id: data.creator_id });
+      const creator = creatorRows?.[0] || null;
 
       return { ...data, roles: data.project_roles || [], creator };
     },
     enabled: !!projectId,
   });
 
-  // Fetch user's existing applications for this project
+  // Fetch user's existing applications (authenticated only)
   const { data: myApplications = [] } = useQuery({
     queryKey: ["my-project-applications", projectId, user?.id],
     queryFn: async () => {
@@ -95,6 +112,7 @@ export default function PublicProjectPage() {
     enabled: !!user?.id && !!projectId,
   });
 
+  // Authenticated apply mutation
   const applyMutation = useMutation({
     mutationFn: async ({ roleId, message }: { roleId: string; message: string }) => {
       if (!user?.id) throw new Error("Not authenticated");
@@ -106,7 +124,6 @@ export default function PublicProjectPage() {
       });
       if (error) throw error;
 
-      // Notify project owner
       try {
         const { data: proj } = await supabase
           .from("projects")
@@ -147,6 +164,49 @@ export default function PublicProjectPage() {
     },
   });
 
+  // Guest apply mutation
+  const guestApplyMutation = useMutation({
+    mutationFn: async ({ roleId }: { roleId: string }) => {
+      const { error } = await supabase.from("guest_role_applications" as any).insert({
+        project_id: projectId!,
+        role_id: roleId,
+        name: guestName.trim(),
+        email: guestEmail.trim(),
+        portfolio_link: guestPortfolio.trim() || null,
+        message: guestMessage.trim() || null,
+      } as any);
+      if (error) throw error;
+
+      // Notify via edge function
+      const roleName = project?.roles?.find((r: any) => r.id === roleId)?.role_name || "Unknown Role";
+      try {
+        await supabase.functions.invoke("notify-guest-application", {
+          body: {
+            project_id: projectId,
+            project_title: project?.title,
+            role_name: roleName,
+            applicant_name: guestName.trim(),
+            applicant_email: guestEmail.trim(),
+            project_creator_id: project?.creator_id,
+            portfolio_link: guestPortfolio.trim() || null,
+            message: guestMessage.trim() || null,
+          },
+        });
+      } catch {}
+    },
+    onSuccess: () => {
+      setShowSuccessDialog(true);
+      setSelectedRoleId(null);
+      setGuestName("");
+      setGuestEmail("");
+      setGuestPortfolio("");
+      setGuestMessage("");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to submit application");
+    },
+  });
+
   const shareUrl = `https://etherbylcove.com/project/${projectId}`;
 
   const handleShare = async () => {
@@ -180,17 +240,27 @@ export default function PublicProjectPage() {
     myApplications.find((a: any) => a.role_id === roleId)?.status;
 
   const handleApplyClick = (roleId: string) => {
-    if (!user) {
-      navigate(`/auth?redirect=${encodeURIComponent(`/project/${projectId}`)}`);
-      return;
-    }
     setSelectedRoleId(selectedRoleId === roleId ? null : roleId);
   };
 
   const handleSubmitApplication = () => {
     if (!selectedRoleId) return;
-    applyMutation.mutate({ roleId: selectedRoleId, message: applicationMessage });
+    if (user) {
+      applyMutation.mutate({ roleId: selectedRoleId, message: applicationMessage });
+    } else {
+      if (!guestName.trim() || !guestEmail.trim()) {
+        toast.error("Name and email are required");
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim())) {
+        toast.error("Please enter a valid email");
+        return;
+      }
+      guestApplyMutation.mutate({ roleId: selectedRoleId });
+    }
   };
+
+  const isPending = applyMutation.isPending || guestApplyMutation.isPending;
 
   if (isLoading) {
     return (
@@ -221,7 +291,6 @@ export default function PublicProjectPage() {
   const filledSlots = project.roles?.reduce((sum: number, r: any) => sum + r.slots_filled, 0) || 0;
   const totalSlots = project.roles?.reduce((sum: number, r: any) => sum + r.slots_available, 0) || 0;
   const outcomeLabels = project.expected_outcome?.split(", ").filter(Boolean) || [];
-  const openRoles = project.roles?.filter((r: any) => !r.is_locked) || [];
   const isCreator = user?.id === project.creator_id;
 
   const formatCurrency = (amount: number) =>
@@ -352,15 +421,13 @@ export default function PublicProjectPage() {
                   <Users className="h-5 w-5 text-primary" /> Apply for a Role
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {user
-                    ? "Select a role below and submit your application."
-                    : "Sign in or create an account to apply for open roles."}
+                  Select a role below and submit your application.
                 </p>
 
                 <div className="space-y-2">
                   {project.roles.map((role: any) => {
-                    const applied = hasAppliedToRole(role.id);
-                    const appStatus = getApplicationStatus(role.id);
+                    const applied = user ? hasAppliedToRole(role.id) : false;
+                    const appStatus = user ? getApplicationStatus(role.id) : undefined;
                     const isFull = role.is_locked || role.slots_filled >= role.slots_available;
                     const isSelected = selectedRoleId === role.id;
 
@@ -410,73 +477,176 @@ export default function PublicProjectPage() {
                           )}
                         </button>
 
-                        {/* Application form (inline, shown when selected) */}
-                        {isSelected && user && !applied && !isFull && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="pl-4 space-y-2"
-                          >
-                            <Textarea
-                              value={applicationMessage}
-                              onChange={(e) => setApplicationMessage(e.target.value)}
-                              placeholder="Why are you a great fit for this role? (optional)"
-                              rows={3}
-                              className="text-sm"
-                            />
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                onClick={handleSubmitApplication}
-                                disabled={applyMutation.isPending}
-                                className="gap-1.5"
-                              >
-                                <Send className="h-3.5 w-3.5" />
-                                {applyMutation.isPending ? "Submitting..." : "Submit Application"}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => { setSelectedRoleId(null); setApplicationMessage(""); }}
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                          </motion.div>
-                        )}
+                        {/* Application form — inline */}
+                        <AnimatePresence>
+                          {isSelected && !applied && !isFull && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="pl-4 space-y-3 overflow-hidden"
+                            >
+                              {/* Guest fields (unauthenticated) */}
+                              {!user && (
+                                <>
+                                  <div className="space-y-1.5">
+                                    <Label htmlFor="guest-name" className="text-xs">Name *</Label>
+                                    <Input
+                                      id="guest-name"
+                                      value={guestName}
+                                      onChange={(e) => setGuestName(e.target.value)}
+                                      placeholder="Your full name"
+                                      className="text-sm h-9"
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label htmlFor="guest-email" className="text-xs">Email *</Label>
+                                    <Input
+                                      id="guest-email"
+                                      type="email"
+                                      value={guestEmail}
+                                      onChange={(e) => setGuestEmail(e.target.value)}
+                                      placeholder="your@email.com"
+                                      className="text-sm h-9"
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label htmlFor="guest-portfolio" className="text-xs">Portfolio / Instagram / Website</Label>
+                                    <Input
+                                      id="guest-portfolio"
+                                      value={guestPortfolio}
+                                      onChange={(e) => setGuestPortfolio(e.target.value)}
+                                      placeholder="https://your-portfolio.com"
+                                      className="text-sm h-9"
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label htmlFor="guest-message" className="text-xs">Short message (optional)</Label>
+                                    <Textarea
+                                      id="guest-message"
+                                      value={guestMessage}
+                                      onChange={(e) => setGuestMessage(e.target.value)}
+                                      placeholder="Why are you a great fit for this role?"
+                                      rows={3}
+                                      className="text-sm"
+                                    />
+                                  </div>
+                                </>
+                              )}
+
+                              {/* Authenticated message field */}
+                              {user && (
+                                <Textarea
+                                  value={applicationMessage}
+                                  onChange={(e) => setApplicationMessage(e.target.value)}
+                                  placeholder="Why are you a great fit for this role? (optional)"
+                                  rows={3}
+                                  className="text-sm"
+                                />
+                              )}
+
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={handleSubmitApplication}
+                                  disabled={isPending}
+                                  className="gap-1.5"
+                                >
+                                  <Send className="h-3.5 w-3.5" />
+                                  {isPending ? "Submitting..." : "Submit Application"}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setSelectedRoleId(null);
+                                    setApplicationMessage("");
+                                    setGuestName("");
+                                    setGuestEmail("");
+                                    setGuestPortfolio("");
+                                    setGuestMessage("");
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     );
                   })}
                 </div>
-
-                {/* Sign-in prompt for unauthenticated users */}
-                {!user && (
-                  <Button
-                    className="w-full gap-2"
-                    onClick={() => navigate(`/auth?redirect=${encodeURIComponent(`/project/${projectId}`)}`)}
-                  >
-                    <LogIn className="h-4 w-4" />
-                    Sign In to Apply
-                  </Button>
-                )}
               </CardContent>
             </Card>
           </motion.div>
         )}
 
-        {/* View Full Project */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+        {/* Action buttons */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="flex gap-2">
           <Button
             variant="outline"
-            className="w-full gap-2"
+            className="flex-1 gap-2"
+            onClick={handleShare}
+          >
+            <Share2 className="h-4 w-4" />
+            Share Project
+          </Button>
+          <Button
+            variant="outline"
+            className="flex-1 gap-2"
             onClick={() => setDetailOpen(true)}
           >
             <ChevronRight className="h-4 w-4" />
-            View Full Project Details
+            View Full Details
           </Button>
         </motion.div>
+
+        {/* Join Workspace (authenticated only) */}
+        {user && !isCreator && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <Button
+              className="w-full gap-2"
+              onClick={() => navigate(`/projects`)}
+            >
+              <ExternalLink className="h-4 w-4" />
+              Join Workspace
+            </Button>
+          </motion.div>
+        )}
       </div>
+
+      {/* Guest success dialog */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="mx-auto w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+              <Sparkles className="h-7 w-7 text-primary" />
+            </div>
+            <DialogTitle className="text-center">Application Submitted!</DialogTitle>
+            <DialogDescription className="text-center">
+              Want to collaborate with the team in real time?
+              Create your Ether profile to join the project workspace.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 mt-2">
+            <Button
+              className="w-full gap-2"
+              onClick={() => navigate(`/auth?redirect=${encodeURIComponent(`/project/${projectId}`)}`)}
+            >
+              <LogIn className="h-4 w-4" />
+              Create Profile
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => setShowSuccessDialog(false)}
+            >
+              Continue as Guest
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Embedded ProjectDetail sheet */}
       <ProjectDetail

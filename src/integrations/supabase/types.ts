@@ -2463,6 +2463,57 @@ export type Database = {
           },
         ]
       }
+      guest_role_applications: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          message: string | null
+          name: string
+          portfolio_link: string | null
+          project_id: string
+          role_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          message?: string | null
+          name: string
+          portfolio_link?: string | null
+          project_id: string
+          role_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string | null
+          name?: string
+          portfolio_link?: string | null
+          project_id?: string
+          role_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guest_role_applications_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_role_applications_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "project_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       home_preferences: {
         Row: {
           auto_reorder: boolean
@@ -6309,6 +6360,13 @@ export type Database = {
           total_creators: number
           total_events: number
           total_projects: number
+        }[]
+      }
+      get_public_creator_profile: {
+        Args: { creator_user_id: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
         }[]
       }
       get_user_emails_for_admin: {
