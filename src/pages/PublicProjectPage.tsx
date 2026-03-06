@@ -147,7 +147,7 @@ export default function PublicProjectPage() {
     },
   });
 
-  const shareUrl = `https://lcove.lovable.app/project/${projectId}`;
+  const shareUrl = `https://etherbylcove.com/project/${projectId}`;
 
   const handleShare = async () => {
     try {
