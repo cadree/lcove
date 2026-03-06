@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, Play, ExternalLink, Upload, X, Eye, Image as ImageIcon, Camera, Share2, Copy, Pencil, Mail, MessageCircle } from 'lucide-react';
+import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, Play, ExternalLink, Upload, X, Eye, Image as ImageIcon, Camera, Share2, Copy, Pencil, Mail, MessageCircle, UserPlus, Lock } from 'lucide-react';
 import { Project, ProjectRole, useProjectApplications, useProjects } from '@/hooks/useProjects';
 import { useProjectAttachments, ProjectAttachment } from '@/hooks/useProjectAttachments';
 import { useProjectUpdates } from '@/hooks/useProjectUpdates';
@@ -22,6 +22,9 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { EditProjectDialog } from '@/components/projects/EditProjectDialog';
+import { ClientDashboardView } from '@/components/projects/ClientDashboardView';
+import { ClientInviteDialog } from '@/components/projects/ClientInviteDialog';
+import { useQuery } from '@tanstack/react-query';
 
 interface ProjectDetailProps {
   project: Project | null;
@@ -71,6 +74,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
   const [linkName, setLinkName] = useState('');
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [clientInviteOpen, setClientInviteOpen] = useState(false);
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
@@ -87,6 +91,41 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
   const { attachments, uploadAttachment, addLinkAttachment, deleteAttachment, isUploading } = useProjectAttachments(project?.id);
   const { updates, addUpdate, isPosting } = useProjectUpdates(project?.id);
   const { data: milestones = [] } = useProjectMilestones(project?.id);
+
+  // Check if user is a client of this project
+  const { data: clientStatus } = useQuery({
+    queryKey: ['project-client-status', project?.id, user?.id],
+    queryFn: async () => {
+      if (!project?.id || !user?.id) return null;
+      const { data } = await (supabase
+        .from('project_clients') as any)
+        .select('id, status')
+        .eq('project_id', project.id)
+        .eq('client_user_id', user.id)
+        .maybeSingle();
+      return data as { id: string; status: string } | null;
+    },
+    enabled: !!project?.id && !!user?.id,
+  });
+
+  const isClient = clientStatus?.status === 'accepted';
+  const isPendingClient = clientStatus?.status === 'invited';
+
+  const acceptClientInvite = useMutation({
+    mutationFn: async () => {
+      if (!clientStatus?.id) throw new Error('No invite');
+      const { error } = await (supabase
+        .from('project_clients') as any)
+        .update({ status: 'accepted' })
+        .eq('id', clientStatus.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-client-status'] });
+      queryClient.invalidateQueries({ queryKey: ['client-projects'] });
+      toast({ title: 'Client invitation accepted!' });
+    },
+  });
 
   const guestApplyMutation = useMutation({
     mutationFn: async ({ roleId }: { roleId: string }) => {
@@ -474,6 +513,31 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
           </SheetHeader>
 
           <div className="p-6 space-y-6">
+            {/* Pending client invite banner */}
+            {isPendingClient && !isCreator && (
+              <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">You've been invited as a client</p>
+                  <p className="text-xs text-muted-foreground">Accept to view project progress</p>
+                </div>
+                <Button size="sm" onClick={() => acceptClientInvite.mutate()} disabled={acceptClientInvite.isPending}>
+                  {acceptClientInvite.isPending ? 'Accepting...' : 'Accept Invite'}
+                </Button>
+              </div>
+            )}
+
+            {/* Client simplified view */}
+            {isClient && !isCreator ? (
+              <>
+                {project.cover_image_url && (
+                  <div className="rounded-xl overflow-hidden -mt-2">
+                    <img src={project.cover_image_url} alt={project.title} className="w-full h-40 object-cover" />
+                  </div>
+                )}
+                <ClientDashboardView project={project} />
+              </>
+            ) : (
+            <>
             {/* Cover image */}
             <div className="rounded-xl overflow-hidden -mt-2 relative group">
               {project.cover_image_url ? (
@@ -911,6 +975,22 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                 )}
               </TabsContent>
             </Tabs>
+
+            {/* Client management for owner */}
+            {isCreator && (project as any).is_private && (
+              <div className="pt-4 border-t border-border">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <UserPlus className="h-4 w-4" /> Clients
+                  </h4>
+                  <Button size="sm" variant="outline" onClick={() => setClientInviteOpen(true)}>
+                    <UserPlus className="h-3 w-3 mr-1" /> Invite Client
+                  </Button>
+                </div>
+              </div>
+            )}
+            </>
+            )}
           </div>
         </SheetContent>
       </Sheet>
@@ -930,6 +1010,15 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
       />
+      {/* Client Invite Dialog */}
+      {project && (
+        <ClientInviteDialog
+          projectId={project.id}
+          projectTitle={project.title}
+          open={clientInviteOpen}
+          onOpenChange={setClientInviteOpen}
+        />
+      )}
       {/* Guest Success Dialog */}
       <Dialog open={showGuestSuccess} onOpenChange={setShowGuestSuccess}>
         <DialogContent>

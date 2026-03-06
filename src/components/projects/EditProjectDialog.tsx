@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Pencil, Plus, Trash2, Target, MapPin, Wrench, Calendar } from 'lucide-react';
+import { Pencil, Plus, Trash2, Target, MapPin, Wrench, Calendar, Lock, Globe, Users2 } from 'lucide-react';
 import { Project, useProjects } from '@/hooks/useProjects';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -58,6 +58,8 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [allowCustomRoles, setAllowCustomRoles] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [clientChatInProduction, setClientChatInProduction] = useState(false);
   const [roles, setRoles] = useState<RoleInput[]>([]);
   const [isSavingRoles, setIsSavingRoles] = useState(false);
 
@@ -80,6 +82,8 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
       setStartDate(project.timeline_start ? project.timeline_start.split('T')[0] : '');
       setEndDate(project.timeline_end ? project.timeline_end.split('T')[0] : '');
       setAllowCustomRoles(project.allow_custom_roles || false);
+      setIsPrivate((project as any).is_private || false);
+      setClientChatInProduction((project as any).client_chat_in_production || false);
       setRoles(
         project.roles?.map(r => ({
           id: r.id,
@@ -132,6 +136,8 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
           timeline_start: startDate ? `${startDate}T00:00` : null,
           timeline_end: endDate ? `${endDate}T23:59` : null,
           allow_custom_roles: allowCustomRoles,
+          is_private: isPrivate,
+          client_chat_in_production: clientChatInProduction,
         },
       },
       {
@@ -219,6 +225,44 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Project Visibility */}
+          <div className="space-y-3">
+            <Label className="flex items-center gap-2">Visibility</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setIsPrivate(false)}
+                className={cn(
+                  "p-3 rounded-lg border text-center transition-all text-sm",
+                  !isPrivate ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"
+                )}
+              >
+                <Globe className="h-4 w-4 mx-auto mb-1" />
+                Public
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPrivate(true)}
+                className={cn(
+                  "p-3 rounded-lg border text-center transition-all text-sm",
+                  isPrivate ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"
+                )}
+              >
+                <Lock className="h-4 w-4 mx-auto mb-1" />
+                Private Client
+              </button>
+            </div>
+            {isPrivate && (
+              <div className="flex items-center gap-2 p-3 border border-border rounded-lg">
+                <Switch checked={clientChatInProduction} onCheckedChange={setClientChatInProduction} />
+                <div>
+                  <Label className="text-sm">Include Client in Production Chat</Label>
+                  <p className="text-xs text-muted-foreground">Let clients see the main team chat</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Expected Outcome */}

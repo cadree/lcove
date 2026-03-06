@@ -1518,6 +1518,7 @@ export type Database = {
           created_by: string
           description: string | null
           id: string
+          is_client_chat: boolean
           is_community_hub: boolean | null
           join_requests_enabled: boolean | null
           max_members: number | null
@@ -1536,6 +1537,7 @@ export type Database = {
           created_by: string
           description?: string | null
           id?: string
+          is_client_chat?: boolean
           is_community_hub?: boolean | null
           join_requests_enabled?: boolean | null
           max_members?: number | null
@@ -1554,6 +1556,7 @@ export type Database = {
           created_by?: string
           description?: string | null
           id?: string
+          is_client_chat?: boolean
           is_community_hub?: boolean | null
           join_requests_enabled?: boolean | null
           max_members?: number | null
@@ -4533,6 +4536,44 @@ export type Database = {
           },
         ]
       }
+      project_clients: {
+        Row: {
+          client_user_id: string
+          created_at: string
+          id: string
+          invited_by: string
+          project_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_user_id: string
+          created_at?: string
+          id?: string
+          invited_by: string
+          project_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_user_id?: string
+          created_at?: string
+          id?: string
+          invited_by?: string
+          project_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_clients_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_item_suggestions: {
         Row: {
           category: string
@@ -4732,6 +4773,7 @@ export type Database = {
         Row: {
           allow_custom_roles: boolean
           budget_range: string | null
+          client_chat_in_production: boolean
           cover_image_url: string | null
           created_at: string
           creator_id: string
@@ -4742,6 +4784,7 @@ export type Database = {
           expected_outcome: string | null
           id: string
           is_moodboard_public: boolean
+          is_private: boolean
           location_secured: boolean
           progress_percent: number
           props_needed: string | null
@@ -4758,6 +4801,7 @@ export type Database = {
         Insert: {
           allow_custom_roles?: boolean
           budget_range?: string | null
+          client_chat_in_production?: boolean
           cover_image_url?: string | null
           created_at?: string
           creator_id: string
@@ -4768,6 +4812,7 @@ export type Database = {
           expected_outcome?: string | null
           id?: string
           is_moodboard_public?: boolean
+          is_private?: boolean
           location_secured?: boolean
           progress_percent?: number
           props_needed?: string | null
@@ -4784,6 +4829,7 @@ export type Database = {
         Update: {
           allow_custom_roles?: boolean
           budget_range?: string | null
+          client_chat_in_production?: boolean
           cover_image_url?: string | null
           created_at?: string
           creator_id?: string
@@ -4794,6 +4840,7 @@ export type Database = {
           expected_outcome?: string | null
           id?: string
           is_moodboard_public?: boolean
+          is_private?: boolean
           location_secured?: boolean
           progress_percent?: number
           props_needed?: string | null
@@ -6393,6 +6440,14 @@ export type Database = {
       }
       is_conversation_participant: {
         Args: { conv_id: string; uid: string }
+        Returns: boolean
+      }
+      is_project_client: {
+        Args: { p_project_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      is_project_creator: {
+        Args: { p_project_id: string; p_user_id: string }
         Returns: boolean
       }
       is_team_admin: {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, FolderKanban, Filter, Rocket, Lightbulb } from 'lucide-react';
+import { Plus, FolderKanban, Filter, Rocket, Lightbulb, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PageLayout from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProjectJoinEnergy } from '@/hooks/useProjectJoinEnergy';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 const Projects: React.FC = () => {
   const { user } = useAuth();
@@ -26,6 +28,54 @@ const Projects: React.FC = () => {
   
   // Check and award energy for accepted project applications
   useProjectJoinEnergy();
+
+  // Fetch client projects (projects where user is an invited/accepted client)
+  const { data: clientProjects = [] } = useQuery({
+    queryKey: ['client-projects', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      // Get project IDs where user is client
+      const { data: clientRows } = await (supabase
+        .from('project_clients') as any)
+        .select('project_id')
+        .eq('client_user_id', user.id)
+        .in('status', ['invited', 'accepted']);
+
+      if (!clientRows || clientRows.length === 0) return [];
+
+      const projectIds = clientRows.map((r: any) => r.project_id);
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .in('id', projectIds)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const ids = data.map(p => p.id);
+      const { data: roles } = await supabase
+        .from('project_roles')
+        .select('*')
+        .in('project_id', ids);
+
+      const creatorIds = [...new Set(data.map(p => p.creator_id))];
+      const { data: profiles } = await supabase
+        .from('profiles_public')
+        .select('user_id, display_name, avatar_url')
+        .in('user_id', creatorIds);
+
+      return data.map(project => ({
+        ...project,
+        total_budget: Number(project.total_budget),
+        roles: roles?.filter(r => r.project_id === project.id).map(r => ({
+          ...r,
+          payout_amount: Number(r.payout_amount)
+        })) || [],
+        creator: profiles?.find(p => p.user_id === project.creator_id)
+      })) as Project[];
+    },
+    enabled: !!user?.id,
+  });
 
   // Handle action params from FAB
   useEffect(() => {
@@ -83,9 +133,10 @@ const Projects: React.FC = () => {
           transition={{ delay: 0.1 }}
         >
           <Tabs defaultValue="browse" className="w-full">
-            <TabsList className="w-full max-w-md mb-8">
-              <TabsTrigger value="browse" className="flex-1">Browse Projects</TabsTrigger>
+            <TabsList className="w-full max-w-lg mb-8">
+              <TabsTrigger value="browse" className="flex-1">Browse</TabsTrigger>
               {user && <TabsTrigger value="my-projects" className="flex-1">My Projects</TabsTrigger>}
+              {user && <TabsTrigger value="client-projects" className="flex-1 gap-1"><Lock className="h-3 w-3" />Client</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="browse">
@@ -161,6 +212,35 @@ const Projects: React.FC = () => {
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {myProjects.map((project, index) => (
+                      <motion.div
+                        key={project.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <ProjectCard
+                          project={project}
+                          onClick={() => handleProjectClick(project)}
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            )}
+
+            {/* Client Projects Tab */}
+            {user && (
+              <TabsContent value="client-projects">
+                {clientProjects.length === 0 ? (
+                  <EmptyState
+                    icon={Lock}
+                    title="No client projects"
+                    description="When a creator invites you as a client on their project, it will appear here."
+                  />
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {clientProjects.map((project, index) => (
                       <motion.div
                         key={project.id}
                         initial={{ opacity: 0, y: 20 }}

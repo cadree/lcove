@@ -29,6 +29,8 @@ export interface Project {
   is_moodboard_public: boolean;
   deliverables: any[] | null;
   allow_custom_roles: boolean;
+  is_private: boolean;
+  client_chat_in_production: boolean;
   roles?: ProjectRole[];
   creator?: { display_name: string | null; avatar_url: string | null };
 }
@@ -71,6 +73,7 @@ export const useProjects = (status?: string) => {
       let query = supabase
         .from('projects')
         .select('*')
+        .eq('is_private', false)
         .order('created_at', { ascending: false });
 
       if (status && status !== 'all') {
@@ -190,6 +193,7 @@ export const useProjects = (status?: string) => {
       is_moodboard_public?: boolean;
       deliverables?: any[];
       allow_custom_roles?: boolean;
+      is_private?: boolean;
       roles: { role_name: string; description?: string; payout_amount: number; slots_available: number }[];
       milestones?: { title: string; phase?: string; due_date?: string }[];
     }) => {
@@ -217,6 +221,7 @@ export const useProjects = (status?: string) => {
           is_moodboard_public: data.is_moodboard_public || false,
           deliverables: data.deliverables || [],
           allow_custom_roles: data.allow_custom_roles || false,
+          is_private: data.is_private || false,
           status: 'open'
         })
         .select()
