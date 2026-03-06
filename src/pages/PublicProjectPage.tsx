@@ -207,30 +207,29 @@ export default function PublicProjectPage() {
     },
   });
 
-  const ogUrl = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/share-page/p/${projectId}`;
-  const cleanUrl = `https://etherbylcove.com/project/${projectId}`;
+  const shareUrl = `https://etherbylcove.com/project/${projectId}`;
 
   const handleShare = async () => {
     try {
       if (navigator.share) {
-        await navigator.share({ title: project?.title, text: `Check out this project: ${project?.title}`, url: ogUrl });
+        await navigator.share({ title: project?.title, text: `Check out this project: ${project?.title}`, url: shareUrl });
         return;
       }
     } catch {}
     try {
-      await navigator.clipboard.writeText(ogUrl);
+      await navigator.clipboard.writeText(shareUrl);
       toast.success("Link copied!");
     } catch {
-      window.prompt("Copy this link:", ogUrl);
+      window.prompt("Copy this link:", shareUrl);
     }
   };
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(ogUrl);
+      await navigator.clipboard.writeText(shareUrl);
       toast.success("Link copied!");
     } catch {
-      window.prompt("Copy this link:", ogUrl);
+      window.prompt("Copy this link:", shareUrl);
     }
   };
 
