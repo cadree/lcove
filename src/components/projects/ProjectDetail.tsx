@@ -979,6 +979,15 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
       />
+      {/* Client Invite Dialog */}
+      {project && (
+        <ClientInviteDialog
+          projectId={project.id}
+          projectTitle={project.title}
+          open={clientInviteOpen}
+          onOpenChange={setClientInviteOpen}
+        />
+      )}
       {/* Guest Success Dialog */}
       <Dialog open={showGuestSuccess} onOpenChange={setShowGuestSuccess}>
         <DialogContent>

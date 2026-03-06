@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, FolderKanban, Filter, Rocket, Lightbulb } from 'lucide-react';
+import { Plus, FolderKanban, Filter, Rocket, Lightbulb, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PageLayout from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProjectJoinEnergy } from '@/hooks/useProjectJoinEnergy';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 const Projects: React.FC = () => {
   const { user } = useAuth();
