@@ -21,6 +21,8 @@ const getNotificationIcon = (type: NotificationType) => {
       return <MessageCircle className="h-5 w-5" />;
     case 'project_invite':
       return <Users className="h-5 w-5 text-blue-500" />;
+    case 'project_client_invite':
+      return <Users className="h-5 w-5 text-purple-500" />;
     case 'event_reminder':
       return <Calendar className="h-5 w-5 text-amber-500" />;
     case 'live_stream':
