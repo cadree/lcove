@@ -314,8 +314,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                 {shareMenuOpen && project && (
                   <div className="absolute right-0 top-9 z-50 w-56 rounded-lg border border-border bg-popover p-1.5 shadow-lg animate-in fade-in-0 zoom-in-95">
                     {(() => {
-                      const ogUrl = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/share-page/p/${project.id}`;
-                      const cleanUrl = `https://etherbylcove.com/project/${project.id}`;
+                       const shareUrl = `https://etherbylcove.com/project/${project.id}`;
                       const text = `Check out this project: ${project.title}`;
                       return (
                         <>
@@ -323,10 +322,10 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                             className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
                             onClick={async () => {
                               try {
-                                await navigator.clipboard.writeText(ogUrl);
+                                await navigator.clipboard.writeText(shareUrl);
                                 toast({ title: 'Link copied to clipboard!' });
                               } catch {
-                                window.prompt('Copy this link:', ogUrl);
+                                window.prompt('Copy this link:', shareUrl);
                               }
                               setShareMenuOpen(false);
                             }}
@@ -337,7 +336,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                           <button
                             className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
                             onClick={() => {
-                              window.open(`mailto:?subject=${encodeURIComponent(project.title)}&body=${encodeURIComponent(text + '\n' + cleanUrl)}`, '_blank');
+                              window.open(`mailto:?subject=${encodeURIComponent(project.title)}&body=${encodeURIComponent(text + '\n' + shareUrl)}`, '_blank');
                               setShareMenuOpen(false);
                             }}
                           >
@@ -347,7 +346,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                           <button
                             className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
                             onClick={() => {
-                              window.open(`sms:?body=${encodeURIComponent(text + ' ' + cleanUrl)}`, '_blank');
+                              window.open(`sms:?body=${encodeURIComponent(text + ' ' + shareUrl)}`, '_blank');
                               setShareMenuOpen(false);
                             }}
                           >
@@ -359,7 +358,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                               className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
                               onClick={async () => {
                                 try {
-                                  await navigator.share({ title: project.title, text, url: ogUrl });
+                                  await navigator.share({ title: project.title, text, url: shareUrl });
                                 } catch {}
                                 setShareMenuOpen(false);
                               }}
