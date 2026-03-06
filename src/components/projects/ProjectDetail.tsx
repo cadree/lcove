@@ -944,6 +944,22 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                 )}
               </TabsContent>
             </Tabs>
+
+            {/* Client management for owner */}
+            {isCreator && (project as any).is_private && (
+              <div className="pt-4 border-t border-border">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <UserPlus className="h-4 w-4" /> Clients
+                  </h4>
+                  <Button size="sm" variant="outline" onClick={() => setClientInviteOpen(true)}>
+                    <UserPlus className="h-3 w-3 mr-1" /> Invite Client
+                  </Button>
+                </div>
+              </div>
+            )}
+            </>
+            )}
           </div>
         </SheetContent>
       </Sheet>
