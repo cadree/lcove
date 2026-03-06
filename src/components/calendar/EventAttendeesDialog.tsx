@@ -70,11 +70,11 @@ export function EventAttendeesDialog({
 
       if (error) throw error;
 
-      // Fetch profiles for each attendee using profiles_public view
+      // Fetch profiles for each attendee
       const attendeesWithProfiles: Attendee[] = await Promise.all(
         (rsvps || []).map(async (rsvp) => {
           const { data: profile } = await supabase
-            .from('profiles_public')
+            .from('profiles')
             .select('display_name, avatar_url')
             .eq('user_id', rsvp.user_id)
             .maybeSingle();

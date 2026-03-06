@@ -71,7 +71,7 @@ export const useProfile = (userId?: string) => {
       error = result.error;
     } else {
       const result = await supabase
-        .from('profiles_public')
+        .from('profiles')
         .select('*')
         .eq('user_id', targetUserId)
         .single();

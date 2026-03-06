@@ -115,7 +115,7 @@ export default function EventDetail() {
       if (!rsvps || rsvps.length === 0) return {};
       const userIds = [...new Set(rsvps.map(r => r.user_id))];
       const { data, error } = await supabase
-        .from("profiles_public")
+        .from("profiles")
         .select("user_id, display_name, avatar_url")
         .in("user_id", userIds);
       if (error) throw error;
@@ -146,7 +146,7 @@ export default function EventDetail() {
       if (!teamMembers || teamMembers.length === 0) return {};
       const userIds = teamMembers.map(m => m.user_id);
       const { data, error } = await supabase
-        .from("profiles_public")
+        .from("profiles")
         .select("user_id, display_name, avatar_url")
         .in("user_id", userIds);
       if (error) throw error;

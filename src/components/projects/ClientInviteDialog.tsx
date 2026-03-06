@@ -63,7 +63,7 @@ export const ClientInviteDialog: React.FC<ClientInviteDialogProps> = ({
       let profiles: any[] = [];
       if (userIds.length > 0) {
         const { data: p } = await supabase
-          .from('profiles_public')
+          .from('profiles')
           .select('user_id, display_name, avatar_url')
           .in('user_id', userIds);
         profiles = p || [];

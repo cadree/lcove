@@ -32,7 +32,7 @@ export function useProjectUpdates(projectId?: string) {
       // Fetch author profiles
       const authorIds = [...new Set((data as any[]).map((u: any) => u.author_id))];
       const { data: profiles } = await supabase
-        .from('profiles_public')
+        .from('profiles')
         .select('user_id, display_name, avatar_url')
         .in('user_id', authorIds);
 

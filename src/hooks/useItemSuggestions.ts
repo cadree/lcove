@@ -37,7 +37,7 @@ export function useItemSuggestions(projectId?: string | null) {
       let profileMap = new Map();
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
-          .from('profiles_public')
+          .from('profiles')
           .select('user_id, display_name, avatar_url')
           .in('user_id', userIds);
         profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
