@@ -513,6 +513,19 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
           </SheetHeader>
 
           <div className="p-6 space-y-6">
+            {/* Pending client invite banner */}
+            {isPendingClient && !isCreator && (
+              <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">You've been invited as a client</p>
+                  <p className="text-xs text-muted-foreground">Accept to view project progress</p>
+                </div>
+                <Button size="sm" onClick={() => acceptClientInvite.mutate()} disabled={acceptClientInvite.isPending}>
+                  {acceptClientInvite.isPending ? 'Accepting...' : 'Accept Invite'}
+                </Button>
+              </div>
+            )}
+
             {/* Client simplified view */}
             {isClient && !isCreator ? (
               <>
