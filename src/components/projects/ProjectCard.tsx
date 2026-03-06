@@ -91,8 +91,8 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
                onClick={async (e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
-                const shareUrl = `${supabaseUrl}/functions/v1/share-page/p/${project.id}`;
+                 const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+                 const shareUrl = `https://${projectId}.supabase.co/functions/v1/share-page/p/${project.id}`;
                 let shared = false;
                 try {
                   if (navigator.share) {
