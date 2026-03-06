@@ -93,20 +93,38 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
   const { data: milestones = [] } = useProjectMilestones(project?.id);
 
   // Check if user is a client of this project
-  const { data: isClient = false } = useQuery({
-    queryKey: ['is-project-client', project?.id, user?.id],
+  const { data: clientStatus } = useQuery({
+    queryKey: ['project-client-status', project?.id, user?.id],
     queryFn: async () => {
-      if (!project?.id || !user?.id) return false;
+      if (!project?.id || !user?.id) return null;
       const { data } = await (supabase
         .from('project_clients') as any)
-        .select('id')
+        .select('id, status')
         .eq('project_id', project.id)
         .eq('client_user_id', user.id)
-        .eq('status', 'accepted')
         .maybeSingle();
-      return !!data;
+      return data as { id: string; status: string } | null;
     },
     enabled: !!project?.id && !!user?.id,
+  });
+
+  const isClient = clientStatus?.status === 'accepted';
+  const isPendingClient = clientStatus?.status === 'invited';
+
+  const acceptClientInvite = useMutation({
+    mutationFn: async () => {
+      if (!clientStatus?.id) throw new Error('No invite');
+      const { error } = await (supabase
+        .from('project_clients') as any)
+        .update({ status: 'accepted' })
+        .eq('id', clientStatus.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-client-status'] });
+      queryClient.invalidateQueries({ queryKey: ['client-projects'] });
+      toast({ title: 'Client invitation accepted!' });
+    },
   });
 
   const guestApplyMutation = useMutation({
