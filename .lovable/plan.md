@@ -1,32 +1,52 @@
 
 
-## Analysis
+## Audit Findings
 
-I tested the `share-page` edge function and confirmed it **does return correct OG tags** (project title "Neon body art", cover image URL, description). However, two issues remain:
+### 1. OG Image Preview: Fundamentally broken
 
-### Issue 1: OG Image Not Rendering in Previews
+**Root cause**: The Supabase gateway **forces `Content-Type: text/plain`** on all edge function responses, regardless of what the function sets. I confirmed this by calling the edge function directly -- the response body contains correct HTML with the right project title, image, and description, but the gateway returns `Content-Type: text/plain`. Social crawlers (iMessage, Facebook, etc.) ignore OG tags in plain text responses.
 
-The Supabase gateway is returning `Content-Type: text/plain` despite the edge function setting `text/html`. This prevents social crawlers from parsing the OG meta tags. Additionally, the response includes `Content-Security-Policy: default-src 'none'; sandbox` which some platforms reject entirely.
+This means the entire edge-function-as-share-URL strategy cannot work. No amount of header manipulation inside the function will fix this -- it's a gateway-level override.
 
-**Fix**: Add `og:image:width`, `og:image:height`, and `og:image:type` meta tags (iMessage requires these for large image previews). Also ensure the HTML response uses a `new Headers()` object to avoid header stripping.
+**Additionally**, the `index.html` `og:image` uses a relative path (`/favicon.png`) which crawlers can't resolve.
 
-### Issue 2: Guest Application Flow
+**Fix**: 
+- Revert share URLs back to clean `https://etherbylcove.com/project/{id}` URLs everywhere (Copy Link, navigator.share, SMS, Email)
+- Update `index.html` OG tags to use absolute URLs (`https://etherbylcove.com/favicon.png`) so at minimum the default ETHER branding shows correctly in previews
+- The edge function can remain as-is for future use if a proxy/CDN is added later
 
-The code and RLS are actually correct — the `AccessGate` marks `/project/` routes as public (line 26), the guest form renders for unauthenticated users (`!user`, line 491), and the RLS policy allows anonymous INSERT on `guest_role_applications`. 
+### 2. Guest Application Flow: Working correctly
 
-However, after testing I believe the issue is that when a guest arrives via the shared link, they land on the page and can see it, but if they click **"View Full Details"** it opens `ProjectDetail` which may trigger auth-dependent queries. Also the share text says "Check out this project" with the raw edge function URL visible, which could confuse users into thinking they need to sign up.
+- `guest_role_applications` table exists with proper RLS: anonymous INSERT allowed, creator-only SELECT/UPDATE
+- Guest form fields (name, email, portfolio, message) render correctly for unauthenticated users
+- Success dialog shows "Create Profile" and "Continue as Guest" buttons
+- `AccessGate` correctly marks `/project/` routes as public
+
+### 3. "View Full Details" button: Works but has auth caveat
+
+The button opens `ProjectDetail` as a sheet, which uses `useProjectApplications`, `useProjectAttachments`, `useProjectUpdates`, and `useProjectMilestones` hooks. These all query with the Supabase client. For unauthenticated users, the `projects` table has a public SELECT policy (`Anyone can view open projects`), so basic data loads. However, the attachment/update queries may return empty for guests (which is acceptable -- those are workspace features).
+
+### 4. Share URL in clipboard/text: Shows ugly Supabase URL
+
+Currently `handleShare` and `handleCopy` in both `PublicProjectPage.tsx` and `ProjectDetail.tsx` copy the edge function URL (`https://wjbyvlgsxscwukkolehg.supabase.co/functions/v1/share-page/p/...`). This is ugly AND broken (doesn't produce previews). Must revert to clean URLs.
 
 ## Planned Changes
 
-### 1. `supabase/functions/share-page/index.ts`
-- Add `og:image:width`, `og:image:height`, `og:image:type` meta tags to `buildOgHtml`
-- Use `new Headers()` constructor to set Content-Type more explicitly
-- Add a `<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>` as a fallback signal for parsers
+### `index.html`
+- Change `og:image` from `/favicon.png` to `https://etherbylcove.com/favicon.png` (absolute URL)
+- Change `twitter:image` similarly
+- Change `og:url` and `canonical` from `https://lcove.lovable.app` to `https://etherbylcove.com`
 
-### 2. `src/pages/PublicProjectPage.tsx`
-- Add a CTA banner for non-authenticated users encouraging profile creation (instead of blocking)
-- Ensure the "View Full Details" button works gracefully for guests (no auth-wall)
+### `src/pages/PublicProjectPage.tsx`
+- Remove `ogUrl` variable entirely
+- Change all share actions (Copy, Share, SMS, Email) to use `cleanUrl` (`https://etherbylcove.com/project/${projectId}`)
 
-### 3. `src/components/projects/ProjectDetail.tsx`
-- No changes needed — the share URL logic from the previous edit is correct
+### `src/components/projects/ProjectDetail.tsx`
+- Same change: remove `ogUrl`, use clean URL for all share actions
+
+### No changes needed
+- Edge function (`share-page/index.ts`) -- keep as-is for future proxy use
+- Database/RLS -- guest applications work correctly
+- `AccessGate` -- public routes configured correctly
+- Guest form UI -- fields and success dialog are correct
 
