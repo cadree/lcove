@@ -27,6 +27,35 @@ export const ClientDashboardView: React.FC<ClientDashboardViewProps> = ({ projec
 
   return (
     <div className="space-y-6">
+      {/* Action Buttons */}
+      <div className="flex flex-wrap gap-2">
+        {project.timeline_start && (
+          <AddToCalendarButtons
+            event={{
+              title: project.title,
+              description: project.description,
+              startDate: new Date(project.timeline_start),
+              endDate: project.timeline_end ? new Date(project.timeline_end) : null,
+              location: project.venue,
+            }}
+            variant="compact"
+          />
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => generateProjectPdf({
+            project,
+            roles: project.roles,
+            milestones,
+            call_sheets: callSheets,
+            attachments,
+          })}
+        >
+          <Download className="h-4 w-4 mr-2" /> Download PDF
+        </Button>
+      </div>
+
       {/* Progress */}
       <div className="bg-muted/30 rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between">

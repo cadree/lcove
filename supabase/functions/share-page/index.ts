@@ -174,6 +174,19 @@ Deno.serve(async (req) => {
         title = "Profile on ETHER";
         description = "View this creator on ETHER";
       }
+    } else if (type === "c") {
+      // Client portal — fetch via token
+      const { data } = await supabase.rpc("get_client_project_by_token", { p_token: id });
+      if (data?.project) {
+        title = `${data.project.title} – Client Portal`;
+        description = data.project.description
+          ? data.project.description.slice(0, 155)
+          : "View project details on ETHER";
+        if (data.project.cover_image_url) imageUrl = data.project.cover_image_url;
+      } else {
+        title = "Client Portal on ETHER";
+        description = "View project details";
+      }
     }
   } catch (err) {
     console.error("share-page error:", err);
