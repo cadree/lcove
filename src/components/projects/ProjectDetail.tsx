@@ -721,6 +721,9 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
               </div>
             )}
 
+            {/* Call Sheet Section */}
+            <CallSheetSection projectId={project.id} roles={project.roles || []} isOwner={isCreator} />
+
             {/* Tabs: Roles, Mood Board, Applications, Updates */}
             <Tabs defaultValue="roles" className="w-full">
               <TabsList className="w-full flex-wrap h-auto">
