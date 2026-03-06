@@ -626,7 +626,6 @@ export default function PublicProjectPage() {
             </div>
             <DialogTitle className="text-center">Application Submitted!</DialogTitle>
             <DialogDescription className="text-center">
-              Want to collaborate with the team in real time?
               Create your Ether profile to join the project workspace.
             </DialogDescription>
           </DialogHeader>

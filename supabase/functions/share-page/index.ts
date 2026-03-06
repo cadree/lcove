@@ -48,6 +48,7 @@ function buildOgHtml(
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
   <title>${esc(title)}</title>
   <meta name="description" content="${esc(description)}"/>
   <link rel="canonical" href="${esc(canonicalUrl)}"/>
@@ -58,6 +59,9 @@ function buildOgHtml(
   <meta property="og:title" content="${esc(title)}"/>
   <meta property="og:description" content="${esc(description)}"/>
   <meta property="og:image" content="${esc(imageUrl)}"/>
+  <meta property="og:image:width" content="1200"/>
+  <meta property="og:image:height" content="630"/>
+  <meta property="og:image:type" content="image/jpeg"/>
   <meta property="og:url" content="${esc(canonicalUrl)}"/>
 
   <!-- Twitter Card -->
@@ -84,7 +88,9 @@ Deno.serve(async (req) => {
     // No valid path — redirect to home
     if (isCrawler(userAgent)) {
       const html = buildOgHtml(SITE_NAME, DEFAULT_DESCRIPTION, DEFAULT_OG_IMAGE, SITE_URL, SITE_URL);
-      return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+      const h = new Headers();
+      h.set("Content-Type", "text/html; charset=utf-8");
+      return new Response(html, { headers: h });
     }
     return new Response(null, {
       status: 302,
@@ -173,10 +179,8 @@ Deno.serve(async (req) => {
   }
 
   const html = buildOgHtml(title, description, imageUrl, canonicalUrl, redirectUrl);
-  return new Response(html, {
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "public, max-age=300, s-maxage=600",
-    },
-  });
+  const headers = new Headers();
+  headers.set("Content-Type", "text/html; charset=utf-8");
+  headers.set("Cache-Control", "public, max-age=300, s-maxage=600");
+  return new Response(html, { headers });
 });
