@@ -133,9 +133,10 @@ const Projects: React.FC = () => {
           transition={{ delay: 0.1 }}
         >
           <Tabs defaultValue="browse" className="w-full">
-            <TabsList className="w-full max-w-md mb-8">
-              <TabsTrigger value="browse" className="flex-1">Browse Projects</TabsTrigger>
+            <TabsList className="w-full max-w-lg mb-8">
+              <TabsTrigger value="browse" className="flex-1">Browse</TabsTrigger>
               {user && <TabsTrigger value="my-projects" className="flex-1">My Projects</TabsTrigger>}
+              {user && <TabsTrigger value="client-projects" className="flex-1 gap-1"><Lock className="h-3 w-3" />Client</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="browse">
