@@ -79,6 +79,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   const [projectType, setProjectType] = useState<ProjectType>('volunteer');
   const [totalBudget, setTotalBudget] = useState('');
   const [creditsReward, setCreditsReward] = useState(25);
+  const [isPrivate, setIsPrivate] = useState(false);
 
   // Expected outcome
   const [selectedOutcomes, setSelectedOutcomes] = useState<string[]>([]);
