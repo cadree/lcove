@@ -92,6 +92,23 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
   const { updates, addUpdate, isPosting } = useProjectUpdates(project?.id);
   const { data: milestones = [] } = useProjectMilestones(project?.id);
 
+  // Check if user is a client of this project
+  const { data: isClient = false } = useQuery({
+    queryKey: ['is-project-client', project?.id, user?.id],
+    queryFn: async () => {
+      if (!project?.id || !user?.id) return false;
+      const { data } = await (supabase
+        .from('project_clients') as any)
+        .select('id')
+        .eq('project_id', project.id)
+        .eq('client_user_id', user.id)
+        .eq('status', 'accepted')
+        .maybeSingle();
+      return !!data;
+    },
+    enabled: !!project?.id && !!user?.id,
+  });
+
   const guestApplyMutation = useMutation({
     mutationFn: async ({ roleId }: { roleId: string }) => {
       if (!project) throw new Error('No project');
