@@ -14,6 +14,7 @@ import { useMembership } from "@/hooks/useMembership";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFundStats } from "@/hooks/useFundStats";
 import { RecentDistributionsCard } from "@/components/fund/FundDistributions";
+import { DonateDialog } from "@/components/fund/DonateDialog";
 import { toast } from "sonner";
 
 const ALLOCATION_DATA = [
