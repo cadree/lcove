@@ -636,6 +636,14 @@ export default function PublicEventPage() {
             </Card>
           </motion.div>
         )}
+
+        {isPast && (
+          <Card className="mt-4 border-border/50 bg-muted/30">
+            <CardContent className="p-5 text-center">
+              <p className="text-sm text-muted-foreground">This event has already ended.</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
