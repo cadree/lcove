@@ -79,7 +79,6 @@ serve(async (req) => {
       let name = "there";
 
       if (rsvp.user_id) {
-        // Get member email
         const { data: profile } = await supabaseAdmin
           .from("profiles")
           .select("display_name")
@@ -87,7 +86,6 @@ serve(async (req) => {
           .single();
         name = profile?.display_name || "there";
 
-        // Get email from auth
         const { data: userData } = await supabaseAdmin.auth.admin.getUserById(rsvp.user_id);
         email = userData?.user?.email || null;
       } else if (rsvp.guest_email) {
@@ -143,10 +141,78 @@ serve(async (req) => {
       }
     }
 
-    logStep("Complete", { totalAttendees: rsvps.length, sent: sentCount });
+    // --- Send push notifications to guest subscribers ---
+    let pushSentCount = 0;
+    try {
+      const { data: guestSubs, error: guestSubError } = await supabaseAdmin
+        .from("guest_push_subscriptions")
+        .select("endpoint, p256dh, auth, guest_email")
+        .eq("event_id", eventId);
+
+      if (!guestSubError && guestSubs && guestSubs.length > 0) {
+        logStep("Found guest push subscriptions", { count: guestSubs.length });
+
+        const pushPayload = JSON.stringify({
+          title: `Reminder: ${event.title}`,
+          body: message || `${eventDate} at ${eventTime} — ${location}`,
+          icon: "/favicon.png",
+          badge: "/favicon.png",
+          tag: `ether-event-reminder-${eventId}`,
+          renotify: true,
+          data: {
+            url: eventUrl,
+            type: "event_reminder",
+          },
+          vibrate: [200, 100, 200],
+          timestamp: Date.now(),
+        });
+
+        const expiredEndpoints: string[] = [];
+
+        for (const sub of guestSubs) {
+          try {
+            const response = await fetch(sub.endpoint, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Content-Length": String(new TextEncoder().encode(pushPayload).length),
+                "TTL": "86400",
+                "Urgency": "high",
+              },
+              body: pushPayload,
+            });
+
+            if (response.status === 201 || response.status === 200) {
+              pushSentCount++;
+              logStep("Guest push sent", { email: sub.guest_email });
+            } else if (response.status === 410 || response.status === 404) {
+              expiredEndpoints.push(sub.endpoint);
+              logStep("Guest push subscription expired", { email: sub.guest_email });
+            } else {
+              logStep("Guest push failed", { email: sub.guest_email, status: response.status });
+            }
+          } catch (err) {
+            logStep("Guest push error", { email: sub.guest_email, error: String(err) });
+          }
+        }
+
+        // Clean up expired guest subscriptions
+        if (expiredEndpoints.length > 0) {
+          await supabaseAdmin
+            .from("guest_push_subscriptions")
+            .delete()
+            .in("endpoint", expiredEndpoints);
+          logStep("Cleaned up expired guest subscriptions", { count: expiredEndpoints.length });
+        }
+      }
+    } catch (err) {
+      logStep("Guest push notification error", { error: String(err) });
+    }
+
+    logStep("Complete", { totalAttendees: rsvps.length, emailsSent: sentCount, pushSent: pushSentCount });
 
     return new Response(
-      JSON.stringify({ success: true, sentCount, totalAttendees: rsvps.length }),
+      JSON.stringify({ success: true, sentCount, pushSentCount, totalAttendees: rsvps.length }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
