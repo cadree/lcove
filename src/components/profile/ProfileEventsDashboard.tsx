@@ -372,9 +372,10 @@ interface CompactListViewProps {
   onEdit: (eventId: string) => void;
   onShare: (event: EventWithStats) => void;
   onDuplicate: (event: EventWithStats) => void;
+  onDelete: (event: EventWithStats) => void;
 }
 
-function CompactListView({ events, onEventClick, onEdit, onShare, onDuplicate }: CompactListViewProps) {
+function CompactListView({ events, onEventClick, onEdit, onShare, onDuplicate, onDelete }: CompactListViewProps) {
   if (events.length === 0) {
     return (
       <div className="py-8 text-center">
