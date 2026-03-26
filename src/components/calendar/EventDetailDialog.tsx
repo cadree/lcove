@@ -35,7 +35,8 @@ import {
   User,
   Settings,
   Sun,
-  CalendarCheck
+  CalendarCheck,
+  UserPlus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -47,6 +48,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EventAttendeesDialog } from "./EventAttendeesDialog";
 import { AddToCalendarButtons } from "./AddToCalendarButtons";
+import { InviteGuestsDialog } from "./InviteGuestsDialog";
 
 interface EventDetailDialogProps {
   eventId: string | null;
@@ -586,6 +588,16 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
               </div>
               {isCreator && <Settings className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />}
             </div>
+
+            {/* Invite Guests - Creator only */}
+            {isCreator && (
+              <InviteGuestsDialog eventId={event.id} eventTitle={event.title}>
+                <Button variant="outline" size="sm" className="w-full gap-2">
+                  <UserPlus className="h-4 w-4" />
+                  Invite Guests via Email / SMS
+                </Button>
+              </InviteGuestsDialog>
+            )}
 
             {/* Organizer */}
             <div 

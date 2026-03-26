@@ -48,7 +48,7 @@ serve(async (req) => {
       }
     }
 
-    const { eventId, eventTitle, ticketPrice, quantity = 1 } = await req.json();
+    const { eventId, eventTitle, ticketPrice, quantity = 1, guestName, guestEmail, guestPhone } = await req.json();
 
     if (!eventId) {
       throw new Error("Missing required field: eventId");
@@ -112,7 +112,7 @@ serve(async (req) => {
     // Build the checkout session config
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       customer: customerId,
-      customer_email: customerId ? undefined : userEmail,
+      customer_email: customerId ? undefined : (userEmail || guestEmail || undefined),
       payment_method_types: ["card"],
       line_items: [
         {
@@ -122,19 +122,22 @@ serve(async (req) => {
               name: `Ticket: ${eventTitle || 'Event'}`,
               description: `Event ticket purchase`,
             },
-            unit_amount: Math.round(ticketPrice * 100), // Convert to cents
+            unit_amount: Math.round(ticketPrice * 100),
           },
           quantity: quantity,
         },
       ],
       mode: "payment",
-      success_url: `${origin}/calendar?ticket_success=true&event=${eventId}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/calendar?ticket_cancelled=true&event=${eventId}`,
+      success_url: `${origin}/event/${eventId}?ticket_success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/event/${eventId}?ticket_cancelled=true`,
       metadata: {
         event_id: eventId,
         user_id: userId || 'guest',
         creator_id: event?.creator_id || '',
         type: "event_ticket",
+        guest_name: guestName || '',
+        guest_email: guestEmail || '',
+        guest_phone: guestPhone || '',
       },
     };
 
@@ -171,12 +174,30 @@ serve(async (req) => {
           user_id: userId,
           status: 'going',
           stripe_payment_id: session.id,
+          ticket_purchased: true,
         }, {
           onConflict: 'event_id,user_id'
         });
 
       if (rsvpError) {
         console.error('Error updating RSVP:', rsvpError);
+      }
+    } else if (guestEmail) {
+      // Guest ticket purchase - create RSVP without user_id
+      const { error: rsvpError } = await supabaseClient
+        .from('event_rsvps')
+        .insert({
+          event_id: eventId,
+          guest_name: guestName || null,
+          guest_email: guestEmail,
+          guest_phone: guestPhone || null,
+          status: 'going',
+          stripe_payment_id: session.id,
+          ticket_purchased: true,
+        });
+
+      if (rsvpError) {
+        console.error('Error creating guest RSVP:', rsvpError);
       }
     }
 
