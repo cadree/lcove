@@ -174,12 +174,30 @@ serve(async (req) => {
           user_id: userId,
           status: 'going',
           stripe_payment_id: session.id,
+          ticket_purchased: true,
         }, {
           onConflict: 'event_id,user_id'
         });
 
       if (rsvpError) {
         console.error('Error updating RSVP:', rsvpError);
+      }
+    } else if (guestEmail) {
+      // Guest ticket purchase - create RSVP without user_id
+      const { error: rsvpError } = await supabaseClient
+        .from('event_rsvps')
+        .insert({
+          event_id: eventId,
+          guest_name: guestName || null,
+          guest_email: guestEmail,
+          guest_phone: guestPhone || null,
+          status: 'going',
+          stripe_payment_id: session.id,
+          ticket_purchased: true,
+        });
+
+      if (rsvpError) {
+        console.error('Error creating guest RSVP:', rsvpError);
       }
     }
 
