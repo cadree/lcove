@@ -417,27 +417,194 @@ export default function PublicEventPage() {
         {!isPast && !isFree && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
             <Card className="mt-4 border-border/50 shadow-lg bg-card/95 backdrop-blur-md">
-              <CardContent className="p-5 text-center space-y-3">
-                <Ticket className="h-10 w-10 text-primary mx-auto" />
-                <h3 className="text-lg font-display font-semibold">Tickets: ${event.ticket_price}</h3>
-                <p className="text-sm text-muted-foreground">
-                  Sign in to the app to purchase tickets for this event.
-                </p>
-                <Button variant="outline" className="gap-2" onClick={() => navigate(`/auth?redirect=/calendar?event=${eventId}`)}>
-                  <LogIn className="h-4 w-4" />
-                  Sign In to Buy Tickets
-                </Button>
+              <CardContent className="p-5">
+                {ticketPurchaseSuccess ? (
+                  <div className="text-center py-4 space-y-3">
+                    <CheckCircle2 className="h-12 w-12 text-primary mx-auto" />
+                    <h3 className="text-lg font-display font-semibold">Ticket Purchased!</h3>
+                    <p className="text-sm text-muted-foreground">
+                      You're all set for <strong>{event.title}</strong>.
+                    </p>
+                    {/* Add to Google Calendar */}
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2 mt-2"
+                      onClick={() => {
+                        const start = new Date(event.start_date);
+                        const end = event.end_date ? new Date(event.end_date) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
+                        const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+                        const location = [event.venue, event.address, event.city, event.state].filter(Boolean).join(', ');
+                        const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${fmt(start)}/${fmt(end)}&details=${encodeURIComponent(event.description || '')}&location=${encodeURIComponent(location)}`;
+                        window.open(gcalUrl, '_blank', 'noopener');
+                      }}
+                    >
+                      <Calendar className="h-4 w-4" />
+                      Add to Google Calendar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full gap-2 text-sm"
+                      onClick={() => {
+                        const start = new Date(event.start_date);
+                        const end = event.end_date ? new Date(event.end_date) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
+                        const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+                        const location = [event.venue, event.address, event.city, event.state].filter(Boolean).join(', ');
+                        const ics = [
+                          'BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT',
+                          `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`,
+                          `SUMMARY:${event.title}`, `LOCATION:${location}`,
+                          `DESCRIPTION:${(event.description || '').replace(/\n/g, '\\n')}`,
+                          'END:VEVENT', 'END:VCALENDAR'
+                        ].join('\r\n');
+                        const blob = new Blob([ics], { type: 'text/calendar' });
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(blob);
+                        a.download = `${event.title.replace(/\s+/g, '-')}.ics`;
+                        a.click();
+                      }}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Download .ics File
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2 text-sm"
+                      onClick={async () => {
+                        try {
+                          const { data, error } = await supabase.functions.invoke("generate-wallet-pass", {
+                            body: {
+                              eventId: event.id,
+                              eventTitle: event.title,
+                              eventDate: event.start_date,
+                              eventEndDate: event.end_date,
+                              venue: [event.venue, event.city].filter(Boolean).join(', '),
+                              guestName: ticketGuestName || guestName || 'Guest',
+                              ticketType: 'paid',
+                            },
+                          });
+                          if (error) throw error;
+                          if (data?.passUrl) {
+                            window.open(data.passUrl, '_blank');
+                          } else {
+                            toast.info("Wallet pass generation is being set up. Check back soon!");
+                          }
+                        } catch {
+                          toast.info("Wallet pass feature coming soon!");
+                        }
+                      }}
+                    >
+                      <Wallet className="h-4 w-4" />
+                      Add to Wallet
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-center mb-4">
+                      <Ticket className="h-10 w-10 text-primary mx-auto mb-2" />
+                      <h3 className="text-lg font-display font-semibold">Tickets: ${event.ticket_price}</h3>
+                      <p className="text-xs text-muted-foreground">No account needed — enter your info and buy your ticket.</p>
+                    </div>
+
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!ticketGuestEmail.trim()) {
+                        toast.error("Please enter your email");
+                        return;
+                      }
+                      setIsPurchasing(true);
+                      try {
+                        const headers: Record<string, string> = {};
+                        if (user) {
+                          const { data: { session } } = await supabase.auth.getSession();
+                          if (session) {
+                            headers.Authorization = `Bearer ${session.access_token}`;
+                          }
+                        }
+                        const { data, error } = await supabase.functions.invoke("purchase-event-ticket", {
+                          body: {
+                            eventId: event.id,
+                            eventTitle: event.title,
+                            ticketPrice: event.ticket_price,
+                            guestName: ticketGuestName.trim(),
+                            guestEmail: ticketGuestEmail.trim().toLowerCase(),
+                            guestPhone: ticketGuestPhone.trim() || undefined,
+                          },
+                          headers,
+                        });
+                        if (error) throw error;
+                        if (data?.url) {
+                          const win = window.open(data.url, "_blank");
+                          if (!win || win.closed) {
+                            try { window.location.href = data.url; } catch {
+                              toast.info("Click to complete purchase", {
+                                duration: 15000,
+                                action: { label: "Open Checkout", onClick: () => window.open(data.url, "_blank") },
+                              });
+                            }
+                          }
+                        }
+                      } catch (err: any) {
+                        toast.error(err.message || "Failed to start checkout");
+                      } finally {
+                        setIsPurchasing(false);
+                      }
+                    }} className="space-y-3">
+                      <div>
+                        <Label htmlFor="ticket-name" className="text-xs">Full Name</Label>
+                        <Input
+                          id="ticket-name"
+                          value={ticketGuestName}
+                          onChange={(e) => setTicketGuestName(e.target.value)}
+                          placeholder="Your full name"
+                          maxLength={100}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="ticket-email" className="text-xs">Email Address *</Label>
+                        <Input
+                          id="ticket-email"
+                          type="email"
+                          value={ticketGuestEmail}
+                          onChange={(e) => setTicketGuestEmail(e.target.value)}
+                          placeholder="you@example.com"
+                          required
+                          maxLength={255}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="ticket-phone" className="text-xs flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          Phone Number
+                        </Label>
+                        <Input
+                          id="ticket-phone"
+                          type="tel"
+                          value={ticketGuestPhone}
+                          onChange={(e) => setTicketGuestPhone(e.target.value)}
+                          placeholder="(555) 123-4567"
+                          maxLength={20}
+                        />
+                      </div>
+                      <Button type="submit" className="w-full gap-2" disabled={isPurchasing}>
+                        {isPurchasing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ticket className="h-4 w-4" />}
+                        {isPurchasing ? "Redirecting..." : `Buy Ticket — $${event.ticket_price}`}
+                      </Button>
+                    </form>
+
+                    <div className="relative my-4">
+                      <Separator />
+                      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3 text-xs text-muted-foreground">or</span>
+                    </div>
+
+                    <Button variant="outline" className="w-full gap-2" onClick={() => navigate(`/auth?redirect=/calendar?event=${eventId}`)}>
+                      <LogIn className="h-4 w-4" />
+                      Sign in to buy with your profile
+                    </Button>
+                  </>
+                )}
               </CardContent>
             </Card>
           </motion.div>
-        )}
-
-        {isPast && (
-          <Card className="mt-4 border-border/50 bg-muted/30">
-            <CardContent className="p-5 text-center">
-              <p className="text-sm text-muted-foreground">This event has already ended.</p>
-            </CardContent>
-          </Card>
         )}
       </div>
     </div>
