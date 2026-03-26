@@ -490,18 +490,25 @@ export default function FundDashboard() {
                         </h3>
                         <p className="text-muted-foreground max-w-md">
                           Join {fundStats?.lifetime.memberCount || 0}+ members funding grants, events, and creative opportunities. 
-                          Starting at $5/month.
+                          Donate once or subscribe monthly — no account required.
                         </p>
                       </div>
                     </div>
-                    <Button 
-                      size="lg" 
-                      className="group"
-                      onClick={handleContribute}
-                    >
-                      Become a Member
-                      <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                    </Button>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <DonateDialog>
+                        <Button size="lg" className="group">
+                          Donate Now
+                          <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                        </Button>
+                      </DonateDialog>
+                      <Button 
+                        size="lg" 
+                        variant="outline"
+                        onClick={handleContribute}
+                      >
+                        Become a Member
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
