@@ -141,17 +141,15 @@ serve(async (req) => {
       },
     };
 
-    // If creator has Stripe Connect enabled, split the payment 95/5
+    // If creator has Stripe Connect enabled, send full payment to creator (0% platform fee)
     if (creatorConnectId && creatorPayoutEnabled) {
-      const platformFeeAmount = Math.round(ticketPrice * 100 * 0.05); // 5% platform fee
-      logStep("Using Stripe Connect split", { 
+      logStep("Using Stripe Connect — full payout to creator", { 
         creatorConnectId, 
-        platformFee: platformFeeAmount / 100,
-        creatorPayout: (ticketPrice * 100 - platformFeeAmount) / 100
+        creatorPayout: ticketPrice
       });
 
       sessionConfig.payment_intent_data = {
-        application_fee_amount: platformFeeAmount,
+        application_fee_amount: 0,
         transfer_data: {
           destination: creatorConnectId,
         },

@@ -123,7 +123,7 @@ serve(async (req) => {
       // If creator has Connect enabled, payment already went to them via Stripe
       // If not, we credit their earned_balance (95% of ticket price)
       if (!creatorProfile?.stripe_connect_account_id || !creatorProfile?.payout_enabled) {
-        const creatorEarnings = Math.floor(ticketAmount * 0.95 * 100); // 95% in credits (1 credit = $0.01)
+        const creatorEarnings = Math.floor(ticketAmount * 100); // 100% in credits (1 credit = $0.01)
         
         logStep("Crediting creator earned_balance", { 
           creatorId, 
@@ -142,7 +142,7 @@ serve(async (req) => {
             credit_type: 'earned',
             earned_amount: creatorEarnings,
             genesis_amount: 0,
-            description: `Event ticket sale (95% of $${ticketAmount.toFixed(2)})`,
+            description: `Event ticket sale (100% of $${ticketAmount.toFixed(2)})`,
             reference_type: 'event_ticket_sale',
             reference_id: eventIdFromSession,
           });
