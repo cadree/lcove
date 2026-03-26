@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EventAttendeesDialog } from "./EventAttendeesDialog";
 import { AddToCalendarButtons } from "./AddToCalendarButtons";
+import { InviteGuestsDialog } from "./InviteGuestsDialog";
 
 interface EventDetailDialogProps {
   eventId: string | null;
