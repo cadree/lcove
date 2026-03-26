@@ -112,7 +112,7 @@ serve(async (req) => {
     // Build the checkout session config
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       customer: customerId,
-      customer_email: customerId ? undefined : userEmail,
+      customer_email: customerId ? undefined : (userEmail || guestEmail || undefined),
       payment_method_types: ["card"],
       line_items: [
         {
@@ -122,19 +122,22 @@ serve(async (req) => {
               name: `Ticket: ${eventTitle || 'Event'}`,
               description: `Event ticket purchase`,
             },
-            unit_amount: Math.round(ticketPrice * 100), // Convert to cents
+            unit_amount: Math.round(ticketPrice * 100),
           },
           quantity: quantity,
         },
       ],
       mode: "payment",
-      success_url: `${origin}/calendar?ticket_success=true&event=${eventId}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/calendar?ticket_cancelled=true&event=${eventId}`,
+      success_url: `${origin}/event/${eventId}?ticket_success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/event/${eventId}?ticket_cancelled=true`,
       metadata: {
         event_id: eventId,
         user_id: userId || 'guest',
         creator_id: event?.creator_id || '',
         type: "event_ticket",
+        guest_name: guestName || '',
+        guest_email: guestEmail || '',
+        guest_phone: guestPhone || '',
       },
     };
 
