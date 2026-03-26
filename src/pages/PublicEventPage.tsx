@@ -604,6 +604,23 @@ export default function PublicEventPage() {
                       <Wallet className="h-4 w-4" />
                       Add to Wallet
                     </Button>
+                    {/* Get Notified - Push */}
+                    {pushStatus !== 'subscribed' && (
+                      <Button
+                        variant="outline"
+                        className="w-full gap-2 text-sm"
+                        disabled={pushStatus === 'subscribing'}
+                        onClick={() => handleSubscribePush(ticketGuestEmail || guestEmail)}
+                      >
+                        <Bell className="h-4 w-4" />
+                        {pushStatus === 'subscribing' ? 'Enabling…' : 'Get Event Reminders'}
+                      </Button>
+                    )}
+                    {pushStatus === 'subscribed' && (
+                      <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                        <Bell className="h-3 w-3" /> Push notifications enabled
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <>
