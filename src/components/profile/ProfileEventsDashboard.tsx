@@ -141,6 +141,20 @@ export function ProfileEventsDashboard() {
     }
   };
 
+  const handleDelete = async (event: EventWithStats) => {
+    if (!confirm(`Delete "${event.title}"? This cannot be undone.`)) return;
+    try {
+      const { error } = await supabase.from('events').delete().eq('id', event.id);
+      if (error) throw error;
+      toast.success("Event deleted");
+      queryClient.invalidateQueries({ queryKey: ['dashboard-events'] });
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error("Failed to delete event");
+    }
+  };
+
   if (!user) return null;
 
   return (
