@@ -14,6 +14,7 @@ import { useMembership } from "@/hooks/useMembership";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFundStats } from "@/hooks/useFundStats";
 import { RecentDistributionsCard } from "@/components/fund/FundDistributions";
+import { DonateDialog } from "@/components/fund/DonateDialog";
 import { toast } from "sonner";
 
 const ALLOCATION_DATA = [
@@ -468,9 +469,17 @@ export default function FundDashboard() {
                         </Badge>
                       )}
                     </div>
-                    <Button variant="outline" size="sm" onClick={handleManageSubscription}>
-                      Manage Subscription
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <DonateDialog>
+                        <Button variant="default" size="sm">
+                          <Heart className="w-3.5 h-3.5 mr-1.5" />
+                          Extra Donation
+                        </Button>
+                      </DonateDialog>
+                      <Button variant="outline" size="sm" onClick={handleManageSubscription}>
+                        Manage Subscription
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -489,18 +498,25 @@ export default function FundDashboard() {
                         </h3>
                         <p className="text-muted-foreground max-w-md">
                           Join {fundStats?.lifetime.memberCount || 0}+ members funding grants, events, and creative opportunities. 
-                          Starting at $5/month.
+                          Donate once or subscribe monthly — no account required.
                         </p>
                       </div>
                     </div>
-                    <Button 
-                      size="lg" 
-                      className="group"
-                      onClick={handleContribute}
-                    >
-                      Become a Member
-                      <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                    </Button>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <DonateDialog>
+                        <Button size="lg" className="group">
+                          Donate Now
+                          <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                        </Button>
+                      </DonateDialog>
+                      <Button 
+                        size="lg" 
+                        variant="outline"
+                        onClick={handleContribute}
+                      >
+                        Become a Member
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
