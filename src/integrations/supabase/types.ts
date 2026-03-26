@@ -2466,6 +2466,50 @@ export type Database = {
           },
         ]
       }
+      guest_push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          event_id: string
+          guest_email: string
+          id: string
+          p256dh: string
+          updated_at: string
+          user_agent: string | null
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          event_id: string
+          guest_email: string
+          id?: string
+          p256dh: string
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          event_id?: string
+          guest_email?: string
+          id?: string
+          p256dh?: string
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guest_push_subscriptions_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       guest_role_applications: {
         Row: {
           created_at: string
