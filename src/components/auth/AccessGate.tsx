@@ -10,7 +10,7 @@ interface AccessGateProps {
 }
 
 // Routes that don't require access gate checks (for unauthenticated users)
-const PUBLIC_ROUTES = ['/', '/landing', '/auth', '/onboarding', '/locked', '/admin/onboarding', '/denied', '/admin'];
+const PUBLIC_ROUTES = ['/', '/landing', '/auth', '/onboarding', '/locked', '/admin/onboarding', '/denied', '/admin', '/fund'];
 
 // Routes that should redirect authenticated users to /home
 const LANDING_ROUTES = ['/', '/landing'];
