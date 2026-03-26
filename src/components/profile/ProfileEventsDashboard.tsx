@@ -461,6 +461,13 @@ function CompactListView({ events, onEventClick, onEdit, onShare, onDuplicate, o
                   <Copy className="h-3.5 w-3.5" />
                   Duplicate
                 </button>
+                <button
+                  onClick={() => onDelete(event)}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-destructive/10 text-destructive transition-colors"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </button>
               </PopoverContent>
             </Popover>
           </div>
