@@ -33,12 +33,20 @@ import { toast } from "sonner";
 export default function PublicEventPage() {
   const { eventId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
   const [rsvpSuccess, setRsvpSuccess] = useState(false);
+  const [ticketPurchaseSuccess, setTicketPurchaseSuccess] = useState(
+    searchParams.get("ticket_success") === "true"
+  );
+  const [isPurchasing, setIsPurchasing] = useState(false);
+  const [ticketGuestName, setTicketGuestName] = useState("");
+  const [ticketGuestEmail, setTicketGuestEmail] = useState("");
+  const [ticketGuestPhone, setTicketGuestPhone] = useState("");
 
   // Fetch event (public – anon can read)
   const { data: event, isLoading } = useQuery({
