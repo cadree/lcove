@@ -367,6 +367,7 @@ export default function PublicEventPage() {
                     >
                       <Wallet className="h-4 w-4" />
                       Add to Wallet
+                    </Button>
                   </div>
                 ) : (
                   <>
