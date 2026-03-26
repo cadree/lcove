@@ -480,6 +480,7 @@ export default function FundDashboard() {
                         Manage Subscription
                       </Button>
                     </div>
+                  </div>
                 </CardContent>
               </Card>
             ) : (
