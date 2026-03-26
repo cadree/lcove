@@ -17,6 +17,7 @@ import {
   Rss,
   CalendarDays,
   ArrowRight,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -140,6 +141,20 @@ export function ProfileEventsDashboard() {
     }
   };
 
+  const handleDelete = async (event: EventWithStats) => {
+    if (!confirm(`Delete "${event.title}"? This cannot be undone.`)) return;
+    try {
+      const { error } = await supabase.from('events').delete().eq('id', event.id);
+      if (error) throw error;
+      toast.success("Event deleted");
+      queryClient.invalidateQueries({ queryKey: ['dashboard-events'] });
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error("Failed to delete event");
+    }
+  };
+
   if (!user) return null;
 
   return (
@@ -220,6 +235,7 @@ export function ProfileEventsDashboard() {
             onEdit={(eventId) => navigate(`/dashboard/events/${eventId}`)}
             onShare={handleShare}
             onDuplicate={handleDuplicate}
+            onDelete={handleDelete}
           />
         ) : view === "list" ? (
           <CompactListView
@@ -228,6 +244,7 @@ export function ProfileEventsDashboard() {
             onEdit={(eventId) => navigate(`/dashboard/events/${eventId}`)}
             onShare={handleShare}
             onDuplicate={handleDuplicate}
+            onDelete={handleDelete}
           />
         ) : (
           <CalendarFeedSettings />
@@ -278,6 +295,7 @@ interface CompactCalendarViewProps {
   onEdit: (eventId: string) => void;
   onShare: (event: EventWithStats) => void;
   onDuplicate: (event: EventWithStats) => void;
+  onDelete: (event: EventWithStats) => void;
 }
 
 function CompactCalendarView({
@@ -354,9 +372,10 @@ interface CompactListViewProps {
   onEdit: (eventId: string) => void;
   onShare: (event: EventWithStats) => void;
   onDuplicate: (event: EventWithStats) => void;
+  onDelete: (event: EventWithStats) => void;
 }
 
-function CompactListView({ events, onEventClick, onEdit, onShare, onDuplicate }: CompactListViewProps) {
+function CompactListView({ events, onEventClick, onEdit, onShare, onDuplicate, onDelete }: CompactListViewProps) {
   if (events.length === 0) {
     return (
       <div className="py-8 text-center">
@@ -441,6 +460,13 @@ function CompactListView({ events, onEventClick, onEdit, onShare, onDuplicate }:
                 >
                   <Copy className="h-3.5 w-3.5" />
                   Duplicate
+                </button>
+                <button
+                  onClick={() => onDelete(event)}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-destructive/10 text-destructive transition-colors"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
                 </button>
               </PopoverContent>
             </Popover>
