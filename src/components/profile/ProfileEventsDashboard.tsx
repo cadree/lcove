@@ -295,6 +295,7 @@ interface CompactCalendarViewProps {
   onEdit: (eventId: string) => void;
   onShare: (event: EventWithStats) => void;
   onDuplicate: (event: EventWithStats) => void;
+  onDelete: (event: EventWithStats) => void;
 }
 
 function CompactCalendarView({
