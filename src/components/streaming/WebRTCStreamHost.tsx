@@ -45,7 +45,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
-  const hostReadyIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hostReadyIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [isStreaming, setIsStreaming] = useState(initialIsLive);
   const [cameraState, setCameraState] = useState<CameraState>('requesting');

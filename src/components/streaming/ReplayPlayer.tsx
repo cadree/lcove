@@ -24,7 +24,7 @@ interface ReplayPlayerProps {
 export const ReplayPlayer: React.FC<ReplayPlayerProps> = ({ src, poster, className }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hideControlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(true);

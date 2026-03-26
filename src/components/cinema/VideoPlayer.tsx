@@ -54,7 +54,7 @@ export const VideoPlayer = ({
   const [isBuffering, setIsBuffering] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [previewEnded, setPreviewEnded] = useState(false);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout>();
+  const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const updateProgress = useUpdateWatchProgress();
 
