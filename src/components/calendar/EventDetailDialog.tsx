@@ -295,15 +295,31 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
   };
 
   const handleShare = async (method: 'copy' | 'twitter' | 'native') => {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
-    const shareUrl = `${supabaseUrl}/functions/v1/share-page/e/${event.id}`;
+    const shareUrl = `https://etherbylcove.com/event/${event.id}`;
     const shareText = `Check out "${event.title}" on ${format(eventDate, 'MMMM d')}!`;
 
     if (method === 'copy') {
+      let copied = false;
       try {
         await navigator.clipboard.writeText(shareUrl);
+        copied = true;
+      } catch { /* clipboard blocked in iframe */ }
+      if (!copied) {
+        try {
+          const textarea = document.createElement('textarea');
+          textarea.value = shareUrl;
+          textarea.style.position = 'fixed';
+          textarea.style.opacity = '0';
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+          copied = true;
+        } catch { /* legacy fallback failed */ }
+      }
+      if (copied) {
         toast.success('Link copied to clipboard!');
-      } catch {
+      } else {
         window.prompt('Copy this link:', shareUrl);
       }
     } else if (method === 'twitter') {
@@ -312,8 +328,7 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
       try {
         await navigator.share({
           title: event.title,
-          text: shareText,
-          url: shareUrl,
+          text: shareUrl,
         });
       } catch {
         // User cancelled
