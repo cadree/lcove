@@ -338,6 +338,35 @@ export default function PublicEventPage() {
                       <ExternalLink className="h-4 w-4" />
                       Download .ics File
                     </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2 text-sm"
+                      onClick={async () => {
+                        try {
+                          const { data, error } = await supabase.functions.invoke("generate-wallet-pass", {
+                            body: {
+                              eventId: event.id,
+                              eventTitle: event.title,
+                              eventDate: event.start_date,
+                              eventEndDate: event.end_date,
+                              venue: [event.venue, event.city].filter(Boolean).join(', '),
+                              guestName: guestName || 'Guest',
+                              ticketType: 'free',
+                            },
+                          });
+                          if (error) throw error;
+                          if (data?.passUrl) {
+                            window.open(data.passUrl, '_blank');
+                          } else {
+                            toast.info("Wallet pass generation is being set up. Check back soon!");
+                          }
+                        } catch {
+                          toast.info("Wallet pass feature coming soon!");
+                        }
+                      }}
+                    >
+                      <Wallet className="h-4 w-4" />
+                      Add to Wallet
                   </div>
                 ) : (
                   <>
