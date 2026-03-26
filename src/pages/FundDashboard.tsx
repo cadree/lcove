@@ -469,10 +469,17 @@ export default function FundDashboard() {
                         </Badge>
                       )}
                     </div>
-                    <Button variant="outline" size="sm" onClick={handleManageSubscription}>
-                      Manage Subscription
-                    </Button>
-                  </div>
+                    <div className="flex flex-wrap gap-2">
+                      <DonateDialog>
+                        <Button variant="default" size="sm">
+                          <Heart className="w-3.5 h-3.5 mr-1.5" />
+                          Extra Donation
+                        </Button>
+                      </DonateDialog>
+                      <Button variant="outline" size="sm" onClick={handleManageSubscription}>
+                        Manage Subscription
+                      </Button>
+                    </div>
                 </CardContent>
               </Card>
             ) : (
