@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import {
@@ -28,6 +28,7 @@ import {
   TrendingUp,
   BarChart3,
   Send,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,6 +44,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import BottomNav from "@/components/navigation/BottomNav";
@@ -74,7 +85,10 @@ export default function EventDetail() {
   const navigate = useNavigate();
   const { eventId } = useParams();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("orders");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch event
   const { data: event, isLoading: eventLoading } = useQuery({
@@ -113,7 +127,8 @@ export default function EventDetail() {
     queryKey: ["event-attendee-profiles", rsvps?.map(r => r.user_id)],
     queryFn: async () => {
       if (!rsvps || rsvps.length === 0) return {};
-      const userIds = [...new Set(rsvps.map(r => r.user_id))];
+      const userIds = [...new Set(rsvps.map(r => r.user_id).filter(Boolean))];
+      if (userIds.length === 0) return {};
       const { data, error } = await supabase
         .from("profiles")
         .select("user_id, display_name, avatar_url")
@@ -179,6 +194,24 @@ export default function EventDetail() {
     toast.success("Link copied to clipboard");
   };
 
+  const handleDelete = async () => {
+    if (!eventId) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase.from("events").delete().eq("id", eventId);
+      if (error) throw error;
+      toast.success("Event deleted");
+      queryClient.invalidateQueries({ queryKey: ["dashboard-events"] });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      navigate("/dashboard/events");
+    } catch (error) {
+      toast.error("Failed to delete event");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
+
   if (!user) {
     navigate("/auth");
     return null;
@@ -200,99 +233,100 @@ export default function EventDetail() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* Persistent Header */}
-      <motion.header
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="sticky top-0 z-50 backdrop-blur-xl bg-background/95 border-b border-border/30"
-        style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 0px)" }}
-      >
-        {/* Top bar */}
-        <div className="flex items-center justify-between px-4 h-12">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/dashboard/events")}
-            className="h-9 w-9"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleCopyLink} className="gap-1.5">
-              <Copy className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Copy Link</span>
+      {/* Single Tabs wrapper around header + main */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        {/* Persistent Header */}
+        <motion.header
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="sticky top-0 z-50 backdrop-blur-xl bg-background/95 border-b border-border/30"
+          style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 0px)" }}
+        >
+          {/* Top bar */}
+          <div className="flex items-center justify-between px-4 h-12">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/dashboard/events")}
+              className="h-9 w-9"
+            >
+              <ArrowLeft className="h-5 w-5" />
             </Button>
-            <Button variant="default" size="sm" onClick={handleShare} className="gap-1.5">
-              <Share2 className="h-3.5 w-3.5" />
-              Share
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9">
-                  <MoreHorizontal className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => navigate(`/calendar?event=${eventId}`)}>
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  View Public Page
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Event
-                </DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive">
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Event
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleCopyLink} className="gap-1.5">
+                <Copy className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Copy Link</span>
+              </Button>
+              <Button variant="default" size="sm" onClick={handleShare} className="gap-1.5">
+                <Share2 className="h-3.5 w-3.5" />
+                Share
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-9 w-9">
+                    <MoreHorizontal className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => navigate(`/event/${eventId}`)}>
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    View Public Page
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate(`/calendar?editEvent=${eventId}`)}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Event
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive" onClick={() => setShowDeleteDialog(true)}>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Event
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
-        </div>
 
-        {/* Event info bar */}
-        {isLoading ? (
-          <div className="px-4 pb-3 space-y-2">
-            <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-4 w-64" />
-          </div>
-        ) : event ? (
-          <div className="px-4 pb-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h1 className="text-lg font-display font-semibold truncate">{event.title}</h1>
-                  <Badge 
-                    variant="outline" 
-                    className={cn("shrink-0 text-[10px] px-1.5", statusStyles[status?.variant || 'draft'])}
-                  >
-                    {status?.label}
-                  </Badge>
-                </div>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {format(new Date(event.start_date), "EEE, MMM d")}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {format(new Date(event.start_date), "h:mm a")}
-                    {event.end_date && ` - ${format(new Date(event.end_date), "h:mm a")}`}
-                  </span>
-                  {(event.venue || event.city) && (
+          {/* Event info bar */}
+          {isLoading ? (
+            <div className="px-4 pb-3 space-y-2">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+          ) : event ? (
+            <div className="px-4 pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h1 className="text-lg font-display font-semibold truncate">{event.title}</h1>
+                    <Badge 
+                      variant="outline" 
+                      className={cn("shrink-0 text-[10px] px-1.5", statusStyles[status?.variant || 'draft'])}
+                    >
+                      {status?.label}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {event.venue || event.city}
+                      <Calendar className="h-3 w-3" />
+                      {format(new Date(event.start_date), "EEE, MMM d")}
                     </span>
-                  )}
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {format(new Date(event.start_date), "h:mm a")}
+                      {event.end_date && ` - ${format(new Date(event.end_date), "h:mm a")}`}
+                    </span>
+                    {(event.venue || event.city) && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {event.venue || event.city}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {/* Tabs */}
           <TabsList className="w-full justify-start gap-0 rounded-none border-t border-border/20 bg-transparent h-11 px-2">
             <TabsTrigger value="orders" className="gap-1.5 data-[state=active]:bg-primary/10 rounded-lg">
               <Ticket className="h-3.5 w-3.5" />
@@ -315,64 +349,88 @@ export default function EventDetail() {
               Team
             </TabsTrigger>
           </TabsList>
-        </Tabs>
-      </motion.header>
+        </motion.header>
 
-      <main className="px-4 py-4">
-        {!event && !isLoading ? (
-          <EmptyState
-            icon={Calendar}
-            title="Event not found"
-            description="This event may have been deleted or you don't have access."
-          />
-        ) : (
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            {/* Orders Tab */}
-            <TabsContent value="orders" className="mt-0 space-y-4">
-              <OrdersTab 
-                orders={orders} 
-                attendeeProfiles={attendeeProfiles || {}} 
-                event={event}
-                isLoading={rsvpsLoading}
-              />
-            </TabsContent>
+        <main className="px-4 py-4">
+          {!event && !isLoading ? (
+            <EmptyState
+              icon={Calendar}
+              title="Event not found"
+              description="This event may have been deleted or you don't have access."
+            />
+          ) : (
+            <>
+              {/* Orders Tab */}
+              <TabsContent value="orders" className="mt-0 space-y-4">
+                <OrdersTab 
+                  orders={orders} 
+                  attendeeProfiles={attendeeProfiles || {}} 
+                  event={event}
+                  isLoading={rsvpsLoading}
+                />
+              </TabsContent>
 
-            {/* Attendees Tab */}
-            <TabsContent value="attendees" className="mt-0 space-y-4">
-              <AttendeesTab 
-                attendees={attendees} 
-                attendeeProfiles={attendeeProfiles || {}}
-                isLoading={rsvpsLoading}
-              />
-            </TabsContent>
+              {/* Attendees Tab */}
+              <TabsContent value="attendees" className="mt-0 space-y-4">
+                <AttendeesTab 
+                  attendees={attendees} 
+                  attendeeProfiles={attendeeProfiles || {}}
+                  isLoading={rsvpsLoading}
+                  eventTitle={event?.title || "Event"}
+                />
+              </TabsContent>
 
-            {/* Marketing Tab */}
-            <TabsContent value="marketing" className="mt-0 space-y-4">
-              <MarketingTab eventId={eventId!} />
-            </TabsContent>
+              {/* Marketing Tab */}
+              <TabsContent value="marketing" className="mt-0 space-y-4">
+                <MarketingTab eventId={eventId!} />
+              </TabsContent>
 
-            {/* Finance Tab */}
-            <TabsContent value="finance" className="mt-0 space-y-4">
-              <FinanceTab 
-                orders={orders}
-                event={event}
-                totalRevenue={totalRevenue}
-                totalCredits={totalCredits}
-              />
-            </TabsContent>
+              {/* Finance Tab */}
+              <TabsContent value="finance" className="mt-0 space-y-4">
+                <FinanceTab 
+                  orders={orders}
+                  event={event}
+                  totalRevenue={totalRevenue}
+                  totalCredits={totalCredits}
+                />
+              </TabsContent>
 
-            {/* Team Tab */}
-            <TabsContent value="team" className="mt-0 space-y-4">
-              <TeamTab 
-                teamMembers={teamMembers || []}
-                teamProfiles={teamProfiles || {}}
-                creatorId={event?.creator_id}
-                organizationId={event?.organization_id}
-              />
-            </TabsContent>
-          </Tabs>
-        )}
-      </main>
+              {/* Team Tab */}
+              <TabsContent value="team" className="mt-0 space-y-4">
+                <TeamTab 
+                  teamMembers={teamMembers || []}
+                  teamProfiles={teamProfiles || {}}
+                  creatorId={event?.creator_id}
+                  organizationId={event?.organization_id}
+                />
+              </TabsContent>
+            </>
+          )}
+        </main>
+      </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Event</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{event?.title}"? This action cannot be undone. All RSVPs and ticket data will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <BottomNav />
     </div>
@@ -387,6 +445,8 @@ interface OrdersTabProps {
     ticket_purchased: boolean | null;
     stripe_payment_id: string | null;
     credits_spent: number | null;
+    guest_name?: string | null;
+    guest_email?: string | null;
     created_at: string;
   }>;
   attendeeProfiles: Record<string, { display_name: string | null; avatar_url: string | null }>;
@@ -397,10 +457,17 @@ interface OrdersTabProps {
 function OrdersTab({ orders, attendeeProfiles, event, isLoading }: OrdersTabProps) {
   const [search, setSearch] = useState("");
 
+  const getOrderName = (order: OrdersTabProps['orders'][0]) => {
+    if (order.user_id && attendeeProfiles[order.user_id]) {
+      return attendeeProfiles[order.user_id].display_name || "Unknown";
+    }
+    return order.guest_name || order.guest_email || "Guest";
+  };
+
   const filteredOrders = orders.filter(order => {
-    const profile = attendeeProfiles[order.user_id];
-    const name = profile?.display_name || "";
-    return name.toLowerCase().includes(search.toLowerCase());
+    const name = getOrderName(order);
+    const email = order.guest_email || "";
+    return name.toLowerCase().includes(search.toLowerCase()) || email.toLowerCase().includes(search.toLowerCase());
   });
 
   if (isLoading) {
@@ -460,18 +527,22 @@ function OrdersTab({ orders, attendeeProfiles, event, isLoading }: OrdersTabProp
       ) : (
         <div className="space-y-2">
           {filteredOrders.map(order => {
-            const profile = attendeeProfiles[order.user_id];
+            const profile = order.user_id ? attendeeProfiles[order.user_id] : null;
+            const displayName = getOrderName(order);
             return (
               <Card key={order.id} className="border-border/40 bg-card/60">
                 <CardContent className="p-3 flex items-center gap-3">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={profile?.avatar_url || undefined} />
-                    <AvatarFallback>{profile?.display_name?.[0] || "?"}</AvatarFallback>
+                    <AvatarFallback>{displayName[0] || "?"}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">
-                      {profile?.display_name || "Unknown"}
-                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-medium text-sm truncate">{displayName}</p>
+                      {!order.user_id && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 bg-muted/50">Guest</Badge>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       {format(new Date(order.created_at), "MMM d, h:mm a")}
                     </p>
@@ -514,9 +585,10 @@ interface AttendeesTabProps {
   }>;
   attendeeProfiles: Record<string, { display_name: string | null; avatar_url: string | null }>;
   isLoading: boolean;
+  eventTitle: string;
 }
 
-function AttendeesTab({ attendees, attendeeProfiles, isLoading }: AttendeesTabProps) {
+function AttendeesTab({ attendees, attendeeProfiles, isLoading, eventTitle }: AttendeesTabProps) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "going" | "interested" | "ticketed" | "guests">("all");
 
@@ -546,6 +618,35 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading }: AttendeesTabPr
     interested: attendees.filter(a => a.status === "interested").length,
     ticketed: attendees.filter(a => a.ticket_purchased).length,
     guests: attendees.filter(a => !a.user_id).length,
+  };
+
+  const handleDownloadCSV = () => {
+    const rows = [["Name", "Email", "Phone", "Status", "Ticket", "Date"]];
+    attendees.forEach(a => {
+      const name = getAttendeeName(a);
+      const email = a.guest_email || "";
+      const phone = a.guest_phone || "";
+      const ticketed = a.ticket_purchased ? "Yes" : "No";
+      const date = format(new Date(a.created_at), "yyyy-MM-dd");
+      rows.push([name, email, phone, a.status, ticketed, date]);
+    });
+    const csv = rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${eventTitle.replace(/[^a-zA-Z0-9]/g, "_")}_attendees.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("Attendee list downloaded");
+  };
+
+  const handleMailAttendee = (a: AttendeesTabProps['attendees'][0]) => {
+    if (a.guest_email) {
+      window.open(`mailto:${a.guest_email}`, "_blank");
+    } else {
+      toast.info("No email address available for this attendee");
+    }
   };
 
   if (isLoading) {
@@ -623,7 +724,7 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading }: AttendeesTabPr
             className="pl-9"
           />
         </div>
-        <Button variant="outline" size="icon">
+        <Button variant="outline" size="icon" onClick={handleDownloadCSV} title="Download attendee list as CSV">
           <Download className="h-4 w-4" />
         </Button>
       </div>
@@ -676,7 +777,7 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading }: AttendeesTabPr
                         Ticket
                       </Badge>
                     )}
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleMailAttendee(attendee)}>
                       <Mail className="h-4 w-4" />
                     </Button>
                   </div>
@@ -692,21 +793,78 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading }: AttendeesTabPr
 
 // ============ Marketing Tab ============
 function MarketingTab({ eventId }: { eventId: string }) {
-  // TODO: Fetch campaigns for this event
+  const { user } = useAuth();
+  const [sendingReminder, setSendingReminder] = useState(false);
+  const [sendingBlast, setSendingBlast] = useState(false);
+
+  const handleSendReminder = async () => {
+    setSendingReminder(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const res = await supabase.functions.invoke("send-event-reminder", {
+        body: { eventId, message: "" },
+      });
+
+      if (res.error) throw res.error;
+      const result = res.data;
+      toast.success(`Reminder sent to ${result.sentCount} attendee${result.sentCount !== 1 ? 's' : ''}${result.pushSentCount ? ` (+${result.pushSentCount} push)` : ''}`);
+    } catch (error) {
+      toast.error("Failed to send reminder");
+    } finally {
+      setSendingReminder(false);
+    }
+  };
+
+  const handleEmailBlast = async () => {
+    setSendingBlast(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const res = await supabase.functions.invoke("send-event-reminder", {
+        body: { eventId, message: "We're excited to see you at our upcoming event! Don't forget to check the event details." },
+      });
+
+      if (res.error) throw res.error;
+      const result = res.data;
+      toast.success(`Email sent to ${result.sentCount} attendee${result.sentCount !== 1 ? 's' : ''}`);
+    } catch (error) {
+      toast.error("Failed to send email blast");
+    } finally {
+      setSendingBlast(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-3">
-        <Card className="border-border/40 bg-card/60 cursor-pointer hover:bg-card/80 transition-colors">
+        <Card 
+          className="border-border/40 bg-card/60 cursor-pointer hover:bg-card/80 transition-colors"
+          onClick={!sendingBlast ? handleEmailBlast : undefined}
+        >
           <CardContent className="p-4 text-center">
-            <Mail className="h-8 w-8 mx-auto mb-2 text-primary" />
+            {sendingBlast ? (
+              <Loader2 className="h-8 w-8 mx-auto mb-2 text-primary animate-spin" />
+            ) : (
+              <Mail className="h-8 w-8 mx-auto mb-2 text-primary" />
+            )}
             <p className="font-medium text-sm">Email Blast</p>
             <p className="text-xs text-muted-foreground">Send to attendees</p>
           </CardContent>
         </Card>
-        <Card className="border-border/40 bg-card/60 cursor-pointer hover:bg-card/80 transition-colors">
+        <Card 
+          className="border-border/40 bg-card/60 cursor-pointer hover:bg-card/80 transition-colors"
+          onClick={!sendingReminder ? handleSendReminder : undefined}
+        >
           <CardContent className="p-4 text-center">
-            <Send className="h-8 w-8 mx-auto mb-2 text-primary" />
+            {sendingReminder ? (
+              <Loader2 className="h-8 w-8 mx-auto mb-2 text-primary animate-spin" />
+            ) : (
+              <Send className="h-8 w-8 mx-auto mb-2 text-primary" />
+            )}
             <p className="font-medium text-sm">Push Notification</p>
             <p className="text-xs text-muted-foreground">Remind attendees</p>
           </CardContent>
