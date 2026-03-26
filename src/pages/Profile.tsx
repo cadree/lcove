@@ -73,7 +73,7 @@ const Profile = () => {
   const [selectedPost, setSelectedPost] = useState<ProfilePost | null>(null);
   const [selectedBlog, setSelectedBlog] = useState<BlogPost | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<PortfolioFolder | null>(null);
-  const volumeSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const volumeSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const hasCreatorRoles = creatorRoles.length > 0;
 

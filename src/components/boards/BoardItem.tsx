@@ -66,7 +66,7 @@ export const BoardItem = memo(function BoardItem({
   const hasDraggedRef = useRef(false);
   const rafRef = useRef<number | null>(null);
   const touchStartTimeRef = useRef<number>(0);
-  const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync position from props only when not dragging
   useEffect(() => {

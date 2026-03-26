@@ -33,7 +33,7 @@ export function useMessages(conversationId: string | null) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: messages = [], isLoading, refetch } = useQuery({
     queryKey: ['messages', conversationId],

@@ -65,7 +65,7 @@ function useDebounceValue(value: string, delay: number = 300) {
   });
 
   // Use effect for proper debouncing
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
   if (timeoutRef.current) clearTimeout(timeoutRef.current);
   timeoutRef.current = setTimeout(() => {
     setDebouncedValue(value);
