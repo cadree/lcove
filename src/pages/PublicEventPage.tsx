@@ -48,6 +48,66 @@ export default function PublicEventPage() {
   const [ticketGuestName, setTicketGuestName] = useState("");
   const [ticketGuestEmail, setTicketGuestEmail] = useState("");
   const [ticketGuestPhone, setTicketGuestPhone] = useState("");
+  const [pushStatus, setPushStatus] = useState<'idle' | 'subscribing' | 'subscribed' | 'error'>('idle');
+
+  const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
+
+  const urlBase64ToArrayBuffer = useCallback((base64String: string): ArrayBuffer => {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    const buffer = new ArrayBuffer(rawData.length);
+    const view = new Uint8Array(buffer);
+    for (let i = 0; i < rawData.length; ++i) {
+      view[i] = rawData.charCodeAt(i);
+    }
+    return buffer;
+  }, []);
+
+  const handleSubscribePush = useCallback(async (email: string) => {
+    if (!VAPID_PUBLIC_KEY || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+      toast.info("Push notifications aren't supported in this browser");
+      return;
+    }
+    setPushStatus('subscribing');
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        toast.error('Notification permission denied');
+        setPushStatus('error');
+        return;
+      }
+      const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToArrayBuffer(VAPID_PUBLIC_KEY),
+        });
+      }
+      const subJson = subscription.toJSON();
+      if (!subJson.endpoint || !subJson.keys?.p256dh || !subJson.keys?.auth) {
+        throw new Error('Invalid push subscription');
+      }
+      const { error } = await supabase.from('guest_push_subscriptions').upsert({
+        guest_email: email.trim().toLowerCase(),
+        event_id: eventId!,
+        endpoint: subJson.endpoint,
+        p256dh: subJson.keys.p256dh,
+        auth: subJson.keys.auth,
+        user_agent: navigator.userAgent,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'guest_email,event_id,endpoint' });
+      if (error) throw error;
+      setPushStatus('subscribed');
+      toast.success('You\'ll get push notifications for this event!');
+    } catch (err) {
+      console.error('Push subscription error:', err);
+      setPushStatus('error');
+      toast.error('Failed to enable notifications');
+    }
+  }, [VAPID_PUBLIC_KEY, eventId, urlBase64ToArrayBuffer]);
 
   // Fetch event (public – anon can read)
   const { data: event, isLoading } = useQuery({
