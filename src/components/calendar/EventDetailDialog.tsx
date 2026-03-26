@@ -588,6 +588,16 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
               {isCreator && <Settings className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />}
             </div>
 
+            {/* Invite Guests - Creator only */}
+            {isCreator && (
+              <InviteGuestsDialog eventId={event.id} eventTitle={event.title}>
+                <Button variant="outline" size="sm" className="w-full gap-2">
+                  <UserPlus className="h-4 w-4" />
+                  Invite Guests via Email / SMS
+                </Button>
+              </InviteGuestsDialog>
+            )}
+
             {/* Organizer */}
             <div 
               className="flex items-start gap-3 cursor-pointer hover:bg-accent/20 -mx-3 px-3 py-2 rounded-xl transition-colors"
