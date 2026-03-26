@@ -235,6 +235,7 @@ export function ProfileEventsDashboard() {
             onEdit={(eventId) => navigate(`/dashboard/events/${eventId}`)}
             onShare={handleShare}
             onDuplicate={handleDuplicate}
+            onDelete={handleDelete}
           />
         ) : view === "list" ? (
           <CompactListView
@@ -243,6 +244,7 @@ export function ProfileEventsDashboard() {
             onEdit={(eventId) => navigate(`/dashboard/events/${eventId}`)}
             onShare={handleShare}
             onDuplicate={handleDuplicate}
+            onDelete={handleDelete}
           />
         ) : (
           <CalendarFeedSettings />
