@@ -48,7 +48,7 @@ serve(async (req) => {
       }
     }
 
-    const { eventId, eventTitle, ticketPrice, quantity = 1 } = await req.json();
+    const { eventId, eventTitle, ticketPrice, quantity = 1, guestName, guestEmail, guestPhone } = await req.json();
 
     if (!eventId) {
       throw new Error("Missing required field: eventId");
