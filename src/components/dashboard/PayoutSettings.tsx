@@ -199,7 +199,7 @@ export function PayoutSettings() {
               </div>
               <div className="text-right">
                 <Badge variant="secondary" className="text-xs">
-                  You: 95% • Platform: 5%
+                  You: 100% • Platform: 0%
                 </Badge>
               </div>
             </div>
