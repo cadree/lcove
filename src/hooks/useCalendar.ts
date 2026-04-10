@@ -25,6 +25,7 @@ export interface CalendarEvent {
   project_id: string | null;
   external_url: string | null;
   timezone: string | null;
+  status: string | null;
   created_at: string;
   rsvp_count?: number;
   user_rsvp?: EventRSVP | null;
@@ -90,6 +91,7 @@ export function useEvents(filters?: { city?: string; state?: string }) {
       let query = supabase
         .from('events')
         .select('*')
+        .in('status', ['published', 'draft'])
         .order('start_date', { ascending: true });
       
       if (filters?.city && filters.city !== 'All Cities') {

@@ -202,6 +202,7 @@ const TIMEZONES = [
       is_public: isPublic,
       external_url: ticketType === 'info' ? externalUrl || null : null,
       project_id: null,
+      status: 'published',
     }, {
       onSuccess: () => {
         toast.success('Event created! It will now be visible to the community.');
