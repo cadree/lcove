@@ -124,12 +124,13 @@ export function CalendarFeedSettings() {
 
   const getCalendarSubscribeUrl = (type: 'google' | 'apple') => {
     const feedUrl = getFeedUrl();
+    // Both Google and Apple Calendar work best with webcal:// protocol
+    const webcalUrl = feedUrl.replace('https://', 'webcal://');
     if (type === 'google') {
-      // Google Calendar uses webcal:// or https:// directly in subscription
-      return `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(feedUrl)}`;
+      return `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalUrl)}`;
     }
     // Apple Calendar uses webcal:// protocol
-    return feedUrl.replace('https://', 'webcal://');
+    return webcalUrl;
   };
 
   if (!user) return null;
