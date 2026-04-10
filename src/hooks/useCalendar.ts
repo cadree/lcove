@@ -91,6 +91,7 @@ export function useEvents(filters?: { city?: string; state?: string }) {
       let query = supabase
         .from('events')
         .select('*')
+        .in('status', ['published', 'draft'])
         .order('start_date', { ascending: true });
       
       if (filters?.city && filters.city !== 'All Cities') {
