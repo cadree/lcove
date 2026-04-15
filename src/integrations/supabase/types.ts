@@ -6003,18 +6003,21 @@ export type Database = {
       user_creative_roles: {
         Row: {
           created_at: string | null
+          description: string | null
           id: string
           role_id: string
           user_id: string
         }
         Insert: {
           created_at?: string | null
+          description?: string | null
           id?: string
           role_id: string
           user_id: string
         }
         Update: {
           created_at?: string | null
+          description?: string | null
           id?: string
           role_id?: string
           user_id?: string
@@ -6113,18 +6116,21 @@ export type Database = {
       user_passions: {
         Row: {
           created_at: string | null
+          description: string | null
           id: string
           passion_id: string
           user_id: string
         }
         Insert: {
           created_at?: string | null
+          description?: string | null
           id?: string
           passion_id: string
           user_id: string
         }
         Update: {
           created_at?: string | null
+          description?: string | null
           id?: string
           passion_id?: string
           user_id?: string
@@ -6213,18 +6219,21 @@ export type Database = {
       user_skills: {
         Row: {
           created_at: string | null
+          description: string | null
           id: string
           skill_id: string
           user_id: string
         }
         Insert: {
           created_at?: string | null
+          description?: string | null
           id?: string
           skill_id: string
           user_id: string
         }
         Update: {
           created_at?: string | null
+          description?: string | null
           id?: string
           skill_id?: string
           user_id?: string
