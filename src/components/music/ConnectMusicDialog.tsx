@@ -63,7 +63,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
     return match ? match[1] : null;
   };
 
-  const fetchArtistImage = async (url: string) => {
+  const fetchArtistData = async (url: string) => {
     if (!url.trim()) return;
     
     const isSpotify = url.includes('open.spotify.com/artist');
@@ -78,16 +78,57 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
       });
 
       if (!error && data) {
+        let updated = false;
+
         if (data.image_url && !artistImage) {
           setArtistImage(data.image_url);
-          toast.success('Artist image found!');
+          updated = true;
         }
         if (data.artist_name && !displayName) {
           setDisplayName(data.artist_name);
+          updated = true;
+        }
+        if (data.genres?.length && genres.length === 0) {
+          setGenres(data.genres);
+          updated = true;
+        }
+        if (data.top_tracks?.length && tracks.length === 0) {
+          const mappedTracks: MusicTrack[] = data.top_tracks.map((t: any) => ({
+            id: crypto.randomUUID(),
+            name: t.name || '',
+            album_name: t.album_name || '',
+            album_image: t.album_image || '',
+            preview_url: t.preview_url || '',
+            spotify_url: t.spotify_url || '',
+            apple_music_url: t.apple_music_url || '',
+          }));
+          setTracks(mappedTracks);
+          updated = true;
+        }
+        if (data.albums?.length && albums.length === 0) {
+          const mappedAlbums: MusicAlbum[] = data.albums.map((a: any) => ({
+            id: crypto.randomUUID(),
+            name: a.name || '',
+            image_url: a.image_url || '',
+            release_date: a.release_date || '',
+            type: a.type || 'album',
+            spotify_url: a.spotify_url || '',
+            apple_music_url: a.apple_music_url || '',
+          }));
+          setAlbums(mappedAlbums);
+          // Set latest release as most recent album
+          if (mappedAlbums.length > 0) {
+            setLatestRelease(mappedAlbums[0]);
+          }
+          updated = true;
+        }
+
+        if (updated) {
+          toast.success('Artist info pulled successfully!');
         }
       }
     } catch (e) {
-      console.error('Failed to fetch artist image:', e);
+      console.error('Failed to fetch artist data:', e);
     } finally {
       setIsFetchingImage(false);
     }
@@ -97,7 +138,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
     setSpotifyUrl(url);
     // Auto-fetch when a valid Spotify artist URL is pasted
     if (url.includes('open.spotify.com/artist') && url.length > 30) {
-      fetchArtistImage(url);
+      fetchArtistData(url);
     }
   };
 
@@ -105,7 +146,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
     setAppleMusicUrl(url);
     // Auto-fetch when a valid Apple Music URL is pasted
     if (url.includes('music.apple.com') && url.includes('artist') && url.length > 30) {
-      fetchArtistImage(url);
+      fetchArtistData(url);
     }
   };
 
@@ -231,7 +272,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
             Connect Music Profiles
           </DialogTitle>
           <DialogDescription>
-            Link your Spotify and Apple Music profiles. Your artist image will be pulled automatically.
+            Link your Spotify and Apple Music profiles. Artist name, image, genres, tracks, and albums will be pulled automatically.
           </DialogDescription>
         </DialogHeader>
 
@@ -339,7 +380,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                   placeholder="https://open.spotify.com/artist/..."
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Paste your Spotify artist URL to auto-fetch your image
+                  Paste your Spotify artist URL to auto-fill name, image, genres, tracks & albums
                 </p>
               </div>
 
@@ -352,7 +393,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                   placeholder="https://music.apple.com/artist/..."
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Paste your Apple Music artist URL to auto-fetch your image
+                  Paste your Apple Music artist URL to auto-fill name, image, genres, tracks & albums
                 </p>
               </div>
 
