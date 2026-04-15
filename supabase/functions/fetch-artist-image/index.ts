@@ -108,12 +108,12 @@ Deno.serve(async (req) => {
           )
           if (ogTitleMatch) {
             let title = ogTitleMatch[1]
-            // Clean common suffixes
+            // Clean common suffixes first
             title = title.replace(/\s+on\s+(Spotify|Apple Music)$/i, '').trim()
             // For Apple Music: "Song (feat. X) by Artist" -> extract "Artist"
             const byArtistMatch = title.match(/\bby\s+(.+)$/i)
             if (byArtistMatch) {
-              artistName = byArtistMatch[1].trim()
+              artistName = byArtistMatch[1].replace(/\s+on\s+(Spotify|Apple Music)$/i, '').trim()
             } else {
               // Clean "Song - Album" or "Song · Artist" patterns for Spotify
               title = title.replace(/\s+[-·]\s+.*$/, '').trim()
