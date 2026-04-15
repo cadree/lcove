@@ -715,7 +715,49 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
               </InviteGuestsDialog>
             )}
 
-            {/* Organizer */}
+            {/* Host Reminder Controls */}
+            {isCreator && (
+              <div className="space-y-2 p-3 rounded-xl bg-accent/10 border border-border/30">
+                <p className="text-xs font-medium text-muted-foreground">Send Reminder to Guests</p>
+                <Input
+                  placeholder="Optional message to attendees..."
+                  value={reminderMessage}
+                  onChange={(e) => setReminderMessage(e.target.value)}
+                  className="text-sm"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => handleSendReminder(false)}
+                    disabled={isSendingReminder}
+                    className="flex-1"
+                  >
+                    {isSendingReminder ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : (
+                      <Bell className="w-3 h-3 mr-1" />
+                    )}
+                    Email All
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSendReminder(true)}
+                    disabled={isSendingReminder}
+                    className="flex-1"
+                  >
+                    {isSendingReminder ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : (
+                      <Phone className="w-3 h-3 mr-1" />
+                    )}
+                    Email + Text
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div 
               className="flex items-start gap-3 cursor-pointer hover:bg-accent/20 -mx-3 px-3 py-2 rounded-xl transition-colors"
               onClick={handleViewOrganizer}
