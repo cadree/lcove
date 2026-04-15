@@ -1,67 +1,80 @@
 
 
-## Event Detail Page Audit
+# Enhanced Event Sharing, Flyer Generation, and Automated Notifications
 
-After reviewing the full `EventDetail.tsx` (913 lines), here are the issues found:
+This plan covers five interconnected improvements to the event system: better share options, auto-generated flyers for social media, automated reminder notifications, host-initiated SMS/email reminders, and guest notification infrastructure.
 
-### Bugs to Fix
+---
 
-1. **Dual Tabs instances causing ref warnings**
-   - The `<Tabs>` component is rendered twice: once in the header (lines 295-318) for the `TabsList`, and again in `<main>` (lines 329-373) for the `TabsContent`. These are two separate unconnected `<Tabs>` components sharing the same `activeTab` state. This works functionally but causes the console warnings about refs on `FinanceTab` and `TeamTab` because Radix expects `TabsContent` to be a direct child of the same `Tabs` provider as the `TabsList`.
-   - **Fix**: Wrap the entire header + main in a single `<Tabs>` component instead of two separate ones.
+## What Gets Built
 
-2. **Edit Event menu item does nothing**
-   - Line 240-243: "Edit Event" dropdown item has no `onClick` handler.
-   - **Fix**: Wire it to open an edit dialog or navigate to an edit page.
+1. **Expanded Share Menu** — Add Instagram Stories, iMessage/SMS, WhatsApp, Facebook, and native share options to the event share dropdown. The shared link always points to the public event page (`/event/:id`) which already has guest RSVP forms.
 
-3. **Delete Event menu item does nothing**
-   - Line 244-247: "Delete Event" dropdown item has no `onClick` handler.
-   - **Fix**: Add a confirmation dialog and delete logic (same pattern as ProfileEventsDashboard).
+2. **Auto-Generated Event Flyer** — A new edge function (`generate-event-flyer`) that uses canvas rendering to create a branded 1080x1920 (Instagram Story) or 1200x630 (feed) image from the event data (title, date, time, venue, cover image, QR code linking to RSVP page). When sharing to Instagram or downloading, the flyer is generated and provided as a shareable image.
 
-4. **Orders tab doesn't show guest orders**
-   - Line 400-403: Orders search filters by `attendeeProfiles[order.user_id]` but guest RSVPs have `user_id: null`. Guest ticket purchases won't show profile names and search won't match them.
-   - **Fix**: Check for `guest_name`/`guest_email` in the orders filter and display.
+3. **Automated Event Reminders** — A new edge function (`auto-event-reminders`) triggered by a pg_cron job that runs hourly, checking for events happening in 24 hours and 1 hour. It sends email reminders (via Resend) and push notifications to all attendees (both members and guests). Guest email/push already supported via `guest_push_subscriptions` and `event_rsvps.guest_email`.
 
-5. **Download button on Attendees tab does nothing**
-   - Line 626-628: The download button has no `onClick` handler.
-   - **Fix**: Add CSV export functionality for the attendee list.
+4. **Host "Send Reminder" Button** — Already partially exists (`send-event-reminder` edge function). Enhance the EventDetailDialog and EventAttendeesDialog to let hosts send custom reminders anytime via email AND SMS (Twilio) to all attendees including guests.
 
-6. **Mail button on each attendee does nothing**
-   - Line 679-681: No `onClick` handler.
-   - **Fix**: Wire to open a compose dialog or email link.
+5. **SMS Notifications for Guests** — Extend `send-event-reminder` to also text guests who provided phone numbers. Add a dedicated "Text All Guests" action for hosts using the existing Twilio integration.
 
-7. **Marketing tab cards are not interactive**
-   - "Email Blast" and "Push Notification" cards (lines 700-713) have `cursor-pointer` but no `onClick`.
-   - **Fix**: Wire to the existing `send-mass-notification` / `send-event-reminder` edge functions.
+---
 
-8. **"View Public Page" menu item navigates incorrectly**
-   - Line 236: Navigates to `/calendar?event=${eventId}` instead of the public page at `/event/${eventId}`.
-   - **Fix**: Change to `navigate(\`/event/${eventId}\`)`.
+## Technical Details
 
-### Implementation Plan
+### 1. Share Menu Enhancements (`EventDetailDialog.tsx`)
+- Add share options: Instagram (via native share with flyer image), SMS/iMessage (`sms:?body=...`), WhatsApp (`https://wa.me/?text=...`), Facebook (`https://www.facebook.com/sharer/...`)
+- For Instagram: generate flyer first, then trigger native share with the image file
+- For SMS: use `sms:?&body=` URL scheme which opens iMessage/Messages on iOS
+- The shared URL remains `https://etherbylcove.com/event/{id}` pointing to `PublicEventPage`
 
-**File**: `src/pages/EventDetail.tsx`
+### 2. Event Flyer Generator Edge Function
+- New edge function: `supabase/functions/generate-event-flyer/index.ts`
+- Uses `@vercel/og` or server-side HTML-to-image approach (Satori) to render a styled flyer
+- Inputs: event ID (fetches title, date, venue, cover image from DB)
+- Outputs: PNG image (1080x1920 for stories, 1200x630 for feed)
+- Includes: event title, date/time, venue, cover image as background, QR code to RSVP link, ETHER branding
+- Caches generated flyers in the `media` storage bucket at `event-flyers/{eventId}.png`
+- Client downloads the image and uses `navigator.share({ files: [flyerFile] })` for Instagram sharing
 
-**Step 1** - Merge dual `<Tabs>` into a single wrapper around header + main to fix the ref warnings.
+### 3. Automated Reminder System
+- New edge function: `supabase/functions/auto-event-reminders/index.ts`
+- New pg_cron job running every 30 minutes
+- Checks for events starting in 24h and 1h windows
+- Tracks sent reminders via a new `event_reminder_log` table to avoid duplicates
+- Sends to:
+  - **Members**: email (Resend) + in-app notification
+  - **Guests**: email (Resend) + push notification (existing `guest_push_subscriptions`)
+  - **SMS**: to anyone with a phone number (Twilio)
 
-**Step 2** - Fix "View Public Page" URL to `/event/${eventId}`.
+### 4. Database Migration
+- New table `event_reminder_log`:
+  - `id UUID PK`, `event_id UUID`, `reminder_type TEXT` (24h, 1h, custom), `sent_at TIMESTAMPTZ`, `recipient_count INT`
+  - Prevents duplicate automated reminders
+- New table `event_flyers`:
+  - `id UUID PK`, `event_id UUID UNIQUE`, `flyer_url TEXT`, `created_at TIMESTAMPTZ`
+  - Caches generated flyer URLs
 
-**Step 3** - Add delete handler with confirmation dialog to the "Delete Event" menu item (reuse the pattern from ProfileEventsDashboard: `supabase.from('events').delete()` + invalidate queries + navigate back).
+### 5. Host Controls Enhancement
+- Add "Send Reminder to All Guests" button in EventDetailDialog (visible to host)
+- Add "Text All Guests" button that sends SMS via `send-event-reminder` edge function
+- Update `send-event-reminder` to also send SMS to guests with phone numbers via Twilio
+- Add custom message input for host reminders
 
-**Step 4** - Add edit handler to navigate to calendar with edit mode or open an inline edit form.
+### 6. PublicEventPage Updates
+- After guest RSVP, automatically offer push notification opt-in (already exists)
+- Add checkbox for "Email me reminders about this event" (already captured via guest_email)
+- Ensure the page works as the landing destination for all shared links
 
-**Step 5** - Fix Orders tab to handle guest orders (show `guest_name`/`guest_email` when `user_id` is null).
+---
 
-**Step 6** - Add CSV export for the attendee download button.
+## Files to Create
+- `supabase/functions/generate-event-flyer/index.ts` — Flyer image generator
+- `supabase/functions/auto-event-reminders/index.ts` — Cron-triggered automated reminders
+- Database migration for `event_reminder_log` table
 
-**Step 7** - Wire Mail buttons to `mailto:` links for guests with emails, or open a compose flow.
-
-**Step 8** - Wire Marketing tab cards to trigger the existing edge functions (`send-event-reminder`, `send-mass-notification`).
-
-### Technical Details
-
-- The dual-Tabs fix restructures the JSX so `<Tabs value={activeTab}>` wraps both the sticky header (containing `TabsList`) and the `<main>` (containing `TabsContent`). This eliminates the Radix ref warnings.
-- Delete uses `useQueryClient` to invalidate `dashboard-events` and `event-detail` queries, then navigates to `/dashboard/events`.
-- CSV export builds a blob from attendee data (name, email, phone, status, date) and triggers a download.
-- Guest order display falls back to `guest_name` / `guest_email` when `user_id` is null.
+## Files to Modify
+- `src/components/calendar/EventDetailDialog.tsx` — Expanded share menu with flyer download, SMS, WhatsApp, Instagram, Facebook; host reminder controls
+- `supabase/functions/send-event-reminder/index.ts` — Add SMS sending for guests with phones
+- `supabase/functions/share-page/index.ts` — Ensure event OG image uses flyer if available
 
