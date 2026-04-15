@@ -63,7 +63,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
     return match ? match[1] : null;
   };
 
-  const fetchArtistImage = async (url: string) => {
+  const fetchArtistData = async (url: string) => {
     if (!url.trim()) return;
     
     const isSpotify = url.includes('open.spotify.com/artist');
@@ -78,16 +78,57 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
       });
 
       if (!error && data) {
+        let updated = false;
+
         if (data.image_url && !artistImage) {
           setArtistImage(data.image_url);
-          toast.success('Artist image found!');
+          updated = true;
         }
         if (data.artist_name && !displayName) {
           setDisplayName(data.artist_name);
+          updated = true;
+        }
+        if (data.genres?.length && genres.length === 0) {
+          setGenres(data.genres);
+          updated = true;
+        }
+        if (data.top_tracks?.length && tracks.length === 0) {
+          const mappedTracks: MusicTrack[] = data.top_tracks.map((t: any) => ({
+            id: crypto.randomUUID(),
+            name: t.name || '',
+            album_name: t.album_name || '',
+            album_image: t.album_image || '',
+            preview_url: t.preview_url || '',
+            spotify_url: t.spotify_url || '',
+            apple_music_url: t.apple_music_url || '',
+          }));
+          setTracks(mappedTracks);
+          updated = true;
+        }
+        if (data.albums?.length && albums.length === 0) {
+          const mappedAlbums: MusicAlbum[] = data.albums.map((a: any) => ({
+            id: crypto.randomUUID(),
+            name: a.name || '',
+            image_url: a.image_url || '',
+            release_date: a.release_date || '',
+            type: a.type || 'album',
+            spotify_url: a.spotify_url || '',
+            apple_music_url: a.apple_music_url || '',
+          }));
+          setAlbums(mappedAlbums);
+          // Set latest release as most recent album
+          if (mappedAlbums.length > 0) {
+            setLatestRelease(mappedAlbums[0]);
+          }
+          updated = true;
+        }
+
+        if (updated) {
+          toast.success('Artist info pulled successfully!');
         }
       }
     } catch (e) {
-      console.error('Failed to fetch artist image:', e);
+      console.error('Failed to fetch artist data:', e);
     } finally {
       setIsFetchingImage(false);
     }
