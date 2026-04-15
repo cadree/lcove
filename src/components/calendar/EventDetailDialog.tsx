@@ -76,6 +76,9 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
   const [attendeesOpen, setAttendeesOpen] = useState(false);
   const [isAddingToMyDay, setIsAddingToMyDay] = useState(false);
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
+  const [isGeneratingFlyer, setIsGeneratingFlyer] = useState(false);
+  const [isSendingReminder, setIsSendingReminder] = useState(false);
+  const [reminderMessage, setReminderMessage] = useState("");
 
   const isCreator = user?.id === event?.creator_id;
 
