@@ -293,7 +293,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
     }
   };
 
-
+  const handleAddGenre = () => {
     if (newGenre.trim() && !genres.includes(newGenre.trim())) {
       setGenres([...genres, newGenre.trim()]);
       setNewGenre("");
