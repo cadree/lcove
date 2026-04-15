@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Check, Loader2, Crown, Star, Heart } from 'lucide-react';
+import { Check, Loader2, Crown, Star, Heart, Plus, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
@@ -16,12 +17,17 @@ interface Item {
   category: string | null;
 }
 
+interface CustomEntry {
+  name: string;
+  description: string;
+}
+
 interface EditProfileDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  currentSkills: Array<{ id: string; name: string; description?: string | null }>;
-  currentPassions: Array<{ id: string; name: string; description?: string | null }>;
-  currentRoles: Array<{ id: string; name: string; description?: string | null }>;
+  currentSkills: Array<{ id: string; name: string; description?: string | null; isCustom?: boolean }>;
+  currentPassions: Array<{ id: string; name: string; description?: string | null; isCustom?: boolean }>;
+  currentRoles: Array<{ id: string; name: string; description?: string | null; isCustom?: boolean }>;
 }
 
 export function EditProfileDetailsDialog({
@@ -45,30 +51,47 @@ export function EditProfileDetailsDialog({
   const [selectedPassionIds, setSelectedPassionIds] = useState<Set<string>>(new Set());
   const [selectedRoleIds, setSelectedRoleIds] = useState<Set<string>>(new Set());
 
-  // Descriptions keyed by item ID
   const [skillDescriptions, setSkillDescriptions] = useState<Record<string, string>>({});
   const [passionDescriptions, setPassionDescriptions] = useState<Record<string, string>>({});
   const [roleDescriptions, setRoleDescriptions] = useState<Record<string, string>>({});
 
+  // Custom entries
+  const [customSkills, setCustomSkills] = useState<CustomEntry[]>([]);
+  const [customPassions, setCustomPassions] = useState<CustomEntry[]>([]);
+  const [customRoles, setCustomRoles] = useState<CustomEntry[]>([]);
+
+  // New custom input
+  const [newCustomSkill, setNewCustomSkill] = useState('');
+  const [newCustomPassion, setNewCustomPassion] = useState('');
+  const [newCustomRole, setNewCustomRole] = useState('');
+
   useEffect(() => {
     if (open) {
       fetchAllOptions();
-      setSelectedSkillIds(new Set(currentSkills.map(s => s.id)));
-      setSelectedPassionIds(new Set(currentPassions.map(p => p.id)));
-      setSelectedRoleIds(new Set(currentRoles.map(r => r.id)));
+      setSelectedSkillIds(new Set(currentSkills.filter(s => !s.isCustom).map(s => s.id)));
+      setSelectedPassionIds(new Set(currentPassions.filter(p => !p.isCustom).map(p => p.id)));
+      setSelectedRoleIds(new Set(currentRoles.filter(r => !r.isCustom).map(r => r.id)));
 
-      // Initialize descriptions
       const sd: Record<string, string> = {};
-      currentSkills.forEach(s => { if (s.description) sd[s.id] = s.description; });
+      currentSkills.filter(s => !s.isCustom).forEach(s => { if (s.description) sd[s.id] = s.description; });
       setSkillDescriptions(sd);
 
       const pd: Record<string, string> = {};
-      currentPassions.forEach(p => { if (p.description) pd[p.id] = p.description; });
+      currentPassions.filter(p => !p.isCustom).forEach(p => { if (p.description) pd[p.id] = p.description; });
       setPassionDescriptions(pd);
 
       const rd: Record<string, string> = {};
-      currentRoles.forEach(r => { if (r.description) rd[r.id] = r.description; });
+      currentRoles.filter(r => !r.isCustom).forEach(r => { if (r.description) rd[r.id] = r.description; });
       setRoleDescriptions(rd);
+
+      // Load existing custom entries
+      setCustomSkills(currentSkills.filter(s => s.isCustom).map(s => ({ name: s.name, description: s.description || '' })));
+      setCustomPassions(currentPassions.filter(p => p.isCustom).map(p => ({ name: p.name, description: p.description || '' })));
+      setCustomRoles(currentRoles.filter(r => r.isCustom).map(r => ({ name: r.name, description: r.description || '' })));
+
+      setNewCustomSkill('');
+      setNewCustomPassion('');
+      setNewCustomRole('');
     }
   }, [open, currentSkills, currentPassions, currentRoles]);
 
@@ -92,13 +115,33 @@ export function EditProfileDetailsDialog({
     const setFn = type === 'skill' ? setSelectedSkillIds : type === 'passion' ? setSelectedPassionIds : setSelectedRoleIds;
     setFn(prev => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
+
+  const addCustomEntry = (type: 'skill' | 'passion' | 'role') => {
+    if (type === 'skill' && newCustomSkill.trim()) {
+      setCustomSkills(prev => [...prev, { name: newCustomSkill.trim(), description: '' }]);
+      setNewCustomSkill('');
+    } else if (type === 'passion' && newCustomPassion.trim()) {
+      setCustomPassions(prev => [...prev, { name: newCustomPassion.trim(), description: '' }]);
+      setNewCustomPassion('');
+    } else if (type === 'role' && newCustomRole.trim()) {
+      setCustomRoles(prev => [...prev, { name: newCustomRole.trim(), description: '' }]);
+      setNewCustomRole('');
+    }
+  };
+
+  const removeCustomEntry = (type: 'skill' | 'passion' | 'role', index: number) => {
+    if (type === 'skill') setCustomSkills(prev => prev.filter((_, i) => i !== index));
+    else if (type === 'passion') setCustomPassions(prev => prev.filter((_, i) => i !== index));
+    else setCustomRoles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateCustomDescription = (type: 'skill' | 'passion' | 'role', index: number, desc: string) => {
+    const setFn = type === 'skill' ? setCustomSkills : type === 'passion' ? setCustomPassions : setCustomRoles;
+    setFn(prev => prev.map((entry, i) => i === index ? { ...entry, description: desc } : entry));
   };
 
   const handleSave = async () => {
@@ -106,41 +149,59 @@ export function EditProfileDetailsDialog({
     setSaving(true);
 
     try {
-      // Update skills
+      // Skills: predefined + custom
       await supabase.from('user_skills').delete().eq('user_id', user.id);
-      if (selectedSkillIds.size > 0) {
-        await supabase.from('user_skills').insert(
-          Array.from(selectedSkillIds).map(id => ({
-            user_id: user.id,
-            skill_id: id,
-            description: skillDescriptions[id] || null,
-          }))
-        );
-      }
+      const skillInserts = [
+        ...Array.from(selectedSkillIds).map(id => ({
+          user_id: user.id,
+          skill_id: id,
+          description: skillDescriptions[id] || null,
+          custom_name: null,
+        })),
+        ...customSkills.map(c => ({
+          user_id: user.id,
+          skill_id: null,
+          description: c.description || null,
+          custom_name: c.name,
+        })),
+      ];
+      if (skillInserts.length > 0) await supabase.from('user_skills').insert(skillInserts);
 
-      // Update passions
+      // Passions
       await supabase.from('user_passions').delete().eq('user_id', user.id);
-      if (selectedPassionIds.size > 0) {
-        await supabase.from('user_passions').insert(
-          Array.from(selectedPassionIds).map(id => ({
-            user_id: user.id,
-            passion_id: id,
-            description: passionDescriptions[id] || null,
-          }))
-        );
-      }
+      const passionInserts = [
+        ...Array.from(selectedPassionIds).map(id => ({
+          user_id: user.id,
+          passion_id: id,
+          description: passionDescriptions[id] || null,
+          custom_name: null,
+        })),
+        ...customPassions.map(c => ({
+          user_id: user.id,
+          passion_id: null,
+          description: c.description || null,
+          custom_name: c.name,
+        })),
+      ];
+      if (passionInserts.length > 0) await supabase.from('user_passions').insert(passionInserts);
 
-      // Update creative roles
+      // Roles
       await supabase.from('user_creative_roles').delete().eq('user_id', user.id);
-      if (selectedRoleIds.size > 0) {
-        await supabase.from('user_creative_roles').insert(
-          Array.from(selectedRoleIds).map(id => ({
-            user_id: user.id,
-            role_id: id,
-            description: roleDescriptions[id] || null,
-          }))
-        );
-      }
+      const roleInserts = [
+        ...Array.from(selectedRoleIds).map(id => ({
+          user_id: user.id,
+          role_id: id,
+          description: roleDescriptions[id] || null,
+          custom_name: null,
+        })),
+        ...customRoles.map(c => ({
+          user_id: user.id,
+          role_id: null,
+          description: c.description || null,
+          custom_name: c.name,
+        })),
+      ];
+      if (roleInserts.length > 0) await supabase.from('user_creative_roles').insert(roleInserts);
 
       queryClient.invalidateQueries({ queryKey: ['user-skills', user.id] });
       queryClient.invalidateQueries({ queryKey: ['user-passions', user.id] });
@@ -170,7 +231,10 @@ export function EditProfileDetailsDialog({
     selectedIds: Set<string>,
     type: 'skill' | 'passion' | 'role',
     descriptions: Record<string, string>,
-    setDescriptions: React.Dispatch<React.SetStateAction<Record<string, string>>>
+    setDescriptions: React.Dispatch<React.SetStateAction<Record<string, string>>>,
+    customs: CustomEntry[],
+    newCustomValue: string,
+    setNewCustomValue: React.Dispatch<React.SetStateAction<string>>
   ) => {
     const grouped = groupByCategory(items);
 
@@ -205,8 +269,67 @@ export function EditProfileDetailsDialog({
           </div>
         ))}
 
-        {/* Description inputs for selected items */}
-        {Array.from(selectedIds).length > 0 && (
+        {/* Custom entries */}
+        {customs.length > 0 && (
+          <div>
+            <h4 className="text-xs font-medium text-muted-foreground mb-2">Your Custom Entries</h4>
+            <div className="flex flex-wrap gap-2">
+              {customs.map((c, i) => (
+                <span
+                  key={i}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 ${
+                    type === 'role'
+                      ? 'bg-primary text-primary-foreground'
+                      : type === 'skill'
+                      ? 'bg-accent text-accent-foreground'
+                      : 'bg-destructive/20 text-destructive border border-destructive/30'
+                  }`}
+                >
+                  {c.name}
+                  <button onClick={() => removeCustomEntry(type, i)} className="ml-1 hover:opacity-70">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Add custom input */}
+        <div className="pt-3 border-t border-border/50">
+          <h4 className="text-xs font-medium text-muted-foreground mb-2">
+            Don't see yours? Add your own
+          </h4>
+          <div className="flex gap-2">
+            <Input
+              value={newCustomValue}
+              onChange={(e) => setNewCustomValue(e.target.value)}
+              placeholder={`Type your own ${type}...`}
+              className="h-8 text-xs flex-1"
+              maxLength={50}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addCustomEntry(type);
+                }
+              }}
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 px-3"
+              onClick={() => addCustomEntry(type)}
+              disabled={!newCustomValue.trim()}
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              Add
+            </Button>
+          </div>
+        </div>
+
+        {/* Description inputs for selected + custom items */}
+        {(Array.from(selectedIds).length > 0 || customs.length > 0) && (
           <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
             <h4 className="text-xs font-medium text-muted-foreground">
               Add your own description (optional)
@@ -215,23 +338,28 @@ export function EditProfileDetailsDialog({
               .filter(item => selectedIds.has(item.id))
               .map(item => (
                 <div key={item.id}>
-                  <label className="text-xs font-medium text-foreground mb-1 block">
-                    {item.name}
-                  </label>
+                  <label className="text-xs font-medium text-foreground mb-1 block">{item.name}</label>
                   <Textarea
                     value={descriptions[item.id] || ''}
-                    onChange={(e) =>
-                      setDescriptions(prev => ({
-                        ...prev,
-                        [item.id]: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setDescriptions(prev => ({ ...prev, [item.id]: e.target.value }))}
                     placeholder={`Describe how ${item.name} relates to you...`}
                     className="min-h-[60px] text-xs placeholder:text-left"
                     maxLength={200}
                   />
                 </div>
               ))}
+            {customs.map((c, i) => (
+              <div key={`custom-${i}`}>
+                <label className="text-xs font-medium text-foreground mb-1 block">{c.name}</label>
+                <Textarea
+                  value={c.description}
+                  onChange={(e) => updateCustomDescription(type, i, e.target.value)}
+                  placeholder={`Describe what ${c.name} means to you...`}
+                  className="min-h-[60px] text-xs placeholder:text-left"
+                  maxLength={200}
+                />
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -270,23 +398,23 @@ export function EditProfileDetailsDialog({
               <ScrollArea className="h-[350px] mt-4 pr-4">
                 <TabsContent value="roles" className="mt-0">
                   <p className="text-xs text-muted-foreground mb-3">
-                    Select roles that describe what you do ({selectedRoleIds.size} selected)
+                    Select roles that describe what you do ({selectedRoleIds.size + customRoles.length} selected)
                   </p>
-                  {renderItemGrid(allRoles, selectedRoleIds, 'role', roleDescriptions, setRoleDescriptions)}
+                  {renderItemGrid(allRoles, selectedRoleIds, 'role', roleDescriptions, setRoleDescriptions, customRoles, newCustomRole, setNewCustomRole)}
                 </TabsContent>
 
                 <TabsContent value="skills" className="mt-0">
                   <p className="text-xs text-muted-foreground mb-3">
-                    Select up to 10 skills you bring to the table ({selectedSkillIds.size}/10)
+                    Select skills you bring to the table ({selectedSkillIds.size + customSkills.length} selected)
                   </p>
-                  {renderItemGrid(allSkills, selectedSkillIds, 'skill', skillDescriptions, setSkillDescriptions)}
+                  {renderItemGrid(allSkills, selectedSkillIds, 'skill', skillDescriptions, setSkillDescriptions, customSkills, newCustomSkill, setNewCustomSkill)}
                 </TabsContent>
 
                 <TabsContent value="passions" className="mt-0">
                   <p className="text-xs text-muted-foreground mb-3">
-                    Select passions that drive you ({selectedPassionIds.size} selected)
+                    Select passions that drive you ({selectedPassionIds.size + customPassions.length} selected)
                   </p>
-                  {renderItemGrid(allPassions, selectedPassionIds, 'passion', passionDescriptions, setPassionDescriptions)}
+                  {renderItemGrid(allPassions, selectedPassionIds, 'passion', passionDescriptions, setPassionDescriptions, customPassions, newCustomPassion, setNewCustomPassion)}
                 </TabsContent>
               </ScrollArea>
             </Tabs>

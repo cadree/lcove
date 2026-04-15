@@ -6003,23 +6003,26 @@ export type Database = {
       user_creative_roles: {
         Row: {
           created_at: string | null
+          custom_name: string | null
           description: string | null
           id: string
-          role_id: string
+          role_id: string | null
           user_id: string
         }
         Insert: {
           created_at?: string | null
+          custom_name?: string | null
           description?: string | null
           id?: string
-          role_id: string
+          role_id?: string | null
           user_id: string
         }
         Update: {
           created_at?: string | null
+          custom_name?: string | null
           description?: string | null
           id?: string
-          role_id?: string
+          role_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -6116,23 +6119,26 @@ export type Database = {
       user_passions: {
         Row: {
           created_at: string | null
+          custom_name: string | null
           description: string | null
           id: string
-          passion_id: string
+          passion_id: string | null
           user_id: string
         }
         Insert: {
           created_at?: string | null
+          custom_name?: string | null
           description?: string | null
           id?: string
-          passion_id: string
+          passion_id?: string | null
           user_id: string
         }
         Update: {
           created_at?: string | null
+          custom_name?: string | null
           description?: string | null
           id?: string
-          passion_id?: string
+          passion_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -6219,23 +6225,26 @@ export type Database = {
       user_skills: {
         Row: {
           created_at: string | null
+          custom_name: string | null
           description: string | null
           id: string
-          skill_id: string
+          skill_id: string | null
           user_id: string
         }
         Insert: {
           created_at?: string | null
+          custom_name?: string | null
           description?: string | null
           id?: string
-          skill_id: string
+          skill_id?: string | null
           user_id: string
         }
         Update: {
           created_at?: string | null
+          custom_name?: string | null
           description?: string | null
           id?: string
-          skill_id?: string
+          skill_id?: string | null
           user_id?: string
         }
         Relationships: [
