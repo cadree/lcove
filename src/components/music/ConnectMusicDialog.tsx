@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Music, Trash2, Plus, X, Loader2, Upload, ImageIcon } from "lucide-react";
+import { Music, Trash2, Plus, X, Loader2, Upload, ImageIcon, FileAudio } from "lucide-react";
 import { useMusicProfile, MusicTrack, MusicAlbum } from "@/hooks/useMusicProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
