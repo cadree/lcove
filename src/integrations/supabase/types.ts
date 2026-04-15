@@ -185,6 +185,57 @@ export type Database = {
           },
         ]
       }
+      artist_subscriptions: {
+        Row: {
+          amount_cents: number
+          artist_user_id: string
+          created_at: string
+          id: string
+          interval: string
+          status: string
+          stripe_subscription_id: string | null
+          subscriber_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount_cents?: number
+          artist_user_id: string
+          created_at?: string
+          id?: string
+          interval?: string
+          status?: string
+          stripe_subscription_id?: string | null
+          subscriber_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          artist_user_id?: string
+          created_at?: string
+          id?: string
+          interval?: string
+          status?: string
+          stripe_subscription_id?: string | null
+          subscriber_user_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_subscriptions_artist_user_id_fkey"
+            columns: ["artist_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "artist_subscriptions_artist_user_id_fkey"
+            columns: ["artist_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       blog_posts: {
         Row: {
           content: string
@@ -2296,6 +2347,184 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      exclusive_access_rules: {
+        Row: {
+          amount_cents: number | null
+          artist_user_id: string
+          created_at: string
+          description: string | null
+          id: string
+          interval: string | null
+          is_active: boolean
+          label: string | null
+          metadata: Json | null
+          rule_type: string
+          sort_order: number
+          track_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount_cents?: number | null
+          artist_user_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          interval?: string | null
+          is_active?: boolean
+          label?: string | null
+          metadata?: Json | null
+          rule_type?: string
+          sort_order?: number
+          track_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number | null
+          artist_user_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          interval?: string | null
+          is_active?: boolean
+          label?: string | null
+          metadata?: Json | null
+          rule_type?: string
+          sort_order?: number
+          track_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exclusive_access_rules_artist_user_id_fkey"
+            columns: ["artist_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "exclusive_access_rules_artist_user_id_fkey"
+            columns: ["artist_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "exclusive_access_rules_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "exclusive_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exclusive_track_purchases: {
+        Row: {
+          access_rule_id: string | null
+          amount_cents: number
+          buyer_user_id: string
+          created_at: string
+          id: string
+          stripe_payment_intent_id: string | null
+          track_id: string
+        }
+        Insert: {
+          access_rule_id?: string | null
+          amount_cents?: number
+          buyer_user_id: string
+          created_at?: string
+          id?: string
+          stripe_payment_intent_id?: string | null
+          track_id: string
+        }
+        Update: {
+          access_rule_id?: string | null
+          amount_cents?: number
+          buyer_user_id?: string
+          created_at?: string
+          id?: string
+          stripe_payment_intent_id?: string | null
+          track_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exclusive_track_purchases_access_rule_id_fkey"
+            columns: ["access_rule_id"]
+            isOneToOne: false
+            referencedRelation: "exclusive_access_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exclusive_track_purchases_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "exclusive_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exclusive_tracks: {
+        Row: {
+          access_type: string
+          artist_user_id: string
+          audio_file_url: string | null
+          cover_image_url: string | null
+          created_at: string
+          description: string | null
+          duration_seconds: number | null
+          id: string
+          is_published: boolean
+          preview_clip_url: string | null
+          price_cents: number | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          access_type?: string
+          artist_user_id: string
+          audio_file_url?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          is_published?: boolean
+          preview_clip_url?: string | null
+          price_cents?: number | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          access_type?: string
+          artist_user_id?: string
+          audio_file_url?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          is_published?: boolean
+          preview_clip_url?: string | null
+          price_cents?: number | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exclusive_tracks_artist_user_id_fkey"
+            columns: ["artist_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "exclusive_tracks_artist_user_id_fkey"
+            columns: ["artist_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["user_id"]
           },
         ]
       }
