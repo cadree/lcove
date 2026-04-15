@@ -240,11 +240,12 @@ const Profile = () => {
                 />
               </div>
             )}
-            {isOwnProfile && (
-              <div className="px-5 py-4">
-                <MusicProfileBlock onConnectClick={() => setShowMusicDialog(true)} />
-              </div>
-            )}
+            <div className="px-5 py-4">
+              <MusicProfileBlock
+                userId={profileUserId}
+                onConnectClick={() => setShowMusicDialog(true)}
+              />
+            </div>
           </div>
         );
       case 'posts_tabs':
