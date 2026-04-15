@@ -2077,6 +2077,76 @@ export type Database = {
           },
         ]
       }
+      event_flyers: {
+        Row: {
+          created_at: string
+          event_id: string
+          flyer_url: string
+          format: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          flyer_url: string
+          format?: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          flyer_url?: string
+          format?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_flyers_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_reminder_log: {
+        Row: {
+          event_id: string
+          id: string
+          message: string | null
+          recipient_count: number
+          reminder_type: string
+          sent_at: string
+          sent_by: string | null
+        }
+        Insert: {
+          event_id: string
+          id?: string
+          message?: string | null
+          recipient_count?: number
+          reminder_type: string
+          sent_at?: string
+          sent_by?: string | null
+        }
+        Update: {
+          event_id?: string
+          id?: string
+          message?: string | null
+          recipient_count?: number
+          reminder_type?: string
+          sent_at?: string
+          sent_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_reminder_log_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_rsvps: {
         Row: {
           created_at: string
