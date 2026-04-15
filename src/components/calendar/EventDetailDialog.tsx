@@ -36,7 +36,13 @@ import {
   Settings,
   Sun,
   CalendarCheck,
-  UserPlus
+  UserPlus,
+  MessageSquare,
+  Download,
+  Send,
+  Image,
+  Facebook,
+  Phone
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -44,11 +50,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EventAttendeesDialog } from "./EventAttendeesDialog";
 import { AddToCalendarButtons } from "./AddToCalendarButtons";
 import { InviteGuestsDialog } from "./InviteGuestsDialog";
+import { Input } from "@/components/ui/input";
 
 interface EventDetailDialogProps {
   eventId: string | null;
