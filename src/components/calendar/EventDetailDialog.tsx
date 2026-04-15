@@ -577,14 +577,36 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
                       <Copy className="w-4 h-4 mr-2" />
                       Copy Link
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleShare('sms')}>
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      iMessage / SMS
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleShare('whatsapp')}>
+                      <Send className="w-4 h-4 mr-2" />
+                      WhatsApp
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleShare('instagram')} disabled={isGeneratingFlyer}>
+                      {isGeneratingFlyer ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Image className="w-4 h-4 mr-2" />}
+                      Instagram (with flyer)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleShare('facebook')}>
+                      <Facebook className="w-4 h-4 mr-2" />
+                      Facebook
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleShare('twitter')}>
                       <Twitter className="w-4 h-4 mr-2" />
-                      Share on Twitter
+                      Twitter / X
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleDownloadFlyer} disabled={isGeneratingFlyer}>
+                      {isGeneratingFlyer ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                      Download Event Flyer
                     </DropdownMenuItem>
                     {navigator.share && (
                       <DropdownMenuItem onClick={() => handleShare('native')}>
                         <Share2 className="w-4 h-4 mr-2" />
-                        Share...
+                        More...
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuContent>
