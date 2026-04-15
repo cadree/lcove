@@ -106,14 +106,17 @@ Deno.serve(async (req) => {
           )
           if (ogTitleMatch) {
             let title = ogTitleMatch[1]
-            // Clean common suffixes first
+            // Decode HTML entities
+            title = title.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"')
+            // Clean common suffixes
+            title = title.replace(/\s+[-–—]\s+(Apple Music|Song).*$/i, '').trim()
             title = title.replace(/\s+on\s+(Spotify|Apple Music)$/i, '').trim()
-            // For Apple Music: "Song (feat. X) by Artist" -> extract "Artist"
-            const byArtistMatch = title.match(/\bby\s+(.+)$/i)
-            if (byArtistMatch) {
-              artistName = byArtistMatch[1].replace(/\s+on\s+(Spotify|Apple Music)$/i, '').trim()
+            // For Apple Music/Spotify: "Song (feat. X) by Artist" -> extract artist after LAST "by"
+            const byParts = title.split(/\s+by\s+/i)
+            if (byParts.length > 1) {
+              artistName = byParts[byParts.length - 1].replace(/\s+on\s+(Spotify|Apple Music)$/i, '').trim()
             } else {
-              // Clean "Song - Album" or "Song · Artist" patterns for Spotify
+              // Clean "Song · Artist" patterns for Spotify
               title = title.replace(/\s+[-·]\s+.*$/, '').trim()
               artistName = title
             }
