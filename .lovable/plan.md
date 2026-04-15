@@ -1,80 +1,119 @@
 
 
-# Enhanced Event Sharing, Flyer Generation, and Automated Notifications
+# Restructured Music Profile + Exclusive Music Monetization
 
-This plan covers five interconnected improvements to the event system: better share options, auto-generated flyers for social media, automated reminder notifications, host-initiated SMS/email reminders, and guest notification infrastructure.
+## Overview
 
----
-
-## What Gets Built
-
-1. **Expanded Share Menu** — Add Instagram Stories, iMessage/SMS, WhatsApp, Facebook, and native share options to the event share dropdown. The shared link always points to the public event page (`/event/:id`) which already has guest RSVP forms.
-
-2. **Auto-Generated Event Flyer** — A new edge function (`generate-event-flyer`) that uses canvas rendering to create a branded 1080x1920 (Instagram Story) or 1200x630 (feed) image from the event data (title, date, time, venue, cover image, QR code linking to RSVP page). When sharing to Instagram or downloading, the flyer is generated and provided as a shareable image.
-
-3. **Automated Event Reminders** — A new edge function (`auto-event-reminders`) triggered by a pg_cron job that runs hourly, checking for events happening in 24 hours and 1 hour. It sends email reminders (via Resend) and push notifications to all attendees (both members and guests). Guest email/push already supported via `guest_push_subscriptions` and `event_rsvps.guest_email`.
-
-4. **Host "Send Reminder" Button** — Already partially exists (`send-event-reminder` edge function). Enhance the EventDetailDialog and EventAttendeesDialog to let hosts send custom reminders anytime via email AND SMS (Twilio) to all attendees including guests.
-
-5. **SMS Notifications for Guests** — Extend `send-event-reminder` to also text guests who provided phone numbers. Add a dedicated "Text All Guests" action for hosts using the existing Twilio integration.
+Simplify the Connect Music Dialog to four core fields (Artist Name, Artist Image, Spotify URL, Apple Music URL), and add a new **Exclusive Music** system where artists can upload tracks, set access rules (one-time purchase, page subscription, or custom fan challenges), and receive 100% of revenue through their Stripe Connect account.
 
 ---
 
-## Technical Details
+## Part 1: Simplified Connect Music Dialog
 
-### 1. Share Menu Enhancements (`EventDetailDialog.tsx`)
-- Add share options: Instagram (via native share with flyer image), SMS/iMessage (`sms:?body=...`), WhatsApp (`https://wa.me/?text=...`), Facebook (`https://www.facebook.com/sharer/...`)
-- For Instagram: generate flyer first, then trigger native share with the image file
-- For SMS: use `sms:?&body=` URL scheme which opens iMessage/Messages on iOS
-- The shared URL remains `https://etherbylcove.com/event/{id}` pointing to `PublicEventPage`
+**Current state**: 4-tab dialog (Links, Tracks, Albums, Latest) with genres, manual track/album entry, and URL fields.
 
-### 2. Event Flyer Generator Edge Function
-- New edge function: `supabase/functions/generate-event-flyer/index.ts`
-- Uses `@vercel/og` or server-side HTML-to-image approach (Satori) to render a styled flyer
-- Inputs: event ID (fetches title, date, venue, cover image from DB)
-- Outputs: PNG image (1080x1920 for stories, 1200x630 for feed)
-- Includes: event title, date/time, venue, cover image as background, QR code to RSVP link, ETHER branding
-- Caches generated flyers in the `media` storage bucket at `event-flyers/{eventId}.png`
-- Client downloads the image and uses `navigator.share({ files: [flyerFile] })` for Instagram sharing
+**New structure**: Single clean form with:
+- Artist / Band Name (required)
+- Artist Image (upload from gallery or auto-pulled from URL)
+- Spotify Artist URL (auto-fetches name + image if empty)
+- Apple Music Artist URL (same auto-fetch)
 
-### 3. Automated Reminder System
-- New edge function: `supabase/functions/auto-event-reminders/index.ts`
-- New pg_cron job running every 30 minutes
-- Checks for events starting in 24h and 1h windows
-- Tracks sent reminders via a new `event_reminder_log` table to avoid duplicates
-- Sends to:
-  - **Members**: email (Resend) + in-app notification
-  - **Guests**: email (Resend) + push notification (existing `guest_push_subscriptions`)
-  - **SMS**: to anyone with a phone number (Twilio)
+Remove: Genres section, Tracks tab, Albums tab, Latest Release tab from the Connect dialog. The public profile block (`MusicProfileBlock`) will still show platform links and the artist image but no longer manually-entered tracks/albums/genres.
 
-### 4. Database Migration
-- New table `event_reminder_log`:
-  - `id UUID PK`, `event_id UUID`, `reminder_type TEXT` (24h, 1h, custom), `sent_at TIMESTAMPTZ`, `recipient_count INT`
-  - Prevents duplicate automated reminders
-- New table `event_flyers`:
-  - `id UUID PK`, `event_id UUID UNIQUE`, `flyer_url TEXT`, `created_at TIMESTAMPTZ`
-  - Caches generated flyer URLs
+---
 
-### 5. Host Controls Enhancement
-- Add "Send Reminder to All Guests" button in EventDetailDialog (visible to host)
-- Add "Text All Guests" button that sends SMS via `send-event-reminder` edge function
-- Update `send-event-reminder` to also send SMS to guests with phone numbers via Twilio
-- Add custom message input for host reminders
+## Part 2: Exclusive Music Upload & Monetization
 
-### 6. PublicEventPage Updates
-- After guest RSVP, automatically offer push notification opt-in (already exists)
-- Add checkbox for "Email me reminders about this event" (already captured via guest_email)
-- Ensure the page works as the landing destination for all shared links
+### New DB Table: `exclusive_tracks`
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID PK | |
+| artist_user_id | UUID FK profiles | Owner |
+| title | TEXT | Track name |
+| cover_image_url | TEXT | Cover art |
+| audio_file_url | TEXT | Stored in `media` bucket |
+| preview_clip_url | TEXT | Optional 30s preview (free) |
+| duration_seconds | INT | |
+| access_type | TEXT | 'purchase', 'subscription', 'custom' |
+| price_cents | INT | One-time price (if purchase) |
+| description | TEXT | Artist notes |
+| is_published | BOOL | |
+| created_at, updated_at | TIMESTAMPTZ | |
+
+### New DB Table: `exclusive_access_rules`
+Customizable unlock conditions per track or globally for the artist.
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID PK | |
+| artist_user_id | UUID FK | |
+| track_id | UUID FK nullable | NULL = applies to all tracks |
+| rule_type | TEXT | 'subscription', 'purchase', 'challenge', 'tip_goal', 'share_unlock' |
+| label | TEXT | Custom label (e.g. "Share on 3 platforms to unlock") |
+| description | TEXT | Fun description by artist |
+| amount_cents | INT | For purchase/subscription/tip rules |
+| interval | TEXT | 'monthly'/'yearly' for subscriptions |
+| metadata | JSONB | Flexible config (share count, challenge details) |
+| sort_order | INT | Display order |
+| is_active | BOOL | |
+
+### New DB Table: `exclusive_track_purchases`
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID PK | |
+| track_id | UUID FK | |
+| buyer_user_id | UUID FK | |
+| access_rule_id | UUID FK | Which rule granted access |
+| stripe_payment_intent_id | TEXT | |
+| amount_cents | INT | |
+| created_at | TIMESTAMPTZ | |
+
+### New DB Table: `artist_subscriptions`
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID PK | |
+| artist_user_id | UUID FK | |
+| subscriber_user_id | UUID FK | |
+| stripe_subscription_id | TEXT | |
+| status | TEXT | active/canceled/past_due |
+| amount_cents | INT | |
+| interval | TEXT | monthly/yearly |
+| created_at, updated_at | TIMESTAMPTZ | |
+
+### Payment Flow
+- Uses existing Stripe Connect infrastructure (artists already have `create-connect-account` / `check-connect-status`)
+- New edge function: `purchase-exclusive-track` — creates a Stripe PaymentIntent with `transfer_data.destination` set to the artist's Connect account (100% to artist, 0% platform fee per revenue split memory)
+- New edge function: `create-artist-subscription` — creates a Stripe subscription checkout with the artist as the connected account destination
+
+### UI Components
+
+**For Artists (owner view):**
+- New "Exclusive Music" section in profile with upload dialog
+- Upload tracks (audio file + cover art + title)
+- Set access rules per track: one-time price, subscription, or custom challenges
+- Custom challenges section: artist writes fun unlock conditions (share goals, tip jars, fan milestones)
+- Highly customizable — artist can add/remove/reorder rules, write playful descriptions, set emoji icons
+
+**For Fans (visitor view):**
+- Locked track cards with cover art and 30s preview button
+- Clear unlock options displayed per track
+- Purchase button → Stripe checkout → instant access
+- Subscribe button → monthly subscription → access all exclusive tracks
+- Custom challenge progress indicators
 
 ---
 
 ## Files to Create
-- `supabase/functions/generate-event-flyer/index.ts` — Flyer image generator
-- `supabase/functions/auto-event-reminders/index.ts` — Cron-triggered automated reminders
-- Database migration for `event_reminder_log` table
+- DB migration for `exclusive_tracks`, `exclusive_access_rules`, `exclusive_track_purchases`, `artist_subscriptions` tables with RLS
+- `src/components/music/ExclusiveMusicSection.tsx` — artist upload + management UI
+- `src/components/music/ExclusiveTrackCard.tsx` — fan-facing locked/unlocked track card
+- `src/components/music/AccessRuleEditor.tsx` — customizable rule builder for artists
+- `src/hooks/useExclusiveMusic.ts` — CRUD for exclusive tracks and access rules
+- `supabase/functions/purchase-exclusive-track/index.ts` — Stripe payment for track purchase
+- `supabase/functions/create-artist-subscription/index.ts` — Stripe subscription for artist page
 
 ## Files to Modify
-- `src/components/calendar/EventDetailDialog.tsx` — Expanded share menu with flyer download, SMS, WhatsApp, Instagram, Facebook; host reminder controls
-- `supabase/functions/send-event-reminder/index.ts` — Add SMS sending for guests with phones
-- `supabase/functions/share-page/index.ts` — Ensure event OG image uses flyer if available
+- `src/components/music/ConnectMusicDialog.tsx` — Strip down to 4 fields only
+- `src/components/music/MusicProfileBlock.tsx` — Remove tracks/albums/genres display, add Exclusive Music section
+- `src/hooks/useMusicProfile.ts` — Simplify interface (remove tracks/albums/genres/latest_release)
+- `src/components/profile/CreatorModuleTabs.tsx` or Profile page — Add Exclusive Music tab/section
 
