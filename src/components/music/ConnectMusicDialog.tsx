@@ -37,7 +37,15 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
   const [isSaving, setIsSaving] = useState(false);
   const [isFetchingImage, setIsFetchingImage] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadingTrackId, setUploadingTrackId] = useState<string | null>(null);
+  const [uploadingAlbumId, setUploadingAlbumId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const trackAudioInputRef = useRef<HTMLInputElement>(null);
+  const trackImageInputRef = useRef<HTMLInputElement>(null);
+  const albumImageInputRef = useRef<HTMLInputElement>(null);
+  const [activeUploadTrackId, setActiveUploadTrackId] = useState<string | null>(null);
+  const [activeUploadAlbumId, setActiveUploadAlbumId] = useState<string | null>(null);
+  const [activeUploadType, setActiveUploadType] = useState<'audio' | 'image' | null>(null);
 
   // Update state when profile loads
   useState(() => {
