@@ -380,7 +380,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                   placeholder="https://open.spotify.com/artist/..."
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Paste your Spotify artist URL to auto-fetch your image
+                  Paste your Spotify artist URL to auto-fill name, image, genres, tracks & albums
                 </p>
               </div>
 
@@ -393,7 +393,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                   placeholder="https://music.apple.com/artist/..."
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Paste your Apple Music artist URL to auto-fetch your image
+                  Paste your Apple Music artist URL to auto-fill name, image, genres, tracks & albums
                 </p>
               </div>
 
