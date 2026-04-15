@@ -720,10 +720,10 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="ml-2"
+                      className="ml-2 text-destructive hover:text-destructive hover:bg-destructive/10"
                       onClick={() => handleRemoveAlbum(album.id)}
                     >
-                      <Trash2 className="w-4 h-4 text-destructive" />
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
@@ -734,6 +734,15 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
               <Plus className="w-4 h-4 mr-2" />
               Add Album/EP/Single
             </Button>
+
+            {/* Hidden file input for album covers */}
+            <input
+              ref={albumImageInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAlbumImageUpload}
+            />
           </TabsContent>
 
           <TabsContent value="latest" className="space-y-4 mt-4">
