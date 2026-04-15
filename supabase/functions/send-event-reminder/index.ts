@@ -25,7 +25,6 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Authenticate the sender (event host)
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("Authorization required");
 
@@ -33,10 +32,9 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !user) throw new Error("Not authenticated");
 
-    const { eventId, message } = await req.json();
+    const { eventId, message, sendSms = false } = await req.json();
     if (!eventId) throw new Error("Missing eventId");
 
-    // Fetch event
     const { data: event, error: eventError } = await supabaseAdmin
       .from("events")
       .select("id, title, start_date, end_date, venue, city, creator_id")
@@ -46,7 +44,6 @@ serve(async (req) => {
     if (eventError || !event) throw new Error("Event not found");
     if (event.creator_id !== user.id) throw new Error("Only the host can send reminders");
 
-    // Fetch all RSVPs (both members and guests)
     const { data: rsvps, error: rsvpError } = await supabaseAdmin
       .from("event_rsvps")
       .select("user_id, guest_email, guest_name, guest_phone, reminder_enabled")
@@ -55,13 +52,16 @@ serve(async (req) => {
 
     if (rsvpError) throw new Error("Failed to fetch attendees");
     if (!rsvps || rsvps.length === 0) {
-      return new Response(JSON.stringify({ success: true, sentCount: 0, message: "No attendees to notify" }), {
+      return new Response(JSON.stringify({ success: true, sentCount: 0, smsSentCount: 0, message: "No attendees to notify" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
       });
     }
 
     const resendKey = Deno.env.get("RESEND_API_KEY");
+    const twilioSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+    const twilioAuth = Deno.env.get("TWILIO_AUTH_TOKEN");
+    const twilioPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
+
     const eventDate = new Date(event.start_date).toLocaleDateString("en-US", {
       weekday: "long", month: "long", day: "numeric", year: "numeric",
     });
@@ -69,22 +69,24 @@ serve(async (req) => {
       hour: "numeric", minute: "2-digit",
     });
     const location = [event.venue, event.city].filter(Boolean).join(", ") || "Location TBA";
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const eventUrl = `${supabaseUrl}/functions/v1/share-page/e/${eventId}`;
+    const eventUrl = `https://etherbylcove.com/event/${eventId}`;
 
     let sentCount = 0;
+    let smsSentCount = 0;
 
     for (const rsvp of rsvps) {
       let email: string | null = null;
+      let phone: string | null = rsvp.guest_phone || null;
       let name = "there";
 
       if (rsvp.user_id) {
         const { data: profile } = await supabaseAdmin
           .from("profiles")
-          .select("display_name")
+          .select("display_name, phone")
           .eq("user_id", rsvp.user_id)
           .single();
         name = profile?.display_name || "there";
+        if (!phone && profile?.phone) phone = profile.phone;
 
         const { data: userData } = await supabaseAdmin.auth.admin.getUserById(rsvp.user_id);
         email = userData?.user?.email || null;
@@ -93,10 +95,10 @@ serve(async (req) => {
         name = rsvp.guest_name || "there";
       }
 
+      // Send email
       if (email && resendKey) {
         try {
           const customMessage = message ? `<p style="margin: 16px 0; padding: 12px; background: #f0f0f0; border-radius: 8px;">"${message}"</p>` : "";
-
           const htmlBody = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
               <h2 style="color: #1a1a2e;">Event Reminder 🎉</h2>
@@ -112,8 +114,7 @@ serve(async (req) => {
                 View Event Details
               </a>
               <p style="color: #999; font-size: 12px; margin-top: 24px;">Sent via ETHER by lcove</p>
-            </div>
-          `;
+            </div>`;
 
           const emailRes = await fetch("https://api.resend.com/emails", {
             method: "POST",
@@ -131,27 +132,57 @@ serve(async (req) => {
 
           if (emailRes.ok) {
             sentCount++;
-            logStep("Reminder sent", { email });
+            logStep("Email sent", { email });
           } else {
-            logStep("Reminder failed", { email, error: await emailRes.text() });
+            logStep("Email failed", { email, error: await emailRes.text() });
           }
         } catch (err) {
-          logStep("Reminder error", { email, error: String(err) });
+          logStep("Email error", { email, error: String(err) });
+        }
+      }
+
+      // Send SMS if requested and phone available
+      if (sendSms && phone && twilioSid && twilioAuth && twilioPhone) {
+        try {
+          const smsBody = message
+            ? `${message}\n\n${event.title}\n📅 ${eventDate} at ${eventTime}\n📍 ${location}\n\nRSVP: ${eventUrl}`
+            : `Reminder: ${event.title} is coming up!\n📅 ${eventDate} at ${eventTime}\n📍 ${location}\n\nRSVP: ${eventUrl}`;
+
+          const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
+          const smsRes = await fetch(twilioUrl, {
+            method: "POST",
+            headers: {
+              Authorization: `Basic ${btoa(`${twilioSid}:${twilioAuth}`)}`,
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+              To: phone,
+              From: twilioPhone,
+              Body: smsBody,
+            }),
+          });
+
+          if (smsRes.ok) {
+            smsSentCount++;
+            logStep("SMS sent", { phone });
+          } else {
+            logStep("SMS failed", { phone, status: smsRes.status });
+          }
+        } catch (err) {
+          logStep("SMS error", { phone, error: String(err) });
         }
       }
     }
 
-    // --- Send push notifications to guest subscribers ---
+    // Send push notifications to guest subscribers
     let pushSentCount = 0;
     try {
-      const { data: guestSubs, error: guestSubError } = await supabaseAdmin
+      const { data: guestSubs } = await supabaseAdmin
         .from("guest_push_subscriptions")
         .select("endpoint, p256dh, auth, guest_email")
         .eq("event_id", eventId);
 
-      if (!guestSubError && guestSubs && guestSubs.length > 0) {
-        logStep("Found guest push subscriptions", { count: guestSubs.length });
-
+      if (guestSubs && guestSubs.length > 0) {
         const pushPayload = JSON.stringify({
           title: `Reminder: ${event.title}`,
           body: message || `${eventDate} at ${eventTime} — ${location}`,
@@ -159,16 +190,12 @@ serve(async (req) => {
           badge: "/favicon.png",
           tag: `ether-event-reminder-${eventId}`,
           renotify: true,
-          data: {
-            url: eventUrl,
-            type: "event_reminder",
-          },
+          data: { url: eventUrl, type: "event_reminder" },
           vibrate: [200, 100, 200],
           timestamp: Date.now(),
         });
 
         const expiredEndpoints: string[] = [];
-
         for (const sub of guestSubs) {
           try {
             const response = await fetch(sub.endpoint, {
@@ -176,47 +203,42 @@ serve(async (req) => {
               headers: {
                 "Content-Type": "application/json",
                 "Content-Length": String(new TextEncoder().encode(pushPayload).length),
-                "TTL": "86400",
-                "Urgency": "high",
+                TTL: "86400",
+                Urgency: "high",
               },
               body: pushPayload,
             });
-
             if (response.status === 201 || response.status === 200) {
               pushSentCount++;
-              logStep("Guest push sent", { email: sub.guest_email });
             } else if (response.status === 410 || response.status === 404) {
               expiredEndpoints.push(sub.endpoint);
-              logStep("Guest push subscription expired", { email: sub.guest_email });
-            } else {
-              logStep("Guest push failed", { email: sub.guest_email, status: response.status });
             }
           } catch (err) {
-            logStep("Guest push error", { email: sub.guest_email, error: String(err) });
+            logStep("Guest push error", { error: String(err) });
           }
         }
-
-        // Clean up expired guest subscriptions
         if (expiredEndpoints.length > 0) {
-          await supabaseAdmin
-            .from("guest_push_subscriptions")
-            .delete()
-            .in("endpoint", expiredEndpoints);
-          logStep("Cleaned up expired guest subscriptions", { count: expiredEndpoints.length });
+          await supabaseAdmin.from("guest_push_subscriptions").delete().in("endpoint", expiredEndpoints);
         }
       }
     } catch (err) {
-      logStep("Guest push notification error", { error: String(err) });
+      logStep("Push notification error", { error: String(err) });
     }
 
-    logStep("Complete", { totalAttendees: rsvps.length, emailsSent: sentCount, pushSent: pushSentCount });
+    // Log reminder
+    await supabaseAdmin.from("event_reminder_log").insert({
+      event_id: eventId,
+      reminder_type: "custom",
+      recipient_count: sentCount + smsSentCount,
+      message: message || null,
+      sent_by: user.id,
+    });
+
+    logStep("Complete", { emailsSent: sentCount, smsSent: smsSentCount, pushSent: pushSentCount });
 
     return new Response(
-      JSON.stringify({ success: true, sentCount, pushSentCount, totalAttendees: rsvps.length }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      }
+      JSON.stringify({ success: true, sentCount, smsSentCount, pushSentCount, totalAttendees: rsvps.length }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
