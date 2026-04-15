@@ -305,7 +305,7 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
     }
   };
 
-  const handleShare = async (method: 'copy' | 'twitter' | 'native') => {
+  const handleShare = async (method: 'copy' | 'twitter' | 'native' | 'sms' | 'whatsapp' | 'facebook' | 'instagram') => {
     const shareUrl = `https://etherbylcove.com/event/${event.id}`;
     const shareText = `Check out "${event.title}" on ${format(eventDate, 'MMMM d')}!`;
 
@@ -335,15 +335,83 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
       }
     } else if (method === 'twitter') {
       window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank');
+    } else if (method === 'sms') {
+      const body = encodeURIComponent(`${shareText}\n${shareUrl}`);
+      window.open(`sms:?&body=${body}`, '_self');
+    } else if (method === 'whatsapp') {
+      window.open(`https://wa.me/?text=${encodeURIComponent(`${shareText}\n${shareUrl}`)}`, '_blank');
+    } else if (method === 'facebook') {
+      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
+    } else if (method === 'instagram') {
+      // Generate flyer then native share
+      await handleDownloadFlyer();
     } else if (method === 'native' && navigator.share) {
       try {
         await navigator.share({
           title: event.title,
-          text: shareUrl,
+          text: shareText,
+          url: shareUrl,
         });
       } catch {
         // User cancelled
       }
+    }
+  };
+
+  const handleDownloadFlyer = async () => {
+    setIsGeneratingFlyer(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-event-flyer', {
+        body: { eventId: event.id, format: 'story' },
+      });
+      if (error) throw error;
+      if (data?.flyer_url) {
+        // Try native share with file, fallback to download
+        try {
+          const response = await fetch(data.flyer_url);
+          const blob = await response.blob();
+          const file = new File([blob], `${event.title.replace(/[^a-zA-Z0-9]/g, '_')}_flyer.svg`, { type: blob.type });
+          
+          if (navigator.share && navigator.canShare?.({ files: [file] })) {
+            await navigator.share({
+              title: `${event.title} - Event Flyer`,
+              files: [file],
+            });
+          } else {
+            // Fallback: open in new tab
+            window.open(data.flyer_url, '_blank');
+          }
+        } catch {
+          window.open(data.flyer_url, '_blank');
+        }
+        toast.success('Flyer generated!');
+      }
+    } catch (error) {
+      console.error('Flyer generation error:', error);
+      toast.error('Failed to generate flyer');
+    } finally {
+      setIsGeneratingFlyer(false);
+    }
+  };
+
+  const handleSendReminder = async (includeSms = false) => {
+    setIsSendingReminder(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-event-reminder', {
+        body: { eventId: event.id, message: reminderMessage || undefined, sendSms: includeSms },
+      });
+      if (error) throw error;
+      const parts = [];
+      if (data?.sentCount > 0) parts.push(`${data.sentCount} emails`);
+      if (data?.smsSentCount > 0) parts.push(`${data.smsSentCount} texts`);
+      if (data?.pushSentCount > 0) parts.push(`${data.pushSentCount} push notifications`);
+      toast.success(parts.length > 0 ? `Sent: ${parts.join(', ')}` : 'No attendees to notify');
+      setReminderMessage("");
+    } catch (error) {
+      console.error('Reminder error:', error);
+      toast.error('Failed to send reminder');
+    } finally {
+      setIsSendingReminder(false);
     }
   };
 
