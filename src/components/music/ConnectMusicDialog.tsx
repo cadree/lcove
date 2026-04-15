@@ -672,11 +672,31 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                         </select>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          placeholder="Cover image URL"
-                          value={album.image_url || ""}
-                          onChange={(e) => handleUpdateAlbum(album.id, "image_url", e.target.value)}
-                        />
+                        <div className="flex gap-1">
+                          <Input
+                            placeholder="Cover image URL"
+                            value={album.image_url || ""}
+                            onChange={(e) => handleUpdateAlbum(album.id, "image_url", e.target.value)}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="flex-shrink-0"
+                            disabled={uploadingAlbumId === album.id}
+                            onClick={() => {
+                              setActiveUploadAlbumId(album.id);
+                              albumImageInputRef.current?.click();
+                            }}
+                          >
+                            {uploadingAlbumId === album.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Upload className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
                         <Input
                           type="date"
                           placeholder="Release date"
