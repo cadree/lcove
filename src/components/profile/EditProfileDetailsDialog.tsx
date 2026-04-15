@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Check, X, Loader2, Crown, Star, Heart } from 'lucide-react';
+import { Check, Loader2, Crown, Star, Heart } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
@@ -19,9 +19,9 @@ interface Item {
 interface EditProfileDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  currentSkills: Item[];
-  currentPassions: Item[];
-  currentRoles: Item[];
+  currentSkills: Array<{ id: string; name: string; description?: string | null }>;
+  currentPassions: Array<{ id: string; name: string; description?: string | null }>;
+  currentRoles: Array<{ id: string; name: string; description?: string | null }>;
 }
 
 export function EditProfileDetailsDialog({
@@ -37,23 +37,38 @@ export function EditProfileDetailsDialog({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // All available options
   const [allSkills, setAllSkills] = useState<Item[]>([]);
   const [allPassions, setAllPassions] = useState<Item[]>([]);
   const [allRoles, setAllRoles] = useState<Item[]>([]);
 
-  // Selected items (by ID)
   const [selectedSkillIds, setSelectedSkillIds] = useState<Set<string>>(new Set());
   const [selectedPassionIds, setSelectedPassionIds] = useState<Set<string>>(new Set());
   const [selectedRoleIds, setSelectedRoleIds] = useState<Set<string>>(new Set());
 
+  // Descriptions keyed by item ID
+  const [skillDescriptions, setSkillDescriptions] = useState<Record<string, string>>({});
+  const [passionDescriptions, setPassionDescriptions] = useState<Record<string, string>>({});
+  const [roleDescriptions, setRoleDescriptions] = useState<Record<string, string>>({});
+
   useEffect(() => {
     if (open) {
       fetchAllOptions();
-      // Initialize selected from current
       setSelectedSkillIds(new Set(currentSkills.map(s => s.id)));
       setSelectedPassionIds(new Set(currentPassions.map(p => p.id)));
       setSelectedRoleIds(new Set(currentRoles.map(r => r.id)));
+
+      // Initialize descriptions
+      const sd: Record<string, string> = {};
+      currentSkills.forEach(s => { if (s.description) sd[s.id] = s.description; });
+      setSkillDescriptions(sd);
+
+      const pd: Record<string, string> = {};
+      currentPassions.forEach(p => { if (p.description) pd[p.id] = p.description; });
+      setPassionDescriptions(pd);
+
+      const rd: Record<string, string> = {};
+      currentRoles.forEach(r => { if (r.description) rd[r.id] = r.description; });
+      setRoleDescriptions(rd);
     }
   }, [open, currentSkills, currentPassions, currentRoles]);
 
@@ -65,7 +80,6 @@ export function EditProfileDetailsDialog({
         supabase.from('passions').select('*').order('category'),
         supabase.from('creative_roles').select('*').order('category'),
       ]);
-
       if (skillsRes.data) setAllSkills(skillsRes.data);
       if (passionsRes.data) setAllPassions(passionsRes.data);
       if (rolesRes.data) setAllRoles(rolesRes.data);
@@ -96,7 +110,11 @@ export function EditProfileDetailsDialog({
       await supabase.from('user_skills').delete().eq('user_id', user.id);
       if (selectedSkillIds.size > 0) {
         await supabase.from('user_skills').insert(
-          Array.from(selectedSkillIds).map(id => ({ user_id: user.id, skill_id: id }))
+          Array.from(selectedSkillIds).map(id => ({
+            user_id: user.id,
+            skill_id: id,
+            description: skillDescriptions[id] || null,
+          }))
         );
       }
 
@@ -104,7 +122,11 @@ export function EditProfileDetailsDialog({
       await supabase.from('user_passions').delete().eq('user_id', user.id);
       if (selectedPassionIds.size > 0) {
         await supabase.from('user_passions').insert(
-          Array.from(selectedPassionIds).map(id => ({ user_id: user.id, passion_id: id }))
+          Array.from(selectedPassionIds).map(id => ({
+            user_id: user.id,
+            passion_id: id,
+            description: passionDescriptions[id] || null,
+          }))
         );
       }
 
@@ -112,11 +134,14 @@ export function EditProfileDetailsDialog({
       await supabase.from('user_creative_roles').delete().eq('user_id', user.id);
       if (selectedRoleIds.size > 0) {
         await supabase.from('user_creative_roles').insert(
-          Array.from(selectedRoleIds).map(id => ({ user_id: user.id, role_id: id }))
+          Array.from(selectedRoleIds).map(id => ({
+            user_id: user.id,
+            role_id: id,
+            description: roleDescriptions[id] || null,
+          }))
         );
       }
 
-      // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ['user-skills', user.id] });
       queryClient.invalidateQueries({ queryKey: ['user-passions', user.id] });
       queryClient.invalidateQueries({ queryKey: ['user-creative-roles', user.id] });
@@ -143,7 +168,9 @@ export function EditProfileDetailsDialog({
   const renderItemGrid = (
     items: Item[],
     selectedIds: Set<string>,
-    type: 'skill' | 'passion' | 'role'
+    type: 'skill' | 'passion' | 'role',
+    descriptions: Record<string, string>,
+    setDescriptions: React.Dispatch<React.SetStateAction<Record<string, string>>>
   ) => {
     const grouped = groupByCategory(items);
 
@@ -177,6 +204,36 @@ export function EditProfileDetailsDialog({
             </div>
           </div>
         ))}
+
+        {/* Description inputs for selected items */}
+        {Array.from(selectedIds).length > 0 && (
+          <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
+            <h4 className="text-xs font-medium text-muted-foreground">
+              Add your own description (optional)
+            </h4>
+            {items
+              .filter(item => selectedIds.has(item.id))
+              .map(item => (
+                <div key={item.id}>
+                  <label className="text-xs font-medium text-foreground mb-1 block">
+                    {item.name}
+                  </label>
+                  <Textarea
+                    value={descriptions[item.id] || ''}
+                    onChange={(e) =>
+                      setDescriptions(prev => ({
+                        ...prev,
+                        [item.id]: e.target.value,
+                      }))
+                    }
+                    placeholder={`Describe how ${item.name} relates to you...`}
+                    className="min-h-[60px] text-xs placeholder:text-left"
+                    maxLength={200}
+                  />
+                </div>
+              ))}
+          </div>
+        )}
       </div>
     );
   };
@@ -215,21 +272,21 @@ export function EditProfileDetailsDialog({
                   <p className="text-xs text-muted-foreground mb-3">
                     Select roles that describe what you do ({selectedRoleIds.size} selected)
                   </p>
-                  {renderItemGrid(allRoles, selectedRoleIds, 'role')}
+                  {renderItemGrid(allRoles, selectedRoleIds, 'role', roleDescriptions, setRoleDescriptions)}
                 </TabsContent>
 
                 <TabsContent value="skills" className="mt-0">
                   <p className="text-xs text-muted-foreground mb-3">
                     Select up to 10 skills you bring to the table ({selectedSkillIds.size}/10)
                   </p>
-                  {renderItemGrid(allSkills, selectedSkillIds, 'skill')}
+                  {renderItemGrid(allSkills, selectedSkillIds, 'skill', skillDescriptions, setSkillDescriptions)}
                 </TabsContent>
 
                 <TabsContent value="passions" className="mt-0">
                   <p className="text-xs text-muted-foreground mb-3">
                     Select passions that drive you ({selectedPassionIds.size} selected)
                   </p>
-                  {renderItemGrid(allPassions, selectedPassionIds, 'passion')}
+                  {renderItemGrid(allPassions, selectedPassionIds, 'passion', passionDescriptions, setPassionDescriptions)}
                 </TabsContent>
               </ScrollArea>
             </Tabs>
