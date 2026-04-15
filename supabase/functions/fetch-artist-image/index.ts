@@ -97,7 +97,31 @@ Deno.serve(async (req) => {
           if (ogImageMatch) imageUrl = ogImageMatch[1]
         }
 
-        // Extract og:title - try to get artist name
+        // Apple Music: extract artist from music:musician meta (most reliable)
+        if (isAppleMusic && !artistName) {
+          const musicianMatch = html.match(/<meta\s+(?:property|name)=["']music:musician["']\s+content=["']([^"']+)["']/i)
+            || html.match(/content=["']([^"']+)["']\s+(?:property|name)=["']music:musician["']/i)
+          if (musicianMatch) {
+            const musicianUrl = musicianMatch[1]
+            const nameFromUrl = musicianUrl.match(/\/artist\/([^/]+)\//)
+            if (nameFromUrl) {
+              artistName = decodeURIComponent(nameFromUrl[1]).replace(/-/g, ' ')
+              artistName = artistName.replace(/\b\w/g, c => c.toUpperCase())
+            }
+          }
+        }
+
+        // Apple Music: extract from apple:title meta (clean song/album name without "on Apple Music")
+        if (isAppleMusic && !artistName) {
+          const appleTitleMatch = html.match(/<meta\s+name=["']apple:description["']\s+content=["']([^"']+)["']/i)
+          if (appleTitleMatch) {
+            const desc = appleTitleMatch[1].replace(/&amp;/g, '&')
+            const byMatch = desc.match(/by\s+(.+?)(?:\s+on\s+Apple Music)?[.]/i)
+            if (byMatch) artistName = byMatch[1].trim()
+          }
+        }
+
+        // Extract og:title - fallback for artist name
         if (!artistName) {
           const ogTitleMatch = html.match(
             /<meta\s+(?:property|name)=["']og:title["']\s+content=["']([^"']+)["']/i
@@ -106,17 +130,13 @@ Deno.serve(async (req) => {
           )
           if (ogTitleMatch) {
             let title = ogTitleMatch[1]
-            // Decode HTML entities
             title = title.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"')
-            // Clean common suffixes
             title = title.replace(/\s+[-–—]\s+(Apple Music|Song).*$/i, '').trim()
             title = title.replace(/\s+on\s+(Spotify|Apple Music)$/i, '').trim()
-            // For Apple Music/Spotify: "Song (feat. X) by Artist" -> extract artist after LAST "by"
             const byParts = title.split(/\s+by\s+/i)
             if (byParts.length > 1) {
               artistName = byParts[byParts.length - 1].replace(/\s+on\s+(Spotify|Apple Music)$/i, '').trim()
             } else {
-              // Clean "Song · Artist" patterns for Spotify
               title = title.replace(/\s+[-·]\s+.*$/, '').trim()
               artistName = title
             }
