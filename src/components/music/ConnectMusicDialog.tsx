@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Music, Trash2, Plus, X, Loader2, Upload, ImageIcon } from "lucide-react";
+import { Music, Trash2, Plus, X, Loader2, Upload, ImageIcon, FileAudio } from "lucide-react";
 import { useMusicProfile, MusicTrack, MusicAlbum } from "@/hooks/useMusicProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -37,7 +37,15 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
   const [isSaving, setIsSaving] = useState(false);
   const [isFetchingImage, setIsFetchingImage] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadingTrackId, setUploadingTrackId] = useState<string | null>(null);
+  const [uploadingAlbumId, setUploadingAlbumId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const trackAudioInputRef = useRef<HTMLInputElement>(null);
+  const trackImageInputRef = useRef<HTMLInputElement>(null);
+  const albumImageInputRef = useRef<HTMLInputElement>(null);
+  const [activeUploadTrackId, setActiveUploadTrackId] = useState<string | null>(null);
+  const [activeUploadAlbumId, setActiveUploadAlbumId] = useState<string | null>(null);
+  const [activeUploadType, setActiveUploadType] = useState<'audio' | 'image' | null>(null);
 
   // Update state when profile loads
   useState(() => {
@@ -190,6 +198,98 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
       setIsUploadingImage(false);
       // Reset the input
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+  const handleTrackAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user || !activeUploadTrackId) return;
+
+    if (!file.type.startsWith('audio/')) {
+      toast.error('Please select an audio file');
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error('Audio file must be under 20MB');
+      return;
+    }
+
+    setUploadingTrackId(activeUploadTrackId);
+    try {
+      const ext = file.name.split('.').pop() || 'mp3';
+      const filePath = `${user.id}/music-tracks/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: publicUrl } = supabase.storage.from('media').getPublicUrl(filePath);
+      handleUpdateTrack(activeUploadTrackId, 'preview_url', publicUrl.publicUrl);
+      toast.success('Audio uploaded!');
+    } catch {
+      toast.error('Failed to upload audio');
+    } finally {
+      setUploadingTrackId(null);
+      setActiveUploadTrackId(null);
+      if (trackAudioInputRef.current) trackAudioInputRef.current.value = '';
+    }
+  };
+
+  const handleTrackImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user || !activeUploadTrackId) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be under 5MB');
+      return;
+    }
+
+    setUploadingTrackId(activeUploadTrackId);
+    try {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const filePath = `${user.id}/music-covers/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: publicUrl } = supabase.storage.from('media').getPublicUrl(filePath);
+      handleUpdateTrack(activeUploadTrackId, 'album_image', publicUrl.publicUrl);
+      toast.success('Cover image uploaded!');
+    } catch {
+      toast.error('Failed to upload image');
+    } finally {
+      setUploadingTrackId(null);
+      setActiveUploadTrackId(null);
+      if (trackImageInputRef.current) trackImageInputRef.current.value = '';
+    }
+  };
+
+  const handleAlbumImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user || !activeUploadAlbumId) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be under 5MB');
+      return;
+    }
+
+    setUploadingAlbumId(activeUploadAlbumId);
+    try {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const filePath = `${user.id}/music-covers/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: publicUrl } = supabase.storage.from('media').getPublicUrl(filePath);
+      handleUpdateAlbum(activeUploadAlbumId, 'image_url', publicUrl.publicUrl);
+      toast.success('Album cover uploaded!');
+    } catch {
+      toast.error('Failed to upload image');
+    } finally {
+      setUploadingAlbumId(null);
+      setActiveUploadAlbumId(null);
+      if (albumImageInputRef.current) albumImageInputRef.current.value = '';
     }
   };
 
@@ -430,7 +530,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
 
           <TabsContent value="tracks" className="space-y-4 mt-4">
             <p className="text-sm text-muted-foreground">
-              Add your top tracks to showcase on your profile.
+              Add your top tracks to showcase on your profile. Upload audio files or paste URLs.
             </p>
             
             <div className="space-y-3">
@@ -449,18 +549,60 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                           value={track.album_name || ""}
                           onChange={(e) => handleUpdateTrack(track.id, "album_name", e.target.value)}
                         />
-                        <Input
-                          placeholder="Album image URL"
-                          value={track.album_image || ""}
-                          onChange={(e) => handleUpdateTrack(track.id, "album_image", e.target.value)}
-                        />
+                        <div className="flex gap-1">
+                          <Input
+                            placeholder="Album image URL"
+                            value={track.album_image || ""}
+                            onChange={(e) => handleUpdateTrack(track.id, "album_image", e.target.value)}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="flex-shrink-0"
+                            disabled={uploadingTrackId === track.id}
+                            onClick={() => {
+                              setActiveUploadTrackId(track.id);
+                              setActiveUploadType('image');
+                              trackImageInputRef.current?.click();
+                            }}
+                          >
+                            {uploadingTrackId === track.id && activeUploadType === 'image' ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <ImageIcon className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          placeholder="Preview URL (30s clip)"
-                          value={track.preview_url || ""}
-                          onChange={(e) => handleUpdateTrack(track.id, "preview_url", e.target.value)}
-                        />
+                        <div className="flex gap-1">
+                          <Input
+                            placeholder="Audio preview URL"
+                            value={track.preview_url || ""}
+                            onChange={(e) => handleUpdateTrack(track.id, "preview_url", e.target.value)}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="flex-shrink-0"
+                            disabled={uploadingTrackId === track.id}
+                            onClick={() => {
+                              setActiveUploadTrackId(track.id);
+                              setActiveUploadType('audio');
+                              trackAudioInputRef.current?.click();
+                            }}
+                          >
+                            {uploadingTrackId === track.id && activeUploadType === 'audio' ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <FileAudio className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
                         <Input
                           placeholder="Spotify/Apple Music link"
                           value={track.spotify_url || ""}
@@ -471,10 +613,10 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="ml-2"
+                      className="ml-2 text-destructive hover:text-destructive hover:bg-destructive/10"
                       onClick={() => handleRemoveTrack(track.id)}
                     >
-                      <Trash2 className="w-4 h-4 text-destructive" />
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
@@ -485,6 +627,22 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
               <Plus className="w-4 h-4 mr-2" />
               Add Track
             </Button>
+
+            {/* Hidden file inputs for tracks */}
+            <input
+              ref={trackAudioInputRef}
+              type="file"
+              accept="audio/*"
+              className="hidden"
+              onChange={handleTrackAudioUpload}
+            />
+            <input
+              ref={trackImageInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleTrackImageUpload}
+            />
           </TabsContent>
 
           <TabsContent value="albums" className="space-y-4 mt-4">
@@ -514,11 +672,31 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                         </select>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          placeholder="Cover image URL"
-                          value={album.image_url || ""}
-                          onChange={(e) => handleUpdateAlbum(album.id, "image_url", e.target.value)}
-                        />
+                        <div className="flex gap-1">
+                          <Input
+                            placeholder="Cover image URL"
+                            value={album.image_url || ""}
+                            onChange={(e) => handleUpdateAlbum(album.id, "image_url", e.target.value)}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="flex-shrink-0"
+                            disabled={uploadingAlbumId === album.id}
+                            onClick={() => {
+                              setActiveUploadAlbumId(album.id);
+                              albumImageInputRef.current?.click();
+                            }}
+                          >
+                            {uploadingAlbumId === album.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Upload className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
                         <Input
                           type="date"
                           placeholder="Release date"
@@ -542,10 +720,10 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="ml-2"
+                      className="ml-2 text-destructive hover:text-destructive hover:bg-destructive/10"
                       onClick={() => handleRemoveAlbum(album.id)}
                     >
-                      <Trash2 className="w-4 h-4 text-destructive" />
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
@@ -556,6 +734,15 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
               <Plus className="w-4 h-4 mr-2" />
               Add Album/EP/Single
             </Button>
+
+            {/* Hidden file input for album covers */}
+            <input
+              ref={albumImageInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAlbumImageUpload}
+            />
           </TabsContent>
 
           <TabsContent value="latest" className="space-y-4 mt-4">
