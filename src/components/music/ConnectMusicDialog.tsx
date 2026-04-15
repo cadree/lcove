@@ -200,8 +200,100 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+  const handleTrackAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user || !activeUploadTrackId) return;
 
-  const handleAddGenre = () => {
+    if (!file.type.startsWith('audio/')) {
+      toast.error('Please select an audio file');
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error('Audio file must be under 20MB');
+      return;
+    }
+
+    setUploadingTrackId(activeUploadTrackId);
+    try {
+      const ext = file.name.split('.').pop() || 'mp3';
+      const filePath = `${user.id}/music-tracks/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: publicUrl } = supabase.storage.from('media').getPublicUrl(filePath);
+      handleUpdateTrack(activeUploadTrackId, 'preview_url', publicUrl.publicUrl);
+      toast.success('Audio uploaded!');
+    } catch {
+      toast.error('Failed to upload audio');
+    } finally {
+      setUploadingTrackId(null);
+      setActiveUploadTrackId(null);
+      if (trackAudioInputRef.current) trackAudioInputRef.current.value = '';
+    }
+  };
+
+  const handleTrackImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user || !activeUploadTrackId) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be under 5MB');
+      return;
+    }
+
+    setUploadingTrackId(activeUploadTrackId);
+    try {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const filePath = `${user.id}/music-covers/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: publicUrl } = supabase.storage.from('media').getPublicUrl(filePath);
+      handleUpdateTrack(activeUploadTrackId, 'album_image', publicUrl.publicUrl);
+      toast.success('Cover image uploaded!');
+    } catch {
+      toast.error('Failed to upload image');
+    } finally {
+      setUploadingTrackId(null);
+      setActiveUploadTrackId(null);
+      if (trackImageInputRef.current) trackImageInputRef.current.value = '';
+    }
+  };
+
+  const handleAlbumImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user || !activeUploadAlbumId) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be under 5MB');
+      return;
+    }
+
+    setUploadingAlbumId(activeUploadAlbumId);
+    try {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const filePath = `${user.id}/music-covers/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: publicUrl } = supabase.storage.from('media').getPublicUrl(filePath);
+      handleUpdateAlbum(activeUploadAlbumId, 'image_url', publicUrl.publicUrl);
+      toast.success('Album cover uploaded!');
+    } catch {
+      toast.error('Failed to upload image');
+    } finally {
+      setUploadingAlbumId(null);
+      setActiveUploadAlbumId(null);
+      if (albumImageInputRef.current) albumImageInputRef.current.value = '';
+    }
+  };
+
+
     if (newGenre.trim() && !genres.includes(newGenre.trim())) {
       setGenres([...genres, newGenre.trim()]);
       setNewGenre("");
