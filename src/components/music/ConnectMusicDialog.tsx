@@ -74,8 +74,8 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
 
   const fetchArtistData = useCallback(async (url: string, index: number) => {
     if (!url.trim()) return;
-    const isSpotify = url.includes("open.spotify.com/artist");
-    const isAppleMusic = url.includes("music.apple.com");
+    const isSpotify = url.includes("open.spotify.com/");
+    const isAppleMusic = url.includes("music.apple.com/");
     if (!isSpotify && !isAppleMusic) return;
 
     setFetchingLinkIndex(index);
