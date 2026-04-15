@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
           if (ogImageMatch) imageUrl = ogImageMatch[1]
         }
 
-        // Extract og:title
+        // Extract og:title - try to get artist name
         if (!artistName) {
           const ogTitleMatch = html.match(
             /<meta\s+(?:property|name)=["']og:title["']\s+content=["']([^"']+)["']/i
@@ -107,10 +107,18 @@ Deno.serve(async (req) => {
             /content=["']([^"']+)["']\s+(?:property|name)=["']og:title["']/i
           )
           if (ogTitleMatch) {
-            artistName = ogTitleMatch[1]
-            artistName = artistName.replace(/\s+on\s+(Spotify|Apple Music)$/i, '').trim()
-            // Clean "Song - Album" or "Song · Artist" patterns
-            artistName = artistName.replace(/\s+[-·]\s+.*$/, '').trim()
+            let title = ogTitleMatch[1]
+            // Clean common suffixes
+            title = title.replace(/\s+on\s+(Spotify|Apple Music)$/i, '').trim()
+            // For Apple Music: "Song (feat. X) by Artist" -> extract "Artist"
+            const byArtistMatch = title.match(/\bby\s+(.+)$/i)
+            if (byArtistMatch) {
+              artistName = byArtistMatch[1].trim()
+            } else {
+              // Clean "Song - Album" or "Song · Artist" patterns for Spotify
+              title = title.replace(/\s+[-·]\s+.*$/, '').trim()
+              artistName = title
+            }
           }
         }
 
