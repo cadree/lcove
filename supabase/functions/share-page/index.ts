@@ -132,12 +132,21 @@ Deno.serve(async (req) => {
         .eq("id", id)
         .maybeSingle();
 
+      // Check for generated flyer image
+      const { data: flyer } = await supabase
+        .from("event_flyers")
+        .select("flyer_url")
+        .eq("event_id", id)
+        .eq("format", "feed")
+        .maybeSingle();
+
       if (data && data.is_public) {
         title = data.title || SITE_NAME;
         description = data.description
           ? data.description.slice(0, 155)
           : [data.venue, data.city].filter(Boolean).join(", ") || DEFAULT_DESCRIPTION;
-        if (data.image_url) imageUrl = data.image_url;
+        if (flyer?.flyer_url) imageUrl = flyer.flyer_url;
+        else if (data.image_url) imageUrl = data.image_url;
       } else {
         title = "Event on ETHER";
         description = "Sign in to view this event";

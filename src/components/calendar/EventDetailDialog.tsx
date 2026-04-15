@@ -36,7 +36,13 @@ import {
   Settings,
   Sun,
   CalendarCheck,
-  UserPlus
+  UserPlus,
+  MessageSquare,
+  Download,
+  Send,
+  Image,
+  Facebook,
+  Phone
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -44,11 +50,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EventAttendeesDialog } from "./EventAttendeesDialog";
 import { AddToCalendarButtons } from "./AddToCalendarButtons";
 import { InviteGuestsDialog } from "./InviteGuestsDialog";
+import { Input } from "@/components/ui/input";
 
 interface EventDetailDialogProps {
   eventId: string | null;
@@ -68,6 +76,9 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
   const [attendeesOpen, setAttendeesOpen] = useState(false);
   const [isAddingToMyDay, setIsAddingToMyDay] = useState(false);
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
+  const [isGeneratingFlyer, setIsGeneratingFlyer] = useState(false);
+  const [isSendingReminder, setIsSendingReminder] = useState(false);
+  const [reminderMessage, setReminderMessage] = useState("");
 
   const isCreator = user?.id === event?.creator_id;
 
@@ -294,7 +305,7 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
     }
   };
 
-  const handleShare = async (method: 'copy' | 'twitter' | 'native') => {
+  const handleShare = async (method: 'copy' | 'twitter' | 'native' | 'sms' | 'whatsapp' | 'facebook' | 'instagram') => {
     const shareUrl = `https://etherbylcove.com/event/${event.id}`;
     const shareText = `Check out "${event.title}" on ${format(eventDate, 'MMMM d')}!`;
 
@@ -324,15 +335,83 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
       }
     } else if (method === 'twitter') {
       window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank');
+    } else if (method === 'sms') {
+      const body = encodeURIComponent(`${shareText}\n${shareUrl}`);
+      window.open(`sms:?&body=${body}`, '_self');
+    } else if (method === 'whatsapp') {
+      window.open(`https://wa.me/?text=${encodeURIComponent(`${shareText}\n${shareUrl}`)}`, '_blank');
+    } else if (method === 'facebook') {
+      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
+    } else if (method === 'instagram') {
+      // Generate flyer then native share
+      await handleDownloadFlyer();
     } else if (method === 'native' && navigator.share) {
       try {
         await navigator.share({
           title: event.title,
-          text: shareUrl,
+          text: shareText,
+          url: shareUrl,
         });
       } catch {
         // User cancelled
       }
+    }
+  };
+
+  const handleDownloadFlyer = async () => {
+    setIsGeneratingFlyer(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-event-flyer', {
+        body: { eventId: event.id, format: 'story' },
+      });
+      if (error) throw error;
+      if (data?.flyer_url) {
+        // Try native share with file, fallback to download
+        try {
+          const response = await fetch(data.flyer_url);
+          const blob = await response.blob();
+          const file = new File([blob], `${event.title.replace(/[^a-zA-Z0-9]/g, '_')}_flyer.svg`, { type: blob.type });
+          
+          if (navigator.share && navigator.canShare?.({ files: [file] })) {
+            await navigator.share({
+              title: `${event.title} - Event Flyer`,
+              files: [file],
+            });
+          } else {
+            // Fallback: open in new tab
+            window.open(data.flyer_url, '_blank');
+          }
+        } catch {
+          window.open(data.flyer_url, '_blank');
+        }
+        toast.success('Flyer generated!');
+      }
+    } catch (error) {
+      console.error('Flyer generation error:', error);
+      toast.error('Failed to generate flyer');
+    } finally {
+      setIsGeneratingFlyer(false);
+    }
+  };
+
+  const handleSendReminder = async (includeSms = false) => {
+    setIsSendingReminder(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-event-reminder', {
+        body: { eventId: event.id, message: reminderMessage || undefined, sendSms: includeSms },
+      });
+      if (error) throw error;
+      const parts = [];
+      if (data?.sentCount > 0) parts.push(`${data.sentCount} emails`);
+      if (data?.smsSentCount > 0) parts.push(`${data.smsSentCount} texts`);
+      if (data?.pushSentCount > 0) parts.push(`${data.pushSentCount} push notifications`);
+      toast.success(parts.length > 0 ? `Sent: ${parts.join(', ')}` : 'No attendees to notify');
+      setReminderMessage("");
+    } catch (error) {
+      console.error('Reminder error:', error);
+      toast.error('Failed to send reminder');
+    } finally {
+      setIsSendingReminder(false);
     }
   };
 
@@ -498,14 +577,36 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
                       <Copy className="w-4 h-4 mr-2" />
                       Copy Link
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleShare('sms')}>
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      iMessage / SMS
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleShare('whatsapp')}>
+                      <Send className="w-4 h-4 mr-2" />
+                      WhatsApp
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleShare('instagram')} disabled={isGeneratingFlyer}>
+                      {isGeneratingFlyer ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Image className="w-4 h-4 mr-2" />}
+                      Instagram (with flyer)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleShare('facebook')}>
+                      <Facebook className="w-4 h-4 mr-2" />
+                      Facebook
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleShare('twitter')}>
                       <Twitter className="w-4 h-4 mr-2" />
-                      Share on Twitter
+                      Twitter / X
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleDownloadFlyer} disabled={isGeneratingFlyer}>
+                      {isGeneratingFlyer ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                      Download Event Flyer
                     </DropdownMenuItem>
                     {navigator.share && (
                       <DropdownMenuItem onClick={() => handleShare('native')}>
                         <Share2 className="w-4 h-4 mr-2" />
-                        Share...
+                        More...
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuContent>
@@ -614,7 +715,49 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
               </InviteGuestsDialog>
             )}
 
-            {/* Organizer */}
+            {/* Host Reminder Controls */}
+            {isCreator && (
+              <div className="space-y-2 p-3 rounded-xl bg-accent/10 border border-border/30">
+                <p className="text-xs font-medium text-muted-foreground">Send Reminder to Guests</p>
+                <Input
+                  placeholder="Optional message to attendees..."
+                  value={reminderMessage}
+                  onChange={(e) => setReminderMessage(e.target.value)}
+                  className="text-sm"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => handleSendReminder(false)}
+                    disabled={isSendingReminder}
+                    className="flex-1"
+                  >
+                    {isSendingReminder ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : (
+                      <Bell className="w-3 h-3 mr-1" />
+                    )}
+                    Email All
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSendReminder(true)}
+                    disabled={isSendingReminder}
+                    className="flex-1"
+                  >
+                    {isSendingReminder ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : (
+                      <Phone className="w-3 h-3 mr-1" />
+                    )}
+                    Email + Text
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div 
               className="flex items-start gap-3 cursor-pointer hover:bg-accent/20 -mx-3 px-3 py-2 rounded-xl transition-colors"
               onClick={handleViewOrganizer}
