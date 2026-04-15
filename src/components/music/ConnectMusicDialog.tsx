@@ -138,7 +138,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
     setSpotifyUrl(url);
     // Auto-fetch when a valid Spotify artist URL is pasted
     if (url.includes('open.spotify.com/artist') && url.length > 30) {
-      fetchArtistImage(url);
+      fetchArtistData(url);
     }
   };
 
