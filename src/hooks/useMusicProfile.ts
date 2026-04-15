@@ -2,29 +2,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import type { Json } from "@/integrations/supabase/types";
-
-export interface MusicTrack {
-  id: string;
-  name: string;
-  preview_url?: string;
-  duration_ms?: number;
-  album_name?: string;
-  album_image?: string;
-  spotify_url?: string;
-  apple_music_url?: string;
-}
-
-export interface MusicAlbum {
-  id: string;
-  name: string;
-  image_url?: string;
-  release_date?: string;
-  total_tracks?: number;
-  spotify_url?: string;
-  apple_music_url?: string;
-  type?: 'album' | 'single' | 'ep';
-}
 
 export interface MusicProfile {
   id: string;
@@ -35,10 +12,6 @@ export interface MusicProfile {
   apple_music_artist_url?: string;
   display_name?: string;
   artist_image_url?: string;
-  genres?: string[];
-  top_tracks: MusicTrack[];
-  albums: MusicAlbum[];
-  latest_release?: MusicAlbum;
   created_at: string;
   updated_at: string;
 }
@@ -52,7 +25,7 @@ export const useMusicProfile = (userId?: string) => {
     queryKey: ["music-profile", targetUserId],
     queryFn: async () => {
       if (!targetUserId) return null;
-      
+
       const { data, error } = await supabase
         .from("music_profiles")
         .select("*")
@@ -60,13 +33,18 @@ export const useMusicProfile = (userId?: string) => {
         .maybeSingle();
 
       if (error) throw error;
-      
       if (data) {
         return {
-          ...data,
-          top_tracks: (data.top_tracks as unknown as MusicTrack[]) || [],
-          albums: (data.albums as unknown as MusicAlbum[]) || [],
-          latest_release: data.latest_release as unknown as MusicAlbum | undefined,
+          id: data.id,
+          user_id: data.user_id,
+          spotify_artist_id: data.spotify_artist_id,
+          spotify_artist_url: data.spotify_artist_url,
+          apple_music_artist_id: data.apple_music_artist_id,
+          apple_music_artist_url: data.apple_music_artist_url,
+          display_name: data.display_name,
+          artist_image_url: data.artist_image_url,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
         } as MusicProfile;
       }
       return null;
@@ -78,28 +56,13 @@ export const useMusicProfile = (userId?: string) => {
     mutationFn: async (profileData: Partial<MusicProfile>) => {
       if (!user) throw new Error("Not authenticated");
 
-      const dataToSave: {
-        spotify_artist_id?: string;
-        spotify_artist_url?: string;
-        apple_music_artist_id?: string;
-        apple_music_artist_url?: string;
-        display_name?: string;
-        artist_image_url?: string;
-        genres?: string[];
-        top_tracks?: Json;
-        albums?: Json;
-        latest_release?: Json;
-      } = {
+      const dataToSave = {
         spotify_artist_id: profileData.spotify_artist_id,
         spotify_artist_url: profileData.spotify_artist_url,
         apple_music_artist_id: profileData.apple_music_artist_id,
         apple_music_artist_url: profileData.apple_music_artist_url,
         display_name: profileData.display_name,
         artist_image_url: profileData.artist_image_url,
-        genres: profileData.genres,
-        top_tracks: (profileData.top_tracks || []) as unknown as Json,
-        albums: (profileData.albums || []) as unknown as Json,
-        latest_release: (profileData.latest_release || null) as unknown as Json,
       };
 
       const { data: existing } = await supabase
@@ -111,19 +74,13 @@ export const useMusicProfile = (userId?: string) => {
       if (existing) {
         const { error } = await supabase
           .from("music_profiles")
-          .update({
-            ...dataToSave,
-            updated_at: new Date().toISOString(),
-          })
+          .update({ ...dataToSave, updated_at: new Date().toISOString() })
           .eq("user_id", user.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("music_profiles")
-          .insert({
-            user_id: user.id,
-            ...dataToSave,
-          });
+          .insert({ user_id: user.id, ...dataToSave });
         if (error) throw error;
       }
     },
@@ -140,12 +97,10 @@ export const useMusicProfile = (userId?: string) => {
   const deleteMusicProfile = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Not authenticated");
-      
       const { error } = await supabase
         .from("music_profiles")
         .delete()
         .eq("user_id", user.id);
-      
       if (error) throw error;
     },
     onSuccess: () => {
