@@ -44,29 +44,27 @@ Deno.serve(async (req) => {
         if (oembedRes.ok) {
           const oembedData = await oembedRes.json()
           imageUrl = oembedData.thumbnail_url || null
-          // oEmbed title includes " - Album by Artist" or "Artist" for artist pages
-          let title = oembedData.title || null
-          if (title) {
-            // For albums: "Album Name" (artist is in description)
-            // For artists: "Artist Name"
-            // For tracks: "Track Name"
+          const title = oembedData.title || null
+          
+          if (url.includes('/artist/')) {
+            // Artist page: title IS the artist name
+            artistName = title
+          } else if (title) {
+            // Album/track/playlist: title is content name, not artist
+            // Try to find artist in description
             const desc = oembedData.description || ''
-            // Try to extract artist from description patterns
             const byMatch = desc.match(/by\s+(.+?)(?:\s+on\s+Spotify)?$/i)
             if (byMatch) {
               artistName = byMatch[1].trim()
-              // The title is the album/track name - also store it
-              if (url.includes('/album/')) {
-                albums.push({
-                  name: title,
-                  image_url: imageUrl || undefined,
-                  type: 'album',
-                  spotify_url: url,
-                })
-              }
-            } else {
-              // Likely an artist page
-              artistName = title
+            }
+            // Store as album/track info
+            if (url.includes('/album/') && title) {
+              albums.push({
+                name: title,
+                image_url: imageUrl || undefined,
+                type: 'album',
+                spotify_url: url,
+              })
             }
           }
         }
