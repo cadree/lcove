@@ -146,7 +146,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
     setAppleMusicUrl(url);
     // Auto-fetch when a valid Apple Music URL is pasted
     if (url.includes('music.apple.com') && url.includes('artist') && url.length > 30) {
-      fetchArtistImage(url);
+      fetchArtistData(url);
     }
   };
 
