@@ -18,12 +18,12 @@ Deno.serve(async (req) => {
       )
     }
 
-    const isSpotify = url.includes('open.spotify.com/artist')
+    const isSpotify = url.includes('open.spotify.com')
     const isAppleMusic = url.includes('music.apple.com')
 
     if (!isSpotify && !isAppleMusic) {
       return new Response(
-        JSON.stringify({ error: 'URL must be a Spotify or Apple Music artist URL' }),
+        JSON.stringify({ error: 'URL must be a Spotify or Apple Music URL' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -34,8 +34,8 @@ Deno.serve(async (req) => {
     let topTracks: { name: string; album_name?: string; album_image?: string; preview_url?: string; spotify_url?: string; apple_music_url?: string }[] = []
     let albums: { name: string; image_url?: string; release_date?: string; type?: string; spotify_url?: string; apple_music_url?: string }[] = []
 
+    // --- Spotify oEmbed (works for artist, album, track, playlist) ---
     if (isSpotify) {
-      // Use Spotify oEmbed endpoint (no auth needed)
       try {
         const oembedRes = await fetch(
           `https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`,
@@ -44,14 +44,38 @@ Deno.serve(async (req) => {
         if (oembedRes.ok) {
           const oembedData = await oembedRes.json()
           imageUrl = oembedData.thumbnail_url || null
-          artistName = oembedData.title || null
+          // oEmbed title includes " - Album by Artist" or "Artist" for artist pages
+          let title = oembedData.title || null
+          if (title) {
+            // For albums: "Album Name" (artist is in description)
+            // For artists: "Artist Name"
+            // For tracks: "Track Name"
+            const desc = oembedData.description || ''
+            // Try to extract artist from description patterns
+            const byMatch = desc.match(/by\s+(.+?)(?:\s+on\s+Spotify)?$/i)
+            if (byMatch) {
+              artistName = byMatch[1].trim()
+              // The title is the album/track name - also store it
+              if (url.includes('/album/')) {
+                albums.push({
+                  name: title,
+                  image_url: imageUrl || undefined,
+                  type: 'album',
+                  spotify_url: url,
+                })
+              }
+            } else {
+              // Likely an artist page
+              artistName = title
+            }
+          }
         }
       } catch (e) {
         console.error('oEmbed failed:', e)
       }
     }
 
-    // Fetch the page HTML for additional metadata
+    // --- Fetch HTML for metadata ---
     try {
       const pageRes = await fetch(url, {
         headers: {
@@ -65,7 +89,7 @@ Deno.serve(async (req) => {
       if (pageRes.ok) {
         const html = await pageRes.text()
 
-        // Extract og:image if not already set
+        // Extract og:image
         if (!imageUrl) {
           const ogImageMatch = html.match(
             /<meta\s+(?:property|name)=["']og:image["']\s+content=["']([^"']+)["']/i
@@ -75,7 +99,7 @@ Deno.serve(async (req) => {
           if (ogImageMatch) imageUrl = ogImageMatch[1]
         }
 
-        // Extract og:title if not already set
+        // Extract og:title
         if (!artistName) {
           const ogTitleMatch = html.match(
             /<meta\s+(?:property|name)=["']og:title["']\s+content=["']([^"']+)["']/i
@@ -84,12 +108,13 @@ Deno.serve(async (req) => {
           )
           if (ogTitleMatch) {
             artistName = ogTitleMatch[1]
-            // Clean up titles like "Artist Name on Spotify" or "Artist Name on Apple Music"
             artistName = artistName.replace(/\s+on\s+(Spotify|Apple Music)$/i, '').trim()
+            // Clean "Song - Album" or "Song · Artist" patterns
+            artistName = artistName.replace(/\s+[-·]\s+.*$/, '').trim()
           }
         }
 
-        // Extract description which often contains genre info
+        // Extract description for genre info
         const descMatch = html.match(
           /<meta\s+(?:property|name)=["'](?:og:description|description)["']\s+content=["']([^"']+)["']/i
         ) || html.match(
@@ -97,13 +122,33 @@ Deno.serve(async (req) => {
         )
         const description = descMatch ? descMatch[1] : ''
 
-        // Try to extract structured data (JSON-LD)
+        // Extract artist name from description if we got a track/album page
+        if (description && !artistName) {
+          const artistFromDesc = description.match(/(?:by|from)\s+([^.·,]+)/i)
+          if (artistFromDesc) artistName = artistFromDesc[1].trim()
+        }
+
+        // For Spotify pages - try to get artist name from description even if title was set
+        if (isSpotify && description) {
+          // Spotify descriptions: "Song · Artist · Album" or "Listen to Artist on Spotify"
+          const spotifyArtistMatch = description.match(/Listen to (.+?) on Spotify/i)
+          if (spotifyArtistMatch && !artistName) {
+            artistName = spotifyArtistMatch[1].trim()
+          }
+          // "Artist · Song · 2024" pattern
+          const dotPattern = description.match(/^([^·]+)\s·/i)
+          if (dotPattern && !url.includes('/artist/') && !artistName) {
+            artistName = dotPattern[1].trim()
+          }
+        }
+
+        // --- JSON-LD structured data ---
         const jsonLdMatches = html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)
         for (const match of jsonLdMatches) {
           try {
             const ld = JSON.parse(match[1])
             const entity = Array.isArray(ld) ? ld[0] : ld
-            
+
             if (entity['@type'] === 'MusicGroup' || entity['@type'] === 'MusicArtist' || entity['@type']?.includes?.('Music')) {
               if (!artistName && entity.name) artistName = entity.name
               if (!imageUrl && entity.image) {
@@ -115,7 +160,38 @@ Deno.serve(async (req) => {
               }
             }
 
-            // Extract tracks from JSON-LD
+            // MusicAlbum type
+            if (entity['@type'] === 'MusicAlbum') {
+              if (entity.byArtist) {
+                const byArtist = Array.isArray(entity.byArtist) ? entity.byArtist[0] : entity.byArtist
+                if (!artistName && byArtist.name) artistName = byArtist.name
+              }
+              if (albums.length === 0 && entity.name) {
+                albums.push({
+                  name: entity.name,
+                  image_url: typeof entity.image === 'string' ? entity.image : entity.image?.url,
+                  release_date: entity.datePublished || entity.dateCreated,
+                  type: 'album',
+                })
+              }
+            }
+
+            // MusicRecording type (track)
+            if (entity['@type'] === 'MusicRecording') {
+              if (entity.byArtist) {
+                const byArtist = Array.isArray(entity.byArtist) ? entity.byArtist[0] : entity.byArtist
+                if (!artistName && byArtist.name) artistName = byArtist.name
+              }
+              if (topTracks.length === 0 && entity.name) {
+                topTracks.push({
+                  name: entity.name,
+                  album_name: entity.inAlbum?.name,
+                  album_image: typeof entity.inAlbum?.image === 'string' ? entity.inAlbum.image : entity.inAlbum?.image?.url,
+                })
+              }
+            }
+
+            // Extract tracks from any entity
             if (entity.track) {
               const trackList = Array.isArray(entity.track) ? entity.track : (entity.track?.itemListElement || [])
               for (const t of trackList.slice(0, 10)) {
@@ -155,10 +231,8 @@ Deno.serve(async (req) => {
           }
         }
 
-        // If no genres from JSON-LD, try to extract from description or page content
+        // Extract genres from description
         if (genres.length === 0 && description) {
-          // Spotify descriptions often say "Artist · Song · album" or mention genres
-          // Apple Music descriptions say things like "Listen to music by Artist. Genre: Hip-Hop/Rap"
           const genrePatterns = [
             /Genre[s]?:\s*([^.]+)/i,
             /(?:genres?\s*(?:include|:)\s*)([^.]+)/i,
@@ -171,15 +245,46 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Apple Music: try to extract from meta music:genre
+        // Apple Music: meta music:genre
         const musicGenreMatches = html.matchAll(/<meta\s+(?:property|name)=["']music:genre["']\s+content=["']([^"']+)["']/gi)
         for (const gm of musicGenreMatches) {
           if (!genres.includes(gm[1])) genres.push(gm[1])
         }
-        // Also try reversed attribute order
         const musicGenreMatches2 = html.matchAll(/content=["']([^"']+)["']\s+(?:property|name)=["']music:genre["']/gi)
         for (const gm of musicGenreMatches2) {
           if (!genres.includes(gm[1])) genres.push(gm[1])
+        }
+
+        // Apple Music: extract track listing from music:song meta tags
+        if (isAppleMusic && topTracks.length === 0) {
+          const songMatches = html.matchAll(/<meta\s+(?:property|name)=["']music:song["']\s+content=["']([^"']+)["']/gi)
+          for (const sm of songMatches) {
+            // These are URLs to individual songs
+            const songUrl = sm[1]
+            const songNameMatch = songUrl.match(/\/([^/?]+)\?/)
+            if (songNameMatch) {
+              topTracks.push({
+                name: decodeURIComponent(songNameMatch[1]).replace(/-/g, ' '),
+                apple_music_url: songUrl,
+              })
+            }
+          }
+        }
+
+        // Apple Music: extract album info from music:musician meta tags  
+        if (isAppleMusic) {
+          const musicianMatch = html.match(/<meta\s+(?:property|name)=["']music:musician["']\s+content=["']([^"']+)["']/i)
+            || html.match(/content=["']([^"']+)["']\s+(?:property|name)=["']music:musician["']/i)
+          if (musicianMatch && !artistName) {
+            // Extract artist name from musician URL
+            const musicianUrl = musicianMatch[1]
+            const nameFromUrl = musicianUrl.match(/\/artist\/([^/]+)\//)
+            if (nameFromUrl) {
+              artistName = decodeURIComponent(nameFromUrl[1]).replace(/-/g, ' ')
+              // Title case
+              artistName = artistName.replace(/\b\w/g, c => c.toUpperCase())
+            }
+          }
         }
       }
     } catch (e) {
@@ -188,6 +293,15 @@ Deno.serve(async (req) => {
 
     // Deduplicate genres
     genres = [...new Set(genres)]
+
+    // Deduplicate tracks by name
+    const trackNames = new Set<string>()
+    topTracks = topTracks.filter(t => {
+      const key = t.name.toLowerCase()
+      if (trackNames.has(key)) return false
+      trackNames.add(key)
+      return true
+    })
 
     return new Response(
       JSON.stringify({
