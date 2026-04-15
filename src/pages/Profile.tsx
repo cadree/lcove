@@ -242,7 +242,7 @@ const Profile = () => {
             )}
             <div className="px-5 py-4">
               <MusicProfileBlock
-                userId={profileUserId}
+                userId={targetUserId}
                 onConnectClick={() => setShowMusicDialog(true)}
               />
             </div>
