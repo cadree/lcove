@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,8 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Music, Trash2, Plus, X, Loader2 } from "lucide-react";
+import { Music, Trash2, Plus, X, Loader2, Upload, ImageIcon } from "lucide-react";
 import { useMusicProfile, MusicTrack, MusicAlbum } from "@/hooks/useMusicProfile";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 interface ConnectMusicDialogProps {
@@ -20,6 +22,7 @@ interface ConnectMusicDialogProps {
 }
 
 export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogProps) => {
+  const { user } = useAuth();
   const { musicProfile, saveMusicProfile, deleteMusicProfile, isOwner } = useMusicProfile();
   
   const [spotifyUrl, setSpotifyUrl] = useState(musicProfile?.spotify_artist_url || "");
@@ -32,6 +35,9 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
   const [albums, setAlbums] = useState<MusicAlbum[]>(musicProfile?.albums || []);
   const [latestRelease, setLatestRelease] = useState<MusicAlbum | undefined>(musicProfile?.latest_release);
   const [isSaving, setIsSaving] = useState(false);
+  const [isFetchingImage, setIsFetchingImage] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Update state when profile loads
   useState(() => {
@@ -57,6 +63,95 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
     return match ? match[1] : null;
   };
 
+  const fetchArtistImage = async (url: string) => {
+    if (!url.trim()) return;
+    
+    const isSpotify = url.includes('open.spotify.com/artist');
+    const isAppleMusic = url.includes('music.apple.com');
+    
+    if (!isSpotify && !isAppleMusic) return;
+
+    setIsFetchingImage(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-artist-image', {
+        body: { url },
+      });
+
+      if (!error && data) {
+        if (data.image_url && !artistImage) {
+          setArtistImage(data.image_url);
+          toast.success('Artist image found!');
+        }
+        if (data.artist_name && !displayName) {
+          setDisplayName(data.artist_name);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch artist image:', e);
+    } finally {
+      setIsFetchingImage(false);
+    }
+  };
+
+  const handleSpotifyUrlChange = (url: string) => {
+    setSpotifyUrl(url);
+    // Auto-fetch when a valid Spotify artist URL is pasted
+    if (url.includes('open.spotify.com/artist') && url.length > 30) {
+      fetchArtistImage(url);
+    }
+  };
+
+  const handleAppleMusicUrlChange = (url: string) => {
+    setAppleMusicUrl(url);
+    // Auto-fetch when a valid Apple Music URL is pasted
+    if (url.includes('music.apple.com') && url.includes('artist') && url.length > 30) {
+      fetchArtistImage(url);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be under 5MB');
+      return;
+    }
+
+    setIsUploadingImage(true);
+    try {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const filePath = `${user.id}/artist-image-${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrl } = supabase.storage
+        .from('media')
+        .getPublicUrl(filePath);
+
+      setArtistImage(publicUrl.publicUrl);
+      toast.success('Artist image uploaded!');
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload image');
+    } finally {
+      setIsUploadingImage(false);
+      // Reset the input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleAddGenre = () => {
     if (newGenre.trim() && !genres.includes(newGenre.trim())) {
       setGenres([...genres, newGenre.trim()]);
@@ -69,10 +164,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
   };
 
   const handleAddTrack = () => {
-    const newTrack: MusicTrack = {
-      id: crypto.randomUUID(),
-      name: "",
-    };
+    const newTrack: MusicTrack = { id: crypto.randomUUID(), name: "" };
     setTracks([...tracks, newTrack]);
   };
 
@@ -85,11 +177,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
   };
 
   const handleAddAlbum = () => {
-    const newAlbum: MusicAlbum = {
-      id: crypto.randomUUID(),
-      name: "",
-      type: "album",
-    };
+    const newAlbum: MusicAlbum = { id: crypto.randomUUID(), name: "", type: "album" };
     setAlbums([...albums, newAlbum]);
   };
 
@@ -143,7 +231,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
             Connect Music Profiles
           </DialogTitle>
           <DialogDescription>
-            Link your Spotify and Apple Music profiles to display your music catalog.
+            Link your Spotify and Apple Music profiles. Your artist image will be pulled automatically.
           </DialogDescription>
         </DialogHeader>
 
@@ -156,7 +244,6 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
           </TabsList>
 
           <TabsContent value="links" className="space-y-4 mt-4">
-            {/* Basic Info */}
             <div className="grid gap-4">
               <div>
                 <Label htmlFor="displayName">Artist / Display Name *</Label>
@@ -168,13 +255,78 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                 />
               </div>
 
+              {/* Artist Image Section */}
               <div>
-                <Label htmlFor="artistImage">Artist Image URL</Label>
-                <Input
-                  id="artistImage"
-                  value={artistImage}
-                  onChange={(e) => setArtistImage(e.target.value)}
-                  placeholder="https://..."
+                <Label>Artist Image</Label>
+                <div className="mt-1 flex items-start gap-3">
+                  {/* Image preview */}
+                  <div className="w-20 h-20 rounded-lg border border-border overflow-hidden flex-shrink-0 bg-muted flex items-center justify-center">
+                    {artistImage ? (
+                      <img src={artistImage} alt="Artist" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon className="w-8 h-8 text-muted-foreground/40" />
+                    )}
+                  </div>
+
+                  <div className="flex-1 space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      {artistImage 
+                        ? 'Image set. Upload a new one or paste a URL to replace.'
+                        : 'Paste a Spotify or Apple Music URL below to auto-fetch, or upload your own.'}
+                    </p>
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingImage}
+                      >
+                        {isUploadingImage ? (
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                        ) : (
+                          <Upload className="w-3 h-3 mr-1" />
+                        )}
+                        Upload Photo
+                      </Button>
+
+                      {isFetchingImage && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Fetching from URL...
+                        </span>
+                      )}
+
+                      {artistImage && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-destructive"
+                          onClick={() => setArtistImage('')}
+                        >
+                          <X className="w-3 h-3 mr-1" />
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+
+                    <Input
+                      value={artistImage}
+                      onChange={(e) => setArtistImage(e.target.value)}
+                      placeholder="Or paste image URL..."
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
                 />
               </div>
 
@@ -183,9 +335,12 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                 <Input
                   id="spotifyUrl"
                   value={spotifyUrl}
-                  onChange={(e) => setSpotifyUrl(e.target.value)}
+                  onChange={(e) => handleSpotifyUrlChange(e.target.value)}
                   placeholder="https://open.spotify.com/artist/..."
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Paste your Spotify artist URL to auto-fetch your image
+                </p>
               </div>
 
               <div>
@@ -193,9 +348,12 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                 <Input
                   id="appleMusicUrl"
                   value={appleMusicUrl}
-                  onChange={(e) => setAppleMusicUrl(e.target.value)}
+                  onChange={(e) => handleAppleMusicUrlChange(e.target.value)}
                   placeholder="https://music.apple.com/artist/..."
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Paste your Apple Music artist URL to auto-fetch your image
+                </p>
               </div>
 
               {/* Genres */}
