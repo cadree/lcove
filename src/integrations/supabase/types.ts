@@ -3327,6 +3327,7 @@ export type Database = {
           genres: string[] | null
           id: string
           latest_release: Json | null
+          platform_links: Json | null
           spotify_artist_id: string | null
           spotify_artist_url: string | null
           top_tracks: Json | null
@@ -3343,6 +3344,7 @@ export type Database = {
           genres?: string[] | null
           id?: string
           latest_release?: Json | null
+          platform_links?: Json | null
           spotify_artist_id?: string | null
           spotify_artist_url?: string | null
           top_tracks?: Json | null
@@ -3359,6 +3361,7 @@ export type Database = {
           genres?: string[] | null
           id?: string
           latest_release?: Json | null
+          platform_links?: Json | null
           spotify_artist_id?: string | null
           spotify_artist_url?: string | null
           top_tracks?: Json | null

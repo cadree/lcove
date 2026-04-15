@@ -1,0 +1,1 @@
+ALTER TABLE public.music_profiles ADD COLUMN platform_links JSONB DEFAULT '[]'::jsonb;
