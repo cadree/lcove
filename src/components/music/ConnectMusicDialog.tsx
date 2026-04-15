@@ -74,8 +74,8 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
 
   const fetchArtistData = useCallback(async (url: string, index: number) => {
     if (!url.trim()) return;
-    const isSpotify = url.includes("open.spotify.com/artist");
-    const isAppleMusic = url.includes("music.apple.com");
+    const isSpotify = url.includes("open.spotify.com/");
+    const isAppleMusic = url.includes("music.apple.com/");
     if (!isSpotify && !isAppleMusic) return;
 
     setFetchingLinkIndex(index);
@@ -112,9 +112,9 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
     else if (url.includes("bandcamp.com")) updated[index].platform = "bandcamp";
     setLinks([...updated]);
 
-    // Auto-fetch for Spotify/Apple Music
-    const isSpotify = url.includes("open.spotify.com/artist") && url.length > 30;
-    const isAppleMusic = url.includes("music.apple.com") && url.includes("artist") && url.length > 30;
+    // Auto-fetch for any Spotify/Apple Music URL
+    const isSpotify = url.includes("open.spotify.com/") && url.length > 30;
+    const isAppleMusic = url.includes("music.apple.com/") && url.length > 30;
     if (isSpotify || isAppleMusic) {
       fetchArtistData(url, index);
     }
