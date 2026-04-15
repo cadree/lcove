@@ -272,7 +272,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
             Connect Music Profiles
           </DialogTitle>
           <DialogDescription>
-            Link your Spotify and Apple Music profiles. Your artist image will be pulled automatically.
+            Link your Spotify and Apple Music profiles. Artist name, image, genres, tracks, and albums will be pulled automatically.
           </DialogDescription>
         </DialogHeader>
 
