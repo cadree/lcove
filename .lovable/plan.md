@@ -1,103 +1,78 @@
 
 
-## Goal
-Make Fan Challenge a real, working unlock path alongside purchase/subscription. Hybrid model: user self-confirms; optional proof upload; artists toggle on/off and configure.
+## Root cause
 
-## Current state (audit)
-- `exclusive_access_rules` table already supports `rule_type='challenge'` with `label`, `description`, `metadata` — artists can already create a challenge rule via `AccessRuleEditor`.
-- `useExclusiveTracks.hasAccess(trackId)` only checks `purchases` + `isSubscribedToArtist`. No challenge path.
-- No `fan_challenge_completions` table.
-- No completion modal / UI affordance on `ExclusiveTrackCard` for challenges.
-- No counter, no proof upload, no revocation.
+When an artist sets a track to free + fan-challenge-only ($0), clicking **Buy** still hits `purchase-exclusive-track`, which throws `"Invalid price"` on `amountCents <= 0`. The challenge-only path is also being blocked because:
 
-## Plan
+1. `ExclusiveTrackCard` likely shows the **Buy** button when `price_cents === 0`, instead of routing to the challenge flow.
+2. Even if challenge UI is shown, the purchase function is the only fallback — and it rejects $0.
 
-### 1. Database (migration)
-Create `fan_challenge_completions`:
-- `id uuid pk`
-- `user_id uuid` (completer)
-- `artist_user_id uuid`
-- `track_id uuid` (nullable → artist-wide challenge)
-- `access_rule_id uuid` references `exclusive_access_rules`
-- `challenge_type text` (instagram/tiktok/x/other)
-- `proof_url text null`
-- `proof_text text null`
-- `verified boolean default true` (auto-verified unless requires_proof and pending review)
-- `status text default 'completed'` (`completed` | `flagged` | `revoked`)
-- `completed_at timestamptz default now()`
-- `revoked_at timestamptz null`, `revoked_reason text null`
-- unique `(user_id, access_rule_id)` to prevent duplicate unlocks
+Let me confirm by reading the card.
+<lov-tool-use id="toolu_vrtx_01KcmmFjsNmiW18UDdxxvikJ" name="code--view" integration-id="code" data="{\"file_path\": \"src/components/music/ExclusiveTrackCard.tsx\"}">
+</lov-tool-use>
 
-Indexes on `(user_id, track_id)` and `(artist_user_id, track_id)`.
+<lov-tool-use id="toolu_vrtx_01Kwqfb7xfoWRokZny5MZztC" name="code--view" integration-id="code" data="{\"file_path\": \"src/components/music/ExclusiveTrackCard.tsx\"}">
+</lov-tool-use>
+I see the issue. When the artist sets price to $0 and only enables fan challenge, there's likely still a `purchase` rule with $0 amount, OR the track itself has `price_cents=0` triggering the Buy button which then errors out via "Invalid price" in the edge function.
 
-RLS:
-- SELECT: completer OR artist owner (via rule).
-- INSERT: authenticated user inserting their own row, with valid active challenge rule.
-- UPDATE: artist owner only (status, verified, revoked_at).
-- DELETE: artist owner only.
+Let me check the section file to see how the Buy/purchase is triggered.
+<lov-tool-use id="toolu_vrtx_01To9qmxBjPQ5867iZtZKKCJ" name="code--search_files" integration-id="code" data="{\"query\": \"Invalid price\"}">
+</lov-tool-use>
 
-Public counter via SECURITY DEFINER RPC `get_challenge_unlock_count(p_track_id uuid)` returning `bigint` — counts `status='completed'` rows.
+<lov-tool-use id="toolu_vrtx_012p1QWwnE2vigTtxdMo5t4K" name="code--view" integration-id="code" data="{\"file_path\": \"src/components/music/ExclusiveMusicSection.tsx\"}">
+</lov-tool-use>
+Now I understand the full picture. Let me check the card logic more carefully:
 
-Extend `exclusive_access_rules.metadata` usage (no schema change): `{ platform, instructions, requires_proof }`.
+Looking at `ExclusiveTrackCard` line 58: `purchaseRule = trackRules.find((r) => r.rule_type === "purchase")`. 
 
-### 2. Storage
-Reuse `media` bucket with path `${user.id}/challenge-proofs/...` (matches existing RLS path conventions).
+The rule could exist with $0 BUT the bigger issue: line 61 sets `price = purchaseRule?.amount_cents ?? track.price_cents ?? 0`. The track itself has `price_cents` (defaulting to whatever artist set, including 0). 
 
-### 3. Hooks
-- New `src/hooks/useFanChallenges.ts`:
-  - `useChallengeRule(artistUserId, trackId)` → returns active challenge rule (most specific track-level, fallback artist-level).
-  - `useMyChallengeCompletions()` → user's `completed` & non-`revoked` rows.
-  - `useChallengeUnlockCount(trackId)` → calls RPC.
-  - `useCompleteChallenge()` mutation: upload proof if provided, insert row.
-- Update `useExclusiveTracks.hasAccess(trackId)`: also true if `myCompletions` contains row matching `track_id` (or artist-wide rule) with `status='completed'`.
+Even with NO purchase rule, if there's no purchase rule at all, `purchaseRule` is undefined and the Buy button (line 157) wouldn't render. But since the track was uploaded with `access_type: "purchase"` and `price_cents: 0`, AND there's no implicit purchase rule unless artist created one... actually rethinking:
 
-### 4. Components
-- New `src/components/music/FanChallengeDialog.tsx`: shows instructions, platform icon, optional proof upload (image) + link/text field if `requires_proof`. "I completed this" CTA → calls mutation → success toast "You unlocked this by supporting the artist 💖".
-- Update `src/components/music/ExclusiveTrackCard.tsx`:
-  - When locked + challenge rule exists + payouts not strictly required for challenge: render secondary button "Unlock via Fan Challenge — Share on {platform}".
-  - States: `locked` → `unlocking` (during mutation) → `unlocked` (with badge "Unlocked via Challenge").
-  - Show challenge unlock counter "🎉 N fans unlocked via challenge" when count > 0.
-- Update `AccessRuleEditor.tsx`: when `rule_type='challenge'`, expose fields:
-  - Platform select (Instagram / TikTok / X / Other)
-  - Instructions textarea (already exists as `description`)
-  - `requires_proof` switch
-  Persist into `metadata`.
+The `purchaseRule` requires an actual rule row. If artist only made a challenge rule, no Buy button would show. But user says "telling users that price is invalid." 
 
-### 5. Artist-side review (lightweight)
-Add small "Challenge Unlocks" section in artist's exclusive music management view (existing `ExclusiveMusicSection` when `isOwner`):
-- List recent completions with proof preview, Revoke button (sets `status='revoked'`).
-- Defer full moderation queue.
+Looking again — there must be a `purchase` rule with $0. Either:
+1. Artist created a purchase rule with $0 by mistake, OR
+2. The system is auto-creating one, OR  
+3. The challenge button itself is somehow routing through purchase
 
-### 6. Access integration recap
-`hasAccess(trackId)` returns true if ANY:
-- `isOwner`
-- paid purchase exists
-- active subscription to artist
-- non-revoked completion matching track (or artist-wide rule)
+Actually checking the FanChallengeDialog flow vs the Buy flow - they're separate. So the issue must be: the artist created BOTH a $0 purchase rule AND a challenge rule, and users are clicking Buy.
 
-Save / Add to profile / Download buttons already gate on `hasAccess` — automatic.
+Best fix: hide the Buy button if `price <= 0`, and in the edge function, if amount is 0 and there's a challenge rule, redirect to challenge (or just block 0-price purchases entirely with a clear message).
 
-### 7. Files
-**New**
-- `supabase/migrations/<ts>_fan_challenges.sql`
-- `src/hooks/useFanChallenges.ts`
-- `src/components/music/FanChallengeDialog.tsx`
+<lov-plan>
 
-**Modified**
-- `src/hooks/useExclusiveMusic.ts` (extend `hasAccess`)
-- `src/components/music/ExclusiveTrackCard.tsx` (challenge button, states, counter, badge)
-- `src/components/music/AccessRuleEditor.tsx` (challenge-specific fields)
-- `src/components/music/ExclusiveMusicSection.tsx` (owner: recent challenge unlocks list with revoke)
-- `src/integrations/supabase/types.ts` (auto-regen by migration)
+## Root cause
 
-### 8. Test checklist
-1. Artist toggles on a challenge rule (Instagram, requires_proof=false).
-2. Non-owner opens artist profile → sees locked track + "Unlock via Fan Challenge — Share on Instagram".
-3. Click → modal → "I completed this" → toast → track flips to **Unlocked via Challenge** within 1s.
-4. Refresh → still unlocked (DB-backed).
-5. Counter increments to "1 fan unlocked via challenge".
-6. Try again from same account → button hidden (already unlocked).
-7. Artist sees completion, clicks Revoke → buyer's track relocks on next load.
-8. Enable `requires_proof` → modal forces screenshot/link before submit.
-9. Preview (15s) still works while locked.
+When the artist sets price to **$0** intending challenge-only unlock, the UI still renders a **Buy $0.00** button if any `purchase` rule exists (or if `track.price_cents = 0` falls through). Clicking it hits `purchase-exclusive-track` which throws **"Invalid price"** at line 85 (`if (amountCents <= 0) throw new Error("Invalid price")`). The challenge button is rendered alongside but users tap Buy first.
+
+Two problems:
+1. **UI**: Buy button shows for $0 tracks/rules — should never render when no payable amount exists.
+2. **Backend**: `purchase-exclusive-track` rejects $0 with a confusing "Invalid price" error instead of guiding the user to the free unlock path.
+
+## Fix
+
+### 1. `src/components/music/ExclusiveTrackCard.tsx`
+- Compute `isPaid = price > 0`.
+- Only render the **Buy** button when `purchaseRule && price > 0`.
+- When `!isPaid` and a `challengeRule` exists, the challenge button becomes the primary CTA (full width, default variant, no "secondary" demotion).
+- Status badge: if `price === 0` and challenge rule exists → show **"Free via Challenge"** instead of `$0.00`.
+
+### 2. `supabase/functions/purchase-exclusive-track/index.ts`
+- Replace the generic `"Invalid price"` throw with a clearer message: `"This track is free — use the Fan Challenge to unlock it."` so any stray client call gets a helpful response instead of an opaque error. Return as structured `{ ok: false, error }` (already the existing pattern).
+
+### 3. `src/components/music/AccessRuleEditor.tsx` (light guard)
+- When `rule_type='purchase'` and `amount_cents === 0`, show an inline warning: *"Set a price above $0 — or remove this rule and rely on the Fan Challenge."* Prevents artists from re-creating the same broken state.
+
+## Files changed
+- `src/components/music/ExclusiveTrackCard.tsx` — gate Buy button on `price > 0`; promote challenge CTA; update badge.
+- `supabase/functions/purchase-exclusive-track/index.ts` — clearer error for $0.
+- `src/components/music/AccessRuleEditor.tsx` — inline warning on $0 purchase rules.
+
+## Test checklist
+1. Artist sets track `price_cents = 0`, no purchase rule, only a challenge rule → non-owner sees only **"Unlock via Challenge"** (no Buy button), badge reads **"Free via Challenge"**.
+2. Artist accidentally creates a $0 purchase rule → editor shows the warning; if saved, Buy button still hidden because `price <= 0`.
+3. Existing paid tracks ($5) still show Buy button and complete checkout normally.
+4. Challenge completion unlocks track + grants full playback / save / download as before.
+5. Refresh after unlock → still unlocked.
 
