@@ -6879,6 +6879,13 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_artist_payout_status: {
+        Args: { artist_user_id: string }
+        Returns: {
+          has_connect_account: boolean
+          payout_enabled: boolean
+        }[]
+      }
       get_client_project_by_token: { Args: { p_token: string }; Returns: Json }
       get_platform_stats: {
         Args: never

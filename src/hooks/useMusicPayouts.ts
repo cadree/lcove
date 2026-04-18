@@ -21,15 +21,15 @@ export const useArtistPayoutStatus = (artistUserId?: string) => {
     queryKey: ["artist-payout-status", artistUserId],
     queryFn: async () => {
       if (!artistUserId) return { has_account: false, payout_enabled: false };
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("stripe_connect_account_id, payout_enabled")
-        .eq("user_id", artistUserId)
-        .maybeSingle();
+      // Use SECURITY DEFINER RPC so visitors (non-owners) can read another artist's payout state
+      const { data, error } = await supabase.rpc("get_artist_payout_status", {
+        artist_user_id: artistUserId,
+      });
       if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
       return {
-        has_account: !!data?.stripe_connect_account_id,
-        payout_enabled: !!data?.payout_enabled,
+        has_account: !!row?.has_connect_account,
+        payout_enabled: !!row?.payout_enabled,
       } as MusicPayoutStatus;
     },
     enabled: !!artistUserId,

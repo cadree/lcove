@@ -130,9 +130,10 @@ serve(async (req) => {
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error";
     log("ERROR", { msg });
-    return new Response(JSON.stringify({ error: msg }), {
+    // Return 200 with structured error so the client can read the body cleanly
+    return new Response(JSON.stringify({ ok: false, error: msg }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 400,
+      status: 200,
     });
   }
 });
