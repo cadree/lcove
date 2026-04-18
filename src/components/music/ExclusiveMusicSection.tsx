@@ -65,7 +65,10 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
   const audioInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
-  // Refresh queries after returning from Stripe
+  // Refresh queries after returning from Stripe.
+  // CRITICAL: never trust URL params alone to grant access. We MUST call the
+  // verify edge function (which asks Stripe directly) before claiming success.
+  // Canceled / abandoned checkouts must leave the track locked.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const purchase = params.get("purchase");
@@ -73,27 +76,49 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
     const musicPayouts = params.get("music_payouts");
 
     if (purchase === "success") {
-      toast.success("Payment successful! Unlocking your track...");
-      // Webhook-independent fallback: confirm payment with Stripe directly,
-      // then refresh the user's purchases so the track unlocks immediately.
+      // Optimistic toast removed — only confirm after Stripe verification.
       (async () => {
         try {
-          await supabase.functions.invoke("verify-music-purchase");
+          const { data } = await supabase.functions.invoke("verify-music-purchase");
+          const verified = (data as any)?.results?.some(
+            (r: any) => r.status === "paid" && r.updated
+          );
+          if (verified) {
+            toast.success("Payment confirmed — track unlocked!");
+          } else {
+            toast.info("Finalizing your purchase…", {
+              description: "If this takes more than a minute, refresh the page.",
+            });
+          }
         } catch (e) {
-          console.warn("[MusicPurchase] verify failed (webhook may handle it)", e);
+          console.warn("[MusicPurchase] verify failed", e);
+          toast.error("Could not verify payment. Please refresh in a moment.");
         }
         queryClient.invalidateQueries({ queryKey: ["exclusive-purchases"] });
         queryClient.invalidateQueries({ queryKey: ["my-exclusive-purchases"] });
         queryClient.invalidateQueries({ queryKey: ["artist-subscriptions"] });
       })();
       window.history.replaceState({}, "", window.location.pathname);
+    } else if (purchase === "canceled") {
+      // Defensive: ensure no client-side optimistic unlock happened.
+      toast.info("Purchase canceled — track remains locked.");
+      queryClient.invalidateQueries({ queryKey: ["my-exclusive-purchases"] });
+      window.history.replaceState({}, "", window.location.pathname);
     } else if (subscribed === "true") {
-      toast.success("Subscription active! You now have access.");
       (async () => {
         try {
-          await supabase.functions.invoke("verify-artist-subscription");
+          const { data } = await supabase.functions.invoke("verify-artist-subscription");
+          const verified = (data as any)?.results?.some(
+            (r: any) => r.status === "active" && r.updated
+          );
+          if (verified) {
+            toast.success("Subscription active! You now have access.");
+          } else {
+            toast.info("Finalizing your subscription…");
+          }
         } catch (e) {
-          console.warn("[MusicSub] verify failed (webhook may handle it)", e);
+          console.warn("[MusicSub] verify failed", e);
+          toast.error("Could not verify subscription. Please refresh in a moment.");
         }
         queryClient.invalidateQueries({ queryKey: ["artist-subscriptions"] });
         queryClient.invalidateQueries({ queryKey: ["exclusive-purchases"] });
