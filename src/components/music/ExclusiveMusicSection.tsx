@@ -295,6 +295,16 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
           </div>
         )}
 
+        {/* Visitor info banner — payouts not connected */}
+        {!isOwner && tracks.length > 0 && payoutStatus && !payoutStatus.payout_enabled && (
+          <div className="mb-4 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-muted-foreground">
+              This artist hasn't connected payouts yet, so purchases and subscriptions are temporarily unavailable. You can still preview tracks below.
+            </p>
+          </div>
+        )}
+
         {/* Access Rules Editor (owner only) */}
         {isOwner && showRules && (
           <div className="mb-4 p-4 rounded-lg bg-muted/10 border border-border/20">
