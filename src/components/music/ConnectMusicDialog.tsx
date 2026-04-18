@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Music, Loader2, Upload, Trash2, Plus, X, ExternalLink } from "lucide-react";
+import { Music, Loader2, Upload, Trash2, Plus, X, AlertCircle } from "lucide-react";
 import { useMusicProfile, PlatformLink, TrackInfo, AlbumInfo } from "@/hooks/useMusicProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -32,6 +32,16 @@ const PLATFORM_OPTIONS = [
   { value: "other", label: "Other", placeholder: "https://..." },
 ];
 
+const looksLikeUrl = (s: string) => /^https?:\/\//i.test(s.trim());
+
+// Slug → Title Case ("anybody-feat-lil-duke-gunna" → "Anybody Feat Lil Duke Gunna")
+const slugToTitle = (slug: string) =>
+  decodeURIComponent(slug)
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
 export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogProps) => {
   const { user } = useAuth();
   const { musicProfile, saveMusicProfile, deleteMusicProfile } = useMusicProfile();
@@ -45,63 +55,205 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
   const [isSaving, setIsSaving] = useState(false);
   const [fetchingLinkIndex, setFetchingLinkIndex] = useState<number | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [extractError, setExtractError] = useState<{ index: number; message: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Track which fields the USER manually edited — so extraction won't clobber them
+  const userEditedRef = useRef<{ name: boolean; image: boolean }>({ name: false, image: false });
+  // Debounce timers per link index
+  const debounceTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  // Track URLs we've already extracted to avoid re-firing
+  const extractedUrlsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (musicProfile) {
-      setDisplayName(musicProfile.display_name || "");
+      // Heal: if display_name was corrupted with a URL, treat as empty
+      const savedName = musicProfile.display_name || "";
+      setDisplayName(looksLikeUrl(savedName) ? "" : savedName);
       setArtistImage(musicProfile.artist_image_url || "");
       setGenres(musicProfile.genres || []);
       setTopTracks(musicProfile.top_tracks || []);
       setAlbums(musicProfile.albums || []);
 
-      // Build links from both legacy fields and platform_links
       const existingLinks: PlatformLink[] = musicProfile.platform_links || [];
-      
-      // If we have legacy spotify/apple urls but they're not in platform_links, add them
       if (musicProfile.spotify_artist_url && !existingLinks.some(l => l.url === musicProfile.spotify_artist_url)) {
         existingLinks.unshift({ platform: "spotify", url: musicProfile.spotify_artist_url });
       }
       if (musicProfile.apple_music_artist_url && !existingLinks.some(l => l.url === musicProfile.apple_music_artist_url)) {
         existingLinks.push({ platform: "apple_music", url: musicProfile.apple_music_artist_url });
       }
-      
       setLinks(existingLinks.length > 0 ? existingLinks : [{ platform: "spotify", url: "" }]);
+      // Reset edit tracking when profile (re)loads
+      userEditedRef.current = { name: !looksLikeUrl(savedName) && !!savedName, image: !!musicProfile.artist_image_url };
     } else {
       setLinks([{ platform: "spotify", url: "" }]);
+      userEditedRef.current = { name: false, image: false };
     }
   }, [musicProfile]);
 
-  const fetchArtistData = useCallback(async (url: string, index: number) => {
+  // Cleanup debounce timers on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(debounceTimers.current).forEach(clearTimeout);
+    };
+  }, []);
+
+  // Apple Music album/track URL fallback parser
+  const parseAppleMusicAlbumFallback = (url: string, imageUrl?: string): AlbumInfo | null => {
+    const m = url.match(/music\.apple\.com\/[^/]+\/album\/([^/?]+)\/(\d+)/i);
+    if (!m) return null;
+    return {
+      name: slugToTitle(m[1]),
+      image_url: imageUrl,
+      apple_music_url: url,
+    };
+  };
+
+  const parseSpotifyAlbumFallback = (url: string, imageUrl?: string): AlbumInfo | null => {
+    const m = url.match(/open\.spotify\.com\/album\/([a-zA-Z0-9]+)/i);
+    if (!m) return null;
+    return {
+      name: "Album",
+      image_url: imageUrl,
+      spotify_url: url,
+    };
+  };
+
+  const parseSpotifyTrackFallback = (url: string, imageUrl?: string): TrackInfo | null => {
+    const m = url.match(/open\.spotify\.com\/track\/([a-zA-Z0-9]+)/i);
+    if (!m) return null;
+    return {
+      name: "Track",
+      album_image: imageUrl,
+      spotify_url: url,
+    };
+  };
+
+  const fetchArtistData = async (url: string, index: number) => {
     if (!url.trim()) return;
     const isSpotify = url.includes("open.spotify.com/");
     const isAppleMusic = url.includes("music.apple.com/");
     if (!isSpotify && !isAppleMusic) return;
+    if (extractedUrlsRef.current.has(url)) {
+      console.log("[MusicExtract] skipping (already extracted):", url);
+      return;
+    }
 
+    console.log("[MusicExtract] starting extraction for:", url);
     setFetchingLinkIndex(index);
+    setExtractError(null);
+
     try {
       const { data, error } = await supabase.functions.invoke("fetch-artist-image", {
         body: { url },
       });
-      if (!error && data) {
-        if (data.image_url && !artistImage) setArtistImage(data.image_url);
-        if (data.artist_name && !displayName) setDisplayName(data.artist_name);
-        if (data.genres?.length && genres.length === 0) setGenres(data.genres);
-        if (data.top_tracks?.length && topTracks.length === 0) setTopTracks(data.top_tracks);
-        if (data.albums?.length && albums.length === 0) setAlbums(data.albums);
+
+      console.log("[MusicExtract] raw response:", { data, error });
+
+      if (error) {
+        console.error("[MusicExtract] edge function error:", error);
+        setExtractError({ index, message: "Couldn't fetch info from this link. You can fill it manually." });
+        return;
+      }
+
+      if (!data) {
+        setExtractError({ index, message: "No data returned from this link." });
+        return;
+      }
+
+      let appliedSomething = false;
+
+      // Artist name — overwrite UNLESS user manually typed it
+      if (data.artist_name && !userEditedRef.current.name) {
+        console.log("[MusicExtract] applying artist_name:", data.artist_name);
+        setDisplayName(data.artist_name);
+        appliedSomething = true;
+      }
+
+      // Artist image — overwrite UNLESS user manually uploaded
+      if (data.image_url && !userEditedRef.current.image) {
+        console.log("[MusicExtract] applying image_url:", data.image_url);
+        setArtistImage(data.image_url);
+        appliedSomething = true;
+      }
+
+      // Genres — merge unique
+      if (Array.isArray(data.genres) && data.genres.length > 0) {
+        setGenres((prev) => {
+          const merged = Array.from(new Set([...prev, ...data.genres]));
+          console.log("[MusicExtract] genres merged:", merged);
+          return merged;
+        });
+        appliedSomething = true;
+      }
+
+      // Top tracks — merge by name
+      if (Array.isArray(data.top_tracks) && data.top_tracks.length > 0) {
+        setTopTracks((prev) => {
+          const existingNames = new Set(prev.map((t) => t.name?.toLowerCase()));
+          const newOnes = data.top_tracks.filter(
+            (t: TrackInfo) => t.name && !existingNames.has(t.name.toLowerCase())
+          );
+          return [...prev, ...newOnes];
+        });
+        appliedSomething = true;
+      }
+
+      // Albums — merge by name, with fallback for /album/ URLs
+      const albumsFromData: AlbumInfo[] = Array.isArray(data.albums) ? [...data.albums] : [];
+      if (albumsFromData.length === 0) {
+        const fallback =
+          (isAppleMusic && parseAppleMusicAlbumFallback(url, data.image_url)) ||
+          (isSpotify && parseSpotifyAlbumFallback(url, data.image_url));
+        if (fallback) {
+          console.log("[MusicExtract] using album fallback:", fallback);
+          albumsFromData.push(fallback);
+        }
+      }
+      if (albumsFromData.length > 0) {
+        setAlbums((prev) => {
+          const existingNames = new Set(prev.map((a) => a.name?.toLowerCase()));
+          const newOnes = albumsFromData.filter(
+            (a) => a.name && !existingNames.has(a.name.toLowerCase())
+          );
+          return [...prev, ...newOnes];
+        });
+        appliedSomething = true;
+      }
+
+      // Spotify track URL fallback
+      if (isSpotify && (!data.top_tracks || data.top_tracks.length === 0)) {
+        const trackFallback = parseSpotifyTrackFallback(url, data.image_url);
+        if (trackFallback) {
+          setTopTracks((prev) => {
+            if (prev.some((t) => t.spotify_url === url)) return prev;
+            return [...prev, trackFallback];
+          });
+          appliedSomething = true;
+        }
+      }
+
+      extractedUrlsRef.current.add(url);
+
+      if (appliedSomething) {
         toast.success("Artist info extracted!");
+      } else {
+        setExtractError({
+          index,
+          message: "Link is valid but no extra info was found. Fill in the details manually.",
+        });
       }
     } catch (e) {
-      console.error("Failed to fetch artist data:", e);
+      console.error("[MusicExtract] exception:", e);
+      setExtractError({ index, message: "Extraction failed. Please fill the fields manually." });
     } finally {
       setFetchingLinkIndex(null);
     }
-  }, [artistImage, displayName, genres.length, topTracks.length, albums.length]);
+  };
 
   const handleLinkUrlChange = (index: number, url: string) => {
     const updated = [...links];
     updated[index] = { ...updated[index], url };
-    setLinks(updated);
 
     // Auto-detect platform
     if (url.includes("open.spotify.com")) updated[index].platform = "spotify";
@@ -110,13 +262,16 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
     else if (url.includes("music.youtube.com") || url.includes("youtube.com/channel")) updated[index].platform = "youtube_music";
     else if (url.includes("tidal.com")) updated[index].platform = "tidal";
     else if (url.includes("bandcamp.com")) updated[index].platform = "bandcamp";
-    setLinks([...updated]);
+    setLinks(updated);
 
-    // Auto-fetch for any Spotify/Apple Music URL
+    // Debounced extraction
+    if (debounceTimers.current[index]) clearTimeout(debounceTimers.current[index]);
     const isSpotify = url.includes("open.spotify.com/") && url.length > 30;
     const isAppleMusic = url.includes("music.apple.com/") && url.length > 30;
     if (isSpotify || isAppleMusic) {
-      fetchArtistData(url, index);
+      debounceTimers.current[index] = setTimeout(() => {
+        fetchArtistData(url, index);
+      }, 400);
     }
   };
 
@@ -126,13 +281,8 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
     setLinks(updated);
   };
 
-  const addLink = () => {
-    setLinks([...links, { platform: "spotify", url: "" }]);
-  };
-
-  const removeLink = (index: number) => {
-    setLinks(links.filter((_, i) => i !== index));
-  };
+  const addLink = () => setLinks([...links, { platform: "spotify", url: "" }]);
+  const removeLink = (index: number) => setLinks(links.filter((_, i) => i !== index));
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -155,6 +305,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
       if (uploadError) throw uploadError;
       const { data: publicUrl } = supabase.storage.from("media").getPublicUrl(filePath);
       setArtistImage(publicUrl.publicUrl);
+      userEditedRef.current.image = true;
       toast.success("Artist image uploaded!");
     } catch (error) {
       console.error("Upload error:", error);
@@ -166,20 +317,20 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
   };
 
   const handleSave = async () => {
-    if (!displayName.trim()) {
-      toast.error("Artist / Band name is required");
+    const cleanName = displayName.trim();
+    if (!cleanName || looksLikeUrl(cleanName)) {
+      toast.error("Please enter a valid Artist / Band name");
       return;
     }
     setIsSaving(true);
 
-    // Extract legacy fields from links for backward compat
     const validLinks = links.filter(l => l.url.trim());
     const spotifyLink = validLinks.find(l => l.platform === "spotify");
     const appleMusicLink = validLinks.find(l => l.platform === "apple_music");
 
     try {
       await saveMusicProfile.mutateAsync({
-        display_name: displayName.trim(),
+        display_name: cleanName,
         artist_image_url: artistImage || undefined,
         spotify_artist_url: spotifyLink?.url || undefined,
         spotify_artist_id: spotifyLink?.url?.match(/artist\/([a-zA-Z0-9]+)/)?.[1] || undefined,
@@ -192,7 +343,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
       });
       onOpenChange(false);
     } catch {
-      // error handled by mutation
+      // handled by mutation
     } finally {
       setIsSaving(false);
     }
@@ -207,14 +358,13 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
       setGenres([]);
       setTopTracks([]);
       setAlbums([]);
+      extractedUrlsRef.current.clear();
+      userEditedRef.current = { name: false, image: false };
       onOpenChange(false);
     } catch {
-      // error handled by mutation
+      // handled by mutation
     }
   };
-
-  const getPlatformLabel = (platform: string) =>
-    PLATFORM_OPTIONS.find(p => p.value === platform)?.label || platform;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -237,7 +387,10 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
               <Input
                 id="artist-name"
                 value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
+                onChange={(e) => {
+                  setDisplayName(e.target.value);
+                  userEditedRef.current.name = e.target.value.trim().length > 0;
+                }}
                 placeholder="Auto-filled from URL or type manually"
               />
             </div>
@@ -272,7 +425,14 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                     Upload Image
                   </Button>
                   {artistImage && (
-                    <Button variant="ghost" size="sm" onClick={() => setArtistImage("")}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setArtistImage("");
+                        userEditedRef.current.image = false;
+                      }}
+                    >
                       Remove
                     </Button>
                   )}
@@ -314,6 +474,14 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                     <Input
                       value={link.url}
                       onChange={(e) => handleLinkUrlChange(index, e.target.value)}
+                      onPaste={(e) => {
+                        // Force immediate extraction on paste
+                        const pasted = e.clipboardData.getData("text");
+                        if (pasted && (pasted.includes("open.spotify.com") || pasted.includes("music.apple.com"))) {
+                          if (debounceTimers.current[index]) clearTimeout(debounceTimers.current[index]);
+                          setTimeout(() => fetchArtistData(pasted.trim(), index), 50);
+                        }
+                      }}
                       placeholder={PLATFORM_OPTIONS.find(p => p.value === link.platform)?.placeholder || "Paste URL..."}
                       className="flex-1"
                     />
@@ -326,6 +494,11 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                   {fetchingLinkIndex === index && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                       <Loader2 className="w-3 h-3 animate-spin" /> Extracting artist info...
+                    </p>
+                  )}
+                  {extractError && extractError.index === index && (
+                    <p className="text-xs text-destructive flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> {extractError.message}
                     </p>
                   )}
                 </div>
@@ -410,7 +583,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={isSaving || !displayName.trim()}>
+            <Button onClick={handleSave} disabled={isSaving || !displayName.trim() || looksLikeUrl(displayName)}>
               {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               Save
             </Button>

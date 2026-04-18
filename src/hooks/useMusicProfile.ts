@@ -91,12 +91,17 @@ export const useMusicProfile = (userId?: string) => {
     mutationFn: async (profileData: Partial<MusicProfile>) => {
       if (!user) throw new Error("Not authenticated");
 
+      // Guard: never persist a URL into display_name
+      const safeName = profileData.display_name && /^https?:\/\//i.test(profileData.display_name)
+        ? null
+        : profileData.display_name;
+
       const dataToSave: Record<string, unknown> = {
         spotify_artist_id: profileData.spotify_artist_id,
         spotify_artist_url: profileData.spotify_artist_url,
         apple_music_artist_id: profileData.apple_music_artist_id,
         apple_music_artist_url: profileData.apple_music_artist_url,
-        display_name: profileData.display_name,
+        display_name: safeName,
         artist_image_url: profileData.artist_image_url,
         genres: profileData.genres,
         top_tracks: profileData.top_tracks as unknown as Json,
