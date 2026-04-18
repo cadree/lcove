@@ -19,6 +19,7 @@ interface ExclusiveTrackCardProps {
   hasAccess: boolean;
   isOwner: boolean;
   rules: ExclusiveAccessRule[];
+  payoutEnabled?: boolean;
   onDelete?: () => void;
   onTogglePublish?: () => void;
   onPurchase?: (track: ExclusiveTrack, rule: ExclusiveAccessRule) => void;
@@ -29,6 +30,7 @@ export const ExclusiveTrackCard = ({
   hasAccess,
   isOwner,
   rules,
+  payoutEnabled = true,
   onDelete,
   onTogglePublish,
   onPurchase,
