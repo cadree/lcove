@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -337,6 +338,31 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
                 onChange={(e) => setNewPrice(e.target.value)}
                 placeholder="0.00 (free preview, paid full access)"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Preview start (seconds)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                value={previewStart}
+                onChange={(e) => setPreviewStart(e.target.value)}
+                placeholder="0"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Locked listeners hear a 15-second preview starting from this point.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border border-border/40 px-3 py-2">
+              <div>
+                <Label className="text-sm">Allow downloads</Label>
+                <p className="text-[11px] text-muted-foreground">
+                  Buyers can download the original audio file.
+                </p>
+              </div>
+              <Switch checked={allowDownloads} onCheckedChange={setAllowDownloads} />
             </div>
           </div>
 

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useMusicProfile } from "@/hooks/useMusicProfile";
 import { ExclusiveMusicSection } from "./ExclusiveMusicSection";
+import { SavedMusicSection } from "./SavedMusicSection";
 
 interface MusicProfileBlockProps {
   userId?: string;
@@ -210,6 +211,9 @@ export const MusicProfileBlock = ({ userId, onConnectClick }: MusicProfileBlockP
 
       {/* Exclusive Music Section */}
       <ExclusiveMusicSection userId={targetUserId} />
+
+      {/* Collected / Saved Music Section */}
+      <SavedMusicSection userId={targetUserId} />
     </div>
   );
 };
