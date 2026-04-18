@@ -79,11 +79,13 @@ export const ExclusiveTrackCard = ({
     ? challengeMeta.platform.charAt(0).toUpperCase() + challengeMeta.platform.slice(1)
     : "social";
 
+  const isPaid = price > 0;
   const statusBadge = (() => {
     if (isOwner) return { label: track.is_published ? "Published" : "Draft", variant: "outline" as const };
     if (unlockedViaChallenge && !ownsTrack) return { label: "Unlocked via Challenge", variant: "secondary" as const };
     if (fullAccess) return { label: "Unlocked", variant: "secondary" as const };
-    if (price > 0) return { label: `$${(price / 100).toFixed(2)}`, variant: "default" as const };
+    if (isPaid) return { label: `$${(price / 100).toFixed(2)}`, variant: "default" as const };
+    if (challengeRule) return { label: "Free via Challenge", variant: "outline" as const };
     if (subscriptionRule) return { label: "Subscribers", variant: "outline" as const };
     return { label: "Exclusive", variant: "outline" as const };
   })();
