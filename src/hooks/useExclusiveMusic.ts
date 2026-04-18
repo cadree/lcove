@@ -183,6 +183,8 @@ export const useExclusiveTracks = (artistUserId?: string) => {
     tracks: isOwner ? tracks : tracks.filter((t) => t.is_published),
     isLoading,
     purchases,
+    subscriptions,
+    isSubscribedToArtist,
     hasAccess,
     createTrack,
     updateTrack,
