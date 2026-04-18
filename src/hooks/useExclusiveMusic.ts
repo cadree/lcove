@@ -46,7 +46,20 @@ export interface ExclusiveTrackPurchase {
   buyer_user_id: string;
   access_rule_id?: string | null;
   stripe_payment_intent_id?: string | null;
+  stripe_session_id?: string | null;
+  payment_status?: string;
   amount_cents: number;
+  created_at: string;
+}
+
+export interface ArtistSubscription {
+  id: string;
+  artist_user_id: string;
+  subscriber_user_id: string;
+  status: string;
+  current_period_end?: string | null;
+  amount_cents: number;
+  interval: string;
   created_at: string;
 }
 
@@ -77,16 +90,35 @@ export const useExclusiveTracks = (artistUserId?: string) => {
       const { data, error } = await supabase
         .from("exclusive_track_purchases")
         .select("*")
-        .eq("buyer_user_id", user.id);
+        .eq("buyer_user_id", user.id)
+        .eq("payment_status", "paid");
       if (error) throw error;
       return (data || []) as ExclusiveTrackPurchase[];
     },
     enabled: !!user?.id,
   });
 
+  const { data: subscriptions = [] } = useQuery({
+    queryKey: ["artist-subscriptions", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from("artist_subscriptions")
+        .select("*")
+        .eq("subscriber_user_id", user.id)
+        .eq("status", "active");
+      if (error) throw error;
+      return (data || []) as ArtistSubscription[];
+    },
+    enabled: !!user?.id,
+  });
+
+  const isSubscribedToArtist = !!artistUserId && subscriptions.some((s) => s.artist_user_id === artistUserId);
+
   const hasAccess = (trackId: string): boolean => {
     if (isOwner) return true;
-    return purchases.some((p) => p.track_id === trackId);
+    if (purchases.some((p) => p.track_id === trackId)) return true;
+    return isSubscribedToArtist;
   };
 
   const createTrack = useMutation({
