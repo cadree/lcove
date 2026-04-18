@@ -28,6 +28,10 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  useArtistChallengeCompletions,
+  useRevokeChallengeCompletion,
+} from "@/hooks/useFanChallenges";
 import { toast } from "sonner";
 
 interface ExclusiveMusicSectionProps {
