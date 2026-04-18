@@ -19,7 +19,13 @@ export interface SavedTrackWithMeta extends MusicSave {
   };
 }
 
-/** All tracks the current user has purchased. */
+/**
+ * All tracks the current user has VERIFIED-PAID for.
+ *
+ * CRITICAL: only `payment_status = 'paid'` rows count as access. Pending rows
+ * are inserted the moment a Checkout Session is created and must NEVER unlock
+ * a track — otherwise an abandoned/canceled checkout would grant free access.
+ */
 export const useMyPurchases = () => {
   const { user } = useAuth();
   return useQuery({
@@ -29,7 +35,8 @@ export const useMyPurchases = () => {
       const { data, error } = await supabase
         .from("exclusive_track_purchases")
         .select("*")
-        .eq("buyer_user_id", user.id);
+        .eq("buyer_user_id", user.id)
+        .eq("payment_status", "paid");
       if (error) throw error;
       return data || [];
     },
