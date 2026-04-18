@@ -28,6 +28,10 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  useArtistChallengeCompletions,
+  useRevokeChallengeCompletion,
+} from "@/hooks/useFanChallenges";
 import { toast } from "sonner";
 
 interface ExclusiveMusicSectionProps {
@@ -50,6 +54,10 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
   const { data: payoutStatus } = useArtistPayoutStatus(userId);
   const createPayoutAccount = useCreateMusicPayoutAccount();
   const refreshPayoutStatus = useRefreshMusicPayoutStatus();
+  const { data: challengeCompletions = [] } = useArtistChallengeCompletions(
+    isOwner ? userId : undefined
+  );
+  const revokeCompletion = useRevokeChallengeCompletion();
 
   const [showUpload, setShowUpload] = useState(false);
   const [showRules, setShowRules] = useState(false);
@@ -358,7 +366,54 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
           </div>
         )}
 
-        {/* Track Grid */}
+        {/* Artist-side Challenge Unlocks panel */}
+        {isOwner && challengeCompletions.length > 0 && (
+          <div className="mb-4 p-4 rounded-lg bg-muted/10 border border-border/20">
+            <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+              🎯 Recent Challenge Unlocks
+              <span className="text-xs text-muted-foreground">({challengeCompletions.length})</span>
+            </h4>
+            <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-thin">
+              {challengeCompletions.map((c) => (
+                <div
+                  key={c.id}
+                  className="flex items-start gap-2 p-2 rounded-lg bg-background/40 border border-border/30"
+                >
+                  <div className="flex-1 min-w-0 text-xs">
+                    <p className="font-medium text-foreground capitalize">
+                      {c.challenge_type} unlock
+                    </p>
+                    <p className="text-muted-foreground">
+                      {new Date(c.completed_at).toLocaleString()}
+                    </p>
+                    {c.proof_text && (
+                      <p className="mt-1 text-muted-foreground break-all">{c.proof_text}</p>
+                    )}
+                    {c.proof_url && (
+                      <a
+                        href={c.proof_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 inline-block text-primary underline"
+                      >
+                        View proof
+                      </a>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs text-destructive"
+                    onClick={() => revokeCompletion.mutate(c.id)}
+                  >
+                    Revoke
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {tracks.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {tracks.map((track) => (

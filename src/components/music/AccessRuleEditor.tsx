@@ -43,26 +43,32 @@ export const AccessRuleEditor = ({
   const [newDescription, setNewDescription] = useState("");
   const [newAmount, setNewAmount] = useState("");
   const [newInterval, setNewInterval] = useState("monthly");
+  const [newPlatform, setNewPlatform] = useState("instagram");
+  const [newRequiresProof, setNewRequiresProof] = useState(false);
 
   const filteredRules = rules.filter((r) =>
     trackId ? r.track_id === trackId || r.track_id === null : true
   );
 
   const handleAdd = () => {
+    const isChallenge = newType === "challenge";
     onCreateRule({
       track_id: trackId,
       rule_type: newType,
       label: newLabel || RULE_TYPE_CONFIG[newType as keyof typeof RULE_TYPE_CONFIG]?.label || newType,
       description: newDescription || undefined,
-      amount_cents: Math.round(parseFloat(newAmount || "0") * 100),
+      amount_cents: isChallenge ? 0 : Math.round(parseFloat(newAmount || "0") * 100),
       interval: newType === "subscription" ? newInterval : undefined,
-      metadata: {},
+      metadata: isChallenge
+        ? { platform: newPlatform, instructions: newDescription, requires_proof: newRequiresProof }
+        : {},
       sort_order: filteredRules.length,
     });
     setShowAdd(false);
     setNewLabel("");
     setNewDescription("");
     setNewAmount("");
+    setNewRequiresProof(false);
   };
 
   return (
@@ -196,6 +202,34 @@ export const AccessRuleEditor = ({
                   </Select>
                 </div>
               )}
+            </div>
+          )}
+
+          {newType === "challenge" && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label className="text-xs">Platform</Label>
+                <Select value={newPlatform} onValueChange={setNewPlatform}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="instagram">Instagram</SelectItem>
+                    <SelectItem value="tiktok">TikTok</SelectItem>
+                    <SelectItem value="x">X (Twitter)</SelectItem>
+                    <SelectItem value="other">Other / Anywhere</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-border/40 px-3 py-2">
+                <div>
+                  <Label className="text-xs">Require proof</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Fans must upload a screenshot or paste a link.
+                  </p>
+                </div>
+                <Switch checked={newRequiresProof} onCheckedChange={setNewRequiresProof} />
+              </div>
             </div>
           )}
 
