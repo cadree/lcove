@@ -122,3 +122,9 @@ verify_jwt = true
 
 [functions.check-music-payout-status]
 verify_jwt = true
+
+[functions.verify-music-purchase]
+verify_jwt = true
+
+[functions.verify-artist-subscription]
+verify_jwt = true

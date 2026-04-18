@@ -74,14 +74,30 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
 
     if (purchase === "success") {
       toast.success("Payment successful! Unlocking your track...");
-      queryClient.invalidateQueries({ queryKey: ["exclusive-purchases"] });
-      queryClient.invalidateQueries({ queryKey: ["artist-subscriptions"] });
-      // Clean URL
+      // Webhook-independent fallback: confirm payment with Stripe directly,
+      // then refresh the user's purchases so the track unlocks immediately.
+      (async () => {
+        try {
+          await supabase.functions.invoke("verify-music-purchase");
+        } catch (e) {
+          console.warn("[MusicPurchase] verify failed (webhook may handle it)", e);
+        }
+        queryClient.invalidateQueries({ queryKey: ["exclusive-purchases"] });
+        queryClient.invalidateQueries({ queryKey: ["my-exclusive-purchases"] });
+        queryClient.invalidateQueries({ queryKey: ["artist-subscriptions"] });
+      })();
       window.history.replaceState({}, "", window.location.pathname);
     } else if (subscribed === "true") {
       toast.success("Subscription active! You now have access.");
-      queryClient.invalidateQueries({ queryKey: ["artist-subscriptions"] });
-      queryClient.invalidateQueries({ queryKey: ["exclusive-purchases"] });
+      (async () => {
+        try {
+          await supabase.functions.invoke("verify-artist-subscription");
+        } catch (e) {
+          console.warn("[MusicSub] verify failed (webhook may handle it)", e);
+        }
+        queryClient.invalidateQueries({ queryKey: ["artist-subscriptions"] });
+        queryClient.invalidateQueries({ queryKey: ["exclusive-purchases"] });
+      })();
       window.history.replaceState({}, "", window.location.pathname);
     } else if (musicPayouts === "success" && isOwner) {
       toast.success("Payouts connected!");
