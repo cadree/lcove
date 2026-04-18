@@ -2555,6 +2555,69 @@ export type Database = {
           },
         ]
       }
+      fan_challenge_completions: {
+        Row: {
+          access_rule_id: string
+          artist_user_id: string
+          challenge_type: string
+          completed_at: string
+          id: string
+          proof_text: string | null
+          proof_url: string | null
+          revoked_at: string | null
+          revoked_reason: string | null
+          status: string
+          track_id: string | null
+          user_id: string
+          verified: boolean
+        }
+        Insert: {
+          access_rule_id: string
+          artist_user_id: string
+          challenge_type?: string
+          completed_at?: string
+          id?: string
+          proof_text?: string | null
+          proof_url?: string | null
+          revoked_at?: string | null
+          revoked_reason?: string | null
+          status?: string
+          track_id?: string | null
+          user_id: string
+          verified?: boolean
+        }
+        Update: {
+          access_rule_id?: string
+          artist_user_id?: string
+          challenge_type?: string
+          completed_at?: string
+          id?: string
+          proof_text?: string | null
+          proof_url?: string | null
+          revoked_at?: string | null
+          revoked_reason?: string | null
+          status?: string
+          track_id?: string | null
+          user_id?: string
+          verified?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fan_challenge_completions_access_rule_id_fkey"
+            columns: ["access_rule_id"]
+            isOneToOne: false
+            referencedRelation: "exclusive_access_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fan_challenge_completions_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "exclusive_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       favorite_friends: {
         Row: {
           created_at: string
@@ -6885,6 +6948,10 @@ export type Database = {
           has_connect_account: boolean
           payout_enabled: boolean
         }[]
+      }
+      get_challenge_unlock_count: {
+        Args: { p_track_id: string }
+        Returns: number
       }
       get_client_project_by_token: { Args: { p_token: string }; Returns: Json }
       get_platform_stats: {
