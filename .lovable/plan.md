@@ -1,100 +1,136 @@
 
 
-## Plan: Public-Facing Exclusive Music Storefront with Previews, Saves & Downloads
+## Audit — Why purchase & subscribe are broken
 
-### What's broken vs. what we need
-- Tracks hidden behind `if (!isOwner && tracks.length === 0) return null` — but they ARE shown (just compactly). Real issue: cards are too small/private-looking, no preview generation, no save flow, no download permission, no "saved music" library.
-- No 15s preview enforcement — currently plays full `preview_clip_url` if set, otherwise nothing.
-- No durable purchase library / saved-to-profile concept.
-- No download toggle per track.
+### Root cause #1 (HARD BLOCKER): Wrong column name on artist Connect lookup
+Both `purchase-exclusive-track` and `create-artist-subscription` edge functions read `profiles.connect_account_id` — **that column does not exist**. The actual column is `profiles.stripe_connect_account_id`. Every checkout immediately throws `"Artist has not set up payments yet"` even when the artist has onboarded. This is the single error blocking 100% of buys.
+
+### Root cause #2: No music-specific Connect onboarding UI
+Owners of music profiles have no place to connect payouts. The existing `useStoreConnect` hook is store-scoped (writes to `stores.stripe_connect_account_id`), not the profile. So even after fixing the column name, most artists have nothing to route to.
+
+### Root cause #3: Purchase row inserted at checkout creation, not after payment
+`purchase-exclusive-track` inserts into `exclusive_track_purchases` immediately. That means a buyer who closes the Stripe tab without paying still gets unlocked. Same for `artist_subscriptions`. We need a webhook to flip status only on `checkout.session.completed`.
+
+### Root cause #4: No subscription rule exists
+Test artist only has a `purchase` rule (`$5`). There's no Subscribe CTA shown because no `subscription` rule has been created. Owner has no easy way to create one — `AccessRuleEditor` exists but is hidden behind a "Rules" toggle and not obvious.
+
+### Root cause #5: UI doesn't refresh after returning from Stripe
+After Stripe redirects back with `?purchase=success`, nothing invalidates `exclusive-purchases`/`artist-subscriptions` queries. Even when the row is inserted, the buy button stays.
+
+### Root cause #6: No inline error feedback
+`handlePurchase` swallows errors with a generic `toast.error("Failed to start purchase")`. Buyer never sees the real reason ("Artist has not set up payouts").
+
+### Root cause #7: Owner can see "Buy" on own track
+`!isOwner` guard exists but `isOwner` resolves via `user?.id === artist_user_id`. Verified OK — but if a track is published with no payout account, visitors hit the dead end with no warning.
 
 ---
 
-### 1. Database changes (one migration)
+## Fix Plan
 
-**Alter `exclusive_tracks`** — add:
-- `allow_downloads` boolean default false
-- `visible_on_profile` boolean default true
-- `preview_start_seconds` integer default 0
-- `preview_duration_seconds` integer default 15
+### A. Database (one migration)
+- Add `stripe_subscription_id`, `stripe_customer_id`, `current_period_end`, `cancel_at_period_end` to `artist_subscriptions` (status updates need them).
+- Add unique index on `artist_subscriptions(stripe_subscription_id)` for idempotent webhook.
+- Add `stripe_session_id` to `exclusive_track_purchases` + unique index for idempotent webhook.
+- Add `payment_status` column (`pending`/`paid`/`failed`) on `exclusive_track_purchases`, default `pending`.
 
-**New table `music_saves`** — buyer's library + "added to my profile" flag:
-- `id`, `user_id`, `track_id` (FK exclusive_tracks), `added_to_profile` boolean default false, `created_at`
-- Unique (user_id, track_id)
-- RLS: user can SELECT/INSERT/UPDATE/DELETE own rows; public SELECT where `added_to_profile = true` (so saved tracks appear on profiles)
+### B. Edge functions
 
-**RLS on `exclusive_tracks`** — confirm public SELECT for `is_published = true` rows (so non-owners see them on profiles).
+**Fix `purchase-exclusive-track`:**
+- Change `connect_account_id` → `stripe_connect_account_id`.
+- Also check `profiles.payout_enabled = true` before allowing checkout. Throw clear error: `"This artist has not enabled payouts yet."`
+- Stop inserting the purchase row at checkout creation. Insert it as `pending` with `stripe_session_id`, OR defer entirely to webhook.
+- Pass `application_fee_amount: 0` explicitly in `payment_intent_data` (100% to artist via `transfer_data.destination`).
+- Pass `client_reference_id: user.id` for safer webhook lookup.
 
-No new tables for purchases (already exists) or subscriptions (exists).
+**Fix `create-artist-subscription`:**
+- Same column fix.
+- Same payout_enabled check.
+- Same defer to webhook; do not insert `artist_subscriptions` row up front.
+- Add `application_fee_percent: 0`.
 
-### 2. Preview generation strategy
+**New `stripe-music-webhook` edge function** (config: `verify_jwt = false`):
+- Verifies signature with `STRIPE_WEBHOOK_SECRET`.
+- Handles `checkout.session.completed`:
+  - If `metadata.type === 'exclusive_track_purchase'` → upsert `exclusive_track_purchases` (idempotent on `stripe_session_id`) with `payment_status='paid'`.
+  - If `metadata.type === 'artist_subscription'` → upsert `artist_subscriptions` with `stripe_subscription_id`, `current_period_end`, `status='active'`.
+- Handles `customer.subscription.updated`/`deleted` → update `artist_subscriptions.status`.
+- Returns 200 always after processing to prevent Stripe retries on duplicates.
+- Ask user to add `STRIPE_WEBHOOK_SECRET` secret + paste the function URL into Stripe Dashboard → Webhooks (events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`).
 
-**Client-side, on-the-fly** — no storage cost, no edge function needed:
-- Locked viewers get `<audio src={audio_file_url}>` with a controller that:
-  - Seeks to `preview_start_seconds` on play
-  - Stops at `preview_start_seconds + preview_duration_seconds` (15s)
-  - Disables seek bar / right-click download
-- Audio file URL is public (in `media` bucket) but the UI-enforced 15s window + no download button keeps it functionally a preview
-- Owners can optionally upload a separate `preview_clip_url` for true protection (kept as existing field)
+**New `create-music-payout-account` + `check-music-payout-status` edge functions:**
+- Mirrors `create-store-connect-account` but writes to `profiles.stripe_connect_account_id` / `profiles.payout_enabled`.
+- Returns Stripe Express onboarding URL.
 
-This avoids needing ffmpeg in an edge function for MVP.
+### C. Frontend
 
-### 3. UI changes
+**`useExclusiveMusic.ts`:**
+- `hasAccess(trackId)`: also check active `artist_subscriptions` for this artist when the track has a subscription rule.
+- Filter purchases to only `payment_status='paid'`.
+- Add query for subscriptions.
 
-**`ExclusiveTrackCard.tsx`** — redesign as storefront card:
-- Always visible (no truthy gate)
-- Larger artwork (h-32 grid) instead of tiny 14×14
-- Status badge: `Free` / `$X.XX` / `Subscribers Only` / `Unlocked` / `Owned`
-- **Play preview** button (15s clipped) for everyone
-- **Buy / Subscribe** CTAs for non-owners without access
-- Post-purchase: **Save to Library** + **Add to Profile** + **Download** (if `allow_downloads`)
-- Owner: edit settings (price, allow_downloads toggle, visible_on_profile toggle, preview start time)
+**New `useMusicPayouts.ts` hook:**
+- `useMusicPayoutStatus()` — reads `profiles.stripe_connect_account_id` + `payout_enabled` for current user.
+- `useCreateMusicPayoutAccount()` mutation — invokes `create-music-payout-account`.
 
-**`ExclusiveMusicSection.tsx`**:
-- Remove `if (!isOwner && tracks.length === 0) return null` gate — show empty state for visitors too if artist has none, OR just hide cleanly
-- Add upload form fields: `Allow downloads` switch, `Preview start (seconds)` input
-- Grid layout (2 cols mobile, 3 cols desktop) instead of vertical list
-- Header: "Exclusive Music" with track count
+**`ExclusiveMusicSection.tsx`:**
+- If owner has any track with `price_cents > 0` OR a paid access rule but `payout_enabled !== true`, render an amber banner at the top:
+  > "Connect payouts to start selling — Buyers can't purchase your tracks until you connect a payout account." [Connect Payouts] button.
+- After Stripe redirect (`?purchase=success` or `?subscribed=true` on URL), invalidate purchases + subscriptions queries and toast success.
+- `handlePurchase`: surface the real edge function error message (not generic).
 
-**New `SavedMusicSection.tsx`** — shows on a user's own profile:
-- Lists tracks where `music_saves.user_id = profile_owner AND added_to_profile = true`
-- Each card shows: artwork, title, **original artist** (linked to their profile), play button
-- Attribution preserved — never shows saver as the uploader
+**`ExclusiveTrackCard.tsx`:**
+- If non-owner & no payout account on artist: disable Buy with tooltip "Artist hasn't enabled payouts yet" instead of dead-end checkout.
+- Add Subscribe CTA when artist has any `subscription` rule (currently only shown when `purchaseRule` is absent — should show alongside).
 
-**`Profile.tsx`** — mount `SavedMusicSection` below `MusicProfileBlock`.
+**Inline owner UX for creating subscription rule:**
+- Add a one-click "Enable monthly subscription ($X/mo)" preset in `AccessRuleEditor` so owners don't have to navigate the raw form.
 
-### 4. New hook: `useMusicLibrary.ts`
-- `useMyPurchases()` — list of purchased tracks for current user
-- `useMySaves()` — saved/added-to-profile tracks
-- `useSavedTracksForProfile(userId)` — public query of saves marked `added_to_profile`
-- Mutations: `saveTrack`, `unsaveTrack`, `toggleAddToProfile`
+### D. Console + visible errors
+- Edge functions log structured `[MUSIC-PAYMENT]` lines for: missing payout, invalid rule, Stripe error, webhook signature failure.
+- Frontend prints `[MusicPurchase]` breadcrumbs and shows the server's error message in a toast that stays 6s.
 
-### 5. Preview audio component: `PreviewPlayer.tsx`
-- Encapsulates the seek-to-start, stop-at-15s logic
-- `controlsList="nodownload"`, `onContextMenu={prevent}`
-- Visual progress bar showing only the 15s window
+---
 
-### 6. Download enforcement
-- Download button only renders if: `allow_downloads === true` AND user has purchase record
-- Triggers `fetch(audio_url) → blob → download` (forces save instead of inline playback)
+## Stripe model used (and why)
 
-### 7. Files
+**Stripe Connect Express + Destination charges via `transfer_data.destination`** with `application_fee_amount: 0` (one-time) and `application_fee_percent: 0` (subscription).
 
-**New**:
-- `supabase/migrations/<ts>_music_saves_and_track_settings.sql`
-- `src/hooks/useMusicLibrary.ts`
-- `src/components/music/PreviewPlayer.tsx`
-- `src/components/music/SavedMusicSection.tsx`
+- Platform creates the PaymentIntent and Subscription on the platform account.
+- Funds settle to the artist's connected account automatically.
+- Platform retains nothing (fee = 0).
+- Platform handles disputes/refunds centrally if ever needed.
+- Same pattern already used by `create-store-connect-account` — consistent.
 
-**Modified**:
-- `src/components/music/ExclusiveTrackCard.tsx` — full redesign
-- `src/components/music/ExclusiveMusicSection.tsx` — grid, new upload fields, remove visitor gate
-- `src/hooks/useExclusiveMusic.ts` — add new track fields to interface
-- `src/integrations/supabase/types.ts` — auto-regenerated
-- `src/pages/Profile.tsx` — mount `SavedMusicSection`
+This is the cleanest marketplace model when the platform wants central control of customer experience but zero revenue cut.
 
-### 8. Verification
-- After build: open `/profile` as visitor → confirm tracks render, preview plays for 15s and stops, Buy CTA visible
-- As owner: upload track with `allow_downloads=true`, set preview start, confirm settings persist
-- Simulate purchase row in DB → confirm Save/Add to Profile/Download all appear → confirm Add to Profile causes track to render in `SavedMusicSection` on owner's profile with original artist attribution
+---
+
+## Files
+
+**New:**
+- `supabase/migrations/<ts>_music_commerce_hardening.sql`
+- `supabase/functions/stripe-music-webhook/index.ts` (+ config block `verify_jwt = false`)
+- `supabase/functions/create-music-payout-account/index.ts`
+- `supabase/functions/check-music-payout-status/index.ts`
+- `src/hooks/useMusicPayouts.ts`
+
+**Modified:**
+- `supabase/functions/purchase-exclusive-track/index.ts` (column fix, defer insert, fee=0)
+- `supabase/functions/create-artist-subscription/index.ts` (column fix, defer insert, fee=0)
+- `src/hooks/useExclusiveMusic.ts` (subscription-aware access, paid filter)
+- `src/components/music/ExclusiveMusicSection.tsx` (payout banner, refresh on return, real errors, subscribe CTA)
+- `src/components/music/ExclusiveTrackCard.tsx` (subscribe button, payout-disabled state)
+- `src/components/music/AccessRuleEditor.tsx` (subscription preset)
+- `supabase/config.toml` (add `verify_jwt = false` for the webhook only)
+
+**Secrets needed:** `STRIPE_WEBHOOK_SECRET` (will request after you approve).
+
+---
+
+## Verification I'll perform after build
+1. As artist (owner): see amber banner → click Connect Payouts → complete Stripe Express onboarding → banner disappears.
+2. Sign in as a different user → open artist profile → click Buy → Stripe checkout opens → use test card `4242 4242 4242 4242` → return to profile → track shows Unlocked → Save/Add to Profile/Download appear.
+3. Same flow for Subscribe.
+4. Confirm 100% routing in Stripe Dashboard → PaymentIntent shows `transfer_data.destination = acct_xxx` and `application_fee_amount = 0`.
+5. Confirm DB: `exclusive_track_purchases.payment_status='paid'` only after webhook fires.
 
