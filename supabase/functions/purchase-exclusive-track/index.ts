@@ -8,6 +8,11 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const log = (step: string, details?: unknown) => {
+  const d = details ? ` - ${JSON.stringify(details)}` : "";
+  console.log(`[MUSIC-PAYMENT][purchase] ${step}${d}`);
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -24,8 +29,8 @@ serve(async (req) => {
   );
 
   try {
-    // Auth
-    const authHeader = req.headers.get("Authorization")!;
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) throw new Error("Not authenticated");
     const token = authHeader.replace("Bearer ", "");
     const { data: userData } = await supabaseClient.auth.getUser(token);
     const user = userData.user;
@@ -34,25 +39,38 @@ serve(async (req) => {
     const { track_id, access_rule_id, artist_user_id } = await req.json();
     if (!track_id || !artist_user_id) throw new Error("Missing required fields");
 
-    // Get artist's Stripe Connect account
-    const { data: artistProfile } = await supabaseAdmin
+    if (user.id === artist_user_id) {
+      throw new Error("You can't purchase your own track");
+    }
+
+    // Get artist's Stripe Connect account + payout status
+    const { data: artistProfile, error: profileErr } = await supabaseAdmin
       .from("profiles")
-      .select("connect_account_id")
+      .select("stripe_connect_account_id, payout_enabled, display_name")
       .eq("user_id", artist_user_id)
       .single();
 
-    if (!artistProfile?.connect_account_id) {
-      throw new Error("Artist has not set up payments yet");
+    if (profileErr) {
+      log("Profile lookup error", { profileErr });
+      throw new Error("Could not load artist profile");
+    }
+
+    if (!artistProfile?.stripe_connect_account_id || !artistProfile?.payout_enabled) {
+      log("Artist payout not ready", {
+        hasAccount: !!artistProfile?.stripe_connect_account_id,
+        payoutEnabled: artistProfile?.payout_enabled,
+      });
+      throw new Error("This artist has not enabled payouts yet.");
     }
 
     // Get track and rule info
-    const { data: track } = await supabaseAdmin
+    const { data: track, error: trackErr } = await supabaseAdmin
       .from("exclusive_tracks")
       .select("*")
       .eq("id", track_id)
       .single();
 
-    if (!track) throw new Error("Track not found");
+    if (trackErr || !track) throw new Error("Track not found");
 
     let amountCents = track.price_cents || 0;
     if (access_rule_id) {
@@ -70,22 +88,25 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    // Check for existing customer
+    // Find/create Stripe customer
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     let customerId: string | undefined;
     if (customers.data.length > 0) customerId = customers.data[0].id;
 
-    // 100% to artist via transfer_data
+    const origin = req.headers.get("origin") || "";
+
+    // Destination charge: 100% to artist, 0% platform fee
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
+      client_reference_id: user.id,
       line_items: [
         {
           price_data: {
             currency: "usd",
             product_data: {
               name: track.title,
-              description: `Exclusive track by artist`,
+              description: `Exclusive track by ${artistProfile.display_name || "artist"}`,
             },
             unit_amount: amountCents,
           },
@@ -94,28 +115,36 @@ serve(async (req) => {
       ],
       mode: "payment",
       payment_intent_data: {
+        application_fee_amount: 0,
         transfer_data: {
-          destination: artistProfile.connect_account_id,
+          destination: artistProfile.stripe_connect_account_id,
         },
       },
       metadata: {
+        type: "exclusive_track_purchase",
         track_id,
         buyer_user_id: user.id,
+        artist_user_id,
         access_rule_id: access_rule_id || "",
-        type: "exclusive_track_purchase",
       },
-      success_url: `${req.headers.get("origin")}/profile/${artist_user_id}?purchase=success`,
-      cancel_url: `${req.headers.get("origin")}/profile/${artist_user_id}`,
+      success_url: `${origin}/profile/${artist_user_id}?purchase=success`,
+      cancel_url: `${origin}/profile/${artist_user_id}?purchase=canceled`,
     });
 
-    // Record purchase (pending — ideally verify via webhook but for MVP record on checkout creation)
-    await supabaseAdmin.from("exclusive_track_purchases").insert({
-      track_id,
-      buyer_user_id: user.id,
-      access_rule_id: access_rule_id || null,
-      stripe_payment_intent_id: session.payment_intent as string,
-      amount_cents: amountCents,
-    });
+    log("Checkout session created", { sessionId: session.id, amountCents });
+
+    // Insert pending purchase row keyed on stripe_session_id (idempotent via unique index)
+    const { error: insertErr } = await supabaseAdmin
+      .from("exclusive_track_purchases")
+      .insert({
+        track_id,
+        buyer_user_id: user.id,
+        access_rule_id: access_rule_id || null,
+        amount_cents: amountCents,
+        stripe_session_id: session.id,
+        payment_status: "pending",
+      });
+    if (insertErr) log("Pending insert warning", { insertErr });
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -123,9 +152,10 @@ serve(async (req) => {
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error";
+    log("ERROR", { msg });
     return new Response(JSON.stringify({ error: msg }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: 400,
     });
   }
 });

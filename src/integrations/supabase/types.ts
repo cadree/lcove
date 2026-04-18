@@ -189,10 +189,13 @@ export type Database = {
         Row: {
           amount_cents: number
           artist_user_id: string
+          cancel_at_period_end: boolean | null
           created_at: string
+          current_period_end: string | null
           id: string
           interval: string
           status: string
+          stripe_customer_id: string | null
           stripe_subscription_id: string | null
           subscriber_user_id: string
           updated_at: string
@@ -200,10 +203,13 @@ export type Database = {
         Insert: {
           amount_cents?: number
           artist_user_id: string
+          cancel_at_period_end?: boolean | null
           created_at?: string
+          current_period_end?: string | null
           id?: string
           interval?: string
           status?: string
+          stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscriber_user_id: string
           updated_at?: string
@@ -211,10 +217,13 @@ export type Database = {
         Update: {
           amount_cents?: number
           artist_user_id?: string
+          cancel_at_period_end?: boolean | null
           created_at?: string
+          current_period_end?: string | null
           id?: string
           interval?: string
           status?: string
+          stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscriber_user_id?: string
           updated_at?: string
@@ -2427,7 +2436,9 @@ export type Database = {
           buyer_user_id: string
           created_at: string
           id: string
+          payment_status: string
           stripe_payment_intent_id: string | null
+          stripe_session_id: string | null
           track_id: string
         }
         Insert: {
@@ -2436,7 +2447,9 @@ export type Database = {
           buyer_user_id: string
           created_at?: string
           id?: string
+          payment_status?: string
           stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
           track_id: string
         }
         Update: {
@@ -2445,7 +2458,9 @@ export type Database = {
           buyer_user_id?: string
           created_at?: string
           id?: string
+          payment_status?: string
           stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
           track_id?: string
         }
         Relationships: [

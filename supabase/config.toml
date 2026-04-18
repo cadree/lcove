@@ -107,3 +107,18 @@ verify_jwt = false
 
 [functions.share-page]
 verify_jwt = false
+
+[functions.stripe-music-webhook]
+verify_jwt = false
+
+[functions.purchase-exclusive-track]
+verify_jwt = true
+
+[functions.create-artist-subscription]
+verify_jwt = true
+
+[functions.create-music-payout-account]
+verify_jwt = true
+
+[functions.check-music-payout-status]
+verify_jwt = true
