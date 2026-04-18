@@ -178,21 +178,36 @@ export const ExclusiveTrackCard = ({
           )}
 
           {isOwner && (
-            <div className="flex gap-1 ml-auto">
+            <div className="flex w-full gap-1.5">
               <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
+                variant={track.is_published ? "secondary" : "default"}
+                size="sm"
+                className="text-xs h-8 flex-1"
                 onClick={onTogglePublish}
-                title={track.is_published ? "Unpublish" : "Publish"}
+                title={
+                  track.is_published
+                    ? "Hide this track from your public profile"
+                    : "Make this track visible on your public profile"
+                }
               >
-                {track.is_published ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                {track.is_published ? (
+                  <>
+                    <EyeOff className="w-3.5 h-3.5 mr-1" />
+                    Unpublish
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3.5 h-3.5 mr-1" />
+                    Publish
+                  </>
+                )}
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 text-destructive"
                 onClick={onDelete}
+                title="Delete track"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </Button>
