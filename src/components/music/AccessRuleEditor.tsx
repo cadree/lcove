@@ -175,32 +175,39 @@ export const AccessRuleEditor = ({
           </div>
 
           {(newType === "purchase" || newType === "subscription" || newType === "tip_goal") && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label className="text-xs">Price ($)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={newAmount}
-                  onChange={(e) => setNewAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="h-9"
-                />
-              </div>
-              {newType === "subscription" && (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label className="text-xs">Billing</Label>
-                  <Select value={newInterval} onValueChange={setNewInterval}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="yearly">Yearly</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-xs">Price ($)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={newAmount}
+                    onChange={(e) => setNewAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="h-9"
+                  />
                 </div>
+                {newType === "subscription" && (
+                  <div className="space-y-2">
+                    <Label className="text-xs">Billing</Label>
+                    <Select value={newInterval} onValueChange={setNewInterval}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="yearly">Yearly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              {newType === "purchase" && (parseFloat(newAmount || "0") <= 0) && (
+                <p className="text-[11px] text-amber-500">
+                  ⚠️ Set a price above $0 — or skip this rule and rely on the Fan Challenge to unlock for free.
+                </p>
               )}
             </div>
           )}
