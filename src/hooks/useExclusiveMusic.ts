@@ -16,6 +16,10 @@ export interface ExclusiveTrack {
   price_cents: number;
   description?: string | null;
   is_published: boolean;
+  allow_downloads?: boolean;
+  visible_on_profile?: boolean;
+  preview_start_seconds?: number;
+  preview_duration_seconds?: number;
   created_at: string;
   updated_at: string;
 }

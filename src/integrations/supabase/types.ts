@@ -2468,6 +2468,7 @@ export type Database = {
       exclusive_tracks: {
         Row: {
           access_type: string
+          allow_downloads: boolean
           artist_user_id: string
           audio_file_url: string | null
           cover_image_url: string | null
@@ -2477,12 +2478,16 @@ export type Database = {
           id: string
           is_published: boolean
           preview_clip_url: string | null
+          preview_duration_seconds: number
+          preview_start_seconds: number
           price_cents: number | null
           title: string
           updated_at: string
+          visible_on_profile: boolean
         }
         Insert: {
           access_type?: string
+          allow_downloads?: boolean
           artist_user_id: string
           audio_file_url?: string | null
           cover_image_url?: string | null
@@ -2492,12 +2497,16 @@ export type Database = {
           id?: string
           is_published?: boolean
           preview_clip_url?: string | null
+          preview_duration_seconds?: number
+          preview_start_seconds?: number
           price_cents?: number | null
           title: string
           updated_at?: string
+          visible_on_profile?: boolean
         }
         Update: {
           access_type?: string
+          allow_downloads?: boolean
           artist_user_id?: string
           audio_file_url?: string | null
           cover_image_url?: string | null
@@ -2507,9 +2516,12 @@ export type Database = {
           id?: string
           is_published?: boolean
           preview_clip_url?: string | null
+          preview_duration_seconds?: number
+          preview_start_seconds?: number
           price_cents?: number | null
           title?: string
           updated_at?: string
+          visible_on_profile?: boolean
         }
         Relationships: [
           {
@@ -3369,6 +3381,41 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      music_saves: {
+        Row: {
+          added_to_profile: boolean
+          created_at: string
+          id: string
+          track_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          added_to_profile?: boolean
+          created_at?: string
+          id?: string
+          track_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          added_to_profile?: boolean
+          created_at?: string
+          id?: string
+          track_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "music_saves_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "exclusive_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       network_content: {
         Row: {

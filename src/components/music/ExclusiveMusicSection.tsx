@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -45,6 +46,8 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newPrice, setNewPrice] = useState("");
+  const [allowDownloads, setAllowDownloads] = useState(false);
+  const [previewStart, setPreviewStart] = useState("0");
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState("");
@@ -101,12 +104,17 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
         price_cents: Math.round(parseFloat(newPrice || "0") * 100),
         access_type: "purchase",
         is_published: true,
+        allow_downloads: allowDownloads,
+        preview_start_seconds: Math.max(0, parseInt(previewStart || "0", 10) || 0),
+        preview_duration_seconds: 15,
       });
 
       // Reset form
       setNewTitle("");
       setNewDescription("");
       setNewPrice("");
+      setAllowDownloads(false);
+      setPreviewStart("0");
       setAudioFile(null);
       setCoverFile(null);
       setCoverPreview("");
@@ -153,6 +161,7 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
     );
   }
 
+  // Always render — visitors should see exclusive offerings even when locked
   if (!isOwner && tracks.length === 0) return null;
 
   return (
@@ -165,10 +174,13 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Lock className="w-4 h-4 text-amber-400" />
+            <Lock className="w-4 h-4 text-amber-500" />
             <h3 className="font-display text-base font-medium text-foreground">
               Exclusive Music
             </h3>
+            {tracks.length > 0 && (
+              <span className="text-xs text-muted-foreground">({tracks.length})</span>
+            )}
           </div>
           {isOwner && (
             <div className="flex gap-1.5">
@@ -204,9 +216,9 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
           </div>
         )}
 
-        {/* Track List */}
+        {/* Track Grid */}
         {tracks.length > 0 ? (
-          <div className="space-y-2">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {tracks.map((track) => (
               <ExclusiveTrackCard
                 key={track.id}
@@ -326,6 +338,31 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
                 onChange={(e) => setNewPrice(e.target.value)}
                 placeholder="0.00 (free preview, paid full access)"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Preview start (seconds)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                value={previewStart}
+                onChange={(e) => setPreviewStart(e.target.value)}
+                placeholder="0"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Locked listeners hear a 15-second preview starting from this point.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border border-border/40 px-3 py-2">
+              <div>
+                <Label className="text-sm">Allow downloads</Label>
+                <p className="text-[11px] text-muted-foreground">
+                  Buyers can download the original audio file.
+                </p>
+              </div>
+              <Switch checked={allowDownloads} onCheckedChange={setAllowDownloads} />
             </div>
           </div>
 
