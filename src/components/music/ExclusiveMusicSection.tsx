@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Music, Plus, Upload, Loader2, Lock } from "lucide-react";
+import { Music, Plus, Upload, Loader2, Lock, AlertTriangle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,8 +20,14 @@ import {
   type ExclusiveTrack,
   type ExclusiveAccessRule,
 } from "@/hooks/useExclusiveMusic";
+import {
+  useArtistPayoutStatus,
+  useCreateMusicPayoutAccount,
+  useRefreshMusicPayoutStatus,
+} from "@/hooks/useMusicPayouts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 interface ExclusiveMusicSectionProps {
@@ -30,6 +36,7 @@ interface ExclusiveMusicSectionProps {
 
 export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const {
     tracks,
     isLoading,
@@ -40,6 +47,9 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
     isOwner,
   } = useExclusiveTracks(userId);
   const { rules, createRule, updateRule, deleteRule } = useAccessRules(userId);
+  const { data: payoutStatus } = useArtistPayoutStatus(userId);
+  const createPayoutAccount = useCreateMusicPayoutAccount();
+  const refreshPayoutStatus = useRefreshMusicPayoutStatus();
 
   const [showUpload, setShowUpload] = useState(false);
   const [showRules, setShowRules] = useState(false);
@@ -54,6 +64,46 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
   const [isUploading, setIsUploading] = useState(false);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+
+  // Refresh queries after returning from Stripe
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const purchase = params.get("purchase");
+    const subscribed = params.get("subscribed");
+    const musicPayouts = params.get("music_payouts");
+
+    if (purchase === "success") {
+      toast.success("Payment successful! Unlocking your track...");
+      queryClient.invalidateQueries({ queryKey: ["exclusive-purchases"] });
+      queryClient.invalidateQueries({ queryKey: ["artist-subscriptions"] });
+      // Clean URL
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (subscribed === "true") {
+      toast.success("Subscription active! You now have access.");
+      queryClient.invalidateQueries({ queryKey: ["artist-subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["exclusive-purchases"] });
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (musicPayouts === "success" && isOwner) {
+      toast.success("Payouts connected!");
+      refreshPayoutStatus.mutate();
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryClient, isOwner]);
+
+  // On mount, refresh live payout status if owner has account but flag isn't set
+  useEffect(() => {
+    if (isOwner && payoutStatus?.has_account && !payoutStatus.payout_enabled) {
+      refreshPayoutStatus.mutate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOwner, payoutStatus?.has_account]);
+
+  const hasMonetizedContent =
+    tracks.some((t) => (t.price_cents || 0) > 0) ||
+    rules.some((r) => r.amount_cents > 0 && r.is_active);
+
+  const showPayoutWarning = isOwner && hasMonetizedContent && !payoutStatus?.payout_enabled;
 
   const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -74,7 +124,6 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
 
     setIsUploading(true);
     try {
-      // Upload audio
       const audioExt = audioFile.name.split(".").pop() || "mp3";
       const audioPath = `${user.id}/exclusive-${Date.now()}.${audioExt}`;
       const { error: audioErr } = await supabase.storage
@@ -83,7 +132,6 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
       if (audioErr) throw audioErr;
       const { data: audioUrl } = supabase.storage.from("media").getPublicUrl(audioPath);
 
-      // Upload cover if provided
       let coverUrl: string | undefined;
       if (coverFile) {
         const coverExt = coverFile.name.split(".").pop() || "jpg";
@@ -109,7 +157,6 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
         preview_duration_seconds: 15,
       });
 
-      // Reset form
       setNewTitle("");
       setNewDescription("");
       setNewPrice("");
@@ -132,20 +179,36 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
       toast.error("Sign in to purchase music");
       return;
     }
+    console.log("[MusicPurchase] starting", { trackId: track.id, ruleType: rule.rule_type });
+
+    const fnName =
+      rule.rule_type === "subscription" ? "create-artist-subscription" : "purchase-exclusive-track";
+    const body =
+      rule.rule_type === "subscription"
+        ? { artist_user_id: track.artist_user_id, access_rule_id: rule.id }
+        : { track_id: track.id, access_rule_id: rule.id, artist_user_id: track.artist_user_id };
+
     try {
-      const { data, error } = await supabase.functions.invoke("purchase-exclusive-track", {
-        body: {
-          track_id: track.id,
-          access_rule_id: rule.id,
-          artist_user_id: track.artist_user_id,
-        },
-      });
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke(fnName, { body });
+      if (error) {
+        // Edge function returns error body even on non-2xx
+        const serverMsg = (error as any)?.context?.body?.error || (data as any)?.error || error.message;
+        console.error("[MusicPurchase] error", serverMsg);
+        toast.error(serverMsg || "Failed to start checkout", { duration: 6000 });
+        return;
+      }
+      if ((data as any)?.error) {
+        toast.error((data as any).error, { duration: 6000 });
+        return;
+      }
       if (data?.url) {
         window.open(data.url, "_blank");
+      } else {
+        toast.error("No checkout URL returned");
       }
-    } catch {
-      toast.error("Failed to start purchase");
+    } catch (err: any) {
+      console.error("[MusicPurchase] exception", err);
+      toast.error(err?.message || "Failed to start checkout", { duration: 6000 });
     }
   };
 
@@ -161,7 +224,6 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
     );
   }
 
-  // Always render — visitors should see exclusive offerings even when locked
   if (!isOwner && tracks.length === 0) return null;
 
   return (
@@ -204,6 +266,35 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
           )}
         </div>
 
+        {/* Payout warning banner — owner only */}
+        {showPayoutWarning && (
+          <div className="mb-4 p-4 rounded-lg border border-amber-500/40 bg-amber-500/10 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground">
+                Connect payouts to start selling
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Buyers can't purchase your tracks until you connect a payout account.
+                100% of every sale goes directly to you.
+              </p>
+              <Button
+                size="sm"
+                className="mt-3 h-8 text-xs"
+                disabled={createPayoutAccount.isPending}
+                onClick={() => createPayoutAccount.mutate()}
+              >
+                {createPayoutAccount.isPending ? (
+                  <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                ) : (
+                  <ExternalLink className="w-3 h-3 mr-1.5" />
+                )}
+                {payoutStatus?.has_account ? "Finish payout setup" : "Connect payouts"}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Access Rules Editor (owner only) */}
         {isOwner && showRules && (
           <div className="mb-4 p-4 rounded-lg bg-muted/10 border border-border/20">
@@ -226,6 +317,7 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
                 hasAccess={hasAccess(track.id)}
                 isOwner={isOwner}
                 rules={rules}
+                payoutEnabled={!!payoutStatus?.payout_enabled}
                 onDelete={() => deleteTrack.mutate(track.id)}
                 onTogglePublish={() =>
                   updateTrack.mutate({
