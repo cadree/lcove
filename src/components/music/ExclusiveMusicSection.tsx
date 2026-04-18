@@ -54,6 +54,10 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
   const { data: payoutStatus } = useArtistPayoutStatus(userId);
   const createPayoutAccount = useCreateMusicPayoutAccount();
   const refreshPayoutStatus = useRefreshMusicPayoutStatus();
+  const { data: challengeCompletions = [] } = useArtistChallengeCompletions(
+    isOwner ? userId : undefined
+  );
+  const revokeCompletion = useRevokeChallengeCompletion();
 
   const [showUpload, setShowUpload] = useState(false);
   const [showRules, setShowRules] = useState(false);
