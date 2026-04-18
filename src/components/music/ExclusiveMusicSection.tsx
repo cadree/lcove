@@ -103,12 +103,17 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
         price_cents: Math.round(parseFloat(newPrice || "0") * 100),
         access_type: "purchase",
         is_published: true,
+        allow_downloads: allowDownloads,
+        preview_start_seconds: Math.max(0, parseInt(previewStart || "0", 10) || 0),
+        preview_duration_seconds: 15,
       });
 
       // Reset form
       setNewTitle("");
       setNewDescription("");
       setNewPrice("");
+      setAllowDownloads(false);
+      setPreviewStart("0");
       setAudioFile(null);
       setCoverFile(null);
       setCoverPreview("");
@@ -155,6 +160,7 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
     );
   }
 
+  // Always render — visitors should see exclusive offerings even when locked
   if (!isOwner && tracks.length === 0) return null;
 
   return (
@@ -167,10 +173,13 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Lock className="w-4 h-4 text-amber-400" />
+            <Lock className="w-4 h-4 text-amber-500" />
             <h3 className="font-display text-base font-medium text-foreground">
               Exclusive Music
             </h3>
+            {tracks.length > 0 && (
+              <span className="text-xs text-muted-foreground">({tracks.length})</span>
+            )}
           </div>
           {isOwner && (
             <div className="flex gap-1.5">
@@ -206,9 +215,9 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
           </div>
         )}
 
-        {/* Track List */}
+        {/* Track Grid */}
         {tracks.length > 0 ? (
-          <div className="space-y-2">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {tracks.map((track) => (
               <ExclusiveTrackCard
                 key={track.id}
