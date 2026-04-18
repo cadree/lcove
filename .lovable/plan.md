@@ -1,119 +1,52 @@
 
 
-# Restructured Music Profile + Exclusive Music Monetization
+## Audit Findings — Why the UI Doesn't Auto-Fill
 
-## Overview
+### What's actually broken
 
-Simplify the Connect Music Dialog to four core fields (Artist Name, Artist Image, Spotify URL, Apple Music URL), and add a new **Exclusive Music** system where artists can upload tracks, set access rules (one-time purchase, page subscription, or custom fan challenges), and receive 100% of revenue through their Stripe Connect account.
+I tested the edge function directly with the user's exact Apple Music URL. **It works** — returns `artist_name: "Lil Keed"` and a valid image URL. So the extraction itself is fine. The bug is **100% client-side**.
 
----
+**Root cause (Bug 1):** In `fetchArtistData`, every assignment is gated:
+```ts
+if (data.artist_name && !displayName) setDisplayName(data.artist_name);
+if (data.image_url && !artistImage) setArtistImage(data.image_url);
+```
+The user's saved `music_profile` row already has `display_name` set to the URL itself (`"https://music.apple.com/us/album/..."`). When the dialog opens, `useEffect` populates `displayName` with that string → the guard `!displayName` is `false` → **name never updates**. Same trap blocks image, genres, tracks, albums. The toast "Artist info extracted!" still fires, so it looks like nothing happened.
 
-## Part 1: Simplified Connect Music Dialog
+**Bug 2 — Stale closure:** `useCallback` dependencies make every paste capture old state. Combined with the truthy guards, this silently swallows updates.
 
-**Current state**: 4-tab dialog (Links, Tracks, Albums, Latest) with genres, manual track/album entry, and URL fields.
+**Bug 3 — Apple Music album pages return empty tracks/genres:** Apple's HTML for `/album/` URLs doesn't expose track listings in scrapeable meta tags. Edge function returns `top_tracks: []`. Need a client-side fallback: at minimum, save the album itself (we know its name from the URL slug + we have its cover art).
 
-**New structure**: Single clean form with:
-- Artist / Band Name (required)
-- Artist Image (upload from gallery or auto-pulled from URL)
-- Spotify Artist URL (auto-fetches name + image if empty)
-- Apple Music Artist URL (same auto-fetch)
-
-Remove: Genres section, Tracks tab, Albums tab, Latest Release tab from the Connect dialog. The public profile block (`MusicProfileBlock`) will still show platform links and the artist image but no longer manually-entered tracks/albums/genres.
-
----
-
-## Part 2: Exclusive Music Upload & Monetization
-
-### New DB Table: `exclusive_tracks`
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID PK | |
-| artist_user_id | UUID FK profiles | Owner |
-| title | TEXT | Track name |
-| cover_image_url | TEXT | Cover art |
-| audio_file_url | TEXT | Stored in `media` bucket |
-| preview_clip_url | TEXT | Optional 30s preview (free) |
-| duration_seconds | INT | |
-| access_type | TEXT | 'purchase', 'subscription', 'custom' |
-| price_cents | INT | One-time price (if purchase) |
-| description | TEXT | Artist notes |
-| is_published | BOOL | |
-| created_at, updated_at | TIMESTAMPTZ | |
-
-### New DB Table: `exclusive_access_rules`
-Customizable unlock conditions per track or globally for the artist.
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID PK | |
-| artist_user_id | UUID FK | |
-| track_id | UUID FK nullable | NULL = applies to all tracks |
-| rule_type | TEXT | 'subscription', 'purchase', 'challenge', 'tip_goal', 'share_unlock' |
-| label | TEXT | Custom label (e.g. "Share on 3 platforms to unlock") |
-| description | TEXT | Fun description by artist |
-| amount_cents | INT | For purchase/subscription/tip rules |
-| interval | TEXT | 'monthly'/'yearly' for subscriptions |
-| metadata | JSONB | Flexible config (share count, challenge details) |
-| sort_order | INT | Display order |
-| is_active | BOOL | |
-
-### New DB Table: `exclusive_track_purchases`
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID PK | |
-| track_id | UUID FK | |
-| buyer_user_id | UUID FK | |
-| access_rule_id | UUID FK | Which rule granted access |
-| stripe_payment_intent_id | TEXT | |
-| amount_cents | INT | |
-| created_at | TIMESTAMPTZ | |
-
-### New DB Table: `artist_subscriptions`
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID PK | |
-| artist_user_id | UUID FK | |
-| subscriber_user_id | UUID FK | |
-| stripe_subscription_id | TEXT | |
-| status | TEXT | active/canceled/past_due |
-| amount_cents | INT | |
-| interval | TEXT | monthly/yearly |
-| created_at, updated_at | TIMESTAMPTZ | |
-
-### Payment Flow
-- Uses existing Stripe Connect infrastructure (artists already have `create-connect-account` / `check-connect-status`)
-- New edge function: `purchase-exclusive-track` — creates a Stripe PaymentIntent with `transfer_data.destination` set to the artist's Connect account (100% to artist, 0% platform fee per revenue split memory)
-- New edge function: `create-artist-subscription` — creates a Stripe subscription checkout with the artist as the connected account destination
-
-### UI Components
-
-**For Artists (owner view):**
-- New "Exclusive Music" section in profile with upload dialog
-- Upload tracks (audio file + cover art + title)
-- Set access rules per track: one-time price, subscription, or custom challenges
-- Custom challenges section: artist writes fun unlock conditions (share goals, tip jars, fan milestones)
-- Highly customizable — artist can add/remove/reorder rules, write playful descriptions, set emoji icons
-
-**For Fans (visitor view):**
-- Locked track cards with cover art and 30s preview button
-- Clear unlock options displayed per track
-- Purchase button → Stripe checkout → instant access
-- Subscribe button → monthly subscription → access all exclusive tracks
-- Custom challenge progress indicators
+**Bug 4 — No error visibility:** Failures are swallowed. No console logs, no inline error.
 
 ---
 
-## Files to Create
-- DB migration for `exclusive_tracks`, `exclusive_access_rules`, `exclusive_track_purchases`, `artist_subscriptions` tables with RLS
-- `src/components/music/ExclusiveMusicSection.tsx` — artist upload + management UI
-- `src/components/music/ExclusiveTrackCard.tsx` — fan-facing locked/unlocked track card
-- `src/components/music/AccessRuleEditor.tsx` — customizable rule builder for artists
-- `src/hooks/useExclusiveMusic.ts` — CRUD for exclusive tracks and access rules
-- `supabase/functions/purchase-exclusive-track/index.ts` — Stripe payment for track purchase
-- `supabase/functions/create-artist-subscription/index.ts` — Stripe subscription for artist page
+## Fix Plan
 
-## Files to Modify
-- `src/components/music/ConnectMusicDialog.tsx` — Strip down to 4 fields only
-- `src/components/music/MusicProfileBlock.tsx` — Remove tracks/albums/genres display, add Exclusive Music section
-- `src/hooks/useMusicProfile.ts` — Simplify interface (remove tracks/albums/genres/latest_release)
-- `src/components/profile/CreatorModuleTabs.tsx` or Profile page — Add Exclusive Music tab/section
+### 1. `src/components/music/ConnectMusicDialog.tsx`
+- **Remove the truthy guards** in `fetchArtistData`. Always overwrite when extraction returns data, UNLESS the current value was manually typed by the user. Track this with a `userEditedFields` ref.
+- **Detect "URL-as-name" corruption**: if `displayName` starts with `http`, treat it as empty and overwrite.
+- **Drop `useCallback` deps** — use a ref-based extractor so paste always uses fresh state and never goes stale.
+- **Add debounce (400ms)** so typing/pasting fires extraction once URL stabilizes (instead of on every keystroke).
+- **Add console.log breadcrumbs**: detected URL, request payload, raw response, what got applied.
+- **Inline error UI**: show a red helper text under the link row when extraction fails or returns nothing useful.
+- **Apple Music album fallback**: if URL contains `/album/<slug>/`, parse the slug → push to `albums` with cover art from `image_url` even when edge function returns `albums: []`.
+- **Spotify track/album fallback**: same treatment for `/album/` and `/track/` URLs.
+
+### 2. `src/hooks/useMusicProfile.ts` (one-line fix)
+- Stop saving the URL into `display_name`. Currently the legacy save path can write the raw URL when artist name extraction fails. Add a guard: if `display_name` looks like a URL, save `null` instead and let the user fill it.
+
+### 3. One-time data heal
+- On dialog mount, if the existing `display_name` is a URL, clear it locally so extraction can repopulate it with the real artist name.
+
+### 4. Test in preview
+- Open dialog on `/profile`, paste the same Apple Music URL, confirm: Artist Name → "Lil Keed", image populates, album appears in the Albums strip, console shows the trace.
+
+---
+
+## Files Modified
+- `src/components/music/ConnectMusicDialog.tsx` — extraction logic, fallbacks, error UI, debug logs
+- `src/hooks/useMusicProfile.ts` — guard against URL-as-name persistence
+
+No DB migration. No edge function changes (it already works).
 
