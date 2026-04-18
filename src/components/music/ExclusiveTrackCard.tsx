@@ -121,20 +121,25 @@ export const ExclusiveTrackCard = ({
               size="sm"
               variant="default"
               className="text-xs h-8 flex-1"
+              disabled={!payoutEnabled}
+              title={!payoutEnabled ? "Artist hasn't enabled payouts yet" : undefined}
               onClick={() => onPurchase?.(track, purchaseRule)}
             >
               <DollarSign className="w-3 h-3 mr-1" />
               Buy {price > 0 ? `$${(price / 100).toFixed(2)}` : ""}
             </Button>
           )}
-          {!fullAccess && !isOwner && !purchaseRule && subscriptionRule && (
+          {!fullAccess && !isOwner && subscriptionRule && (
             <Button
               size="sm"
-              variant="default"
+              variant={purchaseRule ? "outline" : "default"}
               className="text-xs h-8 flex-1"
+              disabled={!payoutEnabled}
+              title={!payoutEnabled ? "Artist hasn't enabled payouts yet" : undefined}
               onClick={() => onPurchase?.(track, subscriptionRule)}
             >
-              Subscribe
+              Subscribe ${(subscriptionRule.amount_cents / 100).toFixed(2)}
+              {subscriptionRule.interval === "yearly" ? "/yr" : "/mo"}
             </Button>
           )}
 
