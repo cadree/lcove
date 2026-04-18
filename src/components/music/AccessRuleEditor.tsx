@@ -43,26 +43,32 @@ export const AccessRuleEditor = ({
   const [newDescription, setNewDescription] = useState("");
   const [newAmount, setNewAmount] = useState("");
   const [newInterval, setNewInterval] = useState("monthly");
+  const [newPlatform, setNewPlatform] = useState("instagram");
+  const [newRequiresProof, setNewRequiresProof] = useState(false);
 
   const filteredRules = rules.filter((r) =>
     trackId ? r.track_id === trackId || r.track_id === null : true
   );
 
   const handleAdd = () => {
+    const isChallenge = newType === "challenge";
     onCreateRule({
       track_id: trackId,
       rule_type: newType,
       label: newLabel || RULE_TYPE_CONFIG[newType as keyof typeof RULE_TYPE_CONFIG]?.label || newType,
       description: newDescription || undefined,
-      amount_cents: Math.round(parseFloat(newAmount || "0") * 100),
+      amount_cents: isChallenge ? 0 : Math.round(parseFloat(newAmount || "0") * 100),
       interval: newType === "subscription" ? newInterval : undefined,
-      metadata: {},
+      metadata: isChallenge
+        ? { platform: newPlatform, instructions: newDescription, requires_proof: newRequiresProof }
+        : {},
       sort_order: filteredRules.length,
     });
     setShowAdd(false);
     setNewLabel("");
     setNewDescription("");
     setNewAmount("");
+    setNewRequiresProof(false);
   };
 
   return (
