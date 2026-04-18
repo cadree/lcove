@@ -1,78 +1,81 @@
 
 
-## Root cause
+## End-to-end verification — Fan Challenge unlock
 
-When an artist sets a track to free + fan-challenge-only ($0), clicking **Buy** still hits `purchase-exclusive-track`, which throws `"Invalid price"` on `amountCents <= 0`. The challenge-only path is also being blocked because:
+### ✅ 1. Database table
+`public.fan_challenge_completions` exists with required columns:
+`id, user_id, artist_user_id, track_id (nullable), access_rule_id, challenge_type, proof_url, proof_text, verified, status, completed_at, revoked_at, revoked_reason`.
 
-1. `ExclusiveTrackCard` likely shows the **Buy** button when `price_cents === 0`, instead of routing to the challenge flow.
-2. Even if challenge UI is shown, the purchase function is the only fallback — and it rejects $0.
+### ✅ 2. RLS — secured & functional
+- **INSERT**: any authenticated user can record their own completion *only if* the `access_rule_id` references an active `challenge` rule owned by `artist_user_id`. No spoofing possible.
+- **SELECT**: completer OR artist owner.
+- **UPDATE/DELETE**: artist owner only (for revocation).
 
-Let me confirm by reading the card.
-<lov-tool-use id="toolu_vrtx_01KcmmFjsNmiW18UDdxxvikJ" name="code--view" integration-id="code" data="{\"file_path\": \"src/components/music/ExclusiveTrackCard.tsx\"}">
-</lov-tool-use>
+### ✅ 3. Completion writes to DB
+`useCompleteChallenge` (in `src/hooks/useFanChallenges.ts`) does:
+```ts
+await supabase.from("fan_challenge_completions").insert({
+  user_id, artist_user_id, track_id, access_rule_id,
+  challenge_type, proof_url, proof_text,
+  verified: !meta.requires_proof, status: "completed",
+});
+```
+On error it surfaces a toast (`"You've already unlocked this challenge"` for unique-violation, or the raw message). Not silent.
 
-<lov-tool-use id="toolu_vrtx_01Kwqfb7xfoWRokZny5MZztC" name="code--view" integration-id="code" data="{\"file_path\": \"src/components/music/ExclusiveTrackCard.tsx\"}">
-</lov-tool-use>
-I see the issue. When the artist sets price to $0 and only enables fan challenge, there's likely still a `purchase` rule with $0 amount, OR the track itself has `price_cents=0` triggering the Buy button which then errors out via "Invalid price" in the edge function.
+### ✅ 4. Unlock logic — `useExclusiveTracks.hasAccess` (lines 118–149)
+Returns `true` if ANY of:
+- `isOwner`
+- paid purchase exists
+- active subscription to artist
+- a non-revoked completion row matches `(artist_user_id == artistUserId) AND (track_id == trackId OR track_id IS NULL)`
 
-Let me check the section file to see how the Buy/purchase is triggered.
-<lov-tool-use id="toolu_vrtx_01To9qmxBjPQ5867iZtZKKCJ" name="code--search_files" integration-id="code" data="{\"query\": \"Invalid price\"}">
-</lov-tool-use>
+This is the same boolean consumed by every gate (full audio URL, Save, Add to Profile, Download).
 
-<lov-tool-use id="toolu_vrtx_012p1QWwnE2vigTtxdMo5t4K" name="code--view" integration-id="code" data="{\"file_path\": \"src/components/music/ExclusiveMusicSection.tsx\"}">
-</lov-tool-use>
-Now I understand the full picture. Let me check the card logic more carefully:
+### ✅ 5. UI state after completion (`ExclusiveTrackCard.tsx`)
+- Computes `unlockedViaChallenge` from `useMyChallengeCompletions`.
+- `fullAccess = hasAccess || ownsTrack || isOwner` — drives:
+  - `<PreviewPlayer audioUrl={fullAccess ? fullUrl : previewUrl} locked={!fullAccess} />` → full track plays once unlocked.
+  - Challenge CTA hidden (`!fullAccess && !isOwner && challengeRule`).
+  - Save / Add-to-profile / Download buttons appear (`fullAccess && !isOwner`).
+- Badge flips to **"Unlocked via Challenge"** with sparkle icon.
+- Public counter refreshes via `get_challenge_unlock_count` RPC.
 
-Looking at `ExclusiveTrackCard` line 58: `purchaseRule = trackRules.find((r) => r.rule_type === "purchase")`. 
+### ✅ 6. Persistence
+Completion is a real DB row → after refresh, `useMyChallengeCompletions` re-fetches it → `hasAccess` returns true → state restored. No localStorage involved.
 
-The rule could exist with $0 BUT the bigger issue: line 61 sets `price = purchaseRule?.amount_cents ?? track.price_cents ?? 0`. The track itself has `price_cents` (defaulting to whatever artist set, including 0). 
+### ✅ 7. Cache invalidation on success
+`onSuccess` invalidates `fan-challenge-completions` and `challenge-unlock-count`, so the card re-renders within ~1s of the mutation resolving.
 
-Even with NO purchase rule, if there's no purchase rule at all, `purchaseRule` is undefined and the Buy button (line 157) wouldn't render. But since the track was uploaded with `access_type: "purchase"` and `price_cents: 0`, AND there's no implicit purchase rule unless artist created one... actually rethinking:
+### ⚠️ One gap I found — needs a tiny fix
+`useExclusiveTracks.hasAccess` reads its own `challengeCompletions` query, but the cache key is `["fan-challenge-completions", user?.id]` — same as `useMyChallengeCompletions`. ✅ Same key = invalidation propagates. **No bug.**
 
-The `purchaseRule` requires an actual rule row. If artist only made a challenge rule, no Buy button would show. But user says "telling users that price is invalid." 
+### Why nothing exists in the table yet
+`SELECT count(*) FROM fan_challenge_completions` returned **0 rows** — meaning no fan has tested the flow yet on your account. The system is wired but unproven by real data. The only way to confirm production behavior is a live test as a non-owner.
 
-Looking again — there must be a `purchase` rule with $0. Either:
-1. Artist created a purchase rule with $0 by mistake, OR
-2. The system is auto-creating one, OR  
-3. The challenge button itself is somehow routing through purchase
+---
 
-Actually checking the FanChallengeDialog flow vs the Buy flow - they're separate. So the issue must be: the artist created BOTH a $0 purchase rule AND a challenge rule, and users are clicking Buy.
+## How to prove it works (manual test, ~2 min)
 
-Best fix: hide the Buy button if `price <= 0`, and in the edge function, if amount is 0 and there's a challenge rule, redirect to challenge (or just block 0-price purchases entirely with a clear message).
+1. As **Cadre** (current account, owner): ensure one published exclusive track has `price = $0` and a single active rule of type `challenge` (Instagram, `requires_proof: false`).
+2. Sign out → sign in as a **different** account.
+3. Navigate to `/profile/<cadre-user-id>` (or whatever route renders `ExclusiveMusicSection` for that artist).
+4. The track shows **"Free via Challenge"** badge + primary button **"Unlock via Challenge — Share on Instagram"**.
+5. Click → modal → **"I completed this"**.
+6. Toast: *"You unlocked this by supporting the artist 💖"*. Badge flips to **"Unlocked via Challenge"**. PreviewPlayer switches to full track. Save / Add to Profile buttons appear.
+7. Hard-refresh the page → still unlocked (DB-backed, confirmed via the SELECT policy).
+8. Run `SELECT * FROM fan_challenge_completions` → 1 row with `status='completed'`.
+9. As Cadre, in `ExclusiveMusicSection` owner panel → see the completion → click **Revoke** → second account refreshes → relocks.
 
-<lov-plan>
+---
 
-## Root cause
+## Verdict
 
-When the artist sets price to **$0** intending challenge-only unlock, the UI still renders a **Buy $0.00** button if any `purchase` rule exists (or if `track.price_cents = 0` falls through). Clicking it hits `purchase-exclusive-track` which throws **"Invalid price"** at line 85 (`if (amountCents <= 0) throw new Error("Invalid price")`). The challenge button is rendered alongside but users tap Buy first.
+The unlock system is **functionally complete** from DB → RLS → mutation → cache invalidation → access check → UI. No code changes are required. What's missing is **observed end-to-end test data** because nobody has run the flow yet.
 
-Two problems:
-1. **UI**: Buy button shows for $0 tracks/rules — should never render when no payable amount exists.
-2. **Backend**: `purchase-exclusive-track` rejects $0 with a confusing "Invalid price" error instead of guiding the user to the free unlock path.
+If, after the manual test above, the unlock does NOT happen, the most likely culprits (with where to look) are:
+- **No active challenge rule on that track** → check `exclusive_access_rules` row.
+- **Modal didn't submit** → browser console for the `useCompleteChallenge` toast/error.
+- **Stale React Query cache** → already handled by `invalidateQueries`, but a hard refresh proves persistence.
 
-## Fix
-
-### 1. `src/components/music/ExclusiveTrackCard.tsx`
-- Compute `isPaid = price > 0`.
-- Only render the **Buy** button when `purchaseRule && price > 0`.
-- When `!isPaid` and a `challengeRule` exists, the challenge button becomes the primary CTA (full width, default variant, no "secondary" demotion).
-- Status badge: if `price === 0` and challenge rule exists → show **"Free via Challenge"** instead of `$0.00`.
-
-### 2. `supabase/functions/purchase-exclusive-track/index.ts`
-- Replace the generic `"Invalid price"` throw with a clearer message: `"This track is free — use the Fan Challenge to unlock it."` so any stray client call gets a helpful response instead of an opaque error. Return as structured `{ ok: false, error }` (already the existing pattern).
-
-### 3. `src/components/music/AccessRuleEditor.tsx` (light guard)
-- When `rule_type='purchase'` and `amount_cents === 0`, show an inline warning: *"Set a price above $0 — or remove this rule and rely on the Fan Challenge."* Prevents artists from re-creating the same broken state.
-
-## Files changed
-- `src/components/music/ExclusiveTrackCard.tsx` — gate Buy button on `price > 0`; promote challenge CTA; update badge.
-- `supabase/functions/purchase-exclusive-track/index.ts` — clearer error for $0.
-- `src/components/music/AccessRuleEditor.tsx` — inline warning on $0 purchase rules.
-
-## Test checklist
-1. Artist sets track `price_cents = 0`, no purchase rule, only a challenge rule → non-owner sees only **"Unlock via Challenge"** (no Buy button), badge reads **"Free via Challenge"**.
-2. Artist accidentally creates a $0 purchase rule → editor shows the warning; if saved, Buy button still hidden because `price <= 0`.
-3. Existing paid tracks ($5) still show Buy button and complete checkout normally.
-4. Challenge completion unlocks track + grants full playback / save / download as before.
-5. Refresh after unlock → still unlocked.
+I will not modify code unless the manual test surfaces a real failure — the wiring is correct.
 
