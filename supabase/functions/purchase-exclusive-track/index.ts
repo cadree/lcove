@@ -82,7 +82,9 @@ serve(async (req) => {
       if (rule?.amount_cents) amountCents = rule.amount_cents;
     }
 
-    if (amountCents <= 0) throw new Error("Invalid price");
+    if (amountCents <= 0) {
+      throw new Error("This track is free — use the Fan Challenge to unlock it.");
+    }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2025-08-27.basil",
