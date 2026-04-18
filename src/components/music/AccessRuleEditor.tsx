@@ -205,6 +205,34 @@ export const AccessRuleEditor = ({
             </div>
           )}
 
+          {newType === "challenge" && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label className="text-xs">Platform</Label>
+                <Select value={newPlatform} onValueChange={setNewPlatform}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="instagram">Instagram</SelectItem>
+                    <SelectItem value="tiktok">TikTok</SelectItem>
+                    <SelectItem value="x">X (Twitter)</SelectItem>
+                    <SelectItem value="other">Other / Anywhere</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-border/40 px-3 py-2">
+                <div>
+                  <Label className="text-xs">Require proof</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Fans must upload a screenshot or paste a link.
+                  </p>
+                </div>
+                <Switch checked={newRequiresProof} onCheckedChange={setNewRequiresProof} />
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" size="sm" onClick={() => setShowAdd(false)}>
               Cancel
