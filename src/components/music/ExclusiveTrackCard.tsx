@@ -156,7 +156,7 @@ export const ExclusiveTrackCard = ({
 
         {/* Actions */}
         <div className="flex flex-wrap gap-1.5 mt-auto pt-1">
-          {!fullAccess && !isOwner && purchaseRule && (
+          {!fullAccess && !isOwner && purchaseRule && isPaid && (
             <Button
               size="sm"
               variant="default"
@@ -166,13 +166,13 @@ export const ExclusiveTrackCard = ({
               onClick={() => onPurchase?.(track, purchaseRule)}
             >
               <DollarSign className="w-3 h-3 mr-1" />
-              Buy {price > 0 ? `$${(price / 100).toFixed(2)}` : ""}
+              Buy ${(price / 100).toFixed(2)}
             </Button>
           )}
           {!fullAccess && !isOwner && subscriptionRule && (
             <Button
               size="sm"
-              variant={purchaseRule ? "outline" : "default"}
+              variant={purchaseRule && isPaid ? "outline" : "default"}
               className="text-xs h-8 flex-1"
               disabled={!payoutEnabled}
               title={!payoutEnabled ? "Artist hasn't enabled payouts yet" : undefined}
@@ -183,11 +183,11 @@ export const ExclusiveTrackCard = ({
             </Button>
           )}
 
-          {/* Fan Challenge unlock */}
+          {/* Fan Challenge unlock — primary CTA when no paid options */}
           {!fullAccess && !isOwner && challengeRule && (
             <Button
               size="sm"
-              variant="secondary"
+              variant={!isPaid && !subscriptionRule ? "default" : "secondary"}
               className="text-xs h-8 flex-1"
               onClick={handleChallengeClick}
             >
