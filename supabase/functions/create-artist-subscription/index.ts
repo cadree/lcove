@@ -8,6 +8,11 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const log = (step: string, details?: unknown) => {
+  const d = details ? ` - ${JSON.stringify(details)}` : "";
+  console.log(`[MUSIC-PAYMENT][subscribe] ${step}${d}`);
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -24,7 +29,8 @@ serve(async (req) => {
   );
 
   try {
-    const authHeader = req.headers.get("Authorization")!;
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) throw new Error("Not authenticated");
     const token = authHeader.replace("Bearer ", "");
     const { data: userData } = await supabaseClient.auth.getUser(token);
     const user = userData.user;
@@ -33,49 +39,58 @@ serve(async (req) => {
     const { artist_user_id, access_rule_id } = await req.json();
     if (!artist_user_id || !access_rule_id) throw new Error("Missing required fields");
 
-    // Get artist's Connect account
-    const { data: artistProfile } = await supabaseAdmin
+    if (user.id === artist_user_id) {
+      throw new Error("You can't subscribe to yourself");
+    }
+
+    const { data: artistProfile, error: profileErr } = await supabaseAdmin
       .from("profiles")
-      .select("connect_account_id, display_name")
+      .select("stripe_connect_account_id, payout_enabled, display_name")
       .eq("user_id", artist_user_id)
       .single();
 
-    if (!artistProfile?.connect_account_id) {
-      throw new Error("Artist has not set up payments yet");
+    if (profileErr) throw new Error("Could not load artist profile");
+
+    if (!artistProfile?.stripe_connect_account_id || !artistProfile?.payout_enabled) {
+      throw new Error("This artist has not enabled payouts yet.");
     }
 
-    // Get the access rule
-    const { data: rule } = await supabaseAdmin
+    const { data: rule, error: ruleErr } = await supabaseAdmin
       .from("exclusive_access_rules")
       .select("*")
       .eq("id", access_rule_id)
       .single();
 
-    if (!rule || rule.rule_type !== "subscription") {
+    if (ruleErr || !rule || rule.rule_type !== "subscription") {
       throw new Error("Invalid subscription rule");
+    }
+
+    if (!rule.amount_cents || rule.amount_cents <= 0) {
+      throw new Error("Subscription price must be greater than zero");
     }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2025-08-27.basil",
     });
 
-    // Check for existing customer
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     let customerId: string | undefined;
     if (customers.data.length > 0) customerId = customers.data[0].id;
 
     const interval = rule.interval === "yearly" ? "year" : "month";
+    const origin = req.headers.get("origin") || "";
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
+      client_reference_id: user.id,
       line_items: [
         {
           price_data: {
             currency: "usd",
             product_data: {
               name: `${artistProfile.display_name || "Artist"} - Exclusive Access`,
-              description: rule.label || "Monthly subscription for exclusive content",
+              description: rule.label || `${interval === "year" ? "Yearly" : "Monthly"} subscription`,
             },
             unit_amount: rule.amount_cents,
             recurring: { interval },
@@ -85,33 +100,28 @@ serve(async (req) => {
       ],
       mode: "subscription",
       subscription_data: {
+        application_fee_percent: 0,
         transfer_data: {
-          destination: artistProfile.connect_account_id,
+          destination: artistProfile.stripe_connect_account_id,
         },
         metadata: {
+          type: "artist_subscription",
           artist_user_id,
           subscriber_user_id: user.id,
           access_rule_id,
-          type: "artist_subscription",
         },
       },
       metadata: {
+        type: "artist_subscription",
         artist_user_id,
         subscriber_user_id: user.id,
-        type: "artist_subscription",
+        access_rule_id,
       },
-      success_url: `${req.headers.get("origin")}/profile/${artist_user_id}?subscribed=true`,
-      cancel_url: `${req.headers.get("origin")}/profile/${artist_user_id}`,
+      success_url: `${origin}/profile/${artist_user_id}?subscribed=true`,
+      cancel_url: `${origin}/profile/${artist_user_id}?subscribed=canceled`,
     });
 
-    // Record subscription (pending)
-    await supabaseAdmin.from("artist_subscriptions").insert({
-      artist_user_id,
-      subscriber_user_id: user.id,
-      status: "active",
-      amount_cents: rule.amount_cents,
-      interval: rule.interval || "monthly",
-    });
+    log("Subscription checkout session created", { sessionId: session.id });
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -119,9 +129,10 @@ serve(async (req) => {
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error";
+    log("ERROR", { msg });
     return new Response(JSON.stringify({ error: msg }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: 400,
     });
   }
 });
