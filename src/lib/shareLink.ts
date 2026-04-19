@@ -95,6 +95,39 @@ function openInNewTab(url: string): boolean {
   }
 }
 
+function isMobileUA(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
+/**
+ * Try to open a native app via its URI scheme. If the app isn't installed
+ * (page stays visible after ~800ms), fall back to the web URL.
+ */
+function tryAppSchemeWithFallback(appUrl: string, webUrl: string): void {
+  if (typeof window === 'undefined') return;
+  const start = Date.now();
+  let fellBack = false;
+
+  const onVisibilityChange = () => {
+    if (document.visibilityState === 'hidden') {
+      fellBack = true; // app opened — cancel fallback
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibilityChange);
+
+  try {
+    window.location.href = appUrl;
+  } catch {}
+
+  window.setTimeout(() => {
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    if (!fellBack && Date.now() - start < 2000 && document.visibilityState === 'visible') {
+      window.location.href = webUrl;
+    }
+  }, 800);
+}
+
 async function copyToClipboardSilent(text: string): Promise<boolean> {
   try {
     if (navigator.clipboard?.writeText) {
