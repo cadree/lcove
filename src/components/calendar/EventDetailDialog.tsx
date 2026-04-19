@@ -13,7 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { supabase } from "@/integrations/supabase/client";
-import { shareLink, buildShareUrl } from "@/lib/shareLink";
+import { shareLink, shareToChannel, buildShareUrl } from "@/lib/shareLink";
 import { format, formatDistanceToNow } from "date-fns";
 import { 
   MapPin, 
@@ -307,25 +307,10 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
     }
   };
 
-  const handleShare = async (method: 'copy' | 'twitter' | 'native' | 'sms' | 'whatsapp' | 'facebook' | 'instagram') => {
+  const handleShare = async (method: 'copy' | 'twitter' | 'native' | 'sms' | 'whatsapp' | 'facebook' | 'instagram' | 'email') => {
     const shareUrl = buildShareUrl.event(event.id);
     const shareText = `Check out "${event.title}" on ${format(eventDate, 'MMMM d')}!`;
-
-    if (method === 'copy' || method === 'native') {
-      await shareLink({ title: event.title, text: shareText, url: shareUrl });
-    } else if (method === 'twitter') {
-      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank');
-    } else if (method === 'sms') {
-      const body = encodeURIComponent(`${shareText}\n${shareUrl}`);
-      window.open(`sms:?&body=${body}`, '_self');
-    } else if (method === 'whatsapp') {
-      window.open(`https://wa.me/?text=${encodeURIComponent(`${shareText}\n${shareUrl}`)}`, '_blank');
-    } else if (method === 'facebook') {
-      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
-    } else if (method === 'instagram') {
-      // Generate flyer then native share
-      await handleDownloadFlyer();
-    }
+    await shareToChannel(method, { title: event.title, text: shareText, url: shareUrl });
   };
 
   const handleDownloadFlyer = async () => {

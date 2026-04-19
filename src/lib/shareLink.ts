@@ -71,6 +71,137 @@ export async function shareLink(opts: ShareLinkOptions): Promise<void> {
 /** Canonical share domain for the platform. */
 export const SHARE_BASE_URL = 'https://etherbylcove.com';
 
+export type ShareChannel =
+  | 'native'
+  | 'copy'
+  | 'twitter'
+  | 'whatsapp'
+  | 'facebook'
+  | 'sms'
+  | 'email'
+  | 'instagram';
+
+/**
+ * Open a URL in a new tab. Returns true if it likely succeeded,
+ * false if the popup was blocked.
+ */
+function openInNewTab(url: string): boolean {
+  try {
+    const w = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!w || w.closed || typeof w.closed === 'undefined') return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function copyToClipboardSilent(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {}
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Share to a specific channel with graceful fallbacks.
+ * If a popup is blocked, copies the link to clipboard and toasts the user.
+ */
+export async function shareToChannel(
+  channel: ShareChannel,
+  opts: ShareLinkOptions
+): Promise<void> {
+  const { title, text, url } = opts;
+  const shareText = text ?? title ?? '';
+  const fullText = shareText ? `${shareText} ${url}` : url;
+
+  const fallbackCopy = async (channelLabel: string) => {
+    const ok = await copyToClipboardSilent(url);
+    if (ok) toast.success(`Popup blocked — link copied. Paste into ${channelLabel}.`);
+    else window.prompt('Copy this link:', url);
+  };
+
+  switch (channel) {
+    case 'native':
+    case 'copy':
+      await shareLink(opts);
+      return;
+
+    case 'twitter': {
+      const u = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`;
+      if (!openInNewTab(u)) await fallbackCopy('X / Twitter');
+      return;
+    }
+
+    case 'whatsapp': {
+      const u = `https://wa.me/?text=${encodeURIComponent(fullText)}`;
+      if (!openInNewTab(u)) await fallbackCopy('WhatsApp');
+      return;
+    }
+
+    case 'facebook': {
+      const u = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+      if (!openInNewTab(u)) await fallbackCopy('Facebook');
+      return;
+    }
+
+    case 'sms': {
+      const body = encodeURIComponent(fullText);
+      // sms: scheme — use location.href (no popup blocker). On desktop this may no-op,
+      // so copy the link as a safety net.
+      try {
+        window.location.href = `sms:?&body=${body}`;
+      } catch {}
+      // Best-effort copy in case the sms: handler did nothing (e.g. desktop)
+      const ok = await copyToClipboardSilent(url);
+      if (ok) toast.success('Link copied — paste into a text');
+      return;
+    }
+
+    case 'email': {
+      const subject = encodeURIComponent(title ?? 'Check this out');
+      const body = encodeURIComponent(fullText);
+      try {
+        window.location.href = `mailto:?subject=${subject}&body=${body}`;
+      } catch {}
+      return;
+    }
+
+    case 'instagram': {
+      // Instagram has no web share API. Try app deep link on mobile, then copy.
+      const isMobile = /android|iphone|ipad|ipod/i.test(
+        typeof navigator !== 'undefined' ? navigator.userAgent : ''
+      );
+      if (isMobile) {
+        try {
+          window.location.href = 'instagram://library';
+        } catch {}
+      }
+      const ok = await copyToClipboardSilent(url);
+      if (ok) {
+        toast.success('Link copied! Paste it into your Instagram story, bio or DM.');
+      } else {
+        window.prompt('Copy this link to share on Instagram:', url);
+      }
+      return;
+    }
+  }
+}
+
 export const buildShareUrl = {
   event: (id: string) => `${SHARE_BASE_URL}/event/${id}`,
   project: (id: string) => `${SHARE_BASE_URL}/project/${id}`,
