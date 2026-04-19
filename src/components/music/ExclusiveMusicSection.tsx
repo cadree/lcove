@@ -28,10 +28,6 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  useArtistChallengeCompletions,
-  useRevokeChallengeCompletion,
-} from "@/hooks/useFanChallenges";
 import { toast } from "sonner";
 
 interface ExclusiveMusicSectionProps {
@@ -52,8 +48,6 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
   } = useExclusiveTracks(userId);
   const { rules, createRule, updateRule, deleteRule } = useAccessRules(userId);
   const { data: payoutStatus } = useArtistPayoutStatus(userId);
-  const createPayoutAccount = useCreateMusicPayoutAccount();
-  const refreshPayoutStatus = useRefreshMusicPayoutStatus();
   const { data: challengeCompletions = [] } = useArtistChallengeCompletions(
     isOwner ? userId : undefined
   );

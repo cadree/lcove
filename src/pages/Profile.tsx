@@ -456,10 +456,6 @@ const Profile = () => {
           userId={targetUserId || ''}
         />
 
-        {/* Fan Challenge card */}
-        {targetUserId && (
-          <ChallengeProfileCard creatorId={targetUserId} isOwnProfile={isOwnProfile} />
-        )}
 
         {/* Edit Layout Button - Only for owner */}
         {isOwnProfile && (
