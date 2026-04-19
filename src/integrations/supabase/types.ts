@@ -882,127 +882,6 @@ export type Database = {
           },
         ]
       }
-      challenge_participants: {
-        Row: {
-          challenge_id: string
-          id: string
-          joined_at: string
-          user_id: string
-        }
-        Insert: {
-          challenge_id: string
-          id?: string
-          joined_at?: string
-          user_id: string
-        }
-        Update: {
-          challenge_id?: string
-          id?: string
-          joined_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "challenge_participants_challenge_id_fkey"
-            columns: ["challenge_id"]
-            isOneToOne: false
-            referencedRelation: "challenges"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      challenge_submissions: {
-        Row: {
-          challenge_id: string
-          id: string
-          reviewed_at: string | null
-          status: string
-          submission_text: string | null
-          submission_url: string | null
-          submitted_at: string
-          user_id: string
-        }
-        Insert: {
-          challenge_id: string
-          id?: string
-          reviewed_at?: string | null
-          status?: string
-          submission_text?: string | null
-          submission_url?: string | null
-          submitted_at?: string
-          user_id: string
-        }
-        Update: {
-          challenge_id?: string
-          id?: string
-          reviewed_at?: string | null
-          status?: string
-          submission_text?: string | null
-          submission_url?: string | null
-          submitted_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "challenge_submissions_challenge_id_fkey"
-            columns: ["challenge_id"]
-            isOneToOne: false
-            referencedRelation: "challenges"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      challenges: {
-        Row: {
-          cost_credits: number
-          cover_image_url: string | null
-          created_at: string
-          creator_id: string
-          deadline: string | null
-          description: string | null
-          id: string
-          is_active: boolean
-          is_published: boolean
-          participant_count: number
-          reward_credits: number
-          rules: string | null
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          cost_credits?: number
-          cover_image_url?: string | null
-          created_at?: string
-          creator_id: string
-          deadline?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          is_published?: boolean
-          participant_count?: number
-          reward_credits?: number
-          rules?: string | null
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          cost_credits?: number
-          cover_image_url?: string | null
-          created_at?: string
-          creator_id?: string
-          deadline?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          is_published?: boolean
-          participant_count?: number
-          reward_credits?: number
-          rules?: string | null
-          title?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       collective_join_requests: {
         Row: {
           conversation_id: string
@@ -2673,69 +2552,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles_public"
             referencedColumns: ["user_id"]
-          },
-        ]
-      }
-      fan_challenge_completions: {
-        Row: {
-          access_rule_id: string
-          artist_user_id: string
-          challenge_type: string
-          completed_at: string
-          id: string
-          proof_text: string | null
-          proof_url: string | null
-          revoked_at: string | null
-          revoked_reason: string | null
-          status: string
-          track_id: string | null
-          user_id: string
-          verified: boolean
-        }
-        Insert: {
-          access_rule_id: string
-          artist_user_id: string
-          challenge_type?: string
-          completed_at?: string
-          id?: string
-          proof_text?: string | null
-          proof_url?: string | null
-          revoked_at?: string | null
-          revoked_reason?: string | null
-          status?: string
-          track_id?: string | null
-          user_id: string
-          verified?: boolean
-        }
-        Update: {
-          access_rule_id?: string
-          artist_user_id?: string
-          challenge_type?: string
-          completed_at?: string
-          id?: string
-          proof_text?: string | null
-          proof_url?: string | null
-          revoked_at?: string | null
-          revoked_reason?: string | null
-          status?: string
-          track_id?: string | null
-          user_id?: string
-          verified?: boolean
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fan_challenge_completions_access_rule_id_fkey"
-            columns: ["access_rule_id"]
-            isOneToOne: false
-            referencedRelation: "exclusive_access_rules"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fan_challenge_completions_track_id_fkey"
-            columns: ["track_id"]
-            isOneToOne: false
-            referencedRelation: "exclusive_tracks"
-            referencedColumns: ["id"]
           },
         ]
       }
@@ -7069,10 +6885,6 @@ export type Database = {
           has_connect_account: boolean
           payout_enabled: boolean
         }[]
-      }
-      get_challenge_unlock_count: {
-        Args: { p_track_id: string }
-        Returns: number
       }
       get_client_project_by_token: { Args: { p_token: string }; Returns: Json }
       get_platform_stats: {
