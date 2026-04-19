@@ -57,6 +57,7 @@ import { EventAttendeesDialog } from "./EventAttendeesDialog";
 import { AddToCalendarButtons } from "./AddToCalendarButtons";
 import { InviteGuestsDialog } from "./InviteGuestsDialog";
 import { Input } from "@/components/ui/input";
+import { EventMoodboardView } from "./EventMoodboardView";
 
 interface EventDetailDialogProps {
   eventId: string | null;
@@ -674,6 +675,9 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
                 )}
               </div>
             </div>
+
+            {/* Moodboard & Itinerary */}
+            <EventMoodboardView eventId={event.id} />
 
             {/* Attendees */}
             <div 
