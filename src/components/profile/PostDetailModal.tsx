@@ -42,6 +42,7 @@ import { ProfilePost } from "@/types/post";
 import { usePostInteractions } from "@/hooks/usePostInteractions";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { shareLink, buildShareUrl } from "@/lib/shareLink";
 
 interface PostDetailModalProps {
   post: ProfilePost | null;
@@ -131,17 +132,10 @@ export function PostDetailModal({
   };
 
   const handleShare = async () => {
-    const postUrl = `${window.location.origin}/profile/${post.user_id}?post=${post.id}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({ url: postUrl });
-      } catch {
-        // User cancelled
-      }
-    } else {
-      await navigator.clipboard.writeText(postUrl);
-      toast.success("Link copied to clipboard");
-    }
+    await shareLink({
+      title: `Post by ${displayName}`,
+      url: buildShareUrl.post(post.user_id, post.id),
+    });
   };
 
   const handleClose = () => {

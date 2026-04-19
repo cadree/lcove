@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { shareLink, buildShareUrl } from '@/lib/shareLink';
 
 interface ProjectCardProps {
   project: Project;
@@ -91,36 +91,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
                onClick={async (e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                 const shareUrl = `https://etherbylcove.com/project/${project.id}`;
-                let shared = false;
-                try {
-                  if (navigator.share) {
-                    await navigator.share({ title: project.title, url: shareUrl });
-                    shared = true;
-                  }
-                } catch (_) { /* user cancelled or not supported */ }
-                if (!shared) {
-                  try {
-                    await navigator.clipboard.writeText(shareUrl);
-                    toast.success('Link copied!');
-                    shared = true;
-                  } catch (_) { /* clipboard blocked */ }
-                }
-                if (!shared) {
-                  const textarea = document.createElement('textarea');
-                  textarea.value = shareUrl;
-                  textarea.style.position = 'fixed';
-                  textarea.style.opacity = '0';
-                  document.body.appendChild(textarea);
-                  textarea.select();
-                  try {
-                    document.execCommand('copy');
-                    toast.success('Link copied!');
-                  } catch (_) {
-                    window.prompt('Copy this link:', shareUrl);
-                  }
-                  document.body.removeChild(textarea);
-                }
+                await shareLink({ title: project.title, url: buildShareUrl.project(project.id) });
                }}
               aria-label="Share project"
            >

@@ -38,6 +38,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { shareLink, buildShareUrl } from "@/lib/shareLink";
 import { cn } from "@/lib/utils";
 import { ProjectDetail } from "@/components/projects/ProjectDetail";
 import type { Project } from "@/hooks/useProjects";
@@ -205,30 +206,18 @@ export default function PublicProjectPage() {
     },
   });
 
-  const shareUrl = `https://etherbylcove.com/project/${projectId}`;
+  const shareUrl = buildShareUrl.project(projectId || '');
 
   const handleShare = async () => {
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: project?.title, text: `Check out this project: ${project?.title}`, url: shareUrl });
-        return;
-      }
-    } catch {}
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      toast.success("Link copied!");
-    } catch {
-      window.prompt("Copy this link:", shareUrl);
-    }
+    await shareLink({
+      title: project?.title,
+      text: `Check out this project: ${project?.title}`,
+      url: shareUrl,
+    });
   };
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      toast.success("Link copied!");
-    } catch {
-      window.prompt("Copy this link:", shareUrl);
-    }
+    await shareLink({ url: shareUrl });
   };
 
   const hasAppliedToRole = (roleId: string) =>
