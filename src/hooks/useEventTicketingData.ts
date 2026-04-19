@@ -18,6 +18,8 @@ export interface TicketOrder {
   stripe_payment_intent_id: string | null;
   stripe_session_id: string | null;
   source: string | null;
+  refund_amount_cents: number;
+  refunded_at: string | null;
   created_at: string;
 }
 
