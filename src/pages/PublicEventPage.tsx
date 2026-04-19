@@ -30,6 +30,7 @@ import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { EventMoodboardView } from "@/components/calendar/EventMoodboardView";
 
 export default function PublicEventPage() {
   const { eventId } = useParams();
@@ -172,7 +173,23 @@ export default function PublicEventPage() {
         throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: async (_, _vars, _ctx) => {
+      // Re-fetch the rsvp we just inserted to get its id, then fire confirmation
+      try {
+        const { data: created } = await supabase
+          .from('event_rsvps')
+          .select('id')
+          .eq('event_id', eventId!)
+          .eq('guest_email', guestEmail.trim().toLowerCase())
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (created?.id) {
+          supabase.functions.invoke('send-rsvp-confirmation', {
+            body: { event_id: eventId, rsvp_id: created.id },
+          }).catch((err) => console.error('Confirmation email failed:', err));
+        }
+      } catch (e) { console.error(e); }
       setRsvpSuccess(true);
       queryClient.invalidateQueries({ queryKey: ["public-event-rsvp-count", eventId] });
       toast.success("You're on the list!");
@@ -343,6 +360,11 @@ export default function PublicEventPage() {
             </CardContent>
           </Card>
         </motion.div>
+
+        {/* Moodboard & Itinerary */}
+        <div className="mt-4">
+          <EventMoodboardView eventId={eventId!} />
+        </div>
 
         {/* RSVP Section for free events */}
         {!isPast && isFree && (
