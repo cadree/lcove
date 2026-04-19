@@ -26,7 +26,7 @@ interface Order {
 }
 
 export default function EventConfirmation() {
-  const { id: eventId } = useParams<{ id: string }>();
+  const { eventId } = useParams<{ eventId: string }>();
   const [params] = useSearchParams();
   const sessionId = params.get("session_id");
   const orderIdParam = params.get("order_id");

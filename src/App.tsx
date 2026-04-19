@@ -54,6 +54,7 @@ import Dashboard from "./pages/Dashboard";
 import EventsDashboard from "./pages/EventsDashboard";
 import EventDetail from "./pages/EventDetail";
 import PublicEventPage from "./pages/PublicEventPage";
+import EventConfirmation from "./pages/EventConfirmation";
 import PublicProjectPage from "./pages/PublicProjectPage";
 import PublicClientPortal from "@/pages/PublicClientPortal";
 
@@ -124,6 +125,7 @@ const App = () => (
                 <Route path="/dashboard/events" element={<EventsDashboard />} />
                 <Route path="/dashboard/events/:eventId" element={<EventDetail />} />
                 <Route path="/event/:eventId" element={<PublicEventPage />} />
+                <Route path="/event/:eventId/confirmation" element={<EventConfirmation />} />
                 <Route path="/project/:projectId" element={<PublicProjectPage />} />
                 <Route path="/client/:token" element={<PublicClientPortal />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
