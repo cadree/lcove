@@ -1,57 +1,56 @@
 
-The social share buttons (Instagram, WhatsApp, Twitter, etc.) in `EventDetailDialog` likely fail because:
-1. **Instagram has no web share URL** — there's no `instagram.com/share?url=...` API. The only way to share to Instagram from web is to copy the link/image and have the user paste it manually, or use the native share sheet on mobile.
-2. **WhatsApp/Twitter/SMS/Facebook** use `window.open(url, '_blank')` which is often blocked by popup blockers (especially inside the Lovable preview iframe), and may silently fail without feedback.
-3. The handlers may not be using the canonical `etherbylcove.com` URL.
+The user wants share buttons (Instagram, WhatsApp, Twitter, Facebook, etc.) to open the **native mobile app directly** instead of opening the web compose page in a new browser tab.
 
-Let me check the actual implementation.
-
-I need to view `EventDetailDialog.tsx` to confirm the current share menu structure, and check any other place with channel-specific share buttons.
+## Current behavior
+`shareToChannel` in `src/lib/shareLink.ts` uses `window.open(https://twitter.com/intent/tweet?...)` and `https://wa.me/?text=...` — these open mobile web pages, not the apps directly. On mobile, the OS sometimes intercepts and routes to the app, but often it just opens Safari/Chrome.
 
 ## Plan
 
-### 1. Extend `src/lib/shareLink.ts` with channel helpers
+### 1. Use app deep-link URI schemes on mobile, web URLs as fallback
 
-Add a `shareToChannel` function and per-channel URL builders:
+Update `shareToChannel` in `src/lib/shareLink.ts` to detect mobile (iOS/Android UA) and try the native app scheme first, falling back to the web intent if the app isn't installed.
 
+| Channel | Mobile (try app first) | Desktop / fallback |
+|---|---|---|
+| **Twitter/X** | `twitter://post?message=<text>%20<url>` | `https://twitter.com/intent/tweet?...` |
+| **WhatsApp** | `whatsapp://send?text=<text>%20<url>` | `https://wa.me/?text=...` |
+| **Facebook** | `fb://share?link=<url>` (limited) → fallback to web sharer | `https://www.facebook.com/sharer/...` |
+| **Instagram** | `instagram://library` (no direct share API) + copy link | copy link + toast |
+| **SMS** | `sms:?&body=...` (already native) | clipboard fallback |
+| **Email** | `mailto:?...` (already native) | — |
+
+### 2. Implementation pattern (app-first with timeout fallback)
+
+For each app-capable channel on mobile:
 ```ts
-export type ShareChannel = 'twitter' | 'whatsapp' | 'facebook' | 'sms' | 'email' | 'instagram' | 'copy' | 'native';
-
-shareToChannel(channel, { title, text, url })
+const tryAppScheme = (appUrl: string, webUrl: string) => {
+  const start = Date.now();
+  // Try app scheme via location.href (no popup blocker on mobile)
+  window.location.href = appUrl;
+  // If app isn't installed, browser stays on page → fall back to web URL after 800ms
+  setTimeout(() => {
+    if (Date.now() - start < 1500 && document.visibilityState === 'visible') {
+      window.location.href = webUrl;
+    }
+  }, 800);
+};
 ```
 
-Behavior per channel:
-- **twitter** → `https://twitter.com/intent/tweet?text=...&url=...` opened in new tab; if `window.open` returns null (blocked), fall back to `shareLink()` (copy) and toast "Popup blocked — link copied instead".
-- **whatsapp** → `https://wa.me/?text=<text>%20<url>` (works on web + deep-links to app on mobile). Same popup-blocker fallback.
-- **facebook** → `https://www.facebook.com/sharer/sharer.php?u=<url>`. Same fallback.
-- **sms** → `sms:?&body=<text>%20<url>` via `window.location.href` (no popup blocker).
-- **email** → `mailto:?subject=<title>&body=<text>%20<url>`.
-- **instagram** → Instagram has NO web share API. Copy link to clipboard + toast: "Link copied! Paste it into your Instagram story or DM." On mobile, attempt `instagram://` deep link as a best-effort first.
-- **copy** → existing `shareLink()` clipboard path.
-- **native** → existing `shareLink()` native sheet path.
+The `visibilityState` check detects whether the app actually launched (page becomes hidden when app opens). If still visible after 800ms, the app isn't installed → open web fallback.
 
-Always show a success toast so the user knows something happened.
+### 3. On desktop, keep existing web `window.open` behavior with the popup-blocked → clipboard fallback already in place.
 
-### 2. Update `EventDetailDialog.tsx`
+### 4. Best practice: prefer native share sheet on mobile when available
 
-Refactor the existing channel buttons (Twitter, WhatsApp, SMS, Facebook, Instagram, Copy/Native) to call `shareToChannel(channel, { title, text, url: buildShareUrl.event(eventId) })`. Remove inline `window.open` calls.
+Add a new "Share via apps…" entry that calls `navigator.share()` directly — this opens the OS share sheet which lists every installed app (Instagram, WhatsApp, Messages, AirDrop, etc.) and is the most reliable way to post directly into an app. Recommend this as the primary CTA on mobile.
 
-### 3. Audit & update other channel-share surfaces
+### Files to update
+- `src/lib/shareLink.ts` — add mobile detection + app-scheme attempts with web fallback for Twitter, WhatsApp, Facebook
+- (No component changes needed — `EventDetailDialog` and other consumers already call `shareToChannel`)
 
-Files I need to check & likely update:
-- `src/components/calendar/EventDetailDialog.tsx`
-- `src/pages/PublicEventPage.tsx`
-- `src/components/projects/ProjectDetail.tsx` (share menu)
-- `src/components/projects/ProjectCard.tsx`
-- `src/pages/PublicProjectPage.tsx`
-- Any other component with Twitter/WhatsApp/Facebook/Instagram buttons
-
-For each, replace inline channel logic with `shareToChannel()`.
-
-### 4. Test
-
-1. In preview iframe (popup-blocked): tap Twitter/WhatsApp/Facebook → toast "Popup blocked — link copied instead", URL on clipboard.
-2. On the published site: tap each → opens the correct compose window/app with prefilled text + canonical `etherbylcove.com` URL.
-3. Instagram → toast "Link copied — paste into your story/DM"; on mobile also tries `instagram://` deep-link.
-4. SMS / Email → opens native compose with prefilled body.
-5. Cancel/dismiss any popup → no error toast.
+### Test
+1. **iOS Safari** at `etherbylcove.com/event/:id` → tap WhatsApp → WhatsApp app opens with text prefilled. Tap Twitter → X app opens with composer. Tap Instagram → toast says "Link copied" + Instagram app opens to library.
+2. **Android Chrome** → same as above for installed apps.
+3. **Phone without WhatsApp installed** → after ~800ms, falls back to `wa.me` web page.
+4. **Desktop** → opens web compose page in new tab as today.
+5. **Lovable preview iframe** (popup blocked) → toast "Popup blocked — link copied".
