@@ -340,7 +340,7 @@ export default function EventDetail() {
           ) : null}
 
           {/* Tabs */}
-          <TabsList className="w-full justify-start gap-0 rounded-none border-t border-border/20 bg-transparent h-11 px-2">
+          <TabsList className="w-full justify-start gap-0 rounded-none border-t border-border/20 bg-transparent h-11 px-2 overflow-x-auto">
             <TabsTrigger value="orders" className="gap-1.5 data-[state=active]:bg-primary/10 rounded-lg">
               <Ticket className="h-3.5 w-3.5" />
               Orders
@@ -348,6 +348,10 @@ export default function EventDetail() {
             <TabsTrigger value="attendees" className="gap-1.5 data-[state=active]:bg-primary/10 rounded-lg">
               <Users className="h-3.5 w-3.5" />
               Attendees
+            </TabsTrigger>
+            <TabsTrigger value="checkin" className="gap-1.5 data-[state=active]:bg-primary/10 rounded-lg">
+              <ScanLine className="h-3.5 w-3.5" />
+              Check-In
             </TabsTrigger>
             <TabsTrigger value="marketing" className="gap-1.5 data-[state=active]:bg-primary/10 rounded-lg">
               <Megaphone className="h-3.5 w-3.5" />
@@ -375,21 +379,33 @@ export default function EventDetail() {
             <>
               {/* Orders Tab */}
               <TabsContent value="orders" className="mt-0 space-y-4">
-                <OrdersTab 
-                  orders={orders} 
-                  attendeeProfiles={attendeeProfiles || {}} 
-                  event={event}
-                  isLoading={rsvpsLoading}
+                <OrdersTabV2
+                  orders={v2Orders}
+                  tiers={v2Tiers}
+                  attendees={v2Attendees}
+                  attendeeProfiles={v2AttendeeProfiles || {}}
+                  isLoading={v2Loading}
                 />
               </TabsContent>
 
               {/* Attendees Tab */}
               <TabsContent value="attendees" className="mt-0 space-y-4">
-                <AttendeesTab 
-                  attendees={attendees} 
-                  attendeeProfiles={attendeeProfiles || {}}
-                  isLoading={rsvpsLoading}
+                <AttendeesTabV2
+                  attendees={v2Attendees}
+                  tiers={v2Tiers}
+                  checkIns={v2CheckIns}
+                  attendeeProfiles={v2AttendeeProfiles || {}}
+                  isLoading={v2Loading}
                   eventTitle={event?.title || "Event"}
+                />
+              </TabsContent>
+
+              {/* Check-In Tab */}
+              <TabsContent value="checkin" className="mt-0 space-y-4">
+                <CheckInTab
+                  eventId={eventId!}
+                  attendees={v2Attendees}
+                  checkIns={v2CheckIns}
                 />
               </TabsContent>
 
@@ -400,17 +416,15 @@ export default function EventDetail() {
 
               {/* Finance Tab */}
               <TabsContent value="finance" className="mt-0 space-y-4">
-                <FinanceTab 
-                  orders={orders}
-                  event={event}
-                  totalRevenue={totalRevenue}
-                  totalCredits={totalCredits}
+                <FinanceTabV2
+                  orders={v2Orders}
+                  tiers={v2Tiers}
                 />
               </TabsContent>
 
               {/* Team Tab */}
               <TabsContent value="team" className="mt-0 space-y-4">
-                <TeamTab 
+                <TeamTab
                   teamMembers={teamMembers || []}
                   teamProfiles={teamProfiles || {}}
                   creatorId={event?.creator_id}
