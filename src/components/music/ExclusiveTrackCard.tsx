@@ -1,6 +1,5 @@
-import { useState } from "react";
 import { motion } from "framer-motion";
-import { Lock, Music, DollarSign, Trash2, Eye, EyeOff, Bookmark, BookmarkCheck, Download, UserPlus, Target, Sparkles } from "lucide-react";
+import { Lock, Music, DollarSign, Trash2, Eye, EyeOff, Bookmark, BookmarkCheck, Download, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -12,14 +11,7 @@ import {
   useMusicLibraryMutations,
   downloadTrack,
 } from "@/hooks/useMusicLibrary";
-import {
-  pickChallengeRule,
-  getChallengeMeta,
-  useMyChallengeCompletions,
-  useChallengeUnlockCount,
-} from "@/hooks/useFanChallenges";
 import { PreviewPlayer } from "./PreviewPlayer";
-import { FanChallengeDialog } from "./FanChallengeDialog";
 import { toast } from "sonner";
 
 interface ExclusiveTrackCardProps {
@@ -47,25 +39,15 @@ export const ExclusiveTrackCard = ({
   const { data: purchases = [] } = useMyPurchases();
   const { data: saves = [] } = useMySaves();
   const { saveTrack, unsaveTrack, toggleAddToProfile } = useMusicLibraryMutations();
-  const { data: myCompletions = [] } = useMyChallengeCompletions();
-  const { data: challengeUnlockCount = 0 } = useChallengeUnlockCount(track.id);
-
-  const [challengeOpen, setChallengeOpen] = useState(false);
 
   const trackRules = rules.filter(
     (r) => r.track_id === track.id || r.track_id === null
   );
   const purchaseRule = trackRules.find((r) => r.rule_type === "purchase");
   const subscriptionRule = trackRules.find((r) => r.rule_type === "subscription");
-  const challengeRule = pickChallengeRule(rules, track.id);
   const price = purchaseRule?.amount_cents ?? track.price_cents ?? 0;
 
   const ownsTrack = purchases.some((p) => p.track_id === track.id);
-  const unlockedViaChallenge = myCompletions.some(
-    (c) =>
-      c.artist_user_id === track.artist_user_id &&
-      (c.track_id === track.id || c.track_id === null)
-  );
   const fullAccess = hasAccess || ownsTrack || isOwner;
   const save = saves.find((s) => s.track_id === track.id);
   const isSaved = !!save;
@@ -74,18 +56,11 @@ export const ExclusiveTrackCard = ({
   const previewUrl = track.preview_clip_url || track.audio_file_url || "";
   const fullUrl = track.audio_file_url || "";
 
-  const challengeMeta = challengeRule ? getChallengeMeta(challengeRule) : null;
-  const challengePlatformLabel = challengeMeta?.platform
-    ? challengeMeta.platform.charAt(0).toUpperCase() + challengeMeta.platform.slice(1)
-    : "social";
-
   const isPaid = price > 0;
   const statusBadge = (() => {
     if (isOwner) return { label: track.is_published ? "Published" : "Draft", variant: "outline" as const };
-    if (unlockedViaChallenge && !ownsTrack) return { label: "Unlocked via Challenge", variant: "secondary" as const };
     if (fullAccess) return { label: "Unlocked", variant: "secondary" as const };
     if (isPaid) return { label: `$${(price / 100).toFixed(2)}`, variant: "default" as const };
-    if (challengeRule) return { label: "Free via Challenge", variant: "outline" as const };
     if (subscriptionRule) return { label: "Subscribers", variant: "outline" as const };
     return { label: "Exclusive", variant: "outline" as const };
   })();
@@ -93,14 +68,6 @@ export const ExclusiveTrackCard = ({
   const handleDownload = () => {
     if (!fullUrl) return;
     downloadTrack(fullUrl, `${track.title}.mp3`);
-  };
-
-  const handleChallengeClick = () => {
-    if (!user) {
-      toast.error("Sign in to unlock via challenge");
-      return;
-    }
-    setChallengeOpen(true);
   };
 
   return (
@@ -124,7 +91,6 @@ export const ExclusiveTrackCard = ({
         <div className="absolute top-2 right-2">
           <Badge variant={statusBadge.variant} className="text-[10px] backdrop-blur-sm">
             {!fullAccess && <Lock className="w-2.5 h-2.5 mr-1" />}
-            {unlockedViaChallenge && !ownsTrack && <Sparkles className="w-2.5 h-2.5 mr-1" />}
             {statusBadge.label}
           </Badge>
         </div>
@@ -136,11 +102,6 @@ export const ExclusiveTrackCard = ({
           <p className="font-medium text-foreground text-sm truncate">{track.title}</p>
           {track.description && (
             <p className="text-xs text-muted-foreground line-clamp-1">{track.description}</p>
-          )}
-          {challengeUnlockCount > 0 && (
-            <p className="text-[11px] text-amber-500 mt-0.5">
-              🎉 {challengeUnlockCount} {challengeUnlockCount === 1 ? "fan" : "fans"} unlocked via challenge
-            </p>
           )}
         </div>
 
@@ -180,21 +141,6 @@ export const ExclusiveTrackCard = ({
             >
               Subscribe ${(subscriptionRule.amount_cents / 100).toFixed(2)}
               {subscriptionRule.interval === "yearly" ? "/yr" : "/mo"}
-            </Button>
-          )}
-
-          {/* Fan Challenge unlock — primary CTA when no paid options */}
-          {!fullAccess && !isOwner && challengeRule && (
-            <Button
-              size="sm"
-              variant={!isPaid && !subscriptionRule ? "default" : "secondary"}
-              className="text-xs h-8 flex-1"
-              onClick={handleChallengeClick}
-            >
-              <Target className="w-3 h-3 mr-1" />
-              {challengeMeta?.platform
-                ? `Unlock via Challenge — Share on ${challengePlatformLabel}`
-                : "Unlock — Free for fans"}
             </Button>
           )}
 
@@ -277,11 +223,11 @@ export const ExclusiveTrackCard = ({
           )}
         </div>
 
-        {/* Extra unlock options for non-owners without access (excluding purchase/sub/challenge already rendered) */}
-        {!fullAccess && !isOwner && trackRules.filter((r) => !["purchase", "subscription", "challenge"].includes(r.rule_type) && r.amount_cents > 0).length > 0 && (
+        {/* Extra unlock options for non-owners without access */}
+        {!fullAccess && !isOwner && trackRules.filter((r) => !["purchase", "subscription"].includes(r.rule_type) && r.amount_cents > 0).length > 0 && (
           <div className="flex flex-wrap gap-1">
             {trackRules
-              .filter((r) => !["purchase", "subscription", "challenge"].includes(r.rule_type) && r.amount_cents > 0)
+              .filter((r) => !["purchase", "subscription"].includes(r.rule_type) && r.amount_cents > 0)
               .map((rule) => (
                 <Badge
                   key={rule.id}
@@ -295,14 +241,6 @@ export const ExclusiveTrackCard = ({
           </div>
         )}
       </div>
-
-      <FanChallengeDialog
-        open={challengeOpen}
-        onOpenChange={setChallengeOpen}
-        rule={challengeRule}
-        trackTitle={track.title}
-        trackId={track.id}
-      />
     </motion.div>
   );
 };

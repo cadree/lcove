@@ -11,13 +11,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Trash2, GripVertical, Sparkles, DollarSign, Share2, Heart, Target } from "lucide-react";
+import { Plus, Trash2, GripVertical, Sparkles, DollarSign, Share2, Heart } from "lucide-react";
 import type { ExclusiveAccessRule } from "@/hooks/useExclusiveMusic";
 
 const RULE_TYPE_CONFIG = {
   purchase: { icon: DollarSign, label: "One-Time Purchase", color: "text-green-500" },
   subscription: { icon: Heart, label: "Page Subscription", color: "text-pink-500" },
-  challenge: { icon: Target, label: "Fan Challenge", color: "text-amber-500" },
   tip_goal: { icon: Sparkles, label: "Tip Goal", color: "text-purple-500" },
   share_unlock: { icon: Share2, label: "Share to Unlock", color: "text-blue-500" },
 };
@@ -43,32 +42,26 @@ export const AccessRuleEditor = ({
   const [newDescription, setNewDescription] = useState("");
   const [newAmount, setNewAmount] = useState("");
   const [newInterval, setNewInterval] = useState("monthly");
-  const [newPlatform, setNewPlatform] = useState("instagram");
-  const [newRequiresProof, setNewRequiresProof] = useState(false);
 
   const filteredRules = rules.filter((r) =>
     trackId ? r.track_id === trackId || r.track_id === null : true
   );
 
   const handleAdd = () => {
-    const isChallenge = newType === "challenge";
     onCreateRule({
       track_id: trackId,
       rule_type: newType,
       label: newLabel || RULE_TYPE_CONFIG[newType as keyof typeof RULE_TYPE_CONFIG]?.label || newType,
       description: newDescription || undefined,
-      amount_cents: isChallenge ? 0 : Math.round(parseFloat(newAmount || "0") * 100),
+      amount_cents: Math.round(parseFloat(newAmount || "0") * 100),
       interval: newType === "subscription" ? newInterval : undefined,
-      metadata: isChallenge
-        ? { platform: newPlatform, instructions: newDescription, requires_proof: newRequiresProof }
-        : {},
+      metadata: {},
       sort_order: filteredRules.length,
     });
     setShowAdd(false);
     setNewLabel("");
     setNewDescription("");
     setNewAmount("");
-    setNewRequiresProof(false);
   };
 
   return (
@@ -206,40 +199,9 @@ export const AccessRuleEditor = ({
               </div>
               {newType === "purchase" && (parseFloat(newAmount || "0") <= 0) && (
                 <p className="text-[11px] text-amber-500">
-                  ⚠️ Set a price above $0 — or skip this rule and rely on the Fan Challenge to unlock for free.
+                  ⚠️ Set a price above $0.
                 </p>
               )}
-            </div>
-          )}
-
-          {newType === "challenge" && (
-            <div className="space-y-3">
-              <p className="text-[11px] text-muted-foreground">
-                💡 Pick a platform and add clear instructions in the description so fans know exactly what to do.
-              </p>
-              <div className="space-y-2">
-                <Label className="text-xs">Platform</Label>
-                <Select value={newPlatform} onValueChange={setNewPlatform}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="instagram">Instagram</SelectItem>
-                    <SelectItem value="tiktok">TikTok</SelectItem>
-                    <SelectItem value="x">X (Twitter)</SelectItem>
-                    <SelectItem value="other">Other / Anywhere</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-border/40 px-3 py-2">
-                <div>
-                  <Label className="text-xs">Require proof</Label>
-                  <p className="text-[11px] text-muted-foreground">
-                    Fans must upload a screenshot or paste a link.
-                  </p>
-                </div>
-                <Switch checked={newRequiresProof} onCheckedChange={setNewRequiresProof} />
-              </div>
             </div>
           )}
 
