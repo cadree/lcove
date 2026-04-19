@@ -3,6 +3,7 @@ import {
   Sheet,
   SheetContent,
 } from '@/components/ui/sheet';
+import { shareLink, buildShareUrl } from '@/lib/shareLink';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -225,13 +226,11 @@ export const ContentDetailDialog = ({
                 icon={Send}
                 label="Share"
                 onClick={() => {
-                  if (navigator.share) {
-                    navigator.share({
-                      title: content.title,
-                      text: content.description || '',
-                      url: window.location.href,
-                    });
-                  }
+                  shareLink({
+                    title: content.title,
+                    text: content.description || '',
+                    url: buildShareUrl.cinema(content.id),
+                  });
                 }}
               />
               {isTVShow && (

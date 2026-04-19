@@ -208,30 +208,18 @@ export default function PublicEventPage() {
     guestRsvpMutation.mutate();
   };
 
-  const shareUrl = `https://etherbylcove.com/event/${eventId}`;
+  const shareUrl = buildShareUrl.event(eventId || '');
 
   const handleShare = async () => {
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: event?.title, text: `Check out this event: ${event?.title}`, url: shareUrl });
-        return;
-      }
-    } catch {}
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      toast.success("Link copied!");
-    } catch {
-      window.prompt("Copy this link:", shareUrl);
-    }
+    await shareLink({
+      title: event?.title,
+      text: `Check out this event: ${event?.title}`,
+      url: shareUrl,
+    });
   };
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      toast.success("Link copied!");
-    } catch {
-      window.prompt("Copy this link:", shareUrl);
-    }
+    await shareLink({ url: shareUrl });
   };
 
   const isPast = event ? new Date(event.end_date || event.start_date) < new Date() : false;

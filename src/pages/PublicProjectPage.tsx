@@ -205,30 +205,18 @@ export default function PublicProjectPage() {
     },
   });
 
-  const shareUrl = `https://etherbylcove.com/project/${projectId}`;
+  const shareUrl = buildShareUrl.project(projectId || '');
 
   const handleShare = async () => {
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: project?.title, text: `Check out this project: ${project?.title}`, url: shareUrl });
-        return;
-      }
-    } catch {}
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      toast.success("Link copied!");
-    } catch {
-      window.prompt("Copy this link:", shareUrl);
-    }
+    await shareLink({
+      title: project?.title,
+      text: `Check out this project: ${project?.title}`,
+      url: shareUrl,
+    });
   };
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      toast.success("Link copied!");
-    } catch {
-      window.prompt("Copy this link:", shareUrl);
-    }
+    await shareLink({ url: shareUrl });
   };
 
   const hasAppliedToRole = (roleId: string) =>

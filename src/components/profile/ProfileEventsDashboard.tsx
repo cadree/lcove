@@ -98,19 +98,11 @@ export function ProfileEventsDashboard() {
   }, [eventsWithStats]);
 
   const handleShare = async (event: EventWithStats) => {
-    const shareUrl = `https://etherbylcove.com/event/${event.id}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: event.title, text: `Check out this event: ${event.title}`, url: shareUrl });
-        return;
-      }
-    } catch {}
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      toast.success("Link copied!");
-    } catch {
-      window.prompt("Copy this link:", shareUrl);
-    }
+    await shareLink({
+      title: event.title,
+      text: `Check out this event: ${event.title}`,
+      url: buildShareUrl.event(event.id),
+    });
   };
 
   const handleDuplicate = async (event: EventWithStats) => {

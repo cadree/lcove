@@ -59,6 +59,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import BottomNav from "@/components/navigation/BottomNav";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { shareLink, buildShareUrl } from "@/lib/shareLink";
 
 // Event status helper
 function getEventStatus(event: { start_date: string; end_date: string | null; status: string | null }) {
@@ -171,27 +172,17 @@ export default function EventDetail() {
   });
 
   const handleShare = async () => {
-    const url = `${window.location.origin}/event/${eventId}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: event?.title,
-          text: `Check out this event: ${event?.title}`,
-          url,
-        });
-      } catch {
-        // User cancelled
-      }
-    } else {
-      await navigator.clipboard.writeText(url);
-      toast.success("Link copied to clipboard");
-    }
+    if (!eventId) return;
+    await shareLink({
+      title: event?.title,
+      text: `Check out this event: ${event?.title}`,
+      url: buildShareUrl.event(eventId),
+    });
   };
 
-  const handleCopyLink = () => {
-    const url = `${window.location.origin}/event/${eventId}`;
-    navigator.clipboard.writeText(url);
-    toast.success("Link copied to clipboard");
+  const handleCopyLink = async () => {
+    if (!eventId) return;
+    await shareLink({ url: buildShareUrl.event(eventId) });
   };
 
   const handleDelete = async () => {

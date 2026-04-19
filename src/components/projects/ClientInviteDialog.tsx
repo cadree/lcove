@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { shareLink } from '@/lib/shareLink';
 
 interface ClientInviteDialogProps {
   projectId: string;
@@ -185,11 +186,11 @@ export const ClientInviteDialog: React.FC<ClientInviteDialogProps> = ({
 
   const handleSystemShare = async () => {
     if (!generatedLink) return;
-    try {
-      await navigator.share({ title: `Project: ${projectTitle}`, text: `View project details for "${projectTitle}"`, url: generatedLink });
-    } catch {
-      handleCopyLink();
-    }
+    await shareLink({
+      title: `Project: ${projectTitle}`,
+      text: `View project details for "${projectTitle}"`,
+      url: generatedLink,
+    });
   };
 
   const statusBadge = (status: string) => {

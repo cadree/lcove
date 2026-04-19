@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { shareLink } from '@/lib/shareLink';
 import { EditProjectDialog } from '@/components/projects/EditProjectDialog';
 import { ClientDashboardView } from '@/components/projects/ClientDashboardView';
 import { ClientInviteDialog } from '@/components/projects/ClientInviteDialog';
@@ -453,20 +454,16 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                             <MessageCircle className="h-4 w-4 text-muted-foreground" />
                             Text Message
                           </button>
-                          {typeof navigator.share === 'function' && (
-                            <button
-                              className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
-                              onClick={async () => {
-                                try {
-                                  await navigator.share({ title: project.title, text, url: shareUrl });
-                                } catch {}
-                                setShareMenuOpen(false);
-                              }}
-                            >
-                              <Share2 className="h-4 w-4 text-muted-foreground" />
-                              More Options…
-                            </button>
-                          )}
+                          <button
+                            className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
+                            onClick={async () => {
+                              await shareLink({ title: project.title, text, url: shareUrl });
+                              setShareMenuOpen(false);
+                            }}
+                          >
+                            <Share2 className="h-4 w-4 text-muted-foreground" />
+                            More Options…
+                          </button>
                         </>
                       );
                     })()}

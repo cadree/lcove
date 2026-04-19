@@ -20,6 +20,7 @@ import {
   CollapsibleContent,
 } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
+import { shareLink, buildShareUrl } from '@/lib/shareLink';
 
 interface Post {
   id: string;
@@ -61,16 +62,11 @@ const FeedPost = ({ post }: { post: Post }) => {
   };
 
   const handleShare = async () => {
-    try {
-      await navigator.share({
-        title: post.profile?.display_name || 'Check out this post',
-        text: post.content || undefined,
-        url: window.location.href,
-      });
-    } catch {
-      await navigator.clipboard.writeText(window.location.href);
-      toast.success('Link copied to clipboard');
-    }
+    await shareLink({
+      title: post.profile?.display_name || 'Check out this post',
+      text: post.content || undefined,
+      url: buildShareUrl.post(post.user_id, post.id),
+    });
   };
 
   const handleDelete = () => {
