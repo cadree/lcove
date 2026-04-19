@@ -175,20 +175,35 @@ export async function shareToChannel(
       return;
 
     case 'twitter': {
-      const u = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`;
-      if (!openInNewTab(u)) await fallbackCopy('X / Twitter');
+      const webUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`;
+      if (isMobileUA()) {
+        const appUrl = `twitter://post?message=${encodeURIComponent(fullText)}`;
+        tryAppSchemeWithFallback(appUrl, webUrl);
+        return;
+      }
+      if (!openInNewTab(webUrl)) await fallbackCopy('X / Twitter');
       return;
     }
 
     case 'whatsapp': {
-      const u = `https://wa.me/?text=${encodeURIComponent(fullText)}`;
-      if (!openInNewTab(u)) await fallbackCopy('WhatsApp');
+      const webUrl = `https://wa.me/?text=${encodeURIComponent(fullText)}`;
+      if (isMobileUA()) {
+        const appUrl = `whatsapp://send?text=${encodeURIComponent(fullText)}`;
+        tryAppSchemeWithFallback(appUrl, webUrl);
+        return;
+      }
+      if (!openInNewTab(webUrl)) await fallbackCopy('WhatsApp');
       return;
     }
 
     case 'facebook': {
-      const u = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
-      if (!openInNewTab(u)) await fallbackCopy('Facebook');
+      const webUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+      if (isMobileUA()) {
+        const appUrl = `fb://share?link=${encodeURIComponent(url)}`;
+        tryAppSchemeWithFallback(appUrl, webUrl);
+        return;
+      }
+      if (!openInNewTab(webUrl)) await fallbackCopy('Facebook');
       return;
     }
 
