@@ -59,6 +59,8 @@ import { AddToCalendarButtons } from "./AddToCalendarButtons";
 import { InviteGuestsDialog } from "./InviteGuestsDialog";
 import { Input } from "@/components/ui/input";
 import { EventMoodboardView } from "./EventMoodboardView";
+import { TicketCheckoutDialog } from "./TicketCheckoutDialog";
+import { TicketTierManagerDialog } from "./TicketTierManagerDialog";
 
 interface EventDetailDialogProps {
   eventId: string | null;
@@ -81,6 +83,8 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
   const [isGeneratingFlyer, setIsGeneratingFlyer] = useState(false);
   const [isSendingReminder, setIsSendingReminder] = useState(false);
   const [reminderMessage, setReminderMessage] = useState("");
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [tierManagerOpen, setTierManagerOpen] = useState(false);
 
   const isCreator = user?.id === event?.creator_id;
 
@@ -641,6 +645,14 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
               {isCreator && <Settings className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />}
             </div>
 
+            {/* Manage Ticket Tiers - Creator only */}
+            {isCreator && (
+              <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => setTierManagerOpen(true)}>
+                <Ticket className="w-4 h-4" />
+                Manage Ticket Tiers
+              </Button>
+            )}
+
             {/* Invite Guests - Creator only */}
             {isCreator && (
               <InviteGuestsDialog eventId={event.id} eventTitle={event.title}>
@@ -796,16 +808,12 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
                     <Button
                       variant="default"
                       size="lg"
-                      onClick={handleBuyTickets}
+                      onClick={() => setCheckoutOpen(true)}
                       disabled={isPurchasing}
                       className="w-full"
                     >
-                      {isPurchasing ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Ticket className="w-4 h-4 mr-2" />
-                      )}
-                      Buy Ticket - ${event.ticket_price}
+                      <Ticket className="w-4 h-4 mr-2" />
+                      Get Tickets
                     </Button>
                   )
                 ) : (
@@ -1018,6 +1026,25 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
           eventTitle={event.title}
           open={attendeesOpen}
           onOpenChange={setAttendeesOpen}
+        />
+      )}
+
+      {/* Multi-attendee Ticket Checkout */}
+      {event && (
+        <TicketCheckoutDialog
+          eventId={event.id}
+          eventTitle={event.title}
+          open={checkoutOpen}
+          onOpenChange={setCheckoutOpen}
+        />
+      )}
+
+      {/* Ticket Tier Manager (creators only) */}
+      {event && isCreator && (
+        <TicketTierManagerDialog
+          eventId={event.id}
+          open={tierManagerOpen}
+          onOpenChange={setTierManagerOpen}
         />
       )}
     </Dialog>
