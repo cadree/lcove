@@ -140,9 +140,14 @@ export const useCompleteChallenge = () => {
       toast.success("You unlocked this by supporting the artist 💖");
     },
     onError: (e: any) => {
-      const msg = e?.message?.includes("duplicate")
-        ? "You've already unlocked this challenge"
-        : e?.message || "Could not record your completion";
+      console.error("[FanChallenge] completion failed", e);
+      const raw = e?.message || "";
+      let msg = raw || "Could not record your completion";
+      if (raw.includes("duplicate")) {
+        msg = "You've already unlocked this challenge";
+      } else if (raw.toLowerCase().includes("row-level security") || raw.toLowerCase().includes("violates")) {
+        msg = "Challenge unavailable — ask the artist to set up the challenge.";
+      }
       toast.error(msg);
     },
   });

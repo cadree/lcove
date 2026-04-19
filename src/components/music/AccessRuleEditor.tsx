@@ -214,6 +214,9 @@ export const AccessRuleEditor = ({
 
           {newType === "challenge" && (
             <div className="space-y-3">
+              <p className="text-[11px] text-muted-foreground">
+                💡 Pick a platform and add clear instructions in the description so fans know exactly what to do.
+              </p>
               <div className="space-y-2">
                 <Label className="text-xs">Platform</Label>
                 <Select value={newPlatform} onValueChange={setNewPlatform}>

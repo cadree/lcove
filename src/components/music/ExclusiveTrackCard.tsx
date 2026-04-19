@@ -192,7 +192,9 @@ export const ExclusiveTrackCard = ({
               onClick={handleChallengeClick}
             >
               <Target className="w-3 h-3 mr-1" />
-              Unlock via Challenge — Share on {challengePlatformLabel}
+              {challengeMeta?.platform
+                ? `Unlock via Challenge — Share on ${challengePlatformLabel}`
+                : "Unlock — Free for fans"}
             </Button>
           )}
 
@@ -276,10 +278,10 @@ export const ExclusiveTrackCard = ({
         </div>
 
         {/* Extra unlock options for non-owners without access (excluding purchase/sub/challenge already rendered) */}
-        {!fullAccess && !isOwner && trackRules.filter((r) => !["purchase", "subscription", "challenge"].includes(r.rule_type)).length > 0 && (
+        {!fullAccess && !isOwner && trackRules.filter((r) => !["purchase", "subscription", "challenge"].includes(r.rule_type) && r.amount_cents > 0).length > 0 && (
           <div className="flex flex-wrap gap-1">
             {trackRules
-              .filter((r) => !["purchase", "subscription", "challenge"].includes(r.rule_type))
+              .filter((r) => !["purchase", "subscription", "challenge"].includes(r.rule_type) && r.amount_cents > 0)
               .map((rule) => (
                 <Badge
                   key={rule.id}
