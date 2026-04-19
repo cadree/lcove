@@ -32,8 +32,10 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !user) throw new Error("Not authenticated");
 
-    const { eventId, message, sendSms = false } = await req.json();
+    const { eventId, message, sendSms = false, recipientUserIds, recipientRsvpIds } = await req.json();
     if (!eventId) throw new Error("Missing eventId");
+    const userIdFilter: string[] | null = Array.isArray(recipientUserIds) && recipientUserIds.length > 0 ? recipientUserIds : null;
+    const rsvpIdFilter: string[] | null = Array.isArray(recipientRsvpIds) && recipientRsvpIds.length > 0 ? recipientRsvpIds : null;
 
     const { data: event, error: eventError } = await supabaseAdmin
       .from("events")
