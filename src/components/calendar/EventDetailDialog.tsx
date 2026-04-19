@@ -13,7 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { supabase } from "@/integrations/supabase/client";
-import { shareLink, buildShareUrl } from "@/lib/shareLink";
+import { shareLink, shareToChannel, buildShareUrl } from "@/lib/shareLink";
 import { format, formatDistanceToNow } from "date-fns";
 import { 
   MapPin, 
