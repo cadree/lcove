@@ -185,8 +185,9 @@ serve(async (req) => {
       }
     }
 
-    // Send push notifications to guest subscribers
+    // Send push notifications to guest subscribers (only when not filtering by recipient)
     let pushSentCount = 0;
+    if (!userIdFilter && !rsvpIdFilter) {
     try {
       const { data: guestSubs } = await supabaseAdmin
         .from("guest_push_subscriptions")
