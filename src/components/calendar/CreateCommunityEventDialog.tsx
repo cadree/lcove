@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { EventMoodboardEditor } from "./EventMoodboardEditor";
 
 interface CreateCommunityEventDialogProps {
   open: boolean;
@@ -95,6 +96,9 @@ export function CreateCommunityEventDialog({
   const [creditsPrice, setCreditsPrice] = useState('');
   const [externalUrl, setExternalUrl] = useState('');
 
+  // After event is created, capture id and show moodboard step
+  const [createdEventId, setCreatedEventId] = useState<string | null>(null);
+
 // Common timezones for selection
 const TIMEZONES = [
   { value: 'America/New_York', label: 'Eastern Time (ET)' },
@@ -108,40 +112,48 @@ const TIMEZONES = [
 ];
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.target;
+    const file = input.files?.[0];
+    // reset so re-selecting the same file re-fires onChange
+    input.value = '';
     if (!file || !user) return;
 
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file');
+    const allowed = /^image\/(jpe?g|png|webp|gif|heic|heif)$/i;
+    if (!file.type.startsWith('image/') && !allowed.test(file.type)) {
+      toast.error('Please upload a JPG, PNG, WEBP, GIF or HEIC image');
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be less than 5MB');
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image must be less than 10MB');
       return;
     }
 
     setIsUploadingImage(true);
+    const toastId = toast.loading(`Uploading ${file.name}...`);
     try {
-      const fileExt = file.name.split('.').pop();
+      const fileExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
       const fileName = `event-${Date.now()}.${fileExt}`;
       const filePath = `${user.id}/event-images/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('media')
-        .upload(filePath, file);
+        .upload(filePath, file, { upsert: false, contentType: file.type || undefined });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Supabase upload error:', uploadError, { filePath, type: file.type, size: file.size });
+        throw uploadError;
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from('media')
         .getPublicUrl(filePath);
 
       setImageUrl(publicUrl);
-      toast.success('Image uploaded!');
-    } catch (error) {
+      toast.success('Image uploaded!', { id: toastId });
+    } catch (error: any) {
       console.error('Upload error:', error);
-      toast.error('Failed to upload image');
+      toast.error(error?.message || 'Failed to upload image', { id: toastId });
     } finally {
       setIsUploadingImage(false);
     }
@@ -204,10 +216,9 @@ const TIMEZONES = [
       project_id: null,
       status: 'published',
     }, {
-      onSuccess: () => {
-        toast.success('Event created! It will now be visible to the community.');
-        onOpenChange(false);
-        resetForm();
+      onSuccess: (created: any) => {
+        toast.success('Event created! Add a moodboard or finish.');
+        setCreatedEventId(created?.id || null);
       }
     });
   };
@@ -259,6 +270,7 @@ const TIMEZONES = [
     setTicketPrice('');
     setCreditsPrice('');
     setExternalUrl('');
+    setCreatedEventId(null);
   };
 
   return (
@@ -270,10 +282,18 @@ const TIMEZONES = [
         <DialogHeader>
           <DialogTitle className="font-display text-xl flex items-center gap-2">
             <Globe className="w-5 h-5 text-primary" />
-            Create Community Event
+            {createdEventId ? 'Add Moodboard & Itinerary' : 'Create Community Event'}
           </DialogTitle>
         </DialogHeader>
 
+        {createdEventId ? (
+          <div className="space-y-4">
+            <EventMoodboardEditor eventId={createdEventId} />
+            <Button type="button" className="w-full" onClick={() => { onOpenChange(false); resetForm(); }}>
+              Done
+            </Button>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Event Image */}
           <div className="space-y-2">
@@ -304,7 +324,7 @@ const TIMEZONES = [
                 <input 
                   type="file" 
                   className="hidden" 
-                  accept="image/*"
+                  accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic,image/heif,image/*"
                   onChange={handleImageUpload}
                   disabled={isUploadingImage}
                 />
@@ -633,6 +653,7 @@ const TIMEZONES = [
             </Button>
           </div>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );

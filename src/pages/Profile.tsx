@@ -27,6 +27,7 @@ import { FolderDetailView } from "@/components/profile/FolderDetailView";
 import { ProfileLayoutEditor } from "@/components/profile/ProfileLayoutEditor";
 import { ProfileFriendsSection } from "@/components/profile/ProfileFriendsSection";
 import { ProfileEventsDashboard } from "@/components/profile/ProfileEventsDashboard";
+import { ProfileMyTickets } from "@/components/profile/ProfileMyTickets";
 import { useProfile } from "@/hooks/useProfile";
 import { useConversations } from "@/hooks/useConversations";
 import { useAuth } from "@/contexts/AuthContext";
@@ -432,6 +433,9 @@ const Profile = () => {
       case 'events_dashboard':
         if (!isOwnProfile) return null;
         return <ProfileEventsDashboard key="events_dashboard" />;
+      case 'my_tickets':
+        if (!isOwnProfile) return null;
+        return <ProfileMyTickets key="my_tickets" />;
       default:
         return null;
     }

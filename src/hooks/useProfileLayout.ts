@@ -22,6 +22,7 @@ export const DEFAULT_SECTIONS: ProfileSection[] = [
   { id: 'store', label: 'My Store', visible: true, size: 'medium', order: 6 },
   { id: 'calendar', label: 'Calendar', visible: true, size: 'medium', order: 7 },
   { id: 'events_dashboard', label: 'My Events', visible: true, size: 'large', order: 8 },
+  { id: 'my_tickets', label: 'My Tickets', visible: true, size: 'large', order: 14 },
   { id: 'creator_modules', label: 'Creator Modules', visible: true, size: 'medium', order: 9 },
   { id: 'music', label: 'Music Player', visible: true, size: 'medium', order: 10 },
   { id: 'posts_tabs', label: 'Posts & Blogs', visible: true, size: 'large', order: 11 },
