@@ -30,6 +30,7 @@ import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { shareLink, buildShareUrl } from "@/lib/shareLink";
 import { EventMoodboardView } from "@/components/calendar/EventMoodboardView";
 
 export default function PublicEventPage() {

@@ -36,6 +36,7 @@ import { CalendarFeedSettings } from "@/components/calendar/CalendarFeedSettings
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { shareLink, buildShareUrl } from "@/lib/shareLink";
 
 interface EventWithStats {
   id: string;

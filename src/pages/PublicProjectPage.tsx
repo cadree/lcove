@@ -38,6 +38,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { shareLink, buildShareUrl } from "@/lib/shareLink";
 import { cn } from "@/lib/utils";
 import { ProjectDetail } from "@/components/projects/ProjectDetail";
 import type { Project } from "@/hooks/useProjects";

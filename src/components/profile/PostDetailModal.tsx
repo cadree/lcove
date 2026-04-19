@@ -42,6 +42,7 @@ import { ProfilePost } from "@/types/post";
 import { usePostInteractions } from "@/hooks/usePostInteractions";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { shareLink, buildShareUrl } from "@/lib/shareLink";
 
 interface PostDetailModalProps {
   post: ProfilePost | null;
