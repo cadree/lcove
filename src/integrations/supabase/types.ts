@@ -2169,12 +2169,63 @@ export type Database = {
           },
         ]
       }
+      event_moodboard_items: {
+        Row: {
+          body: string | null
+          created_at: string
+          created_by: string
+          event_id: string
+          id: string
+          link_url: string | null
+          media_url: string | null
+          sort_order: number
+          start_time: string | null
+          title: string | null
+          type: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          created_by: string
+          event_id: string
+          id?: string
+          link_url?: string | null
+          media_url?: string | null
+          sort_order?: number
+          start_time?: string | null
+          title?: string | null
+          type: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          created_by?: string
+          event_id?: string
+          id?: string
+          link_url?: string | null
+          media_url?: string | null
+          sort_order?: number
+          start_time?: string | null
+          title?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_moodboard_items_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_reminder_log: {
         Row: {
           event_id: string
           id: string
           message: string | null
           recipient_count: number
+          recipient_email: string | null
           reminder_type: string
           sent_at: string
           sent_by: string | null
@@ -2184,6 +2235,7 @@ export type Database = {
           id?: string
           message?: string | null
           recipient_count?: number
+          recipient_email?: string | null
           reminder_type: string
           sent_at?: string
           sent_by?: string | null
@@ -2193,6 +2245,7 @@ export type Database = {
           id?: string
           message?: string | null
           recipient_count?: number
+          recipient_email?: string | null
           reminder_type?: string
           sent_at?: string
           sent_by?: string | null
@@ -2209,6 +2262,7 @@ export type Database = {
       }
       event_rsvps: {
         Row: {
+          confirmation_sent_at: string | null
           created_at: string
           credits_spent: number | null
           event_id: string
@@ -2224,6 +2278,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          confirmation_sent_at?: string | null
           created_at?: string
           credits_spent?: number | null
           event_id: string
@@ -2239,6 +2294,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          confirmation_sent_at?: string | null
           created_at?: string
           credits_spent?: number | null
           event_id?: string
