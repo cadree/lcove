@@ -316,34 +316,12 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
   const handleDownloadFlyer = async () => {
     setIsGeneratingFlyer(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-event-flyer', {
-        body: { eventId: event.id, format: 'story' },
-      });
-      if (error) throw error;
-      if (data?.flyer_url) {
-        // Try native share with file, fallback to download
-        try {
-          const response = await fetch(data.flyer_url);
-          const blob = await response.blob();
-          const file = new File([blob], `${event.title.replace(/[^a-zA-Z0-9]/g, '_')}_flyer.svg`, { type: blob.type });
-          
-          if (navigator.share && navigator.canShare?.({ files: [file] })) {
-            await navigator.share({
-              title: `${event.title} - Event Flyer`,
-              files: [file],
-            });
-          } else {
-            // Fallback: open in new tab
-            window.open(data.flyer_url, '_blank');
-          }
-        } catch {
-          window.open(data.flyer_url, '_blank');
-        }
-        toast.success('Flyer generated!');
-      }
+      const { generateEventPdf } = await import('@/lib/generateEventPdf');
+      await generateEventPdf(event);
+      toast.success('Event PDF downloaded');
     } catch (error) {
-      console.error('Flyer generation error:', error);
-      toast.error('Failed to generate flyer');
+      console.error('PDF generation error:', error);
+      toast.error('Failed to generate PDF');
     } finally {
       setIsGeneratingFlyer(false);
     }
