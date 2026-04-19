@@ -56,6 +56,8 @@ import EventDetail from "./pages/EventDetail";
 import PublicEventPage from "./pages/PublicEventPage";
 import PublicProjectPage from "./pages/PublicProjectPage";
 import PublicClientPortal from "@/pages/PublicClientPortal";
+import Challenges from "./pages/Challenges";
+import ChallengeDetail from "./pages/ChallengeDetail";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -126,6 +128,8 @@ const App = () => (
                 <Route path="/event/:eventId" element={<PublicEventPage />} />
                 <Route path="/project/:projectId" element={<PublicProjectPage />} />
                 <Route path="/client/:token" element={<PublicClientPortal />} />
+                <Route path="/challenges" element={<Challenges />} />
+                <Route path="/challenge/:id" element={<ChallengeDetail />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

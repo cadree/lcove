@@ -19,6 +19,7 @@ import { UserReviews } from "@/components/profile/UserReviews";
 import { CreatorModuleTabs } from "@/components/profile/CreatorModuleTabs";
 import { EditProfileDetailsDialog } from "@/components/profile/EditProfileDetailsDialog";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
+import { ChallengeProfileCard } from "@/components/challenges/ChallengeProfileCard";
 import { ProfileStats } from "@/components/profile/ProfileStats";
 import { ProfileAboutSection } from "@/components/profile/ProfileAboutSection";
 import { ProfileFolders } from "@/components/profile/ProfileFolders";
@@ -455,6 +456,11 @@ const Profile = () => {
           onAvatarUpdate={handleAvatarUpdate}
           userId={targetUserId || ''}
         />
+
+        {/* Fan Challenge card */}
+        {targetUserId && (
+          <ChallengeProfileCard creatorId={targetUserId} isOwnProfile={isOwnProfile} />
+        )}
 
         {/* Edit Layout Button - Only for owner */}
         {isOwnProfile && (
