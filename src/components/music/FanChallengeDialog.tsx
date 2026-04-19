@@ -84,16 +84,20 @@ export const FanChallengeDialog = ({
           <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
             <platform.Icon className={`w-5 h-5 ${platform.color}`} />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium">{rule.label || `Share on ${platform.label}`}</p>
-              <p className="text-xs text-muted-foreground">{platform.label}</p>
+              <p className="text-sm font-medium">
+                {rule.label || (meta.platform ? `Share on ${platform.label}` : "Support the artist")}
+              </p>
+              {meta.platform && (
+                <p className="text-xs text-muted-foreground">{platform.label}</p>
+              )}
             </div>
           </div>
 
-          {(rule.description || meta.instructions) && (
-            <div className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">
-              {rule.description || meta.instructions}
-            </div>
-          )}
+          <div className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">
+            {rule.description ||
+              meta.instructions ||
+              "Support the artist by sharing this track with your network, then tap below to unlock."}
+          </div>
 
           {requiresProof && (
             <div className="space-y-3 p-3 rounded-lg border border-dashed border-border/60">
@@ -140,7 +144,7 @@ export const FanChallengeDialog = ({
               ) : (
                 <Sparkles className="w-4 h-4 mr-2" />
               )}
-              I completed this
+              I completed this — unlock now
             </Button>
           </div>
         </div>
