@@ -192,6 +192,8 @@ export default function EventDetail() {
     },
     enabled: v2Attendees.length > 0,
   });
+
+  const handleShare = async () => {
     if (!eventId) return;
     await shareLink({
       title: event?.title,
