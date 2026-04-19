@@ -281,8 +281,8 @@ export function useRSVP() {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      // Enable reminder by default for 'interested' status
       const reminderEnabled = status === 'interested' ? true : undefined;
+      let rsvpId = existing?.id;
 
       if (existing) {
         const updateData: Record<string, unknown> = { status };
@@ -295,27 +295,39 @@ export function useRSVP() {
           .eq('id', existing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
           .from('event_rsvps')
-          .insert({ 
-            event_id: eventId, 
-            user_id: user.id, 
+          .insert({
+            event_id: eventId,
+            user_id: user.id,
             status,
-            reminder_enabled: status === 'interested' ? true : false,
-          });
+            reminder_enabled: status === 'interested' ? true : true,
+          })
+          .select('id')
+          .single();
         if (error) throw error;
+        rsvpId = inserted.id;
       }
+
+      return { rsvpId, status };
     },
-    onSuccess: async (_, { eventId, status }) => {
+    onSuccess: async ({ rsvpId }, { eventId, status }) => {
       queryClient.invalidateQueries({ queryKey: ['event', eventId] });
       queryClient.invalidateQueries({ queryKey: ['events'] });
-      
+      queryClient.invalidateQueries({ queryKey: ['my-rsvps'] });
+
       if (status === 'interested') {
         toast.success('Marked as interested! Reminder enabled.');
       } else if (status === 'going') {
         toast.success("You're going!");
-        
-        // Award energy for attending an event
+
+        // Fire-and-forget confirmation email
+        if (rsvpId) {
+          supabase.functions.invoke('send-rsvp-confirmation', {
+            body: { event_id: eventId, rsvp_id: rsvpId },
+          }).catch((err) => console.error('Failed to send RSVP confirmation:', err));
+        }
+
         try {
           await earnEnergy({
             amount: ENERGY_GAINS.event_attend,
