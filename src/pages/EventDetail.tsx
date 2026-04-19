@@ -1310,3 +1310,450 @@ function TeamTab({ teamMembers, teamProfiles, creatorId, organizationId }: TeamT
     </div>
   );
 }
+
+// ============================================================
+// PHASE 3: V2 Tab Components (built on ticket_orders / event_attendees / event_check_ins)
+// ============================================================
+
+const formatMoney = (cents: number, currency = "usd") =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase() }).format(cents / 100);
+
+interface ProfileMap { [userId: string]: { display_name: string | null; avatar_url: string | null } }
+
+// ============ Orders Tab V2 ============
+function OrdersTabV2({
+  orders,
+  tiers,
+  attendees,
+  attendeeProfiles,
+  isLoading,
+}: {
+  orders: TicketOrder[];
+  tiers: any[];
+  attendees: EventAttendee[];
+  attendeeProfiles: ProfileMap;
+  isLoading: boolean;
+}) {
+  const [search, setSearch] = useState("");
+
+  const tierMap = Object.fromEntries(tiers.map(t => [t.id, t]));
+  const attendeesByOrder = attendees.reduce<Record<string, EventAttendee[]>>((acc, a) => {
+    if (!a.order_id) return acc;
+    (acc[a.order_id] = acc[a.order_id] || []).push(a);
+    return acc;
+  }, {});
+
+  const filtered = orders.filter(o => {
+    const profile = o.purchaser_user_id ? attendeeProfiles[o.purchaser_user_id] : null;
+    const name = (profile?.display_name || o.purchaser_name || o.purchaser_email || "").toLowerCase();
+    return name.includes(search.toLowerCase());
+  });
+
+  const paid = orders.filter(o => o.payment_status === "paid");
+  const totalRevenue = paid.reduce((s, o) => s + o.total_cents, 0);
+  const totalCredits = orders.reduce((s, o) => s + (o.credits_spent || 0), 0);
+  const totalTickets = orders.reduce((s, o) => s + o.quantity, 0);
+
+  if (isLoading) {
+    return <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <Card className="border-border/40 bg-card/60">
+          <CardContent className="p-3 text-center">
+            <p className="text-2xl font-bold text-primary">{orders.length}</p>
+            <p className="text-xs text-muted-foreground">{totalTickets} tickets</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/40 bg-card/60">
+          <CardContent className="p-3 text-center">
+            <p className="text-2xl font-bold text-emerald-500">{formatMoney(totalRevenue)}</p>
+            <p className="text-xs text-muted-foreground">Revenue</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/40 bg-card/60">
+          <CardContent className="p-3 text-center">
+            <p className="text-2xl font-bold text-amber-500">{totalCredits}</p>
+            <p className="text-xs text-muted-foreground">Credits</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Search orders..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+      </div>
+
+      {filtered.length === 0 ? (
+        <EmptyState icon={Ticket} title="No orders yet" description="Orders will appear when people purchase tickets." />
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(order => {
+            const profile = order.purchaser_user_id ? attendeeProfiles[order.purchaser_user_id] : null;
+            const name = profile?.display_name || order.purchaser_name || order.purchaser_email || "Guest";
+            const orderAttendees = attendeesByOrder[order.id] || [];
+            const tierBreakdown = orderAttendees.reduce<Record<string, number>>((acc, a) => {
+              const tn = a.tier_id ? (tierMap[a.tier_id]?.name || "Ticket") : "Ticket";
+              acc[tn] = (acc[tn] || 0) + 1;
+              return acc;
+            }, {});
+            return (
+              <Card key={order.id} className="border-border/40 bg-card/60">
+                <CardContent className="p-3 flex items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={profile?.avatar_url || undefined} />
+                    <AvatarFallback>{name[0]}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-medium text-sm truncate">{name}</p>
+                      {!order.purchaser_user_id && <Badge variant="outline" className="text-[10px] px-1 py-0">Guest</Badge>}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {Object.entries(tierBreakdown).map(([t, q]) => `${q}× ${t}`).join(", ") || `${order.quantity} ticket${order.quantity > 1 ? "s" : ""}`}
+                      {" · "}
+                      {format(new Date(order.created_at), "MMM d, h:mm a")}
+                    </p>
+                  </div>
+                  <div className="text-right space-y-1">
+                    {order.payment_method === "stripe" ? (
+                      <Badge variant="outline" className={cn("text-[10px]", order.payment_status === "paid" ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" : "bg-amber-500/10 text-amber-600 border-amber-500/30")}>
+                        {order.payment_status === "paid" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                        {formatMoney(order.total_cents, order.currency)}
+                      </Badge>
+                    ) : order.payment_method === "credits" ? (
+                      <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/30">
+                        {order.credits_spent} cr
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px]">Free</Badge>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============ Attendees Tab V2 ============
+function AttendeesTabV2({
+  attendees,
+  tiers,
+  checkIns,
+  attendeeProfiles,
+  isLoading,
+  eventTitle,
+}: {
+  attendees: EventAttendee[];
+  tiers: any[];
+  checkIns: any[];
+  attendeeProfiles: ProfileMap;
+  isLoading: boolean;
+  eventTitle: string;
+}) {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<"all" | "checked_in" | "not_checked_in" | "guests">("all");
+
+  const tierMap = Object.fromEntries(tiers.map(t => [t.id, t]));
+  const checkedInIds = new Set(checkIns.map((c: any) => c.attendee_id));
+
+  const getName = (a: EventAttendee) => {
+    if (a.attendee_user_id && attendeeProfiles[a.attendee_user_id]) {
+      return attendeeProfiles[a.attendee_user_id].display_name || a.attendee_name || "Attendee";
+    }
+    return a.attendee_name || "Guest";
+  };
+
+  const filtered = attendees.filter(a => {
+    const matchesSearch = getName(a).toLowerCase().includes(search.toLowerCase()) ||
+      (a.attendee_email || "").toLowerCase().includes(search.toLowerCase()) ||
+      a.ticket_number.toLowerCase().includes(search.toLowerCase());
+    if (!matchesSearch) return false;
+    if (filter === "checked_in") return checkedInIds.has(a.id);
+    if (filter === "not_checked_in") return !checkedInIds.has(a.id);
+    if (filter === "guests") return !a.attendee_user_id;
+    return true;
+  });
+
+  const stats = {
+    total: attendees.length,
+    checkedIn: attendees.filter(a => checkedInIds.has(a.id)).length,
+    notCheckedIn: attendees.filter(a => !checkedInIds.has(a.id)).length,
+    guests: attendees.filter(a => !a.attendee_user_id).length,
+  };
+
+  const handleDownloadCSV = () => {
+    const rows = [["Name", "Email", "Phone", "Ticket #", "Tier", "Status", "Checked In", "Created"]];
+    attendees.forEach(a => {
+      rows.push([
+        getName(a),
+        a.attendee_email || "",
+        a.attendee_phone || "",
+        a.ticket_number,
+        a.tier_id ? (tierMap[a.tier_id]?.name || "") : "",
+        a.status,
+        checkedInIds.has(a.id) ? "Yes" : "No",
+        format(new Date(a.created_at), "yyyy-MM-dd HH:mm"),
+      ]);
+    });
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${eventTitle.replace(/[^a-zA-Z0-9]/g, "_")}_attendees.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${attendees.length} attendees exported`);
+  };
+
+  if (isLoading) {
+    return <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}</div>;
+  }
+
+  const filterChips: Array<{ key: typeof filter; label: string; count: number }> = [
+    { key: "all", label: "All", count: stats.total },
+    { key: "checked_in", label: "Checked In", count: stats.checkedIn },
+    { key: "not_checked_in", label: "Not Yet", count: stats.notCheckedIn },
+    { key: "guests", label: "Guests", count: stats.guests },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-4 gap-2">
+        {filterChips.map(chip => (
+          <button
+            key={chip.key}
+            onClick={() => setFilter(chip.key)}
+            className={cn(
+              "p-2 rounded-lg border text-center transition-all",
+              filter === chip.key ? "border-primary bg-primary/10" : "border-border/40 bg-card/60"
+            )}
+          >
+            <p className="text-lg font-bold">{chip.count}</p>
+            <p className="text-[10px] text-muted-foreground">{chip.label}</p>
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search by name, email, ticket #..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+        </div>
+        <Button variant="outline" size="icon" onClick={handleDownloadCSV} title="Download CSV">
+          <Download className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {filtered.length === 0 ? (
+        <EmptyState icon={Users} title="No attendees" description="Attendees appear here once tickets are issued." />
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(a => {
+            const isGuest = !a.attendee_user_id;
+            const profile = a.attendee_user_id ? attendeeProfiles[a.attendee_user_id] : null;
+            const name = getName(a);
+            const isCheckedIn = checkedInIds.has(a.id);
+            const tierName = a.tier_id ? tierMap[a.tier_id]?.name : null;
+            return (
+              <Card key={a.id} className={cn("border-border/40 bg-card/60", isCheckedIn && "border-emerald-500/30 bg-emerald-500/5")}>
+                <CardContent className="p-3 flex items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={profile?.avatar_url || undefined} />
+                    <AvatarFallback>{name[0]}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-medium text-sm truncate">{name}</p>
+                      {isGuest && <Badge variant="outline" className="text-[10px] px-1 py-0">Guest</Badge>}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">
+                      <span className="font-mono">{a.ticket_number}</span>
+                      {tierName && <> · {tierName}</>}
+                      {a.attendee_email && <> · {a.attendee_email}</>}
+                    </p>
+                  </div>
+                  {isCheckedIn ? (
+                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      In
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-muted-foreground">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Not yet
+                    </Badge>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============ Check-In Tab ============
+function CheckInTab({
+  eventId,
+  attendees,
+  checkIns,
+}: {
+  eventId: string;
+  attendees: EventAttendee[];
+  checkIns: any[];
+}) {
+  const total = attendees.filter(a => a.status === "confirmed" || a.status === "checked_in").length;
+  const checkedIn = checkIns.length;
+  const remaining = Math.max(0, total - checkedIn);
+  const pct = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
+
+  return (
+    <div className="space-y-4">
+      <Card className="border-border/40 bg-card/60">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground">Checked in</p>
+              <p className="text-3xl font-bold text-emerald-500">{checkedIn} <span className="text-base text-muted-foreground font-normal">/ {total}</span></p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Remaining</p>
+              <p className="text-3xl font-bold">{remaining}</p>
+            </div>
+          </div>
+          <Progress value={pct} className="h-2" />
+          <p className="text-xs text-center text-muted-foreground">{pct}% checked in</p>
+        </CardContent>
+      </Card>
+
+      <CheckInScanner eventId={eventId} />
+
+      {checkIns.length > 0 && (
+        <Card className="border-border/40 bg-card/60">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <QrCode className="h-4 w-4" />
+              Recent check-ins
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {checkIns.slice(0, 10).map((ci: any) => (
+              <div key={ci.id} className="flex items-center justify-between text-sm py-1.5 border-b border-border/30 last:border-0">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{ci.event_attendees?.attendee_name || "Attendee"}</p>
+                  <p className="text-xs text-muted-foreground font-mono truncate">{ci.event_attendees?.ticket_number}</p>
+                </div>
+                <div className="text-right text-xs text-muted-foreground shrink-0 ml-2">
+                  <p>{format(new Date(ci.created_at), "h:mm a")}</p>
+                  <Badge variant="outline" className="text-[9px] mt-0.5">{ci.method}</Badge>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ============ Finance Tab V2 ============
+function FinanceTabV2({
+  orders,
+  tiers,
+}: {
+  orders: TicketOrder[];
+  tiers: any[];
+}) {
+  const paid = orders.filter(o => o.payment_status === "paid");
+  const grossCents = paid.reduce((s, o) => s + o.total_cents, 0);
+  const refundedCents = orders.reduce((s, o) => s + (o.refund_amount_cents || 0), 0);
+  const netCents = grossCents - refundedCents;
+  const currency = orders[0]?.currency || "usd";
+
+  const tierBreakdown = tiers.map(t => ({
+    name: t.name,
+    sold: t.quantity_sold || 0,
+    capacity: t.capacity,
+    revenueCents: (t.quantity_sold || 0) * (t.price_cents || 0),
+  }));
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="border-border/40 bg-card/60">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <DollarSign className="h-4 w-4 text-emerald-500" />
+              <span className="text-xs text-muted-foreground">Gross Revenue</span>
+            </div>
+            <p className="text-2xl font-bold text-emerald-500">{formatMoney(grossCents, currency)}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">{paid.length} paid order{paid.length !== 1 ? "s" : ""}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/40 bg-card/60">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <span className="text-xs text-muted-foreground">Net Revenue</span>
+            </div>
+            <p className="text-2xl font-bold text-primary">{formatMoney(netCents, currency)}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">After {formatMoney(refundedCents, currency)} refunded</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {tierBreakdown.length > 0 && (
+        <Card className="border-border/40 bg-card/60">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Tier sales</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {tierBreakdown.map(t => (
+              <div key={t.name} className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium">{t.name}</span>
+                  <span className="text-muted-foreground">
+                    {t.sold}{t.capacity ? ` / ${t.capacity}` : ""} · {formatMoney(t.revenueCents, currency)}
+                  </span>
+                </div>
+                {t.capacity && <Progress value={Math.min(100, (t.sold / t.capacity) * 100)} className="h-1.5" />}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="border-border/40 bg-card/60">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <CreditCard className="h-4 w-4" /> Payout Status
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {grossCents > 0 ? (
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                <Clock className="h-5 w-5 text-amber-500" />
+              </div>
+              <div>
+                <p className="font-medium text-sm">Pending</p>
+                <p className="text-xs text-muted-foreground">Payouts processed after the event ends</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No revenue to pay out yet.</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
