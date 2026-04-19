@@ -63,6 +63,7 @@
     "framer-motion": "^12.23.26",
     "hls.js": "^1.6.15",
     "html2canvas": "^1.4.1",
+    "html5-qrcode": "^2.3.8",
     "idb": "^8.0.3",
     "input-otp": "^1.4.2",
     "jspdf": "^4.0.0",
