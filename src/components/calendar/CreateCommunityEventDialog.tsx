@@ -95,6 +95,9 @@ export function CreateCommunityEventDialog({
   const [creditsPrice, setCreditsPrice] = useState('');
   const [externalUrl, setExternalUrl] = useState('');
 
+  // After event is created, capture id and show moodboard step
+  const [createdEventId, setCreatedEventId] = useState<string | null>(null);
+
 // Common timezones for selection
 const TIMEZONES = [
   { value: 'America/New_York', label: 'Eastern Time (ET)' },
@@ -212,10 +215,9 @@ const TIMEZONES = [
       project_id: null,
       status: 'published',
     }, {
-      onSuccess: () => {
-        toast.success('Event created! It will now be visible to the community.');
-        onOpenChange(false);
-        resetForm();
+      onSuccess: (created: any) => {
+        toast.success('Event created! Add a moodboard or finish.');
+        setCreatedEventId(created?.id || null);
       }
     });
   };
@@ -267,6 +269,7 @@ const TIMEZONES = [
     setTicketPrice('');
     setCreditsPrice('');
     setExternalUrl('');
+    setCreatedEventId(null);
   };
 
   return (
