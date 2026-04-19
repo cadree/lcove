@@ -10,11 +10,30 @@ export interface PlatformStats {
 }
 
 export function usePlatformStats() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('platform-stats-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['platform-stats'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['platform-stats'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['platform-stats'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   return useQuery({
     queryKey: ['platform-stats'],
     queryFn: async (): Promise<PlatformStats> => {
-      // Use RPC function to get stats without RLS restrictions
-      // This is safe because it only returns aggregate counts
       const { data, error } = await supabase.rpc('get_platform_stats');
 
       if (error) {
@@ -22,7 +41,6 @@ export function usePlatformStats() {
         throw error;
       }
 
-      // The RPC returns an array with one row
       const stats = data?.[0];
 
       return {
@@ -32,8 +50,9 @@ export function usePlatformStats() {
         totalEvents: Number(stats?.total_events) || 0,
       };
     },
-    staleTime: 30000, // Cache for 30 seconds
-    refetchOnWindowFocus: true, // Refresh on tab focus
-    refetchInterval: 60000, // Auto-refresh every 60 seconds
+    staleTime: 10000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    refetchInterval: 30000,
   });
 }
