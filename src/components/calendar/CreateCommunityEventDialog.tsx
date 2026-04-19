@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { EventMoodboardEditor } from "./EventMoodboardEditor";
 
 interface CreateCommunityEventDialogProps {
   open: boolean;
@@ -644,6 +645,7 @@ const TIMEZONES = [
             </Button>
           </div>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );
