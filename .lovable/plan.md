@@ -1,103 +1,107 @@
 
 
-## What's actually happening
+## What's actually broken vs. missing
 
-**Bug found**: The "static Fan Challenge text" you're seeing is in the **artist-side** "🎯 Recent Challenge Unlocks" panel header — it's a label, not a CTA. The real fan-facing CTA is the **"Unlock — Free for fans" / "Unlock via Challenge — Share on Instagram"** button on each track card. If you're not seeing a clickable button, it's because either (a) no track on that profile has an active `challenge` rule, or (b) you're viewing your own profile (owner sees Publish/Delete instead).
+After reading the code:
 
-**Action**: I'll keep the existing per-track unlock flow as-is (it works), and add a brand-new standalone Challenges product alongside it.
+**Image upload** — the code path is correct (`media` bucket, `${user.id}/event-images/...` matches the storage RLS rule). Session replay actually shows you DID create an event successfully ("Event created!" toast). The likely real issues: (1) no error surfacing if a HEIC/large/odd file is picked, (2) no progress feedback past "Uploading…", (3) the file input doesn't reset so picking the same file twice silently fails. I'll harden it.
+
+**Moodboard** — does not exist. Needs to be added.
+
+**RSVP confirmation email** — does not exist. `useRSVP` only writes to DB and shows a toast.
+
+**Reminders** — only 24h + 1h windows exist in `auto-event-reminders`. You want **5 stages**: confirmation, 1 week, 1 day, 5 hours, 30 minutes.
+
+**My Tickets on profile** — `ProfileEventsDashboard` only shows events you HOST, not events you RSVP'd to.
 
 ---
 
-## Plan: Standalone Creator Challenges (new product)
+## Plan
 
-### 1. Database (new tables)
+### 1. Fix + harden event image upload (`CreateCommunityEventDialog`)
+- Accept HEIC/HEIF, JPEG, PNG, WEBP, GIF explicitly.
+- Reset `<input value>` after each pick so re-selecting the same file works.
+- Show file name + spinner overlay during upload; surface real Supabase error message in toast.
+- Increase limit to 10MB, log errors to console with full context.
 
-```sql
--- Challenges created by any user
-CREATE TABLE public.challenges (
-  id uuid PK,
-  creator_id uuid REFERENCES auth.users,
-  title text NOT NULL,
-  description text,
-  rules text,                       -- markdown / plain
-  reward_credits integer DEFAULT 0,
-  cost_credits integer DEFAULT 0,   -- 0 = free to join
-  deadline timestamptz,
-  cover_image_url text,
-  is_active boolean DEFAULT true,
-  is_published boolean DEFAULT false,
-  participant_count integer DEFAULT 0,
-  created_at, updated_at
-);
-
--- Participation
-CREATE TABLE public.challenge_participants (
-  id uuid PK,
-  challenge_id uuid REFERENCES challenges ON DELETE CASCADE,
-  user_id uuid REFERENCES auth.users,
-  joined_at timestamptz DEFAULT now(),
-  UNIQUE (challenge_id, user_id)
-);
-
--- Submissions
-CREATE TABLE public.challenge_submissions (
-  id uuid PK,
-  challenge_id uuid REFERENCES challenges,
-  user_id uuid,
-  submission_url text,        -- link OR uploaded media URL
-  submission_text text,
-  status text DEFAULT 'submitted',  -- submitted | approved | rejected | rewarded
-  submitted_at timestamptz DEFAULT now(),
-  reviewed_at timestamptz,
-  UNIQUE (challenge_id, user_id)
-);
+### 2. Add Moodboard / Itinerary section
+**DB migration** — new table:
 ```
+event_moodboard_items (
+  id uuid PK, event_id uuid FK→events ON DELETE CASCADE,
+  type text CHECK (type IN ('image','link','note','itinerary')),
+  media_url text, link_url text, title text, body text,
+  start_time timestamptz NULL,  -- for itinerary entries
+  sort_order int DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+)
+```
+RLS:
+- SELECT: anyone if parent `events.is_public=true`, else creator/org members/RSVP'd users.
+- INSERT/UPDATE/DELETE: event creator only.
 
-**RLS**:
-- `challenges` SELECT: anyone if `is_published=true`; creator always.
-- `challenges` INSERT/UPDATE/DELETE: creator only.
-- `challenge_participants` SELECT: self or challenge creator. INSERT: self (only on published+active challenges where deadline not past). DELETE: self.
-- `challenge_submissions` SELECT: self or challenge creator. INSERT: self (only if participant exists). UPDATE: creator (to mark approved/rewarded).
+**UI**:
+- In `CreateCommunityEventDialog` and `EventDetail` (host editor): new "Moodboard & Itinerary" section — drag-to-reorder cards with type tabs (Image / Link / Note / Itinerary entry with time).
+- In **public** `EventDetail` / `PublicEventPage` / `EventDetailDialog`: render a "Vibes & Itinerary" section — itinerary entries shown as a timeline (sorted by `start_time`), images/notes shown as a grid.
+- Storage path: `${user.id}/event-moodboards/${eventId}/...`.
 
-### 2. Profile integration
-On `ProfileHeader` (or new `ProfileChallengesSection`), fetch the profile owner's most recent active+published challenge and render a **clickable card** (`ChallengeProfileCard`) with title, reward, deadline, participant count → links to `/challenge/:id`. If no active challenge, render nothing for visitors; show "Create your first challenge" for owner.
+### 3. RSVP confirmation email + 5-stage reminders
+**Schema additions** (`event_reminder_log` already exists):
+- Extend `reminder_type` accepted values to: `confirmation`, `1week`, `1day`, `5hour`, `30min`, plus existing `24h`, `1h`, `custom`.
+- New column `event_rsvps.confirmation_sent_at timestamptz` to dedupe confirmations per RSVP.
 
-### 3. New routes & pages
-- `/challenges` — discovery feed of all active published challenges.
-- `/challenge/:id` — `ChallengeDetail.tsx`: hero, description, rules, reward, deadline, creator card, CTA logic:
-  - Not signed in → "Sign in to join"
-  - Past deadline / `!is_active` → "Challenge Closed" (disabled)
-  - Not joined → **"Join Challenge"** (free instant; or `cost_credits>0` → confirm dialog → deduct via existing `transfer-credits`/credit ledger)
-  - Joined, no submission → **"Submit Entry"** opens `SubmitEntryDialog` (file upload to `media/{user_id}/challenge-submissions/...` or paste link + optional text)
-  - Submitted → "Submitted ✓" + view-my-entry link
+**Edge function: `send-rsvp-confirmation`** (verify_jwt=false, callable by client + service)
+- Takes `{ event_id, rsvp_id }`, looks up event + recipient (auth user email or guest_email), sends a beautiful confirmation email with: title, date/time, venue, address, cover image, .ics attachment link, link to event page, "Add to Calendar" buttons.
+- Sets `confirmation_sent_at = now()`.
+- Triggered from `useRSVP` after successful insert/update to status `going`, AND from `purchase-event-ticket` after successful purchase, AND for guest RSVPs on `PublicEventPage`.
 
-### 4. Creator tools
-- `CreateChallengeDialog` reachable from profile + `/challenges` (FAB for owner).
-- Creator panel inside `/challenge/:id` for owner: list of submissions with Approve / Reward (mints earned credits via existing economy) / Reject buttons.
+**Rewrite `auto-event-reminders`** to handle 5 windows:
+| Type | Hours ahead | Tolerance |
+|---|---|---|
+| `1week` | 168 | 30 min |
+| `1day` | 24 | 30 min |
+| `5hour` | 5 | 30 min |
+| `30min` | 0.5 | 10 min |
 
-### 5. Hooks
-- `useChallenges.ts` — list, by-id, by-creator, create, update, delete.
-- `useChallengeParticipation.ts` — join, my-participation, my-submission, submit-entry, list-submissions (owner).
+(Confirmation is on-RSVP, not time-based; 1h/24h legacy types stay supported but aren't scheduled anymore.)
 
-### 6. Files added/changed
+For each window: find events whose `start_date` falls in the window, find each RSVP with `status='going'` and `reminder_enabled=true`, dedupe via `event_reminder_log (event_id, reminder_type, recipient_email)` — change log to be **per-recipient** (add `recipient_email text`) so adding a new RSVP after a window fires still gets future reminders, and the same address never gets the same window twice.
+
+**Cron schedule**: ensure pg_cron job runs `auto-event-reminders` every 10 minutes (already documented pattern). I'll add the SQL to (re)create the cron job.
+
+Each email matches the existing branded template style (pink #e91e8c CTA, etherbylcove.com domain, sender `notifications@etherbylcove.com`).
+
+### 4. "My Tickets" section on Profile
+- New component `ProfileMyTickets.tsx` (own profile only).
+- Hook `useMyRSVPs.ts`: queries `event_rsvps` where `user_id = me AND status IN ('going','interested')`, joins `events` for full details, splits into **Upcoming** and **Past** with countdown badges.
+- Each ticket card shows cover image, date/time, venue, status badge (Going / Interested / Ticket Purchased), buttons: View Event, Add to Calendar, Cancel RSVP.
+- Tapping opens existing `EventDetailDialog`.
+- Mounted in `Profile.tsx` next to `ProfileEventsDashboard` (visible only when `isOwnProfile && hasAnyRSVPs`). Add layout key `'my_tickets'`.
+
+### 5. Files touched
 **New**:
-- `src/pages/ChallengeDetail.tsx`, `src/pages/Challenges.tsx`
-- `src/components/challenges/ChallengeProfileCard.tsx`
-- `src/components/challenges/CreateChallengeDialog.tsx`
-- `src/components/challenges/SubmitEntryDialog.tsx`
-- `src/components/challenges/ChallengeSubmissionsPanel.tsx`
-- `src/hooks/useChallenges.ts`, `src/hooks/useChallengeParticipation.ts`
-- Migration: `challenges`, `challenge_participants`, `challenge_submissions` + RLS + trigger to bump `participant_count`.
+- `supabase/migrations/<ts>_event_moodboard_and_reminders.sql`
+- `supabase/functions/send-rsvp-confirmation/index.ts`
+- `src/components/calendar/EventMoodboardEditor.tsx` (host)
+- `src/components/calendar/EventMoodboardView.tsx` (public)
+- `src/hooks/useEventMoodboard.ts`
+- `src/hooks/useMyRSVPs.ts`
+- `src/components/profile/ProfileMyTickets.tsx`
 
 **Edited**:
-- `src/App.tsx` — register `/challenges` and `/challenge/:id` routes.
-- `src/pages/Profile.tsx` (or `ProfileHeader.tsx`) — mount `ChallengeProfileCard`.
+- `src/components/calendar/CreateCommunityEventDialog.tsx` — harden upload, mount `EventMoodboardEditor` (after event created in a step 2).
+- `src/hooks/useCalendar.ts` — call `send-rsvp-confirmation` from `useRSVP` on going.
+- `supabase/functions/purchase-event-ticket/index.ts` — invoke confirmation after success.
+- `supabase/functions/auto-event-reminders/index.ts` — 5-window logic + per-recipient dedupe.
+- `src/pages/EventDetail.tsx` — show moodboard tab for host.
+- `src/components/calendar/EventDetailDialog.tsx` + `src/pages/PublicEventPage.tsx` — render `EventMoodboardView`.
+- `src/pages/Profile.tsx` — mount `ProfileMyTickets`.
 
-### 7. Test plan
-1. Owner creates a challenge from profile → card appears, links to `/challenge/:id`.
-2. Sign in as different user → click card → see full detail → click **Join Challenge** → state flips to **Submit Entry**.
-3. Click Submit → upload file or paste link → state flips to **Submitted**.
-4. Owner views submissions panel → approves one → submitter receives credits.
-5. Set `is_active=false` or pass deadline → CTA shows **Challenge Closed**.
-6. Hard refresh on every step → state persists (DB-backed).
+### 6. Test
+1. Create event → upload cover image (JPG, then HEIC) → both succeed with progress shown.
+2. Add 3 moodboard items (image, note, itinerary entry with time) → save → open public event → see "Vibes & Itinerary" with timeline.
+3. RSVP "Going" as another logged-in user → receive **confirmation email** within 30s; check spam.
+4. Set event start to ~7 days away → wait for cron tick → receive 1-week reminder; verify dedupe (no duplicate sent on next tick).
+5. Visit own profile → "My Tickets" section shows the RSVP'd event → tap → opens detail.
+6. Cancel RSVP from My Tickets → row disappears, future reminders stop.
 
