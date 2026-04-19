@@ -29,6 +29,8 @@ import {
   BarChart3,
   Send,
   Loader2,
+  QrCode,
+  ScanLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,6 +62,10 @@ import BottomNav from "@/components/navigation/BottomNav";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { shareLink, buildShareUrl } from "@/lib/shareLink";
+import { useEventTicketingData, type TicketOrder, type EventAttendee } from "@/hooks/useEventTicketingData";
+import { useEventCheckIns } from "@/hooks/useEventCheckIn";
+import { CheckInScanner } from "@/components/events/CheckInScanner";
+import { Progress } from "@/components/ui/progress";
 
 // Event status helper
 function getEventStatus(event: { start_date: string; end_date: string | null; status: string | null }) {
