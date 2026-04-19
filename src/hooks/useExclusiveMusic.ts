@@ -115,36 +115,10 @@ export const useExclusiveTracks = (artistUserId?: string) => {
 
   const isSubscribedToArtist = !!artistUserId && subscriptions.some((s) => s.artist_user_id === artistUserId);
 
-  const { data: challengeCompletions = [] } = useQuery({
-    queryKey: ["fan-challenge-completions", user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      const { data, error } = await supabase
-        .from("fan_challenge_completions")
-        .select("track_id, artist_user_id, status")
-        .eq("user_id", user.id)
-        .eq("status", "completed");
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!user?.id,
-  });
-
   const hasAccess = (trackId: string): boolean => {
     if (isOwner) return true;
     if (purchases.some((p) => p.track_id === trackId)) return true;
     if (isSubscribedToArtist) return true;
-    // Challenge unlock: track-specific OR artist-wide for this artist
-    if (
-      artistUserId &&
-      challengeCompletions.some(
-        (c: any) =>
-          c.artist_user_id === artistUserId &&
-          (c.track_id === trackId || c.track_id === null)
-      )
-    ) {
-      return true;
-    }
     return false;
   };
 
