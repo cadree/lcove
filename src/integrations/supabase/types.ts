@@ -882,6 +882,127 @@ export type Database = {
           },
         ]
       }
+      challenge_participants: {
+        Row: {
+          challenge_id: string
+          id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          challenge_id: string
+          id?: string
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          challenge_id?: string
+          id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_participants_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      challenge_submissions: {
+        Row: {
+          challenge_id: string
+          id: string
+          reviewed_at: string | null
+          status: string
+          submission_text: string | null
+          submission_url: string | null
+          submitted_at: string
+          user_id: string
+        }
+        Insert: {
+          challenge_id: string
+          id?: string
+          reviewed_at?: string | null
+          status?: string
+          submission_text?: string | null
+          submission_url?: string | null
+          submitted_at?: string
+          user_id: string
+        }
+        Update: {
+          challenge_id?: string
+          id?: string
+          reviewed_at?: string | null
+          status?: string
+          submission_text?: string | null
+          submission_url?: string | null
+          submitted_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_submissions_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      challenges: {
+        Row: {
+          cost_credits: number
+          cover_image_url: string | null
+          created_at: string
+          creator_id: string
+          deadline: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          is_published: boolean
+          participant_count: number
+          reward_credits: number
+          rules: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          cost_credits?: number
+          cover_image_url?: string | null
+          created_at?: string
+          creator_id: string
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_published?: boolean
+          participant_count?: number
+          reward_credits?: number
+          rules?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          cost_credits?: number
+          cover_image_url?: string | null
+          created_at?: string
+          creator_id?: string
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_published?: boolean
+          participant_count?: number
+          reward_credits?: number
+          rules?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       collective_join_requests: {
         Row: {
           conversation_id: string
