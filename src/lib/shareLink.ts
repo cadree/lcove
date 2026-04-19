@@ -95,6 +95,39 @@ function openInNewTab(url: string): boolean {
   }
 }
 
+function isMobileUA(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
+/**
+ * Try to open a native app via its URI scheme. If the app isn't installed
+ * (page stays visible after ~800ms), fall back to the web URL.
+ */
+function tryAppSchemeWithFallback(appUrl: string, webUrl: string): void {
+  if (typeof window === 'undefined') return;
+  const start = Date.now();
+  let fellBack = false;
+
+  const onVisibilityChange = () => {
+    if (document.visibilityState === 'hidden') {
+      fellBack = true; // app opened — cancel fallback
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibilityChange);
+
+  try {
+    window.location.href = appUrl;
+  } catch {}
+
+  window.setTimeout(() => {
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    if (!fellBack && Date.now() - start < 2000 && document.visibilityState === 'visible') {
+      window.location.href = webUrl;
+    }
+  }, 800);
+}
+
 async function copyToClipboardSilent(text: string): Promise<boolean> {
   try {
     if (navigator.clipboard?.writeText) {
@@ -142,20 +175,35 @@ export async function shareToChannel(
       return;
 
     case 'twitter': {
-      const u = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`;
-      if (!openInNewTab(u)) await fallbackCopy('X / Twitter');
+      const webUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`;
+      if (isMobileUA()) {
+        const appUrl = `twitter://post?message=${encodeURIComponent(fullText)}`;
+        tryAppSchemeWithFallback(appUrl, webUrl);
+        return;
+      }
+      if (!openInNewTab(webUrl)) await fallbackCopy('X / Twitter');
       return;
     }
 
     case 'whatsapp': {
-      const u = `https://wa.me/?text=${encodeURIComponent(fullText)}`;
-      if (!openInNewTab(u)) await fallbackCopy('WhatsApp');
+      const webUrl = `https://wa.me/?text=${encodeURIComponent(fullText)}`;
+      if (isMobileUA()) {
+        const appUrl = `whatsapp://send?text=${encodeURIComponent(fullText)}`;
+        tryAppSchemeWithFallback(appUrl, webUrl);
+        return;
+      }
+      if (!openInNewTab(webUrl)) await fallbackCopy('WhatsApp');
       return;
     }
 
     case 'facebook': {
-      const u = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
-      if (!openInNewTab(u)) await fallbackCopy('Facebook');
+      const webUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+      if (isMobileUA()) {
+        const appUrl = `fb://share?link=${encodeURIComponent(url)}`;
+        tryAppSchemeWithFallback(appUrl, webUrl);
+        return;
+      }
+      if (!openInNewTab(webUrl)) await fallbackCopy('Facebook');
       return;
     }
 
