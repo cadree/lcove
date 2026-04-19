@@ -32,8 +32,10 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !user) throw new Error("Not authenticated");
 
-    const { eventId, message, sendSms = false } = await req.json();
+    const { eventId, message, sendSms = false, recipientUserIds, recipientRsvpIds } = await req.json();
     if (!eventId) throw new Error("Missing eventId");
+    const userIdFilter: string[] | null = Array.isArray(recipientUserIds) && recipientUserIds.length > 0 ? recipientUserIds : null;
+    const rsvpIdFilter: string[] | null = Array.isArray(recipientRsvpIds) && recipientRsvpIds.length > 0 ? recipientRsvpIds : null;
 
     const { data: event, error: eventError } = await supabaseAdmin
       .from("events")
@@ -44,11 +46,20 @@ serve(async (req) => {
     if (eventError || !event) throw new Error("Event not found");
     if (event.creator_id !== user.id) throw new Error("Only the host can send reminders");
 
-    const { data: rsvps, error: rsvpError } = await supabaseAdmin
+    let rsvpQuery = supabaseAdmin
       .from("event_rsvps")
-      .select("user_id, guest_email, guest_name, guest_phone, reminder_enabled")
-      .eq("event_id", eventId)
-      .eq("status", "going");
+      .select("id, user_id, guest_email, guest_name, guest_phone, reminder_enabled")
+      .eq("event_id", eventId);
+
+    if (rsvpIdFilter) {
+      rsvpQuery = rsvpQuery.in("id", rsvpIdFilter);
+    } else if (userIdFilter) {
+      rsvpQuery = rsvpQuery.in("user_id", userIdFilter);
+    } else {
+      rsvpQuery = rsvpQuery.eq("status", "going");
+    }
+
+    const { data: rsvps, error: rsvpError } = await rsvpQuery;
 
     if (rsvpError) throw new Error("Failed to fetch attendees");
     if (!rsvps || rsvps.length === 0) {
@@ -174,8 +185,9 @@ serve(async (req) => {
       }
     }
 
-    // Send push notifications to guest subscribers
+    // Send push notifications to guest subscribers (only when not filtering by recipient)
     let pushSentCount = 0;
+    if (!userIdFilter && !rsvpIdFilter) {
     try {
       const { data: guestSubs } = await supabaseAdmin
         .from("guest_push_subscriptions")
@@ -223,6 +235,7 @@ serve(async (req) => {
       }
     } catch (err) {
       logStep("Push notification error", { error: String(err) });
+    }
     }
 
     // Log reminder
