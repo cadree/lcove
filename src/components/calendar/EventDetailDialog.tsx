@@ -645,6 +645,14 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
               {isCreator && <Settings className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />}
             </div>
 
+            {/* Manage Ticket Tiers - Creator only */}
+            {isCreator && (
+              <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => setTierManagerOpen(true)}>
+                <Ticket className="w-4 h-4" />
+                Manage Ticket Tiers
+              </Button>
+            )}
+
             {/* Invite Guests - Creator only */}
             {isCreator && (
               <InviteGuestsDialog eventId={event.id} eventTitle={event.title}>
@@ -1018,6 +1026,25 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
           eventTitle={event.title}
           open={attendeesOpen}
           onOpenChange={setAttendeesOpen}
+        />
+      )}
+
+      {/* Multi-attendee Ticket Checkout */}
+      {event && (
+        <TicketCheckoutDialog
+          eventId={event.id}
+          eventTitle={event.title}
+          open={checkoutOpen}
+          onOpenChange={setCheckoutOpen}
+        />
+      )}
+
+      {/* Ticket Tier Manager (creators only) */}
+      {event && isCreator && (
+        <TicketTierManagerDialog
+          eventId={event.id}
+          open={tierManagerOpen}
+          onOpenChange={setTierManagerOpen}
         />
       )}
     </Dialog>
