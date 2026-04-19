@@ -236,6 +236,7 @@ serve(async (req) => {
     } catch (err) {
       logStep("Push notification error", { error: String(err) });
     }
+    }
 
     // Log reminder
     await supabaseAdmin.from("event_reminder_log").insert({
