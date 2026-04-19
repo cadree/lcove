@@ -7193,6 +7193,19 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: number
       }
+      can_manage_event: {
+        Args: { p_event_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      check_in_attendee: {
+        Args: {
+          p_event_id?: string
+          p_method?: string
+          p_notes?: string
+          p_qr_code: string
+        }
+        Returns: Json
+      }
       ensure_default_pipeline: {
         Args: { p_pipeline_id?: string; p_user_id: string }
         Returns: string
