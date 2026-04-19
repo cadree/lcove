@@ -1,58 +1,57 @@
 
+The social share buttons (Instagram, WhatsApp, Twitter, etc.) in `EventDetailDialog` likely fail because:
+1. **Instagram has no web share URL** — there's no `instagram.com/share?url=...` API. The only way to share to Instagram from web is to copy the link/image and have the user paste it manually, or use the native share sheet on mobile.
+2. **WhatsApp/Twitter/SMS/Facebook** use `window.open(url, '_blank')` which is often blocked by popup blockers (especially inside the Lovable preview iframe), and may silently fail without feedback.
+3. The handlers may not be using the canonical `etherbylcove.com` URL.
 
-## Root cause
+Let me check the actual implementation.
 
-`navigator.share()` fails silently or throws in many places:
-- **In the Lovable preview iframe** (where the user is testing) `navigator.share` is blocked by the iframe's permissions policy → throws `NotAllowedError` immediately, never opening the system sheet.
-- **On desktop browsers** (Firefox, most Chrome desktop) `navigator.share` is `undefined` → some handlers do nothing.
-- **Some handlers have NO fallback** (`FeedPost`, `ContentDetailDialog`, `PostDetailModal` partially) so the button appears broken.
-- **Inconsistent URLs** — some use `window.location.href` (which on the preview is a `lovableproject.com` URL, not shareable), others correctly use `etherbylcove.com`.
-
-The `ProjectCard` already has the correct multi-tier fallback (native → clipboard → execCommand → prompt) — I'll extract that into a shared utility and use it everywhere.
+I need to view `EventDetailDialog.tsx` to confirm the current share menu structure, and check any other place with channel-specific share buttons.
 
 ## Plan
 
-### 1. New shared utility `src/lib/shareLink.ts`
-A single `shareLink({ title, text, url })` function with the proven 4-tier fallback:
-1. Try `navigator.share` (wrapped in try/catch — swallow `AbortError` only, fall through on `NotAllowedError`)
-2. Try `navigator.clipboard.writeText`
-3. Try legacy `document.execCommand('copy')` via hidden textarea
-4. `window.prompt('Copy this link:', url)`
-Always shows a toast on success / "Link copied!" / failure.
+### 1. Extend `src/lib/shareLink.ts` with channel helpers
 
-### 2. Standardize share URLs to canonical domain
-Always build URLs as `https://etherbylcove.com/{type}/{id}`:
-| Surface | Type |
-|---|---|
-| Event | `/event/:id` |
-| Project | `/project/:id` |
-| Profile | `/profile/:userId` |
-| Post | `/profile/:userId?post=:postId` |
-| Client portal | `/client/:token` |
-| Cinema content | `/cinema?content=:id` (current Cinema route) |
+Add a `shareToChannel` function and per-channel URL builders:
 
-### 3. Replace every `handleShare` to use `shareLink()`
-Files updated:
-- `src/components/feed/FeedPost.tsx` — currently fails completely on desktop; uses `window.location.href`
-- `src/components/cinema/ContentDetailDialog.tsx` — no fallback at all
-- `src/components/profile/PostDetailModal.tsx` — silent on cancel/desktop
-- `src/components/calendar/EventDetailDialog.tsx` — keep multi-channel menu (Twitter/SMS/WhatsApp/FB) but route the "Native/Copy" path through `shareLink`
-- `src/pages/EventDetail.tsx`
-- `src/pages/EventsDashboard.tsx`
-- `src/components/profile/ProfileEventsDashboard.tsx`
+```ts
+export type ShareChannel = 'twitter' | 'whatsapp' | 'facebook' | 'sms' | 'email' | 'instagram' | 'copy' | 'native';
+
+shareToChannel(channel, { title, text, url })
+```
+
+Behavior per channel:
+- **twitter** → `https://twitter.com/intent/tweet?text=...&url=...` opened in new tab; if `window.open` returns null (blocked), fall back to `shareLink()` (copy) and toast "Popup blocked — link copied instead".
+- **whatsapp** → `https://wa.me/?text=<text>%20<url>` (works on web + deep-links to app on mobile). Same popup-blocker fallback.
+- **facebook** → `https://www.facebook.com/sharer/sharer.php?u=<url>`. Same fallback.
+- **sms** → `sms:?&body=<text>%20<url>` via `window.location.href` (no popup blocker).
+- **email** → `mailto:?subject=<title>&body=<text>%20<url>`.
+- **instagram** → Instagram has NO web share API. Copy link to clipboard + toast: "Link copied! Paste it into your Instagram story or DM." On mobile, attempt `instagram://` deep link as a best-effort first.
+- **copy** → existing `shareLink()` clipboard path.
+- **native** → existing `shareLink()` native sheet path.
+
+Always show a success toast so the user knows something happened.
+
+### 2. Update `EventDetailDialog.tsx`
+
+Refactor the existing channel buttons (Twitter, WhatsApp, SMS, Facebook, Instagram, Copy/Native) to call `shareToChannel(channel, { title, text, url: buildShareUrl.event(eventId) })`. Remove inline `window.open` calls.
+
+### 3. Audit & update other channel-share surfaces
+
+Files I need to check & likely update:
+- `src/components/calendar/EventDetailDialog.tsx`
 - `src/pages/PublicEventPage.tsx`
+- `src/components/projects/ProjectDetail.tsx` (share menu)
+- `src/components/projects/ProjectCard.tsx`
 - `src/pages/PublicProjectPage.tsx`
-- `src/components/projects/ProjectDetail.tsx` (the share menu's native button)
-- `src/components/projects/ProjectCard.tsx` — refactor to call the new util (remove the inlined copy)
-- `src/components/projects/ClientInviteDialog.tsx` — `handleSystemShare` uses util
+- Any other component with Twitter/WhatsApp/Facebook/Instagram buttons
 
-### 4. Verify the OG/share-page edge function still works
-`share-page` already supports `e/p/u/c` types and returns proper OG tags for crawlers + a 302 for humans. No change needed there — confirm the branded URLs (`etherbylcove.com/event/:id` etc.) are what gets shared, since the static OG tags in `index.html` + per-route updates handle previews on the live domain.
+For each, replace inline channel logic with `shareToChannel()`.
 
-### 5. Test
-1. **In the preview iframe**: tap Share on a project card → toast says "Link copied!" (native share blocked → falls back to clipboard).
-2. **On desktop browser** at the published URL: share buttons on Feed post, Cinema content, Post modal, Event dialog, Project detail, Profile event card — each copies link & shows toast.
-3. **On mobile Safari** at `etherbylcove.com`: same buttons open the native share sheet.
-4. Paste a copied event/project/profile link into iMessage / Slack → preview card renders (validates `share-page` OG path is intact).
-5. Cancel a native share sheet → no error toast (AbortError swallowed).
+### 4. Test
 
+1. In preview iframe (popup-blocked): tap Twitter/WhatsApp/Facebook → toast "Popup blocked — link copied instead", URL on clipboard.
+2. On the published site: tap each → opens the correct compose window/app with prefilled text + canonical `etherbylcove.com` URL.
+3. Instagram → toast "Link copied — paste into your story/DM"; on mobile also tries `instagram://` deep-link.
+4. SMS / Email → opens native compose with prefilled body.
+5. Cancel/dismiss any popup → no error toast.
