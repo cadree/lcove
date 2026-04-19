@@ -580,8 +580,15 @@ interface AttendeesTabProps {
 }
 
 function AttendeesTab({ attendees, attendeeProfiles, isLoading, eventTitle }: AttendeesTabProps) {
+  const navigate = useNavigate();
+  const { eventId } = useParams();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "going" | "interested" | "ticketed" | "guests">("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkMessage, setBulkMessage] = useState("");
+  const [showComposer, setShowComposer] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [creatingChat, setCreatingChat] = useState(false);
 
   const getAttendeeName = (a: AttendeesTabProps['attendees'][0]) => {
     if (a.user_id && attendeeProfiles[a.user_id]) {
@@ -611,9 +618,35 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading, eventTitle }: At
     guests: attendees.filter(a => !a.user_id).length,
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const visibleIds = filteredAttendees.map(a => a.id);
+    const allSelected = visibleIds.every(id => selectedIds.has(id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) visibleIds.forEach(id => next.delete(id));
+      else visibleIds.forEach(id => next.add(id));
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const selectedAttendees = attendees.filter(a => selectedIds.has(a.id));
+  const selectedRegisteredUserIds = selectedAttendees.map(a => a.user_id).filter((x): x is string => !!x);
+
   const handleDownloadCSV = () => {
+    const source = selectedIds.size > 0 ? selectedAttendees : attendees;
     const rows = [["Name", "Email", "Phone", "Status", "Ticket", "Date"]];
-    attendees.forEach(a => {
+    source.forEach(a => {
       const name = getAttendeeName(a);
       const email = a.guest_email || "";
       const phone = a.guest_phone || "";
@@ -629,14 +662,78 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading, eventTitle }: At
     link.download = `${eventTitle.replace(/[^a-zA-Z0-9]/g, "_")}_attendees.csv`;
     link.click();
     URL.revokeObjectURL(url);
-    toast.success("Attendee list downloaded");
+    toast.success(`${source.length} attendee${source.length !== 1 ? 's' : ''} exported`);
   };
 
-  const handleMailAttendee = (a: AttendeesTabProps['attendees'][0]) => {
-    if (a.guest_email) {
-      window.open(`mailto:${a.guest_email}`, "_blank");
+  // Send a 1:1 in-app message to a registered user, or mailto for guests.
+  const handleMessageOne = async (a: AttendeesTabProps['attendees'][0]) => {
+    if (a.user_id) {
+      navigate(`/messages?new=${a.user_id}`);
+    } else if (a.guest_email) {
+      window.open(`mailto:${a.guest_email}?subject=${encodeURIComponent(eventTitle)}`, "_blank");
     } else {
-      toast.info("No email address available for this attendee");
+      toast.info("No contact method available");
+    }
+  };
+
+  // Bulk: send email blast (and SMS where possible) to selected attendees
+  const handleBulkEmail = async () => {
+    if (selectedIds.size === 0 || !eventId) return;
+    setSending(true);
+    try {
+      const res = await supabase.functions.invoke("send-event-reminder", {
+        body: {
+          eventId,
+          message: bulkMessage,
+          recipientRsvpIds: Array.from(selectedIds),
+        },
+      });
+      if (res.error) throw res.error;
+      const r = res.data;
+      toast.success(`Email sent to ${r.sentCount} of ${selectedIds.size} selected`);
+      setShowComposer(false);
+      setBulkMessage("");
+      clearSelection();
+    } catch (err) {
+      toast.error("Failed to send email");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // Bulk: start an in-app group chat with selected registered attendees
+  const handleStartGroupChat = async () => {
+    if (selectedRegisteredUserIds.length === 0) {
+      toast.error("Group chat requires registered attendees (no guests)");
+      return;
+    }
+    setCreatingChat(true);
+    try {
+      // 1:1 short-circuit
+      if (selectedRegisteredUserIds.length === 1) {
+        navigate(`/messages?new=${selectedRegisteredUserIds[0]}`);
+        return;
+      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const { data: conv, error: convErr } = await supabase
+        .from("conversations")
+        .insert({ type: "group", name: eventTitle, created_by: user.id })
+        .select()
+        .single();
+      if (convErr) throw convErr;
+      const participants = [user.id, ...selectedRegisteredUserIds].map(uid => ({
+        conversation_id: conv.id,
+        user_id: uid,
+      }));
+      const { error: partErr } = await supabase.from("conversation_participants").insert(participants);
+      if (partErr) throw partErr;
+      toast.success(`Group chat created with ${selectedRegisteredUserIds.length} attendees`);
+      navigate(`/messages?conversation=${conv.id}`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to create group chat");
+    } finally {
+      setCreatingChat(false);
     }
   };
 
@@ -647,6 +744,9 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading, eventTitle }: At
       </div>
     );
   }
+
+  const allVisibleSelected = filteredAttendees.length > 0 && filteredAttendees.every(a => selectedIds.has(a.id));
+  const guestSelectedCount = selectedAttendees.length - selectedRegisteredUserIds.length;
 
   return (
     <div className="space-y-4">
@@ -715,10 +815,104 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading, eventTitle }: At
             className="pl-9"
           />
         </div>
-        <Button variant="outline" size="icon" onClick={handleDownloadCSV} title="Download attendee list as CSV">
+        <Button variant="outline" size="icon" onClick={handleDownloadCSV} title="Download as CSV">
           <Download className="h-4 w-4" />
         </Button>
       </div>
+
+      {/* Select-all bar */}
+      {filteredAttendees.length > 0 && (
+        <div className="flex items-center justify-between px-1">
+          <button
+            onClick={toggleSelectAll}
+            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-2"
+          >
+            <span className={cn(
+              "h-4 w-4 rounded border flex items-center justify-center transition-colors",
+              allVisibleSelected ? "bg-primary border-primary" : "border-border"
+            )}>
+              {allVisibleSelected && <CheckCircle2 className="h-3 w-3 text-primary-foreground" />}
+            </span>
+            {allVisibleSelected ? "Deselect all" : "Select all"}
+          </button>
+          {selectedIds.size > 0 && (
+            <button
+              onClick={clearSelection}
+              className="text-xs text-primary hover:underline"
+            >
+              Clear ({selectedIds.size})
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Bulk Actions Bar */}
+      {selectedIds.size > 0 && (
+        <Card className="border-primary/30 bg-primary/5 sticky top-32 z-10">
+          <CardContent className="p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">
+                {selectedIds.size} selected
+                {guestSelectedCount > 0 && (
+                  <span className="text-xs text-muted-foreground ml-2">
+                    ({selectedRegisteredUserIds.length} members, {guestSelectedCount} guests)
+                  </span>
+                )}
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowComposer(s => !s)}
+                className="gap-1.5"
+              >
+                <Mail className="h-3.5 w-3.5" />
+                Email
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleStartGroupChat}
+                disabled={creatingChat || selectedRegisteredUserIds.length === 0}
+                className="gap-1.5"
+                title={selectedRegisteredUserIds.length === 0 ? "Select members (not guests)" : undefined}
+              >
+                {creatingChat ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Users className="h-3.5 w-3.5" />}
+                Group Chat
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleDownloadCSV}
+                className="gap-1.5"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Export
+              </Button>
+            </div>
+            {showComposer && (
+              <div className="space-y-2 pt-2 border-t border-border/40">
+                <Input
+                  placeholder="Optional message to include in the email..."
+                  value={bulkMessage}
+                  onChange={(e) => setBulkMessage(e.target.value)}
+                  maxLength={500}
+                />
+                <div className="flex gap-2 justify-end">
+                  <Button size="sm" variant="ghost" onClick={() => { setShowComposer(false); setBulkMessage(""); }}>
+                    Cancel
+                  </Button>
+                  <Button size="sm" onClick={handleBulkEmail} disabled={sending} className="gap-1.5">
+                    {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                    Send to {selectedIds.size}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Attendees List */}
       {filteredAttendees.length === 0 ? (
@@ -734,10 +928,24 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading, eventTitle }: At
             const profile = attendee.user_id ? attendeeProfiles[attendee.user_id] : null;
             const displayName = isGuest ? attendee.guest_name || "Guest" : profile?.display_name || "Unknown";
             const avatarUrl = profile?.avatar_url || undefined;
+            const isSelected = selectedIds.has(attendee.id);
 
             return (
-              <Card key={attendee.id} className="border-border/40 bg-card/60">
+              <Card
+                key={attendee.id}
+                className={cn(
+                  "border-border/40 bg-card/60 transition-colors cursor-pointer",
+                  isSelected && "border-primary/50 bg-primary/5"
+                )}
+                onClick={() => toggleSelect(attendee.id)}
+              >
                 <CardContent className="p-3 flex items-center gap-3">
+                  <span className={cn(
+                    "h-5 w-5 rounded border flex items-center justify-center shrink-0 transition-colors",
+                    isSelected ? "bg-primary border-primary" : "border-border bg-background"
+                  )}>
+                    {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-primary-foreground" />}
+                  </span>
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={avatarUrl} />
                     <AvatarFallback>{displayName[0] || "?"}</AvatarFallback>
@@ -751,7 +959,7 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading, eventTitle }: At
                     </div>
                     {isGuest ? (
                       <div className="text-xs text-muted-foreground space-y-0.5">
-                        {attendee.guest_email && <p>{attendee.guest_email}</p>}
+                        {attendee.guest_email && <p className="truncate">{attendee.guest_email}</p>}
                         {attendee.guest_phone && <p>{attendee.guest_phone}</p>}
                         <p className="capitalize">{attendee.status} · {format(new Date(attendee.created_at), "MMM d")}</p>
                       </div>
@@ -761,15 +969,21 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading, eventTitle }: At
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     {attendee.ticket_purchased && (
                       <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
                         <Ticket className="h-3 w-3 mr-1" />
                         Ticket
                       </Badge>
                     )}
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleMailAttendee(attendee)}>
-                      <Mail className="h-4 w-4" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleMessageOne(attendee)}
+                      title={isGuest ? "Email guest" : "Send DM"}
+                    >
+                      {isGuest ? <Mail className="h-4 w-4" /> : <Send className="h-4 w-4" />}
                     </Button>
                   </div>
                 </CardContent>
