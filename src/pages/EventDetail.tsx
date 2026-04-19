@@ -177,7 +177,21 @@ export default function EventDetail() {
     enabled: !!teamMembers && teamMembers.length > 0,
   });
 
-  const handleShare = async () => {
+  // NEW: Phase-3 ticketing data (orders, attendees, tiers) and check-ins
+  const { orders: v2Orders, attendees: v2Attendees, tiers: v2Tiers, isLoading: v2Loading } = useEventTicketingData(eventId);
+  const { data: v2CheckIns = [] } = useEventCheckIns(eventId);
+
+  // Build profile map for v2 attendees (registered users)
+  const { data: v2AttendeeProfiles } = useQuery({
+    queryKey: ["v2-attendee-profiles", v2Attendees.map(a => a.attendee_user_id).filter(Boolean)],
+    queryFn: async () => {
+      const ids = [...new Set(v2Attendees.map(a => a.attendee_user_id).filter((x): x is string => !!x))];
+      if (ids.length === 0) return {};
+      const { data } = await supabase.from("profiles").select("user_id, display_name, avatar_url").in("user_id", ids);
+      return Object.fromEntries((data || []).map(p => [p.user_id, p]));
+    },
+    enabled: v2Attendees.length > 0,
+  });
     if (!eventId) return;
     await shareLink({
       title: event?.title,
