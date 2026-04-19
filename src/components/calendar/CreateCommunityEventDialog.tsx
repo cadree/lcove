@@ -282,10 +282,18 @@ const TIMEZONES = [
         <DialogHeader>
           <DialogTitle className="font-display text-xl flex items-center gap-2">
             <Globe className="w-5 h-5 text-primary" />
-            Create Community Event
+            {createdEventId ? 'Add Moodboard & Itinerary' : 'Create Community Event'}
           </DialogTitle>
         </DialogHeader>
 
+        {createdEventId ? (
+          <div className="space-y-4">
+            <EventMoodboardEditor eventId={createdEventId} />
+            <Button type="button" className="w-full" onClick={() => { onOpenChange(false); resetForm(); }}>
+              Done
+            </Button>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Event Image */}
           <div className="space-y-2">
