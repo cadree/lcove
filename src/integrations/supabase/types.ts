@@ -2137,6 +2137,63 @@ export type Database = {
           },
         ]
       }
+      event_attendee_notes: {
+        Row: {
+          attendee_email: string | null
+          attendee_user_id: string | null
+          created_at: string
+          host_user_id: string
+          id: string
+          note: string
+          updated_at: string
+        }
+        Insert: {
+          attendee_email?: string | null
+          attendee_user_id?: string | null
+          created_at?: string
+          host_user_id: string
+          id?: string
+          note?: string
+          updated_at?: string
+        }
+        Update: {
+          attendee_email?: string | null
+          attendee_user_id?: string | null
+          created_at?: string
+          host_user_id?: string
+          id?: string
+          note?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      event_attendee_tags: {
+        Row: {
+          attendee_email: string | null
+          attendee_user_id: string | null
+          created_at: string
+          host_user_id: string
+          id: string
+          tag: string
+        }
+        Insert: {
+          attendee_email?: string | null
+          attendee_user_id?: string | null
+          created_at?: string
+          host_user_id: string
+          id?: string
+          tag: string
+        }
+        Update: {
+          attendee_email?: string | null
+          attendee_user_id?: string | null
+          created_at?: string
+          host_user_id?: string
+          id?: string
+          tag?: string
+        }
+        Relationships: []
+      }
       event_attendees: {
         Row: {
           attendee_email: string | null
@@ -7230,6 +7287,10 @@ export type Database = {
           payout_enabled: boolean
         }[]
       }
+      get_attendee_crm_profile: {
+        Args: { p_email: string; p_user_id?: string }
+        Returns: Json
+      }
       get_client_project_by_token: { Args: { p_token: string }; Returns: Json }
       get_platform_stats: {
         Args: never
@@ -7292,6 +7353,10 @@ export type Database = {
       is_user_blocked: {
         Args: { uid1: string; uid2: string }
         Returns: boolean
+      }
+      upsert_attendee_note: {
+        Args: { p_email: string; p_note: string; p_user_id: string }
+        Returns: string
       }
     }
     Enums: {
