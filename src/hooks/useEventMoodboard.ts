@@ -4,11 +4,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 export type MoodboardFileType = 'image' | 'video' | 'pdf' | 'doc' | 'presentation' | 'other';
+type MoodboardDbType = 'image' | 'link' | 'note' | 'itinerary';
 
-export interface MoodboardItem {
+type MoodboardDbItem = {
   id: string;
   event_id: string;
-  type: 'image' | 'link' | 'note' | 'itinerary' | 'file';
+  type: MoodboardDbType;
   media_url: string | null;
   link_url: string | null;
   title: string | null;
@@ -21,6 +22,24 @@ export interface MoodboardItem {
   file_name: string | null;
   file_size: number | null;
   mime_type: string | null;
+};
+
+export interface MoodboardItem extends Omit<MoodboardDbItem, 'type'> {
+  type: MoodboardDbType | 'file';
+}
+
+function normalizeMoodboardItem(item: MoodboardDbItem): MoodboardItem {
+  const isUploadedFile = item.type === 'link' && !!item.media_url && (!!item.file_type || !!item.file_name);
+  return {
+    ...item,
+    type: isUploadedFile ? 'file' : item.type,
+  };
+}
+
+function getInsertType(item: Pick<MoodboardItem, 'type' | 'media_url' | 'file_type' | 'file_name'>): MoodboardDbType {
+  if (item.type === 'file') return 'link';
+  if (item.type === 'link' && item.media_url && (item.file_type || item.file_name)) return 'link';
+  return item.type;
 }
 
 export function classifyFile(file: File): MoodboardFileType {
@@ -35,7 +54,6 @@ export function classifyFile(file: File): MoodboardFileType {
 }
 
 export async function uploadMoodboardFile(userId: string, eventId: string, file: File) {
-  const ext = file.name.split('.').pop() || 'bin';
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = `${userId}/event-moodboard/${eventId}/${Date.now()}-${safeName}`;
   const { error } = await supabase.storage.from('media').upload(path, file, {
@@ -57,7 +75,7 @@ export function useEventMoodboard(eventId: string | null | undefined) {
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true });
       if (error) throw error;
-      return (data || []) as MoodboardItem[];
+      return ((data || []) as MoodboardDbItem[]).map(normalizeMoodboardItem);
     },
     enabled: !!eventId,
   });
@@ -70,13 +88,23 @@ export function useAddMoodboardItem() {
   return useMutation({
     mutationFn: async (item: Partial<Omit<MoodboardItem, 'id' | 'created_at' | 'created_by'>> & Pick<MoodboardItem, 'event_id' | 'type'>) => {
       if (!user) throw new Error('Must be logged in');
+      const payload = {
+        ...item,
+        type: getInsertType({
+          type: item.type,
+          media_url: item.media_url ?? null,
+          file_type: item.file_type ?? null,
+          file_name: item.file_name ?? null,
+        }),
+        created_by: user.id,
+      };
       const { data, error } = await supabase
         .from('event_moodboard_items')
-        .insert({ ...item, created_by: user.id })
+        .insert(payload)
         .select()
         .single();
       if (error) throw error;
-      return data as MoodboardItem;
+      return normalizeMoodboardItem(data as MoodboardDbItem);
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['event-moodboard', data.event_id] });
