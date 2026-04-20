@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { resolveHostIdentity } from "../_shared/host-email-identity.ts";
-import { buildHostEventEmail } from "../_shared/host-event-email-template.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -80,7 +79,6 @@ serve(async (req) => {
       weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
     });
     const eventUrl = `https://etherbylcove.com/event/${event.id}`;
-    const resendKey = Deno.env.get("RESEND_API_KEY");
     const identity = await resolveHostIdentity(admin, body.eventId);
     const eventDateLong = new Date(event.start_date).toLocaleDateString("en-US", {
       weekday: "long", month: "long", day: "numeric", year: "numeric",
@@ -167,34 +165,39 @@ serve(async (req) => {
         } catch (e) { await logRow("push", "failed", String(e)); }
       }
 
-      // Email (host-branded)
-      if (channels.email && email && resendKey) {
+      // Email (host-branded, via managed pipeline)
+      if (channels.email && email) {
         try {
-          const { html, text } = buildHostEventEmail("reminder", {
-            identity,
-            recipientName: displayName,
-            eventTitle: event.title,
-            eventDate: eventDateLong,
-            eventTime: eventTimeShort,
-            location,
-            isFree: true,
-            eventUrl,
-            customMessage: finalBody,
-          });
-          const r = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
+          const { data: invokeData, error: invokeErr } = await admin.functions.invoke("send-transactional-email", {
+            body: {
+              templateName: "event-bulk-attendee-reminder",
+              recipientEmail: email,
+              idempotencyKey: `bulk-${campaign?.id || body.eventId}-${a.id}`,
               from: identity.fromHeader,
-              to: [email],
-              reply_to: identity.replyTo,
-              subject: finalTitle,
-              html,
-              text,
-            }),
+              replyTo: identity.replyTo,
+              templateData: {
+                organizerName: identity.organizerName,
+                recipientName: displayName,
+                customMessage: finalBody,
+                signature: identity.signature,
+                hostAvatarUrl: identity.hostAvatarUrl,
+                headerImageUrl: identity.headerImageUrl,
+                brandColor: identity.brandColor,
+                eventTitle: event.title,
+                eventDate: eventDateLong,
+                eventTime: eventTimeShort,
+                location,
+                eventUrl,
+                subjectLine: finalTitle,
+              },
+            },
           });
-          if (r.ok) { await logRow("email", "sent"); sentCount++; }
-          else await logRow("email", "failed", `${r.status}`);
+          if (!invokeErr && invokeData?.success !== false) {
+            await logRow("email", "sent");
+            sentCount++;
+          } else {
+            await logRow("email", "failed", String(invokeErr?.message || invokeData?.reason || "failed"));
+          }
         } catch (e) { await logRow("email", "failed", String(e)); }
       }
 
