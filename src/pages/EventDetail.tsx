@@ -1414,7 +1414,14 @@ function OrdersTabV2({
               return acc;
             }, {});
             return (
-              <Card key={order.id} className="border-border/40 bg-card/60">
+              <Card
+                key={order.id}
+                className="border-border/40 bg-card/60 cursor-pointer hover:border-primary/40 hover:bg-card/80 transition-colors"
+                onClick={() => onSelectAttendee?.(
+                  { email: order.purchaser_email || null, user_id: order.purchaser_user_id || null },
+                  profile?.display_name || order.purchaser_name || null,
+                )}
+              >
                 <CardContent className="p-3 flex items-center gap-3">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={profile?.avatar_url || undefined} />
