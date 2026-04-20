@@ -37,12 +37,14 @@ import {
   useResendReceipt,
   useSaveAttendeeNote,
 } from "@/hooks/useAttendeeCrmProfile";
+import { SendReminderDialog } from "@/components/events/SendReminderDialog";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   attendeeKey: AttendeeKey | null;
   fallbackName?: string | null;
+  eventId?: string;
 }
 
 const fmtMoney = (cents: number, currency = "usd") => {
@@ -57,7 +59,7 @@ const copy = (text: string, label: string) => {
   navigator.clipboard.writeText(text).then(() => toast.success(`${label} copied`)).catch(() => toast.error("Copy failed"));
 };
 
-export function AttendeeProfileDrawer({ open, onOpenChange, attendeeKey, fallbackName }: Props) {
+export function AttendeeProfileDrawer({ open, onOpenChange, attendeeKey, fallbackName, eventId }: Props) {
   const { data, isLoading, error } = useAttendeeCrmProfile(attendeeKey);
   const addTag = useAddAttendeeTag(attendeeKey || {});
   const removeTag = useRemoveAttendeeTag(attendeeKey || {});
@@ -67,6 +69,7 @@ export function AttendeeProfileDrawer({ open, onOpenChange, attendeeKey, fallbac
   const [tagInput, setTagInput] = useState("");
   const [noteDraft, setNoteDraft] = useState("");
   const [noteSavedAt, setNoteSavedAt] = useState<number | null>(null);
+  const [reminderOpen, setReminderOpen] = useState(false);
 
   useEffect(() => {
     setNoteDraft(data?.note?.note || "");
@@ -156,6 +159,18 @@ export function AttendeeProfileDrawer({ open, onOpenChange, attendeeKey, fallbac
                   Last attended <span className="text-foreground">{stats.last_event.title}</span>
                   {stats.last_event.date && <> · {format(new Date(stats.last_event.date), "MMM d, yyyy")}</>}
                 </p>
+              )}
+
+              {/* Quick actions */}
+              {eventId && (
+                <Button
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setReminderOpen(true)}
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  Send reminder
+                </Button>
               )}
 
               {/* Contact */}
@@ -346,6 +361,20 @@ export function AttendeeProfileDrawer({ open, onOpenChange, attendeeKey, fallbac
           )}
         </div>
       </SheetContent>
+
+      {eventId && (
+        <SendReminderDialog
+          open={reminderOpen}
+          onOpenChange={setReminderOpen}
+          eventId={eventId}
+          attendee={{
+            name: identity?.display_name || fallbackName,
+            email: identity?.email || null,
+            user_id: identity?.user_id || null,
+            phone: identity?.phone || null,
+          }}
+        />
+      )}
     </Sheet>
   );
 }
