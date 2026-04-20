@@ -1339,12 +1339,14 @@ function OrdersTabV2({
   attendees,
   attendeeProfiles,
   isLoading,
+  onSelectAttendee,
 }: {
   orders: TicketOrder[];
   tiers: any[];
   attendees: EventAttendee[];
   attendeeProfiles: ProfileMap;
   isLoading: boolean;
+  onSelectAttendee?: (key: AttendeeKey, name: string | null) => void;
 }) {
   const [search, setSearch] = useState("");
 
