@@ -1,9 +1,24 @@
 import { useEventMoodboard } from "@/hooks/useEventMoodboard";
-import { Clock, ExternalLink, StickyNote } from "lucide-react";
+import { Clock, ExternalLink, StickyNote, File as FileIcon, FileText, FileVideo, Presentation } from "lucide-react";
 import { format } from "date-fns";
 
 interface Props {
   eventId: string;
+}
+
+function getFileMeta(fileType: string | null) {
+  switch (fileType) {
+    case 'video':
+      return { Icon: FileVideo, label: 'Video' };
+    case 'pdf':
+      return { Icon: FileText, label: 'PDF' };
+    case 'presentation':
+      return { Icon: Presentation, label: 'Slides' };
+    case 'doc':
+      return { Icon: FileText, label: 'Doc' };
+    default:
+      return { Icon: FileIcon, label: 'File' };
+  }
 }
 
 export function EventMoodboardView({ eventId }: Props) {
@@ -17,6 +32,7 @@ export function EventMoodboardView({ eventId }: Props) {
   const visuals = items.filter((i) => i.type === 'image');
   const notes = items.filter((i) => i.type === 'note');
   const links = items.filter((i) => i.type === 'link');
+  const files = items.filter((i) => i.type === 'file');
 
   return (
     <div className="space-y-5">
@@ -56,7 +72,7 @@ export function EventMoodboardView({ eventId }: Props) {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {visuals.map((item) => (
               <div key={item.id} className="relative aspect-square rounded-lg overflow-hidden border border-border/50">
-                <img src={item.media_url!} alt={item.title || ''} className="w-full h-full object-cover" />
+                <img src={item.media_url!} alt={item.title || 'Moodboard image'} className="w-full h-full object-cover" />
                 {item.title && (
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/90 to-transparent p-2">
                     <p className="text-xs text-foreground font-medium truncate">{item.title}</p>
@@ -64,6 +80,35 @@ export function EventMoodboardView({ eventId }: Props) {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {files.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Files</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {files.map((item) => {
+              const { Icon, label } = getFileMeta(item.file_type);
+              return (
+                <a
+                  key={item.id}
+                  href={item.media_url || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-3 rounded-lg bg-card border border-border/50 hover:border-primary/50 transition-colors"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <Icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{item.file_name || item.title || 'File'}</p>
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                  </div>
+                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                </a>
+              );
+            })}
           </div>
         </div>
       )}
