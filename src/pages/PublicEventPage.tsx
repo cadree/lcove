@@ -315,11 +315,44 @@ export default function PublicEventPage() {
               <div>
                 <div className="flex items-start justify-between gap-3">
                   <h1 className="text-xl sm:text-2xl font-display font-bold leading-tight">{event.title}</h1>
-                  {isPast && (
-                    <Badge variant="outline" className="shrink-0 bg-muted text-muted-foreground">Past</Badge>
-                  )}
+                  <div className="flex flex-col gap-1 shrink-0 items-end">
+                    {isPast && (
+                      <Badge variant="outline" className="bg-muted text-muted-foreground">Past</Badge>
+                    )}
+                    <Badge
+                      variant="outline"
+                      className={
+                        eventType.tone === "paid"
+                          ? "bg-primary/10 text-primary border-primary/30"
+                          : eventType.tone === "hybrid"
+                          ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                          : eventType.tone === "info"
+                          ? "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30"
+                          : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                      }
+                    >
+                      {eventType.label}
+                    </Badge>
+                  </div>
                 </div>
               </div>
+
+              {/* Add-to-calendar quick action */}
+              {!isPast && (
+                <div className="flex flex-wrap gap-2">
+                  <AddToCalendarButtons
+                    variant="compact"
+                    event={{
+                      title: event.title,
+                      description: event.description,
+                      startDate: new Date(event.start_date),
+                      endDate: event.end_date ? new Date(event.end_date) : null,
+                      location: [event.venue, event.address, event.city, event.state].filter(Boolean).join(", ") || null,
+                      url: shareUrl,
+                    }}
+                  />
+                </div>
+              )}
 
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4 text-primary shrink-0" />
