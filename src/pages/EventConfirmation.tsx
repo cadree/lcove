@@ -5,9 +5,11 @@ import { QRCodeSVG } from "qrcode.react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle2, Calendar, Ticket, ArrowLeft } from "lucide-react";
+import { Loader2, CheckCircle2, Calendar, Ticket, ArrowLeft, Share2, MapPin, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import PageLayout from "@/components/layout/PageLayout";
+import { AddToCalendarButtons } from "@/components/calendar/AddToCalendarButtons";
+import { shareLink, buildShareUrl } from "@/lib/shareLink";
 
 interface Attendee {
   id: string;
@@ -24,6 +26,17 @@ interface Order {
   total_cents: number;
   currency: string;
 }
+interface EventInfo {
+  id: string;
+  title: string;
+  description: string | null;
+  start_date: string;
+  end_date: string | null;
+  venue: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+}
 
 export default function EventConfirmation() {
   const { eventId } = useParams<{ eventId: string }>();
@@ -33,7 +46,7 @@ export default function EventConfirmation() {
   const [loading, setLoading] = useState(true);
   const [order, setOrder] = useState<Order | null>(null);
   const [attendees, setAttendees] = useState<Attendee[]>([]);
-  const [eventTitle, setEventTitle] = useState<string>("");
+  const [event, setEvent] = useState<EventInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,13 +75,32 @@ export default function EventConfirmation() {
       }
     };
     if (eventId) {
-      supabase.from("events").select("title").eq("id", eventId).single().then(({ data }) => {
-        if (data && !cancelled) setEventTitle(data.title);
-      });
+      supabase
+        .from("events")
+        .select("id, title, description, start_date, end_date, venue, address, city, state")
+        .eq("id", eventId)
+        .single()
+        .then(({ data }) => {
+          if (data && !cancelled) setEvent(data as EventInfo);
+        });
     }
     verify();
     return () => { cancelled = true; };
   }, [sessionId, orderIdParam, eventId]);
+
+  const locationStr = event ? [event.venue, event.address, event.city, event.state].filter(Boolean).join(", ") : "";
+  const directionsUrl = locationStr
+    ? `https://maps.google.com/?q=${encodeURIComponent(locationStr)}`
+    : null;
+
+  const handleShare = async () => {
+    if (!event) return;
+    await shareLink({
+      title: event.title,
+      text: `I'm going to ${event.title}!`,
+      url: buildShareUrl.event(event.id),
+    });
+  };
 
   return (
     <PageLayout>
@@ -92,13 +124,42 @@ export default function EventConfirmation() {
             <Card className="p-6 text-center bg-gradient-to-br from-emerald-500/10 to-emerald-500/0 border-emerald-500/30">
               <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-2" />
               <h1 className="text-xl font-display font-semibold">You're in!</h1>
-              <p className="text-sm text-muted-foreground mt-1">{eventTitle}</p>
+              <p className="text-sm text-muted-foreground mt-1">{event?.title}</p>
               {order && (
                 <p className="text-xs text-muted-foreground mt-2">
                   {order.quantity} ticket{order.quantity > 1 ? "s" : ""} · {order.total_cents === 0 ? "Free" : `$${(order.total_cents / 100).toFixed(2)}`}
                 </p>
               )}
             </Card>
+
+            {/* Quick actions */}
+            {event && (
+              <Card className="p-4 space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  <AddToCalendarButtons
+                    variant="compact"
+                    event={{
+                      title: event.title,
+                      description: event.description,
+                      startDate: new Date(event.start_date),
+                      endDate: event.end_date ? new Date(event.end_date) : null,
+                      location: locationStr || null,
+                      url: buildShareUrl.event(event.id),
+                    }}
+                  />
+                  <Button variant="outline" size="sm" onClick={handleShare}>
+                    <Share2 className="w-4 h-4 mr-2" /> Share
+                  </Button>
+                  {directionsUrl && (
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={directionsUrl} target="_blank" rel="noopener noreferrer">
+                        <MapPin className="w-4 h-4 mr-2" /> Directions
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            )}
 
             <div className="space-y-3">
               <h2 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -128,7 +189,9 @@ export default function EventConfirmation() {
 
             <div className="flex gap-2">
               <Button asChild variant="outline" className="flex-1"><Link to={`/event/${eventId}`}>Event details</Link></Button>
-              <Button asChild className="flex-1"><Link to="/profile">Go to profile</Link></Button>
+              <Button asChild className="flex-1"><Link to="/profile">
+                <User className="w-4 h-4 mr-2" />My Tickets
+              </Link></Button>
             </div>
           </motion.div>
         )}

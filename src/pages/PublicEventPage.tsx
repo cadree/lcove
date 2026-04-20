@@ -32,6 +32,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { shareLink, buildShareUrl } from "@/lib/shareLink";
 import { EventMoodboardView } from "@/components/calendar/EventMoodboardView";
+import { AddToCalendarButtons } from "@/components/calendar/AddToCalendarButtons";
 
 export default function PublicEventPage() {
   const { eventId } = useParams();
@@ -142,16 +143,37 @@ export default function PublicEventPage() {
     enabled: !!event?.creator_id,
   });
 
-  // Fetch RSVP count
+  // Fetch combined attendance count: confirmed/checked_in attendees + legacy 'going' RSVPs
   const { data: rsvpCount } = useQuery({
-    queryKey: ["public-event-rsvp-count", eventId],
+    queryKey: ["public-event-attendee-count", eventId],
     queryFn: async () => {
-      const { count } = await supabase
-        .from("event_rsvps")
-        .select("*", { count: "exact", head: true })
+      const [{ count: aCount }, { count: rCount }] = await Promise.all([
+        supabase
+          .from("event_attendees")
+          .select("*", { count: "exact", head: true })
+          .eq("event_id", eventId!)
+          .in("status", ["confirmed", "checked_in"]),
+        supabase
+          .from("event_rsvps")
+          .select("*", { count: "exact", head: true })
+          .eq("event_id", eventId!)
+          .eq("status", "going"),
+      ]);
+      return (aCount || 0) + (rCount || 0);
+    },
+    enabled: !!eventId,
+  });
+
+  // Fetch ticket tiers (for type detection)
+  const { data: tiers } = useQuery({
+    queryKey: ["public-event-tiers", eventId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("ticket_tiers")
+        .select("id, price_cents, credits_price, is_active")
         .eq("event_id", eventId!)
-        .eq("status", "going");
-      return count || 0;
+        .eq("is_active", true);
+      return data || [];
     },
     enabled: !!eventId,
   });
@@ -192,7 +214,7 @@ export default function PublicEventPage() {
         }
       } catch (e) { console.error(e); }
       setRsvpSuccess(true);
-      queryClient.invalidateQueries({ queryKey: ["public-event-rsvp-count", eventId] });
+      queryClient.invalidateQueries({ queryKey: ["public-event-attendee-count", eventId] });
       toast.success("You're on the list!");
     },
     onError: (err: Error) => {
@@ -224,7 +246,17 @@ export default function PublicEventPage() {
   };
 
   const isPast = event ? new Date(event.end_date || event.start_date) < new Date() : false;
-  const isFree = !event?.ticket_price || event.ticket_price <= 0;
+  const hasPaidTier = (tiers || []).some((t: any) => (t.price_cents || 0) > 0);
+  const hasFreeTier = (tiers || []).some((t: any) => (t.price_cents || 0) === 0 && (t.credits_price || 0) === 0);
+  const isFree = !hasPaidTier && (!event?.ticket_price || event.ticket_price <= 0);
+  const eventType: { label: string; tone: "free" | "paid" | "hybrid" | "info" } =
+    hasPaidTier && hasFreeTier
+      ? { label: "Hybrid", tone: "hybrid" }
+      : hasPaidTier || (event?.ticket_price && event.ticket_price > 0)
+      ? { label: "Paid Ticket", tone: "paid" }
+      : event?.external_url && !isFree
+      ? { label: "External", tone: "info" }
+      : { label: "Free RSVP", tone: "free" };
 
   if (isLoading) {
     return (
@@ -283,11 +315,44 @@ export default function PublicEventPage() {
               <div>
                 <div className="flex items-start justify-between gap-3">
                   <h1 className="text-xl sm:text-2xl font-display font-bold leading-tight">{event.title}</h1>
-                  {isPast && (
-                    <Badge variant="outline" className="shrink-0 bg-muted text-muted-foreground">Past</Badge>
-                  )}
+                  <div className="flex flex-col gap-1 shrink-0 items-end">
+                    {isPast && (
+                      <Badge variant="outline" className="bg-muted text-muted-foreground">Past</Badge>
+                    )}
+                    <Badge
+                      variant="outline"
+                      className={
+                        eventType.tone === "paid"
+                          ? "bg-primary/10 text-primary border-primary/30"
+                          : eventType.tone === "hybrid"
+                          ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                          : eventType.tone === "info"
+                          ? "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30"
+                          : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                      }
+                    >
+                      {eventType.label}
+                    </Badge>
+                  </div>
                 </div>
               </div>
+
+              {/* Add-to-calendar quick action */}
+              {!isPast && (
+                <div className="flex flex-wrap gap-2">
+                  <AddToCalendarButtons
+                    variant="compact"
+                    event={{
+                      title: event.title,
+                      description: event.description,
+                      startDate: new Date(event.start_date),
+                      endDate: event.end_date ? new Date(event.end_date) : null,
+                      location: [event.venue, event.address, event.city, event.state].filter(Boolean).join(", ") || null,
+                      url: shareUrl,
+                    }}
+                  />
+                </div>
+              )}
 
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4 text-primary shrink-0" />

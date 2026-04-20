@@ -176,6 +176,16 @@ const TIMEZONES = [
       return;
     }
 
+    if (!description.trim() || description.trim().length < 20) {
+      toast.error('Add a description (at least 20 characters) so guests know what to expect');
+      return;
+    }
+
+    if (!imageUrl) {
+      toast.error('Add a cover image — events with images get 3x more RSVPs');
+      return;
+    }
+
     if (!city.trim()) {
       toast.error('Please enter a city');
       return;
@@ -188,6 +198,21 @@ const TIMEZONES = [
 
     if (!endDateValue || !endTimeValue) {
       toast.error('Please select an end date and time');
+      return;
+    }
+
+    if ((ticketType === 'paid' || ticketType === 'hybrid') && (!ticketPrice || parseFloat(ticketPrice) <= 0)) {
+      toast.error('Set a ticket price for paid events');
+      return;
+    }
+
+    if (ticketType === 'credits' && (!creditsPrice || parseInt(creditsPrice) <= 0)) {
+      toast.error('Set a credits price');
+      return;
+    }
+
+    if (ticketType === 'info' && !externalUrl.trim()) {
+      toast.error('Add an external link for info-only events');
       return;
     }
 
