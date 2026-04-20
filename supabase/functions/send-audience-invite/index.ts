@@ -14,7 +14,7 @@ interface Body {
   title: string;
   body: string;
   channels?: { push?: boolean; email?: boolean; sms?: boolean };
-  filter: {
+  filter?: {
     cities?: string[];
     states?: string[];
     countries?: string[];
@@ -26,6 +26,7 @@ interface Body {
     active_only?: boolean;
   };
   lookalike?: boolean;
+  userIds?: string[]; // When present, skip filter query and target these users directly
 }
 
 serve(async (req) => {
