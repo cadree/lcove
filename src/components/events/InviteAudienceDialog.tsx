@@ -8,11 +8,13 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Send, Sparkles, MapPin, Users, Image as ImageIcon, X, Plus, FileText, FileVideo, File as FileIcon, Presentation, Paperclip } from "lucide-react";
+import { Loader2, Send, Sparkles, MapPin, Users, Image as ImageIcon, X, Plus, FileText, FileVideo, File as FileIcon, Presentation, Paperclip, Search, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { sendAudienceInvite, useAudienceEstimate, useAudiencePreview } from "@/hooks/useNotificationCampaigns";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEventMoodboard, useAddMoodboardItem, useDeleteMoodboardItem, uploadMoodboardFile, classifyFile, type MoodboardFileType } from "@/hooks/useEventMoodboard";
+import { useUserSearch, type SearchedUser } from "@/hooks/useUserSearch";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
