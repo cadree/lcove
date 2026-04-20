@@ -57,6 +57,12 @@ import PublicEventPage from "./pages/PublicEventPage";
 import EventConfirmation from "./pages/EventConfirmation";
 import PublicProjectPage from "./pages/PublicProjectPage";
 import PublicClientPortal from "@/pages/PublicClientPortal";
+import { useTrackActivity } from "@/hooks/useTrackActivity";
+
+const ActivityTracker = () => {
+  useTrackActivity();
+  return null;
+};
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,6 +81,7 @@ const App = () => (
           <PresenceProvider>
             <NavCustomizationProvider>
               <AccessGate>
+                <ActivityTracker />
                 <Toaster />
               <Sonner />
               <Routes>

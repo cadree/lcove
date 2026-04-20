@@ -52,7 +52,24 @@ serve(async (req) => {
 
       if (!events || events.length === 0) continue;
 
+      // Gate by per-event auto-reminder toggles (default ON if no row exists)
+      const eventIds = events.map(e => e.id);
+      const { data: settingsRows } = await admin
+        .from("event_auto_reminders")
+        .select("event_id, enabled_24h, enabled_2h, enabled_at_door, last_24h_sent_at, last_2h_sent_at")
+        .in("event_id", eventIds);
+      const settingsMap = new Map((settingsRows || []).map((r: any) => [r.event_id, r]));
+      const isEnabled = (eid: string) => {
+        const s: any = settingsMap.get(eid);
+        if (!s) return true;
+        if (win.type === "1day") return s.enabled_24h !== false;
+        if (win.type === "2hour") return s.enabled_2h !== false;
+        if (win.type === "starting_now") return s.enabled_at_door !== false;
+        return true;
+      };
+
       for (const event of events) {
+        if (!isEnabled(event.id)) continue;
         // Pull attendees from new schema (event_attendees) — confirmed/checked_in only
         const { data: attendees } = await admin
           .from("event_attendees")
