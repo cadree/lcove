@@ -32,6 +32,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { shareLink, buildShareUrl } from "@/lib/shareLink";
 import { EventMoodboardView } from "@/components/calendar/EventMoodboardView";
+import { AddToCalendarButtons } from "@/components/calendar/AddToCalendarButtons";
 
 export default function PublicEventPage() {
   const { eventId } = useParams();
@@ -142,16 +143,37 @@ export default function PublicEventPage() {
     enabled: !!event?.creator_id,
   });
 
-  // Fetch RSVP count
+  // Fetch combined attendance count: confirmed/checked_in attendees + legacy 'going' RSVPs
   const { data: rsvpCount } = useQuery({
-    queryKey: ["public-event-rsvp-count", eventId],
+    queryKey: ["public-event-attendee-count", eventId],
     queryFn: async () => {
-      const { count } = await supabase
-        .from("event_rsvps")
-        .select("*", { count: "exact", head: true })
+      const [{ count: aCount }, { count: rCount }] = await Promise.all([
+        supabase
+          .from("event_attendees")
+          .select("*", { count: "exact", head: true })
+          .eq("event_id", eventId!)
+          .in("status", ["confirmed", "checked_in"]),
+        supabase
+          .from("event_rsvps")
+          .select("*", { count: "exact", head: true })
+          .eq("event_id", eventId!)
+          .eq("status", "going"),
+      ]);
+      return (aCount || 0) + (rCount || 0);
+    },
+    enabled: !!eventId,
+  });
+
+  // Fetch ticket tiers (for type detection)
+  const { data: tiers } = useQuery({
+    queryKey: ["public-event-tiers", eventId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("ticket_tiers")
+        .select("id, price_cents, credits_price, is_active")
         .eq("event_id", eventId!)
-        .eq("status", "going");
-      return count || 0;
+        .eq("is_active", true);
+      return data || [];
     },
     enabled: !!eventId,
   });
