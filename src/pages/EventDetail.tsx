@@ -1586,7 +1586,17 @@ function AttendeesTabV2({
             const isCheckedIn = checkedInIds.has(a.id);
             const tierName = a.tier_id ? tierMap[a.tier_id]?.name : null;
             return (
-              <Card key={a.id} className={cn("border-border/40 bg-card/60", isCheckedIn && "border-emerald-500/30 bg-emerald-500/5")}>
+              <Card
+                key={a.id}
+                className={cn(
+                  "border-border/40 bg-card/60 cursor-pointer hover:border-primary/40 hover:bg-card/80 transition-colors",
+                  isCheckedIn && "border-emerald-500/30 bg-emerald-500/5"
+                )}
+                onClick={() => onSelectAttendee?.(
+                  { email: a.attendee_email || null, user_id: a.attendee_user_id || null },
+                  name,
+                )}
+              >
                 <CardContent className="p-3 flex items-center gap-3">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={profile?.avatar_url || undefined} />
