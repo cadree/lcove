@@ -2362,6 +2362,59 @@ export type Database = {
           },
         ]
       }
+      event_email_branding: {
+        Row: {
+          brand_color: string | null
+          connected_sender_provider: string | null
+          created_at: string
+          event_id: string
+          from_name_override: string | null
+          header_image_url: string | null
+          organizer_name: string | null
+          personal_note: string | null
+          reply_to_email: string | null
+          reply_to_verified_at: string | null
+          signature: string | null
+          updated_at: string
+        }
+        Insert: {
+          brand_color?: string | null
+          connected_sender_provider?: string | null
+          created_at?: string
+          event_id: string
+          from_name_override?: string | null
+          header_image_url?: string | null
+          organizer_name?: string | null
+          personal_note?: string | null
+          reply_to_email?: string | null
+          reply_to_verified_at?: string | null
+          signature?: string | null
+          updated_at?: string
+        }
+        Update: {
+          brand_color?: string | null
+          connected_sender_provider?: string | null
+          created_at?: string
+          event_id?: string
+          from_name_override?: string | null
+          header_image_url?: string | null
+          organizer_name?: string | null
+          personal_note?: string | null
+          reply_to_email?: string | null
+          reply_to_verified_at?: string | null
+          signature?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_email_branding_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_flyers: {
         Row: {
           created_at: string
@@ -3276,6 +3329,36 @@ export type Database = {
           last_accessed_at?: string | null
           token?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      host_email_verifications: {
+        Row: {
+          code_hash: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          user_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          code_hash: string
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          user_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          code_hash?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          user_id?: string
+          verified_at?: string | null
         }
         Relationships: []
       }
