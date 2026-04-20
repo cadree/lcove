@@ -18,7 +18,7 @@ interface Props {
   onOpenChange: (o: boolean) => void;
 }
 
-interface AttendeeForm { name: string; email: string; phone: string; }
+interface AttendeeForm { name: string; email: string; phone: string; social: string; }
 
 export function TicketCheckoutDialog({ eventId, eventTitle, open, onOpenChange }: Props) {
   const { user } = useAuth();
@@ -26,7 +26,7 @@ export function TicketCheckoutDialog({ eventId, eventTitle, open, onOpenChange }
   const activeTiers = useMemo(() => tiers.filter(t => t.is_active), [tiers]);
   const [tierId, setTierId] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
-  const [attendees, setAttendees] = useState<AttendeeForm[]>([{ name: "", email: "", phone: "" }]);
+  const [attendees, setAttendees] = useState<AttendeeForm[]>([{ name: "", email: "", phone: "", social: "" }]);
   const [submitting, setSubmitting] = useState(false);
 
   const tier = activeTiers.find(t => t.id === tierId) || activeTiers[0] || null;
@@ -42,7 +42,7 @@ export function TicketCheckoutDialog({ eventId, eventTitle, open, onOpenChange }
   useEffect(() => {
     setAttendees(prev => {
       const next = [...prev];
-      while (next.length < qty) next.push({ name: "", email: "", phone: "" });
+      while (next.length < qty) next.push({ name: "", email: "", phone: "", social: "" });
       next.length = qty;
       return next;
     });
@@ -54,10 +54,14 @@ export function TicketCheckoutDialog({ eventId, eventTitle, open, onOpenChange }
 
   const handleCheckout = async () => {
     if (!tier) { toast.error("No ticket tier selected"); return; }
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     for (let i = 0; i < attendees.length; i++) {
-      if (!attendees[i].name.trim()) { toast.error(`Enter name for attendee ${i + 1}`); return; }
+      const a = attendees[i];
+      if (!a.name.trim()) { toast.error(`Enter name for attendee ${i + 1}`); return; }
+      if (!a.email.trim() || !emailRe.test(a.email.trim())) { toast.error(`Valid email required for attendee ${i + 1}`); return; }
+      if (!a.phone.trim() || a.phone.replace(/\D/g, "").length < 7) { toast.error(`Valid phone required for attendee ${i + 1}`); return; }
+      if (!a.social.trim()) { toast.error(`Social handle required for attendee ${i + 1}`); return; }
     }
-    if (!user && !attendees[0].email.trim()) { toast.error("Email required for guest checkout"); return; }
 
     setSubmitting(true);
     try {
@@ -72,8 +76,9 @@ export function TicketCheckoutDialog({ eventId, eventTitle, open, onOpenChange }
           tierId: tier.id,
           attendees: attendees.map(a => ({
             name: a.name.trim(),
-            email: a.email.trim().toLowerCase() || undefined,
-            phone: a.phone.trim() || undefined,
+            email: a.email.trim().toLowerCase(),
+            phone: a.phone.trim(),
+            social: a.social.trim().replace(/^@/, ""),
           })),
         },
         headers,
@@ -159,8 +164,10 @@ export function TicketCheckoutDialog({ eventId, eventTitle, open, onOpenChange }
                 <Card key={i} className="p-3 space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">Ticket {i + 1}</p>
                   <Input placeholder="Full name *" value={a.name} onChange={(e) => updateAttendee(i, "name", e.target.value)} maxLength={100} />
-                  <Input placeholder={i === 0 ? "Email *" : "Email (optional)"} type="email" value={a.email} onChange={(e) => updateAttendee(i, "email", e.target.value)} maxLength={255} />
-                  {i === 0 && <Input placeholder="Phone (optional)" type="tel" value={a.phone} onChange={(e) => updateAttendee(i, "phone", e.target.value)} maxLength={20} />}
+                  <Input placeholder="Email *" type="email" value={a.email} onChange={(e) => updateAttendee(i, "email", e.target.value)} maxLength={255} />
+                  <Input placeholder="Phone *" type="tel" value={a.phone} onChange={(e) => updateAttendee(i, "phone", e.target.value)} maxLength={20} />
+                  <Input placeholder="Instagram / social handle *" value={a.social} onChange={(e) => updateAttendee(i, "social", e.target.value)} maxLength={50} />
+                  <p className="text-[10px] text-muted-foreground">All fields required so the host can reach you about the event.</p>
                 </Card>
               ))}
             </div>
