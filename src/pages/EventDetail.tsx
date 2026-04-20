@@ -1097,8 +1097,8 @@ function MarketingTab({ eventId, tiers }: { eventId: string; tiers: any[] }) {
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         eventId={eventId}
-        eventName={event?.title}
-        eventCity={event?.city}
+        eventName={(event as any)?.title}
+        eventCity={(event as any)?.city}
       />
 
     </div>
