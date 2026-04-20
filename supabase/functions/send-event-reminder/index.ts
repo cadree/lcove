@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { resolveHostIdentity } from "../_shared/host-email-identity.ts";
+import { buildHostEventEmail } from "../_shared/host-event-email-template.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
