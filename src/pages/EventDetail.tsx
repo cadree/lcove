@@ -68,6 +68,10 @@ import { useEventTicketingData, type TicketOrder, type EventAttendee } from "@/h
 import { useEventCheckIns } from "@/hooks/useEventCheckIn";
 import { CheckInScanner } from "@/components/events/CheckInScanner";
 import { Progress } from "@/components/ui/progress";
+import { AutoReminderSettings } from "@/components/events/AutoReminderSettings";
+import { CampaignAnalyticsCard } from "@/components/events/CampaignAnalyticsCard";
+import { BulkReminderDialog } from "@/components/events/BulkReminderDialog";
+import { InviteAudienceDialog } from "@/components/events/InviteAudienceDialog";
 
 // Event status helper
 function getEventStatus(event: { start_date: string; end_date: string | null; status: string | null }) {
@@ -416,7 +420,7 @@ export default function EventDetail() {
 
               {/* Marketing Tab */}
               <TabsContent value="marketing" className="mt-0 space-y-4">
-                <MarketingTab eventId={eventId!} />
+                <MarketingTab eventId={eventId!} tiers={v2Tiers} />
               </TabsContent>
 
               {/* Finance Tab */}
@@ -1045,101 +1049,50 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading, eventTitle }: At
 }
 
 // ============ Marketing Tab ============
-function MarketingTab({ eventId }: { eventId: string }) {
-  const { user } = useAuth();
-  const [sendingReminder, setSendingReminder] = useState(false);
-  const [sendingBlast, setSendingBlast] = useState(false);
-
-  const handleSendReminder = async () => {
-    setSendingReminder(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
-      const res = await supabase.functions.invoke("send-event-reminder", {
-        body: { eventId, message: "" },
-      });
-
-      if (res.error) throw res.error;
-      const result = res.data;
-      toast.success(`Reminder sent to ${result.sentCount} attendee${result.sentCount !== 1 ? 's' : ''}${result.pushSentCount ? ` (+${result.pushSentCount} push)` : ''}`);
-    } catch (error) {
-      toast.error("Failed to send reminder");
-    } finally {
-      setSendingReminder(false);
-    }
-  };
-
-  const handleEmailBlast = async () => {
-    setSendingBlast(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
-      const res = await supabase.functions.invoke("send-event-reminder", {
-        body: { eventId, message: "We're excited to see you at our upcoming event! Don't forget to check the event details." },
-      });
-
-      if (res.error) throw res.error;
-      const result = res.data;
-      toast.success(`Email sent to ${result.sentCount} attendee${result.sentCount !== 1 ? 's' : ''}`);
-    } catch (error) {
-      toast.error("Failed to send email blast");
-    } finally {
-      setSendingBlast(false);
-    }
-  };
+function MarketingTab({ eventId, tiers }: { eventId: string; tiers: any[] }) {
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   return (
     <div className="space-y-4">
-      {/* Quick Actions */}
+      {/* Primary: Invite Audience */}
+      <Card
+        className="border-primary/40 bg-gradient-to-br from-primary/10 to-primary/5 cursor-pointer hover:border-primary/60 transition-colors"
+        onClick={() => setInviteOpen(true)}
+      >
+        <CardContent className="p-4 flex items-center gap-3">
+          <div className="h-12 w-12 rounded-lg bg-primary/20 flex items-center justify-center">
+            <Megaphone className="h-6 w-6 text-primary" />
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold">Invite audience</p>
+            <p className="text-xs text-muted-foreground">Reach Ether users by city, interests & more</p>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-2 gap-3">
-        <Card 
-          className="border-border/40 bg-card/60 cursor-pointer hover:bg-card/80 transition-colors"
-          onClick={!sendingBlast ? handleEmailBlast : undefined}
-        >
+        <Card className="border-border/40 bg-card/60 cursor-pointer hover:bg-card/80 transition-colors" onClick={() => setBulkOpen(true)}>
           <CardContent className="p-4 text-center">
-            {sendingBlast ? (
-              <Loader2 className="h-8 w-8 mx-auto mb-2 text-primary animate-spin" />
-            ) : (
-              <Mail className="h-8 w-8 mx-auto mb-2 text-primary" />
-            )}
-            <p className="font-medium text-sm">Email Blast</p>
-            <p className="text-xs text-muted-foreground">Send to attendees</p>
+            <Mail className="h-7 w-7 mx-auto mb-2 text-primary" />
+            <p className="font-medium text-sm">Email blast</p>
+            <p className="text-xs text-muted-foreground">All attendees</p>
           </CardContent>
         </Card>
-        <Card 
-          className="border-border/40 bg-card/60 cursor-pointer hover:bg-card/80 transition-colors"
-          onClick={!sendingReminder ? handleSendReminder : undefined}
-        >
+        <Card className="border-border/40 bg-card/60 cursor-pointer hover:bg-card/80 transition-colors" onClick={() => setBulkOpen(true)}>
           <CardContent className="p-4 text-center">
-            {sendingReminder ? (
-              <Loader2 className="h-8 w-8 mx-auto mb-2 text-primary animate-spin" />
-            ) : (
-              <Send className="h-8 w-8 mx-auto mb-2 text-primary" />
-            )}
-            <p className="font-medium text-sm">Push Notification</p>
-            <p className="text-xs text-muted-foreground">Remind attendees</p>
+            <Send className="h-7 w-7 mx-auto mb-2 text-primary" />
+            <p className="font-medium text-sm">Push reminder</p>
+            <p className="text-xs text-muted-foreground">Filter & send</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Campaign Stats */}
-      <Card className="border-border/40 bg-card/60">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Campaign Performance
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <EmptyState
-            icon={Megaphone}
-            title="No campaigns yet"
-            description="Create an email blast or push notification to reach your attendees."
-          />
-        </CardContent>
-      </Card>
+      <AutoReminderSettings eventId={eventId} />
+      <CampaignAnalyticsCard eventId={eventId} />
+
+      <BulkReminderDialog open={bulkOpen} onOpenChange={setBulkOpen} eventId={eventId} tiers={tiers} />
+      <InviteAudienceDialog open={inviteOpen} onOpenChange={setInviteOpen} eventId={eventId} />
     </div>
   );
 }
