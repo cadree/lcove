@@ -44,37 +44,46 @@ serve(async (req) => {
     const body: Body = await req.json();
     if (!body.title || !body.body) throw new Error("Missing fields");
 
-    let filter: any = { ...body.filter };
+    let profiles: Array<{ user_id: string; display_name: string | null; last_active_at: string | null; interests: string[] | null }> = [];
+    let filter: any = { ...(body.filter || {}) };
 
-    // Lookalike: union with interests of current attendees of this event
-    if (body.lookalike && body.eventId) {
-      const { data: attendees } = await admin.from("event_attendees")
-        .select("attendee_user_id").eq("event_id", body.eventId)
-        .not("attendee_user_id", "is", null).limit(500);
-      const userIds = (attendees || []).map(a => a.attendee_user_id).filter(Boolean) as string[];
-      if (userIds.length > 0) {
-        const { data: profiles } = await admin.from("profiles")
-          .select("interests").in("user_id", userIds);
-        const interestSet = new Set<string>(filter.interests || []);
-        (profiles || []).forEach(p => (p.interests || []).forEach((i: string) => interestSet.add(i)));
-        filter.interests = Array.from(interestSet);
+    if (body.userIds && body.userIds.length > 0) {
+      // Direct targeting mode — skip filter query entirely
+      const { data: directProfiles, error: dpErr } = await admin
+        .from("profiles")
+        .select("user_id, display_name, last_active_at, interests")
+        .in("user_id", body.userIds);
+      if (dpErr) throw new Error(`direct profile lookup failed: ${dpErr.message}`);
+      profiles = (directProfiles || []) as typeof profiles;
+    } else {
+      // Lookalike: union with interests of current attendees of this event
+      if (body.lookalike && body.eventId) {
+        const { data: attendees } = await admin.from("event_attendees")
+          .select("attendee_user_id").eq("event_id", body.eventId)
+          .not("attendee_user_id", "is", null).limit(500);
+        const userIds = (attendees || []).map(a => a.attendee_user_id).filter(Boolean) as string[];
+        if (userIds.length > 0) {
+          const { data: ap } = await admin.from("profiles")
+            .select("interests").in("user_id", userIds);
+          const interestSet = new Set<string>(filter.interests || []);
+          (ap || []).forEach(p => (p.interests || []).forEach((i: string) => interestSet.add(i)));
+          filter.interests = Array.from(interestSet);
+        }
       }
-    }
 
-    // SINGLE SOURCE OF TRUTH: use the same RPC the UI preview uses.
-    // This guarantees estimate = preview = send target.
-    // We must call as the authenticated user (RPC checks auth.uid()), so use a user-scoped client.
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } }
-    );
-    const { data: audienceRows, error: audErr } = await userClient.rpc("get_audience_preview", {
-      filter,
-      p_limit: 10000,
-    });
-    if (audErr) throw new Error(`audience query failed: ${audErr.message}`);
-    let profiles = (audienceRows || []) as Array<{ user_id: string; display_name: string | null; last_active_at: string | null; interests: string[] | null }>;
+      // SINGLE SOURCE OF TRUTH: use the same RPC the UI preview uses.
+      const userClient = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data: audienceRows, error: audErr } = await userClient.rpc("get_audience_preview", {
+        filter,
+        p_limit: 10000,
+      });
+      if (audErr) throw new Error(`audience query failed: ${audErr.message}`);
+      profiles = (audienceRows || []) as typeof profiles;
+    }
 
     const channels = body.channels || { push: true, email: true, sms: false };
     const resendKey = Deno.env.get("RESEND_API_KEY");
