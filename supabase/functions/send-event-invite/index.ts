@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { resolveHostIdentity } from "../_shared/host-email-identity.ts";
-import { buildHostEventEmail } from "../_shared/host-event-email-template.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,9 +14,7 @@ const logStep = (step: string, details?: any) => {
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     logStep("Function started");
@@ -61,7 +58,6 @@ serve(async (req) => {
 
     const identity = await resolveHostIdentity(supabaseAdmin, eventId);
 
-    // Optional moodboard previews
     const { data: moodItems } = await supabaseAdmin
       .from("event_moodboard_items")
       .select("file_url, mime_type")
@@ -72,7 +68,6 @@ serve(async (req) => {
       .slice(0, 3)
       .map((m: any) => m.file_url);
 
-    const resendKey = Deno.env.get("RESEND_API_KEY");
     const results: Array<{ email?: string; phone?: string; status: string; error?: string }> = [];
 
     const eventUrl = `https://etherbylcove.com/event/${eventId}`;
@@ -86,50 +81,47 @@ serve(async (req) => {
     const location = [event.venue, event.city].filter(Boolean).join(", ") || "Location TBA";
 
     for (const invitee of invitees) {
-      if (invitee.email && resendKey) {
+      if (invitee.email) {
         try {
-          const { subject, html, text } = buildHostEventEmail("invite", {
-            identity,
-            recipientName: invitee.name,
-            eventTitle: event.title,
-            eventDate,
-            eventTime,
-            location,
-            isFree,
-            ticketPrice: event.ticket_price,
-            eventUrl,
-            moodboardThumbnails,
-          });
-
-          const emailRes = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${resendKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
+          const { data, error } = await supabaseAdmin.functions.invoke("send-transactional-email", {
+            body: {
+              templateName: "event-invite",
+              recipientEmail: invitee.email,
+              idempotencyKey: `invite-${eventId}-${invitee.email.toLowerCase()}`,
               from: identity.fromHeader,
-              to: [invitee.email],
-              reply_to: identity.replyTo,
-              subject,
-              html,
-              text,
-            }),
+              replyTo: identity.replyTo,
+              templateData: {
+                organizerName: identity.organizerName,
+                recipientName: invitee.name,
+                personalNote: identity.personalNote,
+                signature: identity.signature,
+                hostAvatarUrl: identity.hostAvatarUrl,
+                headerImageUrl: identity.headerImageUrl,
+                brandColor: identity.brandColor,
+                eventTitle: event.title,
+                eventDate,
+                eventTime,
+                location,
+                isFree,
+                ticketPrice: event.ticket_price,
+                eventUrl,
+                moodboardThumbnails,
+              },
+            },
           });
 
-          if (emailRes.ok) {
-            results.push({ email: invitee.email, status: "sent" });
-            logStep("Email sent", { email: invitee.email, from: identity.fromHeader });
+          if (error) {
+            results.push({ email: invitee.email, status: "failed", error: String(error.message || error) });
+            logStep("Invoke error", { email: invitee.email, error });
+          } else if (data?.success === false) {
+            results.push({ email: invitee.email, status: "skipped", error: data.reason || "skipped" });
           } else {
-            const errText = await emailRes.text();
-            results.push({ email: invitee.email, status: "failed", error: errText });
-            logStep("Email failed", { email: invitee.email, error: errText });
+            results.push({ email: invitee.email, status: "sent" });
+            logStep("Email queued", { email: invitee.email });
           }
         } catch (err) {
           results.push({ email: invitee.email, status: "failed", error: String(err) });
         }
-      } else if (invitee.email && !resendKey) {
-        results.push({ email: invitee.email, status: "skipped", error: "Email not configured" });
       }
 
       if (invitee.phone) {

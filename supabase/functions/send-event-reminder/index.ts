@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { resolveHostIdentity } from "../_shared/host-email-identity.ts";
-import { buildHostEventEmail } from "../_shared/host-event-email-template.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,9 +14,7 @@ const logStep = (step: string, details?: any) => {
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     logStep("Function started");
@@ -41,7 +38,7 @@ serve(async (req) => {
 
     const { data: event, error: eventError } = await supabaseAdmin
       .from("events")
-      .select("id, title, start_date, end_date, venue, city, creator_id")
+      .select("id, title, start_date, end_date, venue, city, creator_id, ticket_price")
       .eq("id", eventId)
       .single();
 
@@ -70,7 +67,6 @@ serve(async (req) => {
       });
     }
 
-    const resendKey = Deno.env.get("RESEND_API_KEY");
     const twilioSid = Deno.env.get("TWILIO_ACCOUNT_SID");
     const twilioAuth = Deno.env.get("TWILIO_AUTH_TOKEN");
     const twilioPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
@@ -81,11 +77,11 @@ serve(async (req) => {
     const eventTime = new Date(event.start_date).toLocaleTimeString("en-US", {
       hour: "numeric", minute: "2-digit",
     });
-    const location = [event.venue, event.city].filter(Boolean).join(", ") || "Location TBA";
+    const location = [(event as any).venue, (event as any).city].filter(Boolean).join(", ") || "Location TBA";
     const eventUrl = `https://etherbylcove.com/event/${eventId}`;
     const identity = await resolveHostIdentity(supabaseAdmin, eventId);
-    const isFree = !(event as any).ticket_price || (event as any).ticket_price <= 0;
 
+    let sentCount = 0;
     let smsSentCount = 0;
 
     for (const rsvp of rsvps) {
@@ -109,50 +105,42 @@ serve(async (req) => {
         name = rsvp.guest_name || "there";
       }
 
-      // Send email (host-branded)
-      if (email && resendKey) {
+      if (email) {
         try {
-          const { subject, html, text } = buildHostEventEmail("reminder", {
-            identity,
-            recipientName: name,
-            eventTitle: event.title,
-            eventDate,
-            eventTime,
-            location,
-            isFree,
-            ticketPrice: (event as any).ticket_price,
-            eventUrl,
-            customMessage: message || null,
-          });
-
-          const emailRes = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${resendKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
+          const { data, error } = await supabaseAdmin.functions.invoke("send-transactional-email", {
+            body: {
+              templateName: "event-reminder",
+              recipientEmail: email,
+              idempotencyKey: `reminder-${eventId}-${rsvp.id}`,
               from: identity.fromHeader,
-              to: [email],
-              reply_to: identity.replyTo,
-              subject,
-              html,
-              text,
-            }),
+              replyTo: identity.replyTo,
+              templateData: {
+                organizerName: identity.organizerName,
+                recipientName: name,
+                customMessage: message || null,
+                signature: identity.signature,
+                hostAvatarUrl: identity.hostAvatarUrl,
+                headerImageUrl: identity.headerImageUrl,
+                brandColor: identity.brandColor,
+                eventTitle: event.title,
+                eventDate,
+                eventTime,
+                location,
+                eventUrl,
+              },
+            },
           });
-
-          if (emailRes.ok) {
+          if (!error && data?.success !== false) {
             sentCount++;
-            logStep("Email sent", { email });
+            logStep("Email queued", { email });
           } else {
-            logStep("Email failed", { email, error: await emailRes.text() });
+            logStep("Email failed", { email, error: error?.message || data?.reason });
           }
         } catch (err) {
           logStep("Email error", { email, error: String(err) });
         }
       }
 
-      // Send SMS if requested and phone available
       if (sendSms && phone && twilioSid && twilioAuth && twilioPhone) {
         try {
           const smsBody = message
@@ -185,60 +173,58 @@ serve(async (req) => {
       }
     }
 
-    // Send push notifications to guest subscribers (only when not filtering by recipient)
     let pushSentCount = 0;
     if (!userIdFilter && !rsvpIdFilter) {
-    try {
-      const { data: guestSubs } = await supabaseAdmin
-        .from("guest_push_subscriptions")
-        .select("endpoint, p256dh, auth, guest_email")
-        .eq("event_id", eventId);
+      try {
+        const { data: guestSubs } = await supabaseAdmin
+          .from("guest_push_subscriptions")
+          .select("endpoint, p256dh, auth, guest_email")
+          .eq("event_id", eventId);
 
-      if (guestSubs && guestSubs.length > 0) {
-        const pushPayload = JSON.stringify({
-          title: `Reminder: ${event.title}`,
-          body: message || `${eventDate} at ${eventTime} — ${location}`,
-          icon: "/favicon.png",
-          badge: "/favicon.png",
-          tag: `ether-event-reminder-${eventId}`,
-          renotify: true,
-          data: { url: eventUrl, type: "event_reminder" },
-          vibrate: [200, 100, 200],
-          timestamp: Date.now(),
-        });
+        if (guestSubs && guestSubs.length > 0) {
+          const pushPayload = JSON.stringify({
+            title: `Reminder: ${event.title}`,
+            body: message || `${eventDate} at ${eventTime} — ${location}`,
+            icon: "/favicon.png",
+            badge: "/favicon.png",
+            tag: `ether-event-reminder-${eventId}`,
+            renotify: true,
+            data: { url: eventUrl, type: "event_reminder" },
+            vibrate: [200, 100, 200],
+            timestamp: Date.now(),
+          });
 
-        const expiredEndpoints: string[] = [];
-        for (const sub of guestSubs) {
-          try {
-            const response = await fetch(sub.endpoint, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Content-Length": String(new TextEncoder().encode(pushPayload).length),
-                TTL: "86400",
-                Urgency: "high",
-              },
-              body: pushPayload,
-            });
-            if (response.status === 201 || response.status === 200) {
-              pushSentCount++;
-            } else if (response.status === 410 || response.status === 404) {
-              expiredEndpoints.push(sub.endpoint);
+          const expiredEndpoints: string[] = [];
+          for (const sub of guestSubs) {
+            try {
+              const response = await fetch(sub.endpoint, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Content-Length": String(new TextEncoder().encode(pushPayload).length),
+                  TTL: "86400",
+                  Urgency: "high",
+                },
+                body: pushPayload,
+              });
+              if (response.status === 201 || response.status === 200) {
+                pushSentCount++;
+              } else if (response.status === 410 || response.status === 404) {
+                expiredEndpoints.push(sub.endpoint);
+              }
+            } catch (err) {
+              logStep("Guest push error", { error: String(err) });
             }
-          } catch (err) {
-            logStep("Guest push error", { error: String(err) });
+          }
+          if (expiredEndpoints.length > 0) {
+            await supabaseAdmin.from("guest_push_subscriptions").delete().in("endpoint", expiredEndpoints);
           }
         }
-        if (expiredEndpoints.length > 0) {
-          await supabaseAdmin.from("guest_push_subscriptions").delete().in("endpoint", expiredEndpoints);
-        }
+      } catch (err) {
+        logStep("Push notification error", { error: String(err) });
       }
-    } catch (err) {
-      logStep("Push notification error", { error: String(err) });
-    }
     }
 
-    // Log reminder
     await supabaseAdmin.from("event_reminder_log").insert({
       event_id: eventId,
       reminder_type: "custom",
