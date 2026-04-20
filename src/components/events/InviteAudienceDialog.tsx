@@ -718,9 +718,9 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
 
         <DialogFooter className="px-6 py-4 border-t border-border/40 sticky bottom-0 bg-background">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSend} disabled={sending || (!push && !email) || !estimate}>
+          <Button onClick={handleSend} disabled={sending || (mode !== "external" && !push && !email) || effectiveReach === 0}>
             {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-            Send to {estimate ?? 0}
+            Send to {effectiveReach}
           </Button>
         </DialogFooter>
       </DialogContent>
