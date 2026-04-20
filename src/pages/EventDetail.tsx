@@ -72,6 +72,7 @@ import { AutoReminderSettings } from "@/components/events/AutoReminderSettings";
 import { CampaignAnalyticsCard } from "@/components/events/CampaignAnalyticsCard";
 import { BulkReminderDialog } from "@/components/events/BulkReminderDialog";
 import { InviteAudienceDialog } from "@/components/events/InviteAudienceDialog";
+import { EventEmailIdentitySettings } from "@/components/calendar/EventEmailIdentitySettings";
 
 // Event status helper
 function getEventStatus(event: { start_date: string; end_date: string | null; status: string | null }) {
