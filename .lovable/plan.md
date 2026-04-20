@@ -1,57 +1,52 @@
 
+Fix the external guest invitation email path so it uses the app’s managed email system instead of the current direct-send approach, then back-test the full flow.
 
-# Fix Moodboard Upload + Add Direct Recipient Targeting
+1. Enable a proper sender domain for the project
+- The project currently has no configured sender domain, so reliable branded email delivery is not fully set up.
+- First step will be to connect a sender domain in the app’s email settings so outbound invitation emails can be tracked and delivered through the built-in email infrastructure.
 
-Three issues to fix in the Invite Audience flow:
+2. Move external guest emails onto the managed email pipeline
+- Refactor `send-event-invite` so email invitations no longer depend on the current raw API call.
+- Keep SMS support as-is, but route email sends through the project’s managed email flow for better deliverability and logging.
+- Use the event’s public URL in the invitation instead of the internal function URL.
 
-## 1. Moodboard upload broken
+3. Harden the invite function response
+- Return per-recipient results with separate statuses for email and SMS.
+- Distinguish clearly between:
+  - sent
+  - queued
+  - skipped (missing email / missing phone / email disabled)
+  - failed
+- Include readable failure messages so the UI can surface the real reason when an invite does not go out.
 
-The file input likely fails because `event-moodboard` storage path or RLS isn't set up, or the input only accepts images. Fix:
-- Verify `media` bucket policy allows `${auth.uid()}/event-moodboard/...` writes (add policy if missing).
-- Expand `<input accept="...">` to include all supported MIME types (`image/*,application/pdf,video/*,.doc,.docx,.ppt,.pptx,.txt,.zip`).
-- Surface upload errors via toast so failures aren't silent.
-- Confirm `useEventMoodboard.uploadMoodboardFile` writes `file_type/file_name/file_size/mime_type` and inserts the row.
+4. Update the external guest UI feedback
+- In `src/components/events/InviteAudienceDialog.tsx`, show a clearer success/error summary after send.
+- If some guests succeed and others fail, report a partial-success message instead of a generic “sent” toast.
+- Keep the existing external guest entry UX, but improve visibility into what happened.
 
-## 2. Send to specific users by name
+5. Add delivery observability
+- Make sure external guest email sends can be verified in the project’s email logs rather than only relying on function console logs.
+- This will make future debugging much easier and prevent “it says sent but never arrived” situations.
 
-Add a **"Specific People"** audience mode alongside the filter-based modes:
-- Type-ahead user search (reuses `useUserSearch` against `profiles_public`).
-- Selected users render as removable chips.
-- Reach count = number of chips selected.
-- Send path: pass `userIds: string[]` to `send-audience-invite` edge function; function branches — if `userIds` present, skip `get_audience_preview` and target those users directly.
+6. Back-test the full flow
+- Test 1: external guest with email only
+  - confirm the function returns success
+  - confirm the email appears in delivery logs
+  - confirm the invitation arrives in the inbox
+- Test 2: external guest with phone only
+  - confirm SMS still works after the email refactor
+- Test 3: external guest with both email and phone
+  - confirm both channels are processed correctly
+- Test 4: invalid or missing contact data
+  - confirm the UI shows a clear error instead of silent failure
 
-## 3. Send to outside (off-platform) people
+Files to update
+- `supabase/functions/send-event-invite/index.ts`
+- `src/components/events/InviteAudienceDialog.tsx`
+- Possibly email infrastructure files if the managed email flow needs to be scaffolded for this project
 
-Add a **"External Guests"** mode (or section) reusing the existing `send-event-invite` edge function which already handles email/SMS to non-members:
-- Rows of `{ name, email, phone }` inputs (same UX as existing `InviteGuestsDialog`).
-- On send, route to `send-event-invite` instead of `send-audience-invite`.
-- Allow mixing: if both platform users and external guests are added, fire both functions in parallel.
-
-## UI structure
-
-Top of dialog gets a 3-tab segmented control:
-
-```text
-[ Audience Filter ] [ Specific People ] [ External Guests ]
-```
-
-- **Audience Filter** — existing location/age/smart-match flow (unchanged).
-- **Specific People** — search box + selected chips + message composer.
-- **External Guests** — name/email/phone rows + message composer.
-
-Moodboard section stays below the tabs (shared across all modes).
-
-## Files to change
-
-- `src/components/events/InviteAudienceDialog.tsx` — add tabs, user search picker, external guest rows, fix file input `accept`, wire send routing.
-- `src/hooks/useEventMoodboard.ts` — better error surfacing on upload failure.
-- `supabase/functions/send-audience-invite/index.ts` — accept optional `userIds: string[]` and skip filter query when present.
-- New migration only if `media` bucket lacks the `event-moodboard` path policy (will check first).
-
-## QA
-
-- Upload a PDF and a PNG to moodboard → both appear, PDF shows file card, PNG shows thumbnail.
-- Search "char" in Specific People → real profiles appear, select 2 → reach shows 2 → send delivers to those 2.
-- Add 1 external email + 1 external phone → both receive invite via existing guest invite flow.
-- Mix: 2 platform users + 1 external email → both edge functions fire, both succeed.
-
+Expected outcome
+- External guest invitations will send through the project’s proper email system
+- Delivery will be trackable
+- Failures will be visible in the UI
+- The flow will be verified end-to-end after implementation
