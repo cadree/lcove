@@ -68,7 +68,7 @@ export function useAddMoodboardItem() {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async (item: Omit<MoodboardItem, 'id' | 'created_at' | 'created_by'>) => {
+    mutationFn: async (item: Partial<Omit<MoodboardItem, 'id' | 'created_at' | 'created_by'>> & Pick<MoodboardItem, 'event_id' | 'type'>) => {
       if (!user) throw new Error('Must be logged in');
       const { data, error } = await supabase
         .from('event_moodboard_items')
