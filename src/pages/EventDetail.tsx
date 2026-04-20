@@ -1470,6 +1470,7 @@ function AttendeesTabV2({
   attendeeProfiles,
   isLoading,
   eventTitle,
+  onSelectAttendee,
 }: {
   attendees: EventAttendee[];
   tiers: any[];
@@ -1477,6 +1478,7 @@ function AttendeesTabV2({
   attendeeProfiles: ProfileMap;
   isLoading: boolean;
   eventTitle: string;
+  onSelectAttendee?: (key: AttendeeKey, name: string | null) => void;
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "checked_in" | "not_checked_in" | "guests">("all");
