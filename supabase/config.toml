@@ -128,3 +128,6 @@ verify_jwt = true
 
 [functions.verify-artist-subscription]
 verify_jwt = true
+
+[functions.process-email-queue]
+verify_jwt = true
