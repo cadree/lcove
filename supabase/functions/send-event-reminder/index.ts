@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { resolveHostIdentity } from "../_shared/host-email-identity.ts";
+import { buildHostEventEmail } from "../_shared/host-event-email-template.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -81,8 +83,9 @@ serve(async (req) => {
     });
     const location = [event.venue, event.city].filter(Boolean).join(", ") || "Location TBA";
     const eventUrl = `https://etherbylcove.com/event/${eventId}`;
+    const identity = await resolveHostIdentity(supabaseAdmin, eventId);
+    const isFree = !(event as any).ticket_price || (event as any).ticket_price <= 0;
 
-    let sentCount = 0;
     let smsSentCount = 0;
 
     for (const rsvp of rsvps) {
@@ -106,26 +109,21 @@ serve(async (req) => {
         name = rsvp.guest_name || "there";
       }
 
-      // Send email
+      // Send email (host-branded)
       if (email && resendKey) {
         try {
-          const customMessage = message ? `<p style="margin: 16px 0; padding: 12px; background: #f0f0f0; border-radius: 8px;">"${message}"</p>` : "";
-          const htmlBody = `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <h2 style="color: #1a1a2e;">Event Reminder 🎉</h2>
-              <p>Hey ${name},</p>
-              <p>Just a reminder about your upcoming event:</p>
-              ${customMessage}
-              <div style="background: #f8f8f8; border-radius: 12px; padding: 20px; margin: 16px 0;">
-                <h3 style="margin: 0 0 8px;">${event.title}</h3>
-                <p style="margin: 4px 0; color: #666;">📅 ${eventDate} at ${eventTime}</p>
-                <p style="margin: 4px 0; color: #666;">📍 ${location}</p>
-              </div>
-              <a href="${eventUrl}" style="display: inline-block; background: #e91e8c; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
-                View Event Details
-              </a>
-              <p style="color: #999; font-size: 12px; margin-top: 24px;">Sent via ETHER by lcove</p>
-            </div>`;
+          const { subject, html, text } = buildHostEventEmail("reminder", {
+            identity,
+            recipientName: name,
+            eventTitle: event.title,
+            eventDate,
+            eventTime,
+            location,
+            isFree,
+            ticketPrice: (event as any).ticket_price,
+            eventUrl,
+            customMessage: message || null,
+          });
 
           const emailRes = await fetch("https://api.resend.com/emails", {
             method: "POST",
@@ -134,10 +132,12 @@ serve(async (req) => {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              from: "notifications@etherbylcove.com",
+              from: identity.fromHeader,
               to: [email],
-              subject: `Reminder: ${event.title} is coming up!`,
-              html: htmlBody,
+              reply_to: identity.replyTo,
+              subject,
+              html,
+              text,
             }),
           });
 
