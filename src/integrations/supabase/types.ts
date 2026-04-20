@@ -2400,9 +2400,13 @@ export type Database = {
           created_at: string
           created_by: string
           event_id: string
+          file_name: string | null
+          file_size: number | null
+          file_type: string | null
           id: string
           link_url: string | null
           media_url: string | null
+          mime_type: string | null
           sort_order: number
           start_time: string | null
           title: string | null
@@ -2413,9 +2417,13 @@ export type Database = {
           created_at?: string
           created_by: string
           event_id: string
+          file_name?: string | null
+          file_size?: number | null
+          file_type?: string | null
           id?: string
           link_url?: string | null
           media_url?: string | null
+          mime_type?: string | null
           sort_order?: number
           start_time?: string | null
           title?: string | null
@@ -2426,9 +2434,13 @@ export type Database = {
           created_at?: string
           created_by?: string
           event_id?: string
+          file_name?: string | null
+          file_size?: number | null
+          file_type?: string | null
           id?: string
           link_url?: string | null
           media_url?: string | null
+          mime_type?: string | null
           sort_order?: number
           start_time?: string | null
           title?: string | null
@@ -7465,6 +7477,7 @@ export type Database = {
         }
         Returns: Json
       }
+      city_to_state: { Args: { input: string }; Returns: string }
       ensure_default_pipeline: {
         Args: { p_pipeline_id?: string; p_user_id: string }
         Returns: string
@@ -7569,6 +7582,7 @@ export type Database = {
         Args: { uid1: string; uid2: string }
         Returns: boolean
       }
+      normalize_state: { Args: { input: string }; Returns: string }
       touch_last_active: { Args: never; Returns: undefined }
       upsert_attendee_note: {
         Args: { p_email: string; p_note: string; p_user_id: string }
