@@ -383,7 +383,7 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-medium truncate">{u.display_name}</p>
                         <p className="text-[10px] text-muted-foreground truncate">
-                          {u.last_active_at ? `Active ${formatDistanceToNow(new Date(u.last_active_at), { addSuffix: true })}` : "Active recently"}
+                          {formatActivity(u.last_active_at)}
                         </p>
                       </div>
                     </div>
@@ -424,13 +424,46 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
                 </div>
               )}
 
+              {/* Non-image file cards */}
+              {moodboard.filter(m => m.type === "file").length > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  {moodboard.filter(m => m.type === "file").map(m => {
+                    const { Icon, label } = fileTypeMeta(m.file_type);
+                    return (
+                      <a
+                        key={m.id}
+                        href={m.media_url || "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group relative flex items-center gap-2 rounded-xl border border-border/40 bg-card/40 p-2.5 hover:border-border transition-colors"
+                      >
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                          <Icon className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium truncate">{m.file_name || "File"}</p>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); delMood.mutate({ id: m.id, eventId }); }}
+                          className="absolute top-1 right-1 bg-background/80 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <label className="flex-1 cursor-pointer rounded-xl border border-dashed border-border/40 hover:border-primary/50 p-3 text-center text-xs text-muted-foreground flex items-center justify-center gap-2 transition-colors">
-                  {uploadingMood ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
-                  Add image
+                  {uploadingMood ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                  Add image, PDF, video, or doc
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,video/*,application/pdf,.doc,.docx,.ppt,.pptx,.txt"
                     className="hidden"
                     onChange={e => { const f = e.target.files?.[0]; if (f) handleMoodUpload(f); e.target.value = ""; }}
                   />
