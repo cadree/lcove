@@ -441,6 +441,13 @@ export default function EventDetail() {
         </main>
       </Tabs>
 
+      <AttendeeProfileDrawer
+        open={!!selectedAttendee}
+        onOpenChange={(o) => { if (!o) setSelectedAttendee(null); }}
+        attendeeKey={selectedAttendee?.key || null}
+        fallbackName={selectedAttendee?.name || null}
+      />
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
