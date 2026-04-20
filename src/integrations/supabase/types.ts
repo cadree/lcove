@@ -2199,6 +2199,7 @@ export type Database = {
           attendee_email: string | null
           attendee_name: string | null
           attendee_phone: string | null
+          attendee_social: string | null
           attendee_user_id: string | null
           created_at: string
           event_id: string
@@ -2215,6 +2216,7 @@ export type Database = {
           attendee_email?: string | null
           attendee_name?: string | null
           attendee_phone?: string | null
+          attendee_social?: string | null
           attendee_user_id?: string | null
           created_at?: string
           event_id: string
@@ -2231,6 +2233,7 @@ export type Database = {
           attendee_email?: string | null
           attendee_name?: string | null
           attendee_phone?: string | null
+          attendee_social?: string | null
           attendee_user_id?: string | null
           created_at?: string
           event_id?: string
@@ -6446,6 +6449,7 @@ export type Database = {
           purchaser_email: string | null
           purchaser_name: string | null
           purchaser_phone: string | null
+          purchaser_social: string | null
           purchaser_user_id: string | null
           quantity: number
           refund_amount_cents: number
@@ -6469,6 +6473,7 @@ export type Database = {
           purchaser_email?: string | null
           purchaser_name?: string | null
           purchaser_phone?: string | null
+          purchaser_social?: string | null
           purchaser_user_id?: string | null
           quantity?: number
           refund_amount_cents?: number
@@ -6492,6 +6497,7 @@ export type Database = {
           purchaser_email?: string | null
           purchaser_name?: string | null
           purchaser_phone?: string | null
+          purchaser_social?: string | null
           purchaser_user_id?: string | null
           quantity?: number
           refund_amount_cents?: number
