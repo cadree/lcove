@@ -40,6 +40,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/ui/empty-state";
+import { AttendeeProfileDrawer } from "@/components/events/AttendeeProfileDrawer";
+import type { AttendeeKey } from "@/hooks/useAttendeeCrmProfile";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -96,6 +98,7 @@ export default function EventDetail() {
   const [activeTab, setActiveTab] = useState("orders");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedAttendee, setSelectedAttendee] = useState<{ key: AttendeeKey; name: string | null } | null>(null);
 
   // Fetch event
   const { data: event, isLoading: eventLoading } = useQuery({
@@ -385,6 +388,7 @@ export default function EventDetail() {
                   attendees={v2Attendees}
                   attendeeProfiles={v2AttendeeProfiles || {}}
                   isLoading={v2Loading}
+                  onSelectAttendee={(key, name) => setSelectedAttendee({ key, name })}
                 />
               </TabsContent>
 
@@ -397,6 +401,7 @@ export default function EventDetail() {
                   attendeeProfiles={v2AttendeeProfiles || {}}
                   isLoading={v2Loading}
                   eventTitle={event?.title || "Event"}
+                  onSelectAttendee={(key, name) => setSelectedAttendee({ key, name })}
                 />
               </TabsContent>
 
@@ -435,6 +440,13 @@ export default function EventDetail() {
           )}
         </main>
       </Tabs>
+
+      <AttendeeProfileDrawer
+        open={!!selectedAttendee}
+        onOpenChange={(o) => { if (!o) setSelectedAttendee(null); }}
+        attendeeKey={selectedAttendee?.key || null}
+        fallbackName={selectedAttendee?.name || null}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -1327,12 +1339,14 @@ function OrdersTabV2({
   attendees,
   attendeeProfiles,
   isLoading,
+  onSelectAttendee,
 }: {
   orders: TicketOrder[];
   tiers: any[];
   attendees: EventAttendee[];
   attendeeProfiles: ProfileMap;
   isLoading: boolean;
+  onSelectAttendee?: (key: AttendeeKey, name: string | null) => void;
 }) {
   const [search, setSearch] = useState("");
 
@@ -1400,7 +1414,14 @@ function OrdersTabV2({
               return acc;
             }, {});
             return (
-              <Card key={order.id} className="border-border/40 bg-card/60">
+              <Card
+                key={order.id}
+                className="border-border/40 bg-card/60 cursor-pointer hover:border-primary/40 hover:bg-card/80 transition-colors"
+                onClick={() => onSelectAttendee?.(
+                  { email: order.purchaser_email || null, user_id: order.purchaser_user_id || null },
+                  profile?.display_name || order.purchaser_name || null,
+                )}
+              >
                 <CardContent className="p-3 flex items-center gap-3">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={profile?.avatar_url || undefined} />
@@ -1449,6 +1470,7 @@ function AttendeesTabV2({
   attendeeProfiles,
   isLoading,
   eventTitle,
+  onSelectAttendee,
 }: {
   attendees: EventAttendee[];
   tiers: any[];
@@ -1456,6 +1478,7 @@ function AttendeesTabV2({
   attendeeProfiles: ProfileMap;
   isLoading: boolean;
   eventTitle: string;
+  onSelectAttendee?: (key: AttendeeKey, name: string | null) => void;
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "checked_in" | "not_checked_in" | "guests">("all");
@@ -1563,7 +1586,17 @@ function AttendeesTabV2({
             const isCheckedIn = checkedInIds.has(a.id);
             const tierName = a.tier_id ? tierMap[a.tier_id]?.name : null;
             return (
-              <Card key={a.id} className={cn("border-border/40 bg-card/60", isCheckedIn && "border-emerald-500/30 bg-emerald-500/5")}>
+              <Card
+                key={a.id}
+                className={cn(
+                  "border-border/40 bg-card/60 cursor-pointer hover:border-primary/40 hover:bg-card/80 transition-colors",
+                  isCheckedIn && "border-emerald-500/30 bg-emerald-500/5"
+                )}
+                onClick={() => onSelectAttendee?.(
+                  { email: a.attendee_email || null, user_id: a.attendee_user_id || null },
+                  name,
+                )}
+              >
                 <CardContent className="p-3 flex items-center gap-3">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={profile?.avatar_url || undefined} />
