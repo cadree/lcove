@@ -444,6 +444,19 @@ const Profile = () => {
   return (
     <PageLayout showNotificationBell={false}>
       <div className="min-h-screen pb-20">
+        {/* Back Button - Always at top */}
+        <div className="px-5 pt-4 pb-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2 text-muted-foreground hover:text-foreground"
+            onClick={() => navigate(-1)}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </Button>
+        </div>
+
         {/* Header Section - Always at top */}
         <ProfileHeader
           displayName={displayName}
