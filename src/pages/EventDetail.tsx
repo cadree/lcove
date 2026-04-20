@@ -1093,7 +1093,14 @@ function MarketingTab({ eventId, tiers }: { eventId: string; tiers: any[] }) {
       <CampaignAnalyticsCard eventId={eventId} />
 
       <BulkReminderDialog open={bulkOpen} onOpenChange={setBulkOpen} eventId={eventId} tiers={tiers} />
-      <InviteAudienceDialog open={inviteOpen} onOpenChange={setInviteOpen} eventId={eventId} />
+      <InviteAudienceDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        eventId={eventId}
+        eventName={(event as any)?.title}
+        eventCity={(event as any)?.city}
+      />
+
     </div>
   );
 }

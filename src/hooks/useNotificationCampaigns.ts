@@ -25,6 +25,27 @@ export function useAudienceEstimate(filter: any, enabled = true) {
   });
 }
 
+export interface AudiencePreviewUser {
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  interests: string[] | null;
+  last_active_at: string | null;
+  city: string | null;
+}
+
+export function useAudiencePreview(filter: any, enabled = true, limit = 12) {
+  return useQuery({
+    queryKey: ["audience-preview", filter, limit],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_audience_preview", { filter, p_limit: limit });
+      if (error) throw error;
+      return (data || []) as AudiencePreviewUser[];
+    },
+    enabled,
+  });
+}
+
 export function useAutoReminders(eventId: string) {
   const qc = useQueryClient();
   const query = useQuery({
