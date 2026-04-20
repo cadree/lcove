@@ -54,6 +54,11 @@ export function classifyFile(file: File): MoodboardFileType {
 }
 
 export async function uploadMoodboardFile(userId: string, eventId: string, file: File) {
+  const maxFileSize = 20 * 1024 * 1024;
+  if (file.size > maxFileSize) {
+    throw new Error('Files must be 20MB or smaller');
+  }
+
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = `${userId}/event-moodboard/${eventId}/${Date.now()}-${safeName}`;
   const { error } = await supabase.storage.from('media').upload(path, file, {
