@@ -2270,6 +2270,50 @@ export type Database = {
           },
         ]
       }
+      event_auto_reminders: {
+        Row: {
+          created_at: string
+          enabled_24h: boolean
+          enabled_2h: boolean
+          enabled_at_door: boolean
+          event_id: string
+          last_24h_sent_at: string | null
+          last_2h_sent_at: string | null
+          last_at_door_sent_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled_24h?: boolean
+          enabled_2h?: boolean
+          enabled_at_door?: boolean
+          event_id: string
+          last_24h_sent_at?: string | null
+          last_2h_sent_at?: string | null
+          last_at_door_sent_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled_24h?: boolean
+          enabled_2h?: boolean
+          enabled_at_door?: boolean
+          event_id?: string
+          last_24h_sent_at?: string | null
+          last_2h_sent_at?: string | null
+          last_at_door_sent_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_auto_reminders_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_check_ins: {
         Row: {
           attendee_id: string
@@ -3892,6 +3936,140 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_campaigns: {
+        Row: {
+          audience_filter: Json | null
+          body: string | null
+          channels: string[] | null
+          clicked_count: number
+          created_at: string
+          event_id: string | null
+          host_user_id: string
+          id: string
+          name: string | null
+          opened_count: number
+          recipient_count: number
+          rsvp_conversions: number
+          sent_count: number
+          title: string | null
+          type: string
+        }
+        Insert: {
+          audience_filter?: Json | null
+          body?: string | null
+          channels?: string[] | null
+          clicked_count?: number
+          created_at?: string
+          event_id?: string | null
+          host_user_id: string
+          id?: string
+          name?: string | null
+          opened_count?: number
+          recipient_count?: number
+          rsvp_conversions?: number
+          sent_count?: number
+          title?: string | null
+          type: string
+        }
+        Update: {
+          audience_filter?: Json | null
+          body?: string | null
+          channels?: string[] | null
+          clicked_count?: number
+          created_at?: string
+          event_id?: string | null
+          host_user_id?: string
+          id?: string
+          name?: string | null
+          opened_count?: number
+          recipient_count?: number
+          rsvp_conversions?: number
+          sent_count?: number
+          title?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_campaigns_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_logs: {
+        Row: {
+          campaign_id: string | null
+          channel: string
+          clicked_at: string | null
+          created_at: string
+          error_message: string | null
+          event_id: string | null
+          host_user_id: string
+          id: string
+          metadata: Json | null
+          opened_at: string | null
+          recipient_email: string | null
+          recipient_phone: string | null
+          sent_at: string | null
+          status: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          channel: string
+          clicked_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          event_id?: string | null
+          host_user_id: string
+          id?: string
+          metadata?: Json | null
+          opened_at?: string | null
+          recipient_email?: string | null
+          recipient_phone?: string | null
+          sent_at?: string | null
+          status?: string
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          channel?: string
+          clicked_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          event_id?: string | null
+          host_user_id?: string
+          id?: string
+          metadata?: Json | null
+          opened_at?: string | null
+          recipient_email?: string | null
+          recipient_phone?: string | null
+          sent_at?: string | null
+          status?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_logs_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "notification_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_logs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_preferences: {
         Row: {
           admin_enabled: boolean | null
@@ -4979,13 +5157,17 @@ export type Database = {
           access_status: string | null
           avatar_url: string | null
           bio: string | null
+          birth_year: number | null
           city: string | null
           city_display: string | null
           city_key: string | null
           created_at: string | null
           display_name: string | null
+          gender: string | null
           id: string
+          interests: string[] | null
           is_suspended: boolean | null
+          last_active_at: string | null
           mindset_level: number | null
           onboarding_completed: boolean | null
           onboarding_level: number | null
@@ -4993,6 +5175,8 @@ export type Database = {
           passion_seriousness: number | null
           payout_enabled: boolean | null
           phone: string | null
+          region_country: string | null
+          region_state: string | null
           social_links: Json | null
           stripe_connect_account_id: string | null
           suspended_at: string | null
@@ -5005,13 +5189,17 @@ export type Database = {
           access_status?: string | null
           avatar_url?: string | null
           bio?: string | null
+          birth_year?: number | null
           city?: string | null
           city_display?: string | null
           city_key?: string | null
           created_at?: string | null
           display_name?: string | null
+          gender?: string | null
           id?: string
+          interests?: string[] | null
           is_suspended?: boolean | null
+          last_active_at?: string | null
           mindset_level?: number | null
           onboarding_completed?: boolean | null
           onboarding_level?: number | null
@@ -5019,6 +5207,8 @@ export type Database = {
           passion_seriousness?: number | null
           payout_enabled?: boolean | null
           phone?: string | null
+          region_country?: string | null
+          region_state?: string | null
           social_links?: Json | null
           stripe_connect_account_id?: string | null
           suspended_at?: string | null
@@ -5031,13 +5221,17 @@ export type Database = {
           access_status?: string | null
           avatar_url?: string | null
           bio?: string | null
+          birth_year?: number | null
           city?: string | null
           city_display?: string | null
           city_key?: string | null
           created_at?: string | null
           display_name?: string | null
+          gender?: string | null
           id?: string
+          interests?: string[] | null
           is_suspended?: boolean | null
+          last_active_at?: string | null
           mindset_level?: number | null
           onboarding_completed?: boolean | null
           onboarding_level?: number | null
@@ -5045,6 +5239,8 @@ export type Database = {
           passion_seriousness?: number | null
           payout_enabled?: boolean | null
           phone?: string | null
+          region_country?: string | null
+          region_state?: string | null
           social_links?: Json | null
           stripe_connect_account_id?: string | null
           suspended_at?: string | null
@@ -7297,6 +7493,8 @@ export type Database = {
         Args: { p_email: string; p_user_id?: string }
         Returns: Json
       }
+      get_audience_estimate: { Args: { filter: Json }; Returns: number }
+      get_campaign_analytics: { Args: { p_event_id?: string }; Returns: Json }
       get_client_project_by_token: { Args: { p_token: string }; Returns: Json }
       get_platform_stats: {
         Args: never
@@ -7360,6 +7558,7 @@ export type Database = {
         Args: { uid1: string; uid2: string }
         Returns: boolean
       }
+      touch_last_active: { Args: never; Returns: undefined }
       upsert_attendee_note: {
         Args: { p_email: string; p_note: string; p_user_id: string }
         Returns: string
