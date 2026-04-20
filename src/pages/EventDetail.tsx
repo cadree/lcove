@@ -388,6 +388,7 @@ export default function EventDetail() {
                   attendees={v2Attendees}
                   attendeeProfiles={v2AttendeeProfiles || {}}
                   isLoading={v2Loading}
+                  onSelectAttendee={(key, name) => setSelectedAttendee({ key, name })}
                 />
               </TabsContent>
 
@@ -400,6 +401,7 @@ export default function EventDetail() {
                   attendeeProfiles={v2AttendeeProfiles || {}}
                   isLoading={v2Loading}
                   eventTitle={event?.title || "Event"}
+                  onSelectAttendee={(key, name) => setSelectedAttendee({ key, name })}
                 />
               </TabsContent>
 
