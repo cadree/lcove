@@ -57,6 +57,7 @@ import PublicEventPage from "./pages/PublicEventPage";
 import EventConfirmation from "./pages/EventConfirmation";
 import PublicProjectPage from "./pages/PublicProjectPage";
 import PublicClientPortal from "@/pages/PublicClientPortal";
+import Unsubscribe from "./pages/Unsubscribe";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
 
 const ActivityTracker = () => {
@@ -135,6 +136,7 @@ const App = () => (
                 <Route path="/event/:eventId/confirmation" element={<EventConfirmation />} />
                 <Route path="/project/:projectId" element={<PublicProjectPage />} />
                 <Route path="/client/:token" element={<PublicClientPortal />} />
+                <Route path="/unsubscribe" element={<Unsubscribe />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
