@@ -148,6 +148,10 @@ export function InviteGuestsDialog({ eventId, eventTitle, children }: InviteGues
             Add Another Guest
           </Button>
 
+          <p className="text-xs text-muted-foreground text-center">
+            Sending as your host identity. Customize From name, reply-to & branding in <span className="font-medium">Event &rsaquo; Marketing &rsaquo; Email Identity</span>.
+          </p>
+
           <Button className="w-full gap-2" onClick={handleSend} disabled={sending}>
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             {sending ? "Sending..." : `Send ${invitees.filter((i) => i.email || i.phone).length} Invitation${invitees.filter((i) => i.email || i.phone).length !== 1 ? "s" : ""}`}
