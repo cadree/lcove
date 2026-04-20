@@ -249,17 +249,148 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
         </div>
 
         <div className="px-6 py-5 space-y-6">
+          {/* MODE TABS */}
+          <div className="grid grid-cols-3 gap-1 rounded-xl border border-border/40 p-1 bg-card/40">
+            {([
+              { v: "filter", label: "Audience Filter", Icon: Users },
+              { v: "specific", label: "Specific People", Icon: Search },
+              { v: "external", label: "External Guests", Icon: UserPlus },
+            ] as const).map(t => (
+              <button
+                key={t.v}
+                type="button"
+                onClick={() => setMode(t.v)}
+                className={cn(
+                  "rounded-lg px-2 py-2 text-xs font-medium flex items-center justify-center gap-1.5 transition-all",
+                  mode === t.v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <t.Icon className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{t.label}</span>
+                <span className="sm:hidden">{t.label.split(" ")[0]}</span>
+              </button>
+            ))}
+          </div>
+
           {/* HERO REACH */}
           <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5 text-center">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground">Estimated reach</p>
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">
+              {mode === "filter" ? "Estimated reach" : mode === "specific" ? "Selected people" : "External guests"}
+            </p>
             <div
-              key={estimate ?? 0}
+              key={effectiveReach}
               className={cn("text-5xl font-display font-bold mt-1 tabular-nums", "animate-scale-in")}
             >
-              {estimating ? "…" : (estimate ?? 0).toLocaleString()}
+              {mode === "filter" && estimating ? "…" : effectiveReach.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">people will see this invite</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {mode === "external" ? "people will receive this invite via email/SMS" : "people will see this invite"}
+            </p>
           </div>
+
+          {/* SPECIFIC PEOPLE PANE */}
+          {mode === "specific" && (
+            <section className="space-y-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Search by name</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Type a name (min 2 chars)"
+                  className="pl-9"
+                />
+              </div>
+              {selectedUsers.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedUsers.map(u => (
+                    <Badge key={u.user_id} variant="default" className="pr-1 gap-1">
+                      <Avatar className="h-4 w-4"><AvatarImage src={u.avatar_url || undefined} /><AvatarFallback className="text-[8px]">{(u.display_name || "?").slice(0,1)}</AvatarFallback></Avatar>
+                      {u.display_name}
+                      <button type="button" onClick={() => setSelectedUsers(s => s.filter(x => x.user_id !== u.user_id))} className="ml-1 hover:bg-background/20 rounded-full p-0.5">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              {searchQuery.length >= 2 && (
+                <div className="max-h-60 overflow-y-auto rounded-xl border border-border/40 divide-y divide-border/40">
+                  {searching && <div className="p-3 text-xs text-muted-foreground flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Searching…</div>}
+                  {!searching && searchResults.length === 0 && <div className="p-3 text-xs text-muted-foreground">No users found.</div>}
+                  {searchResults.filter(r => !selectedUsers.some(s => s.user_id === r.user_id)).map(r => (
+                    <button
+                      key={r.user_id}
+                      type="button"
+                      onClick={() => { setSelectedUsers(s => [...s, r]); setSearchQuery(""); }}
+                      className="w-full flex items-center gap-2 p-2.5 hover:bg-accent/30 text-left"
+                    >
+                      <Avatar className="h-8 w-8"><AvatarImage src={r.avatar_url || undefined} /><AvatarFallback className="text-xs">{(r.display_name || "?").slice(0,2).toUpperCase()}</AvatarFallback></Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{r.display_name}</p>
+                        {r.city && <p className="text-[10px] text-muted-foreground truncate">{r.city}</p>}
+                      </div>
+                      <Plus className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* EXTERNAL GUESTS PANE */}
+          {mode === "external" && (
+            <section className="space-y-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Guest details</Label>
+              <p className="text-xs text-muted-foreground -mt-1">Provide email or phone (or both) for each guest.</p>
+              <div className="space-y-2">
+                {externalGuests.map((g, idx) => (
+                  <div key={g.id} className="grid grid-cols-12 gap-1.5 items-center">
+                    <Input
+                      className="col-span-3"
+                      placeholder="Name"
+                      value={g.name}
+                      onChange={e => setExternalGuests(gs => gs.map(x => x.id === g.id ? { ...x, name: e.target.value } : x))}
+                    />
+                    <Input
+                      className="col-span-4"
+                      placeholder="Email"
+                      type="email"
+                      value={g.email}
+                      onChange={e => setExternalGuests(gs => gs.map(x => x.id === g.id ? { ...x, email: e.target.value } : x))}
+                    />
+                    <Input
+                      className="col-span-4"
+                      placeholder="Phone"
+                      type="tel"
+                      value={g.phone}
+                      onChange={e => setExternalGuests(gs => gs.map(x => x.id === g.id ? { ...x, phone: e.target.value } : x))}
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="col-span-1"
+                      onClick={() => setExternalGuests(gs => gs.length > 1 ? gs.filter(x => x.id !== g.id) : gs)}
+                      disabled={externalGuests.length === 1}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setExternalGuests(gs => [...gs, { id: `g${Date.now()}`, name: "", email: "", phone: "" }])}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add guest
+              </Button>
+            </section>
+          )}
+
+          {/* FILTER-MODE-ONLY SECTIONS */}
+          {mode === "filter" && (<>
 
           {/* AUDIENCE TYPE */}
           <section className="space-y-2">
