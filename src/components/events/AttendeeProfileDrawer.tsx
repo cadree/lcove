@@ -88,8 +88,9 @@ export function AttendeeProfileDrawer({ open, onOpenChange, attendeeKey, fallbac
   const displayName = identity?.display_name || fallbackName || identity?.email || "Attendee";
   const initial = (displayName || "?").charAt(0).toUpperCase();
 
-  const socials = identity?.social_links || {};
+  const socials: any = identity?.social_links || {};
   const instagram = socials.instagram || socials.ig;
+  const genericHandle = !instagram ? (socials.handle || socials.tiktok || socials.twitter) : null;
 
   const handleAddTag = () => {
     const v = tagInput.trim();
@@ -182,12 +183,20 @@ export function AttendeeProfileDrawer({ open, onOpenChange, attendeeKey, fallbac
                   {instagram && (
                     <ContactRow
                       icon={Instagram}
-                      value={`@${instagram.replace(/^@/, "")}`}
-                      href={`https://instagram.com/${instagram.replace(/^@/, "")}`}
+                      value={`@${String(instagram).replace(/^@/, "")}`}
+                      href={`https://instagram.com/${String(instagram).replace(/^@/, "")}`}
+                      onCopy={() => copy(`@${String(instagram).replace(/^@/, "")}`, "Handle")}
                       external
                     />
                   )}
-                  {!identity?.email && !identity?.phone && !identity?.city && !instagram && (
+                  {!instagram && genericHandle && (
+                    <ContactRow
+                      icon={Instagram}
+                      value={`@${String(genericHandle).replace(/^@/, "")}`}
+                      onCopy={() => copy(`@${String(genericHandle).replace(/^@/, "")}`, "Handle")}
+                    />
+                  )}
+                  {!identity?.email && !identity?.phone && !identity?.city && !instagram && !genericHandle && (
                     <p className="text-sm text-muted-foreground">No contact info on file.</p>
                   )}
                 </div>
