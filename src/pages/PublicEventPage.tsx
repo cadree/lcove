@@ -214,7 +214,7 @@ export default function PublicEventPage() {
         }
       } catch (e) { console.error(e); }
       setRsvpSuccess(true);
-      queryClient.invalidateQueries({ queryKey: ["public-event-rsvp-count", eventId] });
+      queryClient.invalidateQueries({ queryKey: ["public-event-attendee-count", eventId] });
       toast.success("You're on the list!");
     },
     onError: (err: Error) => {
@@ -246,7 +246,17 @@ export default function PublicEventPage() {
   };
 
   const isPast = event ? new Date(event.end_date || event.start_date) < new Date() : false;
-  const isFree = !event?.ticket_price || event.ticket_price <= 0;
+  const hasPaidTier = (tiers || []).some((t: any) => (t.price_cents || 0) > 0);
+  const hasFreeTier = (tiers || []).some((t: any) => (t.price_cents || 0) === 0 && (t.credits_price || 0) === 0);
+  const isFree = !hasPaidTier && (!event?.ticket_price || event.ticket_price <= 0);
+  const eventType: { label: string; tone: "free" | "paid" | "hybrid" | "info" } =
+    hasPaidTier && hasFreeTier
+      ? { label: "Hybrid", tone: "hybrid" }
+      : hasPaidTier || (event?.ticket_price && event.ticket_price > 0)
+      ? { label: "Paid Ticket", tone: "paid" }
+      : event?.external_url && !isFree
+      ? { label: "External", tone: "info" }
+      : { label: "Free RSVP", tone: "free" };
 
   if (isLoading) {
     return (
