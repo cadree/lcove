@@ -8,13 +8,30 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Send, Sparkles, MapPin, Users, Image as ImageIcon, X, Plus } from "lucide-react";
+import { Loader2, Send, Sparkles, MapPin, Users, Image as ImageIcon, X, Plus, FileText, FileVideo, File as FileIcon, Presentation, Paperclip } from "lucide-react";
 import { toast } from "sonner";
 import { sendAudienceInvite, useAudienceEstimate, useAudiencePreview } from "@/hooks/useNotificationCampaigns";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEventMoodboard, useAddMoodboardItem, useDeleteMoodboardItem, uploadMoodboardImage } from "@/hooks/useEventMoodboard";
+import { useEventMoodboard, useAddMoodboardItem, useDeleteMoodboardItem, uploadMoodboardFile, classifyFile, type MoodboardFileType } from "@/hooks/useEventMoodboard";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+
+function formatActivity(iso: string | null): string {
+  if (!iso) return "No recent activity";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "No recent activity";
+  return `Active ${formatDistanceToNow(d, { addSuffix: true })}`;
+}
+
+function fileTypeMeta(t: MoodboardFileType | null) {
+  switch (t) {
+    case "video": return { Icon: FileVideo, label: "Video" };
+    case "pdf": return { Icon: FileText, label: "PDF" };
+    case "presentation": return { Icon: Presentation, label: "Slides" };
+    case "doc": return { Icon: FileText, label: "Doc" };
+    default: return { Icon: FileIcon, label: "File" };
+  }
+}
 
 interface Props {
   open: boolean;
@@ -114,10 +131,21 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
     if (!user || !eventId) return;
     setUploadingMood(true);
     try {
-      const url = await uploadMoodboardImage(user.id, eventId, file);
+      const url = await uploadMoodboardFile(user.id, eventId, file);
+      const fileType = classifyFile(file);
       await addMood.mutateAsync({
-        event_id: eventId, type: "image", media_url: url, link_url: null,
-        title: null, body: null, start_time: null, sort_order: moodboard.length,
+        event_id: eventId,
+        type: fileType === "image" ? "image" : "file",
+        media_url: url,
+        link_url: null,
+        title: null,
+        body: null,
+        start_time: null,
+        sort_order: moodboard.length,
+        file_type: fileType,
+        file_name: file.name,
+        file_size: file.size,
+        mime_type: file.type || null,
       });
     } catch (e: any) {
       toast.error(e?.message || "Upload failed");
