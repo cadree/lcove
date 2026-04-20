@@ -83,8 +83,9 @@ serve(async (req) => {
     });
     const location = [event.venue, event.city].filter(Boolean).join(", ") || "Location TBA";
     const eventUrl = `https://etherbylcove.com/event/${eventId}`;
+    const identity = await resolveHostIdentity(supabaseAdmin, eventId);
+    const isFree = !(event as any).ticket_price || (event as any).ticket_price <= 0;
 
-    let sentCount = 0;
     let smsSentCount = 0;
 
     for (const rsvp of rsvps) {
