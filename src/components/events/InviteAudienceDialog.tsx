@@ -61,6 +61,18 @@ type AudienceType = "everyone" | "similar" | "active";
 export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, eventCity }: Props) {
   const { user } = useAuth();
 
+  // Mode (which tab is active)
+  const [mode, setMode] = useState<"filter" | "specific" | "external">("filter");
+
+  // Specific People
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedUsers, setSelectedUsers] = useState<SearchedUser[]>([]);
+  const { data: searchResults = [], isFetching: searching } = useUserSearch(searchQuery, mode === "specific" && open);
+
+  // External Guests
+  type ExternalGuest = { id: string; name: string; email: string; phone: string };
+  const [externalGuests, setExternalGuests] = useState<ExternalGuest[]>([{ id: "g1", name: "", email: "", phone: "" }]);
+
   // Audience config
   const [audienceType, setAudienceType] = useState<AudienceType>("everyone");
   const [locationMode, setLocationMode] = useState<LocationMode>("anywhere");
