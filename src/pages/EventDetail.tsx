@@ -98,6 +98,7 @@ export default function EventDetail() {
   const [activeTab, setActiveTab] = useState("orders");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedAttendee, setSelectedAttendee] = useState<{ key: AttendeeKey; name: string | null } | null>(null);
 
   // Fetch event
   const { data: event, isLoading: eventLoading } = useQuery({
