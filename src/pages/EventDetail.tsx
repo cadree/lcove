@@ -40,6 +40,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/ui/empty-state";
+import { AttendeeProfileDrawer } from "@/components/events/AttendeeProfileDrawer";
+import type { AttendeeKey } from "@/hooks/useAttendeeCrmProfile";
 import {
   DropdownMenu,
   DropdownMenuContent,
