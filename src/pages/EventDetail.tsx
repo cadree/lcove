@@ -450,6 +450,7 @@ export default function EventDetail() {
         onOpenChange={(o) => { if (!o) setSelectedAttendee(null); }}
         attendeeKey={selectedAttendee?.key || null}
         fallbackName={selectedAttendee?.name || null}
+        eventId={eventId}
       />
 
       {/* Delete Confirmation Dialog */}
