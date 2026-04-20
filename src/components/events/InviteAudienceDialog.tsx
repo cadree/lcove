@@ -177,26 +177,57 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
     setVibeText("");
   };
 
+  // Effective reach per mode
+  const validExternals = externalGuests.filter(g => g.email.trim() || g.phone.trim());
+  const effectiveReach =
+    mode === "filter" ? (estimate ?? 0)
+    : mode === "specific" ? selectedUsers.length
+    : validExternals.length;
+
   const handleSend = async () => {
     setSending(true);
     try {
-      // Auto-insert event link by appending to body if not present
       const eventLink = eventId ? `https://etherbylcove.com/event/${eventId}` : "";
       const finalBody = eventLink && !body.includes(eventLink) ? `${body}\n\n${eventLink}` : body;
 
-      const res = await sendAudienceInvite({
-        eventId, title, body: finalBody,
-        channels: { push, email },
-        filter: {
-          states: filter.states,
-          interests: filter.interests,
-          age_min: filter.age_min,
-          age_max: filter.age_max,
-          active_only: filter.active_only,
-        },
-        lookalike: filter.lookalike,
-      });
-      toast.success(`Invite sent to ${res.recipientCount} users`);
+      if (mode === "filter") {
+        const res = await sendAudienceInvite({
+          eventId, title, body: finalBody,
+          channels: { push, email },
+          filter: {
+            states: filter.states,
+            interests: filter.interests,
+            age_min: filter.age_min,
+            age_max: filter.age_max,
+            active_only: filter.active_only,
+          },
+          lookalike: filter.lookalike,
+        });
+        toast.success(`Invite sent to ${res.recipientCount} users`);
+      } else if (mode === "specific") {
+        if (selectedUsers.length === 0) throw new Error("Select at least one person");
+        const res = await sendAudienceInvite({
+          eventId, title, body: finalBody,
+          channels: { push, email },
+          userIds: selectedUsers.map(u => u.user_id),
+        });
+        toast.success(`Invite sent to ${res.recipientCount} users`);
+      } else {
+        if (!eventId) throw new Error("External invites require an event");
+        if (validExternals.length === 0) throw new Error("Add at least one guest with email or phone");
+        const { data, error } = await supabase.functions.invoke("send-event-invite", {
+          body: {
+            eventId,
+            invitees: validExternals.map(g => ({
+              name: g.name.trim() || undefined,
+              email: g.email.trim() || undefined,
+              phone: g.phone.trim() || undefined,
+            })),
+          },
+        });
+        if (error) throw error;
+        toast.success(`Invite sent to ${data?.sentCount ?? validExternals.length} guests`);
+      }
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e?.message || "Failed to send");
