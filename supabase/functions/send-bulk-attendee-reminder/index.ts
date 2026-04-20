@@ -81,6 +81,14 @@ serve(async (req) => {
     });
     const eventUrl = `https://etherbylcove.com/event/${event.id}`;
     const resendKey = Deno.env.get("RESEND_API_KEY");
+    const identity = await resolveHostIdentity(admin, body.eventId);
+    const eventDateLong = new Date(event.start_date).toLocaleDateString("en-US", {
+      weekday: "long", month: "long", day: "numeric", year: "numeric",
+    });
+    const eventTimeShort = new Date(event.start_date).toLocaleTimeString("en-US", {
+      hour: "numeric", minute: "2-digit",
+    });
+    const location = [(event as any).venue, (event as any).city].filter(Boolean).join(", ") || "Location TBA";
 
     // Campaign row
     const { data: campaign } = await admin.from("notification_campaigns").insert({
@@ -159,18 +167,31 @@ serve(async (req) => {
         } catch (e) { await logRow("push", "failed", String(e)); }
       }
 
-      // Email
+      // Email (host-branded)
       if (channels.email && email && resendKey) {
         try {
-          const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-            <h1 style="color:#1a1a2e;">${finalTitle}</h1>
-            <p style="color:#555;line-height:1.6;">${finalBody.replace(/\n/g, "<br/>")}</p>
-            <a href="${eventUrl}" style="display:inline-block;background:#e91e8c;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin-top:16px;">View Event</a>
-          </div>`;
+          const { html, text } = buildHostEventEmail("reminder", {
+            identity,
+            recipientName: displayName,
+            eventTitle: event.title,
+            eventDate: eventDateLong,
+            eventTime: eventTimeShort,
+            location,
+            isFree: true,
+            eventUrl,
+            customMessage: finalBody,
+          });
           const r = await fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ from: "notifications@etherbylcove.com", to: [email], subject: finalTitle, html }),
+            body: JSON.stringify({
+              from: identity.fromHeader,
+              to: [email],
+              reply_to: identity.replyTo,
+              subject: finalTitle,
+              html,
+              text,
+            }),
           });
           if (r.ok) { await logRow("email", "sent"); sentCount++; }
           else await logRow("email", "failed", `${r.status}`);
