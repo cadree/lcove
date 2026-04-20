@@ -575,6 +575,7 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
               </div>
             )}
           </section>
+          </>)}
 
           {/* MOODBOARD */}
           {eventId && (
