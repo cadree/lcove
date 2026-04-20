@@ -3,10 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
+export type MoodboardFileType = 'image' | 'video' | 'pdf' | 'doc' | 'presentation' | 'other';
+
 export interface MoodboardItem {
   id: string;
   event_id: string;
-  type: 'image' | 'link' | 'note' | 'itinerary';
+  type: 'image' | 'link' | 'note' | 'itinerary' | 'file';
   media_url: string | null;
   link_url: string | null;
   title: string | null;
@@ -15,6 +17,32 @@ export interface MoodboardItem {
   sort_order: number;
   created_by: string;
   created_at: string;
+  file_type: MoodboardFileType | null;
+  file_name: string | null;
+  file_size: number | null;
+  mime_type: string | null;
+}
+
+export function classifyFile(file: File): MoodboardFileType {
+  const m = file.type.toLowerCase();
+  const n = file.name.toLowerCase();
+  if (m.startsWith('image/')) return 'image';
+  if (m.startsWith('video/')) return 'video';
+  if (m === 'application/pdf' || n.endsWith('.pdf')) return 'pdf';
+  if (n.endsWith('.ppt') || n.endsWith('.pptx') || m.includes('presentation')) return 'presentation';
+  if (n.endsWith('.doc') || n.endsWith('.docx') || m.includes('word') || m === 'text/plain') return 'doc';
+  return 'other';
+}
+
+export async function uploadMoodboardFile(userId: string, eventId: string, file: File) {
+  const ext = file.name.split('.').pop() || 'bin';
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${userId}/event-moodboard/${eventId}/${Date.now()}-${safeName}`;
+  const { error } = await supabase.storage.from('media').upload(path, file, {
+    contentType: file.type || undefined,
+  });
+  if (error) throw error;
+  return supabase.storage.from('media').getPublicUrl(path).data.publicUrl;
 }
 
 export function useEventMoodboard(eventId: string | null | undefined) {
@@ -40,7 +68,7 @@ export function useAddMoodboardItem() {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async (item: Omit<MoodboardItem, 'id' | 'created_at' | 'created_by'>) => {
+    mutationFn: async (item: Partial<Omit<MoodboardItem, 'id' | 'created_at' | 'created_by'>> & Pick<MoodboardItem, 'event_id' | 'type'>) => {
       if (!user) throw new Error('Must be logged in');
       const { data, error } = await supabase
         .from('event_moodboard_items')
@@ -72,9 +100,5 @@ export function useDeleteMoodboardItem() {
 }
 
 export async function uploadMoodboardImage(userId: string, eventId: string, file: File) {
-  const ext = file.name.split('.').pop();
-  const path = `${userId}/event-moodboards/${eventId}/${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from('media').upload(path, file);
-  if (error) throw error;
-  return supabase.storage.from('media').getPublicUrl(path).data.publicUrl;
+  return uploadMoodboardFile(userId, eventId, file);
 }

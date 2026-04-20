@@ -43,9 +43,9 @@ serve(async (req) => {
     const body: Body = await req.json();
     if (!body.title || !body.body) throw new Error("Missing fields");
 
-    let filter = { ...body.filter };
+    let filter: any = { ...body.filter };
 
-    // Lookalike: union with interests/passions of current attendees of this event
+    // Lookalike: union with interests of current attendees of this event
     if (body.lookalike && body.eventId) {
       const { data: attendees } = await admin.from("event_attendees")
         .select("attendee_user_id").eq("event_id", body.eventId)
@@ -60,27 +60,20 @@ serve(async (req) => {
       }
     }
 
-    // Resolve audience: replicate get_audience_estimate logic but return user_ids
-    const currentYear = new Date().getFullYear();
-    let q = admin.from("profiles").select("user_id, display_name, phone, last_active_at, interests, gender, birth_year, city, city_key, region_state, region_country").eq("access_status", "active");
-    if (filter.cities?.length) q = q.in("city_key", filter.cities.map(c => c.toLowerCase()));
-    if (filter.states?.length) q = q.in("region_state", filter.states);
-    if (filter.countries?.length) q = q.in("region_country", filter.countries);
-    if (filter.genders?.length) q = q.in("gender", filter.genders);
-    if (filter.interests?.length) q = q.overlaps("interests", filter.interests);
-    if (filter.active_only) q = q.gte("last_active_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
-
-    const { data: profilesRaw } = await q.limit(5000);
-    let profiles = profilesRaw || [];
-
-    if (filter.age_min != null) profiles = profiles.filter(p => !p.birth_year || (currentYear - p.birth_year) >= filter.age_min!);
-    if (filter.age_max != null) profiles = profiles.filter(p => !p.birth_year || (currentYear - p.birth_year) <= filter.age_max!);
-
-    if (filter.passions?.length) {
-      const { data: ups } = await admin.from("user_passions").select("user_id, passions(name)").in("user_id", profiles.map(p => p.user_id));
-      const matchedIds = new Set((ups || []).filter((u: any) => filter.passions!.includes(u.passions?.name)).map((u: any) => u.user_id));
-      profiles = profiles.filter(p => matchedIds.has(p.user_id));
-    }
+    // SINGLE SOURCE OF TRUTH: use the same RPC the UI preview uses.
+    // This guarantees estimate = preview = send target.
+    // We must call as the authenticated user (RPC checks auth.uid()), so use a user-scoped client.
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: audienceRows, error: audErr } = await userClient.rpc("get_audience_preview", {
+      filter,
+      p_limit: 10000,
+    });
+    if (audErr) throw new Error(`audience query failed: ${audErr.message}`);
+    let profiles = (audienceRows || []) as Array<{ user_id: string; display_name: string | null; last_active_at: string | null; interests: string[] | null }>;
 
     const channels = body.channels || { push: true, email: true, sms: false };
     const resendKey = Deno.env.get("RESEND_API_KEY");
