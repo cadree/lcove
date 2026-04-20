@@ -7494,6 +7494,17 @@ export type Database = {
         Returns: Json
       }
       get_audience_estimate: { Args: { filter: Json }; Returns: number }
+      get_audience_preview: {
+        Args: { filter: Json; p_limit?: number }
+        Returns: {
+          avatar_url: string
+          city: string
+          display_name: string
+          interests: string[]
+          last_active_at: string
+          user_id: string
+        }[]
+      }
       get_campaign_analytics: { Args: { p_event_id?: string }; Returns: Json }
       get_client_project_by_token: { Args: { p_token: string }; Returns: Json }
       get_platform_stats: {
