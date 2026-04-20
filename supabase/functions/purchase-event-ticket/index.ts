@@ -16,6 +16,7 @@ interface AttendeeInput {
   name: string;
   email?: string;
   phone?: string;
+  social?: string;
 }
 
 serve(async (req) => {
@@ -61,6 +62,7 @@ serve(async (req) => {
         name: String(a.name || "").trim(),
         email: a.email ? String(a.email).trim().toLowerCase() : undefined,
         phone: a.phone ? String(a.phone).trim() : undefined,
+        social: a.social ? String(a.social).trim().replace(/^@/, "") : undefined,
       })).filter(a => a.name);
     } else {
       // legacy: build a single attendee from purchaser info
@@ -125,6 +127,7 @@ serve(async (req) => {
     const purchaserEmail = userEmail || attendeeList[0].email || guestEmail || null;
     const purchaserName = attendeeList[0].name || guestName || null;
     const purchaserPhone = attendeeList[0].phone || guestPhone || null;
+    const purchaserSocial = attendeeList[0].social || null;
 
     log("Resolved", { tier: tier.id, qty: attendeeList.length, totalCents, isFree });
 
@@ -138,6 +141,7 @@ serve(async (req) => {
           purchaser_name: purchaserName,
           purchaser_email: purchaserEmail,
           purchaser_phone: purchaserPhone,
+          purchaser_social: purchaserSocial,
           quantity: attendeeList.length,
           subtotal_cents: 0,
           total_cents: 0,
@@ -157,6 +161,7 @@ serve(async (req) => {
         attendee_name: a.name,
         attendee_email: a.email || purchaserEmail,
         attendee_phone: a.phone,
+        attendee_social: a.social,
         status: "registered",
       }));
       const { data: insertedAttendees, error: attErr } = await supabase
@@ -203,6 +208,7 @@ serve(async (req) => {
         purchaser_name: purchaserName,
         purchaser_email: purchaserEmail,
         purchaser_phone: purchaserPhone,
+        purchaser_social: purchaserSocial,
         quantity: attendeeList.length,
         subtotal_cents: totalCents,
         total_cents: totalCents,
@@ -223,6 +229,7 @@ serve(async (req) => {
       attendee_name: a.name,
       attendee_email: a.email || purchaserEmail,
       attendee_phone: a.phone,
+      attendee_social: a.social,
       status: "registered",
     }));
     await supabase.from("event_attendees").insert(attendeeRows);
