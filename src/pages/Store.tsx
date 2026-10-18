@@ -56,7 +56,20 @@ const Store = () => {
   const { data: myStore, isLoading: isLoadingStore } = useMyStore();
   const { data: myItems } = useMyStoreItems();
   const deleteItem = useDeleteStoreItem();
-  const [activeTab, setActiveTab] = useState<'products' | 'services' | 'rentals' | 'my-store' | 'orders'>('products');
+  const tabParam = searchParams.get('tab');
+  const categoryParam = searchParams.get('category');
+  const isStoreTab = (
+    value: string | null,
+  ): value is 'products' | 'services' | 'rentals' | 'my-store' | 'orders' =>
+    value === 'products' || value === 'services' || value === 'rentals' || value === 'my-store' || value === 'orders';
+  const [activeTab, setActiveTab] = useState<'products' | 'services' | 'rentals' | 'my-store' | 'orders'>(
+    isStoreTab(tabParam) ? tabParam : 'products',
+  );
+  useEffect(() => {
+    if (isStoreTab(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState<StoreItem | null>(null);
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
@@ -154,10 +167,12 @@ const Store = () => {
     ? (currentType ? items.filter(item => item.type === currentType) : items)
     : items;
 
-  const filteredItems = (activeTab === 'my-store' ? myItems : typeFilteredItems)?.filter((item) =>
-    item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  const filteredItems = (activeTab === 'my-store' ? myItems : typeFilteredItems)?.filter((item) => {
+    const matchesQuery = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = !categoryParam || item.category_id === categoryParam;
+    return matchesQuery && matchesCategory;
+  }) || [];
 
   const handleItemClick = (item: StoreItem) => {
     setSelectedItem(item);

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { ledgerBalances } from "../_shared/credit-balances.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -119,15 +120,10 @@ serve(async (req) => {
 
     const written: LedgerRow[] = [];
     try {
-      const { data: credits } = await admin
-        .from("user_credits")
-        .select("balance, genesis_balance, earned_balance")
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      const balance = Number(credits?.balance || 0);
-      const genesis = Number(credits?.genesis_balance || 0);
-      const earned = Number(credits?.earned_balance || 0);
+      const credits = await ledgerBalances(admin, userId);
+      const balance = credits.balance;
+      const genesis = credits.genesis_balance;
+      const earned = credits.earned_balance;
       const available = Math.min(balance, genesis + earned);
       if (available < price) {
         throw new Error(`Insufficient credits. You have ${balance} LC, but need ${price} LC`);
@@ -178,12 +174,8 @@ serve(async (req) => {
       const creatorId = event.creator_id as string | null;
       const creatorCredits = Math.floor(price * 0.95);
       if (creatorId && creatorId !== userId && creatorCredits > 0) {
-        const { data: creatorCreditsRow } = await admin
-          .from("user_credits")
-          .select("balance")
-          .eq("user_id", creatorId)
-          .maybeSingle();
-        const creatorBalance = Number(creatorCreditsRow?.balance || 0);
+        const creatorCreditsRow = await ledgerBalances(admin, creatorId);
+        const creatorBalance = creatorCreditsRow.balance;
         const row = {
           user_id: creatorId,
           amount: creatorCredits,

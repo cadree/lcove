@@ -21,6 +21,7 @@ export interface NotificationPreferences {
   user_id: string;
   messages_enabled: boolean;
   likes_enabled: boolean;
+  follows_enabled: boolean;
   comments_enabled: boolean;
   project_invites_enabled: boolean;
   event_reminders_enabled: boolean;

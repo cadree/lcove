@@ -68,6 +68,7 @@ const NetworkPage = () => {
   const [selectedContent, setSelectedContent] = useState<NetworkContent | null>(null);
   const [playingContent, setPlayingContent] = useState<NetworkContent | null>(null);
   const [activeFilter, setActiveFilter] = useState<'all' | 'shows' | 'movies'>('all');
+  const [genreFilter, setGenreFilter] = useState<string | null>(null);
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -78,6 +79,12 @@ const NetworkPage = () => {
   const { data: subscription } = useNetworkSubscription(networkId || '');
   const { data: watchHistory = [] } = useWatchHistory();
   const subscribeMutation = useSubscribeToNetwork();
+
+  const categoryOptions = useMemo(() => {
+    const tags = new Set<string>();
+    content.forEach((item) => item.genre_tags?.forEach((tag) => tags.add(tag)));
+    return [...tags].sort();
+  }, [content]);
 
   const isSubscribed = subscription?.subscribed || !network?.is_paid;
   const isOwner = user?.id === network?.owner_id;
@@ -95,8 +102,12 @@ const NetworkPage = () => {
       filtered = filtered.filter((c) => c.content_type !== 'tv_show');
     }
 
+    if (genreFilter) {
+      filtered = filtered.filter((c) => c.genre_tags?.includes(genreFilter));
+    }
+
     return filtered;
-  }, [content, searchQuery, activeFilter]);
+  }, [content, searchQuery, activeFilter, genreFilter]);
 
   // Content rows
   const featuredContent = filteredContent.filter((c) => c.is_featured);
@@ -208,8 +219,13 @@ const NetworkPage = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-48">
-                  {['Drama', 'Comedy', 'Action', 'Horror', 'Documentary'].map((cat) => (
-                    <DropdownMenuItem key={cat}>{cat}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setGenreFilter(null)}>All categories</DropdownMenuItem>
+                  {categoryOptions.length === 0 ? (
+                    <DropdownMenuItem disabled>No categories yet</DropdownMenuItem>
+                  ) : categoryOptions.map((cat) => (
+                    <DropdownMenuItem key={cat} onClick={() => setGenreFilter(cat)}>
+                      {genreFilter === cat ? '✓ ' : ''}{cat}
+                    </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -228,7 +244,7 @@ const NetworkPage = () => {
             </Button>
 
             {/* Downloads/My List - Desktop */}
-            <Button variant="ghost" size="icon" className="hover:bg-background/20 hidden md:flex">
+            <Button variant="ghost" size="icon" className="hover:bg-background/20 hidden md:flex" disabled title="Downloads aren't available">
               <Download className="w-5 h-5" />
             </Button>
 
@@ -264,9 +280,27 @@ const NetworkPage = () => {
           <FilterPill active={activeFilter === 'movies'} onClick={() => setActiveFilter(activeFilter === 'movies' ? 'all' : 'movies')}>
             Movies
           </FilterPill>
-          <FilterPill active={false} onClick={() => {}}>
-            Categories <ChevronDown className="w-3 h-3 ml-0.5" />
-          </FilterPill>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap flex items-center shrink-0",
+                  genreFilter ? "bg-foreground text-background" : "border border-border/50 text-foreground",
+                )}
+              >
+                {genreFilter || 'Categories'} <ChevronDown className="w-3 h-3 ml-0.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuItem onClick={() => setGenreFilter(null)}>All categories</DropdownMenuItem>
+              {categoryOptions.length === 0 ? (
+                <DropdownMenuItem disabled>No categories yet</DropdownMenuItem>
+              ) : categoryOptions.map((cat) => (
+                <DropdownMenuItem key={cat} onClick={() => setGenreFilter(cat)}>{cat}</DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 

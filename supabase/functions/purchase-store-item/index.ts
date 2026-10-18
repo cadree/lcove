@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { STORE_PLATFORM_FEE_PERCENT } from "../_shared/fees.mjs";
+import { ledgerBalances } from "../_shared/credit-balances.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -125,6 +126,13 @@ serve(async (req) => {
 
       if (item.external_url) {
         throw new Error("This item is sold outside Ether");
+      }
+
+      const totalCredits = item.credits_price * quantity;
+      const userCredits = await ledgerBalances(supabaseAdmin, user.id);
+      const balance = userCredits.balance;
+      if (balance < totalCredits) {
+        throw new Error(`Insufficient credits. You have ${balance} LC, but need ${totalCredits} LC`);
       }
 
       const { data: creditResult, error: creditError } = await supabaseAdmin.rpc(

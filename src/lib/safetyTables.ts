@@ -1,66 +1,42 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { ReportTargetType } from "@/lib/reportReasons";
 
-// content_reports is created in a migration that is newer than
-// src/integrations/supabase/types.ts. Regenerate that file with
-// `supabase gen types` (see README) instead of editing it by hand.
-
-export interface ContentReportRow {
-  id: string;
-  reporter_id: string;
-  target_type: ReportTargetType;
-  target_id: string;
-  reason: string;
-  details: string | null;
-  status: "open" | "actioned" | "dismissed";
-  created_at: string;
-  updated_at: string;
-  reviewed_by: string | null;
-  reviewed_at: string | null;
-}
-
-export interface ContentReportInsert {
-  reporter_id: string;
-  target_type: ReportTargetType;
-  target_id: string;
-  reason: string;
-  details: string | null;
-  status: "open";
-}
-
-export interface ContentReportUpdate {
-  status: "actioned" | "dismissed";
-  reviewed_by: string;
-  reviewed_at: string;
-  updated_at: string;
-}
+// content_reports, stream_chat, and content_likes are created in migrations
+// that are newer than src/integrations/supabase/types.ts. Regenerate that
+// file with `supabase gen types` instead of editing it by hand.
 
 interface QueryError {
   message: string;
   code?: string;
 }
 
-interface ContentReportQuery {
-  select: (columns: string) => {
-    order: (
-      column: string,
-      options: { ascending: boolean },
-    ) => Promise<{ data: ContentReportRow[] | null; error: QueryError | null }>;
-  };
-  insert: (
-    row: ContentReportInsert,
-  ) => Promise<{ data: ContentReportRow | null; error: QueryError | null }>;
-  update: (row: ContentReportUpdate) => {
-    eq: (
-      column: "id",
-      value: string,
-    ) => Promise<{ data: ContentReportRow | null; error: QueryError | null }>;
-  };
+interface QueryResult<T = unknown> {
+  data: T | null;
+  error: QueryError | null;
+  count?: number | null;
 }
 
-export function fromUntyped(table: "content_reports"): ContentReportQuery {
+interface FilterChain<T = unknown> extends PromiseLike<QueryResult<T>> {
+  eq: (column: string, value: unknown) => FilterChain<T>;
+  order: (column: string, options?: { ascending: boolean }) => FilterChain<T>;
+  limit: (count: number) => FilterChain<T>;
+  maybeSingle: () => PromiseLike<QueryResult<T>>;
+}
+
+interface UntypedTable {
+  select: (
+    columns: string,
+    options?: { count?: "exact"; head?: boolean },
+  ) => FilterChain;
+  insert: (row: object) => FilterChain;
+  update: (row: object) => FilterChain;
+  delete: () => FilterChain;
+}
+
+export function fromUntyped(
+  table: "content_reports" | "stream_chat" | "content_likes",
+): UntypedTable {
   const client = supabase as unknown as {
-    from: (name: "content_reports") => ContentReportQuery;
+    from: (name: typeof table) => UntypedTable;
   };
   return client.from(table);
 }

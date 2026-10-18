@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { NetworkContent, useContentGenres } from '@/hooks/useCinema';
+import { callRpc } from '@/lib/rpc';
 import { useUpdateContent } from '@/hooks/useNetworkContentManage';
 import { Film, Upload, Link as LinkIcon, X, Plus, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -60,7 +61,13 @@ export const EditContentDialog = ({ open, onOpenChange, content }: EditContentDi
       setDirector(content.director || '');
       setRuntimeMinutes(content.runtime_minutes?.toString() || '');
       setReleaseDate(content.release_date || '');
-      setExternalVideoUrl(content.external_video_url || '');
+      setExternalVideoUrl('');
+      callRpc<{ video_url: string | null; external_video_url: string | null }[] | null>(
+        'cinema_playback',
+        { p_content_id: content.id, p_episode_id: null },
+      ).then((rows) => {
+        setExternalVideoUrl(rows?.[0]?.external_video_url || '');
+      }).catch(() => undefined);
       setGenreTags(content.genre_tags || []);
       setCastMembers(content.cast_members || []);
       setIsFeatured(content.is_featured);

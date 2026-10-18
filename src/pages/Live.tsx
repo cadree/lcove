@@ -13,7 +13,7 @@ import {
   Clock, Eye, Coins, PlayCircle, Video, Headphones, Search 
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLiveStreams, useGoLive, LiveStream } from '@/hooks/useLiveStreams';
+import { useLiveStreams, useEndStream, LiveStream } from '@/hooks/useLiveStreams';
 import { LiveStreamCard } from '@/components/streaming/LiveStreamCard';
 import { StreamViewer } from '@/components/streaming/StreamViewer';
 import { CreateStreamDialog } from '@/components/streaming/CreateStreamDialog';
@@ -30,7 +30,7 @@ const MyStreamCard: React.FC<{
   onGoLive: () => void;
 }> = ({ stream, onWatch, onEdit, onGoLive }) => {
   const { profile } = useProfile(stream.host_id);
-  const goLive = useGoLive();
+  const endStream = useEndStream();
   
   const getStatus = () => {
     if (stream.is_live) return 'live';
@@ -128,7 +128,7 @@ const MyStreamCard: React.FC<{
                 className="flex-1 h-9 text-xs sm:text-sm"
                 onClick={(e) => {
                   e.stopPropagation();
-                  goLive.mutate({ streamId: stream.id, isLive: false });
+                  endStream.mutate({ id: stream.id, stream_type: stream.stream_type });
                 }}
               >
                 End Stream

@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Radio, Users, Coins, Send, X, Clock, PlayCircle, Trash2 } from 'lucide-react';
-import { useStream, useStreamReactions, useSendReaction, useTipStream, useJoinStream, useDeleteStream } from '@/hooks/useLiveStreams';
+import { useStream, useStreamReactions, useSendReaction, useTipStream, useJoinStream, useDeleteStream, useStreamPresence } from '@/hooks/useLiveStreams';
+import { StreamChat } from './StreamChat';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -61,6 +62,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   const isHost = user?.id === stream?.host_id;
+  useStreamPresence(streamId, open && !!user && !isHost && stream?.is_live === true);
   const streamStatus = stream ? getStreamStatus(stream) : 'draft';
   const hasReplay = streamStatus === 'ended' && stream?.replay_available && stream?.replay_url;
 
@@ -378,6 +380,8 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
               </div>
             )}
           </div>
+
+          {stream && <StreamChat streamId={stream.id || streamId} />}
         </DialogContent>
       </Dialog>
 

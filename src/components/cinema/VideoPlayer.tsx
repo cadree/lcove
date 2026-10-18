@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { NetworkContent, useUpdateWatchProgress } from '@/hooks/useCinema';
+import { NetworkContent, useContentPlayback, useIncrementViewCount, useUpdateWatchProgress } from '@/hooks/useCinema';
 import { isIosApp } from '@/lib/platform';
 import { cn } from '@/lib/utils';
 
@@ -58,6 +58,17 @@ export const VideoPlayer = ({
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const { mutate: saveWatchProgress } = useUpdateWatchProgress();
+  const recordView = useIncrementViewCount();
+  const { data: playback } = useContentPlayback(content.id, episodeId);
+  const externalUrl = playback?.external_video_url || null;
+  const fileUrl = playback?.video_url || null;
+  const isEmbed = !!externalUrl && (
+    externalUrl.includes('youtube.com') ||
+    externalUrl.includes('vimeo.com') ||
+    externalUrl.includes('youtu.be')
+  );
+  const videoUrl = fileUrl || (isEmbed ? null : externalUrl);
+  const recorded = useRef(false);
   const progressSnapshot = useRef({
     currentTime,
     duration,
@@ -73,7 +84,11 @@ export const VideoPlayer = ({
     isPreviewOnly,
   };
 
-  const videoUrl = content.video_url || content.external_video_url;
+  useEffect(() => {
+    if ((!videoUrl && !externalUrl) || recorded.current || isPreviewOnly) return;
+    recorded.current = true;
+    recordView.mutate(content.id);
+  }, [videoUrl, externalUrl, content.id, isPreviewOnly, recordView]);
 
   // Handle preview mode - pause and show paywall when preview time reached
   useEffect(() => {
@@ -246,11 +261,7 @@ export const VideoPlayer = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Check if it's an external embed (YouTube, Vimeo, etc.)
-  const isEmbed = content.external_video_url && 
-    (content.external_video_url.includes('youtube.com') || 
-     content.external_video_url.includes('vimeo.com') ||
-     content.external_video_url.includes('youtu.be'));
+  // Embeds use the playback URL. Public selects do not include video_url.
 
   // Calculate preview progress percentage
   const previewProgress = isPreviewOnly 
@@ -291,7 +302,7 @@ export const VideoPlayer = ({
       {isEmbed ? (
         // External Embed (YouTube, Vimeo) - For embeds, we can't control preview
         <iframe
-          src={content.external_video_url?.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+          src={externalUrl?.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
           className="w-full h-full"
           allowFullScreen
           allow="autoplay; encrypted-media"

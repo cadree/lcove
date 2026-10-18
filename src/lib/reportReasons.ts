@@ -1,4 +1,4 @@
-export const REPORT_TARGET_TYPES = ["post", "profile", "message", "comment", "project"] as const;
+export const REPORT_TARGET_TYPES = ["post", "profile", "message", "comment", "project", "stream_message"] as const;
 
 export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
 

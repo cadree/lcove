@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { ledgerBalances } from "../_shared/credit-balances.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -42,20 +43,10 @@ serve(async (req) => {
 
     logStep("Transfer request", { senderId: sender.id, recipientId: recipient_id, amount });
 
-    // Get sender's credit balances
-    const { data: senderCredits, error: senderError } = await supabaseClient
-      .from('user_credits')
-      .select('balance, genesis_balance, earned_balance')
-      .eq('user_id', sender.id)
-      .single();
-
-    if (senderError || !senderCredits) {
-      throw new Error("Could not fetch sender credits");
-    }
-
-    const genesisBalance = Number(senderCredits.genesis_balance) || 0;
-    const earnedBalance = Number(senderCredits.earned_balance) || 0;
-    const totalBalance = genesisBalance + earnedBalance;
+    const senderCredits = await ledgerBalances(supabaseClient, sender.id);
+    const genesisBalance = senderCredits.genesis_balance;
+    const earnedBalance = senderCredits.earned_balance;
+    const totalBalance = senderCredits.balance;
 
     logStep("Sender balances", { genesisBalance, earnedBalance, totalBalance, requested: amount });
 
@@ -89,14 +80,8 @@ serve(async (req) => {
       throw new Error("Recipient not found");
     }
 
-    // Get current balances for balance_after calculations
-    const { data: recipientCredits } = await supabaseClient
-      .from('user_credits')
-      .select('balance, earned_balance')
-      .eq('user_id', recipient_id)
-      .single();
-
-    const recipientCurrentBalance = recipientCredits?.balance || 0;
+    const recipientCredits = await ledgerBalances(supabaseClient, recipient_id);
+    const recipientCurrentBalance = recipientCredits.balance;
 
     // Create sender's debit ledger entry
     // If spending Genesis, it gets burned (sender loses Genesis, recipient gets Earned)

@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useCreateEvent } from "@/hooks/useCalendar";
+import { zonedWallTimeToUtc } from "@/lib/eventTime";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -84,6 +85,7 @@ export function CreateCommunityEventDialog({
   const [timezone, setTimezone] = useState(
     Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York'
   );
+  const [recurrence, setRecurrence] = useState<'' | 'FREQ=WEEKLY' | 'FREQ=MONTHLY'>('');
   const [capacity, setCapacity] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   
@@ -229,9 +231,10 @@ const TIMEZONES = [
       city: city.trim(),
       state: state || null,
       country: 'USA',
-      start_date: new Date(startDateTime).toISOString(),
-      end_date: new Date(endDateTime).toISOString(),
+      start_date: zonedWallTimeToUtc(startDateValue, startTimeValue, timezone),
+      end_date: zonedWallTimeToUtc(endDateValue, endTimeValue, timezone),
       timezone,
+      recurrence: recurrence || null,
       image_url: imageUrl || null,
       ticket_type: ticketType,
       ticket_price: ticketType === 'paid' || ticketType === 'hybrid' ? parseFloat(ticketPrice) || null : null,
@@ -494,6 +497,21 @@ const TIMEZONES = [
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">Repeats</Label>
+                <Select value={recurrence || 'none'} onValueChange={(value) => setRecurrence(value === 'none' ? '' : value as 'FREQ=WEEKLY' | 'FREQ=MONTHLY')}>
+                  <SelectTrigger className="glass">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Does not repeat</SelectItem>
+                    <SelectItem value="FREQ=WEEKLY">Weekly</SelectItem>
+                    <SelectItem value="FREQ=MONTHLY">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">Tickets and RSVPs stay on the first date.</p>
               </div>
             </div>
           </div>

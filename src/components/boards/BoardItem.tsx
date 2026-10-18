@@ -310,7 +310,8 @@ export const BoardItem = memo(function BoardItem({
             onChange={onContentChange}
           />
         );
-      case 'board_ref':
+      case 'board_ref': {
+        const ref = (item.content || {}) as { title?: string; board_id?: string };
         return (
           <div className="p-4 flex flex-col items-center justify-center h-full">
             <div className="w-16 h-16 bg-[#e7e5e4] rounded-lg flex items-center justify-center mb-2">
@@ -320,10 +321,28 @@ export const BoardItem = memo(function BoardItem({
                 ))}
               </div>
             </div>
-            <span className="text-sm font-medium text-[#44403c]">New Board</span>
-            <span className="text-xs text-[#78716c]">0 cards</span>
+            <span className="text-sm font-medium text-[#44403c]">{ref.title || 'Board'}</span>
+            <span className="text-xs text-[#78716c]">{ref.board_id ? 'Linked board' : 'Not linked'}</span>
           </div>
         );
+      }
+      case 'sketch': {
+        const sketch = (item.content || {}) as { points?: { x: number; y: number }[]; color?: string; width?: number };
+        const points = sketch.points || [];
+        const poly = points.map((point) => `${point.x},${point.y}`).join(' ');
+        return (
+          <svg className="w-full h-full" viewBox={`0 0 ${item.w} ${item.h}`} preserveAspectRatio="none">
+            <polyline
+              points={poly}
+              fill="none"
+              stroke={sketch.color || '#ffffff'}
+              strokeWidth={sketch.width || 3}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        );
+      }
       case 'column':
         return (
           <div className="p-4 h-full">

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { ledgerBalances } from "../_shared/credit-balances.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -102,14 +103,8 @@ serve(async (req) => {
       const sellerCredits = Math.floor(totalCredits * 0.80);
       const platformCredits = totalCredits - sellerCredits;
 
-      // Check user's credit balance
-      const { data: userCredits } = await supabaseClient
-        .from("user_credits")
-        .select("balance")
-        .eq("user_id", user.id)
-        .single();
-
-      const balance = userCredits?.balance || 0;
+      const userCredits = await ledgerBalances(supabaseAdmin, user.id);
+      const balance = userCredits.balance;
       if (balance < totalCredits) {
         throw new Error(`Insufficient credits. You have ${balance} LC, but need ${totalCredits} LC`);
       }
@@ -126,13 +121,8 @@ serve(async (req) => {
       });
 
       // Add 80% to seller
-      const { data: sellerCreditsData } = await supabaseAdmin
-        .from("user_credits")
-        .select("balance")
-        .eq("user_id", store.user_id)
-        .single();
-
-      const sellerBalance = sellerCreditsData?.balance || 0;
+      const sellerCreditsData = await ledgerBalances(supabaseAdmin, store.user_id);
+      const sellerBalance = sellerCreditsData.balance;
       await supabaseAdmin.from("credit_ledger").insert({
         user_id: store.user_id,
         amount: sellerCredits,

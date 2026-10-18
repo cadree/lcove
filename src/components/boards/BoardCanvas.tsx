@@ -45,6 +45,7 @@ interface BoardCanvasProps {
   onDeleteConnector: (id: string) => void;
   onCreateItem?: (type: ItemType, content: Json, x: number, y: number) => void;
   onItemClickForConnect?: (itemId: string) => Promise<boolean>;
+  onViewChange?: (view: { offset: { x: number; y: number }; scale: number }) => void;
 }
 
 export const BoardCanvas = memo(function BoardCanvas({
@@ -60,6 +61,7 @@ export const BoardCanvas = memo(function BoardCanvas({
   onDeleteConnector,
   onCreateItem,
   onItemClickForConnect,
+  onViewChange,
 }: BoardCanvasProps) {
   const { user } = useAuth();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -78,7 +80,8 @@ export const BoardCanvas = memo(function BoardCanvas({
   // Dispatch custom event when offset changes for connector updates
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('board-canvas-pan'));
-  }, [offset, scale]);
+    onViewChange?.({ offset, scale });
+  }, [offset, scale, onViewChange]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('canvas-inner')) {

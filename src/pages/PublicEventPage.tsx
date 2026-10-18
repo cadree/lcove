@@ -17,6 +17,7 @@ import {
   Phone,
   Loader2,
   Bell,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,6 +34,8 @@ import { toast } from "sonner";
 import { shareLink, buildShareUrl } from "@/lib/shareLink";
 import { EventMoodboardView } from "@/components/calendar/EventMoodboardView";
 import { AddToCalendarButtons } from "@/components/calendar/AddToCalendarButtons";
+
+const walletPassesEnabled = import.meta.env.VITE_WALLET_PASSES_ENABLED === "true";
 
 export default function PublicEventPage() {
   const { eventId } = useParams();
@@ -474,6 +477,38 @@ export default function PublicEventPage() {
                       <ExternalLink className="h-4 w-4" />
                       Download .ics File
                     </Button>
+                    {walletPassesEnabled && (
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2 text-sm"
+                      onClick={async () => {
+                        try {
+                          const { data, error } = await supabase.functions.invoke("generate-wallet-pass", {
+                            body: {
+                              eventId: event.id,
+                              eventTitle: event.title,
+                              eventDate: event.start_date,
+                              eventEndDate: event.end_date,
+                              venue: [event.venue, event.city].filter(Boolean).join(', '),
+                              guestName: guestName || 'Guest',
+                              ticketType: 'free',
+                            },
+                          });
+                          if (error) throw error;
+                          if (data?.passUrl) {
+                            window.open(data.passUrl, '_blank');
+                          } else {
+                            toast.info("Wallet pass generation is being set up. Check back soon!");
+                          }
+                        } catch {
+                          toast.info("Wallet pass feature coming soon!");
+                        }
+                      }}
+                    >
+                      <Wallet className="h-4 w-4" />
+                      Add to Wallet
+                    </Button>
+                    )}
                     {/* Get Notified - Push */}
                     {pushStatus !== 'subscribed' && (
                       <Button
@@ -619,6 +654,38 @@ export default function PublicEventPage() {
                       <ExternalLink className="h-4 w-4" />
                       Download .ics File
                     </Button>
+                    {walletPassesEnabled && (
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2 text-sm"
+                      onClick={async () => {
+                        try {
+                          const { data, error } = await supabase.functions.invoke("generate-wallet-pass", {
+                            body: {
+                              eventId: event.id,
+                              eventTitle: event.title,
+                              eventDate: event.start_date,
+                              eventEndDate: event.end_date,
+                              venue: [event.venue, event.city].filter(Boolean).join(', '),
+                              guestName: ticketGuestName || guestName || 'Guest',
+                              ticketType: 'paid',
+                            },
+                          });
+                          if (error) throw error;
+                          if (data?.passUrl) {
+                            window.open(data.passUrl, '_blank');
+                          } else {
+                            toast.info("Wallet pass generation is being set up. Check back soon!");
+                          }
+                        } catch {
+                          toast.info("Wallet pass feature coming soon!");
+                        }
+                      }}
+                    >
+                      <Wallet className="h-4 w-4" />
+                      Add to Wallet
+                    </Button>
+                    )}
                     {/* Get Notified - Push */}
                     {pushStatus !== 'subscribed' && (
                       <Button

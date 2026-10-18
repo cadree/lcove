@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { ledgerBalances } from "../_shared/credit-balances.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,14 +46,8 @@ serve(async (req) => {
 
     // If using credits, convert from credit balance
     if (use_credits) {
-      // Check user's EARNED credit balance - only earned credits can be paid out
-      const { data: credits } = await supabaseClient
-        .from('user_credits')
-        .select('balance, earned_balance, genesis_balance')
-        .eq('user_id', user.id)
-        .single();
-
-      const earnedBalance = Number(credits?.earned_balance || 0);
+      const credits = await ledgerBalances(supabaseClient, user.id);
+      const earnedBalance = credits.earned_balance;
 
       // Only server-issued earned credits from a verified source are withdrawable.
       // Transfers and client-minted rows are not, even if earned_balance includes them.
@@ -85,8 +80,7 @@ serve(async (req) => {
       }
 
       // Deduct from earned credits only
-      const newEarnedBalance = earnedBalance - amount;
-      const newTotalBalance = (credits?.balance || 0) - amount;
+      const newTotalBalance = credits.balance - amount;
       
       await supabaseClient.from('credit_ledger').insert({
         user_id: user.id,

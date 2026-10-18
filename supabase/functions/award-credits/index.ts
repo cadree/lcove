@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { ledgerBalances } from "../_shared/credit-balances.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -55,14 +56,8 @@ serve(async (req) => {
     if (!amount || amount <= 0) throw new Error("Invalid amount");
     if (!description) throw new Error("Description required");
 
-    // Get current balance
-    const { data: credits } = await supabaseClient
-      .from('user_credits')
-      .select('balance')
-      .eq('user_id', targetUserId)
-      .single();
-
-    const currentBalance = credits?.balance || 0;
+    const credits = await ledgerBalances(supabaseClient, targetUserId);
+    const currentBalance = credits.balance;
     const newBalance = currentBalance + amount;
 
     // Create ledger entry (trigger will update user_credits)

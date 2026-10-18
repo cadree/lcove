@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { NetworkContent } from './useCinema';
+import { NetworkContent, NETWORK_CONTENT_PUBLIC_COLUMNS } from './useCinema';
 
 // Fetch ALL network content for manage page (including drafts)
 export const useNetworkContentManage = (networkId: string) => {
@@ -11,7 +11,7 @@ export const useNetworkContentManage = (networkId: string) => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('network_content')
-        .select('*')
+        .select(NETWORK_CONTENT_PUBLIC_COLUMNS)
         .eq('network_id', networkId)
         .order('is_featured', { ascending: false })
         .order('created_at', { ascending: false });
@@ -42,8 +42,7 @@ export const useUpdateContent = () => {
         .from('network_content')
         .update(updates)
         .eq('id', contentId)
-        .eq('creator_id', user.id)
-        .select()
+        .select(NETWORK_CONTENT_PUBLIC_COLUMNS)
         .single();
 
       if (error) throw error;
@@ -73,8 +72,7 @@ export const useDeleteContent = () => {
       const { error } = await supabase
         .from('network_content')
         .delete()
-        .eq('id', contentId)
-        .eq('creator_id', user.id);
+        .eq('id', contentId);
 
       if (error) throw error;
       return { networkId };
@@ -109,8 +107,7 @@ export const useTogglePublish = () => {
         .from('network_content')
         .update({ is_published: isPublished })
         .eq('id', contentId)
-        .eq('creator_id', user.id)
-        .select()
+        .select(NETWORK_CONTENT_PUBLIC_COLUMNS)
         .single();
 
       if (error) throw error;

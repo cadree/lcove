@@ -3,7 +3,9 @@ import { useRef, useState, useEffect, useCallback } from "react";
 interface DrawingLayerProps {
   isActive: boolean;
   offset: { x: number; y: number };
+  scale?: number;
   onClose: () => void;
+  onStroke?: (stroke: Stroke) => void;
 }
 
 interface Point {
@@ -17,7 +19,7 @@ interface Stroke {
   width: number;
 }
 
-export function DrawingLayer({ isActive, offset, onClose }: DrawingLayerProps) {
+export function DrawingLayer({ isActive, offset, scale = 1, onClose, onStroke }: DrawingLayerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
@@ -97,17 +99,26 @@ export function DrawingLayer({ isActive, offset, onClose }: DrawingLayerProps) {
     setCurrentStroke((prev) => [...prev, point]);
   }, [isDrawing, getCanvasPoint]);
 
+  const finishStroke = useCallback((points: Point[]) => {
+    if (points.length > 1) {
+      const safeScale = scale || 1;
+      onStroke?.({
+        points: points.map((point) => ({
+          x: (point.x - offset.x) / safeScale,
+          y: (point.y - offset.y) / safeScale,
+        })),
+        color: strokeColor,
+        width: strokeWidth,
+      });
+    }
+    setCurrentStroke([]);
+  }, [offset.x, offset.y, onStroke, scale, strokeColor, strokeWidth]);
+
   const handleCanvasMouseUp = useCallback(() => {
     if (!isDrawing) return;
     setIsDrawing(false);
-    if (currentStroke.length > 1) {
-      setStrokes((prev) => [
-        ...prev,
-        { points: currentStroke, color: strokeColor, width: strokeWidth },
-      ]);
-    }
-    setCurrentStroke([]);
-  }, [isDrawing, currentStroke, strokeColor, strokeWidth]);
+    finishStroke(currentStroke);
+  }, [isDrawing, currentStroke, finishStroke]);
 
   // Touch handlers for mobile drawing
   const handleCanvasTouchStart = useCallback((e: React.TouchEvent) => {
@@ -132,14 +143,8 @@ export function DrawingLayer({ isActive, offset, onClose }: DrawingLayerProps) {
   const handleCanvasTouchEnd = useCallback(() => {
     if (!isDrawing) return;
     setIsDrawing(false);
-    if (currentStroke.length > 1) {
-      setStrokes((prev) => [
-        ...prev,
-        { points: currentStroke, color: strokeColor, width: strokeWidth },
-      ]);
-    }
-    setCurrentStroke([]);
-  }, [isDrawing, currentStroke, strokeColor, strokeWidth]);
+    finishStroke(currentStroke);
+  }, [isDrawing, currentStroke, finishStroke]);
 
   const handleClear = useCallback(() => {
     setStrokes([]);

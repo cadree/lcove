@@ -9,6 +9,7 @@ import { BoardSidebar } from "@/components/boards/BoardSidebar";
 import { DrawingLayer } from "@/components/boards/DrawingLayer";
 import { useBoard, useBoards } from "@/hooks/useBoards";
 import { useBoardItems, BoardItemType } from "@/hooks/useBoardItems";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -21,7 +22,7 @@ const BoardEditor = () => {
   const { user } = useAuth();
   const { data: board, isLoading: boardLoading } = useBoard(boardId);
   const { updateBoard } = useBoards();
-  const { items, isLoading: itemsLoading, createItem, updateItem, deleteItem } = useBoardItems(boardId);
+  const { items, isLoading: itemsLoading, createItem, updateItem, deleteItem, batchUpdatePositions } = useBoardItems(boardId);
   
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   
@@ -37,6 +38,88 @@ const BoardEditor = () => {
   // Draw mode state
   const [isDrawMode, setIsDrawMode] = useState(false);
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
+  const [canvasScale, setCanvasScale] = useState(1);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteQuery, setInviteQuery] = useState("");
+  const [inviteMatches, setInviteMatches] = useState<{ user_id: string; display_name: string | null }[]>([]);
+  const positionTimer = useRef<number>();
+  const pendingPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
+
+  const unsortedCount = items.filter((item) =>
+    !item.parent_item_id && !["column", "connector", "line", "sketch"].includes(item.type)
+  ).length;
+
+  const queuePosition = (id: string, x: number, y: number) => {
+    pendingPositions.current.set(id, { x, y });
+    window.clearTimeout(positionTimer.current);
+    positionTimer.current = window.setTimeout(() => {
+      const updates = [...pendingPositions.current.entries()].map(([itemId, pos]) => ({
+        id: itemId,
+        x: pos.x,
+        y: pos.y,
+      }));
+      pendingPositions.current.clear();
+      if (updates.length) batchUpdatePositions.mutate(updates);
+    }, 400);
+  };
+
+  const handleStroke = async (stroke: { points: { x: number; y: number }[]; color: string; width: number }) => {
+    if (!boardId || stroke.points.length < 2) return;
+    const xs = stroke.points.map((point) => point.x);
+    const ys = stroke.points.map((point) => point.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const w = Math.max(8, Math.max(...xs) - minX);
+    const h = Math.max(8, Math.max(...ys) - minY);
+    await createItem.mutateAsync({
+      board_id: boardId,
+      type: "sketch",
+      title: null,
+      content: {
+        points: stroke.points.map((point) => ({ x: point.x - minX, y: point.y - minY })),
+        color: stroke.color,
+        width: stroke.width,
+      },
+      x: minX,
+      y: minY,
+      w,
+      h,
+      rotation: 0,
+      z_index: items.length,
+      parent_item_id: null,
+      created_by: user?.id || null,
+    });
+  };
+
+  const searchCollaborators = async (value: string) => {
+    setInviteQuery(value);
+    if (value.trim().length < 2) {
+      setInviteMatches([]);
+      return;
+    }
+    const { data } = await supabase
+      .from("profiles_public")
+      .select("user_id, display_name")
+      .ilike("display_name", `%${value.trim()}%`)
+      .limit(8);
+    setInviteMatches(data || []);
+  };
+
+  const inviteCollaborator = async (userId: string) => {
+    if (!boardId) return;
+    const { error } = await supabase.from("board_members").insert({
+      board_id: boardId,
+      user_id: userId,
+      role: "editor",
+    });
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Collaborator added");
+      setInviteOpen(false);
+      setInviteQuery("");
+      setInviteMatches([]);
+    }
+  };
 
   const handleAddItem = async (type: BoardItemType, customContent?: Json, customX?: number, customY?: number) => {
     if (!boardId) return;
@@ -60,7 +143,9 @@ const BoardEditor = () => {
           ? { items: [{ text: '', done: false }] }
           : type === 'link'
             ? { url: '', title: '' }
-            : {}
+            : type === 'board_ref'
+              ? { title: 'Untitled board', board_id: null }
+              : {}
     );
 
     const dimensions: Record<string, { w: number; h: number }> = {
@@ -323,7 +408,15 @@ const BoardEditor = () => {
                 Cancel Connect
               </Button>
             )}
-            <span className="text-white/50 text-sm">0 Unsorted</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-white border-white/20 hover:bg-white/10"
+              onClick={() => setInviteOpen(true)}
+            >
+              Invite
+            </Button>
+            <span className="text-white/50 text-sm">{unsortedCount} Unsorted</span>
           </div>
         </motion.header>
 
@@ -340,7 +433,23 @@ const BoardEditor = () => {
               setSelectedItemId(id);
             }}
             onSelectConnector={setSelectedConnectorId}
-            onUpdateItem={(id, updates) => updateItem.mutate({ id, ...updates })}
+            onUpdateItem={(id, updates) => {
+              if (
+                updates.x !== undefined &&
+                updates.y !== undefined &&
+                updates.w === undefined &&
+                updates.h === undefined &&
+                updates.content === undefined
+              ) {
+                queuePosition(id, updates.x, updates.y);
+                return;
+              }
+              updateItem.mutate({ id, ...updates });
+            }}
+            onViewChange={({ offset, scale }) => {
+              setCanvasOffset(offset);
+              setCanvasScale(scale);
+            }}
             onDeleteItem={(id) => deleteItem.mutate(id)}
             onDeleteConnector={handleDeleteConnector}
             onCreateItem={handleCreateItem}
@@ -351,10 +460,42 @@ const BoardEditor = () => {
           <DrawingLayer
             isActive={isDrawMode}
             offset={canvasOffset}
+            scale={canvasScale}
             onClose={() => setIsDrawMode(false)}
+            onStroke={(stroke) => { void handleStroke(stroke); }}
           />
         </div>
       </div>
+      {inviteOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-lg p-4 w-full max-w-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-medium">Invite by display name</h2>
+              <Button size="icon" variant="ghost" onClick={() => setInviteOpen(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Profiles have no username. Search matches display name.</p>
+            <Input
+              value={inviteQuery}
+              onChange={(event) => { void searchCollaborators(event.target.value); }}
+              placeholder="Display name"
+            />
+            <div className="space-y-1">
+              {inviteMatches.map((match) => (
+                <Button
+                  key={match.user_id}
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => { void inviteCollaborator(match.user_id); }}
+                >
+                  {match.display_name || match.user_id}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

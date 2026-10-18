@@ -4,6 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import type { Json } from '@/integrations/supabase/types';
+import { callRpc } from '@/lib/rpc';
+import { fromUntyped } from '@/lib/safetyTables';
+
+export const NETWORK_CONTENT_PUBLIC_COLUMNS =
+  'id, network_id, creator_id, title, description, cover_art_url, trailer_url, content_type, runtime_minutes, director, cast_members, credits, genre_tags, is_featured, view_count, release_date, is_published, created_at, updated_at';
+
+export const TV_EPISODE_PUBLIC_COLUMNS =
+  'id, season_id, episode_number, title, description, thumbnail_url, runtime_minutes, created_at';
 
 export interface Network {
   id: string;
@@ -38,8 +46,8 @@ export interface NetworkContent {
   trailer_url: string | null;
   content_type: 'short_film' | 'feature_film' | 'tv_show';
   runtime_minutes: number | null;
-  video_url: string | null;
-  external_video_url: string | null;
+  video_url?: string | null;
+  external_video_url?: string | null;
   director: string | null;
   cast_members: string[] | null;
   credits: Json | null;
@@ -68,8 +76,8 @@ export interface TVEpisode {
   title: string;
   description: string | null;
   thumbnail_url: string | null;
-  video_url: string | null;
-  external_video_url: string | null;
+  video_url?: string | null;
+  external_video_url?: string | null;
   runtime_minutes: number | null;
 }
 
@@ -131,7 +139,7 @@ export const useNetworkContent = (networkId: string) => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('network_content')
-        .select('*')
+        .select(NETWORK_CONTENT_PUBLIC_COLUMNS)
         .eq('network_id', networkId)
         .eq('is_published', true)
         .order('is_featured', { ascending: false })
@@ -151,7 +159,7 @@ export const useContent = (contentId: string) => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('network_content')
-        .select('*')
+        .select(NETWORK_CONTENT_PUBLIC_COLUMNS)
         .eq('id', contentId)
         .single();
 
@@ -180,7 +188,7 @@ export const useTVSeasons = (contentId: string) => {
         (seasons || []).map(async (season) => {
           const { data: episodes } = await supabase
             .from('tv_episodes')
-            .select('*')
+            .select(TV_EPISODE_PUBLIC_COLUMNS)
             .eq('season_id', season.id)
             .order('episode_number');
           return { ...season, episodes: episodes || [] };
@@ -344,7 +352,7 @@ export const useAddContent = () => {
           release_date: contentData.release_date,
           creator_id: user.id,
         })
-        .select()
+        .select(NETWORK_CONTENT_PUBLIC_COLUMNS)
         .single();
 
       if (error) throw error;
@@ -423,10 +431,82 @@ export const useSubscribeToNetwork = () => {
 
 // Increment view count (placeholder - would need RPC function)
 export const useIncrementViewCount = () => {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (contentId: string) => {
-      // View count increment - silently skip for now
-      console.log('View count for:', contentId);
+      return callRpc<number>('record_content_view', { p_content_id: contentId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['network-content'] });
+      queryClient.invalidateQueries({ queryKey: ['content'] });
     },
   });
+};
+
+export const useContentPlayback = (contentId: string | undefined, episodeId?: string) => {
+  return useQuery({
+    queryKey: ['cinema-playback', contentId, episodeId],
+    queryFn: async () => {
+      if (!contentId) return null;
+      const rows = await callRpc<
+        { video_url: string | null; external_video_url: string | null }[]
+        | { video_url: string | null; external_video_url: string | null }
+        | null
+      >(
+        'cinema_playback',
+        { p_content_id: contentId, p_episode_id: episodeId ?? null },
+      );
+      if (!rows) return null;
+      return Array.isArray(rows) ? rows[0] ?? null : rows;
+    },
+    enabled: !!contentId,
+  });
+};
+
+export const useContentLike = (contentId: string | undefined) => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey: ['content-likes', contentId, user?.id],
+    queryFn: async () => {
+      if (!contentId) return { count: 0, liked: false };
+      const { count } = await fromUntyped('content_likes')
+        .select('*', { count: 'exact', head: true })
+        .eq('content_id', contentId);
+      let liked = false;
+      if (user) {
+        const { data } = await fromUntyped('content_likes')
+          .select('user_id')
+          .eq('content_id', contentId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        liked = !!data;
+      }
+      return { count: count || 0, liked };
+    },
+    enabled: !!contentId,
+  });
+
+  const toggle = useMutation({
+    mutationFn: async () => {
+      if (!user || !contentId) throw new Error('Must be logged in');
+      if (query.data?.liked) {
+        const { error } = await fromUntyped('content_likes')
+          .delete()
+          .eq('content_id', contentId)
+          .eq('user_id', user.id);
+        if (error) throw error;
+      } else {
+        const { error } = await fromUntyped('content_likes')
+          .insert({ content_id: contentId, user_id: user.id });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['content-likes', contentId] });
+    },
+  });
+
+  return { ...query, toggle };
 };

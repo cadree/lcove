@@ -3,7 +3,7 @@ import {
   Shield, Users, AlertTriangle, CheckCircle, Clock, History, Search, 
   ArrowLeft, Ban, UserCheck, ClipboardList, Trash2, Eye, Phone, Mail, MapPin, 
   Briefcase, Heart, Star, Send, Coins, Download, MessageSquare, ShieldCheck, ShieldOff,
-  MessageCircle, Building2, Flag, Shirt
+  MessageCircle, Building2, Flag, Shirt, Film
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/layout/PageLayout';
@@ -49,6 +49,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { PartnerApplicationsTab } from '@/components/admin/PartnerApplicationsTab';
 import { ContentReportsTab } from '@/components/admin/ContentReportsTab';
 import { NuanceInterestTab } from '@/components/admin/NuanceInterestTab';
+import { CinemaReviewTab } from '@/components/admin/CinemaReviewTab';
 
 type UserAccessStatus = 'active' | 'banned';
 type MessageAudience = 'all' | 'mindset_level' | 'city';
@@ -410,7 +411,7 @@ const Admin: React.FC = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="users" className="px-4">
-          <TabsList className="w-full h-auto grid grid-cols-4 sm:grid-cols-8">
+          <TabsList className="w-full h-auto grid grid-cols-5 sm:grid-cols-9">
             <TabsTrigger value="users"><Users className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="pending"><Clock className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="partners"><Building2 className="h-4 w-4" /></TabsTrigger>
@@ -418,6 +419,9 @@ const Admin: React.FC = () => {
             <TabsTrigger value="flagged"><AlertTriangle className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="reports" title="Reports"><Flag className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="history"><History className="h-4 w-4" /></TabsTrigger>
+            <TabsTrigger value="cinema" title="Cinema review">
+              <Film className="h-4 w-4" />
+            </TabsTrigger>
             <TabsTrigger value="nuance" aria-label="Nuance interest list">
               <Shirt className="h-4 w-4" />
               <span className="sr-only">Nuance</span>
@@ -876,6 +880,10 @@ const Admin: React.FC = () => {
 
           <TabsContent value="nuance" className="mt-4">
             <NuanceInterestTab />
+          </TabsContent>
+
+          <TabsContent value="cinema" className="mt-4">
+            <CinemaReviewTab />
           </TabsContent>
         </Tabs>
       </div>
