@@ -16,6 +16,7 @@ import {
   Loader2,
   Lock,
   LogOut,
+  Trash2,
   FileText,
   Scale,
   Archive,
@@ -45,6 +46,17 @@ import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const Settings = () => {
   const { user, updatePassword, signOut } = useAuth();
@@ -70,6 +82,7 @@ const Settings = () => {
   });
   const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   
   // Password change state
   const [newPassword, setNewPassword] = useState("");
@@ -117,6 +130,38 @@ const Settings = () => {
     },
     enabled: !!user,
   });
+
+  const handleDeleteAccount = async () => {
+    setDeletingAccount(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("delete-account", { body: {} });
+      if (error) {
+        let message = error.message || "Could not delete the account";
+        const context = (error as { context?: Response }).context;
+        if (context && typeof context.json === "function") {
+          try {
+            const body = await context.json();
+            if (body?.error) message = body.error;
+          } catch {
+            // The function error text is already in message.
+          }
+        }
+        toast.error(message);
+        return;
+      }
+      if (data?.error) {
+        toast.error(data.error);
+        return;
+      }
+      await signOut();
+      toast.success("Account deleted");
+      navigate("/");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not delete the account");
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -946,6 +991,20 @@ const Settings = () => {
               </div>
               <ArrowRight className="w-5 h-5 text-muted-foreground" />
             </Link>
+
+            <Link 
+              to="/guidelines" 
+              className="flex items-center justify-between p-4 rounded-xl bg-background/50 hover:bg-background/80 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Scale className="w-5 h-5 text-muted-foreground" />
+                <div>
+                  <p className="font-medium text-foreground">Community Guidelines</p>
+                  <p className="text-sm text-muted-foreground">Reporting, blocking, and AI</p>
+                </div>
+              </div>
+              <ArrowRight className="w-5 h-5 text-muted-foreground" />
+            </Link>
           </div>
         </motion.section>
 
@@ -962,7 +1021,7 @@ const Settings = () => {
             </div>
             <div>
               <h2 className="font-display text-lg font-medium text-foreground">Account</h2>
-              <p className="text-sm text-muted-foreground">Sign out of your account</p>
+              <p className="text-sm text-muted-foreground">Sign out or delete your account</p>
             </div>
           </div>
 
@@ -984,6 +1043,37 @@ const Settings = () => {
               </>
             )}
           </Button>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" className="w-full mt-3" disabled={deletingAccount}>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete my account
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete my account</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This deletes your login and personal data, including your profile, posts, comments, and messages.
+                  If a payout or other payment is still pending, deletion is refused until that money is settled.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deletingAccount}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(event) => {
+                    event.preventDefault();
+                    handleDeleteAccount();
+                  }}
+                  disabled={deletingAccount}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {deletingAccount ? "Deleting..." : "Delete my account"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </motion.section>
       </div>
     </PageLayout>

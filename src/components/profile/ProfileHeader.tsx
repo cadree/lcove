@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
   Settings, MapPin, Camera, Loader2, Sparkles, 
-  ArrowLeft, MessageCircle, Edit, Shield, BadgeCheck, UserPlus, UserMinus, Users 
+  ArrowLeft, MessageCircle, Edit, Shield, BadgeCheck, UserPlus, UserMinus, Users, Flag, Ban
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -15,6 +15,9 @@ import { ProfileEffects } from './ProfileEffects';
 import type { ProfileCustomization } from '@/hooks/useProfileCustomization';
 import { useCreatorVerification } from '@/hooks/useCreatorVerification';
 import { useFavorites } from '@/hooks/useFavorites';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
+import { useAuth } from '@/contexts/AuthContext';
+import { ReportDialog } from '@/components/safety/ReportDialog';
 import { FriendsDrawer } from '@/components/friends/FriendsDrawer';
 import type { ThemePreset } from '@/lib/profileThemes';
 import { THEME_PRESETS } from '@/lib/profileThemes';
@@ -62,7 +65,10 @@ export function ProfileHeader({
   userId,
 }: ProfileHeaderProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const { isBlocked, blockUser, unblockUser } = useUserBlocks();
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
 
@@ -314,6 +320,34 @@ export function ProfileHeader({
             </>
           )}
         </motion.div>
+        {!isOwnProfile && user && (
+          <div className="flex gap-2 mt-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (isBlocked(userId)) {
+                  unblockUser.mutate(userId);
+                } else {
+                  blockUser.mutate(userId);
+                }
+              }}
+            >
+              <Ban className="w-4 h-4 mr-2" />
+              {isBlocked(userId) ? 'Unblock' : 'Block'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setReportOpen(true)}>
+              <Flag className="w-4 h-4 mr-2" />
+              Report
+            </Button>
+            <ReportDialog
+              open={reportOpen}
+              onOpenChange={setReportOpen}
+              targetType="profile"
+              targetId={userId}
+            />
+          </div>
+        )}
       </div>
     </>
   );

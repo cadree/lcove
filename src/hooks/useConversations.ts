@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 
 interface Participant {
@@ -49,6 +50,7 @@ interface Conversation {
 export function useConversations() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { blockedIds } = useUserBlocks();
 
   const { data: conversations = [], isLoading, refetch } = useQuery({
     queryKey: ['conversations', user?.id],
@@ -354,8 +356,24 @@ export function useConversations() {
     };
   }, [user, refetch]);
 
+  const visibleConversations = useMemo(() => {
+    const blocked = new Set(blockedIds);
+    return conversations
+      .filter((conversation) => {
+        if (conversation.type !== 'direct') return true;
+        const other = conversation.participants?.find((participant) => participant.user_id !== user?.id);
+        return !other || !blocked.has(other.user_id);
+      })
+      .map((conversation) => {
+        if (conversation.last_message && blocked.has(conversation.last_message.sender_id)) {
+          return { ...conversation, last_message: undefined };
+        }
+        return conversation;
+      });
+  }, [conversations, blockedIds, user?.id]);
+
   return {
-    conversations,
+    conversations: visibleConversations,
     isLoading,
     createDirectConversation,
     createGroupConversation,

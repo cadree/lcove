@@ -23,6 +23,7 @@ const PUBLIC_EXACT = new Set([
   '/unsubscribe',
   '/privacy',
   '/terms',
+  '/guidelines',
   '/community',
 ]);
 

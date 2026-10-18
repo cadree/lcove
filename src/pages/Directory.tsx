@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Search, MapPin, Briefcase, Users, Loader2, Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { NewMembersSection } from "@/components/directory/NewMembersSection";
 import { FriendsDrawer } from "@/components/friends/FriendsDrawer";
 import { computeCityKey, computeCityDisplay } from "@/lib/cityNormalization";
@@ -43,6 +44,7 @@ interface UserSkill {
 
 const Directory = () => {
   const navigate = useNavigate();
+  const { blockedIds } = useUserBlocks();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCityKey, setSelectedCityKey] = useState<string | null>(null); // null = All Cities
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -148,6 +150,7 @@ const Directory = () => {
   };
 
   const filteredProfiles = profiles.filter((profile) => {
+    if (blockedIds.includes(profile.user_id)) return false;
     const cityDisplay = getProfileCityDisplay(profile);
     const searchLower = searchQuery.toLowerCase();
     const matchesSearch = 
