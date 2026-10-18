@@ -2,7 +2,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { callRpc } from '@/lib/rpc';
+import { notifyLiveStream } from '@/lib/notifications';
 
 export interface LiveStream {
   id: string;
@@ -48,7 +50,7 @@ export const useLiveStreams = (liveOnly = false) => {
     queryKey: ['live-streams', liveOnly],
     queryFn: async () => {
       let query = supabase
-        .from('live_streams')
+        .from('live_streams_public')
         .select('*')
         .order('created_at', { ascending: false });
       
@@ -95,7 +97,7 @@ export const useStream = (streamId: string | undefined) => {
     queryFn: async () => {
       if (!streamId) return null;
       const { data, error } = await supabase
-        .from('live_streams')
+        .from('live_streams_public')
         .select('*')
         .eq('id', streamId)
         .single();
@@ -230,6 +232,7 @@ export const useCreateStream = () => {
 export const useGoLive = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ streamId, isLive }: { streamId: string; isLive: boolean }) => {
@@ -246,6 +249,24 @@ export const useGoLive = () => {
         .eq('id', streamId);
 
       if (error) throw error;
+
+      if (isLive && user) {
+        const { data: profile } = await supabase
+          .from('profiles_public')
+          .select('display_name')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        const { data: fans } = await supabase
+          .from('favorite_friends')
+          .select('user_id')
+          .eq('friend_user_id', user.id);
+        const name = profile?.display_name || 'Someone';
+        await Promise.all(
+          (fans || []).map((fan) =>
+            notifyLiveStream(fan.user_id, name, streamId).catch(() => undefined),
+          ),
+        );
+      }
     },
     onSuccess: (_, { isLive }) => {
       queryClient.invalidateQueries({ queryKey: ['live-streams'] });
@@ -276,11 +297,30 @@ export const useSendReaction = () => {
 
 export const useTipStream = () => {
   const { toast } = useToast();
+  const idempotencyKey = useRef<string | null>(null);
 
   return useMutation({
-    mutationFn: async ({ streamId, amount, message }: { streamId: string; amount: number; message?: string }) => {
+    mutationFn: async ({
+      streamId,
+      amount,
+      message,
+      idempotencyKey: providedKey,
+    }: {
+      streamId: string;
+      amount: number;
+      message?: string;
+      idempotencyKey?: string;
+    }) => {
+      if (!idempotencyKey.current) {
+        idempotencyKey.current = providedKey ?? crypto.randomUUID();
+      }
       const { data, error } = await supabase.functions.invoke('tip-stream', {
-        body: { stream_id: streamId, amount, message },
+        body: {
+          stream_id: streamId,
+          amount,
+          message,
+          idempotency_key: providedKey ?? idempotencyKey.current,
+        },
       });
 
       if (error) throw error;
@@ -288,6 +328,7 @@ export const useTipStream = () => {
       return data;
     },
     onSuccess: (_, { amount }) => {
+      idempotencyKey.current = null;
       toast({ title: `Tipped ${amount} LC!` });
     },
     onError: (error) => {
@@ -296,6 +337,60 @@ export const useTipStream = () => {
   });
 };
 
+export const useEndStream = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (stream: { id: string; stream_type: string }) => {
+      await callRpc('end_live_stream', { p_stream_id: stream.id });
+
+      if (stream.stream_type === 'obs_rtmp') {
+        const { error } = await supabase.functions.invoke('mux-stream', {
+          body: { action: 'disable', streamId: stream.id },
+        });
+        if (error) throw error;
+      }
+
+      const channel = supabase.channel(`stream-end-${stream.id}`);
+      await Promise.race([
+        new Promise<void>((resolve) => {
+          channel.subscribe((status) => {
+            if (status === 'SUBSCRIBED') resolve();
+          });
+        }),
+        new Promise<void>((resolve) => window.setTimeout(resolve, 1500)),
+      ]);
+      await channel.send({ type: 'broadcast', event: 'end', payload: {} }).catch(() => undefined);
+      supabase.removeChannel(channel);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['live-streams'] });
+      toast({ title: 'Stream ended' });
+    },
+    onError: (error) => {
+      toast({ title: 'Failed to end stream', description: error.message, variant: 'destructive' });
+    },
+  });
+};
+
+export function useStreamPresence(streamId: string | undefined, enabled: boolean) {
+  useEffect(() => {
+    if (!streamId || !enabled) return;
+    let stopped = false;
+    const beat = () => {
+      if (stopped) return;
+      callRpc('touch_stream_presence', { p_stream_id: streamId }).catch(() => undefined);
+    };
+    beat();
+    const timer = window.setInterval(beat, 20000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [streamId, enabled]);
+}
+
 export const useJoinStream = () => {
   const { user } = useAuth();
 
@@ -303,15 +398,7 @@ export const useJoinStream = () => {
     mutationFn: async (streamId: string) => {
       if (!user) return;
 
-      const { error } = await supabase
-        .from('stream_viewers')
-        .upsert({
-          stream_id: streamId,
-          viewer_id: user.id,
-          joined_at: new Date().toISOString(),
-        }, { onConflict: 'stream_id,viewer_id' });
-
-      if (error) throw error;
+      await callRpc('touch_stream_presence', { p_stream_id: streamId });
     },
   });
 };

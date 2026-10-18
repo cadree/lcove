@@ -22,6 +22,7 @@ import { EventDetailDialog } from "@/components/calendar/EventDetailDialog";
 import { PersonalEventDialog } from "@/components/calendar/PersonalEventDialog";
 import { PersonalEventDetailDialog } from "@/components/calendar/PersonalEventDetailDialog";
 import { CreateCommunityEventDialog } from "@/components/calendar/CreateCommunityEventDialog";
+import { EditCommunityEventDialog } from "@/components/calendar/EditCommunityEventDialog";
 import { useCalendarItems, CalendarItem, PersonalCalendarItem } from "@/hooks/useCalendar";
 import { useAuth } from "@/contexts/AuthContext";
 import { addMonths, subMonths, addWeeks, subWeeks, format } from "date-fns";
@@ -69,6 +70,7 @@ const CalendarPage = () => {
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   const [personalEventOpen, setPersonalEventOpen] = useState(false);
   const [communityEventOpen, setCommunityEventOpen] = useState(false);
+  const [editEventId, setEditEventId] = useState<string | null>(null);
   const [selectedDateForNew, setSelectedDateForNew] = useState<Date | undefined>();
   const [selectedPersonalItem, setSelectedPersonalItem] = useState<PersonalCalendarItem | null>(null);
   const [personalDetailOpen, setPersonalDetailOpen] = useState(false);
@@ -79,6 +81,11 @@ const CalendarPage = () => {
     const ticketSuccess = searchParams.get('ticket_success');
     const ticketCancelled = searchParams.get('ticket_cancelled');
     const action = searchParams.get('action');
+    const editEvent = searchParams.get('editEvent');
+
+    if (editEvent) {
+      setEditEventId(editEvent);
+    }
 
     if (eventId) {
       setSelectedEventId(eventId);
@@ -131,7 +138,7 @@ const CalendarPage = () => {
 
   const handleItemClick = (item: CalendarItem) => {
     if (item.type === 'event') {
-      setSelectedEventId(item.id);
+      setSelectedEventId(item.sourceId || item.id.split('@')[0]);
       setEventDialogOpen(true);
     } else if (item.type === 'project') {
       navigate(`/projects?id=${item.id}`);
@@ -345,6 +352,14 @@ const CalendarPage = () => {
         open={communityEventOpen}
         onOpenChange={setCommunityEventOpen}
         defaultDate={selectedDateForNew}
+      />
+
+      <EditCommunityEventDialog
+        eventId={editEventId}
+        open={!!editEventId}
+        onOpenChange={(open) => {
+          if (!open) setEditEventId(null);
+        }}
       />
 
       {/* Personal Event Detail Dialog */}

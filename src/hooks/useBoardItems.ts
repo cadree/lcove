@@ -1,10 +1,11 @@
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Json } from "@/integrations/supabase/types";
 
-export type BoardItemType = 'note' | 'link' | 'todo' | 'image' | 'line' | 'column' | 'board_ref' | 'connector';
+export type BoardItemType = 'note' | 'link' | 'todo' | 'image' | 'line' | 'column' | 'board_ref' | 'connector' | 'sketch';
 
 export interface BoardItem {
   id: string;
@@ -54,6 +55,21 @@ export const useBoardItems = (boardId: string | undefined) => {
     },
     enabled: !!user && !!boardId,
   });
+
+  useEffect(() => {
+    if (!boardId) return;
+    const channel = supabase
+      .channel(`board-items-${boardId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "board_items", filter: `board_id=eq.${boardId}` },
+        () => queryClient.invalidateQueries({ queryKey: ["board-items", boardId] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [boardId, queryClient]);
 
   const createItem = useMutation({
     mutationFn: async (item: Omit<BoardItem, 'id' | 'created_at' | 'updated_at' | 'is_trashed'>) => {

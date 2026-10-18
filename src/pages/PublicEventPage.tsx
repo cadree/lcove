@@ -34,6 +34,8 @@ import { shareLink, buildShareUrl } from "@/lib/shareLink";
 import { EventMoodboardView } from "@/components/calendar/EventMoodboardView";
 import { AddToCalendarButtons } from "@/components/calendar/AddToCalendarButtons";
 
+const walletPassesEnabled = import.meta.env.VITE_WALLET_PASSES_ENABLED === "true";
+
 export default function PublicEventPage() {
   const { eventId } = useParams();
   const navigate = useNavigate();
@@ -474,6 +476,7 @@ export default function PublicEventPage() {
                       <ExternalLink className="h-4 w-4" />
                       Download .ics File
                     </Button>
+                    {walletPassesEnabled && (
                     <Button
                       variant="outline"
                       className="w-full gap-2 text-sm"
@@ -504,6 +507,7 @@ export default function PublicEventPage() {
                       <Wallet className="h-4 w-4" />
                       Add to Wallet
                     </Button>
+                    )}
                     {/* Get Notified - Push */}
                     {pushStatus !== 'subscribed' && (
                       <Button
@@ -649,6 +653,7 @@ export default function PublicEventPage() {
                       <ExternalLink className="h-4 w-4" />
                       Download .ics File
                     </Button>
+                    {walletPassesEnabled && (
                     <Button
                       variant="outline"
                       className="w-full gap-2 text-sm"
@@ -679,6 +684,7 @@ export default function PublicEventPage() {
                       <Wallet className="h-4 w-4" />
                       Add to Wallet
                     </Button>
+                    )}
                     {/* Get Notified - Push */}
                     {pushStatus !== 'subscribed' && (
                       <Button

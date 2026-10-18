@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { isIosApp } from '@/lib/platform';
+import { registerIosPush } from '@/lib/nativePush';
 
 // VAPID public key - this is safe to expose in client code
 // Must be set via VITE_VAPID_PUBLIC_KEY environment variable
@@ -48,6 +50,12 @@ export const usePushNotifications = () => {
   // Check support and current status on mount
   useEffect(() => {
     const checkStatus = async () => {
+      if (user?.id && isIosApp()) {
+        registerIosPush(user.id).catch((error) => console.error('iOS push registration failed', error));
+        setState({ status: 'subscribed', error: null, isLoading: false });
+        return;
+      }
+
       // Check browser support
       const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
       
