@@ -24,6 +24,7 @@ const PUBLIC_EXACT = new Set([
   '/privacy',
   '/terms',
   '/community',
+  '/nuance',
 ]);
 
 // Routes that should redirect authenticated users to /home

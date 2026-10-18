@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { 
   Home, MessageCircle, FolderKanban, Search, User, 
   Calendar, Wallet, Settings, Bell, Users, Video, 
-  ShoppingBag, Kanban, BookOpen, Radio, Store, Heart, Compass, Folder
+  ShoppingBag, Kanban, BookOpen, Radio, Store, Heart, Compass, Folder, Shirt
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -33,6 +33,7 @@ export const allNavItems: NavItem[] = [
   { id: "store", icon: Store, label: "Store", path: "/store" },
   { id: "fund", icon: Heart, label: "Fund", path: "/fund" },
   { id: "portfolios", icon: Folder, label: "Portfolios", path: "/portfolios" },
+  { id: "nuance", icon: Shirt, label: "Nuance", path: "/nuance" },
 ];
 
 const defaultNavIds = ["home", "messages", "projects", "directory", "profile"];

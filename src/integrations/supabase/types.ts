@@ -4345,6 +4345,27 @@ export type Database = {
         }
         Relationships: []
       }
+      nuance_interest: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          item: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          item: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          item?: string
+        }
+        Relationships: []
+      }
       organization_members: {
         Row: {
           created_at: string
