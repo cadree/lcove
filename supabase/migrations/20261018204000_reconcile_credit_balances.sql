@@ -1,5 +1,7 @@
 -- =============================================================================
--- CADRE APPROVAL REQUIRED BEFORE APPLYING TO PRODUCTION
+-- Cadre approved this rewrite. It has not been applied to any live database.
+-- Run it on staging first. Re-running it is safe: the UPDATE only rewrites
+-- stored pools from the ledger, and the check is dropped before it is added.
 -- =============================================================================
 -- One-time reconciliation. This file rewrites public.user_credits from
 -- public.credit_ledger. It does not insert or delete ledger rows.
@@ -16,9 +18,9 @@
 --   3. For users who have no ledger rows, only repairs a broken sum.
 --   4. Adds CHECK (balance = genesis_balance + earned_balance).
 --
--- Do not apply this on the live database until Cadre has reviewed a backup.
 -- Scratch tests apply it to an empty database, then insert users and check
--- that a new signup is 100, not 200.
+-- that a new signup is 100, not 200. Do not apply it to production until
+-- staging has been checked.
 -- =============================================================================
 
 UPDATE public.user_credits uc

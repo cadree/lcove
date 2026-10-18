@@ -111,9 +111,15 @@ BEGIN
   SELECT genesis_balance INTO v_genesis
   FROM public.user_credits
   WHERE user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  IF v_genesis IS DISTINCT FROM (public.credit_ledger_balances('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')->>'genesis_balance')::numeric THEN
+    RAISE EXCEPTION 'FAIL: tip spend cache disagrees with the ledger';
+  END IF;
   SELECT earned_balance INTO v_host_earned
   FROM public.user_credits
   WHERE user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  IF v_host_earned IS DISTINCT FROM (public.credit_ledger_balances('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')->>'earned_balance')::numeric THEN
+    RAISE EXCEPTION 'FAIL: host cache disagrees with the ledger';
+  END IF;
   SELECT count(*) INTO v_tips FROM public.stream_tips
   WHERE idempotency_key = 'tip-key-12345678';
   SELECT credit_type INTO v_type FROM public.credit_ledger
@@ -303,6 +309,172 @@ BEGIN
     RAISE EXCEPTION 'FAIL: blocked viewer still sees chat (% rows)', v_count;
   END IF;
   RAISE NOTICE 'PASS: stream chat is block-aware';
+END $$;
+
+RESET ROLE;
+
+-- Private XP: contribution only, once per source, capped at 40 per UTC day.
+INSERT INTO public.posts (id, user_id, content) VALUES
+  ('10101010-1010-4101-8101-101010101011', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'work 1'),
+  ('10101010-1010-4101-8101-101010101012', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'work 2'),
+  ('10101010-1010-4101-8101-101010101013', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'work 3'),
+  ('10101010-1010-4101-8101-101010101014', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'work 4');
+INSERT INTO public.posts (id, user_id, content)
+VALUES ('10101010-1010-4101-8101-101010101015', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'work 5');
+INSERT INTO public.posts (id, user_id, content, media_url)
+VALUES ('10101010-1010-4101-8101-101010101016', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '   ', NULL);
+INSERT INTO public.post_reactions (post_id, user_id, emoji)
+VALUES ('10101010-1010-4101-8101-101010101011', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', '🔥');
+SELECT public.award_xp(
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  'post_work',
+  '10101010-1010-4101-8101-101010101011',
+  10
+);
+
+INSERT INTO public.events (id, creator_id, title, city, start_date, ticket_type)
+VALUES (
+  '20202020-2020-4202-8202-202020202020',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  'Show',
+  'Austin',
+  now(),
+  'free'
+);
+INSERT INTO public.event_rsvps (event_id, user_id, status)
+VALUES ('20202020-2020-4202-8202-202020202020', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'interested');
+UPDATE public.event_rsvps
+SET status = 'going'
+WHERE event_id = '20202020-2020-4202-8202-202020202020'
+  AND user_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+INSERT INTO public.event_rsvps (event_id, user_id, status)
+VALUES ('20202020-2020-4202-8202-202020202020', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'going');
+
+INSERT INTO public.boards (id, owner_user_id, title)
+VALUES ('30303030-3030-4303-8303-303030303030', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Board');
+INSERT INTO public.board_members (board_id, user_id, role)
+VALUES ('30303030-3030-4303-8303-303030303030', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'owner');
+INSERT INTO public.board_members (board_id, user_id, role)
+VALUES ('30303030-3030-4303-8303-303030303030', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'editor');
+
+INSERT INTO public.projects (id, creator_id, title, status)
+VALUES ('40404040-4040-4404-8404-404040404040', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Piece', 'in_progress');
+INSERT INTO public.project_roles (id, project_id, role_name)
+VALUES ('50505050-5050-4505-8505-505050505050', '40404040-4040-4404-8404-404040404040', 'Editor');
+INSERT INTO public.project_applications (id, project_id, role_id, applicant_id, status)
+VALUES (
+  '60606060-6060-4606-8606-606060606060',
+  '40404040-4040-4404-8404-404040404040',
+  '50505050-5050-4505-8505-505050505050',
+  'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+  'pending'
+);
+UPDATE public.project_applications
+SET status = 'accepted'
+WHERE id = '60606060-6060-4606-8606-606060606060';
+UPDATE public.project_applications
+SET status = 'pending'
+WHERE id = '60606060-6060-4606-8606-606060606060';
+UPDATE public.project_applications
+SET status = 'accepted'
+WHERE id = '60606060-6060-4606-8606-606060606060';
+UPDATE public.projects
+SET status = 'completed'
+WHERE id = '40404040-4040-4404-8404-404040404040';
+UPDATE public.projects
+SET status = 'in_progress'
+WHERE id = '40404040-4040-4404-8404-404040404040';
+UPDATE public.projects
+SET status = 'completed'
+WHERE id = '40404040-4040-4404-8404-404040404040';
+
+DO $$
+DECLARE
+  v_tipper integer;
+  v_viewer integer;
+  v_host integer;
+BEGIN
+  SELECT COALESCE(SUM(amount), 0) INTO v_tipper
+  FROM public.xp_events
+  WHERE user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  SELECT COALESCE(SUM(amount), 0) INTO v_viewer
+  FROM public.xp_events
+  WHERE user_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  SELECT COALESCE(SUM(amount), 0) INTO v_host
+  FROM public.xp_events
+  WHERE user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+  IF v_tipper IS DISTINCT FROM 40 THEN
+    RAISE EXCEPTION 'FAIL: post XP % (expected 40 after the daily cap)', v_tipper;
+  END IF;
+  IF v_viewer IS DISTINCT FROM 40 THEN
+    RAISE EXCEPTION 'FAIL: viewer contribution XP %', v_viewer;
+  END IF;
+  IF v_host IS DISTINCT FROM 25 THEN
+    RAISE EXCEPTION 'FAIL: host completion XP % (own RSVP and owner role must not count)', v_host;
+  END IF;
+  IF public.xp_level(39) IS DISTINCT FROM 1 OR public.xp_level(40) IS DISTINCT FROM 2 OR public.xp_level(400) IS DISTINCT FROM 5 THEN
+    RAISE EXCEPTION 'FAIL: level brackets';
+  END IF;
+  RAISE NOTICE 'PASS: XP is contribution-only, idempotent, and capped';
+END $$;
+
+SELECT set_config('request.jwt.claim.sub', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SET ROLE authenticated;
+
+DO $$
+DECLARE
+  v_seen integer;
+  v_mine jsonb;
+BEGIN
+  SELECT count(*) INTO v_seen
+  FROM public.xp_events
+  WHERE user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  IF v_seen <> 0 THEN
+    RAISE EXCEPTION 'FAIL: another user can read XP rows (%)', v_seen;
+  END IF;
+
+  v_mine := public.my_xp();
+  IF (v_mine->>'total')::integer IS DISTINCT FROM 40 OR (v_mine->>'level')::integer IS DISTINCT FROM 2 THEN
+    RAISE EXCEPTION 'FAIL: my_xp returned %', v_mine;
+  END IF;
+
+  BEGIN
+    PERFORM public.award_xp(
+      'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      'post_work',
+      '10101010-1010-4101-8101-101010101011',
+      10
+    );
+    RAISE EXCEPTION 'FAIL: authenticated user executed award_xp';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO public.xp_events (user_id, source, source_id, amount)
+    VALUES (
+      'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      'post_work',
+      '70707070-7070-4707-8707-707070707070',
+      10
+    );
+    RAISE EXCEPTION 'FAIL: authenticated user inserted xp';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+
+  BEGIN
+    PERFORM 1 FROM public.credit_balance_rows() LIMIT 1;
+    RAISE EXCEPTION 'FAIL: non-admin read every credit balance';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE '%not allowed%' THEN
+      RAISE;
+    END IF;
+  END;
+
+  RAISE NOTICE 'PASS: XP and ledger totals stay private';
 END $$;
 
 RESET ROLE;

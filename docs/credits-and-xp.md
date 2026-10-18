@@ -1,17 +1,19 @@
-# Credits today, and options for XP
+# Credits and private XP
 
-There is no XP or levels system in Ether. This note describes the credit economy that exists, then three designs Cadre can choose among. None of them are implemented.
+Credits are money. XP is a private level for real contribution. They never convert into each other.
 
-## How credits work today
+## How credits work
 
-Two pools live on `user_credits`:
+Two pools live on `user_credits`. That row is a cache. `credit_ledger` is the source of truth, and the ledger trigger is the only writer of the cache.
 
-- **Genesis** is the starter grant. New profiles receive 100 genesis credits from a single `credit_ledger` row (`credit_type = genesis`, amount 100). The ledger trigger is the only writer of `user_credits`. Genesis is spent before earned credits. A transfer or tip burns the genesis portion: it leaves the sender and is not added to the recipient.
+- **Genesis** is the starter grant. New profiles receive 100 genesis credits from a single `credit_ledger` row (`credit_type = genesis`, amount 100). Genesis is spent before earned credits. A transfer or tip burns the genesis portion: it leaves the sender and is not added to the recipient.
 - **Earned** credits come from verified contributions, awards, and tips received. They can be transferred and paid out.
 
-`balance` must equal `genesis_balance + earned_balance`. The trigger sets that sum. A later migration (`20261018204000_REQUIRES_CADRE_APPROVAL_reconcile_credit_balances.sql`) rebuilds stored balances from the ledger and adds a check constraint. It is not applied until Cadre approves it. Until then the wallet shows sums computed from the ledger (`credit_ledger_balances`), which can differ from the stored row if an older bug double-counted the genesis grant.
+`balance` equals `genesis_balance + earned_balance`. The trigger sets that sum. `credit_ledger_balances(user_id)` returns the same three numbers by summing `ledger_entry_deltas`. The wallet, admin balance list, and every spend path (tips, transfers, awards, event tickets, store purchases, studio bookings, payouts, verified contributions, admin deductions) read that function. A stored row cannot disagree with what a spend will allow.
 
 A ledger row whose matching split column is 0 (not null) is treated as `amount` of that `credit_type`. The other pool uses the split column as written.
+
+`20261018204000_reconcile_credit_balances.sql` rebuilds the cache from the ledger and adds `CHECK (balance = genesis_balance + earned_balance)`. Cadre approved it. It has not been applied to any live database. Run it on staging first. Re-running it is safe: it does not insert or delete ledger rows.
 
 ### Earned
 
@@ -25,24 +27,44 @@ A ledger row whose matching split column is 0 (not null) is treated as `amount` 
 
 | Sink | Split |
 | --- | --- |
-| Tip a stream | Genesis first, then earned. Idempotent on `(tipper_id, idempotency_key)`. Sets `credit_type` and the split amounts. |
-| Transfer to another user | Genesis burned, earned delivered (existing `transfer-credits` function; unchanged here) |
-| Event tickets, store items, payouts | Existing purchase and payout functions. They still read `user_credits` until the reconciliation migration is applied. Do not treat the wallet number as the spendable balance until that migration runs. |
+| Tip a stream | Genesis first, then earned. Idempotent on `(tipper_id, idempotency_key)`. The spend reads `credit_ledger_balances` while the cache row is locked. |
+| Transfer to another user | Genesis burned, earned delivered. Both balances come from `credit_ledger_balances`. |
+| Event tickets, store items, studio bookings, payouts | Existing purchase and payout functions. The price, split, and Stripe flow are unchanged. The balance they check and the `balance_after` they write come from `credit_ledger_balances`. |
 
-## Three options for real XP and levels
+## XP
 
-Pick one. Do not combine them without a new decision.
+Option 1 from the earlier note, narrowed so it does not reward engagement.
 
-### 1. Separate XP ledger
+A separate `xp_events` ledger records contribution. Likes, comments, reactions, watch time, and follower counts do not write XP. There is no public total, no profile field other people can read, and no leaderboard. Levels do not fall: rows are append-only, and a level is only a bracket of the sum.
 
-Add `xp_events` (user, source, amount, created_at) and a level table (thresholds). Credits stay money-like and never convert to XP. Likes, comments, RSVPs, and watch time would write XP only. Levels are a pure function of the XP sum. Rejected risk: two currencies in the UI unless the wallet and the profile stay visually distinct.
+Rejected:
 
-### 2. Levels from existing earned credits
+- **Levels from earned credits.** A tip and a payout would move the same number people read as status. Credits stay money.
+- **A nightly activity score.** That score is shaped like engagement, it is late, and it is easier to farm.
 
-Define levels as brackets of `lifetime_earned` (or of earned ledger sums). No new table. Genesis does not count, so buying or being granted starter credits cannot level someone up. Rejected risk: a tip and a payout change the same number people would read as status, and a credit spend would not lower a lifetime-based level unless the rule says otherwise.
+### What awards XP
 
-### 3. Activity score, no currency
+Database triggers call `award_xp`. Clients cannot insert `xp_events` and cannot execute `award_xp`. Each `(user_id, source, source_id)` is awarded once. A UTC day is capped at 40 XP; a later event the same day is skipped or cut to the room left, and the unique row still blocks a second award.
 
-A nightly job counts posts, comments, events hosted, and minutes watched, stores one integer on the profile, and maps it to a named level. Credits are untouched. Rejected risk: the score is easy to game and needs its own abuse rules; it is also invisible until the job runs.
+| Source | When | XP |
+| --- | --- | --- |
+| `post_work` | A post with text or media is created | 10 |
+| `collaborate` | Someone other than the owner is added to a board as an editor, or a project application is accepted | 15 |
+| `attend_event` | An RSVP becomes `going`, and the person is not the event creator | 10 |
+| `complete_project` | A project status changes to `completed`. The creator and each accepted collaborator each receive it | 25 |
 
-Cadre's choice should name the source of truth, whether levels can fall, and whether credits and XP are allowed to appear on the same screen.
+`interested` RSVPs, empty posts, owner board rows, and the host attending their own event do not award XP.
+
+### Level
+
+`xp_level` maps the private sum:
+
+| Total | Level |
+| --- | --- |
+| 0–39 | 1 |
+| 40–99 | 2 |
+| 100–199 | 3 |
+| 200–399 | 4 |
+| 400 and above | 5 |
+
+`my_xp()` returns `{ total, level }` for `auth.uid()` only. The signed-in user sees the level on their own profile and on the wallet. Another person's profile does not show it.

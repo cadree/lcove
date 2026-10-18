@@ -10,6 +10,7 @@ import PageLayout from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCredits, useCreditLedger, usePayoutMethods, usePayouts, useTransactions } from '@/hooks/useCredits';
+import { useMyXp } from '@/hooks/useXp';
 import { TotalBalanceCard, CreditBalanceCard } from '@/components/credits/CreditBalanceCard';
 import { TransferCreditsDialog } from '@/components/credits/TransferCreditsDialog';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,7 @@ const WalletPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const { credits, isLoading: creditsLoading, genesisBalance, earnedBalance, balance } = useCredits();
+  const { data: myXp } = useMyXp();
   const { ledger, isLoading: ledgerLoading } = useCreditLedger();
   const { methods, isLoading: methodsLoading, setupPayoutMethod, setDefaultMethod, deleteMethod, isSettingUp } = usePayoutMethods();
   const { payouts, isLoading: payoutsLoading, requestPayout, isRequesting } = usePayouts();
@@ -145,7 +147,7 @@ const WalletPage: React.FC = () => {
         {/* Header */}
         <PageHeader
           title="Wallet"
-          description="Your LC Credit balance and contribution history"
+          description={myXp ? `Your LC Credit balance and contribution history · Level ${myXp.level}` : "Your LC Credit balance and contribution history"}
           icon={<Wallet className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
           className="mb-6"
         />

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { ledgerBalances } from "../_shared/credit-balances.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -196,14 +197,8 @@ serve(async (req) => {
       multiplier,
     });
 
-    // Get current balance for balance_after
-    const { data: userCredits } = await supabaseClient
-      .from('user_credits')
-      .select('balance, earned_balance')
-      .eq('user_id', contribution.user_id)
-      .single();
-
-    const currentBalance = userCredits?.balance || 0;
+    const userCredits = await ledgerBalances(supabaseClient, contribution.user_id);
+    const currentBalance = userCredits.balance;
 
     // Create ledger entry to award earned credits
     const { error: ledgerError } = await supabaseClient
