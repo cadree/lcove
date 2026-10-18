@@ -7,3 +7,5 @@ import { Capacitor } from "@capacitor/core";
 export function isIosApp(): boolean {
   return Capacitor.getPlatform() === "ios";
 }
+
+export const ETHER_WEB_ORIGIN = "https://etherbylcove.com";

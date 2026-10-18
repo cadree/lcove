@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { EVENT_PLATFORM_FEE_PERCENT } from "@/lib/fees";
 import { useEventConnectStatus, useCreateEventConnectAccount } from "@/hooks/useEventConnectStatus";
 import { cn } from "@/lib/utils";
 
@@ -106,7 +107,7 @@ export function PayoutSettings() {
                 <div>
                   <p className="text-sm font-medium">Payouts Not Enabled</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Set up Stripe Connect to receive 95% of ticket sales directly to your bank account.
+                    Set up Stripe Connect to receive {100 - EVENT_PLATFORM_FEE_PERCENT}% of ticket sales directly to your bank account. Ether keeps {EVENT_PLATFORM_FEE_PERCENT}%.
                   </p>
                 </div>
               </div>

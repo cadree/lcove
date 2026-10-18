@@ -93,7 +93,8 @@ export default function FundDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { membership, isLoading: membershipLoading, startCheckout, openCustomerPortal } = useMembership();
-  const { data: fundStats, isLoading: fundLoading, refetch, isFetching } = useFundStats();
+  const { data: fundStats, isLoading: fundLoading, isError: fundFailed, refetch, isFetching } = useFundStats();
+  const fundEmpty = !fundLoading && !fundFailed && (fundStats?.lifetime.totalCollected ?? 0) === 0 && (fundStats?.lifetime.totalDistributed ?? 0) === 0 && (fundStats?.recentDistributions.length ?? 0) === 0;
   
   const stats = view === "lifetime" ? fundStats?.lifetime : fundStats?.monthly;
   const isMember = membership?.subscribed;
@@ -164,14 +165,26 @@ export default function FundDashboard() {
             </Button>
           </div>
 
-          {/* Live indicator */}
           <div className="flex justify-center mb-6">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Live updates enabled
-            </div>
+            {fundLoading ? (
+              <p className="text-xs text-muted-foreground">Loading fund totals…</p>
+            ) : fundFailed ? (
+              <div className="text-center space-y-2">
+                <p className="text-sm text-destructive">Fund totals could not be loaded.</p>
+                <Button size="sm" variant="outline" onClick={() => refetch()}>Try again</Button>
+              </div>
+            ) : fundEmpty ? (
+              <p className="text-sm text-muted-foreground">No contributions recorded yet.</p>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                Live updates enabled
+              </div>
+            )}
           </div>
 
+          {fundFailed ? null : (
+          <>
           {/* Stats Grid */}
           <motion.div
             key={view}
@@ -411,6 +424,8 @@ export default function FundDashboard() {
               </CardContent>
             </Card>
           </motion.div>
+          </>
+          )}
 
           {/* Member Impact or CTA Section */}
           <motion.div
@@ -472,12 +487,16 @@ export default function FundDashboard() {
                       )}
                     </div>
                     <div className="flex flex-wrap gap-2">
+                      {isIosApp() ? (
+                        <IosDigitalGoodsNotice kind="donation" className="max-w-xs" />
+                      ) : (
                       <DonateDialog>
                         <Button variant="default" size="sm">
                           <Heart className="w-3.5 h-3.5 mr-1.5" />
                           Extra Donation
                         </Button>
                       </DonateDialog>
+                      )}
                       {!isIosApp() && (
                         <Button variant="outline" size="sm" onClick={handleManageSubscription}>
                           Manage Subscription
@@ -504,18 +523,22 @@ export default function FundDashboard() {
                         <p className="text-muted-foreground max-w-md">
                           Join {fundStats?.lifetime.memberCount || 0}+ members funding grants, events, and creative opportunities.{" "}
                           {isIosApp()
-                            ? "One-time donations stay available. Membership checkout is not available in the iOS app."
+                            ? "Membership checkout and card donations are not available in the iOS app."
                             : "Donate once or subscribe monthly — no account required."}
                         </p>
                       </div>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-3">
+                      {isIosApp() ? (
+                        <IosDigitalGoodsNotice kind="donation" className="max-w-xs" />
+                      ) : (
                       <DonateDialog>
                         <Button size="lg" className="group">
                           Donate Now
                           <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                         </Button>
                       </DonateDialog>
+                      )}
                       {isIosApp() ? (
                         <IosDigitalGoodsNotice className="max-w-xs" />
                       ) : (

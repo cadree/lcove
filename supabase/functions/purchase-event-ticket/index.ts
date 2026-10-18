@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { EVENT_PLATFORM_FEE_PERCENT } from "../_shared/fees.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -287,7 +288,7 @@ serve(async (req) => {
 
     if (creatorConnectId && creatorPayoutEnabled) {
       sessionConfig.payment_intent_data = {
-        application_fee_amount: 0,
+        application_fee_amount: Math.round(totalCents * (EVENT_PLATFORM_FEE_PERCENT / 100)),
         transfer_data: { destination: creatorConnectId },
       };
     }

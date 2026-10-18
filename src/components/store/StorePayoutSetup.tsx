@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Percent
 } from 'lucide-react';
+import { STORE_PLATFORM_FEE_PERCENT } from '@/lib/fees';
 
 interface StorePayoutSetupProps {
   storeId: string;
@@ -95,7 +96,7 @@ export const StorePayoutSetup = ({ storeId, storeName }: StorePayoutSetupProps) 
             )}
           </div>
           <CardDescription>
-            Set up payouts to receive 80% of your sales automatically. ETHER collects a 20% platform fee.
+            Set up payouts to receive {100 - STORE_PLATFORM_FEE_PERCENT}% of your sales automatically. ETHER collects a {STORE_PLATFORM_FEE_PERCENT}% platform fee.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -104,8 +105,8 @@ export const StorePayoutSetup = ({ storeId, storeName }: StorePayoutSetupProps) 
               <div className="p-4 bg-muted/50 rounded-lg">
                 <h4 className="font-medium mb-2">How it works:</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• You receive <strong>80%</strong> of every sale</li>
-                  <li>• ETHER collects <strong>20%</strong> platform fee</li>
+                  <li>• You receive <strong>{100 - STORE_PLATFORM_FEE_PERCENT}%</strong> of every sale</li>
+                  <li>• ETHER collects <strong>{STORE_PLATFORM_FEE_PERCENT}%</strong> platform fee</li>
                   <li>• Cash payments are transferred directly to your bank</li>
                   <li>• Credit payments are added to your LC balance</li>
                 </ul>
@@ -136,7 +137,7 @@ export const StorePayoutSetup = ({ storeId, storeName }: StorePayoutSetupProps) 
           ) : (
             <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
               <p className="text-sm text-green-600">
-                Your payouts are fully configured! You'll receive 80% of every sale automatically.
+                Your payouts are fully configured! You'll receive {100 - STORE_PLATFORM_FEE_PERCENT}% of every sale automatically.
               </p>
             </div>
           )}
@@ -167,14 +168,14 @@ export const StorePayoutSetup = ({ storeId, storeName }: StorePayoutSetupProps) 
               <div className="p-3 bg-green-500/10 rounded-lg">
                 <div className="flex items-center gap-1 text-green-600 text-sm mb-1">
                   <TrendingUp className="h-3 w-3" />
-                  Your Earnings (80%)
+                  Your Earnings ({100 - STORE_PLATFORM_FEE_PERCENT}%)
                 </div>
                 <p className="text-xl font-semibold text-green-600">{earnings.totalSellerAmount.toFixed(2)}</p>
               </div>
               <div className="p-3 bg-muted/50 rounded-lg">
                 <div className="flex items-center gap-1 text-muted-foreground text-sm mb-1">
                   <Percent className="h-3 w-3" />
-                  Platform Fee (20%)
+                  Platform Fee ({STORE_PLATFORM_FEE_PERCENT}%)
                 </div>
                 <p className="text-xl font-semibold">{earnings.totalPlatformFee.toFixed(2)}</p>
               </div>

@@ -23,6 +23,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, X, Upload, Package, Wrench, Building2 } from 'lucide-react';
+import { STORE_PLATFORM_FEE_PERCENT } from '@/lib/fees';
 
 interface CreateItemDialogProps {
   open: boolean;
@@ -437,6 +438,12 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
               onCheckedChange={setIsActive}
             />
           </div>
+
+          <p className="text-sm text-muted-foreground rounded-lg bg-muted/50 p-3">
+            {editItem?.external_url
+              ? 'This product is linked from Shopify. Buyers pay there. Ether does not take a fee on that sale.'
+              : `Selling this on Ether: Ether keeps ${STORE_PLATFORM_FEE_PERCENT}% of the sale. You receive ${100 - STORE_PLATFORM_FEE_PERCENT}%.`}
+          </p>
 
           {/* Submit */}
           <div className="flex gap-2 pt-4">
