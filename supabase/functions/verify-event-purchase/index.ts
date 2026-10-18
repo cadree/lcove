@@ -70,42 +70,12 @@ serve(async (req) => {
     log("Session", { status: session.payment_status });
 
     if (session.payment_status === "paid") {
-      // Mark order paid
-      await supabase
-        .from("ticket_orders")
-        .update({
-          payment_status: "paid",
-          stripe_payment_intent_id: typeof session.payment_intent === "string" ? session.payment_intent : null,
-        })
-        .eq("id", order.id);
-
-      // Bump tier sold count (best-effort)
-      const { data: oneAttendee } = await supabase
-        .from("event_attendees")
-        .select("tier_id")
-        .eq("order_id", order.id)
-        .limit(1)
-        .maybeSingle();
-      if (oneAttendee?.tier_id) {
-        const { data: tier } = await supabase.from("ticket_tiers").select("quantity_sold").eq("id", oneAttendee.tier_id).single();
-        if (tier) {
-          await supabase
-            .from("ticket_tiers")
-            .update({ quantity_sold: (tier.quantity_sold || 0) + order.quantity })
-            .eq("id", oneAttendee.tier_id);
-        }
-      }
-
-      // Legacy RSVP (best effort)
-      if (order.purchaser_user_id) {
-        await supabase.from("event_rsvps").upsert({
-          event_id: order.event_id,
-          user_id: order.purchaser_user_id,
-          status: "going",
-          ticket_purchased: true,
-          stripe_payment_id: session.id,
-        }, { onConflict: "event_id,user_id" });
-      }
+      const paymentIntent = typeof session.payment_intent === "string" ? session.payment_intent : null;
+      const { error: confirmError } = await supabase.rpc("confirm_event_ticket_order", {
+        p_order_id: order.id,
+        p_payment_intent: paymentIntent,
+      });
+      if (confirmError) throw confirmError;
     }
 
     const { data: refreshedOrder } = await supabase.from("ticket_orders").select("*").eq("id", order.id).single();

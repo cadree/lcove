@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StoreItem, useCreateRentalInquiry } from '@/hooks/useStore';
 import { useCredits } from '@/hooks/useCredits';
 import { useAuth } from '@/contexts/AuthContext';
@@ -36,6 +36,8 @@ import {
 } from 'lucide-react';
 import { StudioBookingDialog } from '@/components/studio/StudioBookingDialog';
 import { StudioReviews } from '@/components/studio/StudioReviews';
+import { isIosApp, ETHER_WEB_ORIGIN } from '@/lib/platform';
+import { IosDigitalGoodsNotice } from '@/components/ios/IosDigitalGoodsNotice';
 
 interface StoreItemDialogProps {
   item: StoreItem | null;
@@ -60,6 +62,10 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [showBooking, setShowBooking] = useState(false);
 
+  useEffect(() => {
+    if (isIosApp()) setPaymentType('credits');
+  }, [item?.id]);
+
   if (!item) return null;
 
   const TypeIcon = typeIcons[item.type];
@@ -71,6 +77,11 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
   const handlePurchase = async () => {
     if (!user) {
       toast.error('Please sign in to make a purchase');
+      return;
+    }
+
+    if (isIosApp() && paymentType === 'cash') {
+      toast.error("Card checkout isn't available in the iOS app.");
       return;
     }
 
@@ -286,24 +297,18 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
             {/* Purchase Options for Products/Services */}
             {item.type !== 'rental' && (
               <div className="space-y-3 pt-3 border-t border-border">
-                {/* Check if external store is configured - show as primary action */}
-                {store?.shopify_store_url ? (
-                  <Button
-                    className="w-full"
-                    size="lg"
-                    asChild
-                  >
-                    <a
-                      href={store.shopify_store_url.startsWith('http') 
-                        ? store.shopify_store_url 
-                        : `https://${store.shopify_store_url}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Shop on Shopify
-                    </a>
-                  </Button>
+                {item.external_url ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      You pay on Shopify. Ether does not take a fee on this sale.
+                    </p>
+                    <Button className="w-full" size="lg" asChild>
+                      <a href={item.external_url} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Buy on Shopify
+                      </a>
+                    </Button>
+                  </div>
                 ) : store?.peerspace_url ? (
                   <Button
                     className="w-full"
@@ -323,8 +328,25 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
                   </Button>
                 ) : (item.price > 0 || item.credits_price > 0) ? (
                   <>
+                    {isIosApp() && item.price > 0 && item.type === 'product' && (
+                      <p className="text-sm text-muted-foreground">
+                        Card checkout isn't available in the iOS app.{' '}
+                        <a
+                          href={`${ETHER_WEB_ORIGIN}/store`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline"
+                        >
+                          Buy this item on the Ether website
+                        </a>
+                        .
+                      </p>
+                    )}
+                    {isIosApp() && item.price > 0 && item.type !== 'product' && (
+                      <IosDigitalGoodsNotice />
+                    )}
                     <div className="flex gap-2">
-                      {item.price > 0 && (
+                      {item.price > 0 && !isIosApp() && (
                         <Button
                           variant={paymentType === 'cash' ? 'default' : 'outline'}
                           className="flex-1"
@@ -347,14 +369,16 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
                         </Button>
                       )}
                     </div>
-                    <Button
-                      className="w-full"
-                      size="lg"
-                      onClick={handlePurchase}
-                      disabled={isPurchasing || (item.type === 'product' && item.inventory_count === 0)}
-                    >
-                      {isPurchasing ? 'Processing...' : 'Purchase Now'}
-                    </Button>
+                    {(!isIosApp() || item.credits_price > 0) && (
+                      <Button
+                        className="w-full"
+                        size="lg"
+                        onClick={handlePurchase}
+                        disabled={isPurchasing || (item.type === 'product' && item.inventory_count === 0)}
+                      >
+                        {isPurchasing ? 'Processing...' : 'Purchase Now'}
+                      </Button>
+                    )}
                   </>
                 ) : null}
               </div>

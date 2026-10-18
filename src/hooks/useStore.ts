@@ -21,13 +21,16 @@ export interface Store {
   accepts_cash: boolean;
   shopify_store_url: string | null;
   peerspace_url: string | null;
+  flat_shipping_cents?: number | null;
+  tax_line_label?: string | null;
+  tax_line_cents?: number | null;
   created_at: string;
   updated_at: string;
 }
 
 /** Columns safe to read from the client. Payment secrets live in store_secrets. */
 export const STORE_PUBLIC_COLUMNS =
-  'id, user_id, name, description, cover_image_url, logo_url, is_active, accepts_credits, accepts_cash, shopify_store_url, peerspace_url, created_at, updated_at';
+  'id, user_id, name, description, cover_image_url, logo_url, is_active, accepts_credits, accepts_cash, shopify_store_url, peerspace_url, flat_shipping_cents, tax_line_label, tax_line_cents, created_at, updated_at';
 
 export interface StoreItemCategory {
   id: string;
@@ -53,6 +56,9 @@ export interface StoreItem {
   amenities: string[] | null;
   contact_email: string | null;
   contact_phone: string | null;
+  external_source?: string | null;
+  external_handle?: string | null;
+  external_url?: string | null;
   created_at: string;
   updated_at: string;
   category?: StoreItemCategory;
@@ -273,10 +279,15 @@ export const useCreateStore = () => {
         is_active: data.is_active ?? true,
         accepts_credits: data.accepts_credits ?? true,
         accepts_cash: data.accepts_cash ?? true,
+        shopify_store_url: data.shopify_store_url || null,
+        peerspace_url: data.peerspace_url || null,
+        flat_shipping_cents: data.flat_shipping_cents ?? 0,
+        tax_line_label: data.tax_line_label || null,
+        tax_line_cents: data.tax_line_cents ?? 0,
       };
       const { data: store, error } = await supabase
         .from('stores')
-        .insert(insertData)
+        .insert(insertData as never)
         .select(STORE_PUBLIC_COLUMNS)
         .single();
 
@@ -301,7 +312,7 @@ export const useUpdateStore = () => {
     mutationFn: async ({ id, ...data }: Partial<Store> & { id: string }) => {
       const { data: store, error } = await supabase
         .from('stores')
-        .update(data)
+        .update(data as never)
         .eq('id', id)
         .select(STORE_PUBLIC_COLUMNS)
         .single();

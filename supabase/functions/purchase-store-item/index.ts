@@ -1,13 +1,14 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { STORE_PLATFORM_FEE_PERCENT } from "../_shared/fees.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const PLATFORM_FEE_PERCENT = 20;
+const PLATFORM_FEE_PERCENT = STORE_PLATFORM_FEE_PERCENT;
 
 const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
@@ -48,7 +49,27 @@ serve(async (req) => {
 
     logStep("User authenticated", { userId: user.id });
 
-    const { itemId, paymentType, quantity = 1 } = await req.json();
+    const { itemId, paymentType, quantity = 1, action, orderId } = await req.json();
+
+    if (action === "cancel") {
+      if (!orderId) throw new Error("Missing orderId");
+      const { data: pendingOrder, error: pendingError } = await supabaseAdmin
+        .from("store_orders")
+        .select("id, buyer_id, status")
+        .eq("id", orderId)
+        .maybeSingle();
+      if (pendingError || !pendingOrder || pendingOrder.buyer_id !== user.id) {
+        throw new Error("Order not found");
+      }
+      const { error: cancelError } = await supabaseAdmin.rpc("cancel_pending_store_order", {
+        p_order_id: orderId,
+      });
+      if (cancelError) throw new Error(cancelError.message);
+      return new Response(
+        JSON.stringify({ cancelled: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
 
     if (!itemId || !paymentType) {
       throw new Error("Missing required fields: itemId, paymentType");
@@ -57,7 +78,7 @@ serve(async (req) => {
     // Get the store item with store details including Connect info
     const { data: item, error: itemError } = await supabaseClient
       .from("store_items")
-      .select("*, store:stores(id, user_id, name, payout_enabled, accepts_cash, accepts_credits)")
+      .select("*, store:stores(id, user_id, name, payout_enabled, accepts_cash, accepts_credits, flat_shipping_cents, tax_line_label, tax_line_cents)")
       .eq("id", itemId)
       .single();
 
@@ -102,100 +123,26 @@ serve(async (req) => {
         throw new Error("This item cannot be purchased with credits");
       }
 
-      const totalCredits = item.credits_price * quantity;
-      
-      // Calculate 80/20 split for credits
-      const sellerCredits = Math.floor(totalCredits * 0.80);
-      const platformCredits = totalCredits - sellerCredits;
-
-      logStep("Credit split calculated", { totalCredits, sellerCredits, platformCredits });
-
-      // Check user's credit balance
-      const { data: userCredits, error: creditsError } = await supabaseClient
-        .from("user_credits")
-        .select("balance")
-        .eq("user_id", user.id)
-        .single();
-
-      const balance = userCredits?.balance || 0;
-      if (balance < totalCredits) {
-        throw new Error(`Insufficient credits. You have ${balance} LC, but need ${totalCredits} LC`);
+      if (item.external_url) {
+        throw new Error("This item is sold outside Ether");
       }
 
-      // Create the order with fee breakdown
-      const { data: order, error: orderError } = await supabaseAdmin
-        .from("store_orders")
-        .insert({
-          store_id: store.id,
-          buyer_id: user.id,
-          item_id: itemId,
-          quantity,
-          total_price: 0,
-          credits_spent: totalCredits,
-          payment_type: "credits",
-          status: "confirmed",
-          seller_amount: sellerCredits,
-          platform_fee: platformCredits,
-          seller_payout_status: "completed",
-        })
-        .select()
-        .single();
-
-      if (orderError) {
-        console.error("Order creation error:", orderError);
-        throw new Error("Failed to create order");
+      const { data: creditResult, error: creditError } = await supabaseAdmin.rpc(
+        "complete_store_credit_purchase",
+        {
+          p_buyer_id: user.id,
+          p_item_id: itemId,
+          p_quantity: quantity,
+        },
+      );
+      if (creditError) {
+        throw new Error(creditError.message);
       }
 
-      // Deduct credits from buyer
-      await supabaseAdmin.from("credit_ledger").insert({
-        user_id: user.id,
-        amount: -totalCredits,
-        balance_after: balance - totalCredits,
-        type: "purchase",
-        description: `Purchased: ${item.title}`,
-        reference_type: "store_order",
-        reference_id: order.id,
-      });
-
-      // Add 80% credits to seller
-      const { data: sellerCreditsData } = await supabaseAdmin
-        .from("user_credits")
-        .select("balance")
-        .eq("user_id", store.user_id)
-        .single();
-
-      const sellerBalance = sellerCreditsData?.balance || 0;
-      await supabaseAdmin.from("credit_ledger").insert({
-        user_id: store.user_id,
-        amount: sellerCredits,
-        balance_after: sellerBalance + sellerCredits,
-        type: "sale",
-        description: `Sale (80%): ${item.title}`,
-        reference_type: "store_order",
-        reference_id: order.id,
-      });
-
-      // Record platform fee in treasury
-      await supabaseAdmin.from("platform_treasury").insert({
-        source_type: "store_order",
-        source_id: order.id,
-        amount: 0,
-        credits_amount: platformCredits,
-        description: `Platform fee (20%): ${item.title}`,
-      });
-
-      logStep("Credit payment completed", { orderId: order.id, sellerCredits, platformCredits });
-
-      // Update inventory if applicable
-      if (item.type === "product" && item.inventory_count !== null) {
-        await supabaseAdmin
-          .from("store_items")
-          .update({ inventory_count: item.inventory_count - quantity })
-          .eq("id", itemId);
-      }
+      logStep("Credit payment completed", { orderId: creditResult?.order_id });
 
       return new Response(
-        JSON.stringify({ success: true, orderId: order.id }),
+        JSON.stringify({ success: true, orderId: creditResult?.order_id }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
       );
 
@@ -209,11 +156,16 @@ serve(async (req) => {
         throw new Error("This item does not have a cash price");
       }
 
-      const totalPrice = item.price * quantity;
-      
-      // Calculate fee amounts in cents
-      const platformFeeAmount = Math.round(totalPrice * 100 * (PLATFORM_FEE_PERCENT / 100));
-      const sellerAmount = (totalPrice * 100) - platformFeeAmount;
+      if (item.external_url) {
+        throw new Error("This item is sold outside Ether");
+      }
+
+      const merchandiseCents = Math.round(item.price * 100) * quantity;
+      const shippingCents = item.type === "product" ? Number(store.flat_shipping_cents || 0) : 0;
+      const taxCents = Number(store.tax_line_cents || 0);
+      const platformFeeAmount = Math.round(merchandiseCents * (PLATFORM_FEE_PERCENT / 100));
+      const sellerAmount = merchandiseCents - platformFeeAmount + shippingCents + taxCents;
+      const totalPrice = (merchandiseCents + shippingCents + taxCents) / 100;
 
       logStep("Cash split calculated", { 
         totalPrice, 
@@ -258,37 +210,68 @@ serve(async (req) => {
       }
 
       // Build checkout session config
+      const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+        {
+          price_data: {
+            currency: item.currency.toLowerCase(),
+            product_data: {
+              name: item.title,
+              description: item.description || undefined,
+              images: item.images?.length > 0 ? [item.images[0]] : undefined,
+            },
+            unit_amount: Math.round(item.price * 100),
+          },
+          quantity,
+        },
+      ];
+      if (shippingCents > 0) {
+        lineItems.push({
+          price_data: {
+            currency: item.currency.toLowerCase(),
+            product_data: { name: "Shipping (seller arranges)" },
+            unit_amount: shippingCents,
+          },
+          quantity: 1,
+        });
+      }
+      if (taxCents > 0) {
+        lineItems.push({
+          price_data: {
+            currency: item.currency.toLowerCase(),
+            product_data: { name: store.tax_line_label || "Tax" },
+            unit_amount: taxCents,
+          },
+          quantity: 1,
+        });
+      }
+
+      const origin = req.headers.get("origin") || "http://localhost:3000";
       const sessionConfig: Stripe.Checkout.SessionCreateParams = {
         customer: customerId,
         customer_email: customerId ? undefined : user.email!,
-        line_items: [
-          {
-            price_data: {
-              currency: item.currency.toLowerCase(),
-              product_data: {
-                name: item.title,
-                description: item.description || undefined,
-                images: item.images?.length > 0 ? [item.images[0]] : undefined,
-              },
-              unit_amount: Math.round(item.price * 100),
-            },
-            quantity,
-          },
-        ],
+        line_items: lineItems,
         mode: "payment",
-        success_url: `${req.headers.get("origin")}/store?purchase=success&order=${order.id}`,
-        cancel_url: `${req.headers.get("origin")}/store?purchase=cancelled`,
+        success_url: `${origin}/store?purchase=success&order=${order.id}`,
+        cancel_url: `${origin}/store?purchase=cancel&order=${order.id}`,
         metadata: {
+          type: "store_order",
           order_id: order.id,
           item_id: itemId,
           buyer_id: user.id,
         },
+        payment_intent_data: {
+          receipt_email: user.email || undefined,
+        },
       };
 
-      // If seller has Stripe Connect enabled, use application fee for automatic 80/20 split
+      // Sellers arrange shipping themselves. The seller-entered amount is a line item above.
+      // Ether does not collect a shipping address or limit countries.
+      // Connect fee is STORE_PLATFORM_FEE_PERCENT of the item price. Shipping and tax are not in the fee.
+      // Linked Shopify items are rejected above and never reach this split.
       if (connectAccountId && store.payout_enabled) {
         sessionConfig.payment_intent_data = {
-          application_fee_amount: platformFeeAmount,
+          ...sessionConfig.payment_intent_data,
+          ...(platformFeeAmount > 0 ? { application_fee_amount: platformFeeAmount } : {}),
           transfer_data: {
             destination: connectAccountId,
           },
@@ -299,8 +282,13 @@ serve(async (req) => {
         });
       }
 
-      // Create Stripe checkout session
-      const session = await stripe.checkout.sessions.create(sessionConfig);
+      let session: Stripe.Checkout.Session;
+      try {
+        session = await stripe.checkout.sessions.create(sessionConfig);
+      } catch (sessionError) {
+        await supabaseAdmin.rpc("cancel_pending_store_order", { p_order_id: order.id });
+        throw sessionError;
+      }
 
       // Update order with stripe payment intent
       await supabaseAdmin
@@ -314,7 +302,7 @@ serve(async (req) => {
         source_id: order.id,
         amount: platformFeeAmount / 100,
         credits_amount: 0,
-        description: `Platform fee (20%): ${item.title}`,
+        description: `Platform fee (${PLATFORM_FEE_PERCENT}%): ${item.title}`,
       });
 
       logStep("Checkout session created", { sessionUrl: session.url, orderId: order.id });

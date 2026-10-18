@@ -1137,9 +1137,7 @@ function FinanceTab({ orders, event, totalRevenue, totalCredits }: FinanceTabPro
   const paidOrders = orders.filter(o => o.stripe_payment_id);
   const creditOrders = orders.filter(o => o.credits_spent && !o.stripe_payment_id);
 
-  // Estimated platform fee (example: 5%)
-  const platformFee = totalRevenue * 0.05;
-  const netRevenue = totalRevenue - platformFee;
+  const netRevenue = totalRevenue;
 
   return (
     <div className="space-y-4">
@@ -1179,14 +1177,11 @@ function FinanceTab({ orders, event, totalRevenue, totalCredits }: FinanceTabPro
             <span className="text-sm text-muted-foreground">Credit Orders</span>
             <span className="font-medium">{creditOrders.length} ({totalCredits} credits)</span>
           </div>
-          <div className="flex justify-between items-center py-2 border-b border-border/40">
-            <span className="text-sm text-muted-foreground">Platform Fee (5%)</span>
-            <span className="font-medium text-destructive">-${platformFee.toFixed(2)}</span>
-          </div>
           <div className="flex justify-between items-center py-2">
             <span className="text-sm font-medium">Your Payout</span>
             <span className="font-bold text-emerald-500">${netRevenue.toFixed(2)}</span>
           </div>
+          <p className="text-xs text-muted-foreground">Ether does not take a platform fee on tickets.</p>
         </CardContent>
       </Card>
 
@@ -1716,7 +1711,7 @@ function FinanceTabV2({
               <span className="text-xs text-muted-foreground">Net Revenue</span>
             </div>
             <p className="text-2xl font-bold text-primary">{formatMoney(netCents, currency)}</p>
-            <p className="text-[10px] text-muted-foreground mt-1">After {formatMoney(refundedCents, currency)} refunded</p>
+            <p className="text-[10px] text-muted-foreground mt-1">After {formatMoney(refundedCents, currency)} refunded. Ether does not take a platform fee on tickets.</p>
           </CardContent>
         </Card>
       </div>

@@ -6187,6 +6187,9 @@ export type Database = {
           currency: string
           description: string | null
           duration_minutes: number | null
+          external_handle: string | null
+          external_source: string | null
+          external_url: string | null
           id: string
           images: string[] | null
           inventory_count: number | null
@@ -6210,6 +6213,9 @@ export type Database = {
           currency?: string
           description?: string | null
           duration_minutes?: number | null
+          external_handle?: string | null
+          external_source?: string | null
+          external_url?: string | null
           id?: string
           images?: string[] | null
           inventory_count?: number | null
@@ -6233,6 +6239,9 @@ export type Database = {
           currency?: string
           description?: string | null
           duration_minutes?: number | null
+          external_handle?: string | null
+          external_source?: string | null
+          external_url?: string | null
           id?: string
           images?: string[] | null
           inventory_count?: number | null
@@ -6342,6 +6351,7 @@ export type Database = {
           cover_image_url: string | null
           created_at: string
           description: string | null
+          flat_shipping_cents: number
           id: string
           is_active: boolean | null
           logo_url: string | null
@@ -6352,6 +6362,8 @@ export type Database = {
           shopify_access_token: string | null
           shopify_store_url: string | null
           stripe_connect_account_id: string | null
+          tax_line_cents: number
+          tax_line_label: string | null
           updated_at: string
           user_id: string
         }
@@ -6361,6 +6373,7 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           description?: string | null
+          flat_shipping_cents?: number
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
@@ -6371,6 +6384,8 @@ export type Database = {
           shopify_access_token?: string | null
           shopify_store_url?: string | null
           stripe_connect_account_id?: string | null
+          tax_line_cents?: number
+          tax_line_label?: string | null
           updated_at?: string
           user_id: string
         }
@@ -6380,6 +6395,7 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           description?: string | null
+          flat_shipping_cents?: number
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
@@ -6390,6 +6406,8 @@ export type Database = {
           shopify_access_token?: string | null
           shopify_store_url?: string | null
           stripe_connect_account_id?: string | null
+          tax_line_cents?: number
+          tax_line_label?: string | null
           updated_at?: string
           user_id?: string
         }

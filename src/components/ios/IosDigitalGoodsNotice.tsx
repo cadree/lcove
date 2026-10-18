@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 interface IosDigitalGoodsNoticeProps {
   variant?: "short" | "full";
-  kind?: "purchase" | "billing";
+  kind?: "purchase" | "billing" | "donation";
   className?: string;
 }
 
@@ -19,7 +19,9 @@ export function IosDigitalGoodsNotice({
   if (!isIosApp()) return null;
 
   const text =
-    kind === "billing"
+    kind === "donation"
+      ? "Donations aren't available in the iOS app. Card donations inside the app aren't allowed, and this screen does not link out to a payment page."
+      : kind === "billing"
       ? "Subscription billing isn't available in the iOS app."
       : variant === "short"
         ? "This purchase isn't available in the iOS app."
