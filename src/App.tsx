@@ -59,6 +59,7 @@ import EventConfirmation from "./pages/EventConfirmation";
 import PublicProjectPage from "./pages/PublicProjectPage";
 import PublicClientPortal from "@/pages/PublicClientPortal";
 import Unsubscribe from "./pages/Unsubscribe";
+import Nuance from "./pages/Nuance";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
 
 const ActivityTracker = () => {
@@ -105,6 +106,7 @@ const App = () => (
                 <Route path="/wallet" element={<Wallet />} />
                 <Route path="/store" element={<Store />} />
                 <Route path="/mall" element={<Mall />} />
+                <Route path="/nuance" element={<Nuance />} />
                 <Route path="/fund" element={<FundDashboard />} />
                 <Route path="/membership" element={<Membership />} />
                 <Route path="/live" element={<Live />} />
