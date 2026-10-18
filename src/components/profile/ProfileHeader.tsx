@@ -17,6 +17,7 @@ import { useCreatorVerification } from '@/hooks/useCreatorVerification';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMyXp } from '@/hooks/useXp';
 import { ReportDialog } from '@/components/safety/ReportDialog';
 import { FriendsDrawer } from '@/components/friends/FriendsDrawer';
 import type { ThemePreset } from '@/lib/profileThemes';
@@ -71,6 +72,7 @@ export function ProfileHeader({
   const { isBlocked, blockUser, unblockUser } = useUserBlocks();
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
+  const { data: myXp } = useMyXp();
 
   const isUserFavorite = isFavorite(userId);
   const friendsCount = favorites?.length || 0;
@@ -261,6 +263,9 @@ export function ProfileHeader({
                 <MapPin className="w-3.5 h-3.5" />
                 {city}
               </p>
+              {isOwnProfile && myXp && (
+                <p className="text-sm text-muted-foreground">Level {myXp.level}</p>
+              )}
               
               {isOwnProfile && (
                 <FriendsDrawer>

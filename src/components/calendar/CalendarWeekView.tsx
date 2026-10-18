@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { CalendarItem } from "@/hooks/useCalendar";
 import { cn } from "@/lib/utils";
 import { format, startOfWeek, addDays, isSameDay } from "date-fns";
+import { formatEventTime, sameZonedDay, zonedParts } from "@/lib/eventTime";
 
 interface CalendarWeekViewProps {
   currentDate: Date;
@@ -24,22 +25,23 @@ export function CalendarWeekView({
 
   const getItemsForDay = (date: Date) => {
     return items.filter(item => {
-      const itemDate = new Date(item.start_date);
-      return isSameDay(itemDate, date);
+      if (item.type === 'event') return sameZonedDay(item.start_date, date, item.timezone);
+      return isSameDay(new Date(item.start_date), date);
     });
   };
 
   const getItemPosition = (item: CalendarItem) => {
-    const startDate = new Date(item.start_date);
-    const hour = startDate.getHours();
-    const minutes = startDate.getMinutes();
-    return (hour * 60 + minutes) / (24 * 60) * 100;
+    const parts = item.type === 'event'
+      ? zonedParts(item.start_date, item.timezone)
+      : { hour: new Date(item.start_date).getHours(), minute: new Date(item.start_date).getMinutes() };
+    return (parts.hour * 60 + parts.minute) / (24 * 60) * 100;
   };
 
   const isToday = (date: Date) => isSameDay(date, new Date());
 
   return (
-    <div className="glass-strong rounded-2xl overflow-hidden">
+    <div className="glass-strong rounded-2xl overflow-x-auto">
+      <div className="min-w-[720px]">
       {/* Day headers */}
       <div className="grid grid-cols-8 border-b border-border/30">
         <div className="p-2 text-xs text-muted-foreground" />
@@ -119,13 +121,16 @@ export function CalendarWeekView({
                 >
                   <div className="font-medium truncate">{item.title}</div>
                   <div className="text-[8px] opacity-80">
-                    {format(new Date(item.start_date), 'h:mm a')}
+                    {item.type === 'event'
+                      ? formatEventTime(item.start_date, item.timezone)
+                      : format(new Date(item.start_date), 'h:mm a')}
                   </div>
                 </motion.button>
               ))}
             </div>
           ))}
         </div>
+      </div>
       </div>
     </div>
   );

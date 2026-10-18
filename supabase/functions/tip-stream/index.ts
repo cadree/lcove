@@ -15,10 +15,9 @@ serve(async (req) => {
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
+      { auth: { persistSession: false } },
     );
 
-    // Get authenticated user
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header");
 
@@ -27,105 +26,26 @@ serve(async (req) => {
     if (userError || !userData.user) throw new Error("Authentication failed");
 
     const user = userData.user;
-    const { stream_id, amount, message } = await req.json();
+    const { stream_id, amount, message, idempotency_key } = await req.json();
 
     if (!stream_id || !amount || amount < 1) {
       throw new Error("Invalid tip amount");
     }
-
-    console.log(`[TIP-STREAM] User ${user.id} tipping ${amount} LC to stream ${stream_id}`);
-
-    // Get stream info
-    const { data: stream, error: streamError } = await supabaseClient
-      .from("live_streams")
-      .select("host_id, title")
-      .eq("id", stream_id)
-      .single();
-
-    if (streamError || !stream) throw new Error("Stream not found");
-
-    // Check user's credit balance
-    const { data: credits } = await supabaseClient
-      .from("user_credits")
-      .select("balance")
-      .eq("user_id", user.id)
-      .single();
-
-    const balance = credits?.balance || 0;
-    if (balance < amount) {
-      throw new Error("Insufficient credits");
+    if (!idempotency_key || typeof idempotency_key !== "string") {
+      throw new Error("idempotency_key is required");
     }
 
-    // Deduct from tipper
-    const { error: deductError } = await supabaseClient
-      .from("credit_ledger")
-      .insert({
-        user_id: user.id,
-        amount: -amount,
-        balance_after: balance - amount,
-        type: "spend",
-        description: `Tip to stream: ${stream.title}`,
-        reference_type: "stream_tip",
-        reference_id: stream_id,
-      });
-
-    if (deductError) throw deductError;
-
-    // Get host's current balance
-    const { data: hostCredits } = await supabaseClient
-      .from("user_credits")
-      .select("balance")
-      .eq("user_id", stream.host_id)
-      .single();
-
-    const hostBalance = hostCredits?.balance || 0;
-
-    // Add to host
-    const { error: addError } = await supabaseClient
-      .from("credit_ledger")
-      .insert({
-        user_id: stream.host_id,
-        amount: amount,
-        balance_after: hostBalance + amount,
-        type: "earn",
-        description: `Tip received on stream`,
-        reference_type: "stream_tip",
-        reference_id: stream_id,
-      });
-
-    if (addError) throw addError;
-
-    // Record the tip
-    const { error: tipError } = await supabaseClient
-      .from("stream_tips")
-      .insert({
-        stream_id,
-        tipper_id: user.id,
-        host_id: stream.host_id,
-        amount,
-        message,
-      });
-
-    if (tipError) throw tipError;
-
-    // Update stream total tips using RPC to avoid race conditions
-    const { error: updateError } = await supabaseClient.rpc('increment_stream_tips', {
+    const { data, error } = await supabaseClient.rpc("apply_stream_tip", {
+      p_tipper: user.id,
       p_stream_id: stream_id,
-      p_tip_amount: amount
+      p_amount: amount,
+      p_message: message ?? null,
+      p_idempotency_key: idempotency_key,
     });
 
-    // Create notification for host
-    await supabaseClient.from("notifications").insert({
-      user_id: stream.host_id,
-      type: "stream_tip",
-      title: "You received a tip!",
-      body: `Someone tipped you ${amount} LC on your stream`,
-      data: { stream_id, amount },
-    });
+    if (error) throw new Error(error.message);
 
-    console.log(`[TIP-STREAM] Successfully processed tip`);
-
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

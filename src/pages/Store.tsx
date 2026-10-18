@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -52,7 +52,19 @@ const Store = () => {
   const { data: myStore, isLoading: isLoadingStore } = useMyStore();
   const { data: myItems } = useMyStoreItems();
   const deleteItem = useDeleteStoreItem();
-  const [activeTab, setActiveTab] = useState<'products' | 'services' | 'rentals' | 'my-store'>('products');
+  const tabParam = searchParams.get('tab');
+  const categoryParam = searchParams.get('category');
+  const [activeTab, setActiveTab] = useState<'products' | 'services' | 'rentals' | 'my-store'>(
+    tabParam === 'products' || tabParam === 'services' || tabParam === 'rentals' || tabParam === 'my-store'
+      ? tabParam
+      : 'products',
+  );
+  useEffect(() => {
+    if (tabParam === 'products' || tabParam === 'services' || tabParam === 'rentals' || tabParam === 'my-store') {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState<StoreItem | null>(null);
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
@@ -113,10 +125,12 @@ const Store = () => {
     ? (currentType ? items.filter(item => item.type === currentType) : items)
     : items;
 
-  const filteredItems = (activeTab === 'my-store' ? myItems : typeFilteredItems)?.filter((item) =>
-    item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  const filteredItems = (activeTab === 'my-store' ? myItems : typeFilteredItems)?.filter((item) => {
+    const matchesQuery = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = !categoryParam || item.category_id === categoryParam;
+    return matchesQuery && matchesCategory;
+  }) || [];
 
   const handleItemClick = (item: StoreItem) => {
     setSelectedItem(item);

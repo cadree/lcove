@@ -103,6 +103,14 @@ export const NotificationPreferences: React.FC = () => {
         />
 
         <PreferenceItem
+          icon={<Users className="h-4 w-4" />}
+          label="Follows"
+          description="When someone adds you to favorites"
+          checked={preferences.follows_enabled ?? true}
+          onCheckedChange={(checked) => updatePreferences({ follows_enabled: checked })}
+        />
+
+        <PreferenceItem
           icon={<MessageCircle className="h-4 w-4" />}
           label="Comments"
           description="New comments on your posts"

@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "./useAdmin";
 import { toast } from "sonner";
 import type { Json } from "@/integrations/supabase/types";
+import { callRpc } from "@/lib/rpc";
 
 export interface SocialLinks {
   instagram?: string;
@@ -82,7 +83,7 @@ export function useAdminUserData() {
       const { data: skills } = await supabase.from("user_skills").select("user_id, skills(name)");
       const { data: passions } = await supabase.from("user_passions").select("user_id, passions(name)");
       const { data: roles } = await supabase.from("user_creative_roles").select("user_id, creative_roles(name)");
-      const { data: credits } = await supabase.from("user_credits").select("user_id, balance");
+      const credits = await callRpc<Array<{ user_id: string; balance: number }>>("credit_balance_rows");
       const { data: adminRoles } = await supabase.from("user_roles").select("user_id, role");
 
       const skillsMap = new Map<string, string[]>();
@@ -212,15 +213,10 @@ export function useAdjustUserCredits() {
     mutationFn: async (data: { userId: string; amount: number; reason: string }) => {
       if (!user?.id) throw new Error("Not authenticated");
 
-      const { data: currentCredits, error: creditsErr } = await supabase
-        .from("user_credits")
-        .select("balance")
-        .eq("user_id", data.userId)
-        .single();
-
-      if (creditsErr && creditsErr.code !== "PGRST116") throw creditsErr;
-
-      const currentBalance = currentCredits?.balance || 0;
+      const currentCredits = await callRpc<{ balance: number }>("credit_ledger_balances", {
+        p_user_id: data.userId,
+      });
+      const currentBalance = Number(currentCredits?.balance ?? 0);
       const newBalance = currentBalance + data.amount;
 
       if (newBalance < 0) {

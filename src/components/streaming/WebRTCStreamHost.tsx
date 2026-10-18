@@ -567,6 +567,19 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
     }
   };
 
+  const stopStreamRef = useRef(stopStream);
+  stopStreamRef.current = stopStream;
+
+  useEffect(() => {
+    const channel = supabase.channel(`stream-end-${streamId}`);
+    channel.on('broadcast', { event: 'end' }, () => {
+      void stopStreamRef.current(false);
+    }).subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [streamId]);
+
   // Toggle video
   const toggleVideo = () => {
     const newState = !videoEnabled;

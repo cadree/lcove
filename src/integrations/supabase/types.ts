@@ -2709,6 +2709,7 @@ export type Database = {
           end_date: string | null
           event_type: string
           external_url: string | null
+          recurrence: string | null
           id: string
           image_url: string | null
           is_public: boolean | null
@@ -2739,6 +2740,7 @@ export type Database = {
           end_date?: string | null
           event_type?: string
           external_url?: string | null
+          recurrence?: string | null
           id?: string
           image_url?: string | null
           is_public?: boolean | null
@@ -2769,6 +2771,7 @@ export type Database = {
           end_date?: string | null
           event_type?: string
           external_url?: string | null
+          recurrence?: string | null
           id?: string
           image_url?: string | null
           is_public?: boolean | null
@@ -4260,6 +4263,7 @@ export type Database = {
           created_at: string
           email_enabled: boolean | null
           event_reminders_enabled: boolean | null
+          follows_enabled: boolean | null
           id: string
           likes_enabled: boolean | null
           live_streams_enabled: boolean | null
@@ -4279,6 +4283,7 @@ export type Database = {
           created_at?: string
           email_enabled?: boolean | null
           event_reminders_enabled?: boolean | null
+          follows_enabled?: boolean | null
           id?: string
           likes_enabled?: boolean | null
           live_streams_enabled?: boolean | null
@@ -4298,6 +4303,7 @@ export type Database = {
           created_at?: string
           email_enabled?: boolean | null
           event_reminders_enabled?: boolean | null
+          follows_enabled?: boolean | null
           id?: string
           likes_enabled?: boolean | null
           live_streams_enabled?: boolean | null
@@ -5972,6 +5978,7 @@ export type Database = {
           endpoint: string
           id: string
           p256dh: string
+          platform: string
           updated_at: string
           user_agent: string | null
           user_id: string
@@ -5982,6 +5989,7 @@ export type Database = {
           endpoint: string
           id?: string
           p256dh: string
+          platform?: string
           updated_at?: string
           user_agent?: string | null
           user_id: string
@@ -5992,6 +6000,7 @@ export type Database = {
           endpoint?: string
           id?: string
           p256dh?: string
+          platform?: string
           updated_at?: string
           user_agent?: string | null
           user_id?: string
@@ -7514,6 +7523,7 @@ export type Database = {
           rtmp_stream_key: string | null
           started_at: string | null
           stream_type: string | null
+          thumbnail_focal_point: Json | null
           thumbnail_url: string | null
           ticket_price: number | null
           title: string | null
@@ -7542,6 +7552,7 @@ export type Database = {
           rtmp_stream_key?: never
           started_at?: string | null
           stream_type?: string | null
+          thumbnail_focal_point?: Json | null
           thumbnail_url?: string | null
           ticket_price?: number | null
           title?: string | null
@@ -7570,6 +7581,7 @@ export type Database = {
           rtmp_stream_key?: never
           started_at?: string | null
           stream_type?: string | null
+          thumbnail_focal_point?: Json | null
           thumbnail_url?: string | null
           ticket_price?: number | null
           title?: string | null

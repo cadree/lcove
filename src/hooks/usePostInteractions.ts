@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
+import { notifyPostComment, notifyPostLike } from '@/lib/notifications';
 
 interface Comment {
   id: string;
@@ -129,6 +130,20 @@ export function usePostInteractions(postId: string) {
         await supabase
           .from('post_likes')
           .insert({ post_id: postId, user_id: user.id });
+
+        const { data: post } = await supabase
+          .from('posts')
+          .select('user_id')
+          .eq('id', postId)
+          .maybeSingle();
+        if (post && post.user_id !== user.id) {
+          const { data: profile } = await supabase
+            .from('profiles_public')
+            .select('display_name')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          notifyPostLike(post.user_id, profile?.display_name || 'Someone', postId).catch(() => undefined);
+        }
       }
     },
     onSuccess: () => {
@@ -151,6 +166,20 @@ export function usePostInteractions(postId: string) {
         });
 
       if (error) throw error;
+
+      const { data: post } = await supabase
+        .from('posts')
+        .select('user_id')
+        .eq('id', postId)
+        .maybeSingle();
+      if (post && post.user_id !== user.id) {
+        const { data: profile } = await supabase
+          .from('profiles_public')
+          .select('display_name')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        notifyPostComment(post.user_id, profile?.display_name || 'Someone', postId).catch(() => undefined);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['post-comments', postId] });

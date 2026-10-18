@@ -648,6 +648,19 @@ const Settings = () => {
 
             <div className="flex items-center justify-between py-2">
               <div>
+                <Label className="text-foreground">Follows</Label>
+                <p className="text-sm text-muted-foreground">When someone adds you to favorites</p>
+              </div>
+              <Switch
+                checked={preferences?.follows_enabled ?? true}
+                onCheckedChange={(checked) => handleNotificationToggle('follows_enabled', checked)}
+              />
+            </div>
+
+            <Separator className="bg-border/50" />
+
+            <div className="flex items-center justify-between py-2">
+              <div>
                 <Label className="text-foreground">Project Invites</Label>
                 <p className="text-sm text-muted-foreground">Collaboration requests</p>
               </div>

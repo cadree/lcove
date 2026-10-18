@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { NetworkContent, useUpdateWatchProgress } from '@/hooks/useCinema';
+import { NetworkContent, useContentPlayback, useIncrementViewCount, useUpdateWatchProgress } from '@/hooks/useCinema';
 import { isIosApp } from '@/lib/platform';
 import { cn } from '@/lib/utils';
 
@@ -58,8 +58,16 @@ export const VideoPlayer = ({
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const updateProgress = useUpdateWatchProgress();
+  const recordView = useIncrementViewCount();
+  const { data: playback, isLoading: playbackLoading } = useContentPlayback(content.id, episodeId);
+  const videoUrl = playback?.video_url || playback?.external_video_url || null;
+  const recorded = useRef(false);
 
-  const videoUrl = content.video_url || content.external_video_url;
+  useEffect(() => {
+    if (!videoUrl || recorded.current || isPreviewOnly) return;
+    recorded.current = true;
+    recordView.mutate(content.id);
+  }, [videoUrl, content.id, isPreviewOnly, recordView]);
 
   // Handle preview mode - pause and show paywall when preview time reached
   useEffect(() => {
