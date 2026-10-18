@@ -19,6 +19,7 @@ const BottomNav = () => {
   const categories = [
     { label: "Core", items: allNavItems.filter(i => ["home", "feed", "messages", "projects", "calendar"].includes(i.id)) },
     { label: "Discover", items: allNavItems.filter(i => ["directory", "portfolios", "live", "cinema", "community"].includes(i.id)) },
+    { label: "Nuance", items: allNavItems.filter(i => i.id === "nuance") },
     { label: "Create", items: allNavItems.filter(i => ["pipeline", "boards"].includes(i.id)) },
     { label: "Business", items: allNavItems.filter(i => ["store", "wallet", "mall", "fund"].includes(i.id)) },
     { label: "You", items: allNavItems.filter(i => ["profile", "notifications", "settings"].includes(i.id)) },
