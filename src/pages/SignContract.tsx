@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,8 +74,22 @@ interface Contract {
   created_at: string;
 }
 
+function contractReader(signingToken: string | null): SupabaseClient {
+  if (!signingToken) return supabase as unknown as SupabaseClient;
+  return createClient(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    {
+      global: { headers: { "x-signing-token": signingToken } },
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    },
+  );
+}
+
 export default function SignContract() {
   const { contractId } = useParams();
+  const [searchParams] = useSearchParams();
+  const signingToken = searchParams.get("token");
   const navigate = useNavigate();
   const [signatureName, setSignatureName] = useState("");
   const [isDrawing, setIsDrawing] = useState(false);
@@ -84,9 +99,9 @@ export default function SignContract() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const { data: contract, isLoading, error, refetch } = useQuery({
-    queryKey: ['sign-contract', contractId],
+    queryKey: ['sign-contract', contractId, Boolean(signingToken)],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await contractReader(signingToken)
         .from('contact_contracts')
         .select('*')
         .eq('id', contractId)
@@ -126,7 +141,7 @@ export default function SignContract() {
 
   const signContract = useMutation({
     mutationFn: async (signatureUrl: string) => {
-      const { error } = await supabase
+      const { error } = await contractReader(signingToken)
         .from('contact_contracts')
         .update({
           client_signature_url: signatureUrl,

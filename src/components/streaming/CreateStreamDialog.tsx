@@ -66,7 +66,7 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
     
     try {
       const fileExt = thumbnailFile.name.split('.').pop();
-      const fileName = `stream-thumbnails/${user.id}/${Date.now()}.${fileExt}`;
+      const fileName = `${user.id}/stream-thumbnails/${Date.now()}.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage
         .from('media')

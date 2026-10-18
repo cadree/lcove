@@ -1,3 +1,9 @@
+# STALE — DO NOT RUN
+
+This `migration/` folder is a one-time export aimed at a different Supabase project (`waafzlorvnozeujjhvxu`). It is not the schema for this repo. The SQL here is out of date and must not be applied to the live Ether / Lovable Cloud database or to local development.
+
+The live schema lives in `supabase/migrations/`. Change that directory, not the files below.
+
 # Migration Package: Lovable Cloud → External Supabase
 
 This package migrates the ETHER app from Lovable Cloud Supabase (`wjbyvlgsxscwukkolehg`) to your external Supabase project (`waafzlorvnozeujjhvxu`).

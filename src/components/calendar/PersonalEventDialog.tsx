@@ -74,8 +74,12 @@ export function PersonalEventDialog({
     setIsUploadingImage(true);
     try {
       const fileExt = file.name.split('.').pop();
+      if (!user) {
+        toast.error('Sign in to upload');
+        return;
+      }
       const fileName = `event-${Date.now()}.${fileExt}`;
-      const filePath = `event-images/${fileName}`;
+      const filePath = `${user.id}/event-images/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('media')

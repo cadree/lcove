@@ -15,11 +15,11 @@ export const capacitorStorage = {
     try {
       if (Capacitor.isNativePlatform()) {
         const { value } = await Preferences.get({ key });
-        logStorageOperation('get', key, true, value || undefined);
+        logStorageOperation('get', key, true);
         return value;
       }
       const value = localStorage.getItem(key);
-      logStorageOperation('get', key, true, value || undefined);
+      logStorageOperation('get', key, true);
       return value;
     } catch (error) {
       console.error('[CapacitorStorage] getItem error:', error);
@@ -37,10 +37,10 @@ export const capacitorStorage = {
     try {
       if (Capacitor.isNativePlatform()) {
         await Preferences.set({ key, value });
-        logStorageOperation('set', key, true, value);
+        logStorageOperation('set', key, true);
       } else {
         localStorage.setItem(key, value);
-        logStorageOperation('set', key, true, value);
+        logStorageOperation('set', key, true);
       }
     } catch (error) {
       console.error('[CapacitorStorage] setItem error:', error);
@@ -87,7 +87,9 @@ export const clearAllAuthStorage = async (): Promise<void> => {
     'supabase.auth.token',
   ];
 
-  console.log('[CapacitorStorage] Clearing all auth storage keys...');
+  if (import.meta.env.DEV) {
+    console.log('[CapacitorStorage] Clearing auth storage keys');
+  }
 
   try {
     if (Capacitor.isNativePlatform()) {
@@ -99,7 +101,9 @@ export const clearAllAuthStorage = async (): Promise<void> => {
       
       // Also try to clear any other sb- prefixed keys by getting all keys
       // Note: Capacitor Preferences doesn't have a keys() method, so we clear known ones
-      console.log('[CapacitorStorage] Native auth storage cleared');
+      if (import.meta.env.DEV) {
+        console.log('[CapacitorStorage] Native auth storage cleared');
+      }
     } else {
       // Clear from localStorage on web
       for (const key of authKeys) {
@@ -116,7 +120,9 @@ export const clearAllAuthStorage = async (): Promise<void> => {
       }
       keysToRemove.forEach(key => localStorage.removeItem(key));
       
-      console.log('[CapacitorStorage] Web auth storage cleared:', keysToRemove);
+      if (import.meta.env.DEV) {
+        console.log('[CapacitorStorage] Web auth storage cleared', { count: keysToRemove.length });
+      }
     }
   } catch (error) {
     console.error('[CapacitorStorage] Error clearing auth storage:', error);

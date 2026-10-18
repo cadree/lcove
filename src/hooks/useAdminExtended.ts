@@ -227,17 +227,32 @@ export function useAdjustUserCredits() {
         throw new Error("Cannot deduct more credits than available");
       }
 
-      const { error: ledgerError } = await supabase.from("credit_ledger").insert([
-        {
-          user_id: data.userId,
-          amount: data.amount,
-          balance_after: newBalance,
-          type: data.amount > 0 ? "admin_award" : "admin_deduct",
-          description: data.reason,
-        },
-      ]);
-
-      if (ledgerError) throw ledgerError;
+      // Positive awards go through the admin-only edge function so the ledger
+      // row is server-issued and withdrawable. Deductions stay a direct insert:
+      // they cannot increase a withdrawable balance (server_issued stays false).
+      if (data.amount > 0) {
+        const { data: awarded, error: awardError } = await supabase.functions.invoke("award-credits", {
+          body: {
+            target_user_id: data.userId,
+            amount: data.amount,
+            description: data.reason,
+            reference_type: "admin_award",
+          },
+        });
+        if (awardError) throw awardError;
+        if (awarded?.error) throw new Error(awarded.error);
+      } else {
+        const { error: ledgerError } = await supabase.from("credit_ledger").insert([
+          {
+            user_id: data.userId,
+            amount: data.amount,
+            balance_after: newBalance,
+            type: "admin_deduct",
+            description: data.reason,
+          },
+        ]);
+        if (ledgerError) throw ledgerError;
+      }
 
       await logAdminActionSafe({
         admin_id: user.id,
@@ -271,24 +286,16 @@ export function useBulkAwardCredits() {
 
       const results = await Promise.allSettled(
         data.userIds.map(async (userId) => {
-          const { data: currentCredits } = await supabase
-            .from("user_credits")
-            .select("balance")
-            .eq("user_id", userId)
-            .single();
-
-          const currentBalance = currentCredits?.balance || 0;
-          const newBalance = currentBalance + data.amount;
-
-          await supabase.from("credit_ledger").insert([
-            {
-              user_id: userId,
+          const { data: awarded, error: awardError } = await supabase.functions.invoke("award-credits", {
+            body: {
+              target_user_id: userId,
               amount: data.amount,
-              balance_after: newBalance,
-              type: "admin_award",
               description: data.reason,
+              reference_type: "admin_award",
             },
-          ]);
+          });
+          if (awardError) throw awardError;
+          if (awarded?.error) throw new Error(awarded.error);
 
           return userId;
         })

@@ -231,11 +231,25 @@ serve(async (req) => {
   try {
     const { contractId, via, recipient, appUrl } = await req.json();
 
-    console.log(`Sending contract ${contractId} via ${via} to ${recipient}, appUrl: ${appUrl}`);
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Fetch contract
     const { data: contract, error: contractError } = await supabase
@@ -252,11 +266,30 @@ serve(async (req) => {
       });
     }
 
-    // Generate signing URL - use appUrl passed from frontend, or fallback
+    if (contract.owner_user_id !== userData.user.id) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const storedRecipient = via === "email" ? contract.recipient_email : contract.recipient_phone;
+    const destination = (typeof storedRecipient === "string" && storedRecipient.trim())
+      ? storedRecipient.trim()
+      : recipient;
+    if (!destination || typeof destination !== "string") {
+      return new Response(JSON.stringify({ error: "Recipient required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Generate signing URL - use appUrl passed from frontend, or fallback.
+    // Do not log the URL: it contains the unguessable signing token.
     const baseUrl = appUrl || Deno.env.get("APP_URL") || "https://wjbyvlgsxscwukkolehg.lovableproject.com";
-    const signUrl = `${baseUrl}/sign-contract/${contract.id}`;
-    
-    console.log(`Generated sign URL: ${signUrl}`);
+    const signUrl = `${baseUrl}/sign-contract/${contract.id}?token=${encodeURIComponent(contract.signing_token)}`;
+
+    console.log(`Sending contract ${contractId} via ${via}`);
 
     if (via === "email") {
       const resendApiKey = Deno.env.get("RESEND_API_KEY");
@@ -275,7 +308,7 @@ serve(async (req) => {
       const senderName = contract.provider_name || "Ether";
       const emailResponse = await resend.emails.send({
         from: `${senderName} <notifications@etherbylcove.com>`,
-        to: [recipient],
+        to: [destination],
         subject: `Contract: ${contract.title}`,
         html,
         reply_to: contract.provider_email || undefined,
@@ -296,7 +329,7 @@ serve(async (req) => {
       }
 
       // Format phone number
-      let formattedPhone = recipient.replace(/\D/g, "");
+      let formattedPhone = destination.replace(/\D/g, "");
       if (!formattedPhone.startsWith("1") && formattedPhone.length === 10) {
         formattedPhone = "1" + formattedPhone;
       }

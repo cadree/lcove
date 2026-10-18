@@ -52,10 +52,36 @@ serve(async (req) => {
         .eq('user_id', user.id)
         .single();
 
-      const earnedBalance = credits?.earned_balance || 0;
-      
-      if (earnedBalance < amount) {
-        throw new Error(`Insufficient Earned Credit. You have ${earnedBalance} Earned LC, need ${amount} LC. Only Earned Credit can be withdrawn.`);
+      const earnedBalance = Number(credits?.earned_balance || 0);
+
+      // Only server-issued earned credits from a verified source are withdrawable.
+      // Transfers and client-minted rows are not, even if earned_balance includes them.
+      const verifiedSources = ["event_ticket_sale", "store_order", "studio_booking", "stream_tip"];
+      const { data: ledgerRows, error: ledgerReadError } = await supabaseClient
+        .from("credit_ledger")
+        .select("amount, earned_amount, credit_type, reference_type, verified_by, type, server_issued")
+        .eq("user_id", user.id)
+        .eq("credit_type", "earned");
+
+      if (ledgerReadError) throw ledgerReadError;
+
+      let verifiedIn = 0;
+      let convertedOut = 0;
+      for (const row of ledgerRows ?? []) {
+        const earned = Number(row.earned_amount ?? row.amount ?? 0);
+        if (row.type === "payout_conversion") {
+          convertedOut += Math.abs(earned);
+          continue;
+        }
+        const fromVerifiedSource = row.server_issued === true && (
+          row.verified_by != null || verifiedSources.includes(row.reference_type)
+        );
+        if (fromVerifiedSource && earned > 0) verifiedIn += earned;
+      }
+      const withdrawable = Math.min(earnedBalance, Math.max(0, verifiedIn - convertedOut));
+
+      if (withdrawable < amount) {
+        throw new Error(`Insufficient verified Earned Credit. Withdrawable ${withdrawable} LC, need ${amount} LC. Only credits from verified sources can be withdrawn.`);
       }
 
       // Deduct from earned credits only

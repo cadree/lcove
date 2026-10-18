@@ -2,12 +2,16 @@ import { Capacitor } from '@capacitor/core';
 
 /**
  * Auth debug logging utility for tracking authentication events
- * across web and native platforms
+ * across web and native platforms. Logs stay out of production builds
+ * and never include auth storage values.
  */
 
 const DEBUG_PREFIX = '[Auth]';
+const debugEnabled = import.meta.env.DEV;
 
 export const logAuthEvent = (event: string, data?: unknown): void => {
+  if (!debugEnabled) return;
+
   const timestamp = new Date().toISOString();
   const platform = Capacitor.getPlatform();
   const isNative = Capacitor.isNativePlatform();
@@ -24,6 +28,8 @@ export const logAuthEvent = (event: string, data?: unknown): void => {
 };
 
 export const logAuthError = (event: string, error: unknown): void => {
+  if (!debugEnabled) return;
+
   const timestamp = new Date().toISOString();
   const platform = Capacitor.getPlatform();
   
@@ -66,11 +72,9 @@ export const logStorageOperation = (
   operation: 'get' | 'set' | 'remove' | 'clear',
   key: string,
   success: boolean,
-  valuePreview?: string
 ): void => {
   logAuthEvent(`Storage ${operation}`, {
     key,
     success,
-    valuePreview: valuePreview ? `${valuePreview.slice(0, 50)}...` : null,
   });
 };

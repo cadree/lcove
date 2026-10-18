@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useCreateStore, useUpdateStore, Store } from '@/hooks/useStore';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ interface StoreSetupDialogProps {
 
 export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialogProps) => {
   const createStore = useCreateStore();
+  const { user } = useAuth();
   const updateStore = useUpdateStore();
 
   const [name, setName] = useState('');
@@ -66,11 +68,15 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!user) {
+      toast.error('Sign in to upload');
+      return;
+    }
 
     setIsUploading(true);
     const fileExt = file.name.split('.').pop();
     const fileName = `${crypto.randomUUID()}.${fileExt}`;
-    const filePath = `stores/${fileName}`;
+    const filePath = `${user.id}/stores/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from('media')

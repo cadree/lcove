@@ -3,6 +3,7 @@ import { BoardItem } from "./BoardItem";
 import { ConnectorLayer } from "./ConnectorLayer";
 import { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 type ItemType = 'note' | 'todo' | 'link' | 'image' | 'column' | 'board_ref' | 'line' | 'connector';
@@ -60,6 +61,7 @@ export const BoardCanvas = memo(function BoardCanvas({
   onCreateItem,
   onItemClickForConnect,
 }: BoardCanvasProps) {
+  const { user } = useAuth();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -252,8 +254,12 @@ export const BoardCanvas = memo(function BoardCanvas({
       
       try {
         const fileExt = file.name.split('.').pop();
+        if (!user) {
+          toast.error("Sign in to upload");
+          return;
+        }
         const fileName = `${crypto.randomUUID()}.${fileExt}`;
-        const filePath = `board-media/${fileName}`;
+        const filePath = `${user.id}/board-media/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
           .from('board-uploads')
