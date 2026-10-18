@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
+import { NATIVE_APP_ID } from '@/config/nativeIds';
 import { logStorageOperation } from './authDebug';
 
 /**
@@ -142,9 +143,11 @@ export const isNativePlatform = (): boolean => {
  */
 export const getAuthRedirectUrl = (path: string = '/'): string => {
   if (Capacitor.isNativePlatform()) {
-    // Use the app's URL scheme for deep linking
-    // Format: app.lovable.{projectId}://path
-    return `app.lovable.e07d9c457fd949f78f3cc7d5998be668:/${path}`;
+    // Custom URL scheme registered in ios/App/App/Info.plist.
+    // CONFIRM WITH CADRE: NATIVE_APP_ID is a placeholder, and Supabase Auth
+    // redirect URLs must allow this scheme before native login works.
+    // path already starts with "/", so this becomes scheme://...
+    return `${NATIVE_APP_ID}:/${path}`;
   }
   return `${window.location.origin}${path}`;
 };

@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { NetworkContent, useUpdateWatchProgress } from '@/hooks/useCinema';
+import { isIosApp } from '@/lib/platform';
 import { cn } from '@/lib/utils';
 
 interface VideoPlayerProps {
@@ -332,10 +333,12 @@ export const VideoPlayer = ({
                 </h2>
                 
                 <p className="text-white/70 mb-6">
-                  Subscribe to this network to watch the full content and access all exclusive films and shows.
+                  {isIosApp()
+                    ? "The rest of this network isn't available to purchase in the iOS app."
+                    : "Subscribe to this network to watch the full content and access all exclusive films and shows."}
                 </p>
 
-                {networkPrice && (
+                {!isIosApp() && networkPrice && (
                   <div className="mb-6 p-4 rounded-lg bg-white/10 border border-white/20">
                     <div className="flex items-center justify-center gap-2 text-primary">
                       <Crown className="w-5 h-5" />
@@ -348,6 +351,7 @@ export const VideoPlayer = ({
                 )}
 
                 <div className="flex flex-col gap-3">
+                  {!isIosApp() && (
                   <Button
                     size="lg"
                     className="w-full gap-2"
@@ -359,6 +363,7 @@ export const VideoPlayer = ({
                     <Crown className="w-5 h-5" />
                     Subscribe Now
                   </Button>
+                  )}
                   
                   <Button
                     variant="ghost"

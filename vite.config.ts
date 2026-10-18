@@ -11,8 +11,14 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
+    alias: [
+      // Exact match so a Lovable regen of src/integrations/supabase/client.ts
+      // cannot drop the Capacitor auth storage adapter. See docs/ios-release.md.
+      {
+        find: /^@\/integrations\/supabase\/client$/,
+        replacement: path.resolve(__dirname, "./src/lib/supabaseClient.ts"),
+      },
+      { find: "@", replacement: path.resolve(__dirname, "./src") },
+    ],
   },
 }));

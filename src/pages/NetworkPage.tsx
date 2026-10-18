@@ -56,6 +56,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { ContentDetailDialog } from '@/components/cinema/ContentDetailDialog';
 import { VideoPlayer } from '@/components/cinema/VideoPlayer';
+import { IosDigitalGoodsNotice } from '@/components/ios/IosDigitalGoodsNotice';
+import { isIosApp } from '@/lib/platform';
 import { SubmitContentDialog } from '@/components/cinema/SubmitContentDialog';
 import { cn } from '@/lib/utils';
 
@@ -356,6 +358,9 @@ const NetworkPage = () => {
               </Button>
 
               {network.is_paid && !isSubscribed && !isOwner && (
+                isIosApp() ? (
+                  <IosDigitalGoodsNotice className="max-w-xs" />
+                ) : (
                 <Button
                   size="lg"
                   variant="outline"
@@ -366,6 +371,7 @@ const NetworkPage = () => {
                   <Bell className="w-4 h-4" />
                   Subscribe ${network.subscription_price}/mo
                 </Button>
+                )
               )}
             </div>
           </motion.div>

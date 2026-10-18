@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -61,6 +62,11 @@ export const useMembership = () => {
   }, [user, checkMembership]);
 
   const startCheckout = async (tier: "community" | "elite", customAmount?: number) => {
+    if (Capacitor.getPlatform() === "ios") {
+      toast.error("Membership checkout isn't available in the iOS app.");
+      return;
+    }
+
     if (!user) {
       toast.error("Please sign in to become a member");
       return;
@@ -105,6 +111,11 @@ export const useMembership = () => {
   };
 
   const openCustomerPortal = async () => {
+    if (Capacitor.getPlatform() === "ios") {
+      toast.error("Subscription billing isn't available in the iOS app.");
+      return;
+    }
+
     if (!user) {
       toast.error("Please sign in first");
       return;

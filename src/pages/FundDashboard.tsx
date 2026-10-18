@@ -15,6 +15,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useFundStats } from "@/hooks/useFundStats";
 import { RecentDistributionsCard } from "@/components/fund/FundDistributions";
 import { DonateDialog } from "@/components/fund/DonateDialog";
+import { IosDigitalGoodsNotice } from "@/components/ios/IosDigitalGoodsNotice";
+import { isIosApp } from "@/lib/platform";
 import { toast } from "sonner";
 
 const ALLOCATION_DATA = [
@@ -476,9 +478,12 @@ export default function FundDashboard() {
                           Extra Donation
                         </Button>
                       </DonateDialog>
-                      <Button variant="outline" size="sm" onClick={handleManageSubscription}>
-                        Manage Subscription
-                      </Button>
+                      {!isIosApp() && (
+                        <Button variant="outline" size="sm" onClick={handleManageSubscription}>
+                          Manage Subscription
+                        </Button>
+                      )}
+                      <IosDigitalGoodsNotice kind="billing" />
                     </div>
                   </div>
                 </CardContent>
@@ -497,8 +502,10 @@ export default function FundDashboard() {
                           Support the Community
                         </h3>
                         <p className="text-muted-foreground max-w-md">
-                          Join {fundStats?.lifetime.memberCount || 0}+ members funding grants, events, and creative opportunities. 
-                          Donate once or subscribe monthly — no account required.
+                          Join {fundStats?.lifetime.memberCount || 0}+ members funding grants, events, and creative opportunities.{" "}
+                          {isIosApp()
+                            ? "One-time donations stay available. Membership checkout is not available in the iOS app."
+                            : "Donate once or subscribe monthly — no account required."}
                         </p>
                       </div>
                     </div>
@@ -509,6 +516,9 @@ export default function FundDashboard() {
                           <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                         </Button>
                       </DonateDialog>
+                      {isIosApp() ? (
+                        <IosDigitalGoodsNotice className="max-w-xs" />
+                      ) : (
                       <Button 
                         size="lg" 
                         variant="outline"
@@ -516,6 +526,7 @@ export default function FundDashboard() {
                       >
                         Become a Member
                       </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
