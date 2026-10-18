@@ -145,7 +145,7 @@ export default function EventDetail() {
       const userIds = [...new Set(rsvps.map(r => r.user_id).filter(Boolean))];
       if (userIds.length === 0) return {};
       const { data, error } = await supabase
-        .from("profiles")
+        .from("profiles_public")
         .select("user_id, display_name, avatar_url")
         .in("user_id", userIds);
       if (error) throw error;
@@ -176,7 +176,7 @@ export default function EventDetail() {
       if (!teamMembers || teamMembers.length === 0) return {};
       const userIds = teamMembers.map(m => m.user_id);
       const { data, error } = await supabase
-        .from("profiles")
+        .from("profiles_public")
         .select("user_id, display_name, avatar_url")
         .in("user_id", userIds);
       if (error) throw error;
@@ -195,7 +195,7 @@ export default function EventDetail() {
     queryFn: async () => {
       const ids = [...new Set(v2Attendees.map(a => a.attendee_user_id).filter((x): x is string => !!x))];
       if (ids.length === 0) return {};
-      const { data } = await supabase.from("profiles").select("user_id, display_name, avatar_url").in("user_id", ids);
+      const { data } = await supabase.from("profiles_public").select("user_id, display_name, avatar_url").in("user_id", ids);
       return Object.fromEntries((data || []).map(p => [p.user_id, p]));
     },
     enabled: v2Attendees.length > 0,

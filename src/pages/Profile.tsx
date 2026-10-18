@@ -133,8 +133,8 @@ const Profile = () => {
     return (
       <PageLayout>
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
-          <h2 className="font-display text-2xl text-foreground">Profile not found</h2>
-          <p className="text-muted-foreground text-center">This user doesn't exist.</p>
+          <h2 className="font-display text-2xl text-foreground">Private profile</h2>
+          <p className="text-muted-foreground text-center">This profile is not available.</p>
           <Button onClick={() => navigate(-1)}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Go Back

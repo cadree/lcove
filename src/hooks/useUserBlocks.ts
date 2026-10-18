@@ -25,7 +25,7 @@ export function useUserBlocks() {
       if (blockedIds.length === 0) return [];
 
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', blockedIds);
 

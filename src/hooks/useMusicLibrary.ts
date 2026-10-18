@@ -84,7 +84,7 @@ export const useSavedTracksForProfile = (profileUserId?: string) => {
       ) as string[];
       if (artistIds.length === 0) return saves;
       const { data: artists } = await supabase
-        .from("profiles")
+        .from("profiles_public")
         .select("user_id, display_name, avatar_url")
         .in("user_id", artistIds);
       const map = new Map(

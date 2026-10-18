@@ -10,7 +10,7 @@ export const useAccessStatus = () => {
   const onboardingCompleted = profile?.onboarding_completed || false;
   const onboardingScore = profile?.onboarding_score || null;
 
-  const isBlocked = accessStatus === 'denied' || accessStatus === 'banned';
+  const isBlocked = accessStatus === 'banned';
   const isActive = accessStatus === 'active';
   const isPending = accessStatus === 'pending';
 

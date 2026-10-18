@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Shield, Users, AlertTriangle, CheckCircle, XCircle, Clock, History, Search, 
+  Shield, Users, AlertTriangle, CheckCircle, Clock, History, Search, 
   ArrowLeft, Ban, UserCheck, ClipboardList, Trash2, Eye, Phone, Mail, MapPin, 
   Briefcase, Heart, Star, Send, Coins, Download, MessageSquare, ShieldCheck, ShieldOff,
   MessageCircle, Building2
@@ -28,7 +28,6 @@ import {
   useSuspendUser,
   useUnsuspendUser,
   useApproveOnboarding,
-  useDenyOnboarding,
   useLowReputationUsers,
   useChangeAccessStatus,
   useDeleteUser,
@@ -61,7 +60,6 @@ const Admin: React.FC = () => {
   
   // Dialog states
   const [suspendDialog, setSuspendDialog] = useState<{ userId: string; name: string } | null>(null);
-  const [denyDialog, setDenyDialog] = useState<{ userId: string; name: string } | null>(null);
   const [statusDialog, setStatusDialog] = useState<{ userId: string; name: string; currentStatus: string } | null>(null);
   const [removeDialog, setRemoveDialog] = useState<{ userId: string; name: string } | null>(null);
   const [detailDialog, setDetailDialog] = useState<AdminUserData | null>(null);
@@ -78,7 +76,7 @@ const Admin: React.FC = () => {
   
   // Form states
   const [reason, setReason] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<'active' | 'denied' | 'banned'>('active');
+  const [selectedStatus, setSelectedStatus] = useState<'active' | 'banned'>('active');
   const [creditAmount, setCreditAmount] = useState('');
   const [creditReason, setCreditReason] = useState('');
   const [messageTitle, setMessageTitle] = useState('');
@@ -103,7 +101,6 @@ const Admin: React.FC = () => {
   const suspendUser = useSuspendUser();
   const unsuspendUser = useUnsuspendUser();
   const approveOnboarding = useApproveOnboarding();
-  const denyOnboarding = useDenyOnboarding();
   const changeAccessStatus = useChangeAccessStatus();
   const deleteUser = useDeleteUser();
   const adjustCredits = useAdjustUserCredits();
@@ -153,14 +150,6 @@ const Admin: React.FC = () => {
     if (suspendDialog && reason) {
       suspendUser.mutate({ userId: suspendDialog.userId, reason });
       setSuspendDialog(null);
-      setReason('');
-    }
-  };
-
-  const handleDeny = () => {
-    if (denyDialog && reason) {
-      denyOnboarding.mutate({ userId: denyDialog.userId, reason });
-      setDenyDialog(null);
       setReason('');
     }
   };
@@ -714,13 +703,6 @@ const Admin: React.FC = () => {
                           >
                             L3
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => setDenyDialog({ userId: user.user_id, name: user.display_name || 'User' })}
-                          >
-                            <XCircle className="h-4 w-4" />
-                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -897,31 +879,6 @@ const Admin: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Deny Dialog */}
-      <Dialog open={!!denyDialog} onOpenChange={() => setDenyDialog(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Deny {denyDialog?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Reason (will be shown to user)</Label>
-              <Textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Provide a gentle reason for denial..."
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDenyDialog(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDeny} disabled={!reason}>
-              Deny Onboarding
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Status Change Dialog */}
       <Dialog open={!!statusDialog} onOpenChange={() => setStatusDialog(null)}>
         <DialogContent>
@@ -937,7 +894,6 @@ const Admin: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="active">Active (Full Access)</SelectItem>
-                  <SelectItem value="denied">Denied (No Access)</SelectItem>
                   <SelectItem value="banned">Banned (Permanently Blocked)</SelectItem>
                 </SelectContent>
               </Select>

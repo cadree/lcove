@@ -118,7 +118,7 @@ export function useAdminUserData() {
       });
 
       // Fetch social_links from profiles
-      const { data: profilesData } = await supabase.from("profiles").select("user_id, social_links");
+      const { data: profilesData } = await supabase.from("profiles_public").select("user_id, social_links");
       const socialLinksMap = new Map<string, SocialLinks | null>();
       profilesData?.forEach((p: any) => {
         socialLinksMap.set(p.user_id, p.social_links || null);

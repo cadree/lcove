@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { z } from 'zod';
 import { Capacitor } from '@capacitor/core';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
+import { PENDING_SIGNUP_KEY, applyPendingSignupProfile } from '@/lib/pendingSignup';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { logAuthEvent, logAuthError } from '@/lib/authDebug';
@@ -32,7 +33,7 @@ const passwordSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters').max(100),
 });
 
-type AuthMode = 'login' | 'signup' | 'forgot' | 'reset';
+type AuthMode = 'login' | 'signup' | 'forgot' | 'reset' | 'confirm-email';
 
 /**
  * Map Supabase auth errors to user-friendly messages
@@ -143,11 +144,32 @@ const Auth = () => {
   }, []);
 
   useEffect(() => {
-    if (user && mode !== 'reset') {
-      logAuthEvent('User authenticated, navigating to onboarding');
-      navigate('/onboarding');
+    if (!user || searchParams.get('confirmed') !== '1') return;
+    let cancelled = false;
+    applyPendingSignupProfile(user.id).finally(() => {
+      if (!cancelled) {
+        logAuthEvent('Confirmed email, resuming onboarding');
+        navigate('/onboarding', { replace: true });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, searchParams, navigate]);
+
+  useEffect(() => {
+    if (searchParams.get('confirmed') === '1') return;
+    if (!user || mode === 'reset') return;
+    if (mode === 'confirm-email') {
+      applyPendingSignupProfile(user.id).finally(() => {
+        logAuthEvent('Email confirmed in this browser, resuming onboarding');
+        navigate('/onboarding');
+      });
+      return;
     }
-  }, [user, navigate, mode]);
+    logAuthEvent('User authenticated, navigating to onboarding');
+    navigate('/onboarding');
+  }, [user, navigate, mode, searchParams]);
 
   useEffect(() => {
     if (isResetMode) {
@@ -225,21 +247,24 @@ const Auth = () => {
           navigate('/onboarding');
         }
       } else if (mode === 'signup') {
-        const { error } = await signUp(email, password);
+        const { error, session } = await signUp(email, password);
         if (error) {
           logAuthError('Signup failed', error);
           const { title, description } = getAuthErrorMessage(error);
           toast({ title, description, variant: 'destructive' });
+        } else if (!session) {
+          logAuthEvent('Signup needs email confirmation');
+          sessionStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({
+            displayName: displayName.trim(),
+            phone: phone.trim(),
+          }));
+          setMode('confirm-email');
         } else {
           logAuthEvent('Signup successful');
-          // Save display name and phone to profile after signup
-          const { data: { user: newUser } } = await supabase.auth.getUser();
-          if (newUser) {
-            await supabase.from('profiles').update({
-              display_name: displayName.trim(),
-              phone: phone.trim() || null,
-            }).eq('id', newUser.id);
-          }
+          await supabase.from('profiles').update({
+            display_name: displayName.trim(),
+            phone: phone.trim() || null,
+          }).eq('user_id', session.user.id);
           navigate('/onboarding');
         }
       } else if (mode === 'forgot') {
@@ -289,6 +314,7 @@ const Auth = () => {
     switch (mode) {
       case 'forgot': return 'Reset Password';
       case 'reset': return 'New Password';
+      case 'confirm-email': return 'Check your email';
       default: return 'ETHER';
     }
   };
@@ -299,6 +325,7 @@ const Auth = () => {
       case 'signup': return 'Join the creative community';
       case 'forgot': return resetEmailSent ? 'Check your inbox' : 'Enter your email to reset';
       case 'reset': return 'Create your new password';
+      case 'confirm-email': return 'Confirm your email to continue';
     }
   };
 
@@ -397,7 +424,23 @@ const Auth = () => {
             </button>
           )}
 
-          {resetEmailSent && mode === 'forgot' ? (
+          {mode === 'confirm-email' ? (
+            <div className="text-center py-4">
+              <Mail className="h-12 w-12 text-primary mx-auto mb-4" />
+              <p className="text-foreground mb-2">Check your email to confirm</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                We sent a confirmation link to <span className="text-primary">{email}</span>.
+                Open it to finish creating your account. You will continue onboarding after you confirm.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => setMode('login')}
+                className="w-full"
+              >
+                Back to log in
+              </Button>
+            </div>
+          ) : resetEmailSent && mode === 'forgot' ? (
             <div className="text-center py-4">
               <Mail className="h-12 w-12 text-primary mx-auto mb-4" />
               <p className="text-foreground mb-2">Reset link sent!</p>
@@ -568,9 +611,19 @@ const Auth = () => {
                   className="mt-6 text-center text-xs text-muted-foreground"
                 >
                   {mode === 'login' ? (
-                    "Don't have an account? Use the Sign Up tab above."
+                    <>
+                      Don&apos;t have an account? Use the Sign Up tab above.{" "}
+                      <Link to="/privacy" className="text-primary underline">Privacy</Link>
+                      {" · "}
+                      <Link to="/terms" className="text-primary underline">Terms</Link>
+                    </>
                   ) : (
-                    "By signing up, you agree to our community guidelines."
+                    <>
+                      By signing up, you agree to the{" "}
+                      <Link to="/privacy" className="text-primary underline">Privacy Policy</Link>
+                      {" "}and{" "}
+                      <Link to="/terms" className="text-primary underline">Terms</Link>.
+                    </>
                   )}
                 </motion.p>
               </AnimatePresence>

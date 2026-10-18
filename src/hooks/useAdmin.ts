@@ -67,12 +67,17 @@ export function useAllUsers() {
     queryKey: ['admin-users'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data;
+      return (data ?? []).map((row) => ({
+        ...row,
+        phone: null as string | null,
+        email: null as string | null,
+        onboarding_score: null as number | null,
+      }));
     },
     enabled: isAdmin,
   });
@@ -85,10 +90,9 @@ export function usePendingOnboarding() {
     queryKey: ['pending-onboarding'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('*')
         .eq('onboarding_completed', false)
-        .not('onboarding_score', 'is', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -246,60 +250,18 @@ export function useApproveOnboarding() {
   });
 }
 
-export function useDenyOnboarding() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-
-  return useMutation({
-    mutationFn: async (data: { userId: string; reason: string }) => {
-      // Use type assertion for new columns not yet in generated types
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          access_level: 'level_1',
-          mindset_level: 1,
-          access_status: 'denied',
-        } as Record<string, unknown>)
-        .eq('user_id', data.userId);
-
-      if (profileError) throw profileError;
-
-      const { error: actionError } = await supabase
-        .from('admin_actions')
-        .insert({
-          admin_id: user?.id,
-          action_type: 'deny_onboarding',
-          target_user_id: data.userId,
-          reason: data.reason,
-        });
-
-      if (actionError) throw actionError;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pending-onboarding'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-user-data'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
-      toast.success('Onboarding denied');
-    },
-    onError: (error: Error) => {
-      console.error('Failed to deny onboarding:', error);
-      toast.error(`Failed to deny onboarding: ${error.message}`);
-    },
-  });
-}
-
 export function useChangeAccessStatus() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async (data: { userId: string; status: 'active' | 'denied' | 'banned'; reason?: string }) => {
+    mutationFn: async (data: { userId: string; status: 'active' | 'pending' | 'banned'; reason?: string }) => {
+      const status = data.status === ('denied' as string) ? 'active' : data.status;
       // Use type assertion for new column not yet in generated types
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
-          access_status: data.status,
+          access_status: status,
         } as Record<string, unknown>)
         .eq('user_id', data.userId);
 
@@ -309,7 +271,7 @@ export function useChangeAccessStatus() {
         .from('admin_actions')
         .insert({
           admin_id: user?.id,
-          action_type: `change_status_${data.status}`,
+          action_type: `change_status_${status}`,
           target_user_id: data.userId,
           reason: data.reason || null,
         });
@@ -355,15 +317,23 @@ export function useLowReputationUsers() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('reputation_scores')
-        .select(`
-          *,
-          profile:profiles!user_id(display_name, avatar_url, user_id)
-        `)
+        .select('*')
         .lt('overall_score', 2)
         .order('overall_score', { ascending: true });
 
       if (error) throw error;
-      return data;
+      const userIds = [...new Set((data ?? []).map((row) => row.user_id))];
+      const { data: profiles } = userIds.length
+        ? await supabase
+            .from('profiles_public')
+            .select('user_id, display_name, avatar_url')
+            .in('user_id', userIds)
+        : { data: [] };
+      const profileMap = new Map((profiles ?? []).map((profile) => [profile.user_id, profile]));
+      return (data ?? []).map((row) => ({
+        ...row,
+        profile: profileMap.get(row.user_id) ?? null,
+      }));
     },
     enabled: isAdmin,
   });
@@ -377,7 +347,7 @@ export function useAllUsersWithDetails() {
     queryFn: async () => {
       // Get all profiles
       const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('*')
         .order('created_at', { ascending: false });
 

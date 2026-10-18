@@ -97,7 +97,7 @@ export function useConversations() {
       // Get profiles for all participants using profiles table for authenticated identity resolution
       const userIds = [...new Set(allParticipants?.map(p => p.user_id) || [])];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', userIds);
 

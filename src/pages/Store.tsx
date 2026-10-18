@@ -79,10 +79,10 @@ const Store = () => {
       // Fetch owner profile
       if (data) {
         const { data: profile } = await supabase
-          .from('profiles')
+          .from('profiles_public')
           .select('display_name, avatar_url, city')
           .eq('user_id', data.user_id)
-          .single();
+          .maybeSingle();
         
         return { ...data, profile } as StoreType & { profile?: { display_name: string; avatar_url: string; city: string } };
       }

@@ -9,6 +9,7 @@ import FeedPost from "@/components/feed/FeedPost";
 import { FeedFilters } from "@/components/feed/FeedFilters";
 import { FriendsDrawer } from "@/components/friends/FriendsDrawer";
 import { EmptyState } from "@/components/ui/empty-state";
+import FirstRunEmpty from "@/components/onboarding/FirstRunEmpty";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Filter, Shuffle, Loader2, Sparkles, Compass, Users, User, Bell } from "lucide-react";
@@ -214,8 +215,18 @@ const Feed = () => {
                 </motion.div>)}
             </AnimatePresence>
 
-            {/* Empty State */}
-            {filteredPosts.length === 0 && <EmptyState icon={Sparkles} title={activeCategory === "All" ? "The feed is waiting for you" : `No ${activeCategory.toLowerCase()} posts yet`} description="This is your space to share what you're creating, thinking, or discovering. Your voice matters here." action={user ? {
+            {filteredPosts.length === 0 && posts.length === 0 && user && <FirstRunEmpty title="Your feed is empty" description="Start with a post, look through the directory, or read community updates." actions={[{
+          label: "Share something",
+          onClick: () => document.querySelector<HTMLTextAreaElement>('[placeholder*="mind"]')?.focus()
+        }, {
+          label: "Browse directory",
+          to: "/directory"
+        }, {
+          label: "Community updates",
+          to: "/community"
+        }]} />}
+
+            {filteredPosts.length === 0 && !(posts.length === 0 && user) && <EmptyState icon={Sparkles} title={activeCategory === "All" ? "The feed is waiting for you" : `No ${activeCategory.toLowerCase()} posts yet`} description="This is your space to share what you're creating, thinking, or discovering. Your voice matters here." action={user ? {
           label: "Share Something",
           onClick: () => document.querySelector<HTMLTextAreaElement>('[placeholder*="mind"]')?.focus()
         } : undefined} />}

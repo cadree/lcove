@@ -13,7 +13,7 @@ const personas = [
     benefits: [
       "Share work without follower counts",
       "Get discovered by collaborators",
-      "Book clients and get paid securely",
+      "Create a profile",
     ],
     cta: "Join as Creator",
     ctaAction: "/auth",
@@ -22,10 +22,10 @@ const personas = [
     icon: Building2,
     title: "Brands",
     pain: "Struggling to find authentic creative talent?",
-    outcome: "Partner with verified creators.",
+    outcome: "Browse creator profiles.",
     benefits: [
       "Access a curated talent pool",
-      "Secure contracts and e-sign",
+      "Project pages",
       "Streamlined project collaboration",
     ],
     cta: "Partner with Us",

@@ -240,7 +240,7 @@ const AdminOnboarding: React.FC = () => {
     }
   };
 
-  const handleStatusChange = (status: 'active' | 'denied' | 'banned') => {
+  const handleStatusChange = (status: 'active' | 'pending' | 'banned') => {
     if (!selectedUser) return;
     changeAccessStatus.mutate(
       { userId: selectedUser.user_id, status },
@@ -393,8 +393,8 @@ const AdminOnboarding: React.FC = () => {
                 <CardContent>
                   <div className="flex items-center gap-4">
                     <Select
-                      value={selectedUser.access_status || 'pending'}
-                      onValueChange={(value) => handleStatusChange(value as 'active' | 'denied' | 'banned')}
+                      value={selectedUser.access_status === 'denied' ? 'active' : (selectedUser.access_status || 'pending')}
+                      onValueChange={(value) => handleStatusChange(value as 'active' | 'pending' | 'banned')}
                     >
                       <SelectTrigger className="w-48">
                         <SelectValue />
@@ -402,7 +402,6 @@ const AdminOnboarding: React.FC = () => {
                       <SelectContent>
                         <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="denied">Denied</SelectItem>
                         <SelectItem value="banned">Banned</SelectItem>
                       </SelectContent>
                     </Select>

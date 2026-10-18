@@ -40,12 +40,12 @@ export function usePlatformReviews() {
       const userIds = [...new Set(reviews.map(r => r.user_id))];
 
       const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, display_name, avatar_url, city')
-        .in('id', userIds);
+        .from('profiles_public')
+        .select('user_id, display_name, avatar_url, city')
+        .in('user_id', userIds);
 
       // Map profiles to reviews
-      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
 
       return reviews.map(review => ({
         ...review,

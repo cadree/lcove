@@ -57,7 +57,10 @@ const FeedPost = ({ post }: { post: Post }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const isOwner = user?.id === post.user_id;
 
+  const authorName = post.profile ? (post.profile.display_name || 'User') : 'Private profile';
+
   const handleProfileClick = () => {
+    if (!post.profile) return;
     navigate(`/profile/${post.user_id}`);
   };
 
@@ -101,7 +104,7 @@ const FeedPost = ({ post }: { post: Post }) => {
           >
             <AvatarImage src={post.profile?.avatar_url || undefined} />
             <AvatarFallback className="bg-muted text-muted-foreground font-medium">
-              {post.profile?.display_name?.charAt(0).toUpperCase() || '?'}
+              {authorName.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div>
@@ -109,7 +112,7 @@ const FeedPost = ({ post }: { post: Post }) => {
               className="text-sm font-semibold text-foreground cursor-pointer hover:text-primary transition-colors"
               onClick={handleProfileClick}
             >
-              {post.profile?.display_name || 'User'}
+              {authorName}
             </h3>
             <time className="text-xs text-muted-foreground">
               {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}

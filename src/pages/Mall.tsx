@@ -76,7 +76,7 @@ const Mall = () => {
       // Fetch profiles for store owners
       const userIds = storesData?.map(s => s.user_id) || [];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url, city')
         .in('user_id', userIds);
 

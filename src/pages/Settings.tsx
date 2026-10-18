@@ -59,6 +59,7 @@ const Settings = () => {
   const [bio, setBio] = useState("");
   const [city, setCity] = useState("");
   const [phone, setPhone] = useState("");
+  const [showOnlyToPassed, setShowOnlyToPassed] = useState(false);
   const [socialLinks, setSocialLinks] = useState({
     instagram: "",
     twitter: "",
@@ -137,6 +138,7 @@ const Settings = () => {
       setBio(profile.bio || "");
       setCity(profile.city || "");
       setPhone(profile.phone || "");
+      setShowOnlyToPassed(profile.show_only_to_passed_exam);
       setSocialLinks({
         instagram: profile.social_links?.instagram || "",
         twitter: profile.social_links?.twitter || "",
@@ -175,6 +177,18 @@ const Settings = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleExamVisibility = async (checked: boolean) => {
+    if (!profile?.passed_exam) return;
+    setShowOnlyToPassed(checked);
+    const { error } = await updateProfile({ show_only_to_passed_exam: checked });
+    if (error) {
+      setShowOnlyToPassed(!checked);
+      toast.error("Failed to update profile visibility");
+      return;
+    }
+    toast.success("Profile visibility updated");
   };
 
   const handleNotificationToggle = (key: string, value: boolean) => {
@@ -291,6 +305,20 @@ const Settings = () => {
                 className="bg-background/50 min-h-[100px] resize-none"
               />
             </div>
+
+            {profile?.passed_exam && (
+              <div className="flex items-center justify-between gap-4 py-2">
+                <div>
+                  <Label htmlFor="exam-visibility">Only show my profile to members who passed the exam</Label>
+                  <p className="text-sm text-muted-foreground">Off by default.</p>
+                </div>
+                <Switch
+                  id="exam-visibility"
+                  checked={showOnlyToPassed}
+                  onCheckedChange={handleExamVisibility}
+                />
+              </div>
+            )}
 
             <Button 
               onClick={handleSaveProfile} 

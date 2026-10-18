@@ -95,7 +95,7 @@ export const useProjects = (status?: string) => {
       // Fetch creator profiles using profiles table for authenticated identity resolution
       const creatorIds = [...new Set(data.map(p => p.creator_id))];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', creatorIds);
 

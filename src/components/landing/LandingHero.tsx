@@ -58,7 +58,7 @@ export function LandingHero() {
             </div>
             
             <p className="text-sm text-muted-foreground">
-              No spam. Cancel anytime. Free to join.
+              Free to join.
             </p>
           </motion.div>
 
@@ -95,16 +95,6 @@ export function LandingHero() {
                 </div>
               </div>
               
-              {/* Floating elements */}
-              <div className="absolute -top-4 -right-4 card-premium rounded-2xl p-4 glow-pink-sm">
-                <div className="text-2xl font-display text-primary">2.4k+</div>
-                <div className="text-xs text-muted-foreground">Creators</div>
-              </div>
-              
-              <div className="absolute -bottom-4 -left-4 card-premium rounded-2xl p-4">
-                <div className="text-2xl font-display text-foreground">150+</div>
-                <div className="text-xs text-muted-foreground">Cities</div>
-              </div>
             </div>
           </motion.div>
         </div>

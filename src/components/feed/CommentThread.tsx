@@ -55,14 +55,14 @@ const CommentItem = ({
         <Avatar className="w-8 h-8 shrink-0">
           <AvatarImage src={comment.profile?.avatar_url || undefined} />
           <AvatarFallback className="bg-muted text-muted-foreground text-xs">
-            {comment.profile?.display_name?.charAt(0).toUpperCase() || '?'}
+            {(comment.profile ? (comment.profile.display_name || 'User') : 'Private profile').charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 flex-wrap">
             <span className="font-medium text-sm text-foreground">
-              {comment.profile?.display_name || 'User'}
+              {comment.profile ? (comment.profile.display_name || 'User') : 'Private profile'}
             </span>
             <span className="text-xs text-muted-foreground">
               {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
@@ -180,7 +180,7 @@ const CommentThread = ({
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Replying to</span>
               <span className="font-medium text-foreground">
-                {replyingToComment.profile?.display_name || 'User'}
+                {replyingToComment.profile ? (replyingToComment.profile.display_name || 'User') : 'Private profile'}
               </span>
               <Button
                 variant="ghost"

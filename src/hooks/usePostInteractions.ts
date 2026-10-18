@@ -61,16 +61,16 @@ export function usePostInteractions(postId: string) {
       // Get profiles for commenters
       const userIds = [...new Set(commentsData?.map(c => c.user_id) || [])];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', userIds);
 
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]));
 
-      // Add profiles to comments
+      // Add profiles to comments. A missing row is a private profile.
       const commentsWithProfiles = (commentsData || []).map(c => ({
         ...c,
-        profile: profileMap.get(c.user_id) || { display_name: null, avatar_url: null },
+        profile: profileMap.get(c.user_id),
       }));
 
       // Build thread structure

@@ -39,7 +39,7 @@ export function usePosts() {
       // Get profiles for post creators
       const userIds = [...new Set(postsData?.map(p => p.user_id) || [])];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url, city, city_display')
         .in('user_id', userIds);
 
@@ -71,7 +71,7 @@ export function usePosts() {
       return (postsData || []).map(post => ({
         ...post,
         post_type: post.post_type || 'regular',
-        profile: profileMap.get(post.user_id) || { display_name: null, avatar_url: null, city: null, city_display: null },
+        profile: profileMap.get(post.user_id),
         reactions: Array.from(reactionsByPost.get(post.id)?.entries() || []).map(([emoji, count]) => ({ emoji, count })),
         user_reaction: userReactions.get(post.id) || null,
       })) as Post[];

@@ -1,11 +1,9 @@
-import { Shield, CreditCard, Eye, FileText } from "lucide-react";
+import { Eye, UserPlus } from "lucide-react";
 import { motion } from "framer-motion";
 
 const trustPoints = [
-  { icon: Shield, title: "Enterprise security" },
-  { icon: CreditCard, title: "Secure payments" },
-  { icon: Eye, title: "Privacy control" },
-  { icon: FileText, title: "Clear guidelines" },
+  { icon: UserPlus, title: "Free to join" },
+  { icon: Eye, title: "Privacy controls" },
 ];
 
 export function TrustSection() {

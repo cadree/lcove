@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FileText, Scale, ChevronRight } from "lucide-react";
+import { ArrowLeft, FileText, Scale, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -27,7 +27,12 @@ const Index = () => {
   const [isEditing, setIsEditing] = useState(false);
   const home = useHomeUsage();
   const handleBack = () => {
-    navigate("/menu");
+    const historyIndex = window.history.state?.idx;
+    if (typeof historyIndex === "number" && historyIndex > 0) {
+      navigate(-1);
+      return;
+    }
+    navigate("/feed");
   };
   const handleItemClick = (itemId: string) => {
     if (!isEditing) home.trackClick(itemId);
@@ -47,7 +52,7 @@ const Index = () => {
         <div className="flex items-center justify-between px-4 h-14 relative">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground" onClick={handleBack} aria-label="Go back">
-              
+              <ArrowLeft className="h-4 w-4" />
             </Button>
 
             <Link to="/profile" className="tap-target" aria-label="Go to profile">
