@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { Capacitor } from "@capacitor/core";
 import { motion } from "framer-motion";
 import { Music, Plus, Upload, Loader2, Lock, AlertTriangle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -216,6 +217,10 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
   };
 
   const handlePurchase = async (track: ExclusiveTrack, rule: ExclusiveAccessRule) => {
+    if (Capacitor.getPlatform() === "ios") {
+      toast.error("This purchase isn't available in the iOS app.");
+      return;
+    }
     if (!user) {
       toast.error("Sign in to purchase music");
       return;

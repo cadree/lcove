@@ -36,6 +36,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { NetworkContent, useTVSeasons } from '@/hooks/useCinema';
+import { isIosApp } from '@/lib/platform';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -186,6 +187,11 @@ export const ContentDetailDialog = ({
                 <>
                   <Play className="w-5 h-5 fill-current" />
                   {isTVShow ? 'Resume' : 'Play'}
+                </>
+              ) : isIosApp() ? (
+                <>
+                  <Play className="w-5 h-5 fill-current" />
+                  Preview
                 </>
               ) : (
                 <>
