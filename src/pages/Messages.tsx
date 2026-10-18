@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MessageCircle, ArrowLeft } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
-import { PageHeader } from '@/components/layout/PageHeader';
 import ConversationList from '@/components/messages/ConversationList';
 import ChatView from '@/components/messages/ChatView';
 import NewChatDialog from '@/components/messages/NewChatDialog';

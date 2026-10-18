@@ -4,16 +4,16 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { NavCustomizationProvider } from "@/hooks/useNavCustomization";
 import { PresenceProvider } from "@/hooks/usePresence";
+import { CreateFlowProvider } from "@/components/create/CreateFlowContext";
 import AccessGate from "@/components/auth/AccessGate";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
 
-const Index = lazy(() => import("./pages/Index"));
 const Landing = lazy(() => import("./pages/Landing"));
 const Feed = lazy(() => import("./pages/Feed"));
+const Explore = lazy(() => import("./pages/Explore"));
 const Directory = lazy(() => import("./pages/Directory"));
 const Projects = lazy(() => import("./pages/Projects"));
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
@@ -94,7 +94,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <PresenceProvider>
-            <NavCustomizationProvider>
+            <CreateFlowProvider>
               <AccessGate>
                 <ActivityTracker />
                 <Toaster />
@@ -102,12 +102,13 @@ const App = () => (
               <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/" element={<Landing />} />
-                <Route path="/home" element={<Index />} />
-                <Route path="/landing" element={<Landing />} />
+                <Route path="/home" element={<Navigate to="/feed" replace />} />
+                <Route path="/landing" element={<Navigate to="/" replace />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/onboarding" element={<Onboarding />} />
                 <Route path="/locked" element={<Locked />} />
                 <Route path="/feed" element={<Feed />} />
+                <Route path="/explore" element={<Explore />} />
                 <Route path="/directory" element={<Directory />} />
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/calendar" element={<CalendarPage />} />
@@ -159,7 +160,7 @@ const App = () => (
               </Routes>
               </Suspense>
               </AccessGate>
-            </NavCustomizationProvider>
+            </CreateFlowProvider>
           </PresenceProvider>
         </AuthProvider>
       </BrowserRouter>

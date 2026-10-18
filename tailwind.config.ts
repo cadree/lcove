@@ -82,6 +82,10 @@ export default {
         xl: "calc(var(--radius) + 4px)",
         "2xl": "calc(var(--radius) + 8px)",
         "3xl": "calc(var(--radius) + 16px)",
+        media: "2px",
+      },
+      letterSpacing: {
+        eyebrow: "0.16em",
       },
       boxShadow: {
         'card': 'var(--shadow-card)',
@@ -136,8 +140,8 @@ export default {
           "100%": { transform: "translateX(0)", opacity: "1" },
         },
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 20px hsl(340 82% 65% / 0.2)" },
-          "50%": { boxShadow: "0 0 40px hsl(340 82% 65% / 0.4)" },
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.72" },
         },
         "pulse-subtle": {
           "0%, 100%": { opacity: "1" },

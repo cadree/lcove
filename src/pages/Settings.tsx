@@ -847,7 +847,7 @@ const Settings = () => {
                 <Users className="w-5 h-5 text-purple-500" />
               </div>
               <p className="text-2xl font-bold text-foreground">{insightsData?.followers || 0}</p>
-              <p className="text-xs text-muted-foreground">Followers</p>
+              <p className="text-xs text-muted-foreground">Saved as favorite</p>
             </div>
           </div>
         </motion.section>
