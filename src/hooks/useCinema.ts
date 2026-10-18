@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -398,6 +399,10 @@ export const useNetworkSubscription = (networkId: string) => {
 export const useSubscribeToNetwork = () => {
   return useMutation({
     mutationFn: async (networkId: string) => {
+      if (Capacitor.getPlatform() === 'ios') {
+        throw new Error("This subscription isn't available in the iOS app.");
+      }
+
       const { data, error } = await supabase.functions.invoke('create-network-subscription', {
         body: { networkId },
       });

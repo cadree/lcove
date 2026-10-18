@@ -45,7 +45,7 @@ In Supabase Dashboard → Authentication → URL Configuration:
 
 - **Site URL**: `https://lcove.lovable.app`
 - **Redirect URLs**:
-  - `app.lovable.e07d9c457fd949f78f3cc7d5998be668://`
+  - `com.etherbylcove.app://` (placeholder — confirm with Cadre; see `src/config/nativeIds.ts` and `docs/ios-release.md`)
   - `capacitor://localhost`
   - `https://id-preview--e07d9c45-7fd9-49f7-8f3c-c7d5998be668.lovable.app`
   - `https://lcove.lovable.app`
@@ -107,7 +107,7 @@ The app is already configured for native platforms:
 - ✅ PKCE flow enabled
 - ✅ Capacitor Preferences storage adapter
 - ✅ `detectSessionInUrl: false` on native
-- ✅ Deep link scheme: `app.lovable.e07d9c457fd949f78f3cc7d5998be668://`
+- ✅ Deep link scheme: `com.etherbylcove.app://` (placeholder until Cadre confirms the bundle id)
 
 ## Verification Checklist
 

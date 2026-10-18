@@ -12,6 +12,8 @@ import {
   downloadTrack,
 } from "@/hooks/useMusicLibrary";
 import { PreviewPlayer } from "./PreviewPlayer";
+import { IosDigitalGoodsNotice } from "@/components/ios/IosDigitalGoodsNotice";
+import { isIosApp } from "@/lib/platform";
 import { toast } from "sonner";
 
 interface ExclusiveTrackCardProps {
@@ -57,10 +59,12 @@ export const ExclusiveTrackCard = ({
   const fullUrl = track.audio_file_url || "";
 
   const isPaid = price > 0;
+  const iosApp = isIosApp();
+  const showPaidUnlock = !fullAccess && !isOwner && ((!!purchaseRule && isPaid) || !!subscriptionRule);
   const statusBadge = (() => {
     if (isOwner) return { label: track.is_published ? "Published" : "Draft", variant: "outline" as const };
     if (fullAccess) return { label: "Unlocked", variant: "secondary" as const };
-    if (isPaid) return { label: `$${(price / 100).toFixed(2)}`, variant: "default" as const };
+    if (isPaid) return { label: iosApp ? "Exclusive" : `$${(price / 100).toFixed(2)}`, variant: iosApp ? "outline" as const : "default" as const };
     if (subscriptionRule) return { label: "Subscribers", variant: "outline" as const };
     return { label: "Exclusive", variant: "outline" as const };
   })();
@@ -117,7 +121,8 @@ export const ExclusiveTrackCard = ({
 
         {/* Actions */}
         <div className="flex flex-wrap gap-1.5 mt-auto pt-1">
-          {!fullAccess && !isOwner && purchaseRule && isPaid && (
+          {showPaidUnlock && iosApp && <IosDigitalGoodsNotice variant="short" className="w-full" />}
+          {!iosApp && !fullAccess && !isOwner && purchaseRule && isPaid && (
             <Button
               size="sm"
               variant="default"
@@ -130,7 +135,7 @@ export const ExclusiveTrackCard = ({
               Buy ${(price / 100).toFixed(2)}
             </Button>
           )}
-          {!fullAccess && !isOwner && subscriptionRule && (
+          {!iosApp && !fullAccess && !isOwner && subscriptionRule && (
             <Button
               size="sm"
               variant={purchaseRule && isPaid ? "outline" : "default"}
@@ -224,7 +229,7 @@ export const ExclusiveTrackCard = ({
         </div>
 
         {/* Extra unlock options for non-owners without access */}
-        {!fullAccess && !isOwner && trackRules.filter((r) => !["purchase", "subscription"].includes(r.rule_type) && r.amount_cents > 0).length > 0 && (
+        {!iosApp && !fullAccess && !isOwner && trackRules.filter((r) => !["purchase", "subscription"].includes(r.rule_type) && r.amount_cents > 0).length > 0 && (
           <div className="flex flex-wrap gap-1">
             {trackRules
               .filter((r) => !["purchase", "subscription"].includes(r.rule_type) && r.amount_cents > 0)

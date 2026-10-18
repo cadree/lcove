@@ -1,52 +1,56 @@
-import type { CapacitorConfig } from '@capacitor/cli';
+import type { CapacitorConfig } from "@capacitor/cli";
+import { NATIVE_APP_ID, NATIVE_APP_NAME } from "./src/config/nativeIds";
 
+/**
+ * CONFIRM WITH CADRE: appId is a placeholder (reverse-domain of
+ * etherbylcove.com). It is not registered in Apple Developer or Google Play.
+ *
+ * Do not set `server.url`. That key loads a dev server instead of the
+ * bundled web assets and must stay unset for TestFlight and App Store builds.
+ * `server.iosScheme` is also unset so the WebView keeps the default
+ * capacitor://localhost origin. Live streaming calls getUserMedia, which
+ * needs that local secure context.
+ *
+ * `ios.scheme` is the Xcode build scheme (default "App"), not a URL scheme.
+ * Auth return links use NATIVE_APP_ID in Info.plist and getAuthRedirectUrl.
+ */
 const config: CapacitorConfig = {
-  appId: 'app.lovable.e07d9c457fd949f78f3cc7d5998be668',
-  appName: 'ETHER',
-  webDir: 'dist',
-  // NOTE: Remove 'server' block for App Store/TestFlight production builds
-  // server: {
-  //   url: 'https://e07d9c45-7fd9-49f7-8f3c-c7d5998be668.lovableproject.com?forceHideBadge=true',
-  //   cleartext: true
-  // },
+  appId: NATIVE_APP_ID,
+  appName: NATIVE_APP_NAME,
+  webDir: "dist",
   ios: {
-    contentInset: 'always',
-    preferredContentMode: 'mobile',
+    contentInset: "always",
+    preferredContentMode: "mobile",
     allowsLinkPreview: false,
-    // Enable URL scheme handling for auth deep links
-    scheme: 'app.lovable.e07d9c457fd949f78f3cc7d5998be668'
-  },
-  android: {
-    allowMixedContent: true
   },
   plugins: {
     SplashScreen: {
       launchAutoHide: false,
-      backgroundColor: '#080808',
+      backgroundColor: "#080808",
       showSpinner: true,
-      spinnerColor: '#ffffff',
-      androidScaleType: 'CENTER_CROP',
+      spinnerColor: "#ffffff",
+      androidScaleType: "CENTER_CROP",
       splashFullScreen: true,
-      splashImmersive: true
+      splashImmersive: true,
     },
     PushNotifications: {
-      presentationOptions: ['badge', 'sound', 'alert']
+      presentationOptions: ["badge", "sound", "alert"],
     },
     StatusBar: {
-      style: 'DARK',
-      backgroundColor: '#080808'
+      style: "DARK",
+      backgroundColor: "#080808",
     },
     Keyboard: {
-      resize: 'body',
-      resizeOnFullScreen: true
+      resize: "body",
+      resizeOnFullScreen: true,
     },
     CapacitorCookies: {
-      enabled: true
+      enabled: true,
     },
     CapacitorHttp: {
-      enabled: true
-    }
-  }
+      enabled: true,
+    },
+  },
 };
 
 export default config;
