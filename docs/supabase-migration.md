@@ -62,9 +62,9 @@ Copy only the auth providers you will use (email, and Google if you turn it on).
 
 ### Storage
 
-The bundle creates `media` (public), `contact-avatars` (private), `contact-media` (public), and `board-uploads` (public). Confirm them under Storage after the SQL runs.
+The bundle creates `media` (public), `contact-avatars` (private), `contact-media` (public), `board-uploads` (public), and `avatars` (private). Confirm them under Storage after the SQL runs.
 
-Create an `avatars` bucket in the dashboard if `delete-account` should remove profile photos from that name. The migrations do not create it. Buckets start empty. There is no copy from the old project.
+Profile photos are public URLs in `media`. `avatars` is private. `delete-account` lists both names. Buckets start empty. There is no copy from the old project.
 
 ## Apply the bundle
 
@@ -77,7 +77,9 @@ psql "<connection-string-for-aykopqinnnssxdhxqruo>" -v ON_ERROR_STOP=1 -f supaba
 
 Or paste `supabase/bundle/ether-schema.sql` into the dashboard SQL editor. Use the connection string from the dashboard. Do not commit it.
 
-The file records each migration name in `public.ether_schema_migrations`. Running it a second time skips those names. A scratch database that stubs auth, storage, and realtime accepted the file twice. That rehearsal does not prove hosted-only behavior: extension allowlists, `supabase_admin` ownership of `cron`, `vault`, and `supabase_realtime`, or dashboard cron delivery.
+The file records each migration name in `public.ether_schema_migrations`. That table has RLS on and no policies. `anon` and `authenticated` have no grants. Running the file a second time skips recorded names. A scratch database that stubs auth, storage, and realtime accepted the file twice. That rehearsal does not prove hosted-only behavior: extension allowlists, `supabase_admin` ownership of `cron`, `vault`, and `supabase_realtime`, or dashboard cron delivery.
+
+`processed_stripe_events` and `store_secrets` also have RLS on and no policies. The browser does not read them. `service_role` bypasses RLS. The function grant table is in `docs/security-definer-grants.md`.
 
 Do not use `supabase db push` against the paused ETHER project or the Lovable project.
 

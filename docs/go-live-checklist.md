@@ -39,7 +39,9 @@ In the dashboard SQL editor, or with `psql` against this project's connection st
 
 If a statement says it must be the owner of publication `supabase_realtime` (that publication is owned by `supabase_admin`), add these tables under Database, Publications, `supabase_realtime`:
 
-`post_likes`, `post_comments`, `messages`, `typing_indicators`, `message_read_receipts`, `notifications`, `live_streams`, `stream_reactions`, `story_views`, `fund_distributions`, `conversation_participants`, `project_checklist_items`, `project_item_suggestions`, `events`, `projects`, `profiles`, `ticket_tiers`, `ticket_orders`, `event_attendees`, `event_check_ins`, `donations`, `stream_chat`, `board_items`.
+`post_likes`, `post_comments`, `messages`, `typing_indicators`, `message_read_receipts`, `notifications`, `live_streams`, `stream_reactions`, `story_views`, `fund_distributions`, `conversation_participants`, `project_checklist_items`, `project_item_suggestions`, `events`, `projects`, `ticket_tiers`, `ticket_orders`, `event_attendees`, `event_check_ins`, `donations`, `stream_chat`, `board_items`.
+
+`profiles` is not in that list. Realtime would send every column of a row the subscriber can select, including phone and exam fields that `profiles_public` omits. The landing stats query does not subscribe to `profiles`.
 
 The scratch rehearsal of this file is in the pull request. It is not a substitute for running it on `aykopqinnnssxdhxqruo`.
 
@@ -72,8 +74,9 @@ The bundle creates these buckets:
 | `contact-avatars` | no |
 | `contact-media` | yes |
 | `board-uploads` | yes |
+| `avatars` | no |
 
-`delete-account` also lists an `avatars` bucket. Create `avatars` in the dashboard (Storage) if profile photos will live there. The migrations do not create it. There is no storage copy from the old project. Launch starts with empty buckets.
+Profile photos are public URLs in `media`. `avatars` is private and exists so `delete-account` can remove leftover objects under that name. There is no storage copy from the old project. Launch starts with empty buckets.
 
 ## 6. Secrets, by name only
 

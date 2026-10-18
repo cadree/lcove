@@ -103,6 +103,11 @@ GRANT EXECUTE ON FUNCTION storage.foldername(text) TO anon, authenticated, servi
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT USAGE ON SCHEMA extensions TO anon, authenticated, service_role;
 
+-- Hosted Supabase grants new public objects to anon and authenticated
+-- through default privileges, on top of PostgreSQL's EXECUTE-to-PUBLIC
+-- default for functions. REVOKE FROM PUBLIC alone does not remove the
+-- anon and authenticated grants. These statements run before migrations
+-- so a scratch database fails the same way a fresh hosted project would.
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT ALL ON TABLES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public

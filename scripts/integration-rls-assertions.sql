@@ -1068,3 +1068,233 @@ END $$;
 
 RESET ROLE;
 
+-- ---------------------------------------------------------------------------
+-- Hosted-style default EXECUTE grants must not survive the lock migration.
+-- ---------------------------------------------------------------------------
+
+DO $$
+DECLARE
+  fn regprocedure;
+  internal text[] := ARRAY[
+    'enqueue_email(text,jsonb)',
+    'read_email_batch(text,integer,integer)',
+    'delete_email(text,bigint)',
+    'move_to_dlq(text,text,bigint,jsonb)',
+    'purge_user_personal_data(uuid)',
+    'apply_stream_tip(uuid,uuid,integer,text,text)',
+    'confirm_store_card_order(uuid,text)',
+    'award_xp(uuid,text,uuid,integer)',
+    'xp_on_post()',
+    'prevent_blocked_message()',
+    'validate_profile_completion()'
+  ];
+  sig text;
+BEGIN
+  FOREACH sig IN ARRAY internal LOOP
+    fn := sig::regprocedure;
+    IF has_function_privilege('anon', fn, 'EXECUTE') THEN
+      RAISE EXCEPTION 'FAIL: anon can execute %', sig;
+    END IF;
+    IF has_function_privilege('authenticated', fn, 'EXECUTE') THEN
+      RAISE EXCEPTION 'FAIL: authenticated can execute %', sig;
+    END IF;
+    IF NOT has_function_privilege('service_role', fn, 'EXECUTE') THEN
+      RAISE EXCEPTION 'FAIL: service_role cannot execute %', sig;
+    END IF;
+  END LOOP;
+
+  IF NOT has_function_privilege('anon', 'public.get_platform_stats()'::regprocedure, 'EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: anon cannot execute get_platform_stats';
+  END IF;
+  IF NOT has_function_privilege('authenticated', 'public.touch_last_active()'::regprocedure, 'EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: authenticated cannot execute touch_last_active';
+  END IF;
+  IF has_function_privilege('anon', 'public.touch_last_active()'::regprocedure, 'EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: anon can execute touch_last_active';
+  END IF;
+  IF NOT has_function_privilege('anon', 'public.has_blocked(uuid,uuid)'::regprocedure, 'EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: anon cannot execute has_blocked';
+  END IF;
+  IF NOT has_function_privilege('authenticated', 'public.sender_blocked_in_conversation(uuid,uuid)'::regprocedure, 'EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: authenticated cannot execute sender_blocked_in_conversation';
+  END IF;
+
+  IF (SELECT proconfig FROM pg_proc WHERE oid = 'public.enqueue_email(text,jsonb)'::regprocedure) IS NULL
+     OR NOT EXISTS (
+       SELECT 1
+       FROM unnest((SELECT proconfig FROM pg_proc WHERE oid = 'public.enqueue_email(text,jsonb)'::regprocedure)) cfg
+       WHERE cfg LIKE 'search_path=%'
+     ) THEN
+    RAISE EXCEPTION 'FAIL: enqueue_email has no search_path';
+  END IF;
+
+  RAISE NOTICE 'PASS: internal functions are service_role only and user functions stay callable';
+END $$;
+
+CREATE FUNCTION public.ether_default_priv_probe()
+RETURNS integer
+LANGUAGE sql
+AS $$ SELECT 1 $$;
+
+DO $$
+BEGIN
+  IF has_function_privilege('anon', 'public.ether_default_priv_probe()'::regprocedure, 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.ether_default_priv_probe()'::regprocedure, 'EXECUTE')
+     OR has_function_privilege('public', 'public.ether_default_priv_probe()'::regprocedure, 'EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: a new public function was granted to anon, authenticated, or PUBLIC';
+  END IF;
+  IF NOT has_function_privilege('service_role', 'public.ether_default_priv_probe()'::regprocedure, 'EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: a new public function was not granted to service_role';
+  END IF;
+  RAISE NOTICE 'PASS: future functions are not granted to anon or authenticated';
+END $$;
+
+DROP FUNCTION public.ether_default_priv_probe();
+
+DO $$
+BEGIN
+  IF NOT (
+    SELECT c.relrowsecurity
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'ether_schema_migrations'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: ether_schema_migrations RLS is off';
+  END IF;
+  IF has_table_privilege('anon', 'public.ether_schema_migrations', 'SELECT')
+     OR has_table_privilege('authenticated', 'public.ether_schema_migrations', 'SELECT') THEN
+    RAISE EXCEPTION 'FAIL: ether_schema_migrations is readable by anon or authenticated';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'profiles'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: profiles is still in supabase_realtime';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM storage.buckets WHERE id = 'avatars' AND public = false
+  ) THEN
+    RAISE EXCEPTION 'FAIL: private avatars bucket is missing';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM pg_policy
+    WHERE polrelid = 'public.ai_project_matches'::regclass
+      AND polcmd = 'a'
+      AND pg_get_expr(polwithcheck, polrelid) = 'true'
+  ) OR EXISTS (
+    SELECT 1 FROM pg_policy
+    WHERE polrelid = 'public.contact_timeline'::regclass
+      AND polcmd = 'a'
+      AND pg_get_expr(polwithcheck, polrelid) = 'true'
+  ) OR EXISTS (
+    SELECT 1 FROM pg_policy
+    WHERE polrelid = 'public.notifications'::regclass
+      AND polcmd = 'a'
+      AND pg_get_expr(polwithcheck, polrelid) = 'true'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: an open INSERT policy remains';
+  END IF;
+  RAISE NOTICE 'PASS: bookkeeping, profiles publication, avatars, and open inserts are locked';
+END $$;
+
+-- Trigger functions have no EXECUTE for the writer, and the write still runs.
+SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","email":"a.passed@example.com"}', false);
+SET ROLE authenticated;
+
+UPDATE public.profiles
+SET bio = 'trigger still runs'
+WHERE user_id = '11111111-1111-4111-8111-111111111111';
+
+INSERT INTO public.posts (id, user_id, content)
+VALUES (
+  'abababab-abab-4aba-8aba-ababababab99',
+  '11111111-1111-4111-8111-111111111111',
+  'post after execute revoke'
+);
+
+INSERT INTO public.notifications (user_id, type, title, data)
+VALUES (
+  '22222222-2222-4222-8222-222222222222',
+  'message',
+  'New Message',
+  '{"conversation_id":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"}'::jsonb
+);
+
+DO $$
+BEGIN
+  BEGIN
+    INSERT INTO public.notifications (user_id, type, title)
+    VALUES ('33333333-3333-4333-8333-333333333333', 'message', 'spam');
+    RAISE EXCEPTION 'FAIL: arbitrary notification insert was allowed';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS: notification insert requires a real relationship';
+  END;
+  BEGIN
+    INSERT INTO public.ai_project_matches (user_id, project_id)
+    VALUES (
+      '11111111-1111-4111-8111-111111111111',
+      'abababab-abab-4aba-8aba-abababababab'
+    );
+    RAISE EXCEPTION 'FAIL: authenticated inserted an ai match';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS: ai match insert is service_role only';
+  END;
+END $$;
+
+RESET ROLE;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE user_id = '11111111-1111-4111-8111-111111111111'
+      AND bio = 'trigger still runs'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: profile update did not run';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.xp_events
+    WHERE source_id = 'abababab-abab-4aba-8aba-ababababab99'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: post trigger did not award xp without EXECUTE';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.notifications
+    WHERE user_id = '22222222-2222-4222-8222-222222222222'
+      AND type = 'message'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: participant notification was rejected';
+  END IF;
+  RAISE NOTICE 'PASS: triggers and the signed-in notification insert still work';
+END $$;
+
+SELECT set_config('request.jwt.claim.sub', '', false);
+SELECT set_config('request.jwt.claim.role', 'anon', false);
+SELECT set_config('request.jwt.claims', '{"role":"anon"}', false);
+SET ROLE anon;
+
+DO $$
+BEGIN
+  PERFORM 1 FROM public.posts LIMIT 1;
+  BEGIN
+    PERFORM public.enqueue_email('transactional_emails', '{}'::jsonb);
+    RAISE EXCEPTION 'FAIL: anon executed enqueue_email';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS: anon cannot execute enqueue_email';
+  END;
+  BEGIN
+    INSERT INTO public.notifications (user_id, type, title)
+    VALUES ('22222222-2222-4222-8222-222222222222', 'message', 'anon');
+    RAISE EXCEPTION 'FAIL: anon inserted a notification';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS: anon cannot insert a notification';
+  END;
+  RAISE NOTICE 'PASS: anon can still read posts and cannot call the email queue';
+END $$;
+
+RESET ROLE;
+

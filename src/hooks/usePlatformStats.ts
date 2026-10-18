@@ -13,15 +13,14 @@ export function usePlatformStats() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    // profiles is not in the realtime publication. A change event would
+    // carry columns the public profile view hides (phone, exam score).
     const channel = supabase
       .channel('platform-stats-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
         queryClient.invalidateQueries({ queryKey: ['platform-stats'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['platform-stats'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
         queryClient.invalidateQueries({ queryKey: ['platform-stats'] });
       })
       .subscribe();
