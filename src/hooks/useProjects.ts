@@ -3,6 +3,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useEnergy, ENERGY_GAINS } from '@/hooks/useEnergy';
+import { errorMessage } from '@/lib/errorMessage';
+import type { Json, TablesUpdate } from '@/integrations/supabase/types';
+
+export interface ProjectDeliverable {
+  type?: string;
+  publish_date?: string | null;
+  publish_location?: string | null;
+}
 
 export interface Project {
   id: string;
@@ -27,7 +35,7 @@ export interface Project {
   vendors_needed: boolean;
   progress_percent: number;
   is_moodboard_public: boolean;
-  deliverables: any[] | null;
+  deliverables: ProjectDeliverable[] | null;
   allow_custom_roles: boolean;
   is_private: boolean;
   client_chat_in_production: boolean;
@@ -143,8 +151,8 @@ export const useProjects = (status?: string) => {
 
   const updateProjectProgress = useMutation({
     mutationFn: async ({ projectId, progress }: { projectId: string; progress: number }) => {
-      const { error } = await (supabase
-        .from('projects') as any)
+      const { error } = await supabase
+        .from('projects')
         .update({ progress_percent: progress })
         .eq('id', projectId);
       if (error) throw error;
@@ -157,8 +165,8 @@ export const useProjects = (status?: string) => {
 
   const updateProjectCoverImage = useMutation({
     mutationFn: async ({ projectId, coverImageUrl }: { projectId: string; coverImageUrl: string }) => {
-      const { error } = await (supabase
-        .from('projects') as any)
+      const { error } = await supabase
+        .from('projects')
         .update({ cover_image_url: coverImageUrl })
         .eq('id', projectId);
       if (error) throw error;
@@ -168,8 +176,8 @@ export const useProjects = (status?: string) => {
       queryClient.invalidateQueries({ queryKey: ['my-projects'] });
       toast({ title: 'Cover image updated' });
     },
-    onError: (error: any) => {
-      toast({ title: 'Failed to update cover image', description: error.message, variant: 'destructive' });
+    onError: (error: unknown) => {
+      toast({ title: 'Failed to update cover image', description: errorMessage(error), variant: 'destructive' });
     },
   });
 
@@ -191,7 +199,7 @@ export const useProjects = (status?: string) => {
       sponsorship_needed?: boolean;
       vendors_needed?: boolean;
       is_moodboard_public?: boolean;
-      deliverables?: any[];
+      deliverables?: ProjectDeliverable[];
       allow_custom_roles?: boolean;
       is_private?: boolean;
       roles: { role_name: string; description?: string; payout_amount: number; slots_available: number }[];
@@ -199,8 +207,8 @@ export const useProjects = (status?: string) => {
     }) => {
       if (!user?.id) throw new Error('Not authenticated');
 
-      const { data: project, error } = await (supabase
-        .from('projects') as any)
+      const { data: project, error } = await supabase
+        .from('projects')
         .insert({
           creator_id: user.id,
           title: data.title,
@@ -219,7 +227,7 @@ export const useProjects = (status?: string) => {
           sponsorship_needed: data.sponsorship_needed || false,
           vendors_needed: data.vendors_needed || false,
           is_moodboard_public: data.is_moodboard_public || false,
-          deliverables: data.deliverables || [],
+          deliverables: (data.deliverables || []) as unknown as Json,
           allow_custom_roles: data.allow_custom_roles || false,
           is_private: data.is_private || false,
           status: 'open'
@@ -246,8 +254,8 @@ export const useProjects = (status?: string) => {
 
       // Create milestones
       if (data.milestones && data.milestones.length > 0) {
-        const { error: msError } = await (supabase
-          .from('project_milestones') as any)
+        const { error: msError } = await supabase
+          .from('project_milestones')
           .insert(data.milestones.map(ms => ({
             project_id: project.id,
             title: ms.title,
@@ -297,7 +305,7 @@ export const useProjects = (status?: string) => {
             created_by: user.id,
             visibility: 'private',
             project_id: project.id
-          } as any)
+          })
           .select('id')
           .single();
 
@@ -310,7 +318,7 @@ export const useProjects = (status?: string) => {
               user_id: user.id,
               role: 'owner',
               project_role_name: 'Project Creator'
-            } as any);
+            });
         }
       } catch (chatErr) {
         console.error('Failed to create project groupchat:', chatErr);
@@ -374,9 +382,9 @@ export const useProjects = (status?: string) => {
   });
 
   const updateProject = useMutation({
-    mutationFn: async ({ projectId, updates }: { projectId: string; updates: Record<string, any> }) => {
+    mutationFn: async ({ projectId, updates }: { projectId: string; updates: TablesUpdate<"projects"> }) => {
       if (!user?.id) throw new Error('Not authenticated');
-      const { error } = await (supabase.from('projects') as any)
+      const { error } = await supabase.from('projects')
         .update(updates)
         .eq('id', projectId)
         .eq('creator_id', user.id);
@@ -388,8 +396,8 @@ export const useProjects = (status?: string) => {
       queryClient.invalidateQueries({ queryKey: ['public-project'] });
       toast({ title: 'Project updated successfully!' });
     },
-    onError: (error: any) => {
-      toast({ title: 'Failed to update project', description: error.message, variant: 'destructive' });
+    onError: (error: unknown) => {
+      toast({ title: 'Failed to update project', description: errorMessage(error), variant: 'destructive' });
     },
   });
 
@@ -648,9 +656,9 @@ export const useProjectApplications = (projectId?: string) => {
         const finalRoleTitle = roleTitle || role?.role_name || 'a role';
 
         // Find existing project group chat
-        let { data: existingConversation } = await (supabase
+        const { data: existingConversation } = await supabase
           .from('conversations')
-          .select('id') as any)
+          .select('id')
           .eq('project_id', application.project_id)
           .eq('type', 'group')
           .maybeSingle();
@@ -675,7 +683,7 @@ export const useProjectApplications = (projectId?: string) => {
                 user_id: application.applicant_id,
                 role: 'member',
                 project_role_name: finalRoleTitle
-              } as any);
+              });
 
             // Send system join message
             const { data: applicantProfile } = await supabase

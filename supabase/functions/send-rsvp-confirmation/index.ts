@@ -7,7 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const log = (s: string, d?: any) => console.log(`[RSVP-CONFIRM] ${s}${d ? ` - ${JSON.stringify(d)}` : ''}`);
+const log = (s: string, d?: unknown) => console.log(`[RSVP-CONFIRM] ${s}${d ? ` - ${JSON.stringify(d)}` : ''}`);
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });

@@ -182,8 +182,8 @@ export function CalendarAgendaView({
                         )}>
                           {getTicketIcon(item.data.ticket_type)}
                           {item.data.ticket_type === 'free' ? 'Free' : 
-                           item.data.ticket_type === 'paid' ? `$${(item.data as any).ticket_price}` :
-                           `${(item.data as any).credits_price} Credits`}
+                           item.data.ticket_type === 'paid' ? `$${item.data.ticket_price}` :
+                           `${item.data.credits_price} Credits`}
                         </span>
                       </div>
                     )}

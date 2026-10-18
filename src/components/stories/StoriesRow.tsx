@@ -136,7 +136,7 @@ const StoriesRow = () => {
               No stories from favorites
             </motion.div> : otherUsersWithStories.map(([userId, userStoryList], index) => {
           const latestStory = userStoryList[0];
-          const hasUnviewed = userStoryList.some((s: any) => !s.has_viewed);
+          const hasUnviewed = userStoryList.some((s) => !s.has_viewed);
           const isFav = isFavorite(userId);
           return <StoryAvatar key={userId} userId={userId} displayName={latestStory.profile?.display_name || 'User'} avatarUrl={latestStory.profile?.avatar_url} isLive={latestStory.is_live} hasUnviewed={hasUnviewed} isFavorite={isFav} onToggleFavorite={() => toggleFavorite(userId)} onClick={() => handleOpenStory(userId)} index={index} />;
         })}

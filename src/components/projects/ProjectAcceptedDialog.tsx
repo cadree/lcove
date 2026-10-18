@@ -54,9 +54,9 @@ export const ProjectAcceptedDialog: React.FC<ProjectAcceptedDialogProps> = ({
     queryKey: ['project-chat-id', projectId],
     queryFn: async () => {
       if (!projectId) return null;
-      const { data } = await (supabase
+      const { data } = await supabase
         .from('conversations')
-        .select('id') as any)
+        .select('id')
         .eq('project_id', projectId)
         .eq('type', 'group')
         .maybeSingle();

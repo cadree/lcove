@@ -34,7 +34,7 @@ On staging, check with two accounts:
 
 ## 3. Set the internal function secret
 
-In Supabase, Edge Functions, Secrets, add `INTERNAL_FUNCTION_SECRET`. Pick a long random value. Do not put it in the repo, in Lovable, or in chat.
+In Supabase, Edge Functions, Secrets, add `INTERNAL_FUNCTION_SECRET`. Pick a long random value. Do not put it in the repo or in chat.
 
 The event-reminder cron must send that same value in the header `x-internal-secret`. Until both sides match, `auto-event-reminders` answers 401 and reminders do not send. That is intentional.
 
@@ -64,21 +64,25 @@ Password reset returns to `/auth?reset=true`. Signup confirmation returns to `/a
 
 Turn on email confirmation (Authentication, Providers, Email, Confirm email). With that on, signup does not log the person in until they open the link, and the app shows "Check your email."
 
-## 6. Regenerate types in Lovable
+## 6. Regenerate database types
 
-After the staging migrations are applied, regenerate `src/integrations/supabase/types.ts` from Lovable. Do not type those columns in by hand.
+After the staging migrations are applied, regenerate `src/integrations/supabase/types.ts` from the Supabase project you own. Do not type those columns in by hand, and do not edit the generated file to silence a type error.
 
-Do not hand-edit `src/integrations/supabase/client.ts`. It re-exports `src/lib/supabaseClient.ts` so a phone app does not store the session in `localStorage`. The Vite and TypeScript path aliases are what keep that working if Lovable rewrites the generated client.
+```sh
+npx supabase gen types typescript --project-id <project-id> --schema public > src/integrations/supabase/types.ts
+```
 
-## 7. Merge, then sync carefully
+`src/integrations/supabase/client.ts` only re-exports `src/lib/supabaseClient.ts` so a phone app does not store the session in `localStorage`. If a regen replaces `client.ts`, put that re-export back. The Vite and TypeScript path aliases are what keep native login working.
 
-Merge the integration pull request into `main` when staging is accepted. Do not push straight to `main`.
+## 7. Merge
 
-Lovable can overwrite app files on the next sync, and it can apply `supabase/migrations` by itself. After a sync, check:
+Merge the integration pull request into `main` when staging is accepted. Do not push straight to `main`. GitHub is the source of truth for this repo.
+
+After the merge, check:
 
 - `capacitor.config.ts` still says the app name is Ether, the bundle id is still the placeholder `com.etherbylcove.app` until you confirm it, and there is no `server.url`. A `server.url` would load a dev site inside the iOS binary.
 - `vite.config.ts` and the `paths` in `tsconfig.json` / `tsconfig.app.json` still point `@/integrations/supabase/client` at `src/lib/supabaseClient.ts`.
-- Lovable did not add a second migration that repeats these five files.
+- A second migration was not added that repeats these five files.
 
 iOS submission still needs a Mac, Xcode, and a paid Apple Developer account. That list is `docs/ios-release.md`. This checklist does not register the bundle id.
 

@@ -19,7 +19,6 @@ import {
   ArrowLeft,
   ArrowRight,
   MapPin,
-  Users,
   Accessibility,
   Settings,
   Smile,
@@ -545,18 +544,6 @@ export function CreatePostDialog({
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                   />
-                </div>
-
-                {/* Collaborators placeholder */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2 text-sm font-medium">
-                    <Users className="w-4 h-4 text-muted-foreground" />
-                    Tag collaborators
-                  </Label>
-                  <Input placeholder="Search for collaborators..." disabled />
-                  <p className="text-xs text-muted-foreground">
-                    Coming soon: Tag collaborators to feature the post on their profiles too
-                  </p>
                 </div>
 
                 {/* Accessibility */}

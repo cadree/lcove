@@ -20,6 +20,7 @@ import { Upload, X, Image, Film, Loader2, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface SubmitContentDialogProps {
@@ -92,7 +93,7 @@ export const SubmitContentDialog = ({
         .getPublicUrl(fileName);
 
       setCoverArtUrl(urlData.publicUrl);
-    } catch (error: any) {
+    } catch {
       toast.error('Failed to upload image');
     } finally {
       setUploadingCover(false);
@@ -133,7 +134,7 @@ export const SubmitContentDialog = ({
       }
 
       setMoodboardImages([...moodboardImages, ...newImages]);
-    } catch (error: any) {
+    } catch {
       toast.error('Failed to upload moodboard images');
     } finally {
       setUploadingMoodboard(false);
@@ -216,8 +217,8 @@ export const SubmitContentDialog = ({
       queryClient.invalidateQueries({ queryKey: ['content-submissions', networkId] });
       resetForm();
       onOpenChange(false);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to submit content');
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, 'Failed to submit content'));
     } finally {
       setSubmitting(false);
     }
@@ -248,7 +249,7 @@ export const SubmitContentDialog = ({
 
             <div className="space-y-2">
               <Label>Content Type *</Label>
-              <Select value={contentType} onValueChange={(v: any) => setContentType(v)}>
+              <Select value={contentType} onValueChange={(v: 'short_film' | 'feature_film' | 'tv_show') => setContentType(v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

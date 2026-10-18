@@ -27,14 +27,14 @@ export function useItemSuggestions(projectId?: string | null) {
     queryKey: ['item-suggestions', projectId],
     queryFn: async (): Promise<ItemSuggestion[]> => {
       if (!projectId) return [];
-      const { data, error } = await (supabase.from('project_item_suggestions') as any)
+      const { data, error } = await supabase.from('project_item_suggestions')
         .select('*')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false });
       if (error) throw error;
 
-      const userIds = [...new Set((data || []).map((d: any) => d.suggested_by))] as string[];
-      let profileMap = new Map();
+      const userIds = [...new Set((data || []).map((d) => d.suggested_by))];
+      let profileMap = new Map<string, { user_id: string | null; display_name: string | null; avatar_url: string | null }>();
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles_public')
@@ -43,8 +43,9 @@ export function useItemSuggestions(projectId?: string | null) {
         profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
       }
 
-      return (data || []).map((s: any) => ({
+      return (data || []).map((s) => ({
         ...s,
+        status: s.status as ItemSuggestion["status"],
         suggester_profile: profileMap.get(s.suggested_by),
       }));
     },
@@ -77,7 +78,7 @@ export function useSuggestItem() {
   return useMutation({
     mutationFn: async (data: { project_id: string; category: string; name: string; notes?: string }) => {
       if (!user) throw new Error('Must be logged in');
-      const { error } = await (supabase.from('project_item_suggestions') as any)
+      const { error } = await supabase.from('project_item_suggestions')
         .insert({ ...data, suggested_by: user.id });
       if (error) throw error;
 
@@ -115,14 +116,14 @@ export function useReviewSuggestion() {
     }) => {
       if (!user) throw new Error('Must be logged in');
 
-      const { error } = await (supabase.from('project_item_suggestions') as any)
+      const { error } = await supabase.from('project_item_suggestions')
         .update({ status, reviewed_by: user.id })
         .eq('id', suggestionId);
       if (error) throw error;
 
       // If approved, create checklist item
       if (status === 'approved') {
-        await (supabase.from('project_checklist_items') as any).insert({
+        await supabase.from('project_checklist_items').insert({
           project_id: projectId,
           category: suggestion.category,
           name: suggestion.name,

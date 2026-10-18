@@ -484,7 +484,7 @@ export const ProfileThemeCustomizer = ({
             <div className="space-y-3">
               <Label className="text-sm font-medium">Profile Sections</Label>
               <p className="text-xs text-muted-foreground">
-                Drag to reorder your profile sections (coming soon)
+                Choose which sections appear on your profile.
               </p>
               <div className="space-y-2">
                 {PROFILE_SECTIONS.map((section) => {

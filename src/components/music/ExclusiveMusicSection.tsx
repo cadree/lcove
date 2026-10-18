@@ -30,6 +30,37 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
+
+interface VerifyResultRow {
+  status?: string;
+  updated?: boolean;
+}
+
+interface InvokePayload {
+  results?: VerifyResultRow[];
+  error?: string;
+  url?: string;
+}
+
+function asInvokePayload(value: unknown): InvokePayload | null {
+  if (typeof value !== "object" || value === null) return null;
+  return value as InvokePayload;
+}
+
+function invokeErrorText(error: unknown, data: unknown, fallback: string): string {
+  const payload = asInvokePayload(data);
+  let bodyError: string | undefined;
+  if (typeof error === "object" && error !== null && "context" in error) {
+    const context = error.context;
+    if (typeof context === "object" && context !== null && "body" in context) {
+      const body = asInvokePayload(context.body);
+      if (typeof body?.error === "string" && body.error.length > 0) bodyError = body.error;
+    }
+  }
+  const dataError = typeof payload?.error === "string" && payload.error.length > 0 ? payload.error : undefined;
+  return bodyError || dataError || errorMessage(error, fallback);
+}
 
 interface ExclusiveMusicSectionProps {
   userId: string;
@@ -51,6 +82,8 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
   const { data: payoutStatus } = useArtistPayoutStatus(userId);
   const createPayoutAccount = useCreateMusicPayoutAccount();
   const refreshPayoutStatus = useRefreshMusicPayoutStatus();
+  const refreshPayoutsRef = useRef(refreshPayoutStatus.mutate);
+  refreshPayoutsRef.current = refreshPayoutStatus.mutate;
 
   const [showUpload, setShowUpload] = useState(false);
   const [showRules, setShowRules] = useState(false);
@@ -81,8 +114,8 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
       (async () => {
         try {
           const { data } = await supabase.functions.invoke("verify-music-purchase");
-          const verified = (data as any)?.results?.some(
-            (r: any) => r.status === "paid" && r.updated
+          const verified = asInvokePayload(data)?.results?.some(
+            (r) => r.status === "paid" && r.updated
           );
           if (verified) {
             toast.success("Payment confirmed — track unlocked!");
@@ -109,8 +142,8 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
       (async () => {
         try {
           const { data } = await supabase.functions.invoke("verify-artist-subscription");
-          const verified = (data as any)?.results?.some(
-            (r: any) => r.status === "active" && r.updated
+          const verified = asInvokePayload(data)?.results?.some(
+            (r) => r.status === "active" && r.updated
           );
           if (verified) {
             toast.success("Subscription active! You now have access.");
@@ -127,19 +160,17 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
       window.history.replaceState({}, "", window.location.pathname);
     } else if (musicPayouts === "success" && isOwner) {
       toast.success("Payouts connected!");
-      refreshPayoutStatus.mutate();
+      refreshPayoutsRef.current();
       window.history.replaceState({}, "", window.location.pathname);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryClient, isOwner]);
 
   // On mount, refresh live payout status if owner has account but flag isn't set
   useEffect(() => {
     if (isOwner && payoutStatus?.has_account && !payoutStatus.payout_enabled) {
-      refreshPayoutStatus.mutate();
+      refreshPayoutsRef.current();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOwner, payoutStatus?.has_account]);
+  }, [isOwner, payoutStatus?.has_account, payoutStatus?.payout_enabled]);
 
   const hasMonetizedContent =
     tracks.some((t) => (t.price_cents || 0) > 0) ||
@@ -236,25 +267,26 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
 
     try {
       const { data, error } = await supabase.functions.invoke(fnName, { body });
+      const payload = asInvokePayload(data);
       if (error) {
         // Edge function returns error body even on non-2xx
-        const serverMsg = (error as any)?.context?.body?.error || (data as any)?.error || error.message;
+        const serverMsg = invokeErrorText(error, data, "");
         console.error("[MusicPurchase] error", serverMsg);
         toast.error(serverMsg || "Failed to start checkout", { duration: 6000 });
         return;
       }
-      if ((data as any)?.error) {
-        toast.error((data as any).error, { duration: 6000 });
+      if (payload?.error) {
+        toast.error(payload.error, { duration: 6000 });
         return;
       }
-      if (data?.url) {
-        window.open(data.url, "_blank");
+      if (payload?.url) {
+        window.open(payload.url, "_blank");
       } else {
         toast.error("No checkout URL returned");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[MusicPurchase] exception", err);
-      toast.error(err?.message || "Failed to start checkout", { duration: 6000 });
+      toast.error(errorMessage(err, "Failed to start checkout"), { duration: 6000 });
     }
   };
 

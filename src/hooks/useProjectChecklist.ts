@@ -29,7 +29,7 @@ export function useProjectChecklist(projectId?: string | null) {
     queryFn: async (): Promise<ChecklistItem[]> => {
       if (!projectId) return [];
 
-      const { data, error } = await (supabase.from('project_checklist_items') as any)
+      const { data, error } = await supabase.from('project_checklist_items')
         .select('*')
         .eq('project_id', projectId)
         .order('created_at', { ascending: true });
@@ -37,8 +37,8 @@ export function useProjectChecklist(projectId?: string | null) {
       if (error) throw error;
 
       // Fetch assigned user profiles
-      const assignedIds = [...new Set((data || []).filter((d: any) => d.assigned_user_id).map((d: any) => d.assigned_user_id))] as string[];
-      let profileMap = new Map();
+      const assignedIds = [...new Set((data || []).flatMap((d) => d.assigned_user_id ? [d.assigned_user_id] : []))];
+      let profileMap = new Map<string, { user_id: string | null; display_name: string | null; avatar_url: string | null }>();
       if (assignedIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles_public')
@@ -47,8 +47,10 @@ export function useProjectChecklist(projectId?: string | null) {
         profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
       }
 
-      return (data || []).map((item: any) => ({
+      return (data || []).map((item) => ({
         ...item,
+        category: item.category as ChecklistItem["category"],
+        status: item.status as ChecklistItem["status"],
         assigned_profile: item.assigned_user_id ? profileMap.get(item.assigned_user_id) : undefined,
       }));
     },
@@ -83,7 +85,7 @@ export function useCreateChecklistItem() {
   return useMutation({
     mutationFn: async (data: { project_id: string; category: string; name: string; notes?: string }) => {
       if (!user) throw new Error('Must be logged in');
-      const { error } = await (supabase.from('project_checklist_items') as any)
+      const { error } = await supabase.from('project_checklist_items')
         .insert({ ...data, created_by: user.id });
       if (error) throw error;
     },
@@ -102,7 +104,7 @@ export function useClaimChecklistItem() {
   return useMutation({
     mutationFn: async ({ itemId, projectId }: { itemId: string; projectId: string }) => {
       if (!user) throw new Error('Must be logged in');
-      const { error } = await (supabase.from('project_checklist_items') as any)
+      const { error } = await supabase.from('project_checklist_items')
         .update({ assigned_user_id: user.id, status: 'claimed' })
         .eq('id', itemId)
         .eq('status', 'unclaimed');
@@ -134,7 +136,7 @@ export function useCompleteChecklistItem() {
 
   return useMutation({
     mutationFn: async ({ itemId, projectId }: { itemId: string; projectId: string }) => {
-      const { error } = await (supabase.from('project_checklist_items') as any)
+      const { error } = await supabase.from('project_checklist_items')
         .update({ status: 'completed' })
         .eq('id', itemId);
       if (error) throw error;
@@ -152,7 +154,7 @@ export function useDeleteChecklistItem() {
 
   return useMutation({
     mutationFn: async ({ itemId, projectId }: { itemId: string; projectId: string }) => {
-      const { error } = await (supabase.from('project_checklist_items') as any)
+      const { error } = await supabase.from('project_checklist_items')
         .delete()
         .eq('id', itemId);
       if (error) throw error;

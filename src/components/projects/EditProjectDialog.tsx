@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 
 const EXPECTED_OUTCOMES = ['Portfolio piece', 'Paid production', 'Experimental', 'Community collab'];
 const BUDGET_RANGES = ['$0 (Volunteer)', '$1 - $500', '$500 - $2,000', '$2,000 - $5,000', '$5,000 - $10,000', '$10,000+'];
@@ -82,8 +83,8 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
       setStartDate(project.timeline_start ? project.timeline_start.split('T')[0] : '');
       setEndDate(project.timeline_end ? project.timeline_end.split('T')[0] : '');
       setAllowCustomRoles(project.allow_custom_roles || false);
-      setIsPrivate((project as any).is_private || false);
-      setClientChatInProduction((project as any).client_chat_in_production || false);
+      setIsPrivate(project.is_private || false);
+      setClientChatInProduction(project.client_chat_in_production || false);
       setRoles(
         project.roles?.map(r => ({
           id: r.id,
@@ -175,8 +176,8 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
             }
             queryClient.invalidateQueries({ queryKey: ['projects'] });
             queryClient.invalidateQueries({ queryKey: ['my-projects'] });
-          } catch (err: any) {
-            toast.error('Failed to update roles: ' + err.message);
+          } catch (err: unknown) {
+            toast.error('Failed to update roles: ' + errorMessage(err));
           } finally {
             setIsSavingRoles(false);
           }

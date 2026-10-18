@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import {
   Mail,
@@ -28,6 +28,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "sonner";
+import type { LucideIcon } from "lucide-react";
+import { errorMessage } from "@/lib/errorMessage";
 import { cn } from "@/lib/utils";
 import {
   AttendeeKey,
@@ -64,6 +66,10 @@ export function AttendeeProfileDrawer({ open, onOpenChange, attendeeKey, fallbac
   const addTag = useAddAttendeeTag(attendeeKey || {});
   const removeTag = useRemoveAttendeeTag(attendeeKey || {});
   const saveNote = useSaveAttendeeNote(attendeeKey || {});
+  const saveNoteRef = useRef(saveNote);
+  saveNoteRef.current = saveNote;
+  const noteContextRef = useRef({ attendeeKey, data });
+  noteContextRef.current = { attendeeKey, data };
   const resend = useResendReceipt();
 
   const [tagInput, setTagInput] = useState("");
@@ -77,13 +83,13 @@ export function AttendeeProfileDrawer({ open, onOpenChange, attendeeKey, fallbac
 
   // Autosave note (debounced)
   useEffect(() => {
-    if (!attendeeKey || !data) return;
-    if (noteDraft === (data.note?.note || "")) return;
+    const { attendeeKey: key, data: profile } = noteContextRef.current;
+    if (!key || !profile) return;
+    if (noteDraft === (profile.note?.note || "")) return;
     const t = setTimeout(() => {
-      saveNote.mutate(noteDraft, { onSuccess: () => setNoteSavedAt(Date.now()) });
+      saveNoteRef.current.mutate(noteDraft, { onSuccess: () => setNoteSavedAt(Date.now()) });
     }, 800);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteDraft]);
 
   const identity = data?.identity;
@@ -91,7 +97,7 @@ export function AttendeeProfileDrawer({ open, onOpenChange, attendeeKey, fallbac
   const displayName = identity?.display_name || fallbackName || identity?.email || "Attendee";
   const initial = (displayName || "?").charAt(0).toUpperCase();
 
-  const socials: any = identity?.social_links || {};
+  const socials = identity?.social_links || {};
   const instagram = socials.instagram || socials.ig;
   const genericHandle = !instagram ? (socials.handle || socials.tiktok || socials.twitter) : null;
 
@@ -141,7 +147,7 @@ export function AttendeeProfileDrawer({ open, onOpenChange, attendeeKey, fallbac
             <EmptyState
               icon={X}
               title="Could not load profile"
-              description={(error as any)?.message || "Try again later."}
+              description={errorMessage(error, "Try again later.")}
             />
           )}
 
@@ -391,7 +397,7 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: stri
   );
 }
 
-function StatCard({ icon: Icon, label, value }: { icon: any; label: string; value: string | number }) {
+function StatCard({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string | number }) {
   return (
     <Card className="border-border/40 bg-card/60">
       <CardContent className="p-3 flex items-center gap-2.5">
@@ -414,7 +420,7 @@ function ContactRow({
   external,
   onCopy,
 }: {
-  icon: any;
+  icon: LucideIcon;
   value: string;
   href?: string;
   external?: boolean;

@@ -13,9 +13,26 @@ interface LineItem {
   total: number;
 }
 
-function generateInvoiceHTML(invoice: any, senderName: string, senderEmail: string): string {
-  const lineItems = (invoice.line_items as LineItem[]) || [];
-  const attachedImages = (invoice.attached_images as string[]) || [];
+interface InvoiceRecord {
+  line_items: LineItem[] | null;
+  attached_images: string[] | null;
+  currency: string | null;
+  invoice_number: string;
+  title: string;
+  description: string | null;
+  due_date: string | null;
+  total: number;
+  subtotal: number;
+  tax_amount: number;
+  tax_rate: number;
+  owner_user_id: string;
+  recipient_email: string | null;
+  recipient_phone: string | null;
+}
+
+function generateInvoiceHTML(invoice: InvoiceRecord, senderName: string, senderEmail: string): string {
+  const lineItems = invoice.line_items || [];
+  const attachedImages = invoice.attached_images || [];
   
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {

@@ -1,5 +1,7 @@
 // WebRTC Streaming utilities with OPUS audio codec support
 
+import type { RealtimeChannel } from "@supabase/supabase-js";
+
 export interface StreamConfig {
   video: boolean;
   audio: boolean;
@@ -93,33 +95,60 @@ export class LocalStream {
   }
 }
 
+interface SignalingClient {
+  channel: (name: string) => RealtimeChannel;
+}
+
+interface OfferSignal {
+  senderId?: string;
+  offer: RTCSessionDescriptionInit;
+}
+
+interface AnswerSignal {
+  senderId?: string;
+  answer: RTCSessionDescriptionInit;
+}
+
+interface IceSignal {
+  senderId?: string;
+  candidate: RTCIceCandidateInit;
+}
+
+function readSignal<T extends { senderId?: string }>(payload: unknown): T | null {
+  if (!payload || typeof payload !== "object") return null;
+  return payload as T;
+}
+
 // Simple signaling channel using Supabase Realtime
 export class SignalingChannel {
-  private channel: any;
+  private channel: RealtimeChannel;
   private streamId: string;
   private userId: string;
   private onOfferCallback?: (offer: RTCSessionDescriptionInit, senderId: string) => void;
   private onAnswerCallback?: (answer: RTCSessionDescriptionInit, senderId: string) => void;
   private onIceCandidateCallback?: (candidate: RTCIceCandidateInit, senderId: string) => void;
 
-  constructor(supabase: any, streamId: string, userId: string) {
+  constructor(supabase: SignalingClient, streamId: string, userId: string) {
     this.streamId = streamId;
     this.userId = userId;
 
     this.channel = supabase.channel(`stream-signaling-${streamId}`)
-      .on('broadcast', { event: 'offer' }, ({ payload }: any) => {
-        if (payload.senderId !== this.userId && this.onOfferCallback) {
-          this.onOfferCallback(payload.offer, payload.senderId);
+      .on('broadcast', { event: 'offer' }, ({ payload }) => {
+        const signal = readSignal<OfferSignal>(payload);
+        if (signal && signal.senderId !== this.userId && this.onOfferCallback) {
+          this.onOfferCallback(signal.offer, signal.senderId ?? "");
         }
       })
-      .on('broadcast', { event: 'answer' }, ({ payload }: any) => {
-        if (payload.senderId !== this.userId && this.onAnswerCallback) {
-          this.onAnswerCallback(payload.answer, payload.senderId);
+      .on('broadcast', { event: 'answer' }, ({ payload }) => {
+        const signal = readSignal<AnswerSignal>(payload);
+        if (signal && signal.senderId !== this.userId && this.onAnswerCallback) {
+          this.onAnswerCallback(signal.answer, signal.senderId ?? "");
         }
       })
-      .on('broadcast', { event: 'ice-candidate' }, ({ payload }: any) => {
-        if (payload.senderId !== this.userId && this.onIceCandidateCallback) {
-          this.onIceCandidateCallback(payload.candidate, payload.senderId);
+      .on('broadcast', { event: 'ice-candidate' }, ({ payload }) => {
+        const signal = readSignal<IceSignal>(payload);
+        if (signal && signal.senderId !== this.userId && this.onIceCandidateCallback) {
+          this.onIceCandidateCallback(signal.candidate, signal.senderId ?? "");
         }
       })
       .subscribe();
@@ -335,12 +364,16 @@ export const checkMediaCapabilities = async (): Promise<{
       try {
         const cameraPermission = await navigator.permissions.query({ name: 'camera' as PermissionName });
         result.cameraPermission = cameraPermission.state;
-      } catch {}
+      } catch {
+        // The Permissions API rejects unknown names such as camera in some browsers.
+      }
 
       try {
         const micPermission = await navigator.permissions.query({ name: 'microphone' as PermissionName });
         result.microphonePermission = micPermission.state;
-      } catch {}
+      } catch {
+        // The Permissions API rejects unknown names such as microphone in some browsers.
+      }
     }
   } catch (error) {
     console.error('Error checking media capabilities:', error);

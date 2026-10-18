@@ -6,6 +6,57 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+interface ProjectRoleRow {
+  id: string;
+  role_name: string;
+  payout_amount: number;
+  slots_available: number;
+  slots_filled: number;
+  is_locked: boolean;
+}
+
+interface ProjectMatchRow {
+  id: string;
+  title: string | null;
+  description: string | null;
+  total_budget: number | null;
+  currency: string | null;
+  project_roles: ProjectRoleRow[] | null;
+}
+
+interface AiMatch {
+  project_index: number;
+  best_role: string;
+  match_score: number;
+  reasons: string[];
+}
+
+function asNamedRows<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value as unknown as T[] : [];
+}
+
+function parseAiMatches(value: unknown): AiMatch[] {
+  if (typeof value !== "object" || value === null || !("matches" in value)) return [];
+  const matches = (value as { matches?: unknown }).matches;
+  if (!Array.isArray(matches)) return [];
+  const parsed: AiMatch[] = [];
+  for (const item of matches) {
+    if (typeof item !== "object" || item === null) continue;
+    const row = item as Record<string, unknown>;
+    if (typeof row.project_index !== "number") continue;
+    const reasons = Array.isArray(row.reasons)
+      ? row.reasons.filter((reason): reason is string => typeof reason === "string")
+      : [];
+    parsed.push({
+      project_index: row.project_index,
+      best_role: typeof row.best_role === "string" ? row.best_role : "",
+      match_score: typeof row.match_score === "number" ? row.match_score : 0,
+      reasons,
+    });
+  }
+  return parsed;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -42,7 +93,7 @@ serve(async (req) => {
       return text
         .replace(/[\r\n]+/g, ' ')     // Remove newlines
         .replace(/["'`]/g, '')        // Remove quotes
-        .replace(/[{}\[\]]/g, '')     // Remove special chars
+        .replace(/[{}[\]]/g, '')     // Remove special chars
         .substring(0, maxLen)         // Limit length
         .trim();
     };
@@ -55,9 +106,15 @@ serve(async (req) => {
       supabase.from("user_passions").select("passion_id, passions(name)").eq("user_id", user.id),
     ]);
 
-    const userSkills = skillsRes.data?.map((s: any) => s.skills?.name).filter(Boolean) || [];
-    const userRoles = rolesRes.data?.map((r: any) => r.creative_roles?.name).filter(Boolean) || [];
-    const userPassions = passionsRes.data?.map((p: any) => p.passions?.name).filter(Boolean) || [];
+    const userSkills = asNamedRows<{ skills?: { name?: string | null } | null }>(skillsRes.data)
+      .map((s) => s.skills?.name)
+      .filter((name): name is string => typeof name === "string" && name.length > 0);
+    const userRoles = asNamedRows<{ creative_roles?: { name?: string | null } | null }>(rolesRes.data)
+      .map((r) => r.creative_roles?.name)
+      .filter((name): name is string => typeof name === "string" && name.length > 0);
+    const userPassions = asNamedRows<{ passions?: { name?: string | null } | null }>(passionsRes.data)
+      .map((p) => p.passions?.name)
+      .filter((name): name is string => typeof name === "string" && name.length > 0);
     const userCity = profileRes.data?.city || "";
 
     console.log("User data:", { userSkills, userRoles, userPassions, userCity });
@@ -85,8 +142,8 @@ serve(async (req) => {
     }
 
     // Filter projects with available roles
-    const projectsWithRoles = projects.filter((p: any) => 
-      p.project_roles?.some((r: any) => !r.is_locked && r.slots_filled < r.slots_available)
+    const projectsWithRoles = asNamedRows<ProjectMatchRow>(projects).filter((p) => 
+      p.project_roles?.some((r) => !r.is_locked && r.slots_filled < r.slots_available)
     );
 
     if (projectsWithRoles.length === 0) {
@@ -120,14 +177,14 @@ City: ${safeCity}
 </user_profile>
 
 <available_projects>
-${projectsWithRoles.slice(0, 20).map((p: any, i: number) => `
+${projectsWithRoles.slice(0, 20).map((p, i: number) => `
 <project index="${i + 1}">
 Title: ${sanitizeForPrompt(p.title, 100)}
 Description: ${sanitizeForPrompt(p.description, 300) || "No description"}
 Budget: ${p.total_budget} ${p.currency}
-Open Roles: ${p.project_roles?.filter((r: any) => !r.is_locked && r.slots_filled < r.slots_available)
+Open Roles: ${p.project_roles?.filter((r) => !r.is_locked && r.slots_filled < r.slots_available)
   .slice(0, 5)
-  .map((r: any) => `${sanitizeForPrompt(r.role_name, 50)} ($${r.payout_amount})`).join(", ")}
+  .map((r) => `${sanitizeForPrompt(r.role_name, 50)} ($${r.payout_amount})`).join(", ")}
 </project>
 `).join("")}
 </available_projects>
@@ -204,12 +261,11 @@ Return the best matching projects for this user.`;
     const aiData = await aiResponse.json();
     console.log("AI response:", JSON.stringify(aiData, null, 2));
 
-    let matchResults: any[] = [];
+    let matchResults: AiMatch[] = [];
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
     if (toolCall?.function?.arguments) {
       try {
-        const parsed = JSON.parse(toolCall.function.arguments);
-        matchResults = parsed.matches || [];
+        matchResults = parseAiMatches(JSON.parse(toolCall.function.arguments));
       } catch (e) {
         console.error("Error parsing AI response:", e);
       }
@@ -217,13 +273,13 @@ Return the best matching projects for this user.`;
 
     // Map AI results to actual project data
     const finalMatches = matchResults
-      .filter((m: any) => m.project_index > 0 && m.project_index <= projectsWithRoles.length)
-      .map((m: any) => {
+      .filter((m) => m.project_index > 0 && m.project_index <= projectsWithRoles.length)
+      .map((m) => {
         const project = projectsWithRoles[m.project_index - 1];
-        const role = project.project_roles?.find((r: any) => 
+        const role = project.project_roles?.find((r) => 
           r.role_name.toLowerCase().includes(m.best_role.toLowerCase()) ||
           m.best_role.toLowerCase().includes(r.role_name.toLowerCase())
-        ) || project.project_roles?.find((r: any) => !r.is_locked && r.slots_filled < r.slots_available);
+        ) || project.project_roles?.find((r) => !r.is_locked && r.slots_filled < r.slots_available);
 
         return {
           project,
@@ -232,7 +288,7 @@ Return the best matching projects for this user.`;
           reasons: m.reasons,
         };
       })
-      .filter((m: any) => m.role)
+      .filter((m) => m.role)
       .slice(0, 5);
 
     // Store matches in database
@@ -247,7 +303,7 @@ Return the best matching projects for this user.`;
     // Insert new matches
     if (finalMatches.length > 0) {
       await adminSupabase.from("ai_project_matches").insert(
-        finalMatches.map((m: any) => ({
+        finalMatches.map((m) => ({
           user_id: user.id,
           project_id: m.project.id,
           role_id: m.role?.id,

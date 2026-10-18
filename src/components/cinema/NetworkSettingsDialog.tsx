@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -33,6 +33,7 @@ import { Network, useContentGenres } from '@/hooks/useCinema';
 import { Settings, Trash2, CreditCard, CheckCircle, AlertCircle, ExternalLink, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
@@ -70,19 +71,7 @@ export const NetworkSettingsDialog = ({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (open) {
-      setName(network.name);
-      setDescription(network.description || '');
-      setGenre(network.genre || '');
-      setIsPublic(network.is_public);
-      setIsPaid(network.is_paid);
-      setSubscriptionPrice(network.subscription_price.toString());
-      checkConnectStatus();
-    }
-  }, [open, network]);
-
-  const checkConnectStatus = async () => {
+  const checkConnectStatus = useCallback(async () => {
     setLoadingConnect(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -102,7 +91,19 @@ export const NetworkSettingsDialog = ({
     } finally {
       setLoadingConnect(false);
     }
-  };
+  }, [network.id]);
+
+  useEffect(() => {
+    if (open) {
+      setName(network.name);
+      setDescription(network.description || '');
+      setGenre(network.genre || '');
+      setIsPublic(network.is_public);
+      setIsPaid(network.is_paid);
+      setSubscriptionPrice(network.subscription_price.toString());
+      checkConnectStatus();
+    }
+  }, [open, network, checkConnectStatus]);
 
   const handleSetupPayout = async () => {
     setSettingUpPayout(true);
@@ -122,8 +123,8 @@ export const NetworkSettingsDialog = ({
         window.open(data.url, '_blank');
         toast.success('Complete your payout setup in the new tab');
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to start payout setup');
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, 'Failed to start payout setup'));
     } finally {
       setSettingUpPayout(false);
     }
@@ -157,8 +158,8 @@ export const NetworkSettingsDialog = ({
       queryClient.invalidateQueries({ queryKey: ['networks'] });
       queryClient.invalidateQueries({ queryKey: ['my-networks'] });
       onOpenChange(false);
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error: unknown) {
+      toast.error(errorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -180,8 +181,8 @@ export const NetworkSettingsDialog = ({
       queryClient.invalidateQueries({ queryKey: ['my-networks'] });
       onOpenChange(false);
       navigate('/cinema');
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error: unknown) {
+      toast.error(errorMessage(error));
     } finally {
       setDeleting(false);
     }

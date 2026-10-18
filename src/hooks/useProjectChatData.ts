@@ -1,6 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface ProjectDeliverable {
+  type?: string;
+  publish_date?: string | null;
+  publish_location?: string | null;
+}
+
 export interface ProjectChatData {
   id: string;
   title: string;
@@ -17,7 +23,7 @@ export interface ProjectChatData {
   props_needed: string | null;
   vendors_needed: boolean;
   sponsorship_needed: boolean;
-  deliverables: any[] | null;
+  deliverables: ProjectDeliverable[] | null;
   expected_outcome: string | null;
   creator_id: string;
   progress_percent: number;
@@ -66,7 +72,7 @@ export function useProjectChatData(projectId?: string | null) {
           .select('id, title, status, due_date, phase')
           .eq('project_id', projectId)
           .order('created_at', { ascending: true }),
-        (supabase.from('project_attachments') as any)
+        supabase.from('project_attachments')
           .select('id, file_url, file_name, file_type')
           .eq('project_id', projectId)
           .order('created_at', { ascending: false })
@@ -92,7 +98,7 @@ export function useProjectChatData(projectId?: string | null) {
         props_needed: p.props_needed,
         vendors_needed: p.vendors_needed ?? false,
         sponsorship_needed: p.sponsorship_needed ?? false,
-        deliverables: p.deliverables as any[] | null,
+        deliverables: (p.deliverables as unknown as ProjectDeliverable[] | null) ?? null,
         expected_outcome: p.expected_outcome,
         creator_id: p.creator_id,
         progress_percent: p.progress_percent ?? 0,

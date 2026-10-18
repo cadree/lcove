@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
     let artistName: string | null = null
     let genres: string[] = []
     let topTracks: { name: string; album_name?: string; album_image?: string; preview_url?: string; spotify_url?: string; apple_music_url?: string }[] = []
-    let albums: { name: string; image_url?: string; release_date?: string; type?: string; spotify_url?: string; apple_music_url?: string }[] = []
+    const albums: { name: string; image_url?: string; release_date?: string; type?: string; spotify_url?: string; apple_music_url?: string }[] = []
 
     // --- Spotify oEmbed (works for artist, album, track, playlist) ---
     if (isSpotify) {
@@ -269,7 +269,7 @@ Deno.serve(async (req) => {
           for (const pattern of genrePatterns) {
             const gm = description.match(pattern)
             if (gm) {
-              genres.push(...gm[1].split(/[,&\/]/).map((g: string) => g.trim()).filter(Boolean))
+              genres.push(...gm[1].split(/[,&/]/).map((g: string) => g.trim()).filter(Boolean))
             }
           }
         }

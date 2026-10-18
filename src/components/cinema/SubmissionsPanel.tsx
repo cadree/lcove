@@ -23,6 +23,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import type { Enums } from '@/integrations/supabase/types';
 import { format } from 'date-fns';
 
 interface Submission {
@@ -98,7 +99,7 @@ export const SubmissionsPanel = ({ networkId }: SubmissionsPanelProps) => {
           creator_id: submission.submitter_id,
           title: submission.title,
           description: submission.description,
-          content_type: submission.content_type as any,
+          content_type: submission.content_type as Enums<'network_content_type'>,
           director: submission.director,
           cast_members: submission.cast_members,
           runtime_minutes: submission.runtime_minutes,

@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import {
   Package,
   Wrench,
@@ -95,8 +96,8 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
           window.open(data.url, '_blank');
         }
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Purchase failed');
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, 'Purchase failed'));
     } finally {
       setIsPurchasing(false);
     }

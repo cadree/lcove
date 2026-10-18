@@ -21,6 +21,7 @@ import {
   CheckCircle, AlertCircle, Loader2, Trash2
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { errorMessage } from '@/lib/errorMessage';
 
 interface PartnerProfile {
   id: string;
@@ -120,8 +121,8 @@ export default function PartnerPortal() {
       queryClient.invalidateQueries({ queryKey: ['brand-partnerships'] });
       toast.success('Profile updated successfully!');
     },
-    onError: (error: any) => {
-      toast.error('Failed to update: ' + error.message);
+    onError: (error: unknown) => {
+      toast.error('Failed to update: ' + errorMessage(error));
     },
   });
 
@@ -145,7 +146,7 @@ export default function PartnerPortal() {
     if (!partnership) return;
     
     let logoUrl = partnership.brand_logo_url;
-    let galleryUrls = partnership.gallery_images || [];
+    const galleryUrls = partnership.gallery_images || [];
 
     // Upload logo if changed
     if (logoFile) {
@@ -244,8 +245,8 @@ export default function PartnerPortal() {
       toast.success('Partnership removed successfully');
       navigate('/brand-partners');
     },
-    onError: (error: any) => {
-      toast.error('Failed to remove partnership: ' + error.message);
+    onError: (error: unknown) => {
+      toast.error('Failed to remove partnership: ' + errorMessage(error));
     },
   });
 

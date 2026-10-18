@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useCreateStoreItem, useUpdateStoreItem, useStoreCategories, useMyStore, StoreItem } from '@/hooks/useStore';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -61,6 +61,24 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
   const [isActive, setIsActive] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
 
+  const resetForm = useCallback(() => {
+    setType(defaultType || 'product');
+    setTitle('');
+    setDescription('');
+    setPrice('');
+    setCreditsPrice('');
+    setCategoryId('');
+    setImages([]);
+    setInventoryCount('');
+    setDurationMinutes('');
+    setLocation('');
+    setAmenities([]);
+    setNewAmenity('');
+    setContactEmail('');
+    setContactPhone('');
+    setIsActive(true);
+  }, [defaultType]);
+
   useEffect(() => {
     if (editItem) {
       setType(editItem.type);
@@ -81,25 +99,7 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
       resetForm();
       if (defaultType) setType(defaultType);
     }
-  }, [editItem, defaultType, open]);
-
-  const resetForm = () => {
-    setType(defaultType || 'product');
-    setTitle('');
-    setDescription('');
-    setPrice('');
-    setCreditsPrice('');
-    setCategoryId('');
-    setImages([]);
-    setInventoryCount('');
-    setDurationMinutes('');
-    setLocation('');
-    setAmenities([]);
-    setNewAmenity('');
-    setContactEmail('');
-    setContactPhone('');
-    setIsActive(true);
-  };
+  }, [editItem, defaultType, open, resetForm]);
 
   const filteredCategories = categories?.filter((c) => c.type === type) || [];
 

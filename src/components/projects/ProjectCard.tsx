@@ -69,7 +69,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
             <Badge className={cn('text-xs', statusColors[project.status])}>
               {statusLabels[project.status]}
             </Badge>
-            {(project as any).is_private && (
+            {project.is_private && (
               <Badge variant="outline" className="text-[10px] gap-1"><Lock className="h-3 w-3" />Private</Badge>
             )}
             {outcomeLabels.slice(0, 2).map(o => (

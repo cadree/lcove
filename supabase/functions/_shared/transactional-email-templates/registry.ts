@@ -2,11 +2,21 @@
 import * as React from 'npm:react@18.3.1'
 
 export interface TemplateEntry {
-  component: React.ComponentType<any>
-  subject: string | ((data: Record<string, any>) => string)
+  component: React.ComponentType<Record<string, unknown>>
+  subject: string | ((data: Record<string, unknown>) => string)
   to?: string
   displayName?: string
-  previewData?: Record<string, any>
+  previewData?: Record<string, unknown>
+}
+
+export function defineTemplate<P extends object>(entry: {
+  component: React.ComponentType<P>
+  subject: string | ((data: P) => string)
+  to?: string
+  displayName?: string
+  previewData?: P
+}): TemplateEntry {
+  return entry as unknown as TemplateEntry
 }
 
 import { template as eventInvite } from './event-invite.tsx'

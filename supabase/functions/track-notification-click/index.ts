@@ -16,7 +16,9 @@ serve(async (req) => {
         .update({ status: "clicked", clicked_at: nowIso, opened_at: nowIso })
         .eq("id", logId);
     }
-  } catch (_) {}
+  } catch {
+    // Click tracking is best-effort; still redirect.
+  }
   // Validate destination is http(s)
   let dest = to;
   try {

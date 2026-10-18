@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { shareLink } from '@/lib/shareLink';
+import { errorMessage } from '@/lib/errorMessage';
 
 interface ClientInviteDialogProps {
   projectId: string;
@@ -52,16 +53,18 @@ export const ClientInviteDialog: React.FC<ClientInviteDialogProps> = ({
   const { data: clients = [] } = useQuery({
     queryKey: ['project-clients', projectId],
     queryFn: async () => {
-      const { data, error } = await (supabase
-        .from('project_clients') as any)
+      const { data, error } = await supabase
+        .from('project_clients')
         .select('*')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      const userIds = (data || []).filter((c: any) => c.client_user_id).map((c: any) => c.client_user_id);
-      let profiles: any[] = [];
+      const userIds = (data || [])
+        .map((c) => c.client_user_id)
+        .filter((id): id is string => Boolean(id));
+      let profiles: { user_id: string; display_name: string | null; avatar_url: string | null }[] = [];
       if (userIds.length > 0) {
         const { data: p } = await supabase
           .from('profiles_public')
@@ -70,10 +73,10 @@ export const ClientInviteDialog: React.FC<ClientInviteDialogProps> = ({
         profiles = p || [];
       }
 
-      return (data || []).map((c: any) => ({
+      return (data || []).map((c) => ({
         ...c,
         profile: profiles.find(p => p.user_id === c.client_user_id),
-      })) as ProjectClient[];
+      }));
     },
     enabled: open && !!projectId,
   });
@@ -82,7 +85,7 @@ export const ClientInviteDialog: React.FC<ClientInviteDialogProps> = ({
   const inviteClient = useMutation({
     mutationFn: async (clientUserId: string) => {
       if (!user?.id) throw new Error('Not authenticated');
-      const { error } = await (supabase.from('project_clients') as any).insert({
+      const { error } = await supabase.from('project_clients').insert({
         project_id: projectId,
         client_user_id: clientUserId,
         invited_by: user.id,
@@ -93,13 +96,13 @@ export const ClientInviteDialog: React.FC<ClientInviteDialogProps> = ({
       // Create client chat
       const { data: newConv, error: convError } = await supabase
         .from('conversations')
-        .insert({ type: 'direct', name: `${projectTitle} – Client Chat`, created_by: user.id, visibility: 'private', project_id: projectId, is_client_chat: true } as any)
+        .insert({ type: 'direct', name: `${projectTitle} – Client Chat`, created_by: user.id, visibility: 'private', project_id: projectId, is_client_chat: true })
         .select('id').single();
       if (!convError && newConv) {
         await supabase.from('conversation_participants').insert([
           { conversation_id: newConv.id, user_id: user.id, role: 'owner' },
           { conversation_id: newConv.id, user_id: clientUserId, role: 'member' },
-        ] as any);
+        ]);
       }
 
       // Send notification
@@ -110,14 +113,14 @@ export const ClientInviteDialog: React.FC<ClientInviteDialogProps> = ({
         title: 'Client Invitation',
         body: `${profile?.display_name || 'A creator'} invited you as a client on "${projectTitle}"`,
         data: { project_id: projectId },
-      } as any);
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-clients', projectId] });
       setSearchQuery('');
       toast.success('Client invited!');
     },
-    onError: (err: any) => toast.error(err.message || 'Failed to invite client'),
+    onError: (err: unknown) => toast.error(errorMessage(err, 'Failed to invite client')),
   });
 
   // Generate share link for external client
@@ -125,7 +128,7 @@ export const ClientInviteDialog: React.FC<ClientInviteDialogProps> = ({
     mutationFn: async () => {
       if (!user?.id) throw new Error('Not authenticated');
       const token = crypto.randomUUID();
-      const { error } = await (supabase.from('project_clients') as any).insert({
+      const { error } = await supabase.from('project_clients').insert({
         project_id: projectId,
         invited_by: user.id,
         status: 'invited',
@@ -142,12 +145,12 @@ export const ClientInviteDialog: React.FC<ClientInviteDialogProps> = ({
       setGeneratedLink(link);
       toast.success('Client link generated!');
     },
-    onError: (err: any) => toast.error(err.message || 'Failed to generate link'),
+    onError: (err: unknown) => toast.error(errorMessage(err, 'Failed to generate link')),
   });
 
   const removeClient = useMutation({
     mutationFn: async (clientId: string) => {
-      const { error } = await (supabase.from('project_clients') as any).update({ status: 'removed' }).eq('id', clientId);
+      const { error } = await supabase.from('project_clients').update({ status: 'removed' }).eq('id', clientId);
       if (error) throw error;
     },
     onSuccess: () => {

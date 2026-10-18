@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,7 +33,7 @@ export function useUserBlocks() {
     enabled: !!user,
   });
 
-  const blockedIds = data?.blockedIds ?? [];
+  const blockedIds = useMemo(() => data?.blockedIds ?? [], [data?.blockedIds]);
   const blockedUsers = data?.profiles ?? [];
 
   const blockUser = useMutation({

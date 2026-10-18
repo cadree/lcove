@@ -4,13 +4,35 @@ import { useCampaignAnalytics } from "@/hooks/useNotificationCampaigns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 
+interface CampaignTotals {
+  sent?: number;
+  opened?: number;
+  clicked?: number;
+  failed?: number;
+}
+
+interface RecentCampaign {
+  id: string;
+  title?: string | null;
+  type?: string | null;
+  created_at: string;
+  sent_count?: number;
+  recipient_count?: number;
+}
+
+interface CampaignAnalyticsPayload {
+  totals?: CampaignTotals;
+  recent_campaigns?: RecentCampaign[];
+}
+
 export function CampaignAnalyticsCard({ eventId }: { eventId?: string }) {
   const { data, isLoading } = useCampaignAnalytics(eventId);
 
   if (isLoading) return <Skeleton className="h-40 w-full" />;
 
-  const totals = data?.totals || {};
-  const recent = data?.recent_campaigns || [];
+  const analytics = (data ?? null) as unknown as CampaignAnalyticsPayload | null;
+  const totals = analytics?.totals || {};
+  const recent = analytics?.recent_campaigns || [];
 
   const openRate = totals.sent ? Math.round((totals.opened / totals.sent) * 100) : 0;
   const clickRate = totals.sent ? Math.round((totals.clicked / totals.sent) * 100) : 0;
@@ -34,7 +56,7 @@ export function CampaignAnalyticsCard({ eventId }: { eventId?: string }) {
         {recent.length > 0 && (
           <div className="space-y-1.5 pt-2 border-t border-border/40">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Recent</p>
-            {recent.slice(0, 5).map((c: any) => (
+            {recent.slice(0, 5).map((c) => (
               <div key={c.id} className="flex justify-between items-center text-xs py-1">
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{c.title || c.type}</p>
@@ -50,7 +72,7 @@ export function CampaignAnalyticsCard({ eventId }: { eventId?: string }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: any }) {
+function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-lg bg-card/40 border border-border/30 p-2">
       <p className="text-lg font-bold">{value}</p>

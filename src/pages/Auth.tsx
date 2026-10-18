@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { z } from 'zod';
@@ -133,13 +133,15 @@ const Auth = () => {
     };
   }, []);
 
-  // Log platform info on mount
+  // Log platform info on mount. mode is read from a ref so this stays mount-only.
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
   useEffect(() => {
     logAuthEvent('Auth page mounted', {
       platform: Capacitor.getPlatform(),
       isNative: Capacitor.isNativePlatform(),
       isOnline: navigator.onLine,
-      mode,
+      mode: modeRef.current,
     });
   }, []);
 
