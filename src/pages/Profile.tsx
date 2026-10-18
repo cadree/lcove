@@ -101,7 +101,7 @@ const Profile = () => {
       navigate(`/messages?chat=${conversation.id}`);
     } catch (error) {
       console.error('Failed to create conversation:', error);
-      toast.error('Failed to start conversation');
+      toast.error(error instanceof Error ? error.message : 'Failed to start conversation');
     }
   };
 

@@ -3,7 +3,7 @@ import {
   Shield, Users, AlertTriangle, CheckCircle, Clock, History, Search, 
   ArrowLeft, Ban, UserCheck, ClipboardList, Trash2, Eye, Phone, Mail, MapPin, 
   Briefcase, Heart, Star, Send, Coins, Download, MessageSquare, ShieldCheck, ShieldOff,
-  MessageCircle, Building2
+  MessageCircle, Building2, Flag
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/layout/PageLayout';
@@ -47,6 +47,7 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PartnerApplicationsTab } from '@/components/admin/PartnerApplicationsTab';
+import { ContentReportsTab } from '@/components/admin/ContentReportsTab';
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
@@ -397,12 +398,13 @@ const Admin: React.FC = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="users" className="px-4">
-          <TabsList className="w-full grid grid-cols-6">
+          <TabsList className="w-full grid grid-cols-7">
             <TabsTrigger value="users"><Users className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="pending"><Clock className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="partners"><Building2 className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="messages"><MessageSquare className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="flagged"><AlertTriangle className="h-4 w-4" /></TabsTrigger>
+            <TabsTrigger value="reports" title="Reports"><Flag className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="history"><History className="h-4 w-4" /></TabsTrigger>
           </TabsList>
 
@@ -809,6 +811,10 @@ const Admin: React.FC = () => {
                 </div>
               )}
             </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="reports" className="mt-4">
+            <ContentReportsTab />
           </TabsContent>
 
           {/* Action History Tab */}

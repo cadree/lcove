@@ -5,11 +5,13 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConversations } from '@/hooks/useConversations';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { usePresence } from '@/hooks/usePresence';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { OnlineIndicator } from '@/components/ui/online-indicator';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -26,6 +28,7 @@ interface NewChatDialogProps {
 const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDialogProps) => {
   const { user } = useAuth();
   const { createDirectConversation, createGroupConversation } = useConversations();
+  const { blockedIds } = useUserBlocks();
   const { isOnline } = usePresence();
   const [search, setSearch] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
@@ -50,10 +53,11 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
 
       const { data, error } = await query;
       if (error) throw error;
-      return data || [];
+      return (data || []).filter((person) => !blockedIds.includes(person.user_id));
     },
     enabled: open && !!user,
   });
+  const visibleUsers = users.filter((person) => !blockedIds.includes(person.user_id));
 
   const toggleUser = (userId: string) => {
     setSelectedUsers(prev => 
@@ -83,6 +87,7 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
       setIsGroup(false);
     } catch (error) {
       console.error('Failed to create conversation:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to start conversation');
     }
   };
 
@@ -176,12 +181,12 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
           <div className="max-h-[300px] overflow-y-auto space-y-1">
             {isLoading ? (
               <div className="py-8 text-center text-muted-foreground">Loading...</div>
-            ) : users.length === 0 ? (
+            ) : visibleUsers.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground">
                 {search ? 'No users found' : 'No users available'}
               </div>
             ) : (
-              users.map(u => (
+              visibleUsers.map(u => (
                 <button
                   key={u.user_id}
                   onClick={() => {

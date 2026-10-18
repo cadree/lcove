@@ -18,6 +18,7 @@ import {
   Lock,
   ExternalLink,
   Sparkles,
+  Flag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,6 +39,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { ReportDialog } from "@/components/safety/ReportDialog";
 import { shareLink, buildShareUrl } from "@/lib/shareLink";
 import { cn } from "@/lib/utils";
 import { ProjectDetail } from "@/components/projects/ProjectDetail";
@@ -75,6 +77,7 @@ export default function PublicProjectPage() {
   const [guestPortfolio, setGuestPortfolio] = useState("");
   const [guestMessage, setGuestMessage] = useState("");
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const { data: project, isLoading } = useQuery({
     queryKey: ["public-project", projectId],
@@ -303,7 +306,26 @@ export default function PublicProjectPage() {
           <Button variant="secondary" size="icon" className="h-9 w-9 rounded-full backdrop-blur-md bg-background/60" onClick={handleShare}>
             <Share2 className="h-4 w-4" />
           </Button>
+          {user && !isCreator && projectId && (
+            <Button
+              variant="secondary"
+              size="icon"
+              className="h-9 w-9 rounded-full backdrop-blur-md bg-background/60"
+              aria-label="Report project"
+              onClick={() => setReportOpen(true)}
+            >
+              <Flag className="h-4 w-4" />
+            </Button>
+          )}
         </div>
+        {projectId && (
+          <ReportDialog
+            open={reportOpen}
+            onOpenChange={setReportOpen}
+            targetType="project"
+            targetId={projectId}
+          />
+        )}
       </div>
 
       <div className="max-w-lg mx-auto px-4 -mt-12 relative z-10 pb-12 space-y-4">

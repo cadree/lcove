@@ -47,6 +47,7 @@ import SignContract from "./pages/SignContract";
 import Portfolios from "./pages/Portfolios";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
+import Guidelines from "./pages/Guidelines";
 import BrandPartners from "./pages/BrandPartners";
 import Collectives from "./pages/Collectives";
 import PartnerPortal from "./pages/PartnerPortal";
@@ -126,6 +127,7 @@ const App = () => (
                 <Route path="/portfolios" element={<Portfolios />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
+                <Route path="/guidelines" element={<Guidelines />} />
                 <Route path="/brand-partners" element={<BrandPartners />} />
                 <Route path="/partner-portal" element={<PartnerPortal />} />
                 <Route path="/collectives" element={<Collectives />} />

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Trash2, Play } from 'lucide-react';
+import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Trash2, Play, Flag } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { usePostInteractions } from '@/hooks/usePostInteractions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { shareLink, buildShareUrl } from '@/lib/shareLink';
+import { ReportDialog } from '@/components/safety/ReportDialog';
 
 interface Post {
   id: string;
@@ -55,6 +56,7 @@ const FeedPost = ({ post }: { post: Post }) => {
 
   const [showComments, setShowComments] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const isOwner = user?.id === post.user_id;
 
   const authorName = post.profile ? (post.profile.display_name || 'User') : 'Private profile';
@@ -120,24 +122,44 @@ const FeedPost = ({ post }: { post: Post }) => {
           </div>
         </div>
 
-        {isOwner && (
+        {user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="iconSm" className="text-muted-foreground">
+              <Button variant="ghost" size="iconSm" className="text-muted-foreground" aria-label="Post actions">
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-card border-border/50">
-              <DropdownMenuItem
-                onClick={handleDelete}
-                className="text-destructive focus:text-destructive gap-2"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete post
-              </DropdownMenuItem>
+              {isOwner && (
+                <DropdownMenuItem
+                  onClick={handleDelete}
+                  className="text-destructive focus:text-destructive gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete post
+                </DropdownMenuItem>
+              )}
+              {!isOwner && (
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    setReportOpen(true);
+                  }}
+                  className="gap-2"
+                >
+                  <Flag className="w-4 h-4" />
+                  Report
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )}
+        <ReportDialog
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+          targetType="post"
+          targetId={post.id}
+        />
       </header>
 
       {/* Content */}

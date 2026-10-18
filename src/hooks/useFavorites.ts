@@ -40,8 +40,8 @@ export function useFavorites() {
       queryClient.invalidateQueries({ queryKey: ['favorite-friends', user?.id] });
       toast.success('Added to favorites');
     },
-    onError: () => {
-      toast.error('Failed to add favorite');
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Failed to add favorite');
     },
   });
 
