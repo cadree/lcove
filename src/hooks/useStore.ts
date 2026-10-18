@@ -14,11 +14,14 @@ export interface Store {
   accepts_credits: boolean;
   accepts_cash: boolean;
   shopify_store_url: string | null;
-  shopify_access_token: string | null;
   peerspace_url: string | null;
   created_at: string;
   updated_at: string;
 }
+
+/** Columns safe to read from the client. Payment secrets live in store_secrets. */
+export const STORE_PUBLIC_COLUMNS =
+  'id, user_id, name, description, cover_image_url, logo_url, is_active, accepts_credits, accepts_cash, shopify_store_url, peerspace_url, created_at, updated_at';
 
 export interface StoreItemCategory {
   id: string;
@@ -87,7 +90,7 @@ export const useMyStore = () => {
       if (!user) return null;
       const { data, error } = await supabase
         .from('stores')
-        .select('*')
+        .select(STORE_PUBLIC_COLUMNS)
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -106,7 +109,7 @@ export const useStoreByUser = (userId: string | undefined) => {
       if (!userId) return null;
       const { data, error } = await supabase
         .from('stores')
-        .select('*')
+        .select(STORE_PUBLIC_COLUMNS)
         .eq('user_id', userId)
         .eq('is_active', true)
         .maybeSingle();
@@ -144,7 +147,7 @@ export const useStoreItems = (type?: 'product' | 'service' | 'rental', storeId?:
         .select(`
           *,
           category:store_item_categories(*),
-          store:stores(*)
+          store:stores(${STORE_PUBLIC_COLUMNS})
         `)
         .eq('is_active', true);
 
@@ -189,7 +192,7 @@ export const useStoreItem = (itemId: string | undefined) => {
         .select(`
           *,
           category:store_item_categories(*),
-          store:stores(*)
+          store:stores(${STORE_PUBLIC_COLUMNS})
         `)
         .eq('id', itemId)
         .single();
@@ -261,7 +264,7 @@ export const useCreateStore = () => {
       const { data: store, error } = await supabase
         .from('stores')
         .insert(insertData)
-        .select()
+        .select(STORE_PUBLIC_COLUMNS)
         .single();
 
       if (error) throw error;
@@ -287,7 +290,7 @@ export const useUpdateStore = () => {
         .from('stores')
         .update(data)
         .eq('id', id)
-        .select()
+        .select(STORE_PUBLIC_COLUMNS)
         .single();
 
       if (error) throw error;

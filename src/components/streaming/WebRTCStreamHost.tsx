@@ -491,7 +491,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
         if (blob && blob.size > 0 && user) {
           console.log('[Host] Uploading replay, size:', blob.size);
           
-          const fileName = `replays/${user.id}/${streamId}-${Date.now()}.webm`;
+          const fileName = `${user.id}/replays/${streamId}-${Date.now()}.webm`;
           const { error: uploadError } = await supabase.storage
             .from('media')
             .upload(fileName, blob, {

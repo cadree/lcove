@@ -3,6 +3,25 @@ import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
 
+type FundSnapshot = { collected: number; member_count: number };
+
+/** Aggregate-only read. Row policies hide other members' membership rows. */
+async function fundSnapshot(start?: string, end?: string): Promise<FundSnapshot> {
+  const args: { p_start?: string; p_end?: string } = {};
+  if (start) args.p_start = start;
+  if (end) args.p_end = end;
+  const { data, error } = await supabase.rpc(
+    'membership_fund_snapshot' as never,
+    args as never,
+  );
+  if (error) throw error;
+  const row = (data ?? {}) as Partial<FundSnapshot>;
+  return {
+    collected: Number(row.collected ?? 0),
+    member_count: Number(row.member_count ?? 0),
+  };
+}
+
 export interface FundStats {
   lifetime: {
     totalCollected: number;
@@ -94,12 +113,8 @@ export function useFundStats() {
       const monthStart = startOfMonth(now).toISOString();
       const monthEnd = endOfMonth(now).toISOString();
 
-      // Lifetime contributions collected
-      const { data: lifetimeContributions } = await supabase
-        .from('membership_contributions')
-        .select('amount, user_id');
-
-      const lifetimeTotalCollected = lifetimeContributions?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
+      const lifetimeSnapshot = await fundSnapshot();
+      const lifetimeTotalCollected = lifetimeSnapshot.collected;
       
       // Get REAL distribution data from fund_distributions table
       const { data: allDistributions } = await supabase
@@ -125,20 +140,10 @@ export function useFundStats() {
         allDistributions?.filter(d => d.recipient_id || d.recipient_name).map(d => d.recipient_id || d.recipient_name)
       );
 
-      // Get active memberships count
-      const { count: memberCount } = await supabase
-        .from('memberships')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'active');
+      const memberCount = lifetimeSnapshot.member_count;
 
-      // Monthly stats
-      const { data: monthlyContributions } = await supabase
-        .from('membership_contributions')
-        .select('amount, user_id')
-        .gte('created_at', monthStart)
-        .lte('created_at', monthEnd);
-
-      const monthlyTotalCollected = monthlyContributions?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
+      const monthlySnapshot = await fundSnapshot(monthStart, monthEnd);
+      const monthlyTotalCollected = monthlySnapshot.collected;
 
       // Monthly distributions
       const { data: monthlyDistributions } = await supabase
@@ -153,12 +158,7 @@ export function useFundStats() {
         monthlyDistributions?.filter(d => d.recipient_id || d.recipient_name).map(d => d.recipient_id || d.recipient_name)
       );
 
-      // New members this month
-      const { count: newMembersThisMonth } = await supabase
-        .from('memberships')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', monthStart)
-        .lte('created_at', monthEnd);
+      const newMembersThisMonth = monthlySnapshot.member_count;
 
       // Get 6-month trend data with REAL distribution data
       const monthlyTrend = await Promise.all(
@@ -169,14 +169,7 @@ export function useFundStats() {
           const start = startOfMonth(date).toISOString();
           const end = endOfMonth(date).toISOString();
           
-          // Collected
-          const { data: contributions } = await supabase
-            .from('membership_contributions')
-            .select('amount')
-            .gte('created_at', start)
-            .lte('created_at', end);
-
-          const collected = contributions?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
+          const collected = (await fundSnapshot(start, end)).collected;
           
           // Distributed (from real data)
           const { data: distributions } = await supabase

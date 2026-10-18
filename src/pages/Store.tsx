@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMyStore, useStoreItems, useMyStoreItems, useDeleteStoreItem, StoreItem, Store as StoreType } from '@/hooks/useStore';
+import { useMyStore, useStoreItems, useMyStoreItems, useDeleteStoreItem, StoreItem, Store as StoreType, STORE_PUBLIC_COLUMNS } from '@/hooks/useStore';
 import { supabase } from '@/integrations/supabase/client';
 import PageLayout from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -69,7 +69,7 @@ const Store = () => {
       if (!storeIdParam) return null;
       const { data, error } = await supabase
         .from('stores')
-        .select('*')
+        .select(STORE_PUBLIC_COLUMNS)
         .eq('id', storeIdParam)
         .eq('is_active', true)
         .maybeSingle();

@@ -45,7 +45,7 @@ export function ProfileFolders({ userId, isOwner, onFolderClick }: ProfileFolder
     setIsUploadingCover(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const filePath = `folder-covers/${Date.now()}.${fileExt}`;
+      const filePath = `${userId}/folder-covers/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('media')

@@ -57,7 +57,7 @@ serve(async (req) => {
     // Get the store item with store details including Connect info
     const { data: item, error: itemError } = await supabaseClient
       .from("store_items")
-      .select("*, store:stores(*, stripe_connect_account_id, payout_enabled)")
+      .select("*, store:stores(id, user_id, name, payout_enabled, accepts_cash, accepts_credits)")
       .eq("id", itemId)
       .single();
 
@@ -78,10 +78,17 @@ serve(async (req) => {
       throw new Error("Store not found");
     }
 
+    const { data: storeSecrets } = await supabaseAdmin
+      .from("store_secrets")
+      .select("stripe_connect_account_id")
+      .eq("store_id", store.id)
+      .maybeSingle();
+    const connectAccountId = storeSecrets?.stripe_connect_account_id ?? null;
+
     logStep(`Processing ${paymentType} purchase for item ${itemId}`, { 
       itemTitle: item.title,
       storeId: store.id,
-      hasConnect: !!store.stripe_connect_account_id,
+      hasConnect: !!connectAccountId,
       payoutEnabled: store.payout_enabled
     });
 
@@ -279,16 +286,16 @@ serve(async (req) => {
       };
 
       // If seller has Stripe Connect enabled, use application fee for automatic 80/20 split
-      if (store.stripe_connect_account_id && store.payout_enabled) {
+      if (connectAccountId && store.payout_enabled) {
         sessionConfig.payment_intent_data = {
           application_fee_amount: platformFeeAmount,
           transfer_data: {
-            destination: store.stripe_connect_account_id,
+            destination: connectAccountId,
           },
         };
         logStep("Using Stripe Connect with application fee", { 
           platformFeeAmount, 
-          connectAccountId: store.stripe_connect_account_id 
+          connectAccountId
         });
       }
 

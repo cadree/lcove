@@ -42,7 +42,7 @@ serve(async (req) => {
     // Verify user owns this store
     const { data: store, error: storeError } = await supabaseClient
       .from("stores")
-      .select("id, user_id, name, stripe_connect_account_id")
+      .select("id, user_id, name")
       .eq("id", storeId)
       .single();
 
@@ -50,11 +50,17 @@ serve(async (req) => {
     if (store.user_id !== user.id) throw new Error("You don't own this store");
     logStep("Store verified", { storeId, storeName: store.name });
 
+    const { data: secrets } = await supabaseClient
+      .from("store_secrets")
+      .select("stripe_connect_account_id")
+      .eq("store_id", storeId)
+      .maybeSingle();
+
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2025-08-27.basil",
     });
 
-    let accountId = store.stripe_connect_account_id;
+    let accountId = secrets?.stripe_connect_account_id;
 
     // Create a new Connect account if one doesn't exist
     if (!accountId) {
@@ -79,9 +85,8 @@ serve(async (req) => {
 
       // Save the account ID to the store
       const { error: updateError } = await supabaseClient
-        .from("stores")
-        .update({ stripe_connect_account_id: accountId })
-        .eq("id", storeId);
+        .from("store_secrets")
+        .upsert({ store_id: storeId, stripe_connect_account_id: accountId }, { onConflict: "store_id" });
 
       if (updateError) {
         logStep("Failed to save account ID", { error: updateError.message });

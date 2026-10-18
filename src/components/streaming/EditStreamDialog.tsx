@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { LiveStream, useSaveReplay, useDeleteStream } from '@/hooks/useLiveStreams';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Image, Upload, X, Loader2, Trash2, Save, Move } from 'lucide-react';
 import {
@@ -48,6 +49,7 @@ export const EditStreamDialog: React.FC<EditStreamDialogProps> = ({
   const imageContainerRef = useRef<HTMLDivElement>(null);
   
   const deleteStream = useDeleteStream();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (stream) {
@@ -109,7 +111,8 @@ export const EditStreamDialog: React.FC<EditStreamDialogProps> = ({
       if (thumbnailFile) {
         setIsUploading(true);
         const fileExt = thumbnailFile.name.split('.').pop();
-        const fileName = `thumbnails/${stream.id}-${Date.now()}.${fileExt}`;
+        if (!user) throw new Error('Sign in to upload');
+        const fileName = `${user.id}/thumbnails/${stream.id}-${Date.now()}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
           .from('media')

@@ -23,6 +23,7 @@ import { NetworkContent, useContentGenres } from '@/hooks/useCinema';
 import { useUpdateContent } from '@/hooks/useNetworkContentManage';
 import { Film, Upload, Link as LinkIcon, X, Plus, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 interface EditContentDialogProps {
@@ -68,9 +69,12 @@ export const EditContentDialog = ({ open, onOpenChange, content }: EditContentDi
     }
   }, [content]);
 
+  const { user } = useAuth();
+
   const uploadFile = async (file: File, path: string): Promise<string | null> => {
+    if (!user) return null;
     const fileExt = file.name.split('.').pop();
-    const fileName = `${path}/${Date.now()}.${fileExt}`;
+    const fileName = `${user.id}/${path}/${Date.now()}.${fileExt}`;
 
     const { error } = await supabase.storage
       .from('media')

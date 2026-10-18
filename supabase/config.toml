@@ -34,7 +34,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.send-notification-email]
-verify_jwt = false
+verify_jwt = true
 
 [functions.create-network-subscription]
 verify_jwt = true
@@ -61,19 +61,19 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.send-push-notification]
-verify_jwt = false
+verify_jwt = true
 
 [functions.notify-application-accepted]
-verify_jwt = false
+verify_jwt = true
 
 [functions.notify-new-content]
-verify_jwt = false
+verify_jwt = true
 
 [functions.notify-new-application]
-verify_jwt = false
+verify_jwt = true
 
 [functions.notify-content-submission]
-verify_jwt = false
+verify_jwt = true
 
 [functions.transfer-credits]
 verify_jwt = true
@@ -97,13 +97,13 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.notify-partner-accepted]
-verify_jwt = false
+verify_jwt = true
 
 [functions.host-calendar-feed]
 verify_jwt = false
 
 [functions.notify-guest-application]
-verify_jwt = false
+verify_jwt = true
 
 [functions.share-page]
 verify_jwt = false
@@ -143,3 +143,59 @@ verify_jwt = false
 
 [functions.handle-email-suppression]
 verify_jwt = false
+
+# Functions that were previously implicit (gateway default verify_jwt = true is not
+# reliable across Lovable deploys). Explicit values match how each is called.
+# auto-event-reminders is cron-only and checks x-internal-secret in the function.
+# track-notification-* are email pixels and redirects; mail clients send no JWT.
+
+[functions.fetch-artist-image]
+verify_jwt = true
+
+[functions.generate-event-flyer]
+verify_jwt = true
+
+[functions.generate-wallet-pass]
+verify_jwt = true
+
+[functions.auto-event-reminders]
+verify_jwt = false
+
+[functions.check-event-connect-status]
+verify_jwt = true
+
+[functions.create-event-connect-account]
+verify_jwt = true
+
+[functions.create-fund-donation]
+verify_jwt = true
+
+[functions.send-individual-reminder]
+verify_jwt = true
+
+[functions.send-rsvp-confirmation]
+verify_jwt = true
+
+[functions.track-notification-click]
+verify_jwt = false
+
+[functions.track-notification-open]
+verify_jwt = false
+
+[functions.verify-event-purchase]
+verify_jwt = true
+
+[functions.verify-host-email]
+verify_jwt = true
+
+[functions.send-audience-invite]
+verify_jwt = true
+
+[functions.send-bulk-attendee-reminder]
+verify_jwt = true
+
+[functions.send-event-invite]
+verify_jwt = true
+
+[functions.send-event-reminder]
+verify_jwt = true

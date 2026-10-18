@@ -60,7 +60,8 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
     setIsUploadingCover(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const filePath = `folder-covers/${folder.id}/${Date.now()}.${fileExt}`;
+      if (!user) return;
+      const filePath = `${user.id}/folder-covers/${folder.id}/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('media')

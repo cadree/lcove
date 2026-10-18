@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useCreateStoreItem, useUpdateStoreItem, useStoreCategories, useMyStore, StoreItem } from '@/hooks/useStore';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Dialog,
   DialogContent,
@@ -38,6 +39,7 @@ const typeOptions = [
 
 export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: CreateItemDialogProps) => {
   const { data: store } = useMyStore();
+  const { user } = useAuth();
   const { data: categories } = useStoreCategories();
   const createItem = useCreateStoreItem();
   const updateItem = useUpdateStoreItem();
@@ -104,6 +106,10 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    if (!user) {
+      toast.error('Sign in to upload');
+      return;
+    }
 
     setIsUploading(true);
     const uploadedUrls: string[] = [];
@@ -111,7 +117,7 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
     for (const file of Array.from(files)) {
       const fileExt = file.name.split('.').pop();
       const fileName = `${crypto.randomUUID()}.${fileExt}`;
-      const filePath = `store-items/${fileName}`;
+      const filePath = `${user.id}/store-items/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('media')
