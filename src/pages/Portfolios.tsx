@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { CreatePostDialog } from "@/components/profile/CreatePostDialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { toast } from "sonner";
 
 interface PortfolioPost {
@@ -30,6 +31,7 @@ interface PortfolioPost {
 
 const Portfolios = () => {
   const { user } = useAuth();
+  const { blockedIds } = useUserBlocks();
   const queryClient = useQueryClient();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
@@ -174,6 +176,8 @@ const Portfolios = () => {
     await createPortfolioPost.mutateAsync(data);
   };
 
+  const visiblePosts = (posts ?? []).filter((post) => !blockedIds.includes(post.user_id));
+
   return (
     <PageLayout>
       <PageHeader 
@@ -196,9 +200,9 @@ const Portfolios = () => {
           <div className="flex justify-center py-12">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
-        ) : posts && posts.length > 0 ? (
+        ) : visiblePosts.length > 0 ? (
           <div className="grid grid-cols-2 gap-3">
-            {posts.map((post, index) => (
+            {visiblePosts.map((post, index) => (
               <motion.div
                 key={post.id}
                 initial={{ opacity: 0, y: 10 }}

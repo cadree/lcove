@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 
 interface Post {
@@ -24,6 +26,7 @@ interface Post {
 export function usePosts() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { blockedIds } = useUserBlocks();
 
   const { data: posts = [], isLoading, refetch } = useQuery({
     queryKey: ['posts'],
@@ -192,8 +195,13 @@ export function usePosts() {
     },
   });
 
+  const visiblePosts = useMemo(
+    () => posts.filter((post) => !blockedIds.includes(post.user_id)),
+    [posts, blockedIds],
+  );
+
   return {
-    posts,
+    posts: visiblePosts,
     isLoading,
     createPost,
     addReaction,

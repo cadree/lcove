@@ -5,7 +5,7 @@ import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
 import { 
   ArrowLeft, MoreVertical, Phone, Video, Trash2, 
   Check, CheckCheck, Play, Pause, Image as ImageIcon,
-  Users, Calendar, Info, ChevronDown, ChevronUp, LogOut
+  Users, Calendar, Info, ChevronDown, ChevronUp, LogOut, Flag
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/hooks/useMessages';
@@ -20,6 +20,7 @@ import { OnlineIndicator } from '@/components/ui/online-indicator';
 import MessageComposer from './MessageComposer';
 import ProjectCommandCenter from './ProjectCommandCenter';
 import { toast } from 'sonner';
+import { ReportDialog } from '@/components/safety/ReportDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +58,8 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [showProjectInfo, setShowProjectInfo] = useState(false);
+  const [reportMessageId, setReportMessageId] = useState<string | null>(null);
+  const [reportProfileId, setReportProfileId] = useState<string | null>(null);
 
   
   // Get the other participant's user ID for direct messages
@@ -273,6 +276,12 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                   Block user
                 </DropdownMenuItem>
               )}
+              {otherUserId && conversation?.type === 'direct' && (
+                <DropdownMenuItem onClick={() => setReportProfileId(otherUserId)}>
+                  <Flag className="w-4 h-4 mr-2" />
+                  Report profile
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -418,6 +427,17 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                                 )}
                               </span>
                             )}
+                            {!isOwn && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="w-6 h-6 text-muted-foreground"
+                                aria-label="Report message"
+                                onClick={() => setReportMessageId(msg.id)}
+                              >
+                                <Flag className="w-3 h-3" />
+                              </Button>
+                            )}
                           </div>
 
                           {/* Delete option - always visible on mobile */}
@@ -476,6 +496,26 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
         onTyping={setTypingIndicator}
         isSending={sendMessage.isPending}
       />
+      {reportMessageId && (
+        <ReportDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setReportMessageId(null);
+          }}
+          targetType="message"
+          targetId={reportMessageId}
+        />
+      )}
+      {reportProfileId && (
+        <ReportDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setReportProfileId(null);
+          }}
+          targetType="profile"
+          targetId={reportProfileId}
+        />
+      )}
     </div>
   );
 };

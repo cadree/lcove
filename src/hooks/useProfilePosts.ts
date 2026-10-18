@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { ProfilePost } from '@/types/post';
 
@@ -9,6 +10,7 @@ export function useProfilePosts(userId?: string) {
   const queryClient = useQueryClient();
 
   const targetUserId = userId || user?.id;
+  const { isBlocked } = useUserBlocks();
 
   const { data: posts = [], isLoading, refetch } = useQuery({
     queryKey: ['profile-posts', targetUserId],
@@ -166,8 +168,10 @@ export function useProfilePosts(userId?: string) {
     },
   });
 
+  const visiblePosts = targetUserId && isBlocked(targetUserId) ? [] : posts;
+
   return {
-    posts,
+    posts: visiblePosts,
     isLoading,
     createPost,
     deletePost,

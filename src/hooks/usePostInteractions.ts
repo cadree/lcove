@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 
 interface Comment {
@@ -21,6 +22,7 @@ interface Comment {
 export function usePostInteractions(postId: string) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { blockedIds } = useUserBlocks();
 
   // Fetch likes count and user's like status
   const { data: likesData, refetch: refetchLikes } = useQuery({
@@ -227,11 +229,16 @@ export function usePostInteractions(postId: string) {
     };
   }, [postId, refetchLikes, refetchComments]);
 
+  const visibleComments = useMemo(
+    () => hideBlockedComments(comments, new Set(blockedIds)),
+    [comments, blockedIds],
+  );
+
   return {
     likesCount: likesData?.count || 0,
     hasLiked: likesData?.hasLiked || false,
-    comments,
-    commentsCount: comments.reduce((acc, c) => acc + 1 + (c.replies?.length || 0), 0),
+    comments: visibleComments,
+    commentsCount: countComments(visibleComments),
     isSaved,
     toggleLike: () => likeMutation.mutate(),
     addComment: (content: string, parentId?: string) => commentMutation.mutate({ content, parentId }),
@@ -241,4 +248,21 @@ export function usePostInteractions(postId: string) {
     isCommenting: commentMutation.isPending,
     isSaving: saveMutation.isPending,
   };
+}
+
+function hideBlockedComments(comments: Comment[], blocked: Set<string>): Comment[] {
+  const visible: Comment[] = [];
+  for (const comment of comments) {
+    const replies = hideBlockedComments(comment.replies ?? [], blocked);
+    if (blocked.has(comment.user_id)) {
+      visible.push(...replies);
+    } else {
+      visible.push({ ...comment, replies });
+    }
+  }
+  return visible;
+}
+
+function countComments(comments: Comment[]): number {
+  return comments.reduce((acc, comment) => acc + 1 + countComments(comment.replies ?? []), 0);
 }

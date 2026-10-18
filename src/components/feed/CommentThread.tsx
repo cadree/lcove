@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
-import { Trash2, Reply, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trash2, Reply, ChevronDown, ChevronUp, Flag } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
+import { ReportDialog } from '@/components/safety/ReportDialog';
 
 interface Comment {
   id: string;
@@ -41,6 +42,7 @@ const CommentItem = ({
 }) => {
   const { user } = useAuth();
   const [showReplies, setShowReplies] = useState(depth === 0);
+  const [reportOpen, setReportOpen] = useState(false);
   const isOwner = user?.id === comment.user_id;
   const hasReplies = comment.replies && comment.replies.length > 0;
 
@@ -117,6 +119,18 @@ const CommentItem = ({
                 <Trash2 className="w-3 h-3" />
               </Button>
             )}
+
+            {user && !isOwner && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setReportOpen(true)}
+                className="text-muted-foreground hover:text-foreground h-auto py-1 px-2 text-xs"
+              >
+                <Flag className="w-3 h-3 mr-1" />
+                Report
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -141,6 +155,12 @@ const CommentItem = ({
           </motion.div>
         )}
       </AnimatePresence>
+      <ReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        targetType="comment"
+        targetId={comment.id}
+      />
     </motion.div>
   );
 };

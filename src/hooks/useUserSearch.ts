@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
 
 interface SearchedUser {
   id: string;
@@ -18,7 +19,8 @@ interface SearchedUser {
 }
 
 export function useUserSearch(searchQuery: string, enabled: boolean = true) {
-  return useQuery({
+  const { blockedIds } = useUserBlocks();
+  const query = useQuery({
     queryKey: ['user-search', searchQuery],
     queryFn: async () => {
       if (!searchQuery || searchQuery.length < 2) return [];
@@ -44,6 +46,9 @@ export function useUserSearch(searchQuery: string, enabled: boolean = true) {
     staleTime: 30000,
     retry: 2,
   });
+
+  const data = (query.data ?? []).filter((person) => !blockedIds.includes(person.user_id));
+  return { ...query, data };
 }
 
 export type { SearchedUser };

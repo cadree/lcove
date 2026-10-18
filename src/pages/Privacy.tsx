@@ -5,7 +5,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 
 const Privacy = () => {
   const navigate = useNavigate();
-  const lastUpdated = "January 31, 2026";
+  const lastUpdated = "October 18, 2026";
 
   return (
     <div className="min-h-screen bg-background">
@@ -183,15 +183,15 @@ const Privacy = () => {
               <ul className="list-disc list-inside space-y-2 text-sm">
                 <li><strong>Access:</strong> Request a copy of the personal data we hold about you</li>
                 <li><strong>Correction:</strong> Update or correct inaccurate information</li>
-                <li><strong>Deletion:</strong> Request deletion of your account and personal data</li>
+                <li><strong>Deletion:</strong> Delete your account and personal data in Settings</li>
                 <li><strong>Portability:</strong> Receive your data in a portable format</li>
                 <li><strong>Opt-Out:</strong> Unsubscribe from marketing communications</li>
                 <li><strong>Restrict Processing:</strong> Request limitations on how we use your data</li>
               </ul>
-              <p className="text-sm">To exercise these rights, please contact us at privacy@ethercreative.co or through the Settings page in the app.</p>
+              <p className="text-sm">To ask for a copy of your data or another request, email privacy@ethercreative.co. Account deletion is in Settings.</p>
               <div>
                 <h4 className="font-medium text-foreground mb-2">Account Deletion</h4>
-                <p className="text-sm">You can delete your account at any time through Settings. Upon deletion, we will remove your personal data within 30 days, except where retention is required by law.</p>
+                <p className="text-sm">Settings has Delete my account. Confirming it deletes your login and the personal data tied to it, including your profile, posts, comments, and messages. If a payout or other payment is still pending, deletion is refused until that money is settled. Records required for payments or the law can stay, without your profile attached.</p>
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -257,8 +257,8 @@ const Privacy = () => {
                 <li>Resolve disputes and enforce agreements</li>
               </ul>
               <p className="text-sm">
-                When you delete your account, we will delete or anonymize your personal data within 30 days, 
-                except for data we are required to retain for legal, regulatory, or security purposes.
+                When you delete your account in Settings, your login and personal data are removed then.
+                If money is still pending, the account stays until that is settled. Payment records we must keep are retained without your profile.
               </p>
             </AccordionContent>
           </AccordionItem>
