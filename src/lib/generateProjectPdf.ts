@@ -13,7 +13,11 @@ interface PdfProjectData {
     location_secured?: boolean;
     equipment_needed?: string | null;
     props_needed?: string | null;
-    deliverables?: any[] | null;
+    deliverables?: {
+      type?: string;
+      publish_date?: string | null;
+      publish_location?: string | null;
+    }[] | null;
     currency?: string;
   };
   creator?: { display_name?: string | null };
@@ -171,7 +175,7 @@ export function generateProjectPdf(data: PdfProjectData) {
   }
 
   // Deliverables
-  const deliverables = (data.project.deliverables as any[])?.filter(d => d?.type) || [];
+  const deliverables = (data.project.deliverables ?? []).filter(d => d?.type);
   if (deliverables.length > 0) {
     addHeading('Deliverables');
     deliverables.forEach(d => {

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { TablesUpdate } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -89,7 +90,7 @@ export function useUpdateMilestoneStatus() {
       status: ProjectMilestone['status'];
       projectId: string;
     }) => {
-      const updates: Record<string, any> = { status };
+      const updates: TablesUpdate<"project_milestones"> = { status };
       
       if (status === 'submitted') {
         updates.submitted_at = new Date().toISOString();

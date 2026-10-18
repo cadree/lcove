@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import type { Json } from '@/integrations/supabase/types';
 
 export interface Network {
   id: string;
@@ -41,7 +42,7 @@ export interface NetworkContent {
   external_video_url: string | null;
   director: string | null;
   cast_members: string[] | null;
-  credits: Record<string, any>;
+  credits: Json | null;
   genre_tags: string[] | null;
   is_featured: boolean;
   view_count: number;

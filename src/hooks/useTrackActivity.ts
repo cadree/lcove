@@ -8,13 +8,14 @@ import { useAuth } from "@/contexts/AuthContext";
  */
 export function useTrackActivity() {
   const { user } = useAuth();
+  const userId = user?.id;
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     // Throttle: only call once per 6 hours per session
-    const key = `lc_last_active_touch_${user.id}`;
+    const key = `lc_last_active_touch_${userId}`;
     const last = Number(localStorage.getItem(key) || 0);
     if (Date.now() - last < 6 * 60 * 60 * 1000) return;
     localStorage.setItem(key, String(Date.now()));
     supabase.rpc("touch_last_active").then(() => {});
-  }, [user?.id]);
+  }, [userId]);
 }

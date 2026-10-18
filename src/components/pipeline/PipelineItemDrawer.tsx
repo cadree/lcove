@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { format } from "date-fns";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -58,20 +58,23 @@ export function PipelineItemDrawer({
   const [editPriority, setEditPriority] = useState<'low' | 'medium' | 'high' | ''>("");
   const [editAvatarUrl, setEditAvatarUrl] = useState("");
 
-  // Reset edit state when item changes
+  // Reset edit state when the selected contact changes.
+  const itemRef = useRef(item);
+  itemRef.current = item;
+  const itemId = item?.id;
   useEffect(() => {
-    if (item) {
-      setEditName(item.name);
-      setEditEmail(item.email || "");
-      setEditPhone(item.phone || "");
-      setEditCompany(item.company || "");
-      setEditRole(item.role || "");
-      setEditNotes(item.notes || "");
-      setEditPriority(item.priority || "");
-      setEditAvatarUrl(item.avatar_url || "");
-      setIsEditing(false);
-    }
-  }, [item?.id]);
+    const current = itemRef.current;
+    if (!current) return;
+    setEditName(current.name);
+    setEditEmail(current.email || "");
+    setEditPhone(current.phone || "");
+    setEditCompany(current.company || "");
+    setEditRole(current.role || "");
+    setEditNotes(current.notes || "");
+    setEditPriority(current.priority || "");
+    setEditAvatarUrl(current.avatar_url || "");
+    setIsEditing(false);
+  }, [itemId]);
 
   if (!item) return null;
 

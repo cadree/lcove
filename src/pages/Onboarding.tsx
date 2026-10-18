@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -54,9 +54,12 @@ const Onboarding = () => {
     }
   }, [user, authLoading, navigate]);
 
-  // Pre-fill name from profile if available
+  // Pre-fill name from profile if the field is still empty. displayName is read
+  // from a ref so typing in the field does not re-run this effect.
+  const displayNameRef = useRef(data.displayName);
+  displayNameRef.current = data.displayName;
   useEffect(() => {
-    if (profile?.display_name && !data.displayName) {
+    if (profile?.display_name && !displayNameRef.current) {
       setData(prev => ({ ...prev, displayName: profile.display_name || '' }));
     }
   }, [profile]);

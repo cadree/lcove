@@ -22,7 +22,9 @@ serve(async (req) => {
         .eq("id", logId)
         .is("opened_at", null);
     }
-  } catch (_) {}
+  } catch {
+    // Open tracking is best-effort; still return the pixel.
+  }
   return new Response(PIXEL, {
     headers: {
       "Content-Type": "image/gif",

@@ -10,10 +10,11 @@ import { useEnergy, ENERGY_GAINS } from '@/hooks/useEnergy';
 export function useProjectJoinEnergy() {
   const { user } = useAuth();
   const { earnEnergy, energy } = useEnergy();
+  const energyLoaded = Boolean(energy);
   const processedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!user?.id || !energy) return;
+    if (!user?.id || !energyLoaded) return;
 
     const checkAcceptedApplications = async () => {
       // Get all accepted applications for the user
@@ -60,5 +61,5 @@ export function useProjectJoinEnergy() {
     };
 
     checkAcceptedApplications();
-  }, [user?.id, energy?.id, earnEnergy]);
+  }, [user?.id, energyLoaded, earnEnergy]);
 }

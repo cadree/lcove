@@ -194,7 +194,12 @@ const ProjectChecklist = ({ projectId, isOwner }: ProjectChecklistProps) => {
 const SuggestionRow = ({ suggestion, projectId, onReview }: {
   suggestion: ItemSuggestion;
   projectId: string;
-  onReview: (args: any) => void;
+  onReview: (args: {
+    suggestionId: string;
+    projectId: string;
+    status: 'approved' | 'denied';
+    suggestion: ItemSuggestion;
+  }) => void;
 }) => (
   <div className="flex items-center gap-2 text-sm p-2 rounded bg-muted/20">
     <div className="flex-1 min-w-0">

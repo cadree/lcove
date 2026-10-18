@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, Menu, X, Star, StickyNote } from 'lucide-react';
@@ -30,9 +30,12 @@ const BookOfLcove: React.FC = () => {
   const currentChapter = getChapterForPage(currentPage);
   const pageNotes = getNotesForPage(currentPage);
 
-  // Check for saved progress on mount
+  // Check for saved progress when it loads. currentPage is read from a ref so
+  // paging through the book does not re-open the continue prompt.
+  const currentPageRef = useRef(currentPage);
+  currentPageRef.current = currentPage;
   useEffect(() => {
-    if (progress && progress.current_page > 1 && currentPage === 1) {
+    if (progress && progress.current_page > 1 && currentPageRef.current === 1) {
       setShowContinuePrompt(true);
     }
   }, [progress]);
@@ -42,7 +45,7 @@ const BookOfLcove: React.FC = () => {
     if (user && currentPage > 0) {
       updateProgress(currentPage);
     }
-  }, [currentPage, user]);
+  }, [currentPage, user, updateProgress]);
 
   const goToPage = (page: number) => {
     if (page >= 1 && page <= TOTAL_PAGES) {

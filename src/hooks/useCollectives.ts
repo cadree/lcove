@@ -3,6 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
+function participantCount(participants: unknown): number {
+  if (!Array.isArray(participants)) return 0;
+  const first = participants[0];
+  if (!first || typeof first !== "object" || !("count" in first)) return 0;
+  return typeof first.count === "number" ? first.count : 0;
+}
+
 export interface Collective {
   id: string;
   name: string | null;
@@ -77,9 +84,9 @@ export function useCollectives(topic?: string) {
 
       if (error) throw error;
 
-      return (data || []).map((c: any) => ({
+      return (data || []).map((c) => ({
         ...c,
-        member_count: c.conversation_participants?.[0]?.count || 0,
+        member_count: participantCount(c.conversation_participants),
       })) as Collective[];
     },
   });
@@ -120,7 +127,7 @@ export function useMyCollectives() {
 
       if (error) throw error;
 
-      return (data || []).map((p: any) => ({
+      return (data || []).map((p) => ({
         ...p.conversations,
         role: p.role,
       })) as (Collective & { role: string })[];

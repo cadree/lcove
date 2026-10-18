@@ -50,6 +50,17 @@ import { PartnerApplicationsTab } from '@/components/admin/PartnerApplicationsTa
 import { ContentReportsTab } from '@/components/admin/ContentReportsTab';
 import { NuanceInterestTab } from '@/components/admin/NuanceInterestTab';
 
+type UserAccessStatus = 'active' | 'banned';
+type MessageAudience = 'all' | 'mindset_level' | 'city';
+
+function isUserAccessStatus(value: string): value is UserAccessStatus {
+  return value === 'active' || value === 'banned';
+}
+
+function isMessageAudience(value: string): value is MessageAudience {
+  return value === 'all' || value === 'mindset_level' || value === 'city';
+}
+
 const Admin: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin, isLoading: checkingAdmin } = useIsAdmin();
@@ -794,7 +805,7 @@ const Admin: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {lowRepUsers?.map((item: any) => (
+                  {lowRepUsers?.map((item) => (
                     <Card key={item.id}>
                       <CardContent className="p-3 flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -903,7 +914,7 @@ const Admin: React.FC = () => {
           <div className="space-y-4">
             <div>
               <Label>New Status</Label>
-              <Select value={selectedStatus} onValueChange={(v) => setSelectedStatus(v as any)}>
+              <Select value={selectedStatus} onValueChange={(v) => { if (isUserAccessStatus(v)) setSelectedStatus(v); }}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -983,7 +994,7 @@ const Admin: React.FC = () => {
           <div className="space-y-4">
             <div>
               <Label>Target Audience</Label>
-              <Select value={messageTarget} onValueChange={(v: any) => setMessageTarget(v)}>
+              <Select value={messageTarget} onValueChange={(v) => { if (isMessageAudience(v)) setMessageTarget(v); }}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -1060,7 +1071,7 @@ const Admin: React.FC = () => {
           <div className="space-y-4">
             <div>
               <Label>Target Audience</Label>
-              <Select value={messageTarget} onValueChange={(v: any) => setMessageTarget(v)}>
+              <Select value={messageTarget} onValueChange={(v) => { if (isMessageAudience(v)) setMessageTarget(v); }}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

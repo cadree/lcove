@@ -15,6 +15,16 @@ interface ClientDashboardViewProps {
   project: Project;
 }
 
+interface ProjectDeliverable {
+  type?: string;
+  publish_date?: string;
+  publish_location?: string;
+}
+
+function isProjectDeliverable(value: unknown): value is ProjectDeliverable {
+  return typeof value === "object" && value !== null;
+}
+
 export const ClientDashboardView: React.FC<ClientDashboardViewProps> = ({ project }) => {
   const { attachments } = useProjectAttachments(project.id);
   const { data: milestones = [] } = useProjectMilestones(project.id);
@@ -24,6 +34,7 @@ export const ClientDashboardView: React.FC<ClientDashboardViewProps> = ({ projec
     new Intl.NumberFormat('en-US', { style: 'currency', currency: project.currency, minimumFractionDigits: 0 }).format(amount);
 
   const filledRoles = project.roles?.filter(r => r.slots_filled > 0) || [];
+  const deliverables = (Array.isArray(project.deliverables) ? project.deliverables : []).filter(isProjectDeliverable);
 
   return (
     <div className="space-y-6">
@@ -149,7 +160,7 @@ export const ClientDashboardView: React.FC<ClientDashboardViewProps> = ({ projec
           <h4 className="text-sm font-medium">Milestones</h4>
           <div className="relative pl-6 space-y-4">
             <div className="absolute left-2 top-1 bottom-1 w-0.5 bg-border" />
-            {milestones.map((ms: any) => (
+            {milestones.map((ms) => (
               <div key={ms.id} className="relative">
                 <div className={cn(
                   "absolute -left-4 top-1 w-3 h-3 rounded-full border-2",
@@ -220,12 +231,12 @@ export const ClientDashboardView: React.FC<ClientDashboardViewProps> = ({ projec
       )}
 
       {/* Deliverables */}
-      {(project.deliverables as any[])?.filter(d => d?.type).length > 0 && (
+      {deliverables.filter(d => d.type).length > 0 && (
         <div className="space-y-2">
           <h4 className="text-sm font-medium flex items-center gap-2">
             <Package className="h-4 w-4" /> Deliverables
           </h4>
-          {(project.deliverables as any[]).filter(d => d?.type).map((d, i) => (
+          {deliverables.filter(d => d.type).map((d, i) => (
             <div key={i} className="flex items-center justify-between bg-muted/20 rounded-lg p-3 text-sm">
               <span className="font-medium">{d.type}</span>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">

@@ -23,8 +23,8 @@ export function useProjectAttachments(projectId?: string) {
     queryKey: ['project-attachments', projectId],
     queryFn: async () => {
       if (!projectId) return [];
-      const { data, error } = await (supabase
-        .from('project_attachments') as any)
+      const { data, error } = await supabase
+        .from('project_attachments')
         .select('*')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false });
@@ -60,8 +60,8 @@ export function useProjectAttachments(projectId?: string) {
       else if (file.type.startsWith('video/')) fileType = 'video';
       else if (file.type.includes('zip') || file.type.includes('compressed')) fileType = 'zip';
 
-      const { data, error } = await (supabase
-        .from('project_attachments') as any)
+      const { data, error } = await supabase
+        .from('project_attachments')
         .insert({
           project_id: projectId,
           uploaded_by: user.id,
@@ -89,8 +89,8 @@ export function useProjectAttachments(projectId?: string) {
     mutationFn: async ({ projectId, url, name }: { projectId: string; url: string; name: string }) => {
       if (!user?.id) throw new Error('Not authenticated');
 
-      const { data, error } = await (supabase
-        .from('project_attachments') as any)
+      const { data, error } = await supabase
+        .from('project_attachments')
         .insert({
           project_id: projectId,
           uploaded_by: user.id,
@@ -116,8 +116,8 @@ export function useProjectAttachments(projectId?: string) {
 
   const deleteAttachment = useMutation({
     mutationFn: async ({ attachmentId, projectId }: { attachmentId: string; projectId: string }) => {
-      const { error } = await (supabase
-        .from('project_attachments') as any)
+      const { error } = await supabase
+        .from('project_attachments')
         .delete()
         .eq('id', attachmentId);
 

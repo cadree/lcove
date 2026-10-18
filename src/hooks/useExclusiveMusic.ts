@@ -2,7 +2,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import type { Json } from "@/integrations/supabase/types";
+import type { Json, TablesUpdate } from "@/integrations/supabase/types";
+
+function jsonRecord(value: Json | null): Record<string, Json | undefined> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value;
+}
 
 export interface ExclusiveTrack {
   id: string;
@@ -33,7 +38,7 @@ export interface ExclusiveAccessRule {
   description?: string | null;
   amount_cents: number;
   interval?: string | null;
-  metadata: Record<string, any>;
+  metadata: Record<string, Json | undefined>;
   sort_order: number;
   is_active: boolean;
   created_at: string;
@@ -210,8 +215,8 @@ export const useAccessRules = (artistUserId?: string) => {
       if (error) throw error;
       return (data || []).map((r) => ({
         ...r,
-        metadata: (r.metadata as Record<string, any>) || {},
-      })) as ExclusiveAccessRule[];
+        metadata: jsonRecord(r.metadata),
+      }));
     },
     enabled: !!artistUserId,
   });
@@ -243,8 +248,9 @@ export const useAccessRules = (artistUserId?: string) => {
   const updateRule = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<ExclusiveAccessRule> & { id: string }) => {
       if (!user) throw new Error("Not authenticated");
-      const toUpdate: Record<string, any> = { ...updates };
-      if (updates.metadata) toUpdate.metadata = updates.metadata as Json;
+      const { metadata, ...rest } = updates;
+      const toUpdate: TablesUpdate<"exclusive_access_rules"> = { ...rest };
+      if (metadata) toUpdate.metadata = metadata as unknown as Json;
       const { error } = await supabase
         .from("exclusive_access_rules")
         .update(toUpdate)

@@ -57,7 +57,21 @@ export const VideoPlayer = ({
   const [previewEnded, setPreviewEnded] = useState(false);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const updateProgress = useUpdateWatchProgress();
+  const { mutate: saveWatchProgress } = useUpdateWatchProgress();
+  const progressSnapshot = useRef({
+    currentTime,
+    duration,
+    contentId: content.id,
+    episodeId,
+    isPreviewOnly,
+  });
+  progressSnapshot.current = {
+    currentTime,
+    duration,
+    contentId: content.id,
+    episodeId,
+    isPreviewOnly,
+  };
 
   const videoUrl = content.video_url || content.external_video_url;
 
@@ -79,7 +93,7 @@ export const VideoPlayer = ({
     
     const interval = setInterval(() => {
       if (currentTime > 0 && duration > 0) {
-        updateProgress.mutate({
+        saveWatchProgress({
           contentId: content.id,
           episodeId,
           progressSeconds: Math.floor(currentTime),
@@ -89,22 +103,23 @@ export const VideoPlayer = ({
     }, 30000); // Save every 30 seconds
 
     return () => clearInterval(interval);
-  }, [currentTime, duration, content.id, episodeId, isPreviewOnly]);
+  }, [currentTime, duration, content.id, episodeId, isPreviewOnly, saveWatchProgress]);
 
   // Save progress on unmount (only if not preview mode)
   useEffect(() => {
     return () => {
-      if (isPreviewOnly) return;
-      if (currentTime > 0 && duration > 0) {
-        updateProgress.mutate({
-          contentId: content.id,
-          episodeId,
-          progressSeconds: Math.floor(currentTime),
-          durationSeconds: Math.floor(duration),
+      const snapshot = progressSnapshot.current;
+      if (snapshot.isPreviewOnly) return;
+      if (snapshot.currentTime > 0 && snapshot.duration > 0) {
+        saveWatchProgress({
+          contentId: snapshot.contentId,
+          episodeId: snapshot.episodeId,
+          progressSeconds: Math.floor(snapshot.currentTime),
+          durationSeconds: Math.floor(snapshot.duration),
         });
       }
     };
-  }, []);
+  }, [saveWatchProgress]);
 
   // Auto-hide controls
   const resetControlsTimeout = useCallback(() => {
@@ -118,6 +133,47 @@ export const VideoPlayer = ({
       }, 3000);
     }
   }, [isPlaying, showPaywall]);
+
+  const togglePlay = useCallback(() => {
+    if (previewEnded && isPreviewOnly) {
+      setShowPaywall(true);
+      return;
+    }
+    
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  }, [previewEnded, isPreviewOnly, isPlaying]);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!containerRef.current) return;
+
+    if (!isFullscreen) {
+      await containerRef.current.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      await document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  }, [isFullscreen]);
+
+  const seek = useCallback((seconds: number) => {
+    if (videoRef.current) {
+      let newTime = videoRef.current.currentTime + seconds;
+      
+      // In preview mode, don't allow seeking past preview duration
+      if (isPreviewOnly) {
+        newTime = Math.min(newTime, previewDuration);
+      }
+      
+      videoRef.current.currentTime = Math.max(0, Math.min(duration, newTime));
+    }
+  }, [isPreviewOnly, previewDuration, duration]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -154,48 +210,7 @@ export const VideoPlayer = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen, showPaywall]);
-
-  const togglePlay = () => {
-    if (previewEnded && isPreviewOnly) {
-      setShowPaywall(true);
-      return;
-    }
-    
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const toggleFullscreen = async () => {
-    if (!containerRef.current) return;
-
-    if (!isFullscreen) {
-      await containerRef.current.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      await document.exitFullscreen();
-      setIsFullscreen(false);
-    }
-  };
-
-  const seek = (seconds: number) => {
-    if (videoRef.current) {
-      let newTime = videoRef.current.currentTime + seconds;
-      
-      // In preview mode, don't allow seeking past preview duration
-      if (isPreviewOnly) {
-        newTime = Math.min(newTime, previewDuration);
-      }
-      
-      videoRef.current.currentTime = Math.max(0, Math.min(duration, newTime));
-    }
-  };
+  }, [isFullscreen, showPaywall, onClose, seek, toggleFullscreen, togglePlay]);
 
   const handleSeek = (value: number[]) => {
     if (videoRef.current) {

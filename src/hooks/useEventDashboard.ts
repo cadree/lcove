@@ -82,7 +82,7 @@ export function useEventDashboard() {
       if (!user) return [];
       
       // Build query for events created by user
-      let query = supabase
+      const query = supabase
         .from('events')
         .select('*')
         .eq('creator_id', user.id);

@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import PageLayout from "@/components/layout/PageLayout";
 import { AddToCalendarButtons } from "@/components/calendar/AddToCalendarButtons";
 import { shareLink, buildShareUrl } from "@/lib/shareLink";
+import { errorMessage } from "@/lib/errorMessage";
 
 interface Attendee {
   id: string;
@@ -68,9 +69,9 @@ export default function EventConfirmation() {
           return;
         }
         setLoading(false);
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (cancelled) return;
-        setError(e.message || "Failed to verify purchase");
+        setError(errorMessage(e, "Failed to verify purchase"));
         setLoading(false);
       }
     };

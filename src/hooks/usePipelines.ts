@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import { useAuth } from "@/contexts/AuthContext";
 
 export interface Pipeline {
@@ -22,7 +23,7 @@ export function usePipelines() {
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase
-        .from('pipelines' as any)
+        .from('pipelines')
         .select('*')
         .eq('owner_user_id', user.id)
         .order('sort_order', { ascending: true });
@@ -38,16 +39,16 @@ export function usePipelines() {
       if (!user) throw new Error("Not authenticated");
       
       const { data: existing } = await supabase
-        .from('pipelines' as any)
+        .from('pipelines')
         .select('sort_order')
         .eq('owner_user_id', user.id)
         .order('sort_order', { ascending: false })
         .limit(1);
       
-      const nextSortOrder = existing && existing.length > 0 ? (existing[0] as any).sort_order + 1 : 0;
+      const nextSortOrder = existing && existing.length > 0 ? existing[0].sort_order + 1 : 0;
       
       const { data, error } = await supabase
-        .from('pipelines' as any)
+        .from('pipelines')
         .insert({
           owner_user_id: user.id,
           name,
@@ -61,9 +62,9 @@ export function usePipelines() {
       if (error) throw error;
       
       // Create default stages for new pipeline - pass both parameters explicitly
-      await supabase.rpc('ensure_default_pipeline' as any, { 
+      await supabase.rpc('ensure_default_pipeline', { 
         p_user_id: user.id,
-        p_pipeline_id: (data as any).id 
+        p_pipeline_id: data.id 
       });
       
       return data as unknown as Pipeline;
@@ -83,13 +84,13 @@ export function usePipelines() {
     }) => {
       if (!user) throw new Error("Not authenticated");
       
-      const updates: Record<string, unknown> = {};
+      const updates: TablesUpdate<"pipelines"> = {};
       if (name !== undefined) updates.name = name;
       if (description !== undefined) updates.description = description;
       if (color !== undefined) updates.color = color;
       
       const { error } = await supabase
-        .from('pipelines' as any)
+        .from('pipelines')
         .update(updates)
         .eq('id', pipelineId)
         .eq('owner_user_id', user.id);
@@ -106,7 +107,7 @@ export function usePipelines() {
       if (!user) throw new Error("Not authenticated");
       
       const { error } = await supabase
-        .from('pipelines' as any)
+        .from('pipelines')
         .delete()
         .eq('id', pipelineId)
         .eq('owner_user_id', user.id);

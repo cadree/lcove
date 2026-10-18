@@ -3,6 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
+function relationName(relation: unknown): string | undefined {
+  const row = Array.isArray(relation) ? relation[0] : relation;
+  if (!row || typeof row !== "object" || !("name" in row)) return undefined;
+  return typeof row.name === "string" ? row.name : undefined;
+}
+
 export type AppRole = 'admin' | 'moderator' | 'user';
 
 export interface UserRole {
@@ -373,21 +379,24 @@ export function useAllUsersWithDetails() {
       const passionsMap = new Map<string, string[]>();
       const rolesMap = new Map<string, string[]>();
 
-      allUserSkills?.forEach((item: any) => {
+      allUserSkills?.forEach((item) => {
         const skills = skillsMap.get(item.user_id) || [];
-        if (item.skills?.name) skills.push(item.skills.name);
+        const name = relationName(item.skills);
+        if (name) skills.push(name);
         skillsMap.set(item.user_id, skills);
       });
 
-      allUserPassions?.forEach((item: any) => {
+      allUserPassions?.forEach((item) => {
         const passions = passionsMap.get(item.user_id) || [];
-        if (item.passions?.name) passions.push(item.passions.name);
+        const name = relationName(item.passions);
+        if (name) passions.push(name);
         passionsMap.set(item.user_id, passions);
       });
 
-      allUserRoles?.forEach((item: any) => {
+      allUserRoles?.forEach((item) => {
         const roles = rolesMap.get(item.user_id) || [];
-        if (item.creative_roles?.name) roles.push(item.creative_roles.name);
+        const name = relationName(item.creative_roles);
+        if (name) roles.push(name);
         rolesMap.set(item.user_id, roles);
       });
 

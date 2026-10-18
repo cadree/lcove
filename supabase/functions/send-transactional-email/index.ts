@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
   let recipientEmail: string
   let idempotencyKey: string
   let messageId: string
-  let templateData: Record<string, any> = {}
+  let templateData: Record<string, unknown> = {}
   let fromOverride: string | undefined
   let replyToOverride: string | undefined
   try {

@@ -45,6 +45,8 @@ export const ProfileMusicPlayer = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(0.5);
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
   const [showPlayer, setShowPlayer] = useState(true);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -59,7 +61,7 @@ export const ProfileMusicPlayer = ({
     if (playbackUrl && source === 'upload') {
       audioRef.current = new Audio(playbackUrl);
       audioRef.current.loop = true;
-      audioRef.current.volume = volume;
+      audioRef.current.volume = volumeRef.current;
 
       audioRef.current.addEventListener('timeupdate', () => {
         if (audioRef.current) {

@@ -16,7 +16,6 @@ import {
   LogIn,
   Phone,
   Loader2,
-  Wallet,
   Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
+import { errorMessage } from "@/lib/errorMessage";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { shareLink, buildShareUrl } from "@/lib/shareLink";
@@ -246,8 +246,8 @@ export default function PublicEventPage() {
   };
 
   const isPast = event ? new Date(event.end_date || event.start_date) < new Date() : false;
-  const hasPaidTier = (tiers || []).some((t: any) => (t.price_cents || 0) > 0);
-  const hasFreeTier = (tiers || []).some((t: any) => (t.price_cents || 0) === 0 && (t.credits_price || 0) === 0);
+  const hasPaidTier = (tiers || []).some((t) => (t.price_cents || 0) > 0);
+  const hasFreeTier = (tiers || []).some((t) => (t.price_cents || 0) === 0 && (t.credits_price || 0) === 0);
   const isFree = !hasPaidTier && (!event?.ticket_price || event.ticket_price <= 0);
   const eventType: { label: string; tone: "free" | "paid" | "hybrid" | "info" } =
     hasPaidTier && hasFreeTier
@@ -474,36 +474,6 @@ export default function PublicEventPage() {
                       <ExternalLink className="h-4 w-4" />
                       Download .ics File
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full gap-2 text-sm"
-                      onClick={async () => {
-                        try {
-                          const { data, error } = await supabase.functions.invoke("generate-wallet-pass", {
-                            body: {
-                              eventId: event.id,
-                              eventTitle: event.title,
-                              eventDate: event.start_date,
-                              eventEndDate: event.end_date,
-                              venue: [event.venue, event.city].filter(Boolean).join(', '),
-                              guestName: guestName || 'Guest',
-                              ticketType: 'free',
-                            },
-                          });
-                          if (error) throw error;
-                          if (data?.passUrl) {
-                            window.open(data.passUrl, '_blank');
-                          } else {
-                            toast.info("Wallet pass generation is being set up. Check back soon!");
-                          }
-                        } catch {
-                          toast.info("Wallet pass feature coming soon!");
-                        }
-                      }}
-                    >
-                      <Wallet className="h-4 w-4" />
-                      Add to Wallet
-                    </Button>
                     {/* Get Notified - Push */}
                     {pushStatus !== 'subscribed' && (
                       <Button
@@ -649,36 +619,6 @@ export default function PublicEventPage() {
                       <ExternalLink className="h-4 w-4" />
                       Download .ics File
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full gap-2 text-sm"
-                      onClick={async () => {
-                        try {
-                          const { data, error } = await supabase.functions.invoke("generate-wallet-pass", {
-                            body: {
-                              eventId: event.id,
-                              eventTitle: event.title,
-                              eventDate: event.start_date,
-                              eventEndDate: event.end_date,
-                              venue: [event.venue, event.city].filter(Boolean).join(', '),
-                              guestName: ticketGuestName || guestName || 'Guest',
-                              ticketType: 'paid',
-                            },
-                          });
-                          if (error) throw error;
-                          if (data?.passUrl) {
-                            window.open(data.passUrl, '_blank');
-                          } else {
-                            toast.info("Wallet pass generation is being set up. Check back soon!");
-                          }
-                        } catch {
-                          toast.info("Wallet pass feature coming soon!");
-                        }
-                      }}
-                    >
-                      <Wallet className="h-4 w-4" />
-                      Add to Wallet
-                    </Button>
                     {/* Get Notified - Push */}
                     {pushStatus !== 'subscribed' && (
                       <Button
@@ -743,8 +683,8 @@ export default function PublicEventPage() {
                             }
                           }
                         }
-                      } catch (err: any) {
-                        toast.error(err.message || "Failed to start checkout");
+                      } catch (err: unknown) {
+                        toast.error(errorMessage(err, "Failed to start checkout"));
                       } finally {
                         setIsPurchasing(false);
                       }

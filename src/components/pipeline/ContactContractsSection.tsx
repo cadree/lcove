@@ -430,7 +430,11 @@ export function ContactContractsSection({ pipelineItemId, contactName, contactEm
                       <Label>Payment Type</Label>
                       <Select 
                         value={newContract.payment_type || ''} 
-                        onValueChange={(v) => setNewContract({ ...newContract, payment_type: v as any })}
+                        onValueChange={(v) => {
+                          if (v === 'flat_fee' || v === 'hourly' || v === 'retainer' || v === 'milestone') {
+                            setNewContract({ ...newContract, payment_type: v });
+                          }
+                        }}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select type" />

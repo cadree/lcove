@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 
 export interface AttendeeIdentity {
   user_id: string | null;
@@ -80,10 +81,10 @@ export function useAttendeeCrmProfile(key: AttendeeKey | null) {
     queryKey: ["attendee-crm", key?.email?.toLowerCase() || null, key?.user_id || null],
     enabled,
     queryFn: async (): Promise<AttendeeCrmProfile> => {
-      const { data, error } = await supabase.rpc("get_attendee_crm_profile" as any, {
+      const { data, error } = await supabase.rpc("get_attendee_crm_profile", {
         p_email: key?.email || "",
         p_user_id: key?.user_id || null,
-      });
+      } as unknown as { p_email: string; p_user_id?: string });
       if (error) throw error;
       return data as unknown as AttendeeCrmProfile;
     },
@@ -102,16 +103,19 @@ export function useAddAttendeeTag(key: AttendeeKey) {
       if (!trimmed) throw new Error("Tag cannot be empty");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
-      const { error } = await supabase.from("event_attendee_tags" as any).insert({
+      const { error } = await supabase.from("event_attendee_tags").insert({
         host_user_id: user.id,
         attendee_email: key.email?.toLowerCase() || null,
         attendee_user_id: key.user_id || null,
         tag: trimmed,
-      } as any);
+      });
       if (error) throw error;
     },
     onSuccess: () => invalidate(qc, key),
-    onError: (e: any) => toast.error(e?.message?.includes("duplicate") ? "Tag already exists" : (e?.message || "Failed to add tag")),
+    onError: (e: unknown) => {
+      const message = errorMessage(e, "Failed to add tag");
+      toast.error(message.includes("duplicate") ? "Tag already exists" : message);
+    },
   });
 }
 
@@ -119,11 +123,11 @@ export function useRemoveAttendeeTag(key: AttendeeKey) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (tagId: string) => {
-      const { error } = await supabase.from("event_attendee_tags" as any).delete().eq("id", tagId);
+      const { error } = await supabase.from("event_attendee_tags").delete().eq("id", tagId);
       if (error) throw error;
     },
     onSuccess: () => invalidate(qc, key),
-    onError: (e: any) => toast.error(e?.message || "Failed to remove tag"),
+    onError: (e: unknown) => toast.error(errorMessage(e, "Failed to remove tag")),
   });
 }
 
@@ -131,15 +135,15 @@ export function useSaveAttendeeNote(key: AttendeeKey) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (note: string) => {
-      const { error } = await supabase.rpc("upsert_attendee_note" as any, {
+      const { error } = await supabase.rpc("upsert_attendee_note", {
         p_email: key.email || "",
         p_user_id: key.user_id || null,
         p_note: note,
-      });
+      } as unknown as { p_email: string; p_note: string; p_user_id: string });
       if (error) throw error;
     },
     onSuccess: () => invalidate(qc, key),
-    onError: (e: any) => toast.error(e?.message || "Failed to save note"),
+    onError: (e: unknown) => toast.error(errorMessage(e, "Failed to save note")),
   });
 }
 
@@ -152,6 +156,6 @@ export function useResendReceipt() {
       if (error) throw error;
     },
     onSuccess: () => toast.success("Receipt resent"),
-    onError: (e: any) => toast.error(e?.message || "Failed to resend receipt"),
+    onError: (e: unknown) => toast.error(errorMessage(e, "Failed to resend receipt")),
   });
 }

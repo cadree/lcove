@@ -50,6 +50,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   const sendReaction = useSendReaction();
   const tipStream = useTipStream();
   const joinStream = useJoinStream();
+  const joinStreamMutate = joinStream.mutate;
   const deleteStream = useDeleteStream();
 
   const [tipAmount, setTipAmount] = useState('');
@@ -66,9 +67,9 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   // Join stream on mount (for viewers only, when stream is live)
   useEffect(() => {
     if (open && user && !isHost && streamStatus === 'live') {
-      joinStream.mutate(streamId);
+      joinStreamMutate(streamId);
     }
-  }, [open, user, streamId, isHost, streamStatus]);
+  }, [open, user, streamId, isHost, streamStatus, joinStreamMutate]);
 
   // Show floating reactions
   useEffect(() => {
@@ -169,7 +170,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
 
     // YouTube embed
     if (stream.stream_type === 'youtube' && stream.external_url) {
-      const videoId = stream.external_url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
+      const videoId = stream.external_url.match(/(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/)?.[1];
       if (videoId) {
         return (
           <iframe

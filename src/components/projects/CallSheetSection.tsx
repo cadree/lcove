@@ -92,7 +92,7 @@ export const CallSheetSection: React.FC<CallSheetSectionProps> = ({ projectId, r
         general_location: generalLocation || null,
         general_notes: generalNotes || null,
         role_entries: filtered,
-      } as any, {
+      }, {
         onSuccess: () => { setEditingId(null); },
       });
     } else {

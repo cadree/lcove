@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import type Hls from 'hls.js';
 import { Loader2, Radio, AlertCircle } from 'lucide-react';
 
 interface HLSPlayerProps {
@@ -24,7 +25,7 @@ export const HLSPlayer: React.FC<HLSPlayerProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const hlsRef = useRef<any>(null);
+  const hlsRef = useRef<Hls | null>(null);
 
   useEffect(() => {
     const video = videoRef.current;

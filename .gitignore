@@ -11,6 +11,13 @@ node_modules
 dist
 dist-ssr
 *.local
+*.tsbuildinfo
+
+# Local secrets and host-provided public client settings.
+# .env.example lists the variable names. Do not commit values.
+.env
+.env.*
+!.env.example
 
 # Editor directories and files
 .vscode/*

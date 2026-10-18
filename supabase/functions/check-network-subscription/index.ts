@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CHECK-NETWORK-SUBSCRIPTION] ${step}${detailsStr}`);
 };
@@ -93,16 +93,16 @@ serve(async (req) => {
     });
 
     // Check if any subscription matches this network's product
-    const hasActiveSub = subscriptions.data.some((sub: any) => 
-      sub.items.data.some((item: any) => item.price.product === network.stripe_product_id)
+    const hasActiveSub = subscriptions.data.some((sub) => 
+      sub.items.data.some((item) => item.price.product === network.stripe_product_id)
     );
 
     logStep("Subscription check complete", { hasActiveSub });
 
     // Update local subscription record
     if (hasActiveSub) {
-      const activeSub = subscriptions.data.find((sub: any) =>
-        sub.items.data.some((item: any) => item.price.product === network.stripe_product_id)
+      const activeSub = subscriptions.data.find((sub) =>
+        sub.items.data.some((item) => item.price.product === network.stripe_product_id)
       );
       
       if (activeSub) {

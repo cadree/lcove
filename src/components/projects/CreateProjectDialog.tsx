@@ -281,10 +281,10 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
       roles: validRoles,
       milestones: validMilestones,
     }, {
-      onSuccess: async (project: any) => {
+      onSuccess: async (project) => {
         // Upload attachments to project_attachments table
-        if (uploadedAttachments.length > 0) {
-          await (supabase.from('project_attachments') as any)
+        if (uploadedAttachments.length > 0 && user?.id) {
+          await supabase.from('project_attachments')
             .insert(uploadedAttachments.map(a => ({
               project_id: project.id,
               uploaded_by: user.id,

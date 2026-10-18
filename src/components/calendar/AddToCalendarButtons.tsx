@@ -44,7 +44,7 @@ function generateICS(event: CalendarEventData): string {
   const start = formatICSDate(event.startDate);
   const end = formatICSDate(event.endDate || new Date(event.startDate.getTime() + 2 * 60 * 60 * 1000)); // Default 2 hours
 
-  let icsContent = [
+  const icsContent = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//Lcove//Event Calendar//EN',

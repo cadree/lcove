@@ -49,7 +49,7 @@ export function useMyTicketOrders() {
         .eq("purchaser_user_id", user.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data || []).filter((o: any) => o.event) as unknown as MyTicketOrder[];
+      return (data || []).filter((o) => o.event) as unknown as MyTicketOrder[];
     },
   });
 }

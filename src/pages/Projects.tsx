@@ -35,15 +35,15 @@ const Projects: React.FC = () => {
     queryFn: async () => {
       if (!user?.id) return [];
       // Get project IDs where user is client
-      const { data: clientRows } = await (supabase
-        .from('project_clients') as any)
+      const { data: clientRows } = await supabase
+        .from('project_clients')
         .select('project_id')
         .eq('client_user_id', user.id)
         .in('status', ['invited', 'accepted']);
 
       if (!clientRows || clientRows.length === 0) return [];
 
-      const projectIds = clientRows.map((r: any) => r.project_id);
+      const projectIds = clientRows.map((r) => r.project_id);
       const { data, error } = await supabase
         .from('projects')
         .select('*')

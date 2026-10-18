@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 import { sendIndividualReminder } from "@/hooks/useNotificationCampaigns";
 
 interface Props {
@@ -67,8 +68,8 @@ export function SendReminderDialog({ open, onOpenChange, eventId, attendee }: Pr
       const sent = Object.values(res?.results || {}).filter(Boolean).length;
       toast.success(`Reminder sent (${sent} channel${sent !== 1 ? "s" : ""})`);
       onOpenChange(false);
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to send");
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "Failed to send"));
     } finally {
       setSending(false);
     }

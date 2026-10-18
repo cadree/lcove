@@ -73,6 +73,23 @@ import { CampaignAnalyticsCard } from "@/components/events/CampaignAnalyticsCard
 import { BulkReminderDialog } from "@/components/events/BulkReminderDialog";
 import { InviteAudienceDialog } from "@/components/events/InviteAudienceDialog";
 import { EventEmailIdentitySettings } from "@/components/calendar/EventEmailIdentitySettings";
+import { errorMessage } from "@/lib/errorMessage";
+import type { Tables } from "@/integrations/supabase/types";
+
+type TicketTier = Tables<"ticket_tiers">;
+
+interface CheckInAttendeeEmbed {
+  attendee_name: string | null;
+  ticket_number: string | null;
+}
+
+interface EventCheckInRecord {
+  id: string;
+  attendee_id: string;
+  created_at: string;
+  method: string;
+  event_attendees: CheckInAttendeeEmbed | null;
+}
 
 // Event status helper
 function getEventStatus(event: { start_date: string; end_date: string | null; status: string | null }) {
@@ -784,8 +801,8 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading, eventTitle }: At
       if (partErr) throw partErr;
       toast.success(`Group chat created with ${selectedRegisteredUserIds.length} attendees`);
       navigate(`/messages?conversation=${conv.id}`);
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to create group chat");
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, "Failed to create group chat"));
     } finally {
       setCreatingChat(false);
     }
@@ -1051,7 +1068,7 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading, eventTitle }: At
 }
 
 // ============ Marketing Tab ============
-function MarketingTab({ eventId, tiers }: { eventId: string; tiers: any[] }) {
+function MarketingTab({ eventId, tiers }: { eventId: string; tiers: TicketTier[] }) {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
 
@@ -1098,8 +1115,6 @@ function MarketingTab({ eventId, tiers }: { eventId: string; tiers: any[] }) {
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         eventId={eventId}
-        eventName={(event as any)?.title}
-        eventCity={(event as any)?.city}
       />
 
     </div>
@@ -1304,7 +1319,7 @@ function OrdersTabV2({
   onSelectAttendee,
 }: {
   orders: TicketOrder[];
-  tiers: any[];
+  tiers: TicketTier[];
   attendees: EventAttendee[];
   attendeeProfiles: ProfileMap;
   isLoading: boolean;
@@ -1435,8 +1450,8 @@ function AttendeesTabV2({
   onSelectAttendee,
 }: {
   attendees: EventAttendee[];
-  tiers: any[];
-  checkIns: any[];
+  tiers: TicketTier[];
+  checkIns: EventCheckInRecord[];
   attendeeProfiles: ProfileMap;
   isLoading: boolean;
   eventTitle: string;
@@ -1446,7 +1461,7 @@ function AttendeesTabV2({
   const [filter, setFilter] = useState<"all" | "checked_in" | "not_checked_in" | "guests">("all");
 
   const tierMap = Object.fromEntries(tiers.map(t => [t.id, t]));
-  const checkedInIds = new Set(checkIns.map((c: any) => c.attendee_id));
+  const checkedInIds = new Set(checkIns.map((c) => c.attendee_id));
 
   const getName = (a: EventAttendee) => {
     if (a.attendee_user_id && attendeeProfiles[a.attendee_user_id]) {
@@ -1604,7 +1619,7 @@ function CheckInTab({
 }: {
   eventId: string;
   attendees: EventAttendee[];
-  checkIns: any[];
+  checkIns: EventCheckInRecord[];
 }) {
   const total = attendees.filter(a => a.status === "confirmed" || a.status === "checked_in").length;
   const checkedIn = checkIns.length;
@@ -1641,7 +1656,7 @@ function CheckInTab({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {checkIns.slice(0, 10).map((ci: any) => (
+            {checkIns.slice(0, 10).map((ci) => (
               <div key={ci.id} className="flex items-center justify-between text-sm py-1.5 border-b border-border/30 last:border-0">
                 <div className="min-w-0">
                   <p className="truncate font-medium">{ci.event_attendees?.attendee_name || "Attendee"}</p>
@@ -1666,7 +1681,7 @@ function FinanceTabV2({
   tiers,
 }: {
   orders: TicketOrder[];
-  tiers: any[];
+  tiers: TicketTier[];
 }) {
   const paid = orders.filter(o => o.payment_status === "paid");
   const grossCents = paid.reduce((s, o) => s + o.total_cents, 0);

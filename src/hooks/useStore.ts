@@ -3,6 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
+function asStoreRecord(store: unknown): (Store & { user_id: string }) | null {
+  if (!store || typeof store !== "object" || Array.isArray(store)) return null;
+  if (!("user_id" in store) || typeof store.user_id !== "string") return null;
+  return store as Store & { user_id: string };
+}
+
 export interface Store {
   id: string;
   user_id: string;
@@ -162,7 +168,10 @@ export const useStoreItems = (type?: 'product' | 'service' | 'rental', storeId?:
       if (error) throw error;
 
       // Fetch profiles for each store owner using profiles_public view
-      const storeUserIds = [...new Set(data?.map(item => (item.store as any)?.user_id).filter(Boolean))];
+      const storeUserIds = [...new Set((data ?? []).flatMap((item) => {
+        const store = asStoreRecord(item.store);
+        return store ? [store.user_id] : [];
+      }))];
       const { data: profiles } = await supabase
         .from('profiles_public')
         .select('user_id, display_name, avatar_url')
@@ -170,13 +179,16 @@ export const useStoreItems = (type?: 'product' | 'service' | 'rental', storeId?:
 
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
 
-      return data?.map(item => ({
-        ...item,
-        store: item.store ? {
-          ...(item.store as any),
-          profile: profileMap.get((item.store as any).user_id)
-        } : undefined
-      })) as StoreItem[];
+      return data?.map(item => {
+        const store = asStoreRecord(item.store);
+        return {
+          ...item,
+          store: store ? {
+            ...store,
+            profile: profileMap.get(store.user_id)
+          } : undefined
+        };
+      }) as StoreItem[];
     },
   });
 };
@@ -200,17 +212,18 @@ export const useStoreItem = (itemId: string | undefined) => {
       if (error) throw error;
 
       // Fetch profile for store owner using profiles_public view
-      if (data?.store) {
+      const store = asStoreRecord(data?.store);
+      if (store) {
         const { data: profile } = await supabase
           .from('profiles_public')
           .select('user_id, display_name, avatar_url')
-          .eq('user_id', (data.store as any).user_id)
+          .eq('user_id', store.user_id)
           .single();
 
         return {
           ...data,
           store: {
-            ...(data.store as any),
+            ...store,
             profile
           }
         } as StoreItem;

@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   console.log(`[PROCESS-PAYOUT] ${step}`, details ? JSON.stringify(details) : '');
 };
 
@@ -143,8 +143,8 @@ serve(async (req) => {
     if (methodError || !payoutMethod) throw new Error("Payout method not found");
 
     // Create Stripe transfer/payout
-    let stripeTransferId = null;
-    let stripePayoutId = null;
+    const stripeTransferId = null;
+    const stripePayoutId = null;
 
     // For bank accounts, create a payout
     if (payoutMethod.type === 'bank_account' && payoutMethod.stripe_bank_account_id) {

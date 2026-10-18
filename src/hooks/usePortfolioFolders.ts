@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { TablesInsert } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -226,9 +227,9 @@ export function useFolderPosts(folderId: string | null, userId?: string) {
       if (postsError) throw postsError;
 
       // Fetch portfolio items (direct uploads + external links) for this folder
-      const { data: items, error: itemsError } = await (supabase
+      const { data: items, error: itemsError } = await supabase
         .from('portfolio_items')
-        .select('*') as any)
+        .select('*')
         .eq('folder_id', folderId)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
@@ -290,7 +291,7 @@ export function useAddPortfolioItem(userId?: string) {
           media_type: input.media_type || 'link',
           external_url: input.external_url || null,
           thumbnail_url: input.thumbnail_url || null,
-        } as any)
+        } as unknown as TablesInsert<'portfolio_items'>)
         .select()
         .single();
 

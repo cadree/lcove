@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
   let title = SITE_NAME;
   let description = DEFAULT_DESCRIPTION;
   let imageUrl = DEFAULT_OG_IMAGE;
-  let canonicalUrl = redirectUrl;
+  const canonicalUrl = redirectUrl;
 
   try {
     if (type === "e") {

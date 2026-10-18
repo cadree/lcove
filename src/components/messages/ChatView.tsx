@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
 import { 
-  ArrowLeft, MoreVertical, Phone, Video, Trash2, 
+  ArrowLeft, MoreVertical, Trash2, 
   Check, CheckCheck, Play, Pause, Image as ImageIcon,
   Users, Calendar, Info, ChevronDown, ChevronUp, LogOut, Flag
 } from 'lucide-react';
@@ -50,8 +50,8 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   const { isOnline } = usePresence();
   
   const conversation = conversations.find(c => c.id === conversationId);
-  const isProjectChat = !!(conversation as any)?.project_id;
-  const projectId = isProjectChat ? (conversation as any)?.project_id : null;
+  const projectId = conversation?.project_id ?? null;
+  const isProjectChat = !!projectId;
   const { data: projectChatData } = useProjectChatData(projectId);
   const isOwner = !!(projectChatData && user && projectChatData.creator_id === user.id);
 
@@ -71,7 +71,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   
   const otherUserId = getOtherUserId();
   const isMuted = conversation?.participants?.find(p => p.user_id === user?.id)?.is_muted || false;
-  const project = (conversation as any)?.project;
+  const project = conversation?.project;
 
   const getConversationName = () => {
     if (!conversation) return 'Chat';
@@ -87,7 +87,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
     return otherParticipant?.profile?.avatar_url;
   };
 
-  const getParticipantRole = (participant: any) => {
+  const getParticipantRole = (participant: { project_role_name?: string | null }) => {
     return participant.project_role_name || null;
   };
 
@@ -201,32 +201,6 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
               <Info className="w-5 h-5" />
             </Button>
           )}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-muted-foreground hover:text-primary"
-            onClick={() => {
-              toast.info(`Calling ${getConversationName()}...`, {
-                description: 'Voice calls are coming soon! Stay tuned for this feature.',
-                duration: 3000,
-              });
-            }}
-          >
-            <Phone className="w-5 h-5" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-muted-foreground hover:text-primary"
-            onClick={() => {
-              toast.info(`Video calling ${getConversationName()}...`, {
-                description: 'Video calls are coming soon! Stay tuned for this feature.',
-                duration: 3000,
-              });
-            }}
-          >
-            <Video className="w-5 h-5" />
-          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="text-muted-foreground">

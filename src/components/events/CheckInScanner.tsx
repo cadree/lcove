@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Camera, KeyRound, CheckCircle2, XCircle, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useCheckInAttendee, type CheckInResult } from "@/hooks/useEventCheckIn";
+import { errorMessage } from "@/lib/errorMessage";
 import { cn } from "@/lib/utils";
 
 interface CheckInScannerProps {
@@ -23,19 +24,23 @@ export function CheckInScanner({ eventId }: CheckInScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const lastScanRef = useRef<{ code: string; at: number } | null>(null);
   const checkIn = useCheckInAttendee(eventId);
+  const checkInRef = useRef(checkIn);
+  checkInRef.current = checkIn;
 
-  const stopCamera = async () => {
+  const stopCamera = useCallback(async () => {
     const s = scannerRef.current;
     if (!s) return;
     try {
       if (s.isScanning) await s.stop();
       await s.clear();
-    } catch {}
+    } catch {
+      // Camera may already be stopped.
+    }
     scannerRef.current = null;
     setScanning(false);
-  };
+  }, []);
 
-  const startCamera = async () => {
+  const startCamera = useCallback(async () => {
     if (scannerRef.current) return;
     try {
       const html5 = new Html5Qrcode(SCANNER_ID, { verbose: false });
@@ -48,7 +53,7 @@ export function CheckInScanner({ eventId }: CheckInScannerProps) {
           const now = Date.now();
           if (lastScanRef.current && lastScanRef.current.code === decoded && now - lastScanRef.current.at < 2500) return;
           lastScanRef.current = { code: decoded, at: now };
-          const result = await checkIn.mutateAsync({ qrCode: decoded, method: "qr" });
+          const result = await checkInRef.current.mutateAsync({ qrCode: decoded, method: "qr" });
           setLastResult(result);
         },
         () => {
@@ -56,12 +61,12 @@ export function CheckInScanner({ eventId }: CheckInScannerProps) {
         }
       );
       setScanning(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setScanning(false);
       scannerRef.current = null;
-      setLastResult({ success: false, error: err?.message || "camera_unavailable" });
+      setLastResult({ success: false, error: errorMessage(err, "camera_unavailable") });
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (mode === "camera") {
@@ -72,8 +77,7 @@ export function CheckInScanner({ eventId }: CheckInScannerProps) {
     return () => {
       stopCamera();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
+  }, [mode, startCamera, stopCamera]);
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

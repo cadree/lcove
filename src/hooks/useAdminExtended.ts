@@ -5,6 +5,17 @@ import { useIsAdmin } from "./useAdmin";
 import { toast } from "sonner";
 import type { Json } from "@/integrations/supabase/types";
 
+function relationName(relation: unknown): string | undefined {
+  const row = Array.isArray(relation) ? relation[0] : relation;
+  if (!row || typeof row !== "object" || !("name" in row)) return undefined;
+  return typeof row.name === "string" ? row.name : undefined;
+}
+
+function socialLinksFromJson(value: Json | null): SocialLinks | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as unknown as SocialLinks;
+}
+
 export interface SocialLinks {
   instagram?: string;
   twitter?: string;
@@ -91,40 +102,44 @@ export function useAdminUserData() {
       const creditsMap = new Map<string, number>();
       const adminMap = new Map<string, boolean>();
 
-      skills?.forEach((s: any) => {
+      skills?.forEach((s) => {
         const arr = skillsMap.get(s.user_id) || [];
-        if (s.skills?.name) arr.push(s.skills.name);
+        const name = relationName(s.skills);
+        if (name) arr.push(name);
         skillsMap.set(s.user_id, arr);
       });
 
-      passions?.forEach((p: any) => {
+      passions?.forEach((p) => {
         const arr = passionsMap.get(p.user_id) || [];
-        if (p.passions?.name) arr.push(p.passions.name);
+        const name = relationName(p.passions);
+        if (name) arr.push(name);
         passionsMap.set(p.user_id, arr);
       });
 
-      roles?.forEach((r: any) => {
+      roles?.forEach((r) => {
         const arr = rolesMap.get(r.user_id) || [];
-        if (r.creative_roles?.name) arr.push(r.creative_roles.name);
+        const name = relationName(r.creative_roles);
+        if (name) arr.push(name);
         rolesMap.set(r.user_id, arr);
       });
 
-      credits?.forEach((c: any) => {
+      credits?.forEach((c) => {
         creditsMap.set(c.user_id, c.balance || 0);
       });
 
-      adminRoles?.forEach((ar: any) => {
+      adminRoles?.forEach((ar) => {
         if (ar.role === "admin") adminMap.set(ar.user_id, true);
       });
 
       // Fetch social_links from profiles
       const { data: profilesData } = await supabase.from("profiles_public").select("user_id, social_links");
       const socialLinksMap = new Map<string, SocialLinks | null>();
-      profilesData?.forEach((p: any) => {
-        socialLinksMap.set(p.user_id, p.social_links || null);
+      profilesData?.forEach((p) => {
+        if (!p.user_id) return;
+        socialLinksMap.set(p.user_id, socialLinksFromJson(p.social_links));
       });
 
-      return (userData || []).map((u: any) => ({
+      return (userData || []).map((u) => ({
         user_id: u.user_id,
         email: u.email || "",
         display_name: u.display_name,
@@ -160,11 +175,11 @@ export function useAdminAnnouncements() {
 
       if (error) throw error;
 
-      return (data || []).map((item: any) => ({
+      return (data || []).map((item) => ({
         id: item.id,
         title: item.title,
         message: item.message,
-        target_audience: item.target_audience as AdminAnnouncement["target_audience"],
+        target_audience: item.target_audience as unknown as AdminAnnouncement["target_audience"],
         sent_by: item.sent_by,
         sent_at: item.sent_at,
         recipient_count: item.recipient_count,

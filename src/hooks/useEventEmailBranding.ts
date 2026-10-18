@@ -21,11 +21,11 @@ export function useEventEmailBranding(eventId: string | undefined) {
     if (!eventId) return;
     setLoading(true);
     const { data } = await supabase
-      .from("event_email_branding" as any)
-      .select("*")
+      .from("event_email_branding")
+      .select("event_id, from_name_override, organizer_name, reply_to_email, reply_to_verified_at, signature, header_image_url, brand_color, personal_note")
       .eq("event_id", eventId)
       .maybeSingle();
-    setBranding((data as any) || null);
+    setBranding(data);
     setLoading(false);
   }, [eventId]);
 
@@ -37,7 +37,7 @@ export function useEventEmailBranding(eventId: string | undefined) {
     async (patch: Partial<EventEmailBranding>) => {
       if (!eventId) return;
       const { error } = await supabase
-        .from("event_email_branding" as any)
+        .from("event_email_branding")
         .upsert({ event_id: eventId, ...patch }, { onConflict: "event_id" });
       if (error) throw error;
       await refresh();

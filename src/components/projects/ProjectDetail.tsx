@@ -27,6 +27,7 @@ import { ClientDashboardView } from '@/components/projects/ClientDashboardView';
 import { ClientInviteDialog } from '@/components/projects/ClientInviteDialog';
 import { CallSheetSection } from '@/components/projects/CallSheetSection';
 import { useQuery } from '@tanstack/react-query';
+import { errorMessage } from '@/lib/errorMessage';
 
 interface ProjectDetailProps {
   project: Project | null;
@@ -64,6 +65,16 @@ function getDomainLabel(url: string): string {
   }
 }
 
+interface ProjectDeliverable {
+  type?: string;
+  publish_date?: string;
+  publish_location?: string;
+}
+
+function isProjectDeliverable(value: unknown): value is ProjectDeliverable {
+  return typeof value === "object" && value !== null;
+}
+
 export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onClose }) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -99,8 +110,8 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
     queryKey: ['project-client-status', project?.id, user?.id],
     queryFn: async () => {
       if (!project?.id || !user?.id) return null;
-      const { data } = await (supabase
-        .from('project_clients') as any)
+      const { data } = await supabase
+        .from('project_clients')
         .select('id, status')
         .eq('project_id', project.id)
         .eq('client_user_id', user.id)
@@ -116,8 +127,8 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
   const acceptClientInvite = useMutation({
     mutationFn: async () => {
       if (!clientStatus?.id) throw new Error('No invite');
-      const { error } = await (supabase
-        .from('project_clients') as any)
+      const { error } = await supabase
+        .from('project_clients')
         .update({ status: 'accepted' })
         .eq('id', clientStatus.id);
       if (error) throw error;
@@ -132,14 +143,14 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
   const guestApplyMutation = useMutation({
     mutationFn: async ({ roleId }: { roleId: string }) => {
       if (!project) throw new Error('No project');
-      const { error } = await supabase.from("guest_role_applications" as any).insert({
+      const { error } = await supabase.from("guest_role_applications").insert({
         project_id: project.id,
         role_id: roleId,
         name: guestName.trim(),
         email: guestEmail.trim(),
         portfolio_link: guestPortfolio.trim() || null,
         message: guestMessage.trim() || null,
-      } as any);
+      });
       if (error) throw error;
 
       const roleName = project.roles?.find((r) => r.id === roleId)?.role_name || "Unknown Role";
@@ -164,8 +175,8 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
       setGuestPortfolio('');
       setGuestMessage('');
     },
-    onError: (error: any) => {
-      toast({ title: error.message || 'Failed to submit application', variant: 'destructive' });
+    onError: (error: unknown) => {
+      toast({ title: errorMessage(error, 'Failed to submit application'), variant: 'destructive' });
     },
   });
 
@@ -282,8 +293,8 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
       if (uploadError) throw uploadError;
       const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(filePath);
       updateProjectCoverImage({ projectId: project.id, coverImageUrl: publicUrl });
-    } catch (err: any) {
-      toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Upload failed', description: errorMessage(err), variant: 'destructive' });
     } finally {
       setIsUploadingCover(false);
       e.target.value = '';
@@ -291,7 +302,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
   };
 
   const outcomeLabels = project.expected_outcome?.split(', ').filter(Boolean) || [];
-  const deliverables = (project.deliverables as any[]) || [];
+  const deliverables = (Array.isArray(project.deliverables) ? project.deliverables : []).filter(isProjectDeliverable);
 
   const renderAttachmentPreview = (att: ProjectAttachment) => {
     const ytId = (att.file_type === 'video' || att.file_type === 'link') ? getYouTubeId(att.file_url) : null;
@@ -496,7 +507,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={async () => { try { await deleteProject(project.id); } catch {} finally { onClose(); } }} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        <AlertDialogAction onClick={async () => { try { await deleteProject(project.id); } catch { /* Close the dialog even if delete fails. */ } finally { onClose(); } }} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                           {isDeleting ? 'Deleting...' : 'Delete'}
                         </AlertDialogAction>
                       </AlertDialogFooter>
@@ -678,7 +689,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                 <h4 className="text-sm font-medium">Milestones</h4>
                 <div className="relative pl-6 space-y-4">
                   <div className="absolute left-2 top-1 bottom-1 w-0.5 bg-border" />
-                  {milestones.map((ms: any) => (
+                  {milestones.map((ms) => (
                     <div key={ms.id} className="relative">
                       <div className={cn(
                         "absolute -left-4 top-1 w-3 h-3 rounded-full border-2",
@@ -705,7 +716,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
               <div className="space-y-2">
                 <h4 className="text-sm font-medium flex items-center gap-2"><Package className="h-4 w-4" /> Deliverables</h4>
                 <div className="space-y-2">
-                  {deliverables.filter(d => d.type).map((d: any, i: number) => (
+                  {deliverables.filter(d => d.type).map((d, i) => (
                     <div key={i} className="flex items-center justify-between bg-muted/20 rounded-lg p-3 text-sm">
                       <span className="font-medium">{d.type}</span>
                       <div className="flex items-center gap-2 text-muted-foreground text-xs">
@@ -978,7 +989,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
             </Tabs>
 
             {/* Client management for owner */}
-            {isCreator && (project as any).is_private && (
+            {isCreator && project.is_private && (
               <div className="pt-4 border-t border-border">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-medium flex items-center gap-2">

@@ -12,7 +12,7 @@ const MEMBERSHIP_PRODUCTS = {
   "prod_TcmEthbJUKGwjv": "elite",
 };
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CHECK-MEMBERSHIP] ${step}${detailsStr}`);
 };

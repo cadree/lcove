@@ -44,6 +44,7 @@ import { useNotificationPreferences } from "@/hooks/useNotifications";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -258,9 +259,9 @@ const Settings = () => {
       toast.success("Password updated successfully!");
       setNewPassword("");
       setConfirmPassword("");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating password:", error);
-      toast.error(error.message || "Failed to update password");
+      toast.error(errorMessage(error, "Failed to update password"));
     } finally {
       setChangingPassword(false);
     }
