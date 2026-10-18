@@ -99,6 +99,17 @@ export function useFundStats() {
           queryClient.invalidateQueries({ queryKey: ['fund-stats'] });
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'donations'
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['fund-stats'] });
+        }
+      )
       .subscribe();
 
     return () => {
@@ -117,9 +128,10 @@ export function useFundStats() {
       const lifetimeTotalCollected = lifetimeSnapshot.collected;
       
       // Get REAL distribution data from fund_distributions table
-      const { data: allDistributions } = await supabase
+      const { data: allDistributions, error: distributionsError } = await supabase
         .from('fund_distributions')
         .select('*');
+      if (distributionsError) throw distributionsError;
 
       // Calculate actual allocations from real data
       const allocations = {
@@ -146,11 +158,12 @@ export function useFundStats() {
       const monthlyTotalCollected = monthlySnapshot.collected;
 
       // Monthly distributions
-      const { data: monthlyDistributions } = await supabase
+      const { data: monthlyDistributions, error: monthlyError } = await supabase
         .from('fund_distributions')
         .select('*')
         .gte('distributed_at', monthStart)
         .lte('distributed_at', monthEnd);
+      if (monthlyError) throw monthlyError;
 
       const monthlyTotalDistributed = monthlyDistributions?.reduce((sum, d) => sum + Number(d.amount), 0) || 0;
       const monthlyGrantsAwarded = monthlyDistributions?.filter(d => d.category === 'community_grants').length || 0;
@@ -172,11 +185,12 @@ export function useFundStats() {
           const collected = (await fundSnapshot(start, end)).collected;
           
           // Distributed (from real data)
-          const { data: distributions } = await supabase
+          const { data: distributions, error: trendError } = await supabase
             .from('fund_distributions')
             .select('amount')
             .gte('distributed_at', start)
             .lte('distributed_at', end);
+          if (trendError) throw trendError;
 
           const distributed = distributions?.reduce((sum, d) => sum + Number(d.amount), 0) || 0;
 
@@ -189,11 +203,12 @@ export function useFundStats() {
       );
 
       // Get recent distributions for display
-      const { data: recentDistributions } = await supabase
+      const { data: recentDistributions, error: recentError } = await supabase
         .from('fund_distributions')
         .select('id, category, amount, title, recipient_name, distributed_at')
         .order('distributed_at', { ascending: false })
         .limit(5);
+      if (recentError) throw recentError;
 
       return {
         lifetime: {

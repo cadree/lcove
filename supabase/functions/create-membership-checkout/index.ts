@@ -1,35 +1,14 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { MEMBERSHIP_TIER_CONFIG } from "../_shared/membership-products.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface TierConfig {
-  product_id: string;
-  price_id: string;
-  name: string;
-  min_amount?: number;
-  amount?: number;
-}
-
-// Membership tiers configuration
-const MEMBERSHIP_TIERS: Record<string, TierConfig> = {
-  community: {
-    product_id: "prod_Tiqd9bhgTKWRRo",
-    price_id: "price_1SlOwh2O6q4dMrYLAwRO57NB",
-    name: "Community Member",
-    min_amount: 500, // $5 minimum in cents
-  },
-  elite: {
-    product_id: "prod_TiqeFdKIv2xWou",
-    price_id: "price_1SlOwv2O6q4dMrYLVppF6w4f",
-    name: "Elite Member",
-    amount: 2500, // $25 fixed in cents
-  },
-};
+const MEMBERSHIP_TIERS = MEMBERSHIP_TIER_CONFIG;
 
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
@@ -106,9 +85,17 @@ serve(async (req) => {
         success_url: `${origin}/membership?success=true&tier=${tier}`,
         cancel_url: `${origin}/membership?cancelled=true`,
         metadata: {
+          type: "membership",
           user_id: user.id,
           tier: tier,
           amount: amount.toString(),
+        },
+        subscription_data: {
+          metadata: {
+            type: "membership",
+            user_id: user.id,
+            tier: tier,
+          },
         },
       };
     } else {
@@ -126,8 +113,16 @@ serve(async (req) => {
         success_url: `${origin}/membership?success=true&tier=${tier}`,
         cancel_url: `${origin}/membership?cancelled=true`,
         metadata: {
+          type: "membership",
           user_id: user.id,
           tier: tier,
+        },
+        subscription_data: {
+          metadata: {
+            type: "membership",
+            user_id: user.id,
+            tier: tier,
+          },
         },
       };
     }

@@ -14,13 +14,16 @@ The money migration copies store payment secrets into a new table and then delet
 
 Create a Supabase staging branch, or a separate project restored from the backup. Do not run these files on the live project until staging looks right.
 
-The live project already has the older files in `supabase/migrations/`. Apply only the five new files, in this order. The timestamps are already in the order that applied cleanly on a scratch database:
+The live project already has the older files in `supabase/migrations/`. Apply only the new files, in this order. The timestamps are already in the order that applied cleanly on a scratch database:
 
 1. `supabase/migrations/20261018120000_open_access_and_profile_privacy.sql`
 2. `supabase/migrations/20261018153000_reports_blocks_and_account_deletion.sql`
 3. `supabase/migrations/20261018171500_lock_down_money_contracts_storage.sql`
 4. `supabase/migrations/20261018183000_lock_event_ticket_fields.sql`
 5. `supabase/migrations/20261018190000_nuance_interest.sql`
+6. `supabase/migrations/20261018201000_payments_webhook_store_fund.sql`
+
+Stripe checkout does not record a payment until the webhook in `docs/stripe-setup.md` is turned on. Do that with this migration. Do not put the webhook secret in the repo.
 
 On staging, check with two accounts:
 
@@ -78,13 +81,13 @@ Lovable can overwrite app files on the next sync, and it can apply `supabase/mig
 
 - `capacitor.config.ts` still says the app name is Ether, the bundle id is still the placeholder `com.etherbylcove.app` until you confirm it, and there is no `server.url`. A `server.url` would load a dev site inside the iOS binary.
 - `vite.config.ts` and the `paths` in `tsconfig.json` / `tsconfig.app.json` still point `@/integrations/supabase/client` at `src/lib/supabaseClient.ts`.
-- Lovable did not add a second migration that repeats these five files.
+- Lovable did not add a second migration that repeats these six files.
 
 iOS submission still needs a Mac, Xcode, and a paid Apple Developer account. That list is `docs/ios-release.md`. This checklist does not register the bundle id.
 
 ## 8. Production, only after staging
 
-When the staging copy behaves, repeat steps 3, 4, and 5 on the live project, apply the same five files in the same order, deploy the functions, then ship the client. Do the database and the two functions together, then the client. The fund page calls `membership_fund_snapshot`, which does not exist until the money migration has run.
+When the staging copy behaves, repeat steps 3, 4, and 5 on the live project, apply the same six files in the same order, deploy the functions, then ship the client. Do the database and the functions together, then the client. The fund page calls `membership_fund_snapshot`, which does not exist until the money migration has run. The payments migration replaces that function so donations are included. Follow `docs/stripe-setup.md` before expecting paid memberships, donations, tickets, or store orders to update on their own.
 
 ## 9. Rollback
 

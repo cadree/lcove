@@ -205,3 +205,9 @@ verify_jwt = true
 
 [functions.delete-account]
 verify_jwt = true
+
+[functions.refund-store-order]
+verify_jwt = true
+
+[functions.import-shopify-products]
+verify_jwt = true

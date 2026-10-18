@@ -129,8 +129,16 @@ serve(async (req) => {
       success_url: `${req.headers.get("origin")}/cinema/network/${networkId}?subscribed=true`,
       cancel_url: `${req.headers.get("origin")}/cinema/network/${networkId}`,
       metadata: {
+        type: "network_subscription",
         network_id: networkId,
         user_id: user.id,
+      },
+      subscription_data: {
+        metadata: {
+          type: "network_subscription",
+          network_id: networkId,
+          user_id: user.id,
+        },
       },
     };
 
@@ -143,6 +151,7 @@ serve(async (req) => {
       });
 
       sessionOptions.subscription_data = {
+        ...sessionOptions.subscription_data,
         application_fee_percent: PLATFORM_FEE_PERCENT,
         transfer_data: {
           destination: network.stripe_connect_account_id,

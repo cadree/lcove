@@ -16,7 +16,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Upload, Store as StoreIcon, Link, ExternalLink } from 'lucide-react';
+import { Upload, Store as StoreIcon, Link, ExternalLink, Loader2 } from 'lucide-react';
+import { STORE_PLATFORM_FEE_PERCENT } from '@/lib/fees';
 
 interface StoreSetupDialogProps {
   open: boolean;
@@ -37,7 +38,11 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
   const [acceptsCash, setAcceptsCash] = useState(true);
   const [shopifyUrl, setShopifyUrl] = useState('');
   const [peerspaceUrl, setPeerspaceUrl] = useState('');
+  const [flatShipping, setFlatShipping] = useState('0');
+  const [taxLabel, setTaxLabel] = useState('');
+  const [taxAmount, setTaxAmount] = useState('0');
   const [isUploading, setIsUploading] = useState(false);
+  const [isLinking, setIsLinking] = useState(false);
 
   // Sync state with store prop when it changes
   useEffect(() => {
@@ -50,6 +55,9 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
       setAcceptsCash(store.accepts_cash ?? true);
       setShopifyUrl(store.shopify_store_url || '');
       setPeerspaceUrl(store.peerspace_url || '');
+      setFlatShipping(((store.flat_shipping_cents || 0) / 100).toString());
+      setTaxLabel(store.tax_line_label || '');
+      setTaxAmount(((store.tax_line_cents || 0) / 100).toString());
     } else {
       setName('');
       setDescription('');
@@ -59,6 +67,9 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
       setAcceptsCash(true);
       setShopifyUrl('');
       setPeerspaceUrl('');
+      setFlatShipping('0');
+      setTaxLabel('');
+      setTaxAmount('0');
     }
   }, [store, open]);
 
@@ -113,6 +124,9 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
       accepts_cash: acceptsCash,
       shopify_store_url: shopifyUrl.trim() || null,
       peerspace_url: peerspaceUrl.trim() || null,
+      flat_shipping_cents: Math.max(0, Math.round((Number(flatShipping) || 0) * 100)),
+      tax_line_label: taxLabel.trim() || null,
+      tax_line_cents: Math.max(0, Math.round((Number(taxAmount) || 0) * 100)),
     };
 
     try {
@@ -246,6 +260,45 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
                 onCheckedChange={setAcceptsCredits}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="shipping">Shipping amount you charge</Label>
+              <Input
+                id="shipping"
+                type="number"
+                min={0}
+                step="0.01"
+                value={flatShipping}
+                onChange={(e) => setFlatShipping(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-2">
+                <Label htmlFor="tax-label">Tax line label</Label>
+                <Input
+                  id="tax-label"
+                  value={taxLabel}
+                  onChange={(e) => setTaxLabel(e.target.value)}
+                  placeholder="Sales tax"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tax-amount">Tax amount</Label>
+                <Input
+                  id="tax-amount"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={taxAmount}
+                  onChange={(e) => setTaxAmount(e.target.value)}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              You arrange shipping. Enter what you charge the buyer, or leave it at 0. Ether does not set shipping rates or regions. The tax line is a flat amount you enter.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Ether checkout keeps a {STORE_PLATFORM_FEE_PERCENT}% platform fee on the item price. Shipping and this tax line are not part of that fee. Linked Shopify sales are paid on Shopify, and Ether does not take a fee on those.
+            </p>
           </div>
 
           {/* External Integrations */}
@@ -256,7 +309,7 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
               <Label className="text-base font-medium">External Integrations</Label>
             </div>
             <p className="text-sm text-muted-foreground">
-              Connect your existing Shopify or Peerspace accounts to sync products and listings.
+              Link your existing Shopify or Peerspace shop. Linked Shopify products stay on Shopify. Ether does not take a fee on those sales. Buyers pay Shopify, not Ether.
             </p>
 
             {/* Shopify */}
@@ -282,8 +335,38 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
                 placeholder="mystore.myshopify.com"
               />
               <p className="text-xs text-muted-foreground">
-                Enter your Shopify store URL to display a link on your profile
+                Ether reads the public product list at this shop (up to 250 products) and copies title, price, image, and handle. Buy buttons link to https://your-shop/products/handle. No Shopify login. Ether does not take a fee on those sales.
               </p>
+              {store && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isLinking || !shopifyUrl.trim()}
+                  onClick={async () => {
+                    setIsLinking(true);
+                    try {
+                      await updateStore.mutateAsync({
+                        id: store.id,
+                        shopify_store_url: shopifyUrl.trim(),
+                      });
+                      const { data, error } = await supabase.functions.invoke('import-shopify-products', {
+                        body: { storeId: store.id, shopUrl: shopifyUrl.trim() },
+                      });
+                      if (error) throw error;
+                      if (data?.error) throw new Error(data.error);
+                      toast.success(`Linked ${data?.imported ?? 0} Shopify products. Ether does not take a fee on those sales.`);
+                    } catch (err) {
+                      const message = err instanceof Error ? err.message : 'Could not link products';
+                      toast.error(message);
+                    } finally {
+                      setIsLinking(false);
+                    }
+                  }}
+                >
+                  {isLinking ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Link className="w-4 h-4 mr-2" />}
+                  Link products
+                </Button>
+              )}
             </div>
 
             {/* Peerspace */}
