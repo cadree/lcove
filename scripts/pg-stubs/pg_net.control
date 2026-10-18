@@ -1,0 +1,4 @@
+comment = 'Scratch stub of pg_net for local migration checks. Not the real extension.'
+default_version = '1.0'
+relocatable = false
+schema = extensions
