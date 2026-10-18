@@ -70,7 +70,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Missing required fields: email and businessName");
     }
 
-    const appUrl = Deno.env.get("SITE_URL") || "https://lcove.lovable.app";
+    const appUrl = Deno.env.get("SITE_URL") || "https://etherbylcove.com";
     const partnerPortalUrl = `${appUrl}/partner-portal`;
 
     const emailResponse = await resend.emails.send({

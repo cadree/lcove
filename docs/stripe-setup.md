@@ -20,10 +20,10 @@ Set these in the Supabase dashboard: Project Settings, Edge Functions, Secrets.
 
 ## Endpoint
 
-1. Apply `supabase/migrations/20261018201000_payments_webhook_store_fund.sql` on staging first. That creates `donations`, `processed_stripe_events`, and the order functions. Do not run it against production until staging looks right. Do not run it from this chat.
+1. Apply `supabase/bundle/ether-schema.sql` on the new project `aykopqinnnssxdhxqruo`. That file includes `20261018201000_payments_webhook_store_fund.sql`, which creates `donations`, `processed_stripe_events`, and the order functions. Do not run it against the paused ETHER project or the Lovable database.
 2. Deploy `supabase/functions/stripe-music-webhook` with the rest of `supabase/functions/`.
 3. In the Stripe dashboard, Developers, Webhooks, Add endpoint.
-4. Endpoint URL: `https://<project-ref>.supabase.co/functions/v1/stripe-music-webhook`
+4. Endpoint URL: `https://aykopqinnnssxdhxqruo.supabase.co/functions/v1/stripe-music-webhook`
 5. Listen to these events:
    - `checkout.session.completed`
    - `checkout.session.expired`

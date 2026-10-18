@@ -286,7 +286,7 @@ serve(async (req) => {
 
     // Generate signing URL - use appUrl passed from frontend, or fallback.
     // Do not log the URL: it contains the unguessable signing token.
-    const baseUrl = appUrl || Deno.env.get("APP_URL") || "https://wjbyvlgsxscwukkolehg.lovableproject.com";
+    const baseUrl = appUrl || Deno.env.get("APP_URL") || "https://etherbylcove.com";
     const signUrl = `${baseUrl}/sign-contract/${contract.id}?token=${encodeURIComponent(contract.signing_token)}`;
 
     console.log(`Sending contract ${contractId} via ${via}`);

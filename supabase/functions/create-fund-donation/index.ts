@@ -72,7 +72,7 @@ serve(async (req) => {
       }
     }
 
-    const origin = req.headers.get("origin") || "https://lcove.lovable.app";
+    const origin = req.headers.get("origin") || "https://etherbylcove.com";
 
     let sessionConfig: Stripe.Checkout.SessionCreateParams;
 

@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
         .filter(Boolean)
         .join(', ');
 
-      const eventUrl = `https://lcove.lovable.app/calendar?event=${event.id}`;
+      const eventUrl = `https://etherbylcove.com/calendar?event=${event.id}`;
 
       icsLines.push(
         'BEGIN:VEVENT',

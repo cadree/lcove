@@ -1,105 +1,148 @@
 # Go live checklist
 
-Do these steps in order. Nothing in this branch has been applied to the live database. Do not run the SQL in the `migration/` folder. That folder is an old export for a different project.
+Do these steps in order. Nothing in this branch has been applied to a hosted database. Do not run the SQL in the repo-root `migration/` folder. That folder is an old export for a different project.
 
-The five source pull requests are already combined on `cursor/ether-integration`. Land that one pull request. Do not also merge pull requests 1, 2, 3, 4, and 5 on their own, or the same edits will collide.
+Launch uses one new empty Supabase project:
 
-## 1. Back up the live database
+| | |
+| --- | --- |
+| Project ref | `aykopqinnnssxdhxqruo` |
+| Region | `us-east-1` |
+| API URL | `https://aykopqinnnssxdhxqruo.supabase.co` |
 
-In the Supabase dashboard for the live Ether project, take a backup and download it. Keep that file. You need it if the new migrations have to be undone. There is no undo script in this repo.
+The ref and the URL are public. The anon key, service role key, and database password are not. Copy those from the dashboard. Do not put them in git or in chat.
 
-The money migration copies store payment secrets into a new table and then deletes those columns from `stores`. A backup is the way back.
+The paused project named ETHER and the Lovable-hosted database are not used. Do not restore their rows. People create new accounts at launch.
 
-## 2. Apply the migrations on a staging copy first
+`cursor/ether-combined` is the pull request to merge. Do not also merge pull requests 6, 7, 8, 9, and 10 on their own, and do not push this branch straight to `main`.
 
-Create a Supabase staging branch, or a separate project restored from the backup. Do not run these files on the live project until staging looks right.
+## 1. Confirm the empty project
 
-The live project already has the older files in `supabase/migrations/`. Apply only the new files, in this order. The timestamps are already in the order that applied cleanly on a scratch database:
+In the Supabase dashboard, open project `aykopqinnnssxdhxqruo` and confirm the region is `us-east-1`. It should have no Ether member rows. Do not link the CLI at the paused ETHER project or at the Lovable project.
 
-1. `supabase/migrations/20261018120000_open_access_and_profile_privacy.sql`
-2. `supabase/migrations/20261018153000_reports_blocks_and_account_deletion.sql`
-3. `supabase/migrations/20261018171500_lock_down_money_contracts_storage.sql`
-4. `supabase/migrations/20261018183000_lock_event_ticket_fields.sql`
-5. `supabase/migrations/20261018190000_nuance_interest.sql`
-6. `supabase/migrations/20261018201000_payments_webhook_store_fund.sql`
+## 2. Enable extensions
 
-Stripe checkout does not record a payment until the webhook in `docs/stripe-setup.md` is turned on. Do that with this migration. Do not put the webhook secret in the repo.
+Dashboard, Database, Extensions. Turn these on before the schema file runs. `CREATE EXTENSION IF NOT EXISTS` still fails when an extension is not allowlisted:
 
-On staging, check with two accounts:
+- `pg_cron`
+- `pg_net`
+- `supabase_vault` (schema `vault`)
+- `pgmq`
 
-- Account A passed the exam and turned on "only show my profile to members who passed." Account B has not passed. B does not see A in the directory or on A's profile. After B passes, B can see A's name. The score is not on the public profile. B cannot see A's phone.
-- A blocks B. A no longer sees B's posts. B cannot message A or follow A. A can still message B.
-- A report can be filed by the reporter and read by an admin. Another member cannot read it.
-- The Nuance interest list accepts a person's own email once, and only an admin can read it.
-- A normal member cannot write payouts, memberships, or the other money tables, cannot read `store_secrets`, and cannot upload a file outside their own storage folder.
+`pgcrypto` is already available on hosted Supabase.
 
-`scripts/integration-rls-check.sh` repeats those checks on a throwaway local Postgres. It does not connect to Supabase. It is a rehearsal, not a substitute for the staging pass.
+## 3. Apply the schema bundle
 
-## 3. Set the internal function secret
+`supabase/bundle/ether-schema.sql` is every file in `supabase/migrations/`, in filename order, wrapped so a second run skips versions already recorded in `public.ether_schema_migrations`. Rebuild it with `bash scripts/build-supabase-bundle.sh` after any migration change. Do not edit the generated file by hand.
 
-In Supabase, Edge Functions, Secrets, add `INTERNAL_FUNCTION_SECRET`. Pick a long random value. Do not put it in the repo or in chat.
+In the dashboard SQL editor, or with `psql` against this project's connection string, run that file once. It does not connect anywhere by itself. It does not schedule cron jobs and it does not write secrets.
 
-The event-reminder cron must send that same value in the header `x-internal-secret`. Until both sides match, `auto-event-reminders` answers 401 and reminders do not send. That is intentional.
+If a statement says it must be the owner of publication `supabase_realtime` (that publication is owned by `supabase_admin`), add these tables under Database, Publications, `supabase_realtime`:
 
-## 4. Deploy the edge functions
+`post_likes`, `post_comments`, `messages`, `typing_indicators`, `message_read_receipts`, `notifications`, `live_streams`, `stream_reactions`, `story_views`, `fund_distributions`, `conversation_participants`, `project_checklist_items`, `project_item_suggestions`, `events`, `projects`, `profiles`, `ticket_tiers`, `ticket_orders`, `event_attendees`, `event_check_ins`, `donations`, `stream_chat`, `board_items`.
 
-Deploy these two before members use the new buttons:
+The scratch rehearsal of this file is in the pull request. It is not a substitute for running it on `aykopqinnnssxdhxqruo`.
 
-- `purchase-event-with-credits`
-- `delete-account`
+## 4. Auth redirect URLs and email confirmation
 
-Leave `verify_jwt` on for both. `delete-account` ignores any user id in the body and deletes only the person whose token it is. It refuses while a payout, earned credit, escrow, store or booking payout, Stripe balance, or active subscription is still open.
-
-Deploy the rest of `supabase/functions/` in the same pass so the `verify_jwt` values in `supabase/config.toml` match what is running. If the credit-ticket button ships before `purchase-event-with-credits` is deployed, the button fails. If the migration ships before that function, the old client can no longer mark a ticket purchased itself. Ship the function with the migration.
-
-## 5. Auth redirect URLs and email confirmation
-
-In Supabase, Authentication, URL configuration:
+Dashboard, Authentication, URL configuration:
 
 - Site URL: `https://etherbylcove.com`
-- Add redirect URLs:
+- Redirect URLs:
   - `https://etherbylcove.com`
   - `https://etherbylcove.com/**`
   - `https://etherbylcove.com/auth?reset=true`
   - `https://etherbylcove.com/auth?confirmed=1`
+  - `com.etherbylcove.app://`
+  - `capacitor://localhost`
 
-Password reset returns to `/auth?reset=true`. Signup confirmation returns to `/auth?confirmed=1`, which is where the app saves the name and phone and continues onboarding. Both have to be allowed.
+Add the staging host (`pages.dev` or Netlify) the same way, including `/auth?reset=true` and `/auth?confirmed=1`, while you test. Remove it when you no longer want that host to complete login.
 
-Turn on email confirmation (Authentication, Providers, Email, Confirm email). With that on, signup does not log the person in until they open the link, and the app shows "Check your email."
+Password reset returns to `/auth?reset=true`. Signup confirmation returns to `/auth?confirmed=1`, which is where the app saves the name and phone and continues onboarding.
 
-## 6. Regenerate database types
+Turn on email confirmation (Authentication, Providers, Email, Confirm email). Signup does not log the person in until they open the link, and the app shows "Check your email."
 
-After the staging migrations are applied, regenerate `src/integrations/supabase/types.ts` from the Supabase project you own. Do not type those columns in by hand, and do not edit the generated file to silence a type error.
+## 5. Storage buckets
+
+The bundle creates these buckets:
+
+| Bucket | Public |
+| --- | --- |
+| `media` | yes |
+| `contact-avatars` | no |
+| `contact-media` | yes |
+| `board-uploads` | yes |
+
+`delete-account` also lists an `avatars` bucket. Create `avatars` in the dashboard (Storage) if profile photos will live there. The migrations do not create it. There is no storage copy from the old project. Launch starts with empty buckets.
+
+## 6. Secrets, by name only
+
+Dashboard, Edge Functions, Secrets. Supabase injects `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Set the rest yourself. Do not put the values in the repo.
+
+- `INTERNAL_FUNCTION_SECRET` (a new long random value)
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET` (from `docs/stripe-setup.md`, for this project's endpoint)
+- `RESEND_API_KEY`
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_PHONE_NUMBER`
+- `VAPID_PUBLIC_KEY`
+- `VAPID_PRIVATE_KEY`
+- `MUX_TOKEN_ID`
+- `MUX_TOKEN_SECRET`
+- `SITE_URL` = `https://etherbylcove.com`
+- `APP_URL` = `https://etherbylcove.com`
+
+Used when those features are turned on: `APPLE_PASS_TYPE_ID`, `APPLE_TEAM_ID`, `GOOGLE_WALLET_ISSUER_ID`, `GOOGLE_WALLET_SERVICE_ACCOUNT_KEY`.
+
+`process-email-queue`, `handle-email-suppression`, `preview-transactional-email`, and `ai-project-match` still read `LOVABLE_API_KEY`. Copy it only if those functions must keep calling Lovable's API. Replacing that provider is a separate change.
+
+## 7. Cron jobs the bundle does not create
+
+`cron` and `vault` objects are owned by `supabase_admin`. A cron command that named this project's URL and a secret would fail in the SQL editor and would put that secret in a file. Create the jobs in the dashboard (Integrations, Cron) after the functions are deployed and the secrets exist. Do not paste the secret into git.
+
+- `process-email-queue`: POST `https://aykopqinnnssxdhxqruo.supabase.co/functions/v1/process-email-queue` on a short interval. The dashboard cron action can send the service role as the bearer token. The email migration's comments describe a vault secret named `email_queue_service_role_key`. Store that in Vault from the dashboard if you use the vault path. Do not write the key in SQL in this repo.
+- `auto-event-reminders`: POST `https://aykopqinnnssxdhxqruo.supabase.co/functions/v1/auto-event-reminders` with header `x-internal-secret` equal to `INTERNAL_FUNCTION_SECRET`. Until they match, the function returns 401 and reminders do not send.
+
+## 8. Deploy edge functions
+
+From the repo root, with the CLI linked to `aykopqinnnssxdhxqruo`:
 
 ```sh
-npx supabase gen types typescript --project-id <project-id> --schema public > src/integrations/supabase/types.ts
+npx supabase link --project-ref aykopqinnnssxdhxqruo
+npx supabase functions deploy
 ```
 
-`src/integrations/supabase/client.ts` only re-exports `src/lib/supabaseClient.ts` so a phone app does not store the session in `localStorage`. If a regen replaces `client.ts`, put that re-export back. The Vite and TypeScript path aliases are what keep native login working.
+`supabase/config.toml` sets `verify_jwt` per function. Deploying from this repo is what makes the project match those flags. Deploy `purchase-event-with-credits` and `delete-account` before members use those buttons. `delete-account` deletes only the person whose token it is. It refuses while a payout, earned credit, escrow, store or booking payout, Stripe balance, or active subscription is still open.
 
-## 7. Merge
+Stripe webhook events are listed in `docs/stripe-setup.md`.
 
-Merge the integration pull request into `main` when staging is accepted. Do not push straight to `main`. GitHub is the source of truth for this repo.
+## 9. Regenerate database types
+
+After the bundle has been applied on `aykopqinnnssxdhxqruo`:
+
+```sh
+npx supabase gen types typescript --project-id aykopqinnnssxdhxqruo --schema public > src/integrations/supabase/types.ts
+```
+
+Commit that file. `src/integrations/supabase/client.ts` only re-exports `src/lib/supabaseClient.ts`. If a regen replaces `client.ts`, put that re-export back.
+
+## 10. Host the client
+
+Follow `docs/hosting-without-lovable.md`. Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_SUPABASE_PROJECT_ID` (`aykopqinnnssxdhxqruo`) on the host and rebuild. Point `etherbylcove.com` only after a `pages.dev` URL signs in.
+
+## 11. Merge
+
+Merge this pull request into `main` when the new project signs in, a public page loads, and a test payment path is understood. Do not push the branch straight to `main`.
 
 After the merge, check:
 
-- `capacitor.config.ts` still says the app name is Ether, the bundle id is still the placeholder `com.etherbylcove.app` until you confirm it, and there is no `server.url`. A `server.url` would load a dev site inside the iOS binary.
+- `capacitor.config.ts` has no `server.url`.
 - `vite.config.ts` and the `paths` in `tsconfig.json` / `tsconfig.app.json` still point `@/integrations/supabase/client` at `src/lib/supabaseClient.ts`.
-- A second copy of the new migration files was not added. Lovable is not the source of truth for this repo.
+- `supabase/config.toml` `project_id` is still `aykopqinnnssxdhxqruo`.
 
-iOS submission still needs a Mac, Xcode, and a paid Apple Developer account. That list is `docs/ios-release.md`. This checklist does not register the bundle id.
+iOS submission still needs a Mac, Xcode, and a paid Apple Developer account. That list is `docs/ios-release.md`.
 
-## 8. Production, only after staging
+## 12. If the new project is wrong
 
-When the staging copy behaves, repeat steps 3, 4, and 5 on the live project, apply the same six files in the same order, deploy the functions, then ship the client. Do the database and the functions together, then the client. The fund page calls `membership_fund_snapshot`, which does not exist until the money migration has run. The payments migration replaces that function so donations are included. Follow `docs/stripe-setup.md` before expecting paid memberships, donations, tickets, or store orders to update on their own.
-
-## 9. Rollback
-
-If something is wrong after production:
-
-1. Stop sending members to the new client if the new screens are calling objects that failed.
-2. Restore the database from the backup in step 1. Do not try to reverse the money migration by hand. The store secret columns are removed after they are copied.
-3. Redeploy the previous edge functions so `verify_jwt` matches the restored database.
-4. Leave `INTERNAL_FUNCTION_SECRET` in place. Removing it only makes reminders keep returning 401.
-
-Old contract links that have no `?token=` stop working for anyone who is not the owner once the money migration runs. New emails from `send-contract` include the token. Restoring the backup brings the old open signing rules back.
+Stop before changing DNS. The old ETHER backup is not the launch database. You can drop objects on `aykopqinnnssxdhxqruo` and run `supabase/bundle/ether-schema.sql` again, or create another empty project and change the ref in this checklist. Leave `INTERNAL_FUNCTION_SECRET` in place if reminders are already scheduled. Removing it only makes `auto-event-reminders` keep returning 401.

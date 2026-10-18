@@ -87,7 +87,7 @@ serve(async (req) => {
         genericType: "GENERIC_EVENT_TICKET",
         hexBackgroundColor: "#1a1a2e",
         logo: {
-          sourceUri: { uri: "https://lcove.lovable.app/favicon.png" },
+          sourceUri: { uri: "https://etherbylcove.com/favicon.png" },
         },
         cardTitle: { defaultValue: { language: "en", value: "ETHER" } },
         header: { defaultValue: { language: "en", value: eventTitle } },
