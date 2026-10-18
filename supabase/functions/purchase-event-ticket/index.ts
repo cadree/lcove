@@ -287,9 +287,10 @@ serve(async (req) => {
     };
 
     if (creatorConnectId && creatorPayoutEnabled) {
+      const applicationFee = Math.round(totalCents * (EVENT_PLATFORM_FEE_PERCENT / 100));
       sessionConfig.payment_intent_data = {
-        application_fee_amount: Math.round(totalCents * (EVENT_PLATFORM_FEE_PERCENT / 100)),
         transfer_data: { destination: creatorConnectId },
+        ...(applicationFee > 0 ? { application_fee_amount: applicationFee } : {}),
       };
     }
 

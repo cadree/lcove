@@ -57,8 +57,8 @@ BEGIN
   IF v_buyer_balance <> 80 THEN
     RAISE EXCEPTION 'buyer balance %, expected 80', v_buyer_balance;
   END IF;
-  IF v_seller_earned <> 16 THEN
-    RAISE EXCEPTION 'seller earned %, expected 16', v_seller_earned;
+  IF v_seller_earned <> 18 THEN
+    RAISE EXCEPTION 'seller earned %, expected 18', v_seller_earned;
   END IF;
   IF v_inventory <> 3 THEN
     RAISE EXCEPTION 'inventory %, expected 3', v_inventory;
@@ -73,7 +73,7 @@ BEGIN
     SELECT 1 FROM public.credit_ledger
     WHERE reference_id = v_order
       AND type = 'earn'
-      AND (credit_type <> 'earned' OR earned_amount <> 16)
+      AND (credit_type <> 'earned' OR earned_amount <> 18)
   ) THEN
     RAISE EXCEPTION 'seller earn row missing earned_amount';
   END IF;

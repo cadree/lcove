@@ -196,7 +196,8 @@ BEGIN
   END IF;
 
   v_total := v_item.credits_price * p_quantity;
-  v_seller_credits := floor(v_total * 0.80);
+  -- 10% of the item price. Keep equal to STORE_PLATFORM_FEE_PERCENT. Linked Shopify items are rejected above.
+  v_seller_credits := floor(v_total * 0.90);
   v_platform_credits := v_total - v_seller_credits;
 
   INSERT INTO public.user_credits (user_id, balance, genesis_balance, earned_balance, lifetime_earned, lifetime_spent)
@@ -278,7 +279,7 @@ BEGIN
     reference_type, reference_id
   ) VALUES (
     v_store.user_id, v_seller_credits, v_seller_after, 'earn',
-    'Sale (80%): ' || v_item.title,
+    'Sale (90%): ' || v_item.title,
     'earned', v_seller_credits, 0,
     'store_order', v_order_id
   );
@@ -287,7 +288,7 @@ BEGIN
     source_type, source_id, amount, credits_amount, description
   ) VALUES (
     'store_order', v_order_id, 0, v_platform_credits,
-    'Platform fee (20%): ' || v_item.title
+    'Platform fee (10%): ' || v_item.title
   );
 
   IF v_item.type = 'product' AND v_item.inventory_count IS NOT NULL THEN

@@ -225,6 +225,6 @@ test("event and store fee constants match the edge function and the app", () => 
     const pattern = new RegExp(`export const ${name} = (\\d+)`);
     assert.equal(edge.match(pattern)[1], app.match(pattern)[1], name);
   }
-  assert.match(edge, /EVENT_PLATFORM_FEE_PERCENT = 5/);
-  assert.match(edge, /STORE_PLATFORM_FEE_PERCENT = 20/);
+  assert.match(edge, /EVENT_PLATFORM_FEE_PERCENT = 0/);
+  assert.match(edge, /STORE_PLATFORM_FEE_PERCENT = 10/);
 });

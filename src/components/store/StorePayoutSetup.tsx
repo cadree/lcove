@@ -96,7 +96,7 @@ export const StorePayoutSetup = ({ storeId, storeName }: StorePayoutSetupProps) 
             )}
           </div>
           <CardDescription>
-            Set up payouts to receive {100 - STORE_PLATFORM_FEE_PERCENT}% of your sales automatically. ETHER collects a {STORE_PLATFORM_FEE_PERCENT}% platform fee.
+            Set up payouts for sales made through Ether checkout. You receive {100 - STORE_PLATFORM_FEE_PERCENT}% of the item price. Ether keeps {STORE_PLATFORM_FEE_PERCENT}%. Linked Shopify sales are not paid here.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -105,8 +105,9 @@ export const StorePayoutSetup = ({ storeId, storeName }: StorePayoutSetupProps) 
               <div className="p-4 bg-muted/50 rounded-lg">
                 <h4 className="font-medium mb-2">How it works:</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• You receive <strong>{100 - STORE_PLATFORM_FEE_PERCENT}%</strong> of every sale</li>
-                  <li>• ETHER collects <strong>{STORE_PLATFORM_FEE_PERCENT}%</strong> platform fee</li>
+                  <li>• You receive <strong>{100 - STORE_PLATFORM_FEE_PERCENT}%</strong> of the item price on Ether checkout</li>
+                  <li>• Ether collects <strong>{STORE_PLATFORM_FEE_PERCENT}%</strong> on those sales. Shipping and tax are not part of the fee</li>
+                  <li>• Linked Shopify sales are paid on Shopify. Ether does not take a fee</li>
                   <li>• Cash payments are transferred directly to your bank</li>
                   <li>• Credit payments are added to your LC balance</li>
                 </ul>
@@ -137,7 +138,7 @@ export const StorePayoutSetup = ({ storeId, storeName }: StorePayoutSetupProps) 
           ) : (
             <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
               <p className="text-sm text-green-600">
-                Your payouts are fully configured! You'll receive {100 - STORE_PLATFORM_FEE_PERCENT}% of every sale automatically.
+                Your payouts are fully configured. Ether checkout sends you {100 - STORE_PLATFORM_FEE_PERCENT}% of the item price. Linked Shopify sales are paid on Shopify.
               </p>
             </div>
           )}

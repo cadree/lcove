@@ -442,7 +442,7 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
           <p className="text-sm text-muted-foreground rounded-lg bg-muted/50 p-3">
             {editItem?.external_url
               ? 'This product is linked from Shopify. Buyers pay there. Ether does not take a fee on that sale.'
-              : `Selling this on Ether: Ether keeps ${STORE_PLATFORM_FEE_PERCENT}% of the sale. You receive ${100 - STORE_PLATFORM_FEE_PERCENT}%.`}
+              : `Selling this on Ether checkout: Ether keeps ${STORE_PLATFORM_FEE_PERCENT}% of the item price. You receive ${100 - STORE_PLATFORM_FEE_PERCENT}%. Shipping and tax are not part of that fee.`}
           </p>
 
           {/* Submit */}

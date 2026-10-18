@@ -16,7 +16,7 @@ import { useFundStats } from "@/hooks/useFundStats";
 import { RecentDistributionsCard } from "@/components/fund/FundDistributions";
 import { DonateDialog } from "@/components/fund/DonateDialog";
 import { IosDigitalGoodsNotice } from "@/components/ios/IosDigitalGoodsNotice";
-import { isIosApp } from "@/lib/platform";
+import { IOS_DONATIONS_ENABLED, isIosApp } from "@/lib/platform";
 import { toast } from "sonner";
 
 const ALLOCATION_DATA = [
@@ -96,6 +96,8 @@ export default function FundDashboard() {
   const { data: fundStats, isLoading: fundLoading, isError: fundFailed, refetch, isFetching } = useFundStats();
   const fundEmpty = !fundLoading && !fundFailed && (fundStats?.lifetime.totalCollected ?? 0) === 0 && (fundStats?.lifetime.totalDistributed ?? 0) === 0 && (fundStats?.recentDistributions.length ?? 0) === 0;
   
+  const iosApp = isIosApp();
+  const showDonations = !iosApp || IOS_DONATIONS_ENABLED;
   const stats = view === "lifetime" ? fundStats?.lifetime : fundStats?.monthly;
   const isMember = membership?.subscribed;
 
@@ -487,17 +489,17 @@ export default function FundDashboard() {
                       )}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {isIosApp() ? (
-                        <IosDigitalGoodsNotice kind="donation" className="max-w-xs" />
-                      ) : (
+                      {showDonations ? (
                       <DonateDialog>
                         <Button variant="default" size="sm">
                           <Heart className="w-3.5 h-3.5 mr-1.5" />
                           Extra Donation
                         </Button>
                       </DonateDialog>
+                      ) : (
+                        <IosDigitalGoodsNotice kind="donation" className="max-w-xs" />
                       )}
-                      {!isIosApp() && (
+                      {!iosApp && (
                         <Button variant="outline" size="sm" onClick={handleManageSubscription}>
                           Manage Subscription
                         </Button>
@@ -522,24 +524,26 @@ export default function FundDashboard() {
                         </h3>
                         <p className="text-muted-foreground max-w-md">
                           Join {fundStats?.lifetime.memberCount || 0}+ members funding grants, events, and creative opportunities.{" "}
-                          {isIosApp()
-                            ? "Membership checkout and card donations are not available in the iOS app."
+                          {iosApp
+                            ? showDonations
+                              ? "Membership checkout is not available in the iOS app. You can still donate."
+                              : "Membership checkout is not available in the iOS app."
                             : "Donate once or subscribe monthly — no account required."}
                         </p>
                       </div>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-3">
-                      {isIosApp() ? (
-                        <IosDigitalGoodsNotice kind="donation" className="max-w-xs" />
-                      ) : (
+                      {showDonations ? (
                       <DonateDialog>
                         <Button size="lg" className="group">
                           Donate Now
                           <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                         </Button>
                       </DonateDialog>
+                      ) : (
+                        <IosDigitalGoodsNotice kind="donation" className="max-w-xs" />
                       )}
-                      {isIosApp() ? (
+                      {iosApp ? (
                         <IosDigitalGoodsNotice className="max-w-xs" />
                       ) : (
                       <Button 

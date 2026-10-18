@@ -45,16 +45,20 @@ Set these in the Supabase dashboard: Project Settings, Edge Functions, Secrets.
 
 `checkout.session.expired` cancels a pending store order and deletes the platform-fee row that was written before payment. The store page does the same when the buyer returns with `?purchase=cancel`.
 
-## Fees Cadre should confirm
+## Fees
 
-These two numbers are the ones the code charges and the ones the screens show. They live in `src/lib/fees.ts` and `supabase/functions/_shared/fees.mjs` and must stay equal.
+These numbers are what the code charges and what the screens say. They live in `src/lib/fees.ts` and `supabase/functions/_shared/fees.mjs` and must stay equal. Credit sales use the same store rate inside `complete_store_credit_purchase`.
 
-- Store sales made on Ether: **20%** application fee on the item price. The seller receives 80%. A seller-set flat shipping amount and a seller-entered tax line are added in full and are not part of the 20%. The seller sees this before they publish an item.
-- Event tickets: **5%** application fee when the host has Stripe Connect payouts on. This matches the Finance tab. It was previously charged as 0% while the screen said 5%. **Confirm 5% before production.** If the host has not finished Connect, the charge is not split and the platform holds the payment.
-- Shopify products linked from a public `/products.json` list are not sold on Ether. The buy button goes to `https://{shop}/products/{handle}`. Ether does not take a fee on those sales. The store settings screen says that.
+- Store sales through Ether checkout: **10%** of the item price. The seller receives 90%. The seller-entered shipping amount and the seller-entered tax line are added in full and are not part of the 10%. The seller sees this before they publish an item.
+- Shopify products linked from a public `/products.json` list are not sold on Ether. The buy button goes to `https://{shop}/products/{handle}`. Ether does not take a fee on those sales.
+- Event tickets: **no platform fee**. Checkout does not send `application_fee_amount`. The Finance tab and payout settings say that, and they do not show a fee line. When the host has Connect payouts on, the charge is transferred without a platform cut. When Connect is off, the platform still receives the charge until payouts are set up. That is not a fee.
 
-Shipping addresses collected at card checkout are limited to the United States and Canada. Confirm that country list if sellers ship elsewhere.
+## Shipping and tax
+
+Sellers arrange their own shipping. Checkout adds the amount the seller entered as a line named "Shipping (seller arranges)". Ether does not collect a shipping address and does not limit countries. Tax stays a flat amount and label the seller enters. Neither line is part of the platform fee.
 
 ## iOS
 
-The iOS app does not open Stripe for memberships, donations, or store card checkout. Physical goods can show a text link to the Ether website. Donations are hidden, with no payment link, because Apple does not allow card donations inside the app. Credits already on the account can still be spent.
+The iOS app does not open Stripe for memberships, exclusive music, or store card checkout. Physical goods can show a text link to the Ether website. Credits already on the account can still be spent.
+
+Donations stay visible. `IOS_DONATIONS_ENABLED` in `src/lib/platform.ts` is `true`. Set it to `false` to hide the donate buttons if App Review rejects them. Membership and music stay hidden either way. See `docs/ios-release.md`.

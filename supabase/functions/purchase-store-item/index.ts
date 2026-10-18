@@ -9,7 +9,6 @@ const corsHeaders = {
 };
 
 const PLATFORM_FEE_PERCENT = STORE_PLATFORM_FEE_PERCENT;
-const SHIPPING_COUNTRIES = ["US", "CA"];
 
 const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
@@ -229,7 +228,7 @@ serve(async (req) => {
         lineItems.push({
           price_data: {
             currency: item.currency.toLowerCase(),
-            product_data: { name: "Shipping" },
+            product_data: { name: "Shipping (seller arranges)" },
             unit_amount: shippingCents,
           },
           quantity: 1,
@@ -265,18 +264,14 @@ serve(async (req) => {
         },
       };
 
-      if (item.type === "product") {
-        sessionConfig.shipping_address_collection = {
-          allowed_countries: SHIPPING_COUNTRIES,
-        };
-      }
-
-      // If seller has Stripe Connect enabled, use application fee for automatic 80/20 split.
-      // The fee is 20% of the item price. Shipping and the seller tax line are not charged the fee.
+      // Sellers arrange shipping themselves. The seller-entered amount is a line item above.
+      // Ether does not collect a shipping address or limit countries.
+      // Connect fee is STORE_PLATFORM_FEE_PERCENT of the item price. Shipping and tax are not in the fee.
+      // Linked Shopify items are rejected above and never reach this split.
       if (connectAccountId && store.payout_enabled) {
         sessionConfig.payment_intent_data = {
           ...sessionConfig.payment_intent_data,
-          application_fee_amount: platformFeeAmount,
+          ...(platformFeeAmount > 0 ? { application_fee_amount: platformFeeAmount } : {}),
           transfer_data: {
             destination: connectAccountId,
           },
@@ -307,7 +302,7 @@ serve(async (req) => {
         source_id: order.id,
         amount: platformFeeAmount / 100,
         credits_amount: 0,
-        description: `Platform fee (20%): ${item.title}`,
+        description: `Platform fee (${PLATFORM_FEE_PERCENT}%): ${item.title}`,
       });
 
       logStep("Checkout session created", { sessionUrl: session.url, orderId: order.id });

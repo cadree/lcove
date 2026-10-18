@@ -28,7 +28,7 @@ These ran on Linux, without a Mac and without an Apple Developer account:
 - [x] Auth return links use `com.etherbylcove.app://...` from `getAuthRedirectUrl` in `src/lib/capacitorStorage.ts`. The same scheme is in `ios/App/App/Info.plist` under `CFBundleURLTypes`.
 - [x] iOS project generated with `npx cap add ios` (Capacitor 8 default is Swift Package Manager, so CocoaPods is not required).
 - [x] Icon and splash are the existing `src/assets/lc-bear-logo.png` letterboxed on `#080808`. No new artwork.
-- [x] Stripe checkout for the digital goods listed below is hidden when `Capacitor.getPlatform() === "ios"`.
+- [x] Stripe checkout for membership, exclusive music, artist subscriptions, and cinema or network subscriptions is hidden when `Capacitor.getPlatform() === "ios"`. Donations stay visible while `IOS_DONATIONS_ENABLED` is true.
 
 ## Digital goods (implemented)
 
@@ -42,14 +42,20 @@ There is no "buy on the web" button. An external purchase link needs Apple's app
 
 People who already subscribed on the web can still open content they have access to. The iOS app does not sell a new subscription.
 
-### Payments this PR does not hide
+### Community Fund donations
 
-Cadre should decide these before submission. They are still in the iOS build:
+Donations stay visible in the iOS app. `IOS_DONATIONS_ENABLED` in `src/lib/platform.ts` is `true`. `DonateDialog` and the fund page both read that flag. Set it to `false` to hide the donate buttons and stop the dialog from opening Stripe. Membership and exclusive music stay hidden either way.
+
+Apple guidelines 3.2.1 and 3.1.1 may require in-app purchase for donations to individuals. A nonprofit can qualify for an exception. That is a review risk. The flag is the switch if App Review rejects the Stripe donation flow.
+
+### Payments this build does not hide
+
+These are still in the iOS build:
 
 - Live-stream tips (`Tip LC` in `src/components/streaming/StreamViewer.tsx`, `tip-stream`). This is a digital purchase inside the app.
-- One-time Community Fund donations (`DonateDialog`).
+- Community Fund donations, while `IOS_DONATIONS_ENABLED` is true.
 - Event tickets (`purchase-event-ticket`). Real-world tickets are often outside in-app purchase rules. Confirm the events are in-person.
-- Store items (`purchase-store-item`). Confirm each item is a physical good or a real-world service. Digital goods in the store would have the same problem as membership.
+- Store items (`purchase-store-item`). Card checkout is hidden on iOS. Physical goods can show a text link to the website. Credits still spend. Confirm each item is a physical good or a real-world service. Digital goods in the store would have the same problem as membership.
 - Studio bookings (`purchase-studio-booking`). Treat as a real-world booking unless a booking is only access to digital content.
 
 ## Lovable sync and native login

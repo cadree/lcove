@@ -8,7 +8,7 @@ import { Heart, ArrowRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { isIosApp } from "@/lib/platform";
+import { IOS_DONATIONS_ENABLED, isIosApp } from "@/lib/platform";
 
 const PRESET_AMOUNTS = [5, 10, 25, 50];
 
@@ -24,7 +24,7 @@ export function DonateDialog({ children }: { children: React.ReactNode }) {
   const effectiveAmount = isCustom ? Number(customAmount) : amount;
 
   const handleDonate = async () => {
-    if (isIosApp()) {
+    if (isIosApp() && !IOS_DONATIONS_ENABLED) {
       toast.error("Donations aren't available in the iOS app.");
       return;
     }

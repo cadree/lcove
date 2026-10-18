@@ -1,5 +1,5 @@
 // Keep these equal to supabase/functions/_shared/fees.mjs.
-// The event rate is a proposal. See docs/stripe-setup.md.
+// Event tickets: no platform fee. Store: 10% of the item price on Ether checkout only.
 
-export const EVENT_PLATFORM_FEE_PERCENT = 5;
-export const STORE_PLATFORM_FEE_PERCENT = 20;
+export const EVENT_PLATFORM_FEE_PERCENT = 0;
+export const STORE_PLATFORM_FEE_PERCENT = 10;

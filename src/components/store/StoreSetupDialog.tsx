@@ -261,7 +261,7 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="shipping">Flat shipping (physical products)</Label>
+              <Label htmlFor="shipping">Shipping amount you charge</Label>
               <Input
                 id="shipping"
                 type="number"
@@ -294,7 +294,10 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Card sales on Ether keep a {STORE_PLATFORM_FEE_PERCENT}% platform fee on the item price. Shipping and this tax line are added on top and are not charged that fee.
+              You arrange shipping. Enter what you charge the buyer, or leave it at 0. Ether does not set shipping rates or regions. The tax line is a flat amount you enter.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Ether checkout keeps a {STORE_PLATFORM_FEE_PERCENT}% platform fee on the item price. Shipping and this tax line are not part of that fee. Linked Shopify sales are paid on Shopify, and Ether does not take a fee on those.
             </p>
           </div>
 

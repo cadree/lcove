@@ -63,7 +63,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import BottomNav from "@/components/navigation/BottomNav";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { EVENT_PLATFORM_FEE_PERCENT } from "@/lib/fees";
 import { shareLink, buildShareUrl } from "@/lib/shareLink";
 import { useEventTicketingData, type TicketOrder, type EventAttendee } from "@/hooks/useEventTicketingData";
 import { useEventCheckIns } from "@/hooks/useEventCheckIn";
@@ -1123,8 +1122,7 @@ function FinanceTab({ orders, event, totalRevenue, totalCredits }: FinanceTabPro
   const paidOrders = orders.filter(o => o.stripe_payment_id);
   const creditOrders = orders.filter(o => o.credits_spent && !o.stripe_payment_id);
 
-  const platformFee = totalRevenue * (EVENT_PLATFORM_FEE_PERCENT / 100);
-  const netRevenue = totalRevenue - platformFee;
+  const netRevenue = totalRevenue;
 
   return (
     <div className="space-y-4">
@@ -1164,14 +1162,11 @@ function FinanceTab({ orders, event, totalRevenue, totalCredits }: FinanceTabPro
             <span className="text-sm text-muted-foreground">Credit Orders</span>
             <span className="font-medium">{creditOrders.length} ({totalCredits} credits)</span>
           </div>
-          <div className="flex justify-between items-center py-2 border-b border-border/40">
-            <span className="text-sm text-muted-foreground">Platform Fee ({EVENT_PLATFORM_FEE_PERCENT}%)</span>
-            <span className="font-medium text-destructive">-${platformFee.toFixed(2)}</span>
-          </div>
           <div className="flex justify-between items-center py-2">
             <span className="text-sm font-medium">Your Payout</span>
             <span className="font-bold text-emerald-500">${netRevenue.toFixed(2)}</span>
           </div>
+          <p className="text-xs text-muted-foreground">Ether does not take a platform fee on tickets.</p>
         </CardContent>
       </Card>
 
@@ -1671,8 +1666,7 @@ function FinanceTabV2({
   const paid = orders.filter(o => o.payment_status === "paid");
   const grossCents = paid.reduce((s, o) => s + o.total_cents, 0);
   const refundedCents = orders.reduce((s, o) => s + (o.refund_amount_cents || 0), 0);
-  const feeCents = Math.round((grossCents - refundedCents) * (EVENT_PLATFORM_FEE_PERCENT / 100));
-  const netCents = grossCents - refundedCents - feeCents;
+  const netCents = grossCents - refundedCents;
   const currency = orders[0]?.currency || "usd";
 
   const tierBreakdown = tiers.map(t => ({
@@ -1702,7 +1696,7 @@ function FinanceTabV2({
               <span className="text-xs text-muted-foreground">Net Revenue</span>
             </div>
             <p className="text-2xl font-bold text-primary">{formatMoney(netCents, currency)}</p>
-            <p className="text-[10px] text-muted-foreground mt-1">After {formatMoney(refundedCents, currency)} refunded and a {EVENT_PLATFORM_FEE_PERCENT}% platform fee ({formatMoney(feeCents, currency)})</p>
+            <p className="text-[10px] text-muted-foreground mt-1">After {formatMoney(refundedCents, currency)} refunded. Ether does not take a platform fee on tickets.</p>
           </CardContent>
         </Card>
       </div>

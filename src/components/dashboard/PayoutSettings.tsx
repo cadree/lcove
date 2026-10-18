@@ -13,12 +13,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { EVENT_PLATFORM_FEE_PERCENT } from "@/lib/fees";
 import { useEventConnectStatus, useCreateEventConnectAccount } from "@/hooks/useEventConnectStatus";
 import { cn } from "@/lib/utils";
 
@@ -107,7 +105,7 @@ export function PayoutSettings() {
                 <div>
                   <p className="text-sm font-medium">Payouts Not Enabled</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Set up Stripe Connect to receive {100 - EVENT_PLATFORM_FEE_PERCENT}% of ticket sales directly to your bank account. Ether keeps {EVENT_PLATFORM_FEE_PERCENT}%.
+                    Set up Stripe Connect to receive ticket sales in your bank account. Ether does not take a platform fee on tickets.
                   </p>
                 </div>
               </div>
@@ -192,18 +190,9 @@ export function PayoutSettings() {
               </div>
             </div>
 
-            {/* Revenue Split Info */}
-            <div className="flex items-center justify-between py-2 border-t border-border/30">
-              <div>
-                <p className="text-xs font-medium">Revenue Split</p>
-                <p className="text-[10px] text-muted-foreground">Per ticket sale</p>
-              </div>
-              <div className="text-right">
-                <Badge variant="secondary" className="text-xs">
-                  You: 100% • Platform: 0%
-                </Badge>
-              </div>
-            </div>
+            <p className="text-xs text-muted-foreground border-t border-border/30 pt-2">
+              Ether does not take a platform fee on ticket sales.
+            </p>
 
             <Button 
               variant="outline" 
