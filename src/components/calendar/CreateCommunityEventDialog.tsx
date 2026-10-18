@@ -15,6 +15,7 @@ import { useCreateEvent } from "@/hooks/useCalendar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 import { format } from "date-fns";
 import { 
   Upload, 
@@ -151,9 +152,9 @@ const TIMEZONES = [
 
       setImageUrl(publicUrl);
       toast.success('Image uploaded!', { id: toastId });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Upload error:', error);
-      toast.error(error?.message || 'Failed to upload image', { id: toastId });
+      toast.error(errorMessage(error, 'Failed to upload image'), { id: toastId });
     } finally {
       setIsUploadingImage(false);
     }
@@ -241,7 +242,7 @@ const TIMEZONES = [
       project_id: null,
       status: 'published',
     }, {
-      onSuccess: (created: any) => {
+      onSuccess: (created) => {
         toast.success('Event created! Add a moodboard or finish.');
         setCreatedEventId(created?.id || null);
       }

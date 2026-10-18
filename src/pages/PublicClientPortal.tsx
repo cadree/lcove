@@ -10,6 +10,74 @@ import { AddToCalendarButtons } from '@/components/calendar/AddToCalendarButtons
 import { generateProjectPdf } from '@/lib/generateProjectPdf';
 import { cn } from '@/lib/utils';
 
+interface ClientPortalDeliverable {
+  type?: string;
+  publish_date?: string | null;
+  publish_location?: string | null;
+}
+
+interface ClientPortalRole {
+  id: string;
+  role_name: string;
+  slots_filled: number;
+  slots_available: number;
+}
+
+interface ClientPortalMilestone {
+  id: string;
+  title: string;
+  status: string;
+  due_date?: string | null;
+}
+
+interface ClientPortalRoleEntry {
+  role_name: string;
+  call_time: string;
+  wrap_time: string;
+  location: string;
+  notes: string;
+}
+
+interface ClientPortalCallSheet {
+  id: string;
+  shoot_date: string;
+  general_location?: string | null;
+  general_notes?: string | null;
+  role_entries: ClientPortalRoleEntry[];
+}
+
+interface ClientPortalAttachment {
+  id: string;
+  file_type: string;
+  file_name: string;
+  file_url: string;
+}
+
+interface ClientPortalProject {
+  title: string;
+  description?: string | null;
+  status?: string;
+  progress_percent: number;
+  timeline_start?: string | null;
+  timeline_end?: string | null;
+  venue?: string | null;
+  location_secured?: boolean;
+  equipment_needed?: string | null;
+  props_needed?: string | null;
+  currency?: string;
+  deliverables?: ClientPortalDeliverable[] | null;
+}
+
+interface ClientPortalData {
+  client_name?: string | null;
+  project: ClientPortalProject;
+  creator?: { display_name?: string | null } | null;
+  roles?: ClientPortalRole[];
+  milestones?: ClientPortalMilestone[];
+  call_sheets?: ClientPortalCallSheet[];
+  attachments?: ClientPortalAttachment[];
+}
+
 export default function PublicClientPortal() {
   const { token } = useParams<{ token: string }>();
 
@@ -18,7 +86,7 @@ export default function PublicClientPortal() {
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_client_project_by_token', { p_token: token! });
       if (error) throw error;
-      return data as any;
+      return data as unknown as ClientPortalData;
     },
     enabled: !!token,
   });
@@ -48,8 +116,8 @@ export default function PublicClientPortal() {
   const milestones = data.milestones || [];
   const callSheets = data.call_sheets || [];
   const attachments = data.attachments || [];
-  const deliverables = (project.deliverables as any[])?.filter((d: any) => d?.type) || [];
-  const filledRoles = roles.filter((r: any) => r.slots_filled > 0);
+  const deliverables = (project.deliverables || []).filter((d) => d?.type);
+  const filledRoles = roles.filter((r) => r.slots_filled > 0);
 
   const calendarEvent = project.timeline_start ? {
     title: project.title,
@@ -121,7 +189,7 @@ export default function PublicClientPortal() {
         {filledRoles.length > 0 && (
           <div className="space-y-2">
             <h4 className="text-sm font-medium flex items-center gap-2"><Users className="h-4 w-4" /> Confirmed Team</h4>
-            {filledRoles.map((role: any) => (
+            {filledRoles.map((role) => (
               <div key={role.id} className="flex items-center justify-between bg-muted/20 rounded-lg p-3 text-sm">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-emerald-500" />
@@ -153,7 +221,7 @@ export default function PublicClientPortal() {
             <h4 className="text-sm font-medium">Milestones</h4>
             <div className="relative pl-6 space-y-4">
               <div className="absolute left-2 top-1 bottom-1 w-0.5 bg-border" />
-              {milestones.map((ms: any) => (
+              {milestones.map((ms) => (
                 <div key={ms.id} className="relative">
                   <div className={cn(
                     "absolute -left-4 top-1 w-3 h-3 rounded-full border-2",
@@ -181,7 +249,7 @@ export default function PublicClientPortal() {
         {callSheets.length > 0 && (
           <div className="space-y-3">
             <h4 className="text-sm font-medium flex items-center gap-2"><FileText className="h-4 w-4" /> Call Sheets</h4>
-            {callSheets.map((cs: any) => (
+            {callSheets.map((cs) => (
               <div key={cs.id} className="border border-border rounded-lg p-3 space-y-2">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-[10px]">{format(new Date(cs.shoot_date + 'T00:00:00'), 'MMM d, yyyy')}</Badge>
@@ -189,7 +257,7 @@ export default function PublicClientPortal() {
                 </div>
                 {cs.general_notes && <p className="text-xs text-muted-foreground bg-muted/20 rounded p-2">{cs.general_notes}</p>}
                 <div className="space-y-1.5">
-                  {(cs.role_entries || []).map((entry: any, i: number) => (
+                  {(cs.role_entries || []).map((entry, i) => (
                     <div key={i} className="bg-muted/10 rounded-lg p-2.5 text-sm">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium">{entry.role_name}</span>
@@ -211,7 +279,7 @@ export default function PublicClientPortal() {
         {deliverables.length > 0 && (
           <div className="space-y-2">
             <h4 className="text-sm font-medium flex items-center gap-2"><Package className="h-4 w-4" /> Deliverables</h4>
-            {deliverables.map((d: any, i: number) => (
+            {deliverables.map((d, i) => (
               <div key={i} className="flex items-center justify-between bg-muted/20 rounded-lg p-3 text-sm">
                 <span className="font-medium">{d.type}</span>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -226,7 +294,7 @@ export default function PublicClientPortal() {
         {attachments.length > 0 && (
           <div className="space-y-2">
             <h4 className="text-sm font-medium flex items-center gap-2"><FileText className="h-4 w-4" /> Files</h4>
-            {attachments.map((att: any) => (
+            {attachments.map((att) => (
               <div key={att.id} className="flex items-center justify-between border border-border rounded-lg p-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <Badge variant="outline" className="text-[10px] shrink-0">{att.file_type.toUpperCase()}</Badge>

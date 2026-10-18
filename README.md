@@ -1,73 +1,89 @@
-# Welcome to your Lovable project
+# Ether
 
-## Project info
+Ether is the creative community app at [etherbylcove.com](https://etherbylcove.com). GitHub is the source of truth. Change the app by opening a pull request against this repository.
 
-**URL**: https://etherbylcove.com
+## Local setup
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://etherbylcove.com) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Install Node.js 22 and npm. [nvm](https://github.com/nvm-sh/nvm#installing-and-updating) is a reliable way to do that.
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+git clone https://github.com/cadree/lcove.git
+cd lcove
+npm ci
+cp .env.example .env
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The dev server listens on port 8080.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Fill in `.env` on your machine. That file is gitignored. The names are listed in `.env.example`. Values are not stored in the repo.
 
-**Use GitHub Codespaces**
+| Name | What it is |
+| --- | --- |
+| `VITE_SUPABASE_URL` | Supabase project URL |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase anon (public) key |
+| `VITE_SUPABASE_PROJECT_ID` | Supabase project ref |
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Vite inlines every `VITE_` variable when it builds. A hosted build reads them from the host's environment settings, not from a file in git. The service role key must never use a `VITE_` name. See `docs/hosting-without-lovable.md`.
 
-## What technologies are used for this project?
+## Scripts
 
-This project is built with:
+```sh
+npm run dev         # local app
+npm run typecheck   # tsc -b
+npm run lint        # eslint
+npm run build       # production build into dist/
+npm run preview     # serve dist/
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Database migrations
 
-## How can I deploy this project?
+Migrations live in `supabase/migrations/`. Apply them with the Supabase CLI to a project you own. Do not apply the SQL in the `migration/` folder. That folder is an old export for a different project.
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+```sh
+npx supabase login
+npx supabase link --project-ref <project-id>
+npx supabase db push
+```
 
-## Can I connect a custom domain to my Lovable project?
+`db push` applies the files in `supabase/migrations/` that the linked project has not applied yet. Run it against a staging project before production. Nothing in this repo connects to the live database by itself.
 
-Yes, you can!
+A local rehearsal that never opens a remote connection:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+```sh
+bash scripts/integration-rls-check.sh
+```
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+That script needs local Postgres (`psql`, `pg_config`, `createdb`). It creates a throwaway database, applies the migrations, runs `scripts/integration-rls-assertions.sql`, and drops the database.
+
+`bash scripts/safety-rls-check.sh` is an older check for the reporting and block migration only. It also stays on the local machine.
+
+## Generate TypeScript types
+
+`src/integrations/supabase/types.ts` is generated. After you apply migrations, regenerate it and commit the result:
+
+```sh
+npx supabase gen types typescript --project-id <project-id> --schema public > src/integrations/supabase/types.ts
+```
+
+You can edit that file by replacing it with the command above. Do not hand-write columns into it to paper over a mismatch. If a query uses a table the current file does not know about yet, define a small local type at the call site until the next regen.
+
+`src/integrations/supabase/client.ts` re-exports `src/lib/supabaseClient.ts`. The Vite and TypeScript path aliases send `@/integrations/supabase/client` to that file so a phone session is stored in Capacitor Preferences. If you replace `client.ts`, keep the re-export and the aliases in `vite.config.ts`, `tsconfig.json`, and `tsconfig.app.json`.
+
+## Tests
+
+There is no `npm test` script and no browser test suite in this repo. The checks that exist are:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+- `bash scripts/integration-rls-check.sh` (local Postgres only)
+
+GitHub Actions runs typecheck, lint, and build on pull requests (`.github/workflows/ci.yml`).
+
+## More
+
+- Hosting without a platform lock-in: `docs/hosting-without-lovable.md`
+- Moving the database to a Supabase project you own: `docs/supabase-migration.md`
+- Production database steps that are already written: `docs/go-live-checklist.md`
+- iOS: `docs/ios-release.md`

@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const log = (s: string, d?: any) =>
+const log = (s: string, d?: unknown) =>
   console.log(`[SEND-BULK-REMINDER] ${s}${d ? " - " + JSON.stringify(d) : ""}`);
 
 interface Body {
@@ -86,7 +86,8 @@ serve(async (req) => {
     const eventTimeShort = new Date(event.start_date).toLocaleTimeString("en-US", {
       hour: "numeric", minute: "2-digit",
     });
-    const location = [(event as any).venue, (event as any).city].filter(Boolean).join(", ") || "Location TBA";
+    const eventPlace = event as unknown as { venue?: string | null; city?: string | null };
+    const location = [eventPlace.venue, eventPlace.city].filter(Boolean).join(", ") || "Location TBA";
 
     // Campaign row
     const { data: campaign } = await admin.from("notification_campaigns").insert({

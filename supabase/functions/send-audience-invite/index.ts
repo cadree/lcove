@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const log = (s: string, d?: any) =>
+const log = (s: string, d?: unknown) =>
   console.log(`[SEND-AUDIENCE-INVITE] ${s}${d ? " - " + JSON.stringify(d) : ""}`);
 
 interface Body {
@@ -45,7 +45,7 @@ serve(async (req) => {
     if (!body.title || !body.body) throw new Error("Missing fields");
 
     let profiles: Array<{ user_id: string; display_name: string | null; last_active_at: string | null; interests: string[] | null }> = [];
-    let filter: any = { ...(body.filter || {}) };
+    const filter: NonNullable<Body["filter"]> = { ...(body.filter || {}) };
 
     if (body.userIds && body.userIds.length > 0) {
       // Direct targeting mode — skip filter query entirely

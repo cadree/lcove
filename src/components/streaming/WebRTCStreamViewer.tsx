@@ -4,6 +4,22 @@ import { Button } from '@/components/ui/button';
 import { Radio, Users, Loader2, WifiOff, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { errorMessage } from '@/lib/errorMessage';
+
+function readRecord(payload: unknown): Record<string, unknown> {
+  if (typeof payload !== "object" || payload === null) return {};
+  return payload as unknown as Record<string, unknown>;
+}
+
+function asSessionDescription(value: unknown): RTCSessionDescriptionInit | null {
+  if (typeof value !== "object" || value === null) return null;
+  return value as unknown as RTCSessionDescriptionInit;
+}
+
+function asIceCandidate(value: unknown): RTCIceCandidateInit | null {
+  if (typeof value !== "object" || value === null) return null;
+  return value as unknown as RTCIceCandidateInit;
+}
 
 interface WebRTCStreamViewerProps {
   streamId: string;
@@ -58,6 +74,33 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
     offerSentRef.current = false;
     setHostReady(false);
   }, []);
+
+  const sendOffer = useCallback(async (pc: RTCPeerConnection, channel: ReturnType<typeof supabase.channel>) => {
+    try {
+      // Only create offer if we haven't already sent one
+      if (offerSentRef.current) {
+        console.log('[Viewer] Offer already sent, skipping duplicate');
+        return;
+      }
+      
+      // Only create offer if signaling state allows
+      if (pc.signalingState === 'stable') {
+        offerSentRef.current = true;
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        
+        console.log('[Viewer] Sending offer to host');
+        await channel.send({
+          type: 'broadcast',
+          event: 'offer',
+          payload: { offer, senderId: user?.id },
+        });
+      }
+    } catch (err) {
+      console.error('[Viewer] Error creating/sending offer:', err);
+      offerSentRef.current = false; // Reset on error to allow retry
+    }
+  }, [user?.id]);
 
   const connect = useCallback(async () => {
     if (!user || !isLive) {
@@ -170,9 +213,10 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       channelRef.current = channel;
 
       // Listen for host-ready signal
-      channel.on('broadcast', { event: 'host-ready' }, ({ payload }: any) => {
-        console.log('[Viewer] Host is ready:', payload);
-        if (payload.hostId === hostId) {
+      channel.on('broadcast', { event: 'host-ready' }, ({ payload }) => {
+        const data = readRecord(payload);
+        console.log('[Viewer] Host is ready:', data);
+        if (data.hostId === hostId) {
           setHostReady(true);
           // Send offer when host is ready (only if we haven't sent one yet)
           if (!offerSentRef.current) {
@@ -183,8 +227,11 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       });
 
       // Listen for answer from host
-      channel.on('broadcast', { event: 'answer' }, async ({ payload }: any) => {
-        const { answer, senderId, targetId } = payload;
+      channel.on('broadcast', { event: 'answer' }, async ({ payload }) => {
+        const data = readRecord(payload);
+        const answer = asSessionDescription(data.answer);
+        const senderId = typeof data.senderId === "string" ? data.senderId : "";
+        const targetId = typeof data.targetId === "string" ? data.targetId : undefined;
         
         // Only process answers meant for us from the host
         if (senderId !== hostId) return;
@@ -194,6 +241,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
         
         try {
           if (pc.signalingState === 'have-local-offer') {
+            if (!answer) throw new Error("Missing answer");
             await pc.setRemoteDescription(new RTCSessionDescription(answer));
             console.log('[Viewer] Set remote description');
             
@@ -214,12 +262,16 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       });
 
       // Listen for ICE candidates from host
-      channel.on('broadcast', { event: 'ice-candidate' }, async ({ payload }: any) => {
-        const { candidate, senderId, targetId } = payload;
+      channel.on('broadcast', { event: 'ice-candidate' }, async ({ payload }) => {
+        const data = readRecord(payload);
+        const candidate = asIceCandidate(data.candidate);
+        const senderId = typeof data.senderId === "string" ? data.senderId : "";
+        const targetId = typeof data.targetId === "string" ? data.targetId : undefined;
         
         // Only accept candidates from the host meant for us
         if (senderId !== hostId) return;
         if (targetId && targetId !== user.id) return;
+        if (!candidate) return;
         
         console.log('[Viewer] Received ICE candidate from host');
         
@@ -311,40 +363,13 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       reconnectTimeoutRef.current = connectionTimeout;
       if (existingTimeout) clearTimeout(existingTimeout);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Viewer] Error connecting to stream:', err);
-      setError(err.message || 'Failed to connect');
+      setError(errorMessage(err, 'Failed to connect'));
       setConnectionState('failed');
       setIsConnecting(false);
     }
-  }, [streamId, hostId, user, isLive, cleanup, hasVideo]);
-
-  const sendOffer = async (pc: RTCPeerConnection, channel: ReturnType<typeof supabase.channel>) => {
-    try {
-      // Only create offer if we haven't already sent one
-      if (offerSentRef.current) {
-        console.log('[Viewer] Offer already sent, skipping duplicate');
-        return;
-      }
-      
-      // Only create offer if signaling state allows
-      if (pc.signalingState === 'stable') {
-        offerSentRef.current = true;
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        
-        console.log('[Viewer] Sending offer to host');
-        await channel.send({
-          type: 'broadcast',
-          event: 'offer',
-          payload: { offer, senderId: user?.id },
-        });
-      }
-    } catch (err) {
-      console.error('[Viewer] Error creating/sending offer:', err);
-      offerSentRef.current = false; // Reset on error to allow retry
-    }
-  };
+  }, [streamId, hostId, user, isLive, cleanup, hasVideo, sendOffer]);
 
   useEffect(() => {
     if (isLive && user) {

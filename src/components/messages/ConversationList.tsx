@@ -29,6 +29,9 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
   const { isOnline } = usePresence();
   const [search, setSearch] = useState('');
 
+  const isConversationMuted = (conv: typeof conversations[0]) =>
+    !!conv.participants?.find(p => p.user_id === user?.id)?.is_muted;
+
   const getOtherUserId = (conv: typeof conversations[0]) => {
     if (conv.type !== 'direct') return null;
     const otherParticipant = conv.participants?.find(p => p.user_id !== user?.id);
@@ -204,10 +207,10 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
-                        toggleMute.mutate({ conversationId: conv.id, muted: !(conv as any).is_muted });
+                        toggleMute.mutate({ conversationId: conv.id, muted: !isConversationMuted(conv) });
                       }}
                     >
-                      {(conv as any).is_muted ? (
+                      {isConversationMuted(conv) ? (
                         <>
                           <Bell className="w-4 h-4 mr-2" />
                           Unmute

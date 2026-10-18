@@ -2,6 +2,11 @@ import { useState, useEffect, useCallback, createContext, useContext, ReactNode,
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
+function presenceUserId(presence: unknown): string | undefined {
+  if (typeof presence !== "object" || presence === null || !("user_id" in presence)) return undefined;
+  return typeof presence.user_id === "string" ? presence.user_id : undefined;
+}
+
 interface PresenceContextValue {
   onlineUsers: Set<string>;
   isOnline: (userId: string) => boolean;
@@ -29,10 +34,9 @@ function usePresenceInternal() {
         const online = new Set<string>();
         
         Object.values(state).forEach(presences => {
-          (presences as any[]).forEach(presence => {
-            if (presence.user_id) {
-              online.add(presence.user_id);
-            }
+          presences.forEach(presence => {
+            const userId = presenceUserId(presence);
+            if (userId) online.add(userId);
           });
         });
         
@@ -41,8 +45,9 @@ function usePresenceInternal() {
       .on('presence', { event: 'join' }, ({ newPresences }) => {
         setOnlineUsers(prev => {
           const updated = new Set(prev);
-          (newPresences as any[]).forEach(p => {
-            if (p.user_id) updated.add(p.user_id);
+          newPresences.forEach(p => {
+            const userId = presenceUserId(p);
+            if (userId) updated.add(userId);
           });
           return updated;
         });
@@ -50,8 +55,9 @@ function usePresenceInternal() {
       .on('presence', { event: 'leave' }, ({ leftPresences }) => {
         setOnlineUsers(prev => {
           const updated = new Set(prev);
-          (leftPresences as any[]).forEach(p => {
-            if (p.user_id) updated.delete(p.user_id);
+          leftPresences.forEach(p => {
+            const userId = presenceUserId(p);
+            if (userId) updated.delete(userId);
           });
           return updated;
         });

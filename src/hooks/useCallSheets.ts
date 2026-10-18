@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import type { Json } from '@/integrations/supabase/types';
 
 export interface RoleEntry {
   role_name: string;
@@ -31,16 +32,16 @@ export function useCallSheets(projectId?: string) {
     queryKey: ['call-sheets', projectId],
     queryFn: async () => {
       if (!projectId) return [];
-      const { data, error } = await (supabase
-        .from('project_call_sheets') as any)
+      const { data, error } = await supabase
+        .from('project_call_sheets')
         .select('*')
         .eq('project_id', projectId)
         .order('shoot_date', { ascending: true });
       if (error) throw error;
-      return (data || []).map((d: any) => ({
+      return (data || []).map((d) => ({
         ...d,
-        role_entries: Array.isArray(d.role_entries) ? d.role_entries : [],
-      })) as CallSheet[];
+        role_entries: Array.isArray(d.role_entries) ? d.role_entries as unknown as RoleEntry[] : [],
+      }));
     },
     enabled: !!projectId,
   });
@@ -54,10 +55,14 @@ export function useCallSheets(projectId?: string) {
       role_entries: RoleEntry[];
     }) => {
       if (!user?.id) throw new Error('Not authenticated');
-      const { data, error } = await (supabase
-        .from('project_call_sheets') as any)
+      const { data, error } = await supabase
+        .from('project_call_sheets')
         .insert({
-          ...input,
+          project_id: input.project_id,
+          shoot_date: input.shoot_date,
+          general_location: input.general_location,
+          general_notes: input.general_notes,
+          role_entries: input.role_entries as unknown as Json,
           created_by: user.id,
         })
         .select()
@@ -74,9 +79,13 @@ export function useCallSheets(projectId?: string) {
 
   const updateCallSheet = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<CallSheet> & { id: string }) => {
-      const { error } = await (supabase
-        .from('project_call_sheets') as any)
-        .update(updates)
+      const { role_entries, ...rest } = updates;
+      const { error } = await supabase
+        .from('project_call_sheets')
+        .update({
+          ...rest,
+          ...(role_entries !== undefined ? { role_entries: role_entries as unknown as Json } : {}),
+        })
         .eq('id', id);
       if (error) throw error;
     },
@@ -89,8 +98,8 @@ export function useCallSheets(projectId?: string) {
 
   const deleteCallSheet = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase
-        .from('project_call_sheets') as any)
+      const { error } = await supabase
+        .from('project_call_sheets')
         .delete()
         .eq('id', id);
       if (error) throw error;

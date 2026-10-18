@@ -21,8 +21,8 @@ export function useProjectUpdates(projectId?: string) {
     queryKey: ['project-updates', projectId],
     queryFn: async () => {
       if (!projectId) return [];
-      const { data, error } = await (supabase
-        .from('project_updates') as any)
+      const { data, error } = await supabase
+        .from('project_updates')
         .select('*')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false });
@@ -30,16 +30,16 @@ export function useProjectUpdates(projectId?: string) {
       if (error) throw error;
 
       // Fetch author profiles
-      const authorIds = [...new Set((data as any[]).map((u: any) => u.author_id))];
+      const authorIds = [...new Set((data || []).map((u) => u.author_id))];
       const { data: profiles } = await supabase
         .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', authorIds);
 
-      return (data as any[]).map((update: any) => ({
+      return (data || []).map((update) => ({
         ...update,
         author: profiles?.find(p => p.user_id === update.author_id),
-      })) as ProjectUpdate[];
+      }));
     },
     enabled: !!projectId,
   });
@@ -47,8 +47,8 @@ export function useProjectUpdates(projectId?: string) {
   const addUpdate = useMutation({
     mutationFn: async ({ projectId, content }: { projectId: string; content: string }) => {
       if (!user?.id) throw new Error('Not authenticated');
-      const { data, error } = await (supabase
-        .from('project_updates') as any)
+      const { data, error } = await supabase
+        .from('project_updates')
         .insert({
           project_id: projectId,
           author_id: user.id,

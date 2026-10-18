@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -46,16 +46,7 @@ export const useProfile = (userId?: string) => {
   const targetUserId = userId || user?.id;
   const isOwnProfile = targetUserId === user?.id;
 
-  useEffect(() => {
-    if (targetUserId) {
-      fetchProfile();
-    } else {
-      setProfile(null);
-      setLoading(false);
-    }
-  }, [targetUserId, isOwnProfile]);
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     if (!targetUserId) return;
     
     setLoading(true);
@@ -111,7 +102,16 @@ export const useProfile = (userId?: string) => {
       setProfile(null);
     }
     setLoading(false);
-  };
+  }, [targetUserId, isOwnProfile]);
+
+  useEffect(() => {
+    if (targetUserId) {
+      fetchProfile();
+    } else {
+      setProfile(null);
+      setLoading(false);
+    }
+  }, [targetUserId, fetchProfile]);
 
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) return { error: new Error('Not authenticated') };

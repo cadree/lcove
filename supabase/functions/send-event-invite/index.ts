@@ -8,7 +8,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : "";
   console.log(`[SEND-EVENT-INVITE] ${step}${detailsStr}`);
 };
@@ -63,10 +63,10 @@ serve(async (req) => {
       .select("file_url, mime_type")
       .eq("event_id", eventId)
       .limit(6);
-    const moodboardThumbnails = (moodItems || [])
-      .filter((m: any) => (m.mime_type || "").startsWith("image/"))
+    const moodboardThumbnails = ((moodItems || []) as unknown as { file_url: string; mime_type?: string | null }[])
+      .filter((m) => (m.mime_type || "").startsWith("image/"))
       .slice(0, 3)
-      .map((m: any) => m.file_url);
+      .map((m) => m.file_url);
 
     const results: Array<{ email?: string; phone?: string; status: string; error?: string }> = [];
 

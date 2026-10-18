@@ -93,7 +93,7 @@ export function NavCustomizationProvider(props: ProviderProps) {
     setCustomization(prev => {
       const isEnabled = prev.enabledIds.includes(id);
       let newEnabledIds: string[];
-      let newOrder = [...prev.order];
+      const newOrder = [...prev.order];
       
       if (isEnabled) {
         if (prev.enabledIds.length <= 3) return prev;

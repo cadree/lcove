@@ -24,6 +24,36 @@ type SupportedTable =
   | 'pipeline_items'
   | 'calendar_tasks';
 
+interface DynamicRow {
+  id: string;
+  [key: string]: unknown;
+}
+
+interface DynamicTableQuery {
+  insert: (row: DynamicRow) => {
+    select: () => {
+      single: () => Promise<{ data: DynamicRow | null; error: { message: string } | null }>;
+    };
+  };
+  update: (row: Record<string, unknown>) => {
+    eq: (column: "id", value: string) => {
+      select: () => {
+        single: () => Promise<{ data: DynamicRow | null; error: { message: string } | null }>;
+      };
+    };
+  };
+  delete: () => {
+    eq: (column: "id", value: string) => Promise<{ error: { message: string } | null }>;
+  };
+}
+
+function fromSupported(table: SupportedTable): DynamicTableQuery {
+  const client = supabase as unknown as {
+    from: (name: SupportedTable) => DynamicTableQuery;
+  };
+  return client.from(table);
+}
+
 interface UseOfflineQueryOptions<T> {
   table: SupportedTable;
   queryKey: QueryKey;
@@ -125,7 +155,7 @@ export function useOfflineInsert({
       const itemWithId = { ...data, id: (data.id as string) || crypto.randomUUID() };
 
       if (isOnline) {
-        const { data: result, error } = await (supabase.from(table) as any)
+        const { data: result, error } = await fromSupported(table)
           .insert(itemWithId)
           .select()
           .single();
@@ -155,7 +185,7 @@ export function useOfflineUpdate({
     mutationFn: async (data: Record<string, unknown> & { id: string }) => {
       if (isOnline) {
         const { id, ...updateData } = data;
-        const { data: result, error } = await (supabase.from(table) as any)
+        const { data: result, error } = await fromSupported(table)
           .update(updateData)
           .eq('id', id)
           .select()
@@ -187,7 +217,7 @@ export function useOfflineDelete({
   return useMutation({
     mutationFn: async (id: string) => {
       if (isOnline) {
-        const { error } = await (supabase.from(table) as any).delete().eq('id', id);
+        const { error } = await fromSupported(table).delete().eq('id', id);
         if (error) throw error;
       } else {
         await addToSyncQueue(table, 'delete', { id });

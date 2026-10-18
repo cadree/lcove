@@ -30,6 +30,27 @@ function sanitizeDisplayName(name: string): string {
     .slice(0, 80);
 }
 
+interface EventIdentityRow {
+  creator_id?: string | null;
+  image_url?: string | null;
+}
+
+interface BrandingIdentityRow {
+  from_name_override?: string | null;
+  reply_to_email?: string | null;
+  reply_to_verified_at?: string | null;
+  organizer_name?: string | null;
+  header_image_url?: string | null;
+  brand_color?: string | null;
+  signature?: string | null;
+  personal_note?: string | null;
+}
+
+interface ProfileIdentityRow {
+  display_name?: string | null;
+  avatar_url?: string | null;
+}
+
 export async function resolveHostIdentity(
   supabaseAdmin: ReturnType<typeof createClient>,
   eventId: string
@@ -48,8 +69,8 @@ export async function resolveHostIdentity(
       .maybeSingle(),
   ]);
 
-  const event: any = eventRes.data;
-  const branding: any = brandingRes.data;
+  const event = eventRes.data as unknown as EventIdentityRow | null;
+  const branding = brandingRes.data as unknown as BrandingIdentityRow | null;
 
   let hostDisplayName = "The Host";
   let hostAvatarUrl: string | null = null;
@@ -59,9 +80,10 @@ export async function resolveHostIdentity(
       .select("display_name, avatar_url")
       .eq("user_id", event.creator_id)
       .single();
-    if (profile) {
-      hostDisplayName = (profile as any).display_name || hostDisplayName;
-      hostAvatarUrl = (profile as any).avatar_url || null;
+    const profileIdentity = profile as unknown as ProfileIdentityRow | null;
+    if (profileIdentity) {
+      hostDisplayName = profileIdentity.display_name || hostDisplayName;
+      hostAvatarUrl = profileIdentity.avatar_url || null;
     }
   }
 

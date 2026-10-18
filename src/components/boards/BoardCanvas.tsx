@@ -292,7 +292,7 @@ export const BoardCanvas = memo(function BoardCanvas({
         toast.error(`Failed to upload ${file.name}`);
       }
     }
-  }, [offset, onCreateItem]);
+  }, [offset, onCreateItem, user]);
 
   const nonConnectorItems = items.filter(item => item.type !== 'connector');
 

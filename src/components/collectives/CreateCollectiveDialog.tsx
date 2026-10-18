@@ -26,6 +26,7 @@ import { useCreateCollective, COLLECTIVE_TOPICS } from "@/hooks/useCollectives";
 import { useUserSearch } from "@/hooks/useUserSearch";
 import { Camera, X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 
 interface CreateCollectiveDialogProps {
   open: boolean;
@@ -91,8 +92,8 @@ export function CreateCollectiveDialog({
       } else {
         setCoverImageUrl(data.publicUrl);
       }
-    } catch (error: any) {
-      toast.error("Failed to upload image: " + error.message);
+    } catch (error: unknown) {
+      toast.error("Failed to upload image: " + errorMessage(error));
     } finally {
       setUploading(false);
     }
@@ -215,7 +216,7 @@ export function CreateCollectiveDialog({
           <div className="space-y-4">
             <div className="space-y-3">
               <Label>Who can join?</Label>
-              <RadioGroup value={visibility} onValueChange={(v) => setVisibility(v as any)}>
+              <RadioGroup value={visibility} onValueChange={(v: "public" | "private" | "discoverable") => setVisibility(v)}>
                 <div className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer">
                   <RadioGroupItem value="public" id="public" className="mt-0.5" />
                   <div>

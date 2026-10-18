@@ -3,7 +3,7 @@ import * as React from 'npm:react@18.3.1'
 import {
   Body, Container, Head, Heading, Html, Preview, Text, Button, Section, Img, Hr,
 } from 'npm:@react-email/components@0.0.22'
-import type { TemplateEntry } from './registry.ts'
+import { defineTemplate } from './registry.ts'
 
 interface Props {
   organizerName?: string
@@ -89,9 +89,9 @@ const EventBulkAttendeeReminderEmail = ({
   )
 }
 
-export const template = {
+export const template = defineTemplate<Props>({
   component: EventBulkAttendeeReminderEmail,
-  subject: (d: Record<string, any>) =>
+  subject: (d) =>
     d.subjectLine || `Update: ${d.eventTitle || 'your event'}`,
   displayName: 'Event bulk attendee reminder',
   previewData: {
@@ -105,7 +105,7 @@ export const template = {
     eventUrl: 'https://etherbylcove.com/event/demo',
     brandColor: '#ff4d8d',
   },
-} satisfies TemplateEntry
+})
 
 const main = { backgroundColor: '#ffffff', fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif" }
 const container = { maxWidth: '600px', margin: '0 auto', padding: '20px' }

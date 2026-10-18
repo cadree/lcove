@@ -3,6 +3,9 @@ import { Capacitor } from "@capacitor/core";
 import { capacitorStorage } from "@/lib/capacitorStorage";
 import type { Database } from "@/integrations/supabase/types";
 
+// Vite inlines VITE_* from the process environment and from a local .env file.
+// Hosted builds must set these in the host's environment settings.
+// See .env.example and docs/hosting-without-lovable.md.
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 

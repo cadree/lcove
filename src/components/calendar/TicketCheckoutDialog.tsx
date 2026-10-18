@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Minus, Plus, Loader2, Ticket } from "lucide-react";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTicketTiers, type TicketTier } from "@/hooks/useTicketTiers";
@@ -96,8 +97,8 @@ export function TicketCheckoutDialog({ eventId, eventTitle, open, onOpenChange }
       } else {
         throw new Error("No checkout URL returned");
       }
-    } catch (e: any) {
-      toast.error(e.message || "Checkout failed");
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "Checkout failed"));
     } finally {
       setSubmitting(false);
     }

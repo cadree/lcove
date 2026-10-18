@@ -4,6 +4,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import type { Json } from "@/integrations/supabase/types";
 
+function errorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("code" in error)) return undefined;
+  return typeof error.code === "string" ? error.code : undefined;
+}
+
 export interface Appointment {
   id: string;
   owner_user_id: string;
@@ -410,8 +415,8 @@ export function useCreateBookingPage() {
       queryClient.invalidateQueries({ queryKey: ['booking-pages'] });
       toast.success('Booking page created');
     },
-    onError: (error: any) => {
-      if (error.code === '23505') {
+    onError: (error: unknown) => {
+      if (errorCode(error) === '23505') {
         toast.error('This URL slug is already taken');
       } else {
         toast.error('Failed to create booking page');
@@ -450,8 +455,8 @@ export function useUpdateBookingPage() {
       queryClient.invalidateQueries({ queryKey: ['booking-pages'] });
       toast.success('Booking page updated');
     },
-    onError: (error: any) => {
-      if (error.code === '23505') {
+    onError: (error: unknown) => {
+      if (errorCode(error) === '23505') {
         toast.error('This URL slug is already taken');
       } else {
         toast.error('Failed to update booking page');

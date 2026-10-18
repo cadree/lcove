@@ -1,6 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+function errorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("code" in error)) return undefined;
+  return typeof error.code === "string" ? error.code : undefined;
+}
 import { PartnerCategory } from './usePartners';
 
 interface PartnerApplicationData {
@@ -25,8 +30,8 @@ export function useCreatePartnerApplication() {
   return useMutation({
     mutationFn: async (data: PartnerApplicationData) => {
       const { data: application, error } = await supabase
-        .from('partner_applications' as any)
-        .insert(data as any)
+        .from('partner_applications')
+        .insert(data)
         .select()
         .single();
 
@@ -37,8 +42,8 @@ export function useCreatePartnerApplication() {
       queryClient.invalidateQueries({ queryKey: ['partner-applications'] });
       toast.success('Application submitted! We\'ll review it and get back to you soon.');
     },
-    onError: (error: any) => {
-      if (error?.code === '23505') {
+    onError: (error: unknown) => {
+      if (errorCode(error) === '23505') {
         toast.error('You already have a pending application');
       } else {
         toast.error('Failed to submit application');

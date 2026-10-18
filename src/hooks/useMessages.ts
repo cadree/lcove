@@ -215,6 +215,16 @@ export function useMessages(conversationId: string | null) {
     queryClient.invalidateQueries({ queryKey: ['conversations'] });
   }, [user, conversationId, messages, queryClient]);
 
+  const clearTypingIndicator = useCallback(async () => {
+    if (!user || !conversationId) return;
+
+    await supabase
+      .from('typing_indicators')
+      .delete()
+      .eq('conversation_id', conversationId)
+      .eq('user_id', user.id);
+  }, [user, conversationId]);
+
   // Typing indicator
   const setTypingIndicator = useCallback(async () => {
     if (!user || !conversationId) return;
@@ -232,17 +242,7 @@ export function useMessages(conversationId: string | null) {
       clearTimeout(typingTimeoutRef.current);
     }
     typingTimeoutRef.current = setTimeout(clearTypingIndicator, 3000);
-  }, [user, conversationId]);
-
-  const clearTypingIndicator = useCallback(async () => {
-    if (!user || !conversationId) return;
-
-    await supabase
-      .from('typing_indicators')
-      .delete()
-      .eq('conversation_id', conversationId)
-      .eq('user_id', user.id);
-  }, [user, conversationId]);
+  }, [user, conversationId, clearTypingIndicator]);
 
   // Delete message
   const deleteMessage = useMutation({

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 // Energy gain amounts by source
 export const ENERGY_GAINS = {
@@ -41,6 +41,17 @@ const PASSIVE_REGEN_RATE = 1; // energy per hour
 const OVERNIGHT_REGEN = 10; // smaller bonus for overnight
 const LOW_ENERGY_THRESHOLD = 20;
 const CRITICAL_ENERGY_THRESHOLD = 10;
+
+function regenerationAmount(lastRegenAt: string): number {
+  const lastRegen = new Date(lastRegenAt);
+  const now = new Date();
+  const hoursPassed = (now.getTime() - lastRegen.getTime()) / (1000 * 60 * 60);
+  let amount = Math.floor(hoursPassed * PASSIVE_REGEN_RATE);
+  if (hoursPassed >= 8) {
+    amount += OVERNIGHT_REGEN;
+  }
+  return amount;
+}
 
 interface UserEnergy {
   id: string;
@@ -107,39 +118,33 @@ export function useEnergy() {
     staleTime: 30000,
   });
 
-  // Calculate passive regeneration
-  const calculateRegeneration = (lastRegenAt: string): number => {
-    const lastRegen = new Date(lastRegenAt);
-    const now = new Date();
-    const hoursPassed = (now.getTime() - lastRegen.getTime()) / (1000 * 60 * 60);
+  const energyRef = useRef(energy);
+  energyRef.current = energy;
+  const userIdRef = useRef(user?.id);
+  userIdRef.current = user?.id;
+  const queryClientRef = useRef(queryClient);
+  queryClientRef.current = queryClient;
 
-    let regenAmount = Math.floor(hoursPassed * PASSIVE_REGEN_RATE);
-
-    // Overnight bonus (8+ hours)
-    if (hoursPassed >= 8) {
-      regenAmount += OVERNIGHT_REGEN;
-    }
-
-    return regenAmount;
-  };
-
-  // Apply regeneration on load
+  // Apply regeneration once the energy row is loaded. Refs keep this from
+  // re-running on every energy refetch.
   useEffect(() => {
-    if (!energy || !user?.id) return;
+    const currentEnergy = energyRef.current;
+    const userId = userIdRef.current;
+    if (!currentEnergy || !userId) return;
 
-    const regenAmount = calculateRegeneration(energy.last_regen_at);
-    if (regenAmount > 0 && energy.current_energy < energy.max_energy) {
-      const newEnergy = Math.min(energy.current_energy + regenAmount, energy.max_energy);
-      
+    const regenAmount = regenerationAmount(currentEnergy.last_regen_at);
+    if (regenAmount > 0 && currentEnergy.current_energy < currentEnergy.max_energy) {
+      const newEnergy = Math.min(currentEnergy.current_energy + regenAmount, currentEnergy.max_energy);
+
       supabase
         .from("user_energy")
         .update({
           current_energy: newEnergy,
           last_regen_at: new Date().toISOString(),
         })
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .then(() => {
-          queryClient.invalidateQueries({ queryKey: ["user-energy", user.id] });
+          queryClientRef.current.invalidateQueries({ queryKey: ["user-energy", userId] });
         });
     }
   }, [energy?.id]);

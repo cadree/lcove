@@ -1,5 +1,74 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
+
+export interface CampaignTotals {
+  sent?: number;
+  opened?: number;
+  clicked?: number;
+  failed?: number;
+}
+
+export interface CampaignSummary {
+  id: string;
+  title?: string | null;
+  type?: string;
+  created_at?: string;
+  sent_count?: number;
+  recipient_count?: number;
+}
+
+export interface CampaignAnalytics {
+  totals?: CampaignTotals;
+  recent_campaigns?: CampaignSummary[];
+}
+
+export interface AudienceFilter {
+  states?: string[];
+  interests?: string[];
+  lookalike?: boolean;
+  active_only?: boolean;
+  age_min?: number | null;
+  age_max?: number | null;
+}
+
+export interface IndividualReminderPayload {
+  eventId: string;
+  attendeeEmail?: string | null;
+  attendeeUserId?: string | null;
+  attendeeName?: string | null;
+  attendeePhone?: string | null;
+  tierName?: string | null;
+  channels: { push: boolean; email: boolean; sms: boolean };
+  title: string;
+  body: string;
+}
+
+export interface BulkReminderPayload {
+  eventId: string;
+  title: string;
+  body: string;
+  channels: { push: boolean; email: boolean; sms: boolean };
+  filter: { tierIds?: string[]; status: string[] };
+}
+
+export interface AudienceInvitePayload {
+  eventId?: string;
+  title: string;
+  body: string;
+  channels: { push: boolean; email: boolean };
+  filter?: AudienceFilter;
+  lookalike?: boolean;
+  userIds?: string[];
+}
+
+function asJson(value: object): Json {
+  return value as unknown as Json;
+}
+
+function invokeBody(payload: object): { [key: string]: Json | undefined } {
+  return { ...payload } as unknown as { [key: string]: Json | undefined };
+}
 
 export function useCampaignAnalytics(eventId?: string) {
   return useQuery({
@@ -7,17 +76,17 @@ export function useCampaignAnalytics(eventId?: string) {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_campaign_analytics", { p_event_id: eventId || null });
       if (error) throw error;
-      return data as any;
+      return data as unknown as CampaignAnalytics;
     },
     enabled: true,
   });
 }
 
-export function useAudienceEstimate(filter: any, enabled = true) {
+export function useAudienceEstimate(filter: AudienceFilter, enabled = true) {
   return useQuery({
     queryKey: ["audience-estimate", filter],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_audience_estimate", { filter });
+      const { data, error } = await supabase.rpc("get_audience_estimate", { filter: asJson(filter) });
       if (error) throw error;
       return data as number;
     },
@@ -34,11 +103,11 @@ export interface AudiencePreviewUser {
   city: string | null;
 }
 
-export function useAudiencePreview(filter: any, enabled = true, limit = 12) {
+export function useAudiencePreview(filter: AudienceFilter, enabled = true, limit = 12) {
   return useQuery({
     queryKey: ["audience-preview", filter, limit],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_audience_preview", { filter, p_limit: limit });
+      const { data, error } = await supabase.rpc("get_audience_preview", { filter: asJson(filter), p_limit: limit });
       if (error) throw error;
       return (data || []) as AudiencePreviewUser[];
     },
@@ -75,20 +144,20 @@ export function useAutoReminders(eventId: string) {
   return { ...query, upsert };
 }
 
-export async function sendIndividualReminder(payload: any) {
-  const { data, error } = await supabase.functions.invoke("send-individual-reminder", { body: payload });
+export async function sendIndividualReminder(payload: IndividualReminderPayload) {
+  const { data, error } = await supabase.functions.invoke("send-individual-reminder", { body: invokeBody(payload) });
   if (error) throw error;
-  return data;
+  return data as { results?: Record<string, boolean> };
 }
 
-export async function sendBulkReminder(payload: any) {
-  const { data, error } = await supabase.functions.invoke("send-bulk-attendee-reminder", { body: payload });
+export async function sendBulkReminder(payload: BulkReminderPayload) {
+  const { data, error } = await supabase.functions.invoke("send-bulk-attendee-reminder", { body: invokeBody(payload) });
   if (error) throw error;
-  return data;
+  return data as { recipientCount: number };
 }
 
-export async function sendAudienceInvite(payload: any) {
-  const { data, error } = await supabase.functions.invoke("send-audience-invite", { body: payload });
+export async function sendAudienceInvite(payload: AudienceInvitePayload) {
+  const { data, error } = await supabase.functions.invoke("send-audience-invite", { body: invokeBody(payload) });
   if (error) throw error;
-  return data;
+  return data as { recipientCount: number };
 }

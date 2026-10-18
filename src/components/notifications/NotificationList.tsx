@@ -37,7 +37,7 @@ export const NotificationList: React.FC = () => {
   });
 
   const handleProjectInviteTap = (notification: Notification) => {
-    const data = notification.data as Record<string, any>;
+    const data = notification.data as { project_id?: string | null; role_title?: string | null };
     setAcceptedDialog({
       open: true,
       projectId: data?.project_id || null,

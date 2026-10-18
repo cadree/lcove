@@ -84,7 +84,7 @@ export function useConversations() {
         .in('conversation_id', conversationIds);
 
       // Fetch project details for project-linked conversations
-      const projectIds = convos?.filter(c => (c as any).project_id).map(c => (c as any).project_id) || [];
+      const projectIds = (convos ?? []).flatMap((c) => (c.project_id ? [c.project_id] : []));
       let projectMap = new Map<string, ProjectInfo>();
       
       if (projectIds.length > 0) {
@@ -140,7 +140,7 @@ export function useConversations() {
       const mutedMap = new Map(participations.map(p => [p.conversation_id, p.is_muted]));
 
       return (convos || []).map(conv => {
-        const projectId = (conv as any).project_id;
+        const projectId = conv.project_id;
         return {
           ...conv,
           project_id: projectId,
@@ -149,7 +149,7 @@ export function useConversations() {
             ?.filter(p => p.conversation_id === conv.id)
             .map(p => ({
               ...p,
-              project_role_name: (p as any).project_role_name,
+              project_role_name: p.project_role_name,
               profile: profileMap.get(p.user_id),
             })),
           last_message: lastMessageMap.get(conv.id),

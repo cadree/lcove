@@ -181,7 +181,7 @@ export const AddContentDialog = ({ open, onOpenChange, networkId }: AddContentDi
 
             <div className="space-y-2">
               <Label>Content Type *</Label>
-              <Select value={contentType} onValueChange={(v: any) => setContentType(v)}>
+              <Select value={contentType} onValueChange={(v: 'short_film' | 'feature_film' | 'tv_show') => setContentType(v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 
 export interface MusicPayoutStatus {
   has_account: boolean;
@@ -64,9 +65,9 @@ export const useCreateMusicPayoutAccount = () => {
     onSuccess: (data) => {
       window.location.href = data.url;
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       console.error("[MusicPayouts] onboarding error", err);
-      toast.error(err?.message || "Failed to start payout setup");
+      toast.error(errorMessage(err, "Failed to start payout setup"));
     },
   });
 };

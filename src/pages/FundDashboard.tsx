@@ -54,14 +54,30 @@ const AnimatedNumber = forwardRef<HTMLSpanElement, { value: number; prefix?: str
 
 AnimatedNumber.displayName = "AnimatedNumber";
 
-const CustomTooltip = forwardRef<HTMLDivElement, any>(({ active, payload }, ref) => {
+interface FundTooltipEntry {
+  name?: string;
+  value?: number;
+  payload?: {
+    month?: string;
+    name?: string;
+    value?: number;
+    description?: string;
+  };
+}
+
+interface FundTooltipProps {
+  active?: boolean;
+  payload?: FundTooltipEntry[];
+}
+
+const CustomTooltip = forwardRef<HTMLDivElement, FundTooltipProps>(({ active, payload }, ref) => {
   if (active && payload && payload.length) {
     return (
       <div ref={ref} className="bg-card/95 backdrop-blur-sm border border-border rounded-xl p-3 shadow-xl">
-        <p className="text-foreground font-medium">{payload[0].payload.month}</p>
-        {payload.map((entry: any, index: number) => (
+        <p className="text-foreground font-medium">{payload[0].payload?.month}</p>
+        {payload.map((entry, index) => (
           <p key={index} className="text-sm text-muted-foreground">
-            {entry.name}: {formatCurrency(entry.value)}
+            {entry.name}: {formatCurrency(entry.value ?? 0)}
           </p>
         ))}
       </div>
@@ -72,13 +88,14 @@ const CustomTooltip = forwardRef<HTMLDivElement, any>(({ active, payload }, ref)
 
 CustomTooltip.displayName = "CustomTooltip";
 
-const PieTooltip = forwardRef<HTMLDivElement, any>(({ active, payload }, ref) => {
+const PieTooltip = forwardRef<HTMLDivElement, FundTooltipProps>(({ active, payload }, ref) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
+    if (!data) return null;
     return (
       <div ref={ref} className="bg-card/95 backdrop-blur-sm border border-border rounded-xl p-3 shadow-xl">
         <p className="text-foreground font-medium">{data.name}</p>
-        <p className="text-primary text-lg font-bold">{formatCurrency(data.value)}</p>
+        <p className="text-primary text-lg font-bold">{formatCurrency(data.value ?? 0)}</p>
         <p className="text-sm text-muted-foreground max-w-[200px]">{data.description}</p>
       </div>
     );
