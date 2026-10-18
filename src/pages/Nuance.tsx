@@ -17,7 +17,7 @@ const Nuance = () => {
       navigate(-1);
       return;
     }
-    navigate(user ? "/home" : "/");
+    navigate(user ? "/feed" : "/");
   };
 
   return (

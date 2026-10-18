@@ -175,13 +175,13 @@ const Directory = () => {
       <div className="px-6 pt-6 pb-24">
         {/* Header */}
         <PageHeader
+          eyebrow="People"
           title="Directory"
           description="Find creatives by name, city, or interests"
-          icon={<Users className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
           className="mb-6"
           actions={
             <FriendsDrawer>
-              <Button variant="glass" size="icon" className="w-10 h-10" title="Friends">
+              <Button variant="outline" size="icon" title="Friends" aria-label="Friends">
                 <Heart className="w-4 h-4" />
               </Button>
             </FriendsDrawer>
@@ -218,7 +218,7 @@ const Directory = () => {
             variant={selectedCityKey === null ? "default" : "glass"}
             size="sm"
             onClick={() => setSelectedCityKey(null)}
-            className="whitespace-nowrap"
+            className="whitespace-nowrap min-h-11"
           >
             <MapPin className="w-3 h-3 mr-1" />
             All Cities
@@ -230,7 +230,7 @@ const Directory = () => {
               variant={selectedCityKey === cityOption.key ? "default" : "glass"}
               size="sm"
               onClick={() => setSelectedCityKey(cityOption.key)}
-              className="whitespace-nowrap"
+              className="whitespace-nowrap min-h-11"
             >
               <MapPin className="w-3 h-3 mr-1" />
               {cityOption.display}
@@ -258,13 +258,13 @@ const Directory = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: index * 0.05 }}
                 onClick={() => handleProfileClick(profile.user_id)}
-                className="glass-strong rounded-2xl p-5 hover:bg-accent/20 transition-all duration-300 cursor-pointer group"
+                className="bg-card border border-border rounded-[2px] p-5 cursor-pointer group"
               >
                 <div className="flex items-start gap-4">
                   {/* Avatar */}
-                  <Avatar className="w-16 h-16 rounded-xl border-2 border-border group-hover:border-primary/50 transition-colors">
-                    <AvatarImage src={profile.avatar_url || undefined} />
-                    <AvatarFallback className="bg-muted text-muted-foreground text-xl font-medium rounded-xl">
+                  <Avatar className="w-16 h-16 rounded-[2px] border border-border">
+                    <AvatarImage src={profile.avatar_url || undefined} className="rounded-[2px]" />
+                    <AvatarFallback className="bg-muted text-foreground text-xl font-medium rounded-[2px]">
                       {profile.display_name?.charAt(0).toUpperCase() || '?'}
                     </AvatarFallback>
                   </Avatar>
@@ -281,7 +281,7 @@ const Directory = () => {
                       </p>
                     )}
                     {profile.bio && (
-                      <p className="text-xs text-muted-foreground/70 line-clamp-2">
+                      <p className="text-xs text-muted-foreground line-clamp-2">
                         {profile.bio}
                       </p>
                     )}

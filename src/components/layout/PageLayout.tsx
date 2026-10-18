@@ -1,5 +1,4 @@
 import { ReactNode } from "react";
-import { GlobalFAB } from "@/components/navigation/GlobalFAB";
 import BottomNav from "@/components/navigation/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -27,11 +26,7 @@ const PageLayout = ({
         {children}
       </main>
       
-      {/* Bottom Navigation - visible on all pages when authenticated */}
       {!hideNav && user && <BottomNav />}
-      
-      {/* Global FAB for quick actions */}
-      {!hideNav && <GlobalFAB />}
     </div>
   );
 };
