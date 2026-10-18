@@ -315,7 +315,7 @@ export function PostDetailModal({
                     <button 
                       onClick={handleLike}
                       disabled={isLiking}
-                      className="hover:opacity-70 transition-opacity disabled:opacity-50"
+                      className="min-h-11 min-w-11 flex items-center justify-center hover:opacity-70 transition-opacity disabled:opacity-50"
                       aria-label={hasLiked ? "Unlike post" : "Like post"}
                       role="button"
                     >
@@ -327,7 +327,7 @@ export function PostDetailModal({
                       />
                     </button>
                     <button 
-                      className="hover:opacity-70 transition-opacity"
+                      className="min-h-11 min-w-11 flex items-center justify-center hover:opacity-70 transition-opacity"
                       aria-label="View comments"
                       role="button"
                     >
@@ -335,7 +335,7 @@ export function PostDetailModal({
                     </button>
                     <button 
                       onClick={handleShare}
-                      className="hover:opacity-70 transition-opacity"
+                      className="min-h-11 min-w-11 flex items-center justify-center hover:opacity-70 transition-opacity"
                       aria-label="Share post"
                       role="button"
                     >
@@ -345,7 +345,7 @@ export function PostDetailModal({
                   <button 
                     onClick={handleSave}
                     disabled={isSaving}
-                    className="hover:opacity-70 transition-opacity disabled:opacity-50"
+                    className="min-h-11 min-w-11 flex items-center justify-center hover:opacity-70 transition-opacity disabled:opacity-50"
                     aria-label={isSaved ? "Unsave post" : "Save post"}
                     role="button"
                   >
@@ -358,7 +358,9 @@ export function PostDetailModal({
                   </button>
                 </div>
 
-                <p className="text-sm font-semibold mb-1">{likesCount} {likesCount === 1 ? 'like' : 'likes'}</p>
+                {isOwner && likesCount > 0 && (
+                  <p className="text-xs text-muted-foreground mb-1">Only you can see this: {likesCount} {likesCount === 1 ? 'like' : 'likes'}</p>
+                )}
                 <p className="text-xs text-muted-foreground mb-3">{timeAgo}</p>
 
                 {/* Comment input */}

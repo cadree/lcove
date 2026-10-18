@@ -18,6 +18,7 @@ import { useFavorites } from '@/hooks/useFavorites';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { useAuth } from '@/contexts/AuthContext';
 import { ReportDialog } from '@/components/safety/ReportDialog';
+import { MoreMenuButton } from '@/components/navigation/MoreMenu';
 import { FriendsDrawer } from '@/components/friends/FriendsDrawer';
 import type { ThemePreset } from '@/lib/profileThemes';
 import { THEME_PRESETS } from '@/lib/profileThemes';
@@ -177,7 +178,7 @@ export function ProfileHeader({
                 if (window.history.length > 1) {
                   navigate(-1);
                 } else {
-                  navigate('/home');
+                  navigate('/feed');
                 }
               }}
             >
@@ -189,10 +190,11 @@ export function ProfileHeader({
           
           {isOwnProfile && (
             <div className="flex gap-2">
-              <Button variant="glass" size="icon" className="w-10 h-10" onClick={onCustomizeClick}>
+              <MoreMenuButton className="bg-background/80 border border-border" />
+              <Button variant="outline" size="icon" className="bg-background/80" onClick={onCustomizeClick} aria-label="Customize profile">
                 <Sparkles className="w-5 h-5" />
               </Button>
-              <Button variant="glass" size="icon" className="w-10 h-10" onClick={onSettingsClick}>
+              <Button variant="outline" size="icon" className="bg-background/80" onClick={onSettingsClick} aria-label="Settings">
                 <Settings className="w-5 h-5" />
               </Button>
             </div>
@@ -210,7 +212,7 @@ export function ProfileHeader({
         >
           {/* Avatar */}
           <div className="relative group flex-shrink-0">
-            <Avatar className="w-24 h-24 sm:w-28 sm:h-28 border-4 border-background shadow-xl ring-2 ring-primary/20">
+            <Avatar className="w-24 h-24 sm:w-28 sm:h-28 rounded-[2px] border border-border">
               <AvatarImage src={avatarUrl || undefined} />
               <AvatarFallback className="bg-muted text-muted-foreground text-2xl font-display">
                 {displayName.charAt(0).toUpperCase()}

@@ -15,10 +15,11 @@ export function TrustSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="glass-subtle rounded-2xl p-6 md:p-8"
+          className="border border-border p-6 md:p-8"
         >
-          <h2 className="font-display text-xl sm:text-2xl font-medium text-center mb-6">
-            Built on trust & transparency
+          <p className="eyebrow text-center mb-2">Joining</p>
+          <h2 className="ether-title text-3xl text-center mb-6">
+            Free to join
           </h2>
           
           <div className="flex justify-center gap-6 md:gap-10 flex-wrap">

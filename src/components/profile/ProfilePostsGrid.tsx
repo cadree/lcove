@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import { Play, ImageIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { ProfilePost } from "@/types/post";
 
 interface ProfilePostsGridProps {
@@ -69,19 +68,6 @@ export function ProfilePostsGrid({ posts, onPostClick, isLoading }: ProfilePosts
             />
           )}
           
-          {/* Hover overlay */}
-          <div className={cn(
-            "absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity",
-          )}>
-            <div className="flex items-center gap-4 text-white text-sm font-semibold">
-              <span className="flex items-center gap-1">
-                ❤️ 0
-              </span>
-              <span className="flex items-center gap-1">
-                💬 0
-              </span>
-            </div>
-          </div>
         </motion.button>
       ))}
     </div>

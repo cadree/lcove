@@ -321,8 +321,8 @@ const Auth = () => {
 
   const getSubtitle = () => {
     switch (mode) {
-      case 'login': return 'Welcome back, creative soul';
-      case 'signup': return 'Join the creative community';
+      case 'login': return 'Sign in';
+      case 'signup': return 'Create an account. Free to join.';
       case 'forgot': return resetEmailSent ? 'Check your inbox' : 'Enter your email to reset';
       case 'reset': return 'Create your new password';
       case 'confirm-email': return 'Confirm your email to continue';
@@ -361,8 +361,9 @@ const Auth = () => {
               className="h-24 w-auto mx-auto object-contain"
             />
           </motion.div>
+          <p className="eyebrow mb-2">Ether</p>
           <motion.h1 
-            className="font-display text-3xl font-medium text-foreground mb-2"
+            className="ether-title text-4xl text-foreground mb-2"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
@@ -380,16 +381,16 @@ const Auth = () => {
         </div>
 
         <motion.div
-          className="glass-strong rounded-2xl p-8"
+          className="border border-border rounded-[2px] bg-card p-8"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
         >
           {(mode === 'login' || mode === 'signup') && (
-            <div className="flex mb-8 bg-muted rounded-xl p-1">
+            <div className="flex mb-8 border border-border p-1">
               <button
                 onClick={() => setMode('login')}
-                className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                className={`flex-1 min-h-11 rounded-[2px] text-sm font-medium transition-all ${
                   mode === 'login' 
                     ? 'bg-primary text-primary-foreground' 
                     : 'text-muted-foreground hover:text-foreground'
@@ -399,7 +400,7 @@ const Auth = () => {
               </button>
               <button
                 onClick={() => setMode('signup')}
-                className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                className={`flex-1 min-h-11 rounded-[2px] text-sm font-medium transition-all ${
                   mode === 'signup' 
                     ? 'bg-primary text-primary-foreground' 
                     : 'text-muted-foreground hover:text-foreground'

@@ -28,7 +28,7 @@ const PUBLIC_EXACT = new Set([
   '/nuance',
 ]);
 
-// Routes that should redirect authenticated users to /home
+// Signed-in people leave the public landing for the feed.
 const LANDING_ROUTES = ['/', '/landing'];
 
 function isPublicPath(pathname: string) {
@@ -58,9 +58,8 @@ const AccessGate = ({ children }: AccessGateProps) => {
     // Wait for auth to load first
     if (authLoading) return;
 
-    // If user is authenticated and on a landing route, redirect to /home
     if (user && isLandingRoute) {
-      navigate('/home', { replace: true });
+      navigate('/feed', { replace: true });
       return;
     }
 

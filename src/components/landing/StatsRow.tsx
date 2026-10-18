@@ -13,8 +13,9 @@ export function StatsRow() {
   ];
 
   return (
-    <section className="py-16 md:py-20 border-y border-border/30">
+    <section className="py-16 md:py-20 border-y border-border">
       <div className="container px-4 sm:px-6 lg:px-8">
+        <p className="eyebrow text-center mb-8">Live counts</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
           {displayStats.map((stat, index) => (
             <motion.div
@@ -25,7 +26,7 @@ export function StatsRow() {
               transition={{ duration: 0.5, delay: index * 0.1 }}
               className="text-center"
             >
-              <div className="font-display text-4xl sm:text-5xl lg:text-6xl font-medium text-gradient-pink mb-2">
+              <div className="ether-title text-4xl sm:text-5xl lg:text-6xl mb-2">
                 {isLoading ? (
                   <Skeleton className="h-12 sm:h-14 lg:h-16 w-20 mx-auto bg-muted/20" />
                 ) : isError ? (

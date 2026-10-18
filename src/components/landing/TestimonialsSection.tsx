@@ -72,7 +72,7 @@ function ReviewForm() {
           <p className="text-muted-foreground mb-4">
             Sign in to share your experience with Ether
           </p>
-          <Button onClick={() => navigate('/auth')} className="glow-pink-sm">
+          <Button onClick={() => navigate('/auth')} className="min-h-11">
             Sign In to Review
           </Button>
         </CardContent>
@@ -118,7 +118,7 @@ function ReviewForm() {
             <Textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="What do you love about Ether? Be honest—your feedback helps others decide."
+              placeholder="Your review"
               className="min-h-[100px] resize-none"
               maxLength={500}
             />
@@ -133,7 +133,7 @@ function ReviewForm() {
             <Button 
               onClick={handleSubmit} 
               disabled={!content.trim() || createReview.isPending || updateReview.isPending}
-              className="glow-pink-sm"
+              className="min-h-11"
             >
               {(createReview.isPending || updateReview.isPending) ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -162,12 +162,10 @@ export function TestimonialsSection() {
           transition={{ duration: 0.5 }}
           className="text-center mb-12 md:mb-16"
         >
-          <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-medium mb-4">
-            Real reviews from <span className="text-gradient-pink">real creators</span>
+          <p className="eyebrow mb-2">Reviews</p>
+          <h2 className="ether-title text-3xl sm:text-4xl">
+            Reviews from members
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Honest feedback from our community members
-          </p>
         </motion.div>
 
         {/* Reviews Carousel */}

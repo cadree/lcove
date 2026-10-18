@@ -1,56 +1,69 @@
 import { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { MoreMenuButton } from "@/components/navigation/MoreMenu";
+import { cn } from "@/lib/utils";
+
 interface PageHeaderProps {
   title: string;
   description?: string;
+  eyebrow?: string;
   icon?: ReactNode;
   actions?: ReactNode;
   showBack?: boolean;
+  showMore?: boolean;
   backPath?: string;
   className?: string;
 }
+
 export const PageHeader = ({
   title,
   description,
+  eyebrow,
   icon,
   actions,
   showBack = true,
+  showMore = true,
   backPath,
-  className = ""
+  className = "",
 }: PageHeaderProps) => {
   const navigate = useNavigate();
+
   const handleBack = () => {
     if (backPath) {
       navigate(backPath);
     } else if (window.history.length > 1) {
       navigate(-1);
     } else {
-      navigate('/home');
+      navigate("/feed");
     }
   };
-  return <motion.header initial={{
-    opacity: 0,
-    y: -20
-  }} animate={{
-    opacity: 1,
-    y: 0
-  }} transition={{
-    duration: 0.5
-  }} className={`flex items-center justify-between mb-6 ${className}`} role="banner">
-      <div className="flex items-center gap-3">
-        {showBack && <Button variant="ghost" size="icon" onClick={handleBack} className="shrink-0" aria-label="Go back">
+
+  return (
+    <header
+      className={cn("flex items-start justify-between gap-3 pb-4 mb-6 border-b border-border", className)}
+      role="banner"
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        {showBack && (
+          <Button variant="ghost" size="icon" onClick={handleBack} className="shrink-0" aria-label="Go back">
             <ArrowLeft className="h-5 w-5" aria-hidden="true" />
-          </Button>}
-        {icon && <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0" aria-hidden="true">
-            {icon}
-          </div>}
-        
+          </Button>
+        )}
+        <div className="min-w-0">
+          {eyebrow && <p className="eyebrow">{eyebrow}</p>}
+          <div className="flex items-center gap-2 min-w-0">
+            {icon && <span className="shrink-0 text-foreground" aria-hidden="true">{icon}</span>}
+            <h1 className="ether-title text-2xl sm:text-3xl truncate">{title}</h1>
+          </div>
+          {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+        </div>
       </div>
-      {actions && <nav className="flex items-center gap-2" aria-label="Page actions">
-          {actions}
-        </nav>}
-    </motion.header>;
+      <div className="flex items-center gap-2 shrink-0">
+        {actions && <nav className="flex items-center gap-2" aria-label="Page actions">{actions}</nav>}
+        {showMore && <MoreMenuButton />}
+      </div>
+    </header>
+  );
 };
