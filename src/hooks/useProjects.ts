@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { milestonesForInsert, roleCreditAmount } from '@/lib/projectCollaborations';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useEnergy, ENERGY_GAINS } from '@/hooks/useEnergy';
@@ -293,18 +294,19 @@ export const useProjects = (status?: string) => {
             role_name: role.role_name,
             description: role.description,
             payout_amount: role.payout_amount,
-            credit_amount: role.credit_amount || 0,
+            credit_amount: roleCreditAmount(role.credit_amount),
             slots_available: role.slots_available
           })));
 
         if (rolesError) throw rolesError;
       }
 
-      // Create milestones
-      if (data.milestones && data.milestones.length > 0) {
+      // Untitled rows and blank dates are not sent. An empty date string is a 400.
+      const milestones = milestonesForInsert(data.milestones || []);
+      if (milestones.length > 0) {
         const { error: msError } = await supabase
           .from('project_milestones')
-          .insert(data.milestones.map(ms => ({
+          .insert(milestones.map(ms => ({
             project_id: project.id,
             title: ms.title,
             phase: ms.phase,

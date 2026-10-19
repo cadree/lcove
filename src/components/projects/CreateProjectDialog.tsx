@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { milestonesForInsert, roleCreditAmount } from '@/lib/projectCollaborations';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
@@ -79,7 +79,6 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   const [description, setDescription] = useState('');
   const [projectType, setProjectType] = useState<ProjectType>('volunteer');
   const [totalBudget, setTotalBudget] = useState('');
-  const [creditsReward, setCreditsReward] = useState(25);
   const [isPrivate, setIsPrivate] = useState(false);
   const [hideFromCalendar, setHideFromCalendar] = useState(false);
   const [listingType, setListingType] = useState<'project' | 'gig'>('project');
@@ -222,7 +221,6 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     if (!user?.id) return;
 
     const validRoles = roles.filter(r => r.role_name.trim());
-    const validMilestones = milestones.filter(m => m.title.trim());
     const validDeliverables = deliverables.filter(d => d.type.trim());
 
     const timelineStart = startDate ? `${startDate}${startTime ? `T${startTime}` : 'T00:00'}` : undefined;
@@ -285,9 +283,9 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
       listing_type: listingType,
       roles: validRoles.map((role) => ({
         ...role,
-        credit_amount: role.credit_amount > 0 ? role.credit_amount : creditsReward,
+        credit_amount: roleCreditAmount(role.credit_amount),
       })),
-      milestones: validMilestones,
+      milestones: milestonesForInsert(milestones),
     }, {
       onSuccess: async (project) => {
         // Upload attachments to project_attachments table
@@ -310,7 +308,6 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     setDescription('');
     setProjectType('volunteer');
     setTotalBudget('');
-    setCreditsReward(25);
     setIsPrivate(false);
     setSelectedOutcomes([]);
     setAttachments([]);
@@ -335,10 +332,11 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     setDeliverables([{ type: '', publish_date: '', publish_location: '' }]);
   };
 
+  const roleCredits = roles.reduce((sum, role) => sum + roleCreditAmount(role.credit_amount), 0);
   const canSubmit = title.trim() && (
     projectType === 'volunteer' || 
     (projectType === 'paid' && budgetNum > 0) ||
-    (projectType === 'hybrid' && (budgetNum > 0 || creditsReward > 0))
+    (projectType === 'hybrid' && (budgetNum > 0 || roleCredits > 0))
   );
 
   const fileTypeBadge = (type: string) => {
@@ -583,18 +581,6 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
               )}
             </div>
           )}
-
-          {/* LC Credits Reward */}
-          <div className="space-y-4">
-            <Label className="flex items-center gap-2"><Coins className="h-4 w-4 text-primary" /> LC Credits Reward</Label>
-            <p className="text-xs text-muted-foreground mb-3">Award LC Credits to collaborators (max 100)</p>
-            <Slider value={[creditsReward]} onValueChange={(v) => setCreditsReward(v[0])} max={100} min={5} step={5} />
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">5 (Simple)</span>
-              <span className="font-medium text-primary">{creditsReward} LC</span>
-              <span className="text-muted-foreground">100 (Complex)</span>
-            </div>
-          </div>
 
           {/* Budget & Resources */}
           <div className="space-y-4">
