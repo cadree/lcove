@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, Menu, Star, StickyNote } from 'lucide-react';
@@ -18,10 +18,12 @@ const BookOfLcove: React.FC = () => {
   const { user } = useAuth();
   const [currentPage, setCurrentPage] = useState(1);
   const [showContinuePrompt, setShowContinuePrompt] = useState(false);
+  const [savedPage, setSavedPage] = useState<number | null>(null);
+  const [progressChecked, setProgressChecked] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [direction, setDirection] = useState(0);
 
-  const { progress, updateProgress } = useBookProgress();
+  const { progress, progressLoading, updateProgress } = useBookProgress();
   const { bookmarks, addBookmark, removeBookmark, isPageBookmarked, getBookmarkForPage } = useBookmarks();
   const { highlights, importantHighlights, addHighlight } = useHighlights();
   const { notes, addNote, getNotesForPage } = useBookNotes();
@@ -30,22 +32,23 @@ const BookOfLcove: React.FC = () => {
   const currentChapter = getChapterForPage(currentPage);
   const pageNotes = getNotesForPage(currentPage);
 
-  // Check for saved progress when it loads. currentPage is read from a ref so
-  // paging through the book does not re-open the continue prompt.
-  const currentPageRef = useRef(currentPage);
-  currentPageRef.current = currentPage;
+  // Ask once, after the saved page has loaded, and only if it is past page 1.
+  // Saving is held until that decision so the first visit does not overwrite
+  // the saved page with page 1.
   useEffect(() => {
-    if (progress && progress.current_page > 1 && currentPageRef.current === 1) {
+    if (progressLoading || progressChecked) return;
+    setProgressChecked(true);
+    const page = progress?.current_page ?? 1;
+    if (page > 1) {
+      setSavedPage(page);
       setShowContinuePrompt(true);
     }
-  }, [progress]);
+  }, [progress, progressLoading, progressChecked]);
 
-  // Save progress when page changes
   useEffect(() => {
-    if (user && currentPage > 0) {
-      updateProgress(currentPage);
-    }
-  }, [currentPage, user, updateProgress]);
+    if (!user || !progressChecked || showContinuePrompt || currentPage < 1) return;
+    updateProgress(currentPage);
+  }, [currentPage, user, updateProgress, progressChecked, showContinuePrompt]);
 
   const goToPage = (page: number) => {
     if (page >= 1 && page <= TOTAL_PAGES) {
@@ -58,9 +61,7 @@ const BookOfLcove: React.FC = () => {
   const prevPage = () => goToPage(currentPage - 1);
 
   const handleContinue = () => {
-    if (progress) {
-      setCurrentPage(progress.current_page);
-    }
+    if (savedPage && savedPage > 1) setCurrentPage(savedPage);
     setShowContinuePrompt(false);
   };
 
@@ -111,7 +112,7 @@ const BookOfLcove: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0d0a08] text-[#e8e0d5] relative overflow-hidden">
+    <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-[#0d0a08] text-[#e8e0d5]">
       {/* Paper texture overlay */}
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
            style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 400 400\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }} />
@@ -132,7 +133,7 @@ const BookOfLcove: React.FC = () => {
             >
               <h2 className="text-xl font-serif">Continue where you left off?</h2>
               <p className="text-muted-foreground">
-                You were on page {progress?.current_page} of {TOTAL_PAGES}
+                You were on page {savedPage} of {TOTAL_PAGES}
               </p>
               <div className="flex gap-4 justify-center">
                 <Button variant="outline" onClick={handleStartFresh}>Start Fresh</Button>
@@ -144,7 +145,10 @@ const BookOfLcove: React.FC = () => {
       </AnimatePresence>
 
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-[#0d0a08] to-transparent pb-8 pt-4 px-4">
+      <header
+        className="relative z-40 shrink-0 border-b border-white/10 bg-[#0d0a08]/95 px-4 pb-3 backdrop-blur-md"
+        style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
+      >
         <div className="max-w-4xl mx-auto flex items-center gap-2">
           <Button
             variant="ghost"
@@ -252,7 +256,7 @@ const BookOfLcove: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="pt-20 pb-32 px-4 min-h-screen flex items-center justify-center">
+      <main className="relative z-10 min-h-0 flex-1 overflow-y-auto px-4 py-6">
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={currentPage}
@@ -292,7 +296,10 @@ const BookOfLcove: React.FC = () => {
       </main>
 
       {/* Footer Navigation */}
-      <footer className="fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-[#0d0a08] to-transparent pt-8 pb-6 px-4">
+      <footer
+        className="relative z-40 shrink-0 border-t border-white/10 bg-[#0d0a08]/95 px-4 pt-4 backdrop-blur-md"
+        style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+      >
         <div className="max-w-4xl mx-auto">
           {/* Progress bar */}
           <div className="h-1 bg-[#2a2520] rounded-full mb-4 overflow-hidden">

@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Compass, Home, MessageCircle, Plus, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCreateFlow } from "@/components/create/CreateFlowContext";
@@ -36,10 +36,10 @@ const BottomNav = () => {
         {tabs.slice(0, 2).map((tab) => {
           const active = tab.match(location.pathname);
           return (
-            <NavLink key={tab.id} to={tab.to} className={itemClass(active)} aria-current={active ? "page" : undefined}>
+            <Link key={tab.id} to={tab.to} className={itemClass(active)} aria-current={active ? "page" : undefined}>
               <tab.icon className="h-5 w-5" strokeWidth={1.5} />
               <span>{tab.label}</span>
-            </NavLink>
+            </Link>
           );
         })}
 
@@ -51,10 +51,10 @@ const BottomNav = () => {
         {tabs.slice(2).map((tab) => {
           const active = tab.match(location.pathname);
           return (
-            <NavLink key={tab.id} to={tab.to} className={itemClass(active)} aria-current={active ? "page" : undefined}>
+            <Link key={tab.id} to={tab.to} className={itemClass(active)} aria-current={active ? "page" : undefined}>
               <tab.icon className="h-5 w-5" strokeWidth={1.5} />
               <span>{tab.label}</span>
-            </NavLink>
+            </Link>
           );
         })}
       </div>

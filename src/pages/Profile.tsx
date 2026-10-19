@@ -4,13 +4,12 @@ import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Plus, Grid, Bookmark, FileText, ArrowLeft, LayoutGrid, Users, LayoutDashboard, ShoppingBag, Calendar, PenLine } from "lucide-react";
+import { Loader2, Grid, Bookmark, FileText, ArrowLeft, LayoutGrid, Users, LayoutDashboard, ShoppingBag, Calendar, PenLine } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
 import { ProfileCustomizationDialog } from "@/components/profile/ProfileCustomizationDialog";
 import { ProfileRecordPlayer } from "@/components/profile/ProfileRecordPlayer";
-import { useCreateFlow } from "@/components/create/CreateFlowContext";
 import { ProfilePostsGrid } from "@/components/profile/ProfilePostsGrid";
 import { PostDetailModal } from "@/components/profile/PostDetailModal";
 import { CreateBlogDialog } from "@/components/profile/CreateBlogDialog";
@@ -66,8 +65,7 @@ const Profile = () => {
   const { folders } = usePortfolioFolders(targetUserId);
   const { layout } = useProfileLayout(targetUserId);
   const { createDirectConversation } = useConversations();
-  const { openCreate } = useCreateFlow();
-  
+
   const [showMusicDialog, setShowMusicDialog] = useState(false);
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
   const [showCreateBlogDialog, setShowCreateBlogDialog] = useState(false);
@@ -295,6 +293,16 @@ const Profile = () => {
                 />
               </TabsContent>
               <TabsContent value="blogs" className="mt-4">
+                {isOwnProfile && (
+                  <Button
+                    variant="outline"
+                    className="mb-4 min-h-11"
+                    onClick={() => setShowCreateBlogDialog(true)}
+                  >
+                    <PenLine className="w-4 h-4 mr-2" />
+                    Write a blog
+                  </Button>
+                )}
                 <ProfileBlogsGrid 
                   blogs={blogs}
                   onBlogClick={(blog) => setSelectedBlog(blog)}
@@ -449,18 +457,23 @@ const Profile = () => {
   return (
     <PageLayout showNotificationBell={false}>
       <div className="min-h-screen pb-20">
-        {/* Back Button - Always at top */}
-        <div className="px-5 pt-4 pb-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-2 text-muted-foreground hover:text-foreground"
-            onClick={() => navigate(-1)}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Button>
-        </div>
+        {!isOwnProfile && (
+          <div className="px-5 pt-4 pb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                const index = window.history.state?.idx;
+                if (typeof index === "number" && index > 0) navigate(-1);
+                else navigate("/feed");
+              }}
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </Button>
+          </div>
+        )}
 
         {/* Header Section - Always at top */}
         <ProfileHeader
@@ -500,29 +513,6 @@ const Profile = () => {
         )}
 
         {moduleSections.map(section => renderSection(section))}
-
-        {/* Floating Create Buttons - Always visible */}
-        {isOwnProfile && (
-          <div className="fixed bottom-24 right-5 z-40 flex flex-col gap-3">
-            <Button
-              size="icon"
-              className="w-12 h-12 rounded-full shadow-lg bg-secondary hover:bg-secondary/90"
-              onClick={() => setShowCreateBlogDialog(true)}
-              title="Write a blog"
-            >
-              <PenLine className="w-5 h-5" />
-            </Button>
-            <Button
-              size="icon"
-              className="w-14 h-14 rounded-[2px]"
-              onClick={openCreate}
-              title="Create post"
-              aria-label="Create post"
-            >
-              <Plus className="w-6 h-6" />
-            </Button>
-          </div>
-        )}
 
         {/* Dialogs */}
         {isOwnProfile && (

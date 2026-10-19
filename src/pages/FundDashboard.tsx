@@ -411,10 +411,10 @@ export default function FundDashboard() {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.1 * index }}
-                        className="flex items-center gap-4 p-4 rounded-xl bg-background/50 hover:bg-background/80 transition-colors"
+                        className="flex items-start gap-3 p-3 sm:gap-4 sm:p-4 rounded-xl bg-background/50 hover:bg-background/80 transition-colors"
                       >
                         <div 
-                          className="w-12 h-12 rounded-xl flex items-center justify-center"
+                          className="w-12 h-12 shrink-0 rounded-xl flex items-center justify-center"
                           style={{ backgroundColor: `${item.color}20` }}
                         >
                           <Icon className="w-6 h-6" style={{ color: item.color }} />
@@ -423,9 +423,9 @@ export default function FundDashboard() {
                           <div className="flex items-center gap-2 mb-1">
                             <h3 className="font-medium text-foreground">{item.name}</h3>
                           </div>
-                          <p className="text-sm text-muted-foreground truncate">{item.description}</p>
+                          <p className="text-sm text-muted-foreground whitespace-normal">{item.description}</p>
                         </div>
-                        <div className="text-right">
+                        <div className="shrink-0 text-right whitespace-nowrap">
                           {fundLoading ? (
                             <Skeleton className="h-6 w-20" />
                           ) : (
