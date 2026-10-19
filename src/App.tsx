@@ -34,6 +34,7 @@ const Membership = lazy(() => import("./pages/Membership"));
 const Live = lazy(() => import("./pages/Live"));
 const Settings = lazy(() => import("./pages/Settings"));
 const BookOfLcove = lazy(() => import("./pages/BookOfLcove"));
+const QuestLog = lazy(() => import("./pages/QuestLog"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Cinema = lazy(() => import("./pages/Cinema"));
 const NetworkPage = lazy(() => import("./pages/NetworkPage"));
@@ -134,6 +135,7 @@ const App = () => (
                 <Route path="/membership" element={<Membership />} />
                 <Route path="/live" element={<Live />} />
                 <Route path="/book" element={<BookOfLcove />} />
+                <Route path="/quests" element={<QuestLog />} />
                 <Route path="/cinema" element={<Cinema />} />
                 <Route path="/cinema/network/:networkId" element={<NetworkPage />} />
                 <Route path="/cinema/manage/:networkId" element={<NetworkManage />} />

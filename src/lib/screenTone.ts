@@ -1,6 +1,6 @@
 export type ScreenTone = "blood" | "crimson" | "cyan" | "pink" | "denim" | "gold" | "flare";
 
-/** Per-screen gradient tone. Quest log is not built yet; gold is the credit wash. */
+/** Per-screen gradient tone. Quest log shares the neo-gold wash with credits. */
 export function toneForPath(pathname: string): ScreenTone {
   const path = pathname.split("?")[0] || "/";
 
@@ -48,7 +48,7 @@ export function toneForPath(pathname: string): ScreenTone {
 
   if (path.startsWith("/messages")) return "denim";
 
-  if (path.startsWith("/wallet") || path.startsWith("/fund") || path.startsWith("/membership")) {
+  if (path.startsWith("/wallet") || path.startsWith("/fund") || path.startsWith("/membership") || path.startsWith("/quests")) {
     return "gold";
   }
 

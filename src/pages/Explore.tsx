@@ -1,9 +1,15 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { CommunityMall } from "@/components/explore/CommunityMall";
+import { QuestCard } from "@/components/novi/QuestCard";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
+import { useNoviQuests } from "@/hooks/useNoviQuests";
+import { nextQuest } from "@/lib/noviQuests";
+import { shotPeople, shotSessionEnabled } from "@/lib/shotSession";
 
 const segments = [
   { id: "for-you", label: "For you" },
@@ -55,6 +61,23 @@ const destinations: Record<Exclude<SegmentId, "for-you" | "mall">, { title: stri
 const Explore = () => {
   const [segment, setSegment] = useState<SegmentId>("for-you");
   const [query, setQuery] = useState("");
+  const { quests } = useNoviQuests();
+  const openQuest = nextQuest(quests);
+  const { data: people = [] } = useQuery({
+    queryKey: ["explore-people", query],
+    queryFn: async () => {
+      if (shotSessionEnabled()) return shotPeople;
+      const request = supabase
+        .from("profiles_public")
+        .select("user_id, display_name, city_display, avatar_url")
+        .limit(8);
+      const { data, error } = query.trim()
+        ? await request.ilike("display_name", `%${query.trim()}%`)
+        : await request;
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
 
   return (
     <PageLayout>
@@ -97,16 +120,30 @@ const Explore = () => {
         </div>
 
         {(segment === "for-you" || segment === "people") && (
-          <Link to="/directory" className="file-panel mb-6 flex min-h-[88px] items-center justify-between gap-3 px-4 py-4">
-            <span>
-              <span className="mono-label block text-[9px] text-[hsl(var(--bubble))]">Directory</span>
-              <span className="ether-title mt-1 block text-[20px]">Find your people</span>
-              <span className="mt-1 block text-sm text-muted-foreground">Open the directory</span>
-            </span>
-            <span className="mono-label rounded-full border border-[hsl(var(--bubble))] px-3 py-2 text-[10px] text-foreground">
-              People
-            </span>
-          </Link>
+          <section className="mb-6">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="ether-title text-[15px]">Find your people</h2>
+              <Link to="/directory" className="mono-label text-[9px] text-muted-foreground">Directory</Link>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+              {people.map((person) => (
+                <Link
+                  key={person.user_id}
+                  to={`/profile/${person.user_id}`}
+                  className="file-panel flex w-[132px] shrink-0 flex-col items-center px-3 py-4 text-center"
+                >
+                  <span className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-[conic-gradient(from_120deg,#FF9FC8,#C4142D,#FF9FC8)] p-[2px]">
+                    <span className="flex h-full w-full items-center justify-center rounded-full bg-card font-body text-sm font-extrabold">
+                      {(person.display_name || "?").charAt(0)}
+                    </span>
+                  </span>
+                  <span className="line-clamp-2 font-body text-[13px] font-extrabold">{person.display_name || "Member"}</span>
+                  <span className="mono-label mt-1 text-[8px] text-muted-foreground">{person.city_display || "City open"}</span>
+                </Link>
+              ))}
+            </div>
+            {openQuest && segment === "for-you" && <div className="mt-4"><QuestCard quest={openQuest} /></div>}
+          </section>
         )}
 
         {segment !== "for-you" && segment !== "mall" && segment !== "people" && (

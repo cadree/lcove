@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { SHOT_USER_ID, shotProfile, shotSessionEnabled } from '@/lib/shotSession';
 
 export interface SocialLinks {
   instagram?: string;
@@ -48,6 +49,12 @@ export const useProfile = (userId?: string) => {
 
   const fetchProfile = useCallback(async () => {
     if (!targetUserId) return;
+
+    if (shotSessionEnabled() && targetUserId === SHOT_USER_ID) {
+      setProfile(shotProfile);
+      setLoading(false);
+      return;
+    }
     
     setLoading(true);
     

@@ -22,6 +22,7 @@ import { ProfileStats } from "@/components/profile/ProfileStats";
 import { ProfileAboutSection } from "@/components/profile/ProfileAboutSection";
 import { ProfileFolders } from "@/components/profile/ProfileFolders";
 import { ProfileBookEntry, ProfileQuickLinks, ToolsEntry } from "@/components/profile/ProfileQuickLinks";
+import { ProfileNovi } from "@/components/profile/ProfileNovi";
 import { FolderDetailView } from "@/components/profile/FolderDetailView";
 import { ProfileLayoutEditor } from "@/components/profile/ProfileLayoutEditor";
 import { ProfileFriendsSection } from "@/components/profile/ProfileFriendsSection";
@@ -536,6 +537,7 @@ const Profile = () => {
           postCount={posts.length}
         />
 
+        {isOwnProfile && <div className="px-4 pt-4"><ProfileNovi /></div>}
         <ProfileBookEntry />
         {isOwnProfile && <ToolsEntry />}
 

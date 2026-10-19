@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
+import { shotConversations, shotSessionEnabled } from '@/lib/shotSession';
 
 interface Participant {
   user_id: string;
@@ -58,6 +59,7 @@ export function useConversations() {
     queryKey: ['conversations', user?.id],
     queryFn: async () => {
       if (!user) return [];
+      if (shotSessionEnabled()) return shotConversations(user.id);
 
       // Get all conversations user is part of
       const { data: participations, error: partError } = await supabase

@@ -24,6 +24,7 @@ describe("toneForPath", () => {
   });
 
   it("gives credits, reading, and alerts their own tones", () => {
+    assert.equal(toneForPath("/quests"), "gold");
     assert.equal(toneForPath("/wallet"), "gold");
     assert.equal(toneForPath("/fund"), "gold");
     assert.equal(toneForPath("/blog/abc"), "pink");

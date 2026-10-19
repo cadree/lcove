@@ -55,8 +55,8 @@ export const PageHeader = ({
           </Button>
         )}
         <div className="min-w-0 flex-1">
-          {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-          <div className="flex items-center gap-2 min-w-0">
+          <p className="kicker">// {eyebrow || "Archive"}</p>
+          <div className="mt-1 flex items-center gap-2 min-w-0">
             {icon && (
               <span
                 className="squircle-icon shrink-0 [&_svg]:!h-[18px] [&_svg]:!w-[18px] [&_svg]:!text-current"
@@ -66,7 +66,7 @@ export const PageHeader = ({
                 {icon}
               </span>
             )}
-            <h1 className="ether-title text-2xl sm:text-3xl leading-tight">{title}</h1>
+            <h1 className="ether-title text-[34px] leading-tight">{title}</h1>
           </div>
         </div>
         {showMore && <MoreMenuButton />}

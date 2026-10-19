@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getAuthRedirectUrl, clearAllAuthStorage } from '@/lib/capacitorStorage';
 import { logAuthEvent, logAuthError, logSessionState } from '@/lib/authDebug';
 import { applyPendingSignupProfile } from '@/lib/pendingSignup';
+import { SHOT_USER_ID, shotSessionEnabled } from '@/lib/shotSession';
 
 interface AuthContextType {
   user: User | null;
@@ -24,6 +25,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (shotSessionEnabled()) {
+      setUser({
+        id: SHOT_USER_ID,
+        email: "maya@ether.test",
+        app_metadata: {},
+        user_metadata: {},
+        aud: "authenticated",
+        created_at: "2026-10-01T00:00:00.000Z",
+      } as User);
+      setLoading(false);
+      return;
+    }
     logAuthEvent('AuthProvider initializing');
 
     // Set up auth state listener FIRST

@@ -17,6 +17,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { cityFilterOptions, cityMatchesFilter } from "@/lib/cityNormalization";
+import { useFavorites } from "@/hooks/useFavorites";
+import { QuestCard } from "@/components/novi/QuestCard";
+import { useNoviQuests } from "@/hooks/useNoviQuests";
+import { nextQuest } from "@/lib/noviQuests";
 const Feed = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeCategory, setActiveCategory] = useState("All");
@@ -24,7 +28,11 @@ const Feed = () => {
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
   const [shuffledPosts, setShuffledPosts] = useState<typeof posts>([]);
   const [isShuffled, setIsShuffled] = useState(false);
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
+  const [lane, setLane] = useState<"for-you" | "friends" | "city" | "live">("for-you");
+  const { favorites } = useFavorites();
+  const { quests } = useNoviQuests();
+  const openQuest = nextQuest(quests);
   const {
     user
   } = useAuth();
@@ -100,6 +108,13 @@ const Feed = () => {
     }
     return matchesCategory && matchesPostType && matchesRegion;
   });
+  const favoriteIds = new Set(favorites);
+  const lanePosts = filteredPosts.filter((post) => {
+    if (lane === "friends") return favoriteIds.has(post.user_id);
+    if (lane === "city") return !!profile?.city && (post.profile?.city === profile.city || post.profile?.city_display === profile.city_display);
+    if (lane === "live") return false;
+    return true;
+  });
   return <PageLayout>
       <div className="px-4 sm:px-6 pt-3">
         <header className="mb-3 flex min-h-11 items-center justify-between gap-3">
@@ -120,11 +135,31 @@ const Feed = () => {
           </div>
         </header>
 
-        {/* Stories Row */}
         <StoriesRow />
 
-        {/* Room for the Novi quest card. Quests ship in a later phase. */}
-        <div data-novi-quest-slot="" />
+        <div className="mb-3 flex gap-2 overflow-x-auto scrollbar-hide" role="tablist" aria-label="Feed">
+          {([
+            ["for-you", "For you"],
+            ["friends", "Friends"],
+            ["city", "City"],
+            ["live", "Live"],
+          ] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={lane === id}
+              onClick={() => setLane(id)}
+              className={`mono-label inline-flex h-11 shrink-0 items-center border-b-2 px-2 text-[11px] ${
+                lane === id ? "border-[hsl(var(--bubble))] text-foreground" : "border-transparent text-muted-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {openQuest && <div className="mb-4"><QuestCard quest={openQuest} /></div>}
 
         <div className="mb-4 mt-2 flex items-center justify-end gap-2">
           <div className="flex gap-2">
@@ -170,11 +205,20 @@ const Feed = () => {
         </AnimatePresence>
 
         {/* Feed */}
+        {lane === "live" && (
+          <Link to="/live" className="file-panel mb-4 flex min-h-11 items-center justify-between px-4">
+            <span>
+              <span className="mono-label block text-[8px] text-[hsl(var(--brand))]">Live</span>
+              <span className="font-body text-[15px] font-extrabold">Open the live room</span>
+            </span>
+            <span className="mono-label rounded-full bg-[hsl(var(--brand))] px-2 py-1 text-[8px] text-[#0A0A0A]">Live</span>
+          </Link>
+        )}
         {isLoading ? <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div> : <div className="space-y-5 pb-32">
             <AnimatePresence mode="popLayout">
-              {filteredPosts.map((post, index) => <motion.div key={post.id} initial={{
+              {lanePosts.map((post, index) => <motion.div key={post.id} initial={{
             opacity: 0,
             y: 20
           }} animate={{
@@ -187,7 +231,7 @@ const Feed = () => {
                 </motion.div>)}
             </AnimatePresence>
 
-            {filteredPosts.length === 0 && posts.length === 0 && user && <FirstRunEmpty title="Your feed is empty" description="Start with a post, look through the directory, or read community updates." actions={[{
+            {lanePosts.length === 0 && posts.length === 0 && user && lane !== "live" && <FirstRunEmpty title="Your feed is empty" description="Start with a post, look through the directory, or read community updates." actions={[{
           label: "Share something",
           onClick: () => document.querySelector<HTMLTextAreaElement>('[placeholder*="mind"]')?.focus()
         }, {
@@ -198,7 +242,7 @@ const Feed = () => {
           to: "/community"
         }]} />}
 
-            {filteredPosts.length === 0 && !(posts.length === 0 && user) && <EmptyState icon={Sparkles} title={activeCategory === "All" ? "The feed is waiting for you" : `No ${activeCategory.toLowerCase()} posts yet`} description="This is your space to share what you're creating, thinking, or discovering. Your voice matters here." action={user ? {
+            {lanePosts.length === 0 && !(posts.length === 0 && user) && lane !== "live" && <EmptyState icon={Sparkles} title={lane === "for-you" && activeCategory === "All" ? "The feed is waiting for you" : `No ${lane === "for-you" ? activeCategory.toLowerCase() : lane} posts yet`} description="This is your space to share what you're creating, thinking, or discovering. Your voice matters here." action={user ? {
           label: "Share Something",
           onClick: () => document.querySelector<HTMLTextAreaElement>('[placeholder*="mind"]')?.focus()
         } : undefined} />}

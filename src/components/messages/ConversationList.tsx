@@ -5,6 +5,7 @@ import { Search, Plus, Users, MoreVertical, BellOff, Bell, MessageSquare, Trash2
 import { useAuth } from '@/contexts/AuthContext';
 import { useConversations } from '@/hooks/useConversations';
 import { usePresence } from '@/hooks/usePresence';
+import { shotOnline, shotSessionEnabled } from '@/lib/shotSession';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,7 +27,8 @@ interface ConversationListProps {
 const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversation }: ConversationListProps) => {
   const { user } = useAuth();
   const { conversations, isLoading, toggleMute, deleteConversation } = useConversations();
-  const { isOnline } = usePresence();
+  const { isOnline: presenceOnline } = usePresence();
+  const isOnline = (userId: string) => (shotSessionEnabled() ? shotOnline(userId) : presenceOnline(userId));
   const [search, setSearch] = useState('');
 
   const isConversationMuted = (conv: typeof conversations[0]) =>
@@ -77,7 +79,7 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
       <div className="border-b border-border p-4">
         <div className="mb-3 flex items-start justify-between gap-2">
           <div>
-            <p className="kicker">Encrypted channel</p>
+            <p className="kicker">// Encrypted channel</p>
             <h1 className="ether-title text-[34px] text-foreground">Messages</h1>
           </div>
           <Button variant="ghost" size="icon" onClick={onNewChat} aria-label="New message">
@@ -97,7 +99,7 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
         </div>
 
         <div>
-          <p className="kicker mb-2">Active now</p>
+            <p className="kicker mb-2">// Active now</p>
           {conversations.filter((conv) => {
             const otherId = getOtherUserId(conv);
             return otherId ? isOnline(otherId) : false;
@@ -130,8 +132,8 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
         </div>
       </div>
 
-      {/* Conversations List */}
       <div className="flex-1 overflow-y-auto">
+        <p className="kicker px-4 pt-3">// Chats</p>
         {isLoading ? (
           <div className="p-4 space-y-4">
             {[...Array(5)].map((_, i) => (
@@ -229,7 +231,12 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
                   <p className={`text-xs truncate ${
                     conv.unread_count > 0 ? 'text-foreground/70 font-medium' : 'text-muted-foreground'
                   }`}>
-                    {conv.parent_conversation_id ? (
+                    {conv.project_id ? (
+                    <span className="mono-label mr-1 rounded-full border border-[hsl(var(--scan))] px-1.5 text-[8px] text-[hsl(var(--scan))]">Project</span>
+                  ) : conv.type === "group" ? (
+                    <span className="mono-label mr-1 rounded-full border border-border px-1.5 text-[8px]">Group</span>
+                  ) : null}
+                  {conv.parent_conversation_id ? (
                       <span className="mono-label text-[9px] text-muted-foreground">Subgroup · </span>
                     ) : null}
                     {conv.oversight ? (

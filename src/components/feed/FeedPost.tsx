@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { shareLink, buildShareUrl } from '@/lib/shareLink';
+import { fileCode } from '@/lib/noviQuests';
 import { ReportDialog } from '@/components/safety/ReportDialog';
 
 interface Post {
@@ -96,6 +97,7 @@ const FeedPost = ({ post }: { post: Post }) => {
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       className="file-panel overflow-hidden"
     >
+      <p className="mono-label px-4 pt-3 text-[8px] text-[hsl(var(--brand))]">{fileCode(post.id)}</p>
       {/* Header */}
       <header className="flex items-center justify-between p-4 sm:p-5">
         <div className="flex items-center gap-3">
@@ -209,59 +211,60 @@ const FeedPost = ({ post }: { post: Post }) => {
       )}
 
       {/* Action Bar */}
-      <div className="px-3 sm:px-4 py-2 border-t border-border">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
+      <div className="grid grid-cols-4 border-t border-border">
+        <div className="contents">
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={toggleLike}
               disabled={!user || isLiking}
               aria-label={hasLiked ? "Unlike" : "Like"}
-              className={`flex items-center justify-center min-h-11 min-w-11 ${
+              className={`mono-label flex min-h-11 flex-col items-center justify-center gap-0.5 text-[8px] ${
                 hasLiked ? 'text-primary' : 'text-foreground'
               }`}
             >
-              <Heart className={`w-6 h-6 ${hasLiked ? 'fill-primary' : ''}`} />
+              <Heart className={`h-4 w-4 ${hasLiked ? 'fill-primary' : ''}`} />
+              {likesCount}
             </motion.button>
 
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowComments(!showComments)}
               aria-label="Comment"
-              className="flex items-center justify-center min-h-11 min-w-11 text-foreground"
+              className="mono-label flex min-h-11 flex-col items-center justify-center gap-0.5 text-[8px] text-foreground"
             >
-              <MessageCircle className="w-6 h-6" />
+              <MessageCircle className="h-4 w-4" />
+              Note
             </motion.button>
 
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={handleShare}
               aria-label="Share"
-              className="flex items-center justify-center min-h-11 min-w-11 text-foreground"
+              className="mono-label flex min-h-11 flex-col items-center justify-center gap-0.5 text-[8px] text-foreground"
             >
-              <Share2 className="w-6 h-6" />
+              <Share2 className="h-4 w-4" />
+              Send
             </motion.button>
-          </div>
 
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={toggleSave}
             disabled={!user}
             aria-label={isSaved ? "Unsave" : "Save"}
-            className={`flex items-center justify-center min-h-11 min-w-11 ${
+            className={`mono-label flex min-h-11 flex-col items-center justify-center gap-0.5 text-[8px] ${
               isSaved ? 'text-primary' : 'text-foreground'
             }`}
           >
-            <Bookmark className={`w-6 h-6 ${isSaved ? 'fill-primary' : ''}`} />
+            <Bookmark className={`h-4 w-4 ${isSaved ? 'fill-primary' : ''}`} />
+            File
           </motion.button>
         </div>
-
-        {isOwner && likesCount > 0 && (
-          <p className="px-2 pb-2 text-xs text-muted-foreground">
-            Only you can see this: {likesCount} {likesCount === 1 ? 'like' : 'likes'}
-          </p>
-        )}
       </div>
+      {isOwner && likesCount > 0 && (
+        <p className="px-4 pb-2 text-xs text-muted-foreground">
+          Only you can see this: {likesCount} {likesCount === 1 ? 'like' : 'likes'}
+        </p>
+      )}
 
       {/* Comments Section */}
       <Collapsible open={showComments} onOpenChange={setShowComments}>

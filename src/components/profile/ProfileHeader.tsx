@@ -15,6 +15,8 @@ import { useFavorites } from '@/hooks/useFavorites';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyXp } from '@/hooks/useXp';
+import { xpBar } from '@/lib/noviQuests';
+import { Link } from 'react-router-dom';
 import { ReportDialog } from '@/components/safety/ReportDialog';
 import { FriendsDrawer } from '@/components/friends/FriendsDrawer';
 
@@ -164,7 +166,7 @@ export function ProfileHeader({
         <div className="relative z-[1] -mt-10 px-4 pb-4">
         <div className="flex items-end gap-3">
           <div className="group relative shrink-0">
-            <Avatar className="h-[72px] w-[72px] rounded-full border-4 border-card">
+            <Avatar className="h-[72px] w-[72px] rounded-full border-2 border-transparent bg-[conic-gradient(from_120deg,#FF9FC8,#79C3CF,#FF9FC8)] p-[2px]">
               <AvatarImage src={avatarUrl || undefined} />
               <AvatarFallback className="rounded-full bg-muted font-body text-xl font-bold text-foreground">
                 {displayName.charAt(0).toUpperCase()}
@@ -212,8 +214,21 @@ export function ProfileHeader({
           </div>
         </div>
 
-        {isOwnProfile && myXp && (
-          <p className="mono-label mt-2 text-[10px] text-muted-foreground">Level {myXp.level}</p>
+        {isOwnProfile && (
+          <Link to="/quests" className="mt-3 block">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="mono-label text-[9px] text-[hsl(var(--brand))]">
+                {roleLabel} // Lv {xpBar(myXp?.total ?? 0).level}
+              </span>
+              <span className="mono-label text-[9px] text-muted-foreground">{myXp?.total ?? 0} XP</span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-foreground/10">
+              <div
+                className="h-full rounded-full bg-[linear-gradient(90deg,#FFD6E8,#FF9FC8)]"
+                style={{ width: `${Math.round(xpBar(myXp?.total ?? 0).ratio * 100)}%` }}
+              />
+            </div>
+          </Link>
         )}
 
         <div className="mt-3 grid grid-cols-3 border-y border-border py-2">

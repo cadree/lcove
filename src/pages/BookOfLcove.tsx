@@ -9,6 +9,8 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
+import { callRpc } from '@/lib/rpc';
+import { shotSessionEnabled } from '@/lib/shotSession';
 import { useBookProgress, useBookmarks, useHighlights, useBookNotes } from '@/hooks/useBookProgress';
 import { BOOK_PAGES, BOOK_CHAPTERS, TOTAL_PAGES, getChapterForPage, getPageByNumber } from '@/data/bookOfLcove';
 import { toast } from 'sonner';
@@ -35,6 +37,11 @@ const BookOfLcove: React.FC = () => {
   // Ask once, after the saved page has loaded, and only if it is past page 1.
   // Saving is held until that decision so the first visit does not overwrite
   // the saved page with page 1.
+  useEffect(() => {
+    if (!user || shotSessionEnabled()) return;
+    callRpc("complete_novi_quest", { p_quest: "read_book" }).catch(() => undefined);
+  }, [user]);
+
   useEffect(() => {
     if (progressLoading || progressChecked) return;
     setProgressChecked(true);

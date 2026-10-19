@@ -25,7 +25,7 @@ const BottomNav = () => {
   const itemClass = (active: boolean) =>
     cn(
       "mono-label flex min-h-11 flex-col items-center justify-center gap-1 px-1 text-[8.5px] tracking-[0.14em]",
-      active ? "text-[hsl(var(--bubble))]" : "text-muted-foreground",
+      active ? "text-[hsl(var(--bubble))] drop-shadow-[0_0_8px_rgba(255,159,200,0.85)]" : "text-muted-foreground",
     );
 
   const renderTab = (tab: (typeof tabs)[number]) => {

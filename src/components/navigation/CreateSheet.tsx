@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { CreateShareFlow } from "@/components/create/CreateShareFlow";
 import StoryUpload from "@/components/stories/StoryUpload";
 import { SquircleIcon, type IconFill } from "@/components/world/SquircleIcon";
+import { NoviPeek } from "@/components/novi/NoviPeek";
 import { useAuth } from "@/contexts/AuthContext";
 import type { LucideIcon } from "lucide-react";
 
@@ -138,6 +139,11 @@ export function CreateSheet({ open, onOpenChange }: CreateSheetProps) {
                 <span className="mono-label text-center text-[9px] leading-tight text-foreground">{item.label}</span>
               </button>
             ))}
+          </div>
+          <div className="quest-card relative mt-5">
+            <NoviPeek className="absolute -right-1 -top-6 h-14 w-14" />
+            <p className="mono-label text-[8px] text-[hsl(var(--brand))]">Novi // Note</p>
+            <p className="lore pr-12 text-[16px] text-foreground">Your first post writes 10 XP.</p>
           </div>
         </SheetContent>
       </Sheet>

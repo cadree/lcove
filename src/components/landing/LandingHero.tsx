@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import lcoveMark from "@/assets/lcove-mark-cutout.png";
+import { NoviPeek } from "@/components/novi/NoviPeek";
 
 export function LandingHero() {
   const navigate = useNavigate();
@@ -33,6 +34,9 @@ export function LandingHero() {
           Sign in
         </Button>
         <p className="mono-label mt-6 text-[9px] text-muted-foreground">Year 2096 // Creativity preserved</p>
+        <div className="mt-4 flex w-full justify-end">
+          <NoviPeek />
+        </div>
       </div>
     </section>
   );
