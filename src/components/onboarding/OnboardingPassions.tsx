@@ -1,4 +1,4 @@
-import { useState, useEffect, KeyboardEvent } from 'react';
+import { useState, useEffect, useRef, KeyboardEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,7 @@ import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
 import { ArrowRight, ArrowLeft, X, Plus, Sparkles } from 'lucide-react';
 import { OnboardingData } from '@/pages/Onboarding';
+import { MAX_PASSIONS, mergePassions } from '@/lib/onboardingPassions';
 
 interface Props {
   data: OnboardingData;
@@ -20,15 +21,15 @@ interface Passion {
   category: string | null;
 }
 
-const MAX_PASSIONS = 10;
-const MIN_PASSION_LENGTH = 2;
-const MAX_PASSION_LENGTH = 32;
-
 const OnboardingPassions = ({ data, updateData, onNext, onBack }: Props) => {
   const [suggestions, setSuggestions] = useState<Passion[]>([]);
   const [loading, setLoading] = useState(true);
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState('');
+  const passionsRef = useRef(data.passions);
+  useEffect(() => {
+    passionsRef.current = data.passions;
+  }, [data.passions]);
 
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -48,40 +49,22 @@ const OnboardingPassions = ({ data, updateData, onNext, onBack }: Props) => {
   const normalizePassion = (passion: string) => passion.trim().toLowerCase();
 
   const addPassion = (passionName: string) => {
-    const trimmed = passionName.trim();
-    setError('');
-
-    if (trimmed.length < MIN_PASSION_LENGTH) {
-      setError(`Passion must be at least ${MIN_PASSION_LENGTH} characters`);
-      return false;
+    const current = passionsRef.current;
+    const result = mergePassions(current, passionName);
+    const added = result.passions.length > current.length;
+    if (added) {
+      passionsRef.current = result.passions;
+      updateData({ passions: result.passions });
+      setInputValue('');
     }
-
-    if (trimmed.length > MAX_PASSION_LENGTH) {
-      setError(`Passion must be ${MAX_PASSION_LENGTH} characters or less`);
-      return false;
-    }
-
-    if (data.passions.length >= MAX_PASSIONS) {
-      setError(`You can add up to ${MAX_PASSIONS} passions`);
-      return false;
-    }
-
-    const isDuplicate = data.passions.some(
-      (p) => normalizePassion(p) === normalizePassion(trimmed)
-    );
-
-    if (isDuplicate) {
-      setError('This passion is already added');
-      return false;
-    }
-
-    updateData({ passions: [...data.passions, trimmed] });
-    setInputValue('');
-    return true;
+    setError(result.error ?? '');
+    return added;
   };
 
   const removePassion = (passionToRemove: string) => {
-    updateData({ passions: data.passions.filter((p) => p !== passionToRemove) });
+    const next = passionsRef.current.filter((passion) => passion !== passionToRemove);
+    passionsRef.current = next;
+    updateData({ passions: next });
     setError('');
   };
 
@@ -132,15 +115,19 @@ const OnboardingPassions = ({ data, updateData, onNext, onBack }: Props) => {
           <div className="relative">
             <Input
               type="text"
-              placeholder="Type a passion and press Enter (e.g., Music Production, Urban Farming, Streetwear...)"
+              placeholder="Type a passion, then Enter or comma"
               value={inputValue}
               onChange={(e) => {
-                setInputValue(e.target.value);
+                const value = e.target.value;
+                if (/[,;\n]/.test(value)) {
+                  addPassion(value);
+                  return;
+                }
+                setInputValue(value);
                 setError('');
               }}
               onKeyDown={handleKeyDown}
               className="h-12 pr-12 bg-secondary/50 border-border/50 focus:border-primary"
-              maxLength={MAX_PASSION_LENGTH}
             />
             {inputValue.trim() && (
               <button
@@ -297,8 +284,15 @@ const OnboardingPassions = ({ data, updateData, onNext, onBack }: Props) => {
             Back
           </Button>
           <Button
-            onClick={onNext}
-            disabled={data.passions.length === 0}
+            onClick={() => {
+              if (inputValue.trim()) {
+                const added = addPassion(inputValue);
+                if (!added && passionsRef.current.length === 0) return;
+              }
+              if (passionsRef.current.length === 0) return;
+              onNext();
+            }}
+            disabled={data.passions.length === 0 && inputValue.trim().length < 2}
             className="flex-1 h-12 bg-primary hover:bg-primary/90 glow-pink"
           >
             Continue

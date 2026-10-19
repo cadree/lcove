@@ -14,6 +14,7 @@ import OnboardingRoles from '@/components/onboarding/OnboardingRoles';
 import OnboardingQuestionnaire from '@/components/onboarding/OnboardingQuestionnaire';
 import OnboardingConnections from '@/components/onboarding/OnboardingConnections';
 import OnboardingCompletion from '@/components/onboarding/OnboardingCompletion';
+import { buildUserPassionInserts } from '@/lib/onboardingPassions';
 
 export interface OnboardingData {
   displayName: string;
@@ -115,16 +116,22 @@ const Onboarding = () => {
         total_score: score
       }, { onConflict: 'user_id' });
 
-      // Save passions
-      const { data: passions } = await supabase
+      // Seeded names link to passions.id. Typed names that are not in the
+      // catalog are stored as custom_name. Replace this user's rows so a
+      // retry cannot leave only the first matching seed.
+      const { data: passionCatalog, error: passionCatalogError } = await supabase
         .from('passions')
-        .select('id, name')
-        .in('name', data.passions);
-      if (passions && passions.length > 0) {
-        await supabase.from('user_passions').upsert(
-          passions.map(p => ({ user_id: user.id, passion_id: p.id })),
-          { onConflict: 'user_id,passion_id' }
-        );
+        .select('id, name');
+      if (passionCatalogError) throw passionCatalogError;
+      const passionRows = buildUserPassionInserts(user.id, data.passions, passionCatalog ?? []);
+      const { error: clearPassionsError } = await supabase
+        .from('user_passions')
+        .delete()
+        .eq('user_id', user.id);
+      if (clearPassionsError) throw clearPassionsError;
+      if (passionRows.length > 0) {
+        const { error } = await supabase.from('user_passions').insert(passionRows);
+        if (error) throw error;
       }
 
       // Save skills

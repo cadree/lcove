@@ -107,12 +107,9 @@ const Messages = () => {
                   <MessageCircle className="w-10 h-10 text-primary/60" />
                 </motion.div>
                 <h3 className="font-display text-xl font-medium text-foreground mb-2">Your inbox awaits</h3>
-                <p className="text-muted-foreground text-sm mb-6 max-w-xs mx-auto">
+                <p className="text-muted-foreground text-sm max-w-xs mx-auto">
                   Start a conversation with someone who inspires you or continue where you left off.
                 </p>
-                <Button onClick={() => setShowNewChat(true)}>
-                  Start a Conversation
-                </Button>
               </motion.div>
             </div>
           )}

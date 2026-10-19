@@ -12,7 +12,7 @@ export function ProfileQuickLinks({ isOwner }: ProfileQuickLinksProps) {
 
   const links = [
     { to: '/store', icon: Store, label: 'My Store', color: 'text-muted-foreground' },
-    { to: '/calendar', icon: Calendar, label: 'Events', color: 'text-muted-foreground' },
+    { to: '/events', icon: Calendar, label: 'Events', color: 'text-muted-foreground' },
     { to: '/fund', icon: Heart, label: 'Fund', color: 'text-primary' },
     { to: '/boards', icon: LayoutDashboard, label: 'Boards', color: 'text-amber-400' },
   ];

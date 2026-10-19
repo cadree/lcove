@@ -8,7 +8,7 @@ export function LandingHero() {
   return (
     <section className="relative min-h-[80vh] flex items-center">
       <div className="container relative px-4 sm:px-6 lg:px-8 py-16 md:py-24">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+        <div className="max-w-xl">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -34,21 +34,6 @@ export function LandingHero() {
               >
                 Community updates
               </Button>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="hidden lg:block"
-          >
-            <div className="border border-border p-4">
-              <div className="grid grid-cols-3 gap-2">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="aspect-square bg-muted rounded-[2px]" />
-                ))}
-              </div>
             </div>
           </motion.div>
         </div>

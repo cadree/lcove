@@ -27,11 +27,12 @@ export function useProfilePosts(userId?: string) {
       if (error) throw error;
 
       // Get profile for the user using profiles_public view
-      const { data: profile } = await supabase
+      const { data: profileRows } = await supabase
         .from('profiles_public')
         .select('display_name, avatar_url')
         .eq('user_id', targetUserId)
-        .single();
+        .limit(1);
+      const profile = profileRows?.[0];
 
       return (postsData || []).map(post => ({
         id: post.id,
@@ -49,6 +50,7 @@ export function useProfilePosts(userId?: string) {
       }));
     },
     enabled: !!targetUserId,
+    staleTime: 0,
   });
 
   const createPost = useMutation({
@@ -168,7 +170,7 @@ export function useProfilePosts(userId?: string) {
     },
   });
 
-  const visiblePosts = targetUserId && isBlocked(targetUserId) ? [] : posts;
+  const visiblePosts = targetUserId && targetUserId !== user?.id && isBlocked(targetUserId) ? [] : posts;
 
   return {
     posts: visiblePosts,

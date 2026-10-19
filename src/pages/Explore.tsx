@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Folder, Megaphone, Users } from "lucide-react";
+import { Calendar, Folder, Megaphone, Users } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { MoreMenuButton } from "@/components/navigation/MoreMenu";
 
@@ -24,6 +24,13 @@ const sections = [
     eyebrow: "Updates",
     title: "Community",
     detail: "Public community updates",
+  },
+  {
+    to: "/events",
+    icon: Calendar,
+    eyebrow: "Schedule",
+    title: "Events",
+    detail: "Community events",
   },
 ];
 

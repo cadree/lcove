@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Play, ImageIcon } from "lucide-react";
 import { ProfilePost } from "@/types/post";
+import { postsForProfileGrid } from "@/lib/profilePosts";
 
 interface ProfilePostsGridProps {
   posts: ProfilePost[];
@@ -9,8 +10,7 @@ interface ProfilePostsGridProps {
 }
 
 export function ProfilePostsGrid({ posts, onPostClick, isLoading }: ProfilePostsGridProps) {
-  // Filter to only show posts with media
-  const mediaPosts = posts.filter(post => post.media_url);
+  const mediaPosts = postsForProfileGrid(posts);
 
   if (isLoading) {
     return (
@@ -47,10 +47,10 @@ export function ProfilePostsGrid({ posts, onPostClick, isLoading }: ProfilePosts
           className="aspect-square relative group overflow-hidden bg-muted"
           onClick={() => onPostClick(post)}
         >
-          {post.media_type === 'video' ? (
+          {post.media_url && post.media_type === 'video' ? (
             <>
               <video
-                src={post.media_url || undefined}
+                src={post.media_url}
                 className="w-full h-full object-cover"
                 muted
                 preload="metadata"
@@ -59,13 +59,17 @@ export function ProfilePostsGrid({ posts, onPostClick, isLoading }: ProfilePosts
                 <Play className="w-4 h-4 text-white drop-shadow-lg" fill="white" />
               </div>
             </>
-          ) : (
+          ) : post.media_url ? (
             <img
-              src={post.media_url || undefined}
+              src={post.media_url}
               alt={post.content || 'Post'}
               className="w-full h-full object-cover"
               loading="lazy"
             />
+          ) : (
+            <div className="flex h-full items-center justify-center p-2">
+              <p className="text-xs text-foreground line-clamp-4">{post.content}</p>
+            </div>
           )}
           
         </motion.button>

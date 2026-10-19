@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowRight, ArrowLeft, Check } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, RefreshCw } from 'lucide-react';
 import { OnboardingData } from '@/pages/Onboarding';
 
 interface Props {
@@ -21,21 +21,28 @@ interface Role {
 const OnboardingRoles = ({ data, updateData, onNext, onBack }: Props) => {
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchRoles = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const { data: rolesData, error: fetchError } = await supabase
+      .from('creative_roles')
+      .select('id, name, category')
+      .order('category', { ascending: true });
+
+    if (fetchError) {
+      setError('Could not load roles. Try again.');
+      setRoles([]);
+    } else {
+      setRoles(rolesData ?? []);
+    }
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    const fetchRoles = async () => {
-      const { data: rolesData } = await supabase
-        .from('creative_roles')
-        .select('*')
-        .order('category', { ascending: true });
-      
-      if (rolesData) {
-        setRoles(rolesData);
-      }
-      setLoading(false);
-    };
-    fetchRoles();
-  }, []);
+    void fetchRoles();
+  }, [fetchRoles]);
 
   const toggleRole = (name: string) => {
     const current = data.roles;
@@ -71,13 +78,31 @@ const OnboardingRoles = ({ data, updateData, onNext, onBack }: Props) => {
         </motion.div>
 
         {loading ? (
-          <div className="flex justify-center py-20">
+          <div className="flex flex-col items-center justify-center py-20 gap-4" role="status">
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
               className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full"
             />
+            <p className="text-sm text-muted-foreground">Loading roles…</p>
           </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <p className="text-sm text-muted-foreground text-center">{error}</p>
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2"
+              onClick={() => void fetchRoles()}
+            >
+              <RefreshCw className="w-4 h-4" />
+              Retry
+            </Button>
+          </div>
+        ) : roles.length === 0 ? (
+          <p className="py-20 text-center text-sm text-muted-foreground">
+            No roles are available yet.
+          </p>
         ) : (
           <motion.div
             initial={{ opacity: 0 }}
@@ -115,14 +140,16 @@ const OnboardingRoles = ({ data, updateData, onNext, onBack }: Props) => {
           </motion.div>
         )}
 
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="mt-6 text-sm text-muted-foreground text-center"
-        >
-          {data.roles.length}/5 selected
-        </motion.p>
+        {!loading && !error && roles.length > 0 && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="mt-6 text-sm text-muted-foreground text-center"
+          >
+            {data.roles.length}/5 selected
+          </motion.p>
+        )}
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background to-transparent">

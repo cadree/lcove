@@ -9,9 +9,9 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Search, MapPin, Briefcase, Users, Loader2, Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserBlocks } from "@/hooks/useUserBlocks";
-import { NewMembersSection } from "@/components/directory/NewMembersSection";
 import { FriendsDrawer } from "@/components/friends/FriendsDrawer";
 import { computeCityKey, computeCityDisplay } from "@/lib/cityNormalization";
+import { dedupeProfilesByUserId } from "@/lib/directoryProfiles";
 
 interface Profile {
   id: string;
@@ -34,12 +34,21 @@ interface CityOption {
 
 interface UserPassion {
   user_id: string;
-  passions: { name: string } | null;
+  custom_name: string | null;
+  passions: { name: string } | { name: string }[] | null;
 }
 
 interface UserSkill {
   user_id: string;
   skills: { name: string } | null;
+}
+
+function passionLabel(row: UserPassion): string | null {
+  const custom = row.custom_name?.trim();
+  if (custom) return custom;
+  const related = Array.isArray(row.passions) ? row.passions[0] : row.passions;
+  const name = related?.name?.trim();
+  return name || null;
 }
 
 const Directory = () => {
@@ -72,7 +81,7 @@ const Directory = () => {
     // Fetch user passions with passion names
     const { data: passionsData } = await supabase
       .from('user_passions')
-      .select('user_id, passions(name)');
+      .select('user_id, custom_name, passions(name)');
     
     // Fetch user skills with skill names
     const { data: skillsData } = await supabase
@@ -83,11 +92,11 @@ const Directory = () => {
     const passionsByUser = new Map<string, string[]>();
     if (passionsData) {
       (passionsData as UserPassion[]).forEach(up => {
-        if (up.passions?.name) {
-          const existing = passionsByUser.get(up.user_id) || [];
-          existing.push(up.passions.name);
-          passionsByUser.set(up.user_id, existing);
-        }
+        const name = passionLabel(up);
+        if (!name) return;
+        const existing = passionsByUser.get(up.user_id) || [];
+        existing.push(name);
+        passionsByUser.set(up.user_id, existing);
       });
     }
     
@@ -110,7 +119,7 @@ const Directory = () => {
       skills: skillsByUser.get(profile.user_id) || []
     }));
     
-    setProfiles(profilesWithDetails as Profile[]);
+    setProfiles(dedupeProfilesByUserId(profilesWithDetails as Profile[]));
     setLoading(false);
   };
 
@@ -238,9 +247,6 @@ const Directory = () => {
           ))}
         </motion.div>
 
-        {/* New Members Section */}
-        {!loading && <NewMembersSection profiles={profiles} />}
-
         {/* Loading State */}
         {loading && (
           <div className="flex items-center justify-center py-12">
@@ -271,9 +277,14 @@ const Directory = () => {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
                     <h3 className="font-display text-lg font-medium text-foreground truncate group-hover:text-primary transition-colors">
                       {profile.display_name || 'Anonymous'}
                     </h3>
+                    {profile.created_at && Date.now() - new Date(profile.created_at).getTime() < 14 * 24 * 60 * 60 * 1000 && (
+                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-primary">New</span>
+                    )}
+                  </div>
                     {getProfileCityDisplay(profile) && (
                       <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
                         <MapPin className="w-3 h-3" />

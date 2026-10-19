@@ -117,6 +117,7 @@ export function usePosts() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['profile-posts'] });
       toast.success('Post created!');
     },
     onError: (error) => {
@@ -188,6 +189,7 @@ export function usePosts() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['profile-posts'] });
       toast.success('Post deleted');
     },
     onError: () => {

@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "typecheck": "tsc -b --pretty false",
     "preview": "vite preview",
-    "test:webhook": "node scripts/stripe-webhook-fixtures.test.mjs"
+    "test:webhook": "node scripts/stripe-webhook-fixtures.test.mjs",
+    "test:unit": "node --experimental-strip-types --test src/lib/directoryProfiles.test.ts src/lib/onboardingPassions.test.ts src/lib/resendCooldown.test.ts src/lib/profilePosts.test.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.1",

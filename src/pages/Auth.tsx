@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { PENDING_SIGNUP_KEY, applyPendingSignupProfile } from '@/lib/pendingSignup';
+import { getAuthRedirectUrl } from '@/lib/capacitorStorage';
+import { resendCooldownRemaining } from '@/lib/resendCooldown';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { logAuthEvent, logAuthError } from '@/lib/authDebug';
@@ -15,7 +17,7 @@ import etherBearLogo from '@/assets/ether-bear-logo.png';
 
 const signupSchema = z.object({
   email: z.string().email('Please enter a valid email').max(255),
-  password: z.string().min(6, 'Password must be at least 6 characters').max(100),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(100),
   displayName: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name must be less than 50 characters'),
   phone: z.string().optional().refine(val => !val || /^[\d\s\-+()]*$/.test(val), 'Please enter a valid phone number'),
 });
@@ -30,7 +32,7 @@ const emailSchema = z.object({
 });
 
 const passwordSchema = z.object({
-  password: z.string().min(6, 'Password must be at least 6 characters').max(100),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(100),
 });
 
 type AuthMode = 'login' | 'signup' | 'forgot' | 'reset' | 'confirm-email';
@@ -89,7 +91,7 @@ const getAuthErrorMessage = (error: Error): { title: string; description: string
   if (message.includes('password') && message.includes('weak')) {
     return {
       title: 'Weak Password',
-      description: 'Please choose a stronger password with at least 6 characters.',
+      description: 'Please choose a stronger password with at least 8 characters.',
     };
   }
   
@@ -114,6 +116,9 @@ const Auth = () => {
   const [errors, setErrors] = useState<{ email?: string; password?: string; displayName?: string; phone?: string }>({});
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [confirmationSentAt, setConfirmationSentAt] = useState<number | null>(null);
+  const [resendNow, setResendNow] = useState(() => Date.now());
+  const [isResending, setIsResending] = useState(false);
 
   const { signIn, signUp, user, resetPassword, updatePassword } = useAuth();
   const navigate = useNavigate();
@@ -132,6 +137,36 @@ const Auth = () => {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  useEffect(() => {
+    if (confirmationSentAt == null) return;
+    setResendNow(Date.now());
+    const id = window.setInterval(() => setResendNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [confirmationSentAt]);
+
+  const resendWaitMs = resendCooldownRemaining(confirmationSentAt, resendNow);
+
+  const handleResendConfirmation = async () => {
+    if (resendWaitMs > 0 || isResending || !email) return;
+    setIsResending(true);
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: getAuthRedirectUrl('/auth?confirmed=1') },
+    });
+    setIsResending(false);
+    if (error) {
+      const { title, description } = getAuthErrorMessage(error);
+      toast({ title, description, variant: 'destructive' });
+      return;
+    }
+    setConfirmationSentAt(Date.now());
+    toast({
+      title: 'Email sent',
+      description: 'We sent another confirmation link.',
+    });
+  };
 
   // Log platform info on mount. mode is read from a ref so this stays mount-only.
   const modeRef = useRef(mode);
@@ -260,6 +295,7 @@ const Auth = () => {
             displayName: displayName.trim(),
             phone: phone.trim(),
           }));
+          setConfirmationSentAt(Date.now());
           setMode('confirm-email');
         } else {
           logAuthEvent('Signup successful');
@@ -323,7 +359,7 @@ const Auth = () => {
 
   const getSubtitle = () => {
     switch (mode) {
-      case 'login': return 'Sign in';
+      case 'login': return 'Log in';
       case 'signup': return 'Create an account. Free to join.';
       case 'forgot': return resetEmailSent ? 'Check your inbox' : 'Enter your email to reset';
       case 'reset': return 'Create your new password';
@@ -398,7 +434,7 @@ const Auth = () => {
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                Log In
+                Log in
               </button>
               <button
                 onClick={() => setMode('signup')}
@@ -435,6 +471,17 @@ const Auth = () => {
                 We sent a confirmation link to <span className="text-primary">{email}</span>.
                 Open it to finish creating your account. You will continue onboarding after you confirm.
               </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handleResendConfirmation()}
+                disabled={isResending || resendWaitMs > 0}
+                className="w-full mb-3"
+              >
+                {resendWaitMs > 0
+                  ? `Resend email (${Math.ceil(resendWaitMs / 1000)}s)`
+                  : 'Resend email'}
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => setMode('login')}
@@ -545,10 +592,13 @@ const Auth = () => {
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       type={showPassword ? 'text' : 'password'}
-                      placeholder={mode === 'reset' ? 'New password' : 'Password'}
+                      placeholder={mode === 'reset' ? 'New password *' : 'Password *'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="pl-11 pr-11 h-12 bg-input border-border focus:border-primary"
+                      required
+                      minLength={mode === 'login' ? 6 : 8}
+                      aria-describedby={mode === 'signup' || mode === 'reset' ? 'password-rules' : undefined}
                     />
                     <button
                       type="button"
@@ -558,6 +608,11 @@ const Auth = () => {
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
+                  {(mode === 'signup' || mode === 'reset') && (
+                    <p id="password-rules" className="text-xs text-muted-foreground pl-1">
+                      At least 8 characters.
+                    </p>
+                  )}
                   {errors.password && (
                     <p className="text-sm text-destructive">{errors.password}</p>
                   )}
@@ -582,7 +637,7 @@ const Auth = () => {
                   </>
                 ) : (
                   <>
-                    {mode === 'login' && 'Enter'}
+                    {mode === 'login' && 'Log in'}
                     {mode === 'signup' && 'Begin Journey'}
                     {mode === 'forgot' && 'Send Reset Link'}
                     {mode === 'reset' && 'Update Password'}
