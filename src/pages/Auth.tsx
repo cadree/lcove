@@ -619,13 +619,13 @@ const Auth = () => {
               <Button
                 type="submit"
                 disabled={isLoading || !isOnline}
-                className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-medium glow-pink"
+                className="w-full h-12 font-medium"
               >
                 {isLoading ? (
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                    className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full"
+                    className="w-5 h-5 border-2 border-[#0A0A0A]/30 border-t-[#0A0A0A] rounded-full"
                   />
                 ) : !isOnline ? (
                   <>

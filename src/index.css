@@ -701,17 +701,31 @@
   filter: drop-shadow(0 6px 14px rgba(60, 40, 30, 0.28));
 }
 
-/* Pale neon on bone is about 1.5:1. Light mode keeps the glow on an ink plate. */
+/* Light mode uses a deeper magenta of the same glyphs. The neon cutout stays for dark and the splash. */
 .ether-mark {
-  display: inline-flex;
+  display: inline-grid;
   aspect-ratio: 1214 / 389;
   line-height: 0;
-  padding: 4px 8px;
-  border-radius: 14px;
 }
 
-.light .ether-mark {
-  background: #08080a;
+.ether-mark img {
+  grid-area: 1 / 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.ether-mark .ether-wordmark-light {
+  display: none;
+}
+
+.light .ether-mark .ether-wordmark-dark {
+  display: none;
+}
+
+.light .ether-mark .ether-wordmark-light {
+  display: block;
 }
 
 .ether-splash {
