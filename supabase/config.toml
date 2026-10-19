@@ -135,8 +135,10 @@ verify_jwt = true
 [functions.verify-artist-subscription]
 verify_jwt = true
 
+# Cron calls this with x-internal-secret. The function checks that header.
+# A gateway JWT check would reject the cron job.
 [functions.process-email-queue]
-verify_jwt = true
+verify_jwt = false
 
 [functions.send-transactional-email]
 verify_jwt = true
@@ -153,6 +155,8 @@ verify_jwt = false
 # Functions that were previously implicit (gateway default verify_jwt = true is not
 # reliable across Lovable deploys). Explicit values match how each is called.
 # auto-event-reminders is cron-only and checks x-internal-secret in the function.
+# process-email-queue, preview-transactional-email, and handle-email-suppression
+# use the same header.
 # track-notification-* are email pixels and redirects; mail clients send no JWT.
 
 [functions.fetch-artist-image]

@@ -3,7 +3,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
-export const HOST_EVENT_FROM_ADDRESS = "events@notify.etherbylcove.com";
+export const HOST_EVENT_FROM_ADDRESS = "events@notifications.etherbylcove.com";
 export const PLATFORM_FALLBACK_REPLY_TO = "support@notify.etherbylcove.com";
 
 export interface HostIdentity {

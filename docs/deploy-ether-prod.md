@@ -49,13 +49,40 @@ Optional names, same **New repository secret** button. Add them when you have th
 | `RESEND_API_KEY` | Resend, API Keys. Also the Auth SMTP password in the next step. |
 | `STRIPE_SECRET_KEY` | Stripe, Developers, API keys. Use the test secret key (`sk_test_...`) until launch. |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret from the step below (`whsec_...`). |
-| `INTERNAL_FUNCTION_SECRET` | A new long random string from a password manager. The reminder cron job must send this same value. |
+| `INTERNAL_FUNCTION_SECRET` | The same value as the ether-prod Vault secret `internal_function_secret` (already created). Database, Vault. The email-queue cron and the reminder cron send it as `x-internal-secret`. |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | Twilio, only if texts are turned on. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | `docs/push-setup.md`. Optional `VAPID_SUBJECT` (`mailto:you@domain`). |
 | `MUX_TOKEN_ID`, `MUX_TOKEN_SECRET` | Mux, only if livestreams are turned on. |
 | `SITE_URL`, `APP_URL` | The site people should land on from email links. See the hosting step. |
+| `EMAIL_FROM` | Optional. The queue From address. If you leave it unset, mail is sent as `notifications@notifications.etherbylcove.com`. |
 | `APPLE_PASS_TYPE_ID`, `APPLE_TEAM_ID`, `GOOGLE_WALLET_ISSUER_ID`, `GOOGLE_WALLET_SERVICE_ACCOUNT_KEY` | Wallet passes, later. Store the Google key as one line. |
-| `LOVABLE_API_KEY`, `LOVABLE_SEND_URL` | Only if email queue, suppression, preview, or project match must still call Lovable. |
+| `LOVABLE_API_KEY` | Only `ai-project-match`. That function is not email. Leave this unset and project matching fails closed. Do not add `LOVABLE_SEND_URL`. Nothing reads it. |
+
+### Run the email queue every minute
+
+`process-email-queue` reads the `auth_emails` and `transactional_emails` queues and sends with Resend. It does not accept a service role JWT. `verify_jwt` is off. The function checks header `x-internal-secret`.
+
+ether-prod already has a Vault secret named `internal_function_secret`. Copy that value into the GitHub secret `INTERNAL_FUNCTION_SECRET` (same **New repository secret** button), then **Re-run all jobs**. Do not paste the value into git, chat, or this file. Do not create a second secret, and do not create `email_queue_service_role_key`.
+
+After that deploy is green:
+
+1. Open [https://supabase.com/dashboard/project/aykopqinnnssxdhxqruo/integrations/cron/jobs](https://supabase.com/dashboard/project/aykopqinnnssxdhxqruo/integrations/cron/jobs).
+2. Click **Create job** (or **Jobs**, then **Create**).
+3. Name: `process-email-queue`
+4. Schedule: `* * * * *` (every minute).
+5. Type: HTTP request, method **POST**.
+6. URL: `https://aykopqinnnssxdhxqruo.supabase.co/functions/v1/process-email-queue`
+7. Add a header. Name: `x-internal-secret`. Value: the Vault secret `internal_function_secret` (Database, Vault). Do not put the service role key in `Authorization`.
+
+The same header belongs on the `auto-event-reminders` cron job if that job is not already sending it.
+
+Resend bounce and complaint webhooks are not connected. To suppress an address, POST JSON to `https://aykopqinnnssxdhxqruo.supabase.co/functions/v1/handle-email-suppression` with the same `x-internal-secret` header:
+
+```json
+{ "email": "person@example.com", "reason": "bounce" }
+```
+
+`reason` is `bounce`, `complaint`, or `unsubscribe`. `message_id` and `metadata` are optional. People who click unsubscribe still hit `handle-email-unsubscribe`, which does not need this header.
 
 ## 3. Free custom SMTP with Resend
 

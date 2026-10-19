@@ -152,7 +152,7 @@ export function EventEmailIdentitySettings({ eventId, hostDisplayName }: Props) 
       <Card className="p-4 bg-muted/30 space-y-1">
         <div className="text-xs text-muted-foreground">Recipients will see:</div>
         <div className="text-sm font-medium">
-          From: <span className="text-primary">{effectiveFromName}</span> &lt;events@notify.etherbylcove.com&gt;
+          From: <span className="text-primary">{effectiveFromName}</span> &lt;events@notifications.etherbylcove.com&gt;
         </div>
         <div className="text-sm">
           Reply-To: {replyTo || "support@notify.etherbylcove.com"}

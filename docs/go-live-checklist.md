@@ -84,7 +84,8 @@ Profile photos are public URLs in `media`. `avatars` is private and exists so `d
 
 Supabase injects `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Set the rest as GitHub Actions secrets. The deploy workflow copies each name that is set and skips the rest. Do not put the values in the repo. The click path is in `docs/deploy-ether-prod.md`.
 
-- `INTERNAL_FUNCTION_SECRET` (a new long random value)
+- `INTERNAL_FUNCTION_SECRET` (the existing Vault secret `internal_function_secret`, not a new value)
+- `EMAIL_FROM` (optional; default `notifications@notifications.etherbylcove.com`)
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET` (from `docs/stripe-setup.md`, for this project's endpoint)
 - `RESEND_API_KEY`
@@ -100,14 +101,14 @@ Supabase injects `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE
 
 Used when those features are turned on: `APPLE_PASS_TYPE_ID`, `APPLE_TEAM_ID`, `GOOGLE_WALLET_ISSUER_ID`, `GOOGLE_WALLET_SERVICE_ACCOUNT_KEY`.
 
-`process-email-queue`, `handle-email-suppression`, `preview-transactional-email`, and `ai-project-match` still read `LOVABLE_API_KEY`. Copy it only if those functions must keep calling Lovable's API. Replacing that provider is a separate change.
+`ai-project-match` still reads `LOVABLE_API_KEY` and calls Lovable's AI gateway. It is not email. Leave the secret unset and that function fails closed. Nothing in the email queue, suppression, or preview path reads `LOVABLE_*`. Do not set `LOVABLE_SEND_URL`.
 
 ## 7. Cron jobs the bundle does not create
 
 `cron` and `vault` objects are owned by `supabase_admin`. A cron command that named this project's URL and a secret would fail in the SQL editor and would put that secret in a file. Create the jobs in the dashboard (Integrations, Cron) after the functions are deployed and the secrets exist. Do not paste the secret into git.
 
-- `process-email-queue`: POST `https://aykopqinnnssxdhxqruo.supabase.co/functions/v1/process-email-queue` on a short interval. The dashboard cron action can send the service role as the bearer token. The email migration's comments describe a vault secret named `email_queue_service_role_key`. Store that in Vault from the dashboard if you use the vault path. Do not write the key in SQL in this repo.
-- `auto-event-reminders`: POST `https://aykopqinnnssxdhxqruo.supabase.co/functions/v1/auto-event-reminders` with header `x-internal-secret` equal to `INTERNAL_FUNCTION_SECRET`. Until they match, the function returns 401 and reminders do not send.
+- `process-email-queue`: POST `https://aykopqinnnssxdhxqruo.supabase.co/functions/v1/process-email-queue` every minute (`* * * * *`). Header `x-internal-secret` is the Vault secret `internal_function_secret`, which already exists on ether-prod. Do not send the service role key. `verify_jwt` is off. The click path is in `docs/deploy-ether-prod.md`.
+- `auto-event-reminders`: POST `https://aykopqinnnssxdhxqruo.supabase.co/functions/v1/auto-event-reminders` with the same `x-internal-secret` header. Until it matches `INTERNAL_FUNCTION_SECRET`, the function returns 401 and reminders do not send.
 
 ## 8. Deploy edge functions
 
@@ -145,4 +146,4 @@ iOS submission still needs a Mac, Xcode, and a paid Apple Developer account. Tha
 
 ## 12. If the new project is wrong
 
-Stop before changing DNS. The old ETHER backup is not the launch database. You can drop objects on `aykopqinnnssxdhxqruo` and run `supabase/bundle/ether-schema.sql` again, or create another empty project and change the ref in this checklist. Leave `INTERNAL_FUNCTION_SECRET` in place if reminders are already scheduled. Removing it only makes `auto-event-reminders` keep returning 401.
+Stop before changing DNS. The old ETHER backup is not the launch database. You can drop objects on `aykopqinnnssxdhxqruo` and run `supabase/bundle/ether-schema.sql` again, or create another empty project and change the ref in this checklist. Leave `INTERNAL_FUNCTION_SECRET` in place if the email queue or reminders are already scheduled. Removing it makes `process-email-queue` and `auto-event-reminders` keep returning 401.

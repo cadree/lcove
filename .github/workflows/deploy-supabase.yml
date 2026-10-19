@@ -78,11 +78,11 @@ jobs:
           APPLE_PASS_TYPE_ID: ${{ secrets.APPLE_PASS_TYPE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APP_URL: ${{ secrets.APP_URL }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           GOOGLE_WALLET_ISSUER_ID: ${{ secrets.GOOGLE_WALLET_ISSUER_ID }}
           GOOGLE_WALLET_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_WALLET_SERVICE_ACCOUNT_KEY }}
           INTERNAL_FUNCTION_SECRET: ${{ secrets.INTERNAL_FUNCTION_SECRET }}
           LOVABLE_API_KEY: ${{ secrets.LOVABLE_API_KEY }}
-          LOVABLE_SEND_URL: ${{ secrets.LOVABLE_SEND_URL }}
           MUX_TOKEN_ID: ${{ secrets.MUX_TOKEN_ID }}
           MUX_TOKEN_SECRET: ${{ secrets.MUX_TOKEN_SECRET }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
