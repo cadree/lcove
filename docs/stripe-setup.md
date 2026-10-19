@@ -50,6 +50,7 @@ If any name is unset, membership checkout, the customer portal, and a subscripti
 5. Listen to these events:
    - `checkout.session.completed`
    - `checkout.session.expired`
+   - `invoice.paid`
    - `invoice.payment_failed`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
@@ -61,20 +62,27 @@ If any name is unset, membership checkout, the customer portal, and a subscripti
 
 - membership (`metadata.type = membership`)
 - fund donation (`metadata.type = fund_donation`) into `donations`
-- network subscription (`metadata.network_id`)
+- network subscription (`metadata.network_id`). The community-fund fee is written to `community_fund_fees`
+- studio booking (`metadata.type = studio_booking`). The booking is marked completed and the community-fund fee is written to `community_fund_fees`
 - store card order (`metadata.type = store_order`): status becomes confirmed and inventory drops once
 - event ticket (`metadata.type = event_ticket`): the ticket is confirmed once; `verify-event-purchase` uses the same database function
 - exclusive track purchase and artist subscription, same as before
 
+`invoice.paid` records the community-fund fee for a later network-subscription invoice. The first invoice is also recorded from `checkout.session.completed`. Both writes use the Stripe invoice id, so the first payment is stored once. Membership, donation, and artist invoices are ignored.
+
 `checkout.session.expired` cancels a pending store order and deletes the platform-fee row that was written before payment. The store page does the same when the buyer returns with `?purchase=cancel`.
+
+`charge.refunded` for a membership invoice reduces `memberships.lifetime_contribution` by the refunded amount, never below 0, sets `memberships.status` to `cancelled`, and cancels the Stripe subscription immediately. The membership row stays. A later `customer.subscription.deleted` for that subscription does not write the membership again. The same event still refunds a store order, donation, or ticket when the payment intent matches one.
 
 ## Fees
 
 These numbers are what the code charges and what the screens say. They live in `src/lib/fees.ts` and `supabase/functions/_shared/fees.mjs` and must stay equal. Credit sales use the same store rate inside `complete_store_credit_purchase`.
 
-- Store sales through Ether checkout: **10%** of the item price. The seller receives 90%. The seller-entered shipping amount and the seller-entered tax line are added in full and are not part of the 10%. The seller sees this before they publish an item.
+- Store sales through Ether checkout: **10%** of the item price (`STORE_PLATFORM_FEE_PERCENT`). The seller receives 90%. The seller-entered shipping amount and the seller-entered tax line are added in full and are not part of the 10%. The seller sees this before they publish an item. This is not the community-fund fee.
 - Shopify products linked from a public `/products.json` list are not sold on Ether. The buy button goes to `https://{shop}/products/{handle}`. Ether does not take a fee on those sales.
-- Event tickets: **no platform fee**. Checkout does not send `application_fee_amount`. The Finance tab and payout settings say that, and they do not show a fee line. When the host has Connect payouts on, the charge is transferred without a platform cut. When Connect is off, the platform still receives the charge until payouts are set up. That is not a fee.
+- Event tickets: **no platform fee** (`EVENT_PLATFORM_FEE_PERCENT` is 0). Checkout does not send `application_fee_amount`. The Finance tab and payout settings say that, and they do not show a fee line. When the host has Connect payouts on, the charge is transferred without a platform cut. When Connect is off, the platform still receives the charge until payouts are set up. That is not a fee.
+- Network subscriptions: **10%** (`COMMUNITY_FUND_FEE_PERCENT`), earmarked for the community fund. When the creator has Connect payouts on, Checkout sends `application_fee_percent` of 10. The creator receives 90%. The fee is inserted into `community_fund_fees` when the payment completes, and `membership_fund_snapshot` adds that dollar amount to the fund total.
+- Studio bookings on Ether checkout: **10%** of the booking price (`COMMUNITY_FUND_FEE_PERCENT`), earmarked for the community fund. Checkout sends `application_fee_amount`. The fee row is written on `checkout.session.completed`, not when the Checkout Session is created. A credit booking records the same percentage as `credits_amount` when the credit payment completes. Credit amounts are not added to the dollar fund total.
 
 ## Shipping and tax
 

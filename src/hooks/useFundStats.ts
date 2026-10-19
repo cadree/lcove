@@ -110,6 +110,17 @@ export function useFundStats() {
           queryClient.invalidateQueries({ queryKey: ['fund-stats'] });
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'community_fund_fees'
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['fund-stats'] });
+        }
+      )
       .subscribe();
 
     return () => {

@@ -13,6 +13,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
+import { COMMUNITY_FUND_FEE_PERCENT } from '@/lib/fees';
 
 interface NetworkAnalyticsProps {
   networkId: string;
@@ -84,9 +85,9 @@ export const NetworkAnalytics = ({ networkId, network }: NetworkAnalyticsProps) 
     new Date(s.created_at) > subDays(new Date(), 30)
   );
 
-  // Estimated monthly revenue (80% of subscription price * active subscribers)
-  const estimatedMonthlyRevenue = network.is_paid 
-    ? (activeSubscriptions.length * network.subscription_price * 0.8).toFixed(2)
+  const creatorShare = (100 - COMMUNITY_FUND_FEE_PERCENT) / 100;
+  const estimatedMonthlyRevenue = network.is_paid
+    ? (activeSubscriptions.length * network.subscription_price * creatorShare).toFixed(2)
     : '0.00';
 
   if (isLoading) {
@@ -123,7 +124,7 @@ export const NetworkAnalytics = ({ networkId, network }: NetworkAnalyticsProps) 
           icon={<DollarSign className="w-5 h-5 text-green-500" />}
           label="Est. Monthly Revenue"
           value={`$${estimatedMonthlyRevenue}`}
-          subtext="After platform fees"
+          subtext={`After the ${COMMUNITY_FUND_FEE_PERCENT}% community fund fee`}
         />
       </div>
 

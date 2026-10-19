@@ -117,10 +117,12 @@ BEGIN
   VALUES (v_buyer, 10, now(), now());
   INSERT INTO public.donations (amount, mode, status) VALUES (5, 'one_time', 'paid');
   INSERT INTO public.donations (amount, mode, status) VALUES (9, 'one_time', 'refunded');
+  INSERT INTO public.community_fund_fees (source_type, source_id, amount, credits_amount)
+  VALUES ('studio_booking', 'booking-scratch', 2, 0);
   v_snapshot := public.membership_fund_snapshot();
   v_collected := (v_snapshot->>'collected')::numeric;
-  IF v_collected <> 15 THEN
-    RAISE EXCEPTION 'fund snapshot collected %, expected 15', v_collected;
+  IF v_collected <> 17 THEN
+    RAISE EXCEPTION 'fund snapshot collected %, expected 17', v_collected;
   END IF;
 
   INSERT INTO public.events (creator_id, title, city, start_date)

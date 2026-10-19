@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { COMMUNITY_FUND_FEE_PERCENT } from "../_shared/fees.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,9 +12,6 @@ const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CREATE-NETWORK-SUBSCRIPTION] ${step}${detailsStr}`);
 };
-
-// Platform fee percentage (20%)
-const PLATFORM_FEE_PERCENT = 20;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -142,17 +140,16 @@ serve(async (req) => {
       },
     };
 
-    // If creator has Stripe Connect set up, add payment split
-    // 80% goes to creator, 20% to platform
+    // Creator receives the rest. COMMUNITY_FUND_FEE_PERCENT is earmarked for the community fund.
     if (network.stripe_connect_account_id && network.payout_enabled) {
       logStep("Adding revenue split", { 
         creatorAccount: network.stripe_connect_account_id,
-        platformFee: `${PLATFORM_FEE_PERCENT}%` 
+        platformFee: `${COMMUNITY_FUND_FEE_PERCENT}%` 
       });
 
       sessionOptions.subscription_data = {
         ...sessionOptions.subscription_data,
-        application_fee_percent: PLATFORM_FEE_PERCENT,
+        application_fee_percent: COMMUNITY_FUND_FEE_PERCENT,
         transfer_data: {
           destination: network.stripe_connect_account_id,
         },

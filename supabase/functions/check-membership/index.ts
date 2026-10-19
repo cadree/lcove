@@ -153,7 +153,7 @@ serve(async (req) => {
         .eq("user_id", user.id);
       return new Response(JSON.stringify({
         subscribed: false,
-        tier,
+        tier: null,
         subscription_end: period.end,
         monthly_amount: monthlyAmount,
         lifetime_contribution: Number(existingMembership?.lifetime_contribution || 0),
@@ -189,8 +189,19 @@ serve(async (req) => {
         lifetimeContribution += (invoice.amount_paid || 0) / 100;
       }
     }
-    // Keep the webhook total if invoice ids are not on this payload yet.
-    if (lifetimeContribution < storedLifetime) lifetimeContribution = storedLifetime;
+    const { data: refundRows, error: refundError } = await supabaseClient
+      .from("membership_payment_refunds")
+      .select("amount")
+      .eq("stripe_subscription_id", membershipSub.id);
+    if (refundError) throw new Error(refundError.message);
+    const refunded = (refundRows || []).reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    // A refund already lowered the stored total. Paid invoices still report
+    // amount_paid, so do not raise the stored total back over the refund.
+    if (refunded > 0) {
+      lifetimeContribution = storedLifetime;
+    } else if (lifetimeContribution < storedLifetime) {
+      lifetimeContribution = storedLifetime;
+    }
 
     // Upsert membership record in database
     const { error: upsertError } = await supabaseClient

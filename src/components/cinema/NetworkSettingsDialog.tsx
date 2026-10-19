@@ -34,6 +34,7 @@ import { Settings, Trash2, CreditCard, CheckCircle, AlertCircle, ExternalLink, L
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { errorMessage } from '@/lib/errorMessage';
+import { COMMUNITY_FUND_FEE_PERCENT } from '@/lib/fees';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
@@ -279,7 +280,7 @@ export const NetworkSettingsDialog = ({
                   onChange={(e) => setSubscriptionPrice(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  You receive 80% of subscription revenue. 20% goes to platform fees.
+                  You receive {100 - COMMUNITY_FUND_FEE_PERCENT}% of subscription revenue. {COMMUNITY_FUND_FEE_PERCENT}% goes to the community fund.
                 </p>
               </div>
             )}
@@ -302,7 +303,7 @@ export const NetworkSettingsDialog = ({
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm text-green-600">
                     <CheckCircle className="w-4 h-4" />
-                    Payouts are enabled! You'll receive 80% of subscription revenue.
+                    Payouts are enabled! You'll receive {100 - COMMUNITY_FUND_FEE_PERCENT}% of subscription revenue.
                   </div>
                   <Button
                     variant="outline"
@@ -355,7 +356,7 @@ export const NetworkSettingsDialog = ({
                 <div className="space-y-3">
                   <p className="text-sm text-muted-foreground">
                     Connect your bank account or debit card to receive payments from subscribers.
-                    You'll receive 80% of all subscription revenue.
+                    You'll receive {100 - COMMUNITY_FUND_FEE_PERCENT}% of subscription revenue. {COMMUNITY_FUND_FEE_PERCENT}% goes to the community fund.
                   </p>
                   <Button
                     onClick={handleSetupPayout}

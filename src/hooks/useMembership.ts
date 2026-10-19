@@ -28,11 +28,25 @@ function membershipFromRow(row: MembershipRow | null): MembershipStatus | null {
   const subscribed = !!tier && (row.status === "active" || row.status === "trialing");
   return {
     subscribed,
-    tier,
+    tier: subscribed ? tier : null,
     subscription_end: row.current_period_end,
     monthly_amount: row.monthly_amount,
     lifetime_contribution: Number(row.lifetime_contribution || 0),
-    grant_eligible: Boolean(row.grant_eligible),
+    grant_eligible: subscribed ? Boolean(row.grant_eligible) : false,
+  };
+}
+
+function membershipFromPayload(data: Partial<MembershipStatus> | null): MembershipStatus | null {
+  if (!data) return null;
+  const tier = data.tier === "community" || data.tier === "elite" ? data.tier : null;
+  const subscribed = Boolean(data.subscribed) && !!tier;
+  return {
+    subscribed,
+    tier: subscribed ? tier : null,
+    subscription_end: data.subscription_end ?? null,
+    monthly_amount: data.monthly_amount ?? null,
+    lifetime_contribution: Number(data.lifetime_contribution || 0),
+    grant_eligible: subscribed ? Boolean(data.grant_eligible) : false,
   };
 }
 
@@ -68,7 +82,7 @@ export const useMembership = () => {
     let row: MembershipStatus | null = null;
     try {
       row = await readOwnMembership(user.id);
-      if (row) setMembership(row);
+      if (row) setMembership(membershipFromPayload(row));
     } catch (error) {
       console.error("Error reading membership row", error);
     }
@@ -91,7 +105,7 @@ export const useMembership = () => {
         if (error) console.error("Error checking membership:", error);
         return;
       }
-      setMembership(data);
+      setMembership(membershipFromPayload(data));
     } catch (error) {
       console.error("Error checking membership:", error);
       if (!row) setMembership(null);

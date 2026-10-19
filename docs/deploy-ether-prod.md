@@ -146,9 +146,10 @@ Use Stripe test mode. Do not use the live account for this step.
 
 1. In the Stripe dashboard, open **Developers**, then **Webhooks**, then **Add endpoint**.
 2. Endpoint URL: `https://aykopqinnnssxdhxqruo.supabase.co/functions/v1/stripe-music-webhook`
-3. Select these six events, not "all events":
+3. Select these events, not "all events":
    - `checkout.session.completed`
    - `checkout.session.expired`
+   - `invoice.paid`
    - `invoice.payment_failed`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
