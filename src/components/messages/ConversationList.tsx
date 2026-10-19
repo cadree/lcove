@@ -115,12 +115,12 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
               key={conv.id}
               type="button"
               onClick={() => onSelect(conv.id)}
-              className="flex w-14 shrink-0 flex-col items-center gap-1"
+              className="flex w-16 shrink-0 flex-col items-center gap-1"
             >
-              <span className="relative">
-                <Avatar className="h-11 w-11 rounded-full">
+              <span className="relative rounded-full bg-[conic-gradient(from_140deg,#FF9FC8,#8B7CFF,#79C3CF,#FF9FC8)] p-[2px]">
+                <Avatar className="h-14 w-14 rounded-full border-2 border-card">
                   <AvatarImage src={getConversationAvatar(conv) || undefined} />
-                  <AvatarFallback className="rounded-full text-xs">{getConversationName(conv).charAt(0)}</AvatarFallback>
+                  <AvatarFallback className="rounded-full font-body text-sm font-extrabold">{getConversationName(conv).charAt(0)}</AvatarFallback>
                 </Avatar>
                 <OnlineIndicator isOnline size="sm" className="absolute bottom-0 right-0" />
               </span>

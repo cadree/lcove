@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { fileCode, nextQuest, questViews, streakFromDays, xpBar, xpLevel } from "./noviQuests.ts";
+import { dailyDecodeCopy, fileCode, nextQuest, questViews, streakFromDays, xpBar, xpLevel } from "./noviQuests.ts";
 
 describe("novi quests", () => {
   it("uses the same level bands as the XP ledger", () => {
@@ -35,5 +35,12 @@ describe("novi quests", () => {
 
   it("builds a file code from the real id", () => {
     assert.equal(fileCode("ab12-cd"), "FILE AB12");
+  });
+
+  it("reports the XP the daily cap actually wrote", () => {
+    assert.match(dailyDecodeCopy(false, 0), /up to 5 XP/);
+    assert.match(dailyDecodeCopy(true, 0), /granted 0 XP/);
+    assert.match(dailyDecodeCopy(true, 5), /5 XP is on the ledger/);
+    assert.match(dailyDecodeCopy(true, 2), /2 XP is on the ledger/);
   });
 });

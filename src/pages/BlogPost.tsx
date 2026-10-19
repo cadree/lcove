@@ -47,8 +47,7 @@ export default function BlogPostPage() {
           onClick={() => {
             const index = window.history.state?.idx;
             if (typeof index === "number" && index > 0) navigate(-1);
-            else if (post) navigate(`/profile/${post.user_id}`);
-            else navigate("/feed");
+            else navigate("/blog");
           }}
         >
           <ArrowLeft className="h-4 w-4" />

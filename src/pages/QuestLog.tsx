@@ -7,7 +7,7 @@ import { SquircleIcon } from "@/components/world/SquircleIcon";
 import { useNoviQuests } from "@/hooks/useNoviQuests";
 import { useEnergy } from "@/hooks/useEnergy";
 import { useCredits } from "@/hooks/useCredits";
-import type { QuestView } from "@/lib/noviQuests";
+import { dailyDecodeCopy, type QuestView } from "@/lib/noviQuests";
 
 const tabs = ["Active", "Daily", "Story", "Done"] as const;
 type Tab = (typeof tabs)[number];
@@ -20,7 +20,7 @@ function visible(tab: Tab, quest: QuestView): boolean {
 }
 
 const QuestLog = () => {
-  const { quests, total, bar, streak, dailyDone, complete } = useNoviQuests();
+  const { quests, total, bar, streak, dailyDone, dailyXp, complete } = useNoviQuests();
   const { energy, currentEnergy } = useEnergy();
   const { balance } = useCredits();
   const [tab, setTab] = useState<Tab>("Active");
@@ -110,7 +110,7 @@ const QuestLog = () => {
                 <span className="mono-label block text-[8px] text-[hsl(var(--scan))]">Daily decode</span>
                 <span className="font-body text-[15px] font-extrabold">Decode today&apos;s symbol</span>
                 <span className="lore block text-[14px] text-muted-foreground">
-                  {dailyDone ? "Decoded. 5 XP is on the ledger." : "One tap files today and writes 5 XP."}
+                  {dailyDecodeCopy(dailyDone, dailyXp)}
                 </span>
               </span>
             </div>

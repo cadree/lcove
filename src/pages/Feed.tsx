@@ -227,7 +227,7 @@ const Feed = () => {
           }} transition={{
             delay: index * 0.05
           }}>
-                  <FeedPost post={post} />
+                  <FeedPost post={post} hero={index === 0 && lane === "for-you"} />
                 </motion.div>)}
             </AnimatePresence>
 

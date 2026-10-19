@@ -111,7 +111,7 @@ const StoriesRow = () => {
         {user && <motion.button whileTap={{
         scale: 0.95
       }} onClick={() => userStories.length > 0 ? handleOpenStory(user.id) : setShowUpload(true)} className="relative shrink-0 group">
-            <div className="w-16 h-16 rounded-full relative">
+            <div className="w-20 h-20 rounded-full relative">
               {/* Glass ring */}
               <div className="absolute inset-0 rounded-full bg-[conic-gradient(from_120deg,#C4142D,#FF9FC8,#C4142D)] p-[2px]">
                 <div className="w-full h-full rounded-full bg-card p-[2px]">
@@ -121,7 +121,7 @@ const StoriesRow = () => {
                 </div>
               </div>
             </div>
-            <span className="text-[10px] text-foreground mt-1.5 block text-center truncate w-16">
+            <span className="text-[10px] text-foreground mt-1.5 block text-center truncate w-20 font-body">
               Your story
             </span>
           </motion.button>}

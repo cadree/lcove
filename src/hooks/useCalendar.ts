@@ -171,12 +171,12 @@ export function useEventWithRSVP(eventId: string) {
       
       if (error) throw error;
 
-      // Get RSVP count
-      const { count } = await supabase
-        .from('event_rsvps')
-        .select('*', { count: 'exact', head: true })
-        .eq('event_id', eventId)
-        .eq('status', 'going');
+      // Headcount bypasses RSVP row visibility. A member only sees their own row.
+      const { data: attendance, error: attendanceError } = await supabase.rpc(
+        'public_event_attendance_count',
+        { p_event_id: eventId },
+      );
+      if (attendanceError) throw attendanceError;
 
       // Get user's RSVP if logged in
       let userRsvp = null;
@@ -203,7 +203,7 @@ export function useEventWithRSVP(eventId: string) {
 
       return {
         ...event,
-        rsvp_count: count || 0,
+        rsvp_count: attendance ?? 0,
         user_rsvp: userRsvp,
         organizer,
       } as CalendarEvent;

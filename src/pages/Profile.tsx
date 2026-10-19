@@ -492,7 +492,6 @@ const Profile = () => {
       >
         {showEffects && (
           <ProfileEffects
-            portal
             grain={customization?.effect_grain}
             scanlines={customization?.effect_scanlines}
             neonGlow={customization?.effect_neon_glow}
@@ -500,6 +499,7 @@ const Profile = () => {
             motionGradient={customization?.effect_motion_gradient}
           />
         )}
+        <div className="relative z-10">
         {!isOwnProfile && (
           <div className="px-5 pt-4 pb-2">
             <Button
@@ -596,6 +596,7 @@ const Profile = () => {
             setSelectedPost(null);
           }}
         />
+        </div>
       </div>
     </PageLayout>
   );

@@ -412,8 +412,8 @@
     border-radius: 22px;
     border: 1px solid color-mix(in srgb, #ff9fc8 60%, transparent);
     background:
-      linear-gradient(160deg, color-mix(in srgb, #ff9fc8 22%, transparent), color-mix(in srgb, #79c3cf 14%, transparent)),
-      hsl(var(--card) / 0.78);
+      linear-gradient(160deg, color-mix(in srgb, #ff9fc8 18%, transparent), color-mix(in srgb, #79c3cf 12%, transparent)),
+      hsl(var(--card));
   }
 
   .holo-card::after {

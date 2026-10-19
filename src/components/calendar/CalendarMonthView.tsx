@@ -62,33 +62,30 @@ export function CalendarMonthView({
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
-    <div className="glass-strong rounded-2xl p-4">
-      {/* Week day headers */}
-      <div className="grid grid-cols-7 gap-1 mb-2">
+    <div className="file-panel p-3">
+      <div className="mb-2 grid grid-cols-7 gap-1">
         {weekDays.map(day => (
-          <div 
-            key={day} 
-            className="text-center text-xs font-medium text-muted-foreground py-2"
+          <div
+            key={day}
+            className="mono-label py-2 text-center text-[8px] text-muted-foreground"
           >
             {day}
           </div>
         ))}
       </div>
 
-      {/* Calendar grid */}
       <div className="grid grid-cols-7 gap-1">
         {calendarDays.map((date, index) => (
           <motion.div
             key={index}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.01 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: index * 0.008 }}
             className={cn(
-              "min-h-[80px] sm:min-h-[100px] rounded-xl p-1 cursor-pointer transition-all duration-200",
-              date ? "hover:bg-accent/30" : "",
-              date && isToday(date) ? "bg-primary/10 ring-1 ring-primary/30" : "",
-              date && selectedDate?.toDateString() === date.toDateString() 
-                ? "bg-accent/50 ring-1 ring-accent" 
+              "min-h-[76px] rounded-[12px] border p-1 sm:min-h-[96px]",
+              date ? "cursor-pointer border-border bg-card/40" : "border-transparent",
+              date && selectedDate?.toDateString() === date.toDateString()
+                ? "border-[hsl(var(--scan))] shadow-[inset_0_0_12px_rgba(121,195,207,0.28)]"
                 : ""
             )}
             onClick={() => date && handleDateClick(date)}
@@ -96,8 +93,8 @@ export function CalendarMonthView({
             {date && (
               <>
                 <span className={cn(
-                  "text-xs font-medium",
-                  isToday(date) ? "text-primary" : "text-foreground"
+                  "inline-flex h-6 w-6 items-center justify-center rounded-full font-body text-[12px] font-extrabold",
+                  isToday(date) ? "bg-[linear-gradient(180deg,#FFD6E8,#FF9FC8)] text-[#0A0A0A]" : "text-foreground"
                 )}>
                   {date.getDate()}
                 </span>

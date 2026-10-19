@@ -62,6 +62,7 @@ const EventsDashboard = lazy(() => import("./pages/EventsDashboard"));
 const EventDetail = lazy(() => import("./pages/EventDetail"));
 const PublicEventPage = lazy(() => import("./pages/PublicEventPage"));
 const BlogPostPage = lazy(() => import("./pages/BlogPost"));
+const BlogIndex = lazy(() => import("./pages/BlogIndex"));
 const EventConfirmation = lazy(() => import("./pages/EventConfirmation"));
 const PublicProjectPage = lazy(() => import("./pages/PublicProjectPage"));
 const PublicClientPortal = lazy(() => import("@/pages/PublicClientPortal"));
@@ -123,6 +124,7 @@ const App = () => (
                 <Route path="/events" element={<Navigate to="/calendar" replace />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/profile/:userId" element={<Profile />} />
+                <Route path="/blog" element={<BlogIndex />} />
                 <Route path="/blog/:blogId" element={<BlogPostPage />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/messages" element={<Messages />} />

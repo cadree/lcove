@@ -122,6 +122,13 @@ export function nextQuest(quests: QuestView[]): QuestView | null {
   return quests.find((quest) => quest.state !== "decrypted") ?? null;
 }
 
+/** Copy for the daily decode tile. granted is the XP row that was written. */
+export function dailyDecodeCopy(done: boolean, granted: number): string {
+  if (!done) return "One tap files today. The ledger writes up to 5 XP.";
+  if (granted <= 0) return "Decoded. The daily cap granted 0 XP.";
+  return `Decoded. ${granted} XP is on the ledger.`;
+}
+
 export function fileCode(id: string): string {
   const compact = id.replace(/[^a-z0-9]/gi, "").slice(0, 4).toUpperCase();
   return `FILE ${compact.padEnd(4, "0")}`;

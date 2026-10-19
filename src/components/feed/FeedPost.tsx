@@ -37,7 +37,7 @@ interface Post {
   };
 }
 
-const FeedPost = ({ post }: { post: Post }) => {
+const FeedPost = ({ post, hero = false }: { post: Post; hero?: boolean }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { deletePost } = usePosts();
@@ -97,7 +97,9 @@ const FeedPost = ({ post }: { post: Post }) => {
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       className="file-panel overflow-hidden"
     >
-      <p className="mono-label px-4 pt-3 text-[8px] text-[hsl(var(--brand))]">{fileCode(post.id)}</p>
+      {!(post.media_url && post.media_type !== "text") && (
+        <p className="mono-label px-4 pt-3 text-[8px] text-[hsl(var(--brand))]">{fileCode(post.id)}</p>
+      )}
       {/* Header */}
       <header className="flex items-center justify-between p-4 sm:p-5">
         <div className="flex items-center gap-3">
@@ -174,7 +176,10 @@ const FeedPost = ({ post }: { post: Post }) => {
 
       {/* Media */}
       {post.media_url && post.media_type !== 'text' && (
-        <div className="relative bg-muted/10 aspect-square">
+        <div className={`relative bg-muted/10 ${hero ? "aspect-[3/4]" : "aspect-square"}`}>
+          <span className="mono-label absolute left-3 top-3 z-[1] rounded-full bg-black/55 px-2 py-1 text-[8px] text-white">
+            {fileCode(post.id)}
+          </span>
           {post.media_type === 'video' ? (
             <div className="relative h-full">
               <video

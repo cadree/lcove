@@ -29,11 +29,11 @@ export const ProfileEffects = ({
   const effect = (
     <div
       className={cn(
-        "pointer-events-none inset-0",
-        portal ? "fixed z-40" : "absolute overflow-hidden",
+        "pointer-events-none inset-0 z-0",
+        portal ? "fixed" : "absolute overflow-hidden",
         className,
       )}
-      style={portal ? { position: "fixed", inset: 0, zIndex: 40 } : undefined}
+      style={portal ? { position: "fixed", inset: 0, zIndex: 0 } : undefined}
       aria-hidden
       data-profile-effects=""
     >
@@ -42,11 +42,9 @@ export const ProfileEffects = ({
           className="absolute inset-0"
           data-effect="grain"
           style={{
-            opacity: 0.95,
-            mixBlendMode: "screen",
-            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.95) 0.7px, transparent 0.85px), radial-gradient(circle, rgba(255,255,255,0.55) 0.6px, transparent 0.75px)",
-            backgroundSize: "3px 3px, 5px 4px",
-            backgroundPosition: "0 0, 1px 2px",
+            opacity: 0.18,
+            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.55) 0.6px, transparent 0.8px)",
+            backgroundSize: "3px 3px",
           }}
         />
       )}
@@ -56,7 +54,8 @@ export const ProfileEffects = ({
           className="absolute inset-0"
           data-effect="scanlines"
           style={{
-            backgroundImage: "repeating-linear-gradient(to bottom, rgba(255,255,255,0.55) 0px, rgba(255,255,255,0.55) 2px, transparent 2px, transparent 6px)",
+            opacity: 0.22,
+            backgroundImage: "repeating-linear-gradient(to bottom, rgba(0,0,0,0.28) 0px, rgba(0,0,0,0.28) 1px, transparent 1px, transparent 4px)",
           }}
         />
       )}
@@ -66,15 +65,15 @@ export const ProfileEffects = ({
           className="absolute inset-3"
           data-effect="neon"
           style={{
-            border: "3px solid #00ff9f",
+            border: "2px solid rgba(0,255,159,0.85)",
             borderRadius: 16,
-            boxShadow: "0 0 28px #00ff9f, inset 0 0 48px rgba(0,255,159,0.8), inset 0 0 140px rgba(0,255,159,0.35)",
+            boxShadow: "0 0 18px rgba(0,255,159,0.45)",
           }}
           animate={prefersReducedMotion ? undefined : {
             boxShadow: [
-              "0 0 28px #00ff9f, inset 0 0 48px rgba(0,255,159,0.8), inset 0 0 140px rgba(0,255,159,0.35)",
-              "0 0 48px #00ff9f, inset 0 0 80px rgba(0,255,159,0.95), inset 0 0 180px rgba(0,255,159,0.5)",
-              "0 0 28px #00ff9f, inset 0 0 48px rgba(0,255,159,0.8), inset 0 0 140px rgba(0,255,159,0.35)",
+              "0 0 18px rgba(0,255,159,0.35)",
+              "0 0 28px rgba(0,255,159,0.65)",
+              "0 0 18px rgba(0,255,159,0.35)",
             ],
           }}
           transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
@@ -86,9 +85,8 @@ export const ProfileEffects = ({
           className="absolute inset-0"
           data-effect="holographic"
           style={{
-            opacity: 0.72,
-            mixBlendMode: "screen",
-            background: "linear-gradient(115deg, #ff4d8d 0%, #7af 28%, #0ff 52%, #df0 76%, #f6f 100%)",
+            opacity: 0.16,
+            background: "linear-gradient(115deg, rgba(255,77,141,0.9) 0%, rgba(119,170,255,0.9) 28%, rgba(0,255,255,0.9) 52%, rgba(221,255,0,0.9) 76%, rgba(255,102,255,0.9) 100%)",
             backgroundSize: "220% 220%",
           }}
           animate={prefersReducedMotion ? undefined : { backgroundPosition: ["0% 0%", "100% 100%", "0% 0%"] }}
@@ -101,9 +99,8 @@ export const ProfileEffects = ({
           className="absolute inset-0"
           data-effect="motion"
           style={{
-            opacity: 0.7,
-            mixBlendMode: "screen",
-            background: "linear-gradient(120deg, #00ff9f 0%, #ff00aa 46%, #00c2ff 100%)",
+            opacity: 0.14,
+            background: "linear-gradient(120deg, rgba(0,255,159,0.9) 0%, rgba(255,0,170,0.9) 46%, rgba(0,194,255,0.9) 100%)",
             backgroundSize: "200% 200%",
           }}
           animate={prefersReducedMotion ? undefined : { backgroundPosition: ["0% 40%", "100% 60%", "0% 40%"] }}

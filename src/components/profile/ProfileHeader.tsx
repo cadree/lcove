@@ -166,7 +166,7 @@ export function ProfileHeader({
         <div className="relative z-[1] -mt-10 px-4 pb-4">
         <div className="flex items-end gap-3">
           <div className="group relative shrink-0">
-            <Avatar className="h-[72px] w-[72px] rounded-full border-2 border-transparent bg-[conic-gradient(from_120deg,#FF9FC8,#79C3CF,#FF9FC8)] p-[2px]">
+            <Avatar className="h-24 w-24 rounded-full border-[3px] border-transparent bg-[conic-gradient(from_140deg,#FF9FC8,#C4142D,#79C3CF,#FF9FC8)] p-[3px] shadow-[0_0_24px_rgba(255,159,200,0.45)]">
               <AvatarImage src={avatarUrl || undefined} />
               <AvatarFallback className="rounded-full bg-muted font-body text-xl font-bold text-foreground">
                 {displayName.charAt(0).toUpperCase()}
@@ -231,27 +231,27 @@ export function ProfileHeader({
           </Link>
         )}
 
-        <div className="mt-3 grid grid-cols-3 border-y border-border py-2">
-          <div className="min-h-11 text-center">
-            <span className="block font-body text-[18px] font-extrabold text-foreground">{postCount}</span>
-            <span className="mono-label text-[9px] text-muted-foreground">Posts</span>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="file-panel min-h-11 rounded-[12px] px-2 py-2 text-center">
+            <span className="block font-body text-[19px] font-extrabold text-foreground">{postCount}</span>
+            <span className="mono-label text-[8px] text-muted-foreground">Posts</span>
           </div>
           {isOwnProfile ? (
             <FriendsDrawer>
-              <button type="button" className="min-h-11 w-full text-center">
-                <span className="block font-body text-[18px] font-extrabold text-foreground">{friendsCount}</span>
-                <span className="mono-label text-[9px] text-muted-foreground">Friends</span>
+              <button type="button" className="file-panel min-h-11 w-full rounded-[12px] px-2 py-2 text-center">
+                <span className="block font-body text-[19px] font-extrabold text-foreground">{friendsCount}</span>
+                <span className="mono-label text-[8px] text-muted-foreground">Friends</span>
               </button>
             </FriendsDrawer>
           ) : (
-            <div className="min-h-11 text-center">
-              <span className="block font-body text-[18px] font-extrabold text-foreground">{friendsCount}</span>
-              <span className="mono-label text-[9px] text-muted-foreground">Friends</span>
+            <div className="file-panel min-h-11 rounded-[12px] px-2 py-2 text-center">
+              <span className="block font-body text-[19px] font-extrabold text-foreground">{friendsCount}</span>
+              <span className="mono-label text-[8px] text-muted-foreground">Friends</span>
             </div>
           )}
-          <div className="min-h-11 text-center">
-            <span className="block font-body text-[18px] font-extrabold text-foreground">{projectCount}</span>
-            <span className="mono-label text-[9px] text-muted-foreground">Projects</span>
+          <div className="file-panel min-h-11 rounded-[12px] px-2 py-2 text-center">
+            <span className="block font-body text-[19px] font-extrabold text-foreground">{projectCount}</span>
+            <span className="mono-label text-[8px] text-muted-foreground">Projects</span>
           </div>
         </div>
 

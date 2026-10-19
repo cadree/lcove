@@ -8,7 +8,10 @@ import { shotSessionEnabled } from "@/lib/shotSession";
 export interface NoviBoard {
   total: number;
   level: number;
+  /** Consecutive days, same key signed in or out. */
+  streak: number;
   streakDays: string[];
+  dailyXp: number;
   bookOpened: boolean;
   dailyDone: boolean;
   postCount: number;
@@ -20,7 +23,9 @@ export interface NoviBoard {
 const emptyBoard: NoviBoard = {
   total: 0,
   level: 1,
+  streak: 0,
   streakDays: [],
+  dailyXp: 0,
   bookOpened: false,
   dailyDone: false,
   postCount: 0,
@@ -28,6 +33,18 @@ const emptyBoard: NoviBoard = {
   completedProjects: 0,
   profileReady: false,
 };
+
+function normalizeBoard(data: Partial<NoviBoard> | null | undefined): NoviBoard {
+  const raw = data ?? {};
+  const streakDays = Array.isArray(raw.streakDays) ? raw.streakDays : [];
+  return {
+    ...emptyBoard,
+    ...raw,
+    streak: Number(raw.streak ?? 0),
+    streakDays,
+    dailyXp: Number(raw.dailyXp ?? 0),
+  };
+}
 
 function shotBoard(): NoviBoard {
   return {
@@ -48,7 +65,7 @@ export function useNoviQuests() {
       if (shotSessionEnabled()) return shotBoard();
       try {
         const data = await callRpc<NoviBoard>("novi_board");
-        return { ...emptyBoard, ...data, streakDays: data?.streakDays ?? [] };
+        return normalizeBoard(data);
       } catch {
         return emptyBoard;
       }
@@ -72,7 +89,7 @@ export function useNoviQuests() {
       return callRpc<NoviBoard>("complete_novi_quest", { p_quest: questId });
     },
     onSuccess: (data) => {
-      if (data) queryClient.setQueryData(["novi-board", user?.id], { ...emptyBoard, ...data, streakDays: data.streakDays ?? [] });
+      if (data) queryClient.setQueryData(["novi-board", user?.id], normalizeBoard(data));
       queryClient.invalidateQueries({ queryKey: ["my-xp", user?.id] });
     },
   });
@@ -91,7 +108,8 @@ export function useNoviQuests() {
     quests,
     total: board.total,
     bar: xpBar(board.total),
-    streak: streakFromDays(board.streakDays, today),
+    streak: board.streakDays.length > 0 ? streakFromDays(board.streakDays, today) : board.streak,
+    dailyXp: board.dailyXp,
     dailyDone: board.dailyDone,
     isLoading: boardQuery.isLoading,
     complete,

@@ -39,7 +39,7 @@ const StoryAvatar = ({
       onClick={onClick}
       className="relative shrink-0 group"
     >
-      <div className="w-16 h-16 rounded-full relative">
+      <div className="h-20 w-20 rounded-full relative">
         {/* Animated gradient ring */}
         <div 
           className="absolute inset-0 rounded-full p-[2px]"
@@ -99,7 +99,7 @@ const StoryAvatar = ({
       </div>
 
       {/* Username */}
-      <span className="text-[10px] text-foreground mt-1.5 block text-center truncate w-16">
+      <span className="mt-1.5 block w-20 truncate text-center font-body text-[10px] text-foreground">
         {displayName.split(' ')[0]}
       </span>
     </motion.button>
