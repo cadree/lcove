@@ -7,6 +7,7 @@ import { ProjectAcceptedDialog } from '@/components/projects/ProjectAcceptedDial
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { dayDividerLabel } from '@/lib/calendarDay';
 
 const NOTIFICATION_TYPES: { value: string; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -49,26 +50,13 @@ export const NotificationList: React.FC = () => {
     ? notifications
     : notifications.filter(n => n.type === activeTab);
 
-  // Group notifications by date
+  // Group notifications by the viewer's local calendar day.
   const groupedNotifications = React.useMemo(() => {
     const groups: { [key: string]: typeof notifications } = {};
-    const today = new Date().toDateString();
-    const yesterday = new Date(Date.now() - 86400000).toDateString();
+    const now = new Date();
 
     filteredNotifications.forEach(notification => {
-      const date = new Date(notification.created_at).toDateString();
-      let key: string;
-
-      if (date === today) {
-        key = 'Today';
-      } else if (date === yesterday) {
-        key = 'Yesterday';
-      } else {
-        key = new Date(notification.created_at).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-        });
-      }
+      const key = dayDividerLabel(notification.created_at, { now, older: 'short' });
 
       if (!groups[key]) {
         groups[key] = [];

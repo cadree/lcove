@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
+import { format } from 'date-fns';
+import { calendarDayKey, dayDividerLabel, localCalendarDayDelta } from '@/lib/calendarDay';
 import { 
   ArrowLeft, MoreVertical, Trash2, 
   Check, CheckCheck, Play, Pause, Image as ImageIcon,
@@ -102,8 +103,10 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   }, [markAsRead, messages]);
 
   const formatMessageTime = (date: Date) => {
-    if (isToday(date)) return format(date, 'h:mm a');
-    if (isYesterday(date)) return 'Yesterday ' + format(date, 'h:mm a');
+    const time = format(date, 'h:mm a');
+    const delta = localCalendarDayDelta(date, new Date());
+    if (delta === 0) return time;
+    if (delta === -1) return `Yesterday ${time}`;
     return format(date, 'MMM d, h:mm a');
   };
 
@@ -112,7 +115,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
     let currentDate = '';
 
     messages.forEach(msg => {
-      const msgDate = format(new Date(msg.created_at), 'yyyy-MM-dd');
+      const msgDate = calendarDayKey(msg.created_at);
       if (msgDate !== currentDate) {
         currentDate = msgDate;
         groups.push({ date: msgDate, messages: [msg] });
@@ -122,13 +125,6 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
     });
 
     return groups;
-  };
-
-  const formatDateHeader = (dateStr: string) => {
-    const date = new Date(dateStr);
-    if (isToday(date)) return 'Today';
-    if (isYesterday(date)) return 'Yesterday';
-    return format(date, 'MMMM d, yyyy');
   };
 
   const handleSend = async (content?: string, file?: File, mediaType?: 'image' | 'video' | 'audio') => {
@@ -307,7 +303,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
               {/* Date Header */}
               <div className="flex items-center justify-center my-4">
                 <span className="px-3 py-1 rounded-full bg-muted/50 text-xs text-muted-foreground">
-                  {formatDateHeader(group.date)}
+                  {dayDividerLabel(group.messages[0].created_at)}
                 </span>
               </div>
 
