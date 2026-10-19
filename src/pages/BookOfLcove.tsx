@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, Menu, X, Star, StickyNote } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, Menu, Star, StickyNote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -104,7 +104,7 @@ const BookOfLcove: React.FC = () => {
         <div className="text-center space-y-4">
           <h1 className="text-2xl font-serif">The Book of LCOVE</h1>
           <p className="text-muted-foreground">Please sign in to read</p>
-          <Button onClick={() => navigate('/auth')}>Sign In</Button>
+          <Button onClick={() => navigate('/auth')}>Sign in</Button>
         </div>
       </div>
     );
@@ -145,18 +145,27 @@ const BookOfLcove: React.FC = () => {
 
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-[#0d0a08] to-transparent pb-8 pt-4 px-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <X className="h-5 w-5" />
+        <div className="max-w-4xl mx-auto flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0"
+            aria-label="Back"
+            onClick={() => {
+              if (window.history.length > 1) navigate(-1);
+              else navigate('/profile');
+            }}
+          >
+            <ChevronLeft className="h-5 w-5" />
           </Button>
           
-          <div className="text-center">
-            <p className="text-xs text-muted-foreground uppercase tracking-widest">
+          <div className="min-w-0 flex-1 text-center">
+            <p className="truncate text-xs text-muted-foreground uppercase tracking-widest">
               {currentChapter?.title || 'The Book of LCOVE'}
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1">
             <Button variant="ghost" size="icon" onClick={toggleBookmark}>
               {isPageBookmarked(currentPage) ? (
                 <BookmarkCheck className="h-5 w-5 text-primary" />
@@ -264,7 +273,7 @@ const BookOfLcove: React.FC = () => {
                 )}
                 
                 {currentPageData.title && (
-                  <h1 className="text-3xl md:text-4xl font-serif text-center leading-tight">
+                  <h1 className="text-2xl sm:text-4xl font-serif text-center leading-tight text-balance">
                     {currentPageData.title}
                   </h1>
                 )}

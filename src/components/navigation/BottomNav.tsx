@@ -10,10 +10,10 @@ const tabs = [
     label: "Explore",
     to: "/explore",
     icon: Compass,
-    match: (path: string) => ["/explore", "/directory", "/portfolios", "/community", "/events", "/calendar"].includes(path),
+    match: (path: string) => ["/explore", "/directory", "/portfolios", "/community", "/events"].includes(path),
   },
   { id: "messages", label: "Messages", to: "/messages", icon: MessageCircle, match: (path: string) => path.startsWith("/messages") },
-  { id: "profile", label: "Profile", to: "/profile", icon: User, match: (path: string) => path.startsWith("/profile") },
+  { id: "profile", label: "Profile", to: "/profile", icon: User, match: (path: string) => path === "/profile" },
 ];
 
 const BottomNav = () => {

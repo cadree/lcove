@@ -1,10 +1,27 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Store, Calendar, Heart, Crown, BookOpen, FolderKanban, Rocket, LayoutDashboard } from 'lucide-react';
+import { Store, Calendar, Heart, FolderKanban, Rocket, LayoutDashboard, BookOpen, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ProfileQuickLinksProps {
   isOwner: boolean;
+}
+
+export function ProfileBookEntry() {
+  return (
+    <div className="px-5 pt-4">
+      <Link
+        to="/book"
+        className="flex min-h-11 items-center gap-3 rounded-2xl border border-border bg-card px-4 py-4 hover:bg-accent/40 transition-colors"
+      >
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/15">
+          <BookOpen className="h-5 w-5 text-primary" />
+        </div>
+        <span className="min-w-0 flex-1 font-display text-lg text-foreground">The Book of LCOVE</span>
+        <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+      </Link>
+    </div>
+  );
 }
 
 export function ProfileQuickLinks({ isOwner }: ProfileQuickLinksProps) {
@@ -74,18 +91,6 @@ export function ProfileQuickLinks({ isOwner }: ProfileQuickLinksProps) {
           );
         })}
       </div>
-
-      {/* Book Link */}
-      <Link 
-        to="/book" 
-        className={cn(
-          "mt-3 glass-subtle rounded-xl p-3 flex items-center justify-center gap-2",
-          "hover:bg-accent/20 transition-colors"
-        )}
-      >
-        <BookOpen className="w-5 h-5 text-foreground" />
-        <span className="text-sm text-muted-foreground">The Book of LCOVE</span>
-      </Link>
     </motion.div>
   );
 }

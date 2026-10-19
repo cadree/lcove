@@ -6,6 +6,7 @@ import {
   MessageCircle, Building2, Flag, Shirt, Film
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { cityMatchesQuery, citiesShareGroup } from '@/lib/cityNormalization';
 import PageLayout from '@/components/layout/PageLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -132,7 +133,7 @@ const Admin: React.FC = () => {
       const matchesSearch = 
         u.display_name?.toLowerCase().includes(search.toLowerCase()) ||
         u.email?.toLowerCase().includes(search.toLowerCase()) ||
-        u.city?.toLowerCase().includes(search.toLowerCase()) ||
+        cityMatchesQuery(u.city, search) ||
         u.phone?.toLowerCase().includes(search.toLowerCase());
       
       const matchesMindset = mindsetFilter === 'all' || 
@@ -210,7 +211,7 @@ const Admin: React.FC = () => {
       } else if (messageTarget === 'mindset_level') {
         targetUserIds = adminUserData.filter(u => u.mindset_level === parseInt(messageTargetValue)).map(u => u.user_id);
       } else if (messageTarget === 'city') {
-        targetUserIds = adminUserData.filter(u => u.city?.toLowerCase() === messageTargetValue.toLowerCase()).map(u => u.user_id);
+        targetUserIds = adminUserData.filter(u => citiesShareGroup(u.city, messageTargetValue)).map(u => u.user_id);
       }
       
       bulkAwardCredits.mutate({

@@ -359,7 +359,7 @@ const Auth = () => {
 
   const getSubtitle = () => {
     switch (mode) {
-      case 'login': return 'Log in';
+      case 'login': return 'Sign in';
       case 'signup': return 'Create an account. Free to join.';
       case 'forgot': return resetEmailSent ? 'Check your inbox' : 'Enter your email to reset';
       case 'reset': return 'Create your new password';
@@ -434,7 +434,7 @@ const Auth = () => {
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                Log in
+                Sign in
               </button>
               <button
                 onClick={() => setMode('signup')}
@@ -444,7 +444,7 @@ const Auth = () => {
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                Sign Up
+                Join
               </button>
             </div>
           )}
@@ -637,8 +637,8 @@ const Auth = () => {
                   </>
                 ) : (
                   <>
-                    {mode === 'login' && 'Log in'}
-                    {mode === 'signup' && 'Begin Journey'}
+                    {mode === 'login' && 'Sign in'}
+                    {mode === 'signup' && 'Join'}
                     {mode === 'forgot' && 'Send Reset Link'}
                     {mode === 'reset' && 'Update Password'}
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -670,7 +670,7 @@ const Auth = () => {
                 >
                   {mode === 'login' ? (
                     <>
-                      Don&apos;t have an account? Use the Sign Up tab above.{" "}
+                      Don&apos;t have an account? Use the Join tab above.{" "}
                       <Link to="/privacy" className="text-primary underline">Privacy</Link>
                       {" · "}
                       <Link to="/terms" className="text-primary underline">Terms</Link>

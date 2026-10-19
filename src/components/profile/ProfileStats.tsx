@@ -54,7 +54,7 @@ export function ProfileStats({ credits, projectCount, eventCount, reviewScore, i
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 }}
-      className="px-5 py-4"
+      className={cn("px-5 py-4", isOwnProfile && "pr-24")}
     >
       <div className={cn(
         "grid gap-3",

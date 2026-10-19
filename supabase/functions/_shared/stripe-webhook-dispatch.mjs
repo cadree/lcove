@@ -4,6 +4,7 @@ import {
 } from "./fees.mjs";
 import {
   invoiceSubscriptionId,
+  isGrantEligible,
   mapMembershipStatus,
   subscriptionPeriodUnix,
   tierFromStripeSubscription,
@@ -405,7 +406,7 @@ export function createSupabaseStripeDb(supabase, stripe) {
         .from("memberships")
         .update({
           lifetime_contribution: lifetime,
-          grant_eligible: lifetime >= 50 || tier === "elite",
+          grant_eligible: isGrantEligible(lifetime),
         })
         .eq("user_id", userId);
       throwIf(lifetimeError);
@@ -728,7 +729,7 @@ async function refundMembershipInvoice(supabase, stripe, charge) {
       .update({
         lifetime_contribution: lifetime,
         status: "cancelled",
-        grant_eligible: lifetime >= 50 || membership.tier === "elite",
+        grant_eligible: isGrantEligible(lifetime),
         updated_at: new Date().toISOString(),
       })
       .eq("id", membership.id);

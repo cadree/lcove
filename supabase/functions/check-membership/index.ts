@@ -3,6 +3,7 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import {
   invoiceSubscriptionId,
+  isGrantEligible,
   mapMembershipStatus,
   subscriptionPeriodUnix,
   tierFromStripeSubscription,
@@ -216,7 +217,7 @@ serve(async (req) => {
         current_period_end: subscriptionEnd,
         monthly_amount: monthlyAmount,
         lifetime_contribution: lifetimeContribution,
-        grant_eligible: lifetimeContribution >= 50 || tier === "elite",
+        grant_eligible: isGrantEligible(lifetimeContribution),
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
 
@@ -230,7 +231,7 @@ serve(async (req) => {
       subscription_end: subscriptionEnd,
       monthly_amount: monthlyAmount,
       lifetime_contribution: lifetimeContribution,
-      grant_eligible: lifetimeContribution >= 50 || tier === "elite",
+      grant_eligible: isGrantEligible(lifetimeContribution),
       stripe_subscription_id: membershipSub.id,
       cancel_at_period_end: membershipSub.cancel_at_period_end,
       status: membershipStatus,

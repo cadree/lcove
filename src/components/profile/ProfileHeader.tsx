@@ -1,9 +1,8 @@
 import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
 import { 
   Settings, MapPin, Camera, Loader2, Sparkles, Crown, Heart,
-  ArrowLeft, MessageCircle, Edit, Shield, BadgeCheck, UserPlus, UserMinus, Users, Flag, Ban
+  MessageCircle, Edit, Shield, BadgeCheck, UserPlus, UserMinus, Users, Flag, Ban
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -68,7 +67,6 @@ export function ProfileHeader({
   userId,
   memberTier,
 }: ProfileHeaderProps) {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -172,26 +170,7 @@ export function ProfileHeader({
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
         
         {/* Top Actions */}
-        <div className="absolute top-4 left-4 right-4 flex justify-between z-10">
-          {!isOwnProfile ? (
-            <Button 
-              variant="glass" 
-              size="icon" 
-              className="w-10 h-10" 
-              onClick={() => {
-                if (window.history.length > 1) {
-                  navigate(-1);
-                } else {
-                  navigate('/feed');
-                }
-              }}
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          ) : (
-            <div />
-          )}
-          
+        <div className="absolute top-4 left-4 right-4 flex justify-end z-10">
           {isOwnProfile && (
             <div className="flex gap-2">
               <MoreMenuButton className="bg-background/80 border border-border" />
@@ -216,7 +195,7 @@ export function ProfileHeader({
         >
           {/* Avatar */}
           <div className="relative group flex-shrink-0">
-            <Avatar className="w-24 h-24 sm:w-28 sm:h-28 rounded-[2px] border border-border">
+            <Avatar className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border border-border">
               <AvatarImage src={avatarUrl || undefined} />
               <AvatarFallback className="bg-muted text-muted-foreground text-2xl font-display">
                 {displayName.charAt(0).toUpperCase()}
@@ -274,18 +253,18 @@ export function ProfileHeader({
               )}
             </div>
             
-            <div className="flex items-center gap-3 mt-1">
-              <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <p className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground">
                 <MapPin className="w-3.5 h-3.5" />
                 {city}
               </p>
               {isOwnProfile && myXp && (
-                <p className="text-sm text-muted-foreground">Level {myXp.level}</p>
+                <p className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">Level {myXp.level}</p>
               )}
               
               {isOwnProfile && (
                 <FriendsDrawer>
-                  <button className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors">
+                  <button className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground transition-colors hover:text-foreground">
                     <Users className="w-3.5 h-3.5" />
                     <span className="font-medium">{friendsCount}</span> friends
                   </button>

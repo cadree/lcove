@@ -11,6 +11,7 @@ import {
 import { communityFundFeeCents } from "../supabase/functions/_shared/fees.mjs";
 import {
   invoiceSubscriptionId,
+  isGrantEligible,
   requireMembershipConfig,
   subscriptionPeriodUnix,
   tierFromStripeSubscription,
@@ -399,6 +400,11 @@ test("basil subscription periods are read from the item for checkout and subscri
   assert.equal(upsert.payload.tier, "elite");
   assert.equal(upsert.payload.status, "active");
   assert.equal(upsert.payload.monthly_amount, 25);
+  const eligibility = ops.find((op) => op.table === "memberships" && op.op === "update" && Object.prototype.hasOwnProperty.call(op.payload, "grant_eligible"));
+  assert.equal(eligibility.payload.lifetime_contribution, 25);
+  assert.equal(eligibility.payload.grant_eligible, false);
+  assert.equal(isGrantEligible(25), false);
+  assert.equal(isGrantEligible(50), true);
 
   const contribution = ops.find((op) => op.table === "membership_contributions" && op.op === "insert");
   assert.equal(contribution.payload.period_start, start);
@@ -830,6 +836,7 @@ test("a refunded membership invoice cancels the membership and the Stripe subscr
   const membership = db.rows("memberships")[0];
   assert.equal(membership.lifetime_contribution, 5);
   assert.equal(membership.status, "cancelled");
+  assert.equal(membership.grant_eligible, false);
   assert.equal(db.rows("membership_contributions")[0].amount, 0);
   assert.equal(db.rows("membership_payment_refunds")[0].stripe_refund_id, "re_1");
   assert.equal(db.rows("membership_payment_refunds")[0].stripe_invoice_id, "in_member");

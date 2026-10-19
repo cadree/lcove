@@ -73,7 +73,7 @@ function ReviewForm() {
             Sign in to share your experience with Ether
           </p>
           <Button onClick={() => navigate('/auth')} className="min-h-11">
-            Sign In to Review
+            Sign in to review
           </Button>
         </CardContent>
       </Card>

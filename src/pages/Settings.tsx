@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { CityInput } from "@/components/city/CityInput";
+import { resolveCity } from "@/lib/cities";
 import { Separator } from "@/components/ui/separator";
 import {
   User,
@@ -207,10 +209,13 @@ const Settings = () => {
         }
       });
 
+      const resolvedCity = resolveCity(city);
       const { error } = await updateProfile({
         display_name: displayName || null,
         bio: bio || null,
         city: city || null,
+        city_display: city ? resolvedCity.city_display : null,
+        city_key: city ? resolvedCity.city_key : null,
         phone: phone || null,
         social_links: Object.keys(cleanedSocialLinks).length > 0 ? cleanedSocialLinks : null,
       });
@@ -273,7 +278,7 @@ const Settings = () => {
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
           <h2 className="font-display text-2xl text-foreground">Sign in to access settings</h2>
           <Button asChild>
-            <Link to="/auth">Sign In</Link>
+            <Link to="/auth">Sign in</Link>
           </Button>
         </div>
       </PageLayout>
@@ -332,12 +337,11 @@ const Settings = () => {
 
             <div className="space-y-2">
               <Label htmlFor="city">City</Label>
-              <Input
+              <CityInput
                 id="city"
                 placeholder="Where are you based?"
                 value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="bg-background/50"
+                onChange={setCity}
               />
             </div>
 
@@ -348,7 +352,7 @@ const Settings = () => {
                 placeholder="Tell us about yourself and your creative journey..."
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                className="bg-background/50 min-h-[100px] resize-none"
+                className="bg-background/50 min-h-[100px] resize-none text-left placeholder:text-left"
               />
             </div>
 

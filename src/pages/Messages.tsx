@@ -55,7 +55,7 @@ const Messages = () => {
               Connect with other creatives through direct messages
             </p>
             <Link to="/auth">
-              <Button className="w-full">Sign In</Button>
+              <Button className="w-full">Sign in</Button>
             </Link>
           </motion.div>
         </div>

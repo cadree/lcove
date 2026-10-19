@@ -7,9 +7,10 @@ interface ProfilePostsGridProps {
   posts: ProfilePost[];
   onPostClick: (post: ProfilePost) => void;
   isLoading?: boolean;
+  isOwner?: boolean;
 }
 
-export function ProfilePostsGrid({ posts, onPostClick, isLoading }: ProfilePostsGridProps) {
+export function ProfilePostsGrid({ posts, onPostClick, isLoading, isOwner = false }: ProfilePostsGridProps) {
   const mediaPosts = postsForProfileGrid(posts);
 
   if (isLoading) {
@@ -28,9 +29,13 @@ export function ProfilePostsGrid({ posts, onPostClick, isLoading }: ProfilePosts
         <div className="w-20 h-20 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center mb-4">
           <ImageIcon className="w-10 h-10 text-muted-foreground/50" />
         </div>
-        <h3 className="text-xl font-medium text-foreground mb-2">Share Photos</h3>
+        <h3 className="text-xl font-medium text-foreground mb-2">
+          {isOwner ? "Share Photos" : "No photos yet"}
+        </h3>
         <p className="text-muted-foreground text-sm max-w-[250px]">
-          When you share photos, they will appear on your profile.
+          {isOwner
+            ? "When you share photos, they will appear on your profile."
+            : "No photos have been shared on this profile yet."}
         </p>
       </div>
     );

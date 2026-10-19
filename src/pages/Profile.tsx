@@ -22,7 +22,7 @@ import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { ProfileStats } from "@/components/profile/ProfileStats";
 import { ProfileAboutSection } from "@/components/profile/ProfileAboutSection";
 import { ProfileFolders } from "@/components/profile/ProfileFolders";
-import { ProfileQuickLinks } from "@/components/profile/ProfileQuickLinks";
+import { ProfileBookEntry, ProfileQuickLinks } from "@/components/profile/ProfileQuickLinks";
 import { FolderDetailView } from "@/components/profile/FolderDetailView";
 import { ProfileLayoutEditor } from "@/components/profile/ProfileLayoutEditor";
 import { ProfileFriendsSection } from "@/components/profile/ProfileFriendsSection";
@@ -126,7 +126,7 @@ const Profile = () => {
           <h2 className="font-display text-2xl text-foreground">Sign in to view your profile</h2>
           <p className="text-muted-foreground text-center">Create an account or sign in to customize your profile.</p>
           <Button asChild>
-            <Link to="/auth">Sign In</Link>
+            <Link to="/auth">Sign in</Link>
           </Button>
         </div>
       </PageLayout>
@@ -149,7 +149,7 @@ const Profile = () => {
   }
 
   const displayName = profile?.display_name || 'Creative';
-  const bio = profile?.bio || 'Welcome to my profile!';
+  const bio = profile?.bio?.trim() || '';
   const city = profile?.city || 'Location not set';
   const avatarUrl = profile?.avatar_url;
 
@@ -291,6 +291,7 @@ const Profile = () => {
                   posts={posts}
                   onPostClick={(post) => setSelectedPost(post)}
                   isLoading={postsLoading}
+                  isOwner={isOwnProfile}
                 />
               </TabsContent>
               <TabsContent value="blogs" className="mt-4">
@@ -478,6 +479,7 @@ const Profile = () => {
           memberTier={isOwnProfile && membership?.subscribed ? membership.tier : null}
         />
 
+        <ProfileBookEntry />
 
         {postsSection && renderSection(postsSection)}
 

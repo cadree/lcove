@@ -181,7 +181,7 @@ const BookingSettings = () => {
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
           <h2 className="font-display text-2xl text-foreground">Sign in to manage booking pages</h2>
           <Button asChild>
-            <Link to="/auth">Sign In</Link>
+            <Link to="/auth">Sign in</Link>
           </Button>
         </div>
       </PageLayout>

@@ -15,7 +15,7 @@ interface FeedFiltersProps {
   setPostTypeFilter: (filter: 'all' | 'regular' | 'portfolio') => void;
   regionFilter: string | null;
   setRegionFilter: (region: string | null) => void;
-  availableRegions: string[];
+  availableRegions: Array<{ key: string; display: string }>;
 }
 
 export function FeedFilters({
@@ -57,8 +57,8 @@ export function FeedFilters({
         <SelectContent className="bg-popover">
           <SelectItem value="all">All Regions</SelectItem>
           {availableRegions.map((region) => (
-            <SelectItem key={region} value={region}>
-              {region}
+            <SelectItem key={region.key} value={region.key}>
+              {region.display}
             </SelectItem>
           ))}
         </SelectContent>

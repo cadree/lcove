@@ -123,6 +123,7 @@ export default function FundDashboard() {
     ...item,
     value: fundStats?.allocations?.[item.key as keyof typeof fundStats.allocations] || 0,
   }));
+  const allocationTotal = pieChartData.reduce((sum, item) => sum + item.value, 0);
 
   const handleContribute = async () => {
     if (!user) {
@@ -286,6 +287,14 @@ export default function FundDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="h-[300px]">
+                    {!fundLoading && allocationTotal <= 0 ? (
+                      <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+                        <p className="font-medium text-foreground">No allocations yet</p>
+                        <p className="mt-1 max-w-[240px] text-sm text-muted-foreground">
+                          Distributions will appear here once the fund pays out.
+                        </p>
+                      </div>
+                    ) : (
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -310,6 +319,7 @@ export default function FundDashboard() {
                         <Tooltip content={<PieTooltip />} />
                       </PieChart>
                     </ResponsiveContainer>
+                    )}
                   </div>
                 </CardContent>
               </Card>

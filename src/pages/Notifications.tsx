@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 const Notifications: React.FC = () => {
   return (
     <PageLayout showNotificationBell={false}>
-      <div className="h-full flex flex-col px-4 pt-6">
+      <div className="flex h-full min-w-0 flex-col px-4 pt-6">
         <PageHeader
           title="Notifications"
           icon={<Bell className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}

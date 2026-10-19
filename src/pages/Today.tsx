@@ -218,7 +218,7 @@ const Today = () => {
   const hasNoFilteredTasks = filteredTasks.length === 0 && !hasNoTasks;
 
   return (
-    <PageLayout hideNav>
+    <PageLayout>
       <div className="min-h-screen bg-background">
         {/* Header */}
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
@@ -295,13 +295,9 @@ const Today = () => {
               <p className="text-muted-foreground text-sm mb-4">
                 Add a task to a contact to see it here.
               </p>
-              <div className="flex flex-col sm:flex-row gap-2 justify-center">
+              <div className="flex justify-center">
                 <Button variant="outline" onClick={() => navigate('/pipeline')}>
                   Go to Pipeline
-                </Button>
-                <Button onClick={() => setShowAddTask(true)} className="gap-1.5">
-                  <Plus className="w-4 h-4" />
-                  Add Task
                 </Button>
               </div>
             </Card>

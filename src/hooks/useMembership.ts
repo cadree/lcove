@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { isGrantEligible } from "@/lib/grantEligibility";
 import { toast } from "sonner";
 
 export interface MembershipStatus {
@@ -32,7 +33,7 @@ function membershipFromRow(row: MembershipRow | null): MembershipStatus | null {
     subscription_end: row.current_period_end,
     monthly_amount: row.monthly_amount,
     lifetime_contribution: Number(row.lifetime_contribution || 0),
-    grant_eligible: subscribed ? Boolean(row.grant_eligible) : false,
+    grant_eligible: subscribed ? isGrantEligible(row.lifetime_contribution) : false,
   };
 }
 
@@ -46,7 +47,7 @@ function membershipFromPayload(data: Partial<MembershipStatus> | null): Membersh
     subscription_end: data.subscription_end ?? null,
     monthly_amount: data.monthly_amount ?? null,
     lifetime_contribution: Number(data.lifetime_contribution || 0),
-    grant_eligible: subscribed ? Boolean(data.grant_eligible) : false,
+    grant_eligible: subscribed ? isGrantEligible(data.lifetime_contribution) : false,
   };
 }
 

@@ -10,7 +10,7 @@ import { Search, MapPin, Briefcase, Users, Loader2, Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { FriendsDrawer } from "@/components/friends/FriendsDrawer";
-import { computeCityKey, computeCityDisplay } from "@/lib/cityNormalization";
+import { cityFilterOptions, cityMatchesFilter, cityMatchesQuery } from "@/lib/cityNormalization";
 import { dedupeProfilesByUserId } from "@/lib/directoryProfiles";
 
 interface Profile {
@@ -123,54 +123,34 @@ const Directory = () => {
     setLoading(false);
   };
 
-  // Build deduplicated city list using city_key (or computed key for old data)
+  // Group filter chips from the strings already stored. "Charlotte" and
+  // "Charlotte, NC" share a chip. Stored city fields are left unchanged.
   const cityOptions = useMemo<CityOption[]>(() => {
-    const cityMap = new Map<string, string>(); // key -> display
-    
-    profiles.forEach(profile => {
-      // Use city_key if available, otherwise compute from city
-      const key = profile.city_key || computeCityKey(profile.city);
-      if (!key) return;
-      
-      // Use city_display if available, otherwise compute from city
-      const display = profile.city_display || computeCityDisplay(profile.city);
-      if (!display) return;
-      
-      // Only store first display value seen for each key (they should all be the same after normalization)
-      if (!cityMap.has(key)) {
-        cityMap.set(key, display);
-      }
-    });
-
-    // Convert to array and sort alphabetically by display name
-    return Array.from(cityMap.entries())
-      .map(([key, display]) => ({ key, display }))
-      .sort((a, b) => a.display.localeCompare(b.display));
+    return cityFilterOptions(profiles.flatMap((profile) => [profile.city_display, profile.city]));
   }, [profiles]);
 
-  // Get the city key for a profile (for filtering)
-  const getProfileCityKey = (profile: Profile): string => {
-    return profile.city_key || computeCityKey(profile.city);
+  const profileMatchesSelectedCity = (profile: Profile): boolean => {
+    if (selectedCityKey === null) return true;
+    return [profile.city_display, profile.city].some((value) => cityMatchesFilter(value, selectedCityKey));
   };
 
   // Get the display value for a profile's city
   const getProfileCityDisplay = (profile: Profile): string => {
-    return profile.city_display || computeCityDisplay(profile.city) || profile.city || '';
+    return profile.city || profile.city_display || '';
   };
 
   const filteredProfiles = profiles.filter((profile) => {
     if (blockedIds.includes(profile.user_id)) return false;
-    const cityDisplay = getProfileCityDisplay(profile);
     const searchLower = searchQuery.toLowerCase();
     const matchesSearch = 
       profile.display_name?.toLowerCase().includes(searchLower) ||
       profile.bio?.toLowerCase().includes(searchLower) ||
-      cityDisplay.toLowerCase().includes(searchLower) ||
+      cityMatchesQuery(profile.city, searchQuery) ||
+      cityMatchesQuery(profile.city_display, searchQuery) ||
       profile.passions?.some(passion => passion.toLowerCase().includes(searchLower)) ||
       profile.skills?.some(skill => skill.toLowerCase().includes(searchLower));
     
-    const profileCityKey = getProfileCityKey(profile);
-    const matchesCity = selectedCityKey === null || profileCityKey === selectedCityKey;
+    const matchesCity = profileMatchesSelectedCity(profile);
     
     return matchesSearch && matchesCity;
   });
@@ -268,9 +248,9 @@ const Directory = () => {
               >
                 <div className="flex items-start gap-4">
                   {/* Avatar */}
-                  <Avatar className="w-16 h-16 rounded-[2px] border border-border">
-                    <AvatarImage src={profile.avatar_url || undefined} className="rounded-[2px]" />
-                    <AvatarFallback className="bg-muted text-foreground text-xl font-medium rounded-[2px]">
+                  <Avatar className="w-16 h-16 rounded-full border border-border">
+                    <AvatarImage src={profile.avatar_url || undefined} className="rounded-full" />
+                    <AvatarFallback className="bg-muted text-foreground text-xl font-medium rounded-full">
                       {profile.display_name?.charAt(0).toUpperCase() || '?'}
                     </AvatarFallback>
                   </Avatar>

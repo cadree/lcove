@@ -158,7 +158,7 @@ export default function Collectives() {
                 title="Sign in to see your collectives"
                 description="Create an account to join and create collectives"
                 action={{
-                  label: "Sign In",
+                  label: "Sign in",
                   onClick: () => navigate("/auth"),
                 }}
               />

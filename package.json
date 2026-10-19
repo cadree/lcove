@@ -8,10 +8,11 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "lint:spell": "cspell \"src/**/*.{ts,tsx}\" --no-progress --gitignore",
     "typecheck": "tsc -b --pretty false",
     "preview": "vite preview",
     "test:webhook": "node scripts/stripe-webhook-fixtures.test.mjs",
-    "test:unit": "node --experimental-strip-types --test src/lib/calendarDay.test.ts src/lib/directoryProfiles.test.ts src/lib/onboardingPassions.test.ts src/lib/resendCooldown.test.ts src/lib/profilePosts.test.ts"
+    "test:unit": "node --experimental-strip-types --test src/lib/calendarDay.test.ts src/lib/cityNormalization.test.ts src/lib/directoryProfiles.test.ts src/lib/grantEligibility.test.ts src/lib/onboardingPassions.test.ts src/lib/resendCooldown.test.ts src/lib/profilePosts.test.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.1",
@@ -97,6 +98,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
+    "cspell": "^8.19.4",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",

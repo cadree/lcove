@@ -300,7 +300,7 @@ const BoardEditor = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
         <h2 className="font-display text-2xl text-foreground">Sign in to view this board</h2>
-        <Button onClick={() => navigate("/auth")}>Sign In</Button>
+        <Button onClick={() => navigate("/auth")}>Sign in</Button>
       </div>
     );
   }

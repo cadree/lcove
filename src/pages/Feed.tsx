@@ -18,6 +18,7 @@ import { usePosts } from "@/hooks/usePosts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
+import { cityFilterOptions, cityMatchesFilter } from "@/lib/cityNormalization";
 const Feed = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeCategory, setActiveCategory] = useState("All");
@@ -68,12 +69,10 @@ const Feed = () => {
       const {
         data,
         error
-      } = await supabase.from("profiles_public").select("city_display").not("city_display", "is", null).neq("city_display", "");
+      } = await supabase.from("profiles_public").select("city, city_display");
       if (error) throw error;
 
-      // Get unique cities
-      const uniqueCities = [...new Set(data?.map(p => p.city_display).filter(Boolean) as string[])];
-      return uniqueCities.sort();
+      return cityFilterOptions((data || []).flatMap((profile) => [profile.city, profile.city_display]));
     }
   });
   const handleShuffle = () => {
@@ -98,8 +97,8 @@ const Feed = () => {
     // Region filter - check both city and city_display for compatibility
     let matchesRegion = regionFilter === null;
     if (!matchesRegion) {
-      const postCity = post.profile?.city_display || post.profile?.city;
-      matchesRegion = postCity === regionFilter;
+      matchesRegion = cityMatchesFilter(post.profile?.city, regionFilter)
+        || cityMatchesFilter(post.profile?.city_display, regionFilter);
     }
     return matchesCategory && matchesPostType && matchesRegion;
   });
@@ -115,9 +114,9 @@ const Feed = () => {
       }} className="flex items-start justify-between gap-3 mb-4 pb-4 border-b border-border">
           <div className="flex items-center gap-3 min-w-0">
             <Link to="/profile" aria-label="View my profile" className="shrink-0">
-              <Avatar className="w-11 h-11 rounded-[2px]">
-                <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || "My profile"} className="rounded-[2px]" />
-                <AvatarFallback className="rounded-[2px] bg-muted text-foreground">
+              <Avatar className="w-11 h-11 rounded-full">
+                <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || "My profile"} className="rounded-full" />
+                <AvatarFallback className="rounded-full bg-muted text-foreground">
                   <User className="w-5 h-5" />
                 </AvatarFallback>
               </Avatar>

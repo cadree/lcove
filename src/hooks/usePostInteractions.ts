@@ -24,10 +24,12 @@ export function usePostInteractions(postId: string) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { blockedIds } = useUserBlocks();
+  const canQuery = postId.trim().length > 0;
 
   // Fetch likes count and user's like status
   const { data: likesData, refetch: refetchLikes } = useQuery({
     queryKey: ['post-likes', postId],
+    enabled: canQuery,
     queryFn: async () => {
       const { count } = await supabase
         .from('post_likes')
@@ -52,6 +54,7 @@ export function usePostInteractions(postId: string) {
   // Fetch comments with profiles
   const { data: comments = [], refetch: refetchComments } = useQuery({
     queryKey: ['post-comments', postId],
+    enabled: canQuery,
     queryFn: async () => {
       const { data: commentsData, error } = await supabase
         .from('post_comments')
@@ -110,7 +113,7 @@ export function usePostInteractions(postId: string) {
         .maybeSingle();
       return !!data;
     },
-    enabled: !!user,
+    enabled: canQuery && !!user,
   });
 
   // Like mutation
@@ -234,6 +237,8 @@ export function usePostInteractions(postId: string) {
 
   // Real-time subscriptions
   useEffect(() => {
+    if (!canQuery) return;
+
     const likesChannel = supabase
       .channel(`post-likes-${postId}`)
       .on(
@@ -256,7 +261,7 @@ export function usePostInteractions(postId: string) {
       supabase.removeChannel(likesChannel);
       supabase.removeChannel(commentsChannel);
     };
-  }, [postId, refetchLikes, refetchComments]);
+  }, [canQuery, postId, refetchLikes, refetchComments]);
 
   const visibleComments = useMemo(
     () => hideBlockedComments(comments, new Set(blockedIds)),

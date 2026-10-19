@@ -257,7 +257,7 @@ export default function PartnerPortal() {
           <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h2 className="text-xl font-semibold mb-2">Sign in required</h2>
           <p className="text-muted-foreground mb-4">Please sign in to access your partner portal</p>
-          <Button onClick={() => navigate('/auth')}>Sign In</Button>
+          <Button onClick={() => navigate('/auth')}>Sign in</Button>
         </div>
       </PageLayout>
     );

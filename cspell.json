@@ -1,0 +1,27 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "dictionaries": ["project-words"],
+  "dictionaryDefinitions": [
+    {
+      "name": "project-words",
+      "path": "./project-words.txt",
+      "addWords": true
+    }
+  ],
+  "ignorePaths": [
+    "node_modules",
+    "dist",
+    "src/data/cities.ts",
+    "src/integrations/supabase/types.ts",
+    "package-lock.json"
+  ],
+  "words": [
+    "Ether",
+    "LCOVE",
+    "Familcy",
+    "Novi",
+    "lcove",
+    "familcy"
+  ]
+}
