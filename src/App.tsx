@@ -1,5 +1,5 @@
 // Application entry point - Ether App
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,6 +12,7 @@ import AccessGate from "@/components/auth/AccessGate";
 import { IosPushRegistration } from "@/components/ios/IosPushRegistration";
 import { NativeLinkRouter } from "@/components/ios/NativeLinkRouter";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
+import { hideNativeSplash } from "@/lib/nativeShell";
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Feed = lazy(() => import("./pages/Feed"));
@@ -71,6 +72,14 @@ const ActivityTracker = () => {
   return null;
 };
 
+/** Runs even when a route is still waiting on auth or a lazy chunk. */
+function HideSplashOnMount() {
+  useEffect(() => {
+    hideNativeSplash();
+  }, []);
+  return null;
+}
+
 function RouteFallback() {
   return (
     <div
@@ -94,6 +103,7 @@ const queryClient = new QueryClient({
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
+      <HideSplashOnMount />
       <BrowserRouter>
         <AuthProvider>
           <PresenceProvider>

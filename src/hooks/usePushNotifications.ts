@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Capacitor } from '@capacitor/core';
+import { allowsWebServiceWorker } from '@/lib/nativeShellPolicy';
 import { isIosApp } from '@/lib/platform';
 import { registerIosPush, syncIosPushIfGranted, unregisterIosPush, type IosPushPermission } from '@/lib/nativePush';
 
@@ -170,6 +172,10 @@ export const usePushNotifications = () => {
   };
 
   const registerServiceWorker = useCallback(async (): Promise<ServiceWorkerRegistration | null> => {
+    if (!allowsWebServiceWorker(Capacitor.isNativePlatform())) {
+      console.log('Web service worker skipped in the native shell');
+      return null;
+    }
     if (!('serviceWorker' in navigator)) {
       console.log('Service workers not supported');
       return null;

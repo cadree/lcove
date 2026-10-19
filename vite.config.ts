@@ -47,13 +47,34 @@ function reachableFromEntry(
   return reached;
 }
 
+// Relative bundle URLs, one root base, and no crossorigin attribute.
+// capacitor://localhost has no CORS headers for local files. A root base keeps
+// the same relative URLs working when the website refreshes a nested route.
+function capacitorBundleHtml() {
+  return {
+    name: "capacitor-bundle-html",
+    enforce: "post" as const,
+    transformIndexHtml: {
+      order: "post" as const,
+      handler(html: string) {
+        const withoutBase = html.replace(/<base\b[^>]*>/gi, "");
+        const withBase = withoutBase.replace(/<head([^>]*)>/i, '<head$1>\n    <base href="/" />');
+        return withBase.replace(/<((?:script|link)\b[^>]*?) crossorigin(?:="[^"]*")?/gi, "<$1");
+      },
+    },
+  };
+}
+
 // https://vitejs.dev/config/
-export default defineConfig(() => ({
+export default defineConfig(({ command }) => ({
+  // Dev stays at /. The production bundle uses relative asset URLs so they
+  // resolve against <base href="/"> on capacitor://localhost and on the web.
+  base: command === "build" ? "./" : "/",
   server: {
     host: "::",
     port: 8080,
   },
-  plugins: [react()],
+  plugins: [react(), capacitorBundleHtml()],
   resolve: {
     alias: [
       // Exact match so a regenerated src/integrations/supabase/client.ts

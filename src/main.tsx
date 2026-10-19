@@ -4,10 +4,13 @@ import App from "./App.tsx";
 import "./index.css";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { setupDeepLinkHandler, initializeCapacitorApp } from "@/lib/deepLinkHandler";
+import { bootNativeShell } from "@/lib/nativeShell";
 
 // Ether Application Bootstrap - v2
 
-// Initialize Capacitor deep link handler for native auth
+// Hide the native splash without waiting on auth or network, then listen
+// for auth return links.
+bootNativeShell();
 setupDeepLinkHandler();
 initializeCapacitorApp();
 

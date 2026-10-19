@@ -27,7 +27,9 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
+import { allowsWebServiceWorker } from "@/lib/nativeShellPolicy";
 import { errorMessage } from "@/lib/errorMessage";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -71,7 +73,7 @@ export default function PublicEventPage() {
   }, []);
 
   const handleSubscribePush = useCallback(async (email: string) => {
-    if (!VAPID_PUBLIC_KEY || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    if (!allowsWebServiceWorker(Capacitor.isNativePlatform()) || !VAPID_PUBLIC_KEY || !('serviceWorker' in navigator) || !('PushManager' in window)) {
       toast.info("Push notifications aren't supported in this browser");
       return;
     }

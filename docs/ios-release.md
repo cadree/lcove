@@ -47,7 +47,13 @@ open ios/App/App.xcodeproj
 
 Run `npm run build` and `npx cap sync ios` again after every web change before you archive. `ios/App/App/public` and `ios/App/App/capacitor.config.json` are gitignored. The archive only contains the web bundle from the last sync.
 
-Do not set `server.url` in `capacitor.config.ts`. That loads a dev server instead of `dist`.
+Do not set `server.url` in `capacitor.config.ts`. That loads a dev server instead of `dist`. The WebView origin stays `capacitor://localhost`.
+
+The production bundle uses relative `./assets/...` URLs and `<base href="/">`. Those resolve to `capacitor://localhost/assets/...`. The same base keeps a website refresh of a nested route on the origin root. `npm run build` then `npx cap sync ios` is still the Mac sequence. Rebuild after this change. The previous Debug build at `d5e5ec3` stays on the bear because that splash never hides.
+
+## Splash
+
+`plugins.SplashScreen.launchAutoHide` is true. The native splash (the bear, plus the small white spinner) is removed when the bundle starts, again on the first React commit, and on a short timer. None of those wait for Supabase. If the bundle never runs, Capacitor hides the splash after 4 seconds. The web push service worker is not registered in the native shell. iOS push uses APNs.
 
 ## What the iOS app shows for payments
 
