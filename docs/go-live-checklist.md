@@ -82,7 +82,7 @@ Profile photos are public URLs in `media`. `avatars` is private and exists so `d
 
 ## 6. Secrets, by name only
 
-Dashboard, Edge Functions, Secrets. Supabase injects `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Set the rest yourself. Do not put the values in the repo.
+Supabase injects `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Set the rest as GitHub Actions secrets. The deploy workflow copies each name that is set and skips the rest. Do not put the values in the repo. The click path is in `docs/deploy-ether-prod.md`.
 
 - `INTERNAL_FUNCTION_SECRET` (a new long random value)
 - `STRIPE_SECRET_KEY`
@@ -95,8 +95,8 @@ Dashboard, Edge Functions, Secrets. Supabase injects `SUPABASE_URL`, `SUPABASE_A
 - `VAPID_PRIVATE_KEY`
 - `MUX_TOKEN_ID`
 - `MUX_TOKEN_SECRET`
-- `SITE_URL` = `https://etherbylcove.com`
-- `APP_URL` = `https://etherbylcove.com`
+- `SITE_URL` = `https://etherbylcove.com` (use the `pages.dev` URL until the domain moves)
+- `APP_URL` = `https://etherbylcove.com` (same as `SITE_URL`)
 
 Used when those features are turned on: `APPLE_PASS_TYPE_ID`, `APPLE_TEAM_ID`, `GOOGLE_WALLET_ISSUER_ID`, `GOOGLE_WALLET_SERVICE_ACCOUNT_KEY`.
 
@@ -111,14 +111,9 @@ Used when those features are turned on: `APPLE_PASS_TYPE_ID`, `APPLE_TEAM_ID`, `
 
 ## 8. Deploy edge functions
 
-From the repo root, with the CLI linked to `aykopqinnnssxdhxqruo`:
+Deploy from GitHub Actions, not from the machine coordinating the move. That machine cannot reach Postgres and should not clone the repo. The workflow is "Deploy Supabase functions" on branch `cursor/ether-combined` until this pull request is merged. The ordered steps are in `docs/deploy-ether-prod.md`.
 
-```sh
-npx supabase link --project-ref aykopqinnnssxdhxqruo
-npx supabase functions deploy
-```
-
-`supabase/config.toml` sets `verify_jwt` per function. Deploying from this repo is what makes the project match those flags. Deploy `purchase-event-with-credits` and `delete-account` before members use those buttons. `delete-account` deletes only the person whose token it is. It refuses while a payout, earned credit, escrow, store or booking payout, Stripe balance, or active subscription is still open.
+The workflow runs `supabase functions deploy --use-api` (no Docker) and reads `verify_jwt` from `supabase/config.toml`. It does not run SQL. Deploy `purchase-event-with-credits` and `delete-account` before members use those buttons. `delete-account` deletes only the person whose token it is. It refuses while a payout, earned credit, escrow, store or booking payout, Stripe balance, or active subscription is still open.
 
 Stripe webhook events are listed in `docs/stripe-setup.md`.
 

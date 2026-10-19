@@ -28,6 +28,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Stripe webhook fixtures
+        run: npm run test:webhook
+
       - name: Build
         run: npm run build
         env:

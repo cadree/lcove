@@ -31,7 +31,7 @@ Set these in the Supabase dashboard: Project Settings, Edge Functions, Secrets.
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
    - `charge.refunded`
-6. Open the endpoint, reveal the signing secret, and save it as `STRIPE_WEBHOOK_SECRET`.
+6. Open the endpoint, reveal the signing secret, and save it as the GitHub Actions secret `STRIPE_WEBHOOK_SECRET`. Run the "Deploy Supabase functions" workflow so it is copied onto the project. The click path is in `docs/deploy-ether-prod.md`. Do not paste the secret into git or chat.
 7. Send a test event from the Stripe dashboard only after the secret is saved. Do not use the live account from a development machine.
 
 `checkout.session.completed` records:
