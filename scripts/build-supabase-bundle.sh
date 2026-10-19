@@ -214,12 +214,16 @@ function guardStatement(statement) {
     "INSERT INTO storage.buckets (id, name, public) VALUES ('media', 'media', true) ON CONFLICT (id) DO NOTHING;",
   );
 
-  const publication = next.match(
-    /^ALTER PUBLICATION supabase_realtime ADD TABLE (public\.)?([a-z0-9_]+);$/i,
+  const stripped = withoutComments(next).trim();
+  const publication = stripped.match(
+    /^ALTER PUBLICATION supabase_realtime (ADD|DROP) TABLE (ONLY )?(public\.)?([a-z0-9_]+)\s*;$/i,
   );
   if (publication) {
-    const table = publication[2];
-    return `DO $ether_pub$\nBEGIN\n  IF NOT EXISTS (\n    SELECT 1 FROM pg_publication_tables\n    WHERE pubname = 'supabase_realtime'\n      AND schemaname = 'public'\n      AND tablename = '${table}'\n  ) THEN\n    ALTER PUBLICATION supabase_realtime ADD TABLE public.${table};\n  END IF;\nEND\n$ether_pub$;`;
+    const action = publication[1].toUpperCase();
+    const table = publication[4];
+    const gate = action === "ADD" ? "NOT EXISTS" : "EXISTS";
+    const verb = action === "ADD" ? "adding" : "dropping";
+    return `DO $ether_pub$\nBEGIN\n  IF ${gate} (\n    SELECT 1 FROM pg_publication_tables\n    WHERE pubname = 'supabase_realtime'\n      AND schemaname = 'public'\n      AND tablename = '${table}'\n  ) THEN\n    BEGIN\n      ALTER PUBLICATION supabase_realtime ${action} TABLE public.${table};\n    EXCEPTION\n      WHEN insufficient_privilege THEN\n        RAISE NOTICE 'skipped ${verb} ${table} on supabase_realtime: %', SQLERRM;\n    END;\n  END IF;\nEND\n$ether_pub$;`;
   }
 
   return next;
@@ -244,8 +248,20 @@ const header = `-- Ether schema bundle for a brand-new hosted Supabase project.
 -- dashboard after the functions are deployed. See docs/supabase-migration.md.
 --
 -- ALTER PUBLICATION supabase_realtime is guarded so a table already in
--- the publication is skipped. If the SQL editor says the publication is
--- owned by supabase_admin, add the tables under Database, Publications.
+-- the publication is skipped. Changing the publication needs its owner.
+-- On hosted that owner is supabase_admin, and the Management API role
+-- postgres is not a member of it. A permission error is a notice. Add or
+-- remove the tables under Database, Publications. Do not add profiles.
+--
+-- ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin is the same kind of
+-- error. The migration skips it unless the current role is a member.
+-- Defaults for the current role, and for postgres when this session may
+-- act for postgres, still apply.
+--
+-- pg_net belongs in extensions. A project that already has it in public
+-- can move it only when this role owns the extension and the installed
+-- build allows SET SCHEMA. Otherwise the notice below is the result, and
+-- the dashboard owner runs: ALTER EXTENSION pg_net SET SCHEMA extensions
 --
 -- Running this file a second time records nothing new. Applied versions
 -- live in public.ether_schema_migrations.
@@ -254,6 +270,33 @@ CREATE TABLE IF NOT EXISTS public.ether_schema_migrations (
   version text PRIMARY KEY,
   applied_at timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE SCHEMA IF NOT EXISTS extensions;
+
+DO $ether_pg_net$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_net') THEN
+    BEGIN
+      CREATE EXTENSION pg_net WITH SCHEMA extensions;
+    EXCEPTION
+      WHEN insufficient_privilege OR undefined_file THEN
+        RAISE NOTICE 'pg_net was not created in extensions: %', SQLERRM;
+    END;
+  ELSIF (
+    SELECT n.nspname
+    FROM pg_extension e
+    JOIN pg_namespace n ON n.oid = e.extnamespace
+    WHERE e.extname = 'pg_net'
+  ) IS DISTINCT FROM 'extensions' THEN
+    BEGIN
+      ALTER EXTENSION pg_net SET SCHEMA extensions;
+    EXCEPTION
+      WHEN insufficient_privilege OR feature_not_supported THEN
+        RAISE NOTICE 'pg_net was left outside extensions (move it in the dashboard as the extension owner): %', SQLERRM;
+    END;
+  END IF;
+END
+$ether_pg_net$;
 
 `;
 

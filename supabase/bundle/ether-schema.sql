@@ -17,8 +17,20 @@
 -- dashboard after the functions are deployed. See docs/supabase-migration.md.
 --
 -- ALTER PUBLICATION supabase_realtime is guarded so a table already in
--- the publication is skipped. If the SQL editor says the publication is
--- owned by supabase_admin, add the tables under Database, Publications.
+-- the publication is skipped. Changing the publication needs its owner.
+-- On hosted that owner is supabase_admin, and the Management API role
+-- postgres is not a member of it. A permission error is a notice. Add or
+-- remove the tables under Database, Publications. Do not add profiles.
+--
+-- ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin is the same kind of
+-- error. The migration skips it unless the current role is a member.
+-- Defaults for the current role, and for postgres when this session may
+-- act for postgres, still apply.
+--
+-- pg_net belongs in extensions. A project that already has it in public
+-- can move it only when this role owns the extension and the installed
+-- build allows SET SCHEMA. Otherwise the notice below is the result, and
+-- the dashboard owner runs: ALTER EXTENSION pg_net SET SCHEMA extensions
 --
 -- Running this file a second time records nothing new. Applied versions
 -- live in public.ether_schema_migrations.
@@ -27,6 +39,33 @@ CREATE TABLE IF NOT EXISTS public.ether_schema_migrations (
   version text PRIMARY KEY,
   applied_at timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE SCHEMA IF NOT EXISTS extensions;
+
+DO $ether_pg_net$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_net') THEN
+    BEGIN
+      CREATE EXTENSION pg_net WITH SCHEMA extensions;
+    EXCEPTION
+      WHEN insufficient_privilege OR undefined_file THEN
+        RAISE NOTICE 'pg_net was not created in extensions: %', SQLERRM;
+    END;
+  ELSIF (
+    SELECT n.nspname
+    FROM pg_extension e
+    JOIN pg_namespace n ON n.oid = e.extnamespace
+    WHERE e.extname = 'pg_net'
+  ) IS DISTINCT FROM 'extensions' THEN
+    BEGIN
+      ALTER EXTENSION pg_net SET SCHEMA extensions;
+    EXCEPTION
+      WHEN insufficient_privilege OR feature_not_supported THEN
+        RAISE NOTICE 'pg_net was left outside extensions (move it in the dashboard as the extension owner): %', SQLERRM;
+    END;
+  END IF;
+END
+$ether_pg_net$;
 
 -- 20251218002113_8178886c-cb9a-4fc6-8966-a4edcbdafa21.sql
 DO $ether_m0$
@@ -601,8 +640,23 @@ CREATE POLICY "Users can unsave posts" ON public.saved_posts
   FOR DELETE USING (auth.uid() = user_id);
 $ether_m3s15$;
   EXECUTE $ether_m3s16$
--- Enable realtime for likes and comments
-ALTER PUBLICATION supabase_realtime ADD TABLE public.post_likes;
+DO $ether_pub$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'post_likes'
+  ) THEN
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.post_likes;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding post_likes on supabase_realtime: %', SQLERRM;
+    END;
+  END IF;
+END
+$ether_pub$;
 $ether_m3s16$;
   EXECUTE $ether_m3s17$
 DO $ether_pub$
@@ -613,7 +667,12 @@ BEGIN
       AND schemaname = 'public'
       AND tablename = 'post_comments'
   ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.post_comments;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.post_comments;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding post_comments on supabase_realtime: %', SQLERRM;
+    END;
   END IF;
 END
 $ether_pub$;
@@ -860,8 +919,23 @@ CREATE POLICY "Users can update their typing indicator" ON public.typing_indicat
   FOR UPDATE USING (auth.uid() = user_id);
 $ether_m4s33$;
   EXECUTE $ether_m4s34$
--- Enable realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+DO $ether_pub$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'messages'
+  ) THEN
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding messages on supabase_realtime: %', SQLERRM;
+    END;
+  END IF;
+END
+$ether_pub$;
 $ether_m4s34$;
   EXECUTE $ether_m4s35$
 DO $ether_pub$
@@ -872,7 +946,12 @@ BEGIN
       AND schemaname = 'public'
       AND tablename = 'typing_indicators'
   ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.typing_indicators;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.typing_indicators;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding typing_indicators on supabase_realtime: %', SQLERRM;
+    END;
   END IF;
 END
 $ether_pub$;
@@ -886,7 +965,12 @@ BEGIN
       AND schemaname = 'public'
       AND tablename = 'message_read_receipts'
   ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.message_read_receipts;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.message_read_receipts;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding message_read_receipts on supabase_realtime: %', SQLERRM;
+    END;
   END IF;
 END
 $ether_pub$;
@@ -1023,8 +1107,23 @@ $ether_m5s13$;
 CREATE INDEX idx_notifications_type ON public.notifications(type);
 $ether_m5s14$;
   EXECUTE $ether_m5s15$
--- Enable realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+DO $ether_pub$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'notifications'
+  ) THEN
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding notifications on supabase_realtime: %', SQLERRM;
+    END;
+  END IF;
+END
+$ether_pub$;
 $ether_m5s15$;
   EXECUTE $ether_m5s16$
 -- Trigger to update preferences timestamp
@@ -2301,8 +2400,23 @@ $ether_m12s33$;
 CREATE INDEX idx_studio_reviews_item ON public.studio_reviews(item_id);
 $ether_m12s34$;
   EXECUTE $ether_m12s35$
--- Enable realtime for live streams
-ALTER PUBLICATION supabase_realtime ADD TABLE public.live_streams;
+DO $ether_pub$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'live_streams'
+  ) THEN
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.live_streams;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding live_streams on supabase_realtime: %', SQLERRM;
+    END;
+  END IF;
+END
+$ether_pub$;
 $ether_m12s35$;
   EXECUTE $ether_m12s36$
 DO $ether_pub$
@@ -2313,7 +2427,12 @@ BEGIN
       AND schemaname = 'public'
       AND tablename = 'stream_reactions'
   ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.stream_reactions;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.stream_reactions;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding stream_reactions on supabase_realtime: %', SQLERRM;
+    END;
   END IF;
 END
 $ether_pub$;
@@ -4022,8 +4141,23 @@ $ether_m25s4$;
 CREATE INDEX idx_favorite_friends_user_id ON public.favorite_friends(user_id);
 $ether_m25s5$;
   EXECUTE $ether_m25s6$
--- Enable realtime for story_views to fix view count updates
-ALTER PUBLICATION supabase_realtime ADD TABLE public.story_views;
+DO $ether_pub$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'story_views'
+  ) THEN
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.story_views;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding story_views on supabase_realtime: %', SQLERRM;
+    END;
+  END IF;
+END
+$ether_pub$;
 $ether_m25s6$;
   INSERT INTO public.ether_schema_migrations (version) VALUES ('20251218233701_103bf293-0003-4466-bda1-9c63d430377d.sql');
 END
@@ -7789,8 +7923,23 @@ FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column();
 $ether_m84s8$;
   EXECUTE $ether_m84s9$
--- Enable realtime for live updates
-ALTER PUBLICATION supabase_realtime ADD TABLE public.fund_distributions;
+DO $ether_pub$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'fund_distributions'
+  ) THEN
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.fund_distributions;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding fund_distributions on supabase_realtime: %', SQLERRM;
+    END;
+  END IF;
+END
+$ether_pub$;
 $ether_m84s9$;
   INSERT INTO public.ether_schema_migrations (version) VALUES ('20260125214227_ab2813fa-94fe-445e-950f-687c7112cfd4.sql');
 END
@@ -8931,8 +9080,23 @@ ON public.conversations (project_id)
 WHERE project_id IS NOT NULL;
 $ether_m101s0$;
   EXECUTE $ether_m101s1$
--- Enable realtime for conversation_participants so team list updates live
-ALTER PUBLICATION supabase_realtime ADD TABLE public.conversation_participants;
+DO $ether_pub$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'conversation_participants'
+  ) THEN
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.conversation_participants;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding conversation_participants on supabase_realtime: %', SQLERRM;
+    END;
+  END IF;
+END
+$ether_pub$;
 $ether_m101s1$;
   INSERT INTO public.ether_schema_migrations (version) VALUES ('20260302074345_09a8561f-bbf8-485e-98fa-06c9b76a37d0.sql');
 END
@@ -9098,8 +9262,23 @@ CREATE POLICY "Project owner can review suggestions"
   );
 $ether_m102s11$;
   EXECUTE $ether_m102s12$
--- Enable realtime for both tables
-ALTER PUBLICATION supabase_realtime ADD TABLE public.project_checklist_items;
+DO $ether_pub$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'project_checklist_items'
+  ) THEN
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.project_checklist_items;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding project_checklist_items on supabase_realtime: %', SQLERRM;
+    END;
+  END IF;
+END
+$ether_pub$;
 $ether_m102s12$;
   EXECUTE $ether_m102s13$
 DO $ether_pub$
@@ -9110,7 +9289,12 @@ BEGIN
       AND schemaname = 'public'
       AND tablename = 'project_item_suggestions'
   ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.project_item_suggestions;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.project_item_suggestions;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding project_item_suggestions on supabase_realtime: %', SQLERRM;
+    END;
   END IF;
 END
 $ether_pub$;
@@ -10537,7 +10721,12 @@ BEGIN
       AND schemaname = 'public'
       AND tablename = 'events'
   ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.events;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.events;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding events on supabase_realtime: %', SQLERRM;
+    END;
   END IF;
 END
 $ether_pub$;
@@ -10551,7 +10740,12 @@ BEGIN
       AND schemaname = 'public'
       AND tablename = 'projects'
   ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.projects;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.projects;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding projects on supabase_realtime: %', SQLERRM;
+    END;
   END IF;
 END
 $ether_pub$;
@@ -10565,7 +10759,12 @@ BEGIN
       AND schemaname = 'public'
       AND tablename = 'profiles'
   ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding profiles on supabase_realtime: %', SQLERRM;
+    END;
   END IF;
 END
 $ether_pub$;
@@ -10914,10 +11113,23 @@ BEGIN
 END $$;
 $ether_m124s39$;
   EXECUTE $ether_m124s40$
--- =========================================
--- 7. Realtime
--- =========================================
-ALTER PUBLICATION supabase_realtime ADD TABLE public.ticket_tiers;
+DO $ether_pub$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'ticket_tiers'
+  ) THEN
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.ticket_tiers;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding ticket_tiers on supabase_realtime: %', SQLERRM;
+    END;
+  END IF;
+END
+$ether_pub$;
 $ether_m124s40$;
   EXECUTE $ether_m124s41$
 DO $ether_pub$
@@ -10928,7 +11140,12 @@ BEGIN
       AND schemaname = 'public'
       AND tablename = 'ticket_orders'
   ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.ticket_orders;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.ticket_orders;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding ticket_orders on supabase_realtime: %', SQLERRM;
+    END;
   END IF;
 END
 $ether_pub$;
@@ -10942,7 +11159,12 @@ BEGIN
       AND schemaname = 'public'
       AND tablename = 'event_attendees'
   ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.event_attendees;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.event_attendees;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding event_attendees on supabase_realtime: %', SQLERRM;
+    END;
   END IF;
 END
 $ether_pub$;
@@ -10956,7 +11178,12 @@ BEGIN
       AND schemaname = 'public'
       AND tablename = 'event_check_ins'
   ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.event_check_ins;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.event_check_ins;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding event_check_ins on supabase_realtime: %', SQLERRM;
+    END;
   END IF;
 END
 $ether_pub$;
@@ -12422,7 +12649,7 @@ $ether_m132s0$;
   EXECUTE $ether_m132s1$
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
-    CREATE EXTENSION IF NOT EXISTS pg_cron;
+    CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA pg_catalog;
   END IF;
 END $$;
 $ether_m132s1$;
@@ -13582,6 +13809,7 @@ CREATE OR REPLACE FUNCTION public.request_header(p_name text)
 RETURNS text
 LANGUAGE plpgsql
 STABLE
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   raw text;
@@ -14034,7 +14262,12 @@ BEGIN
       AND schemaname = 'public'
       AND tablename = 'donations'
   ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.donations;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.donations;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding donations to supabase_realtime: %', SQLERRM;
+    END;
   END IF;
 END $$;
 $ether_m138s13$;
@@ -14523,6 +14756,7 @@ CREATE OR REPLACE FUNCTION public.ledger_entry_deltas(
 RETURNS TABLE (genesis_delta numeric, earned_delta numeric)
 LANGUAGE sql
 IMMUTABLE
+SET search_path = public, pg_temp
 AS $$
   SELECT
     CASE
@@ -15029,6 +15263,8 @@ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE public.stream_chat;
 EXCEPTION
   WHEN duplicate_object THEN NULL;
+  WHEN insufficient_privilege THEN
+    RAISE NOTICE 'skipped adding stream_chat to supabase_realtime: %', SQLERRM;
 END $$;
 $ether_m139s38$;
   EXECUTE $ether_m139s39$
@@ -15037,6 +15273,8 @@ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE public.board_items;
 EXCEPTION
   WHEN duplicate_object THEN NULL;
+  WHEN insufficient_privilege THEN
+    RAISE NOTICE 'skipped adding board_items to supabase_realtime: %', SQLERRM;
 END $$;
 $ether_m139s39$;
   EXECUTE $ether_m139s40$
@@ -15432,7 +15670,8 @@ $ether_m140s3$;
   EXECUTE $ether_m140s4$
 -- Read-only check Cadre can run after the rewrite:
 --   SELECT * FROM public.user_credits_pool_check WHERE NOT pools_match;
-CREATE OR REPLACE VIEW public.user_credits_pool_check AS
+CREATE OR REPLACE VIEW public.user_credits_pool_check
+WITH (security_invoker = true) AS
 SELECT
   user_id,
   balance,
@@ -15708,6 +15947,7 @@ CREATE OR REPLACE FUNCTION public.xp_level(p_total integer)
 RETURNS integer
 LANGUAGE sql
 IMMUTABLE
+SET search_path = public, pg_temp
 AS $$
   SELECT CASE
     WHEN COALESCE(p_total, 0) >= 400 THEN 5
@@ -16079,6 +16319,9 @@ END
 $sweep$;
 $ether_m142s0$;
   EXECUTE $ether_m142s1$
+-- Extension objects (pgcrypto in public, and anything owned by an extension)
+-- are left alone. ALTER FUNCTION on those is wiped by an extension upgrade
+-- and is not what the advisor count is about.
 DO $path$
 DECLARE
   fn regprocedure;
@@ -16088,7 +16331,13 @@ BEGIN
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname = 'public'
-      AND p.prosecdef
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pg_depend d
+        WHERE d.classid = 'pg_proc'::regclass
+          AND d.objid = p.oid
+          AND d.deptype = 'e'
+      )
       AND NOT EXISTS (
         SELECT 1
         FROM unnest(COALESCE(p.proconfig, ARRAY[]::text[])) AS cfg
@@ -16105,6 +16354,8 @@ $ether_m142s1$;
 -- which gives EXECUTE to PUBLIC on every new function. PUBLIC includes
 -- anon, so a schema-only revoke of anon still leaves the function callable.
 -- The global revoke removes that built-in grant for functions this role creates.
+-- These unqualified statements apply to current_user. On hosted that role
+-- is postgres, which owns the functions these migrations create.
 ALTER DEFAULT PRIVILEGES
   REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated;
 $ether_m142s2$;
@@ -16117,21 +16368,47 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT EXECUTE ON FUNCTIONS TO service_role;
 $ether_m142s4$;
   EXECUTE $ether_m142s5$
-DO $$
+-- FOR ROLE only succeeds when current_user is that role, a member of it,
+-- or a superuser. The Management API role is postgres: not a superuser and
+-- not a member of supabase_admin. A 42501 here aborts the whole migration,
+-- so a role we cannot act for is a notice. postgres still gets the same
+-- revoke above, and again below when this session may act for postgres.
+DO $defaults_postgres$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'postgres') THEN
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated';
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated';
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO service_role';
+    IF pg_has_role(current_user, 'postgres', 'MEMBER') THEN
+      EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated';
+      EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated';
+      EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO service_role';
+    ELSE
+      RAISE NOTICE 'skipped default privileges for postgres: % is not a member', current_user;
+    END IF;
   END IF;
-  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_admin') THEN
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated';
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated';
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO service_role';
-  END IF;
-END $$;
+EXCEPTION
+  WHEN insufficient_privilege THEN
+    RAISE NOTICE 'skipped default privileges for postgres: %', SQLERRM;
+END
+$defaults_postgres$;
 $ether_m142s5$;
   EXECUTE $ether_m142s6$
+DO $defaults_admin$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_admin') THEN
+    IF pg_has_role(current_user, 'supabase_admin', 'MEMBER') THEN
+      EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated';
+      EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated';
+      EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO service_role';
+    ELSE
+      RAISE NOTICE 'skipped default privileges for supabase_admin: % is not a member', current_user;
+    END IF;
+  END IF;
+EXCEPTION
+  WHEN insufficient_privilege THEN
+    RAISE NOTICE 'skipped default privileges for supabase_admin: %', SQLERRM;
+END
+$defaults_admin$;
+$ether_m142s6$;
+  EXECUTE $ether_m142s7$
 -- ---------------------------------------------------------------------------
 -- 2. Bundle bookkeeping. The schema bundle creates this table before the
 -- migrations run. Create it here too so a migrations-only scratch database
@@ -16142,31 +16419,31 @@ CREATE TABLE IF NOT EXISTS public.ether_schema_migrations (
   version text PRIMARY KEY,
   applied_at timestamptz NOT NULL DEFAULT now()
 );
-$ether_m142s6$;
-  EXECUTE $ether_m142s7$
-ALTER TABLE public.ether_schema_migrations ENABLE ROW LEVEL SECURITY;
 $ether_m142s7$;
   EXECUTE $ether_m142s8$
-REVOKE ALL ON TABLE public.ether_schema_migrations FROM PUBLIC, anon, authenticated;
+ALTER TABLE public.ether_schema_migrations ENABLE ROW LEVEL SECURITY;
 $ether_m142s8$;
   EXECUTE $ether_m142s9$
-GRANT ALL ON TABLE public.ether_schema_migrations TO service_role;
+REVOKE ALL ON TABLE public.ether_schema_migrations FROM PUBLIC, anon, authenticated;
 $ether_m142s9$;
   EXECUTE $ether_m142s10$
-COMMENT ON TABLE public.ether_schema_migrations IS
-  'Bundle bookkeeping. RLS is on and there are no policies. anon and authenticated have no grants. The table owner records applied versions.';
+GRANT ALL ON TABLE public.ether_schema_migrations TO service_role;
 $ether_m142s10$;
   EXECUTE $ether_m142s11$
+COMMENT ON TABLE public.ether_schema_migrations IS
+  'Bundle bookkeeping. RLS is on and there are no policies. anon and authenticated have no grants. The table owner records applied versions.';
+$ether_m142s11$;
+  EXECUTE $ether_m142s12$
 -- ---------------------------------------------------------------------------
 -- 3. Open INSERT policies
 -- ---------------------------------------------------------------------------
 
 DROP POLICY IF EXISTS "Service role can create notifications" ON public.notifications;
-$ether_m142s11$;
-  EXECUTE $ether_m142s12$
-DROP POLICY IF EXISTS "Authenticated users create notifications they caused" ON public.notifications;
 $ether_m142s12$;
   EXECUTE $ether_m142s13$
+DROP POLICY IF EXISTS "Authenticated users create notifications they caused" ON public.notifications;
+$ether_m142s13$;
+  EXECUTE $ether_m142s14$
 CREATE POLICY "Authenticated users create notifications they caused"
 ON public.notifications
 FOR INSERT
@@ -16257,39 +16534,44 @@ WITH CHECK (
     )
   )
 );
-$ether_m142s13$;
-  EXECUTE $ether_m142s14$
-DROP POLICY IF EXISTS "System can create matches" ON public.ai_project_matches;
 $ether_m142s14$;
   EXECUTE $ether_m142s15$
-DROP POLICY IF EXISTS "System can create timeline entries" ON public.contact_timeline;
+DROP POLICY IF EXISTS "System can create matches" ON public.ai_project_matches;
 $ether_m142s15$;
   EXECUTE $ether_m142s16$
+DROP POLICY IF EXISTS "System can create timeline entries" ON public.contact_timeline;
+$ether_m142s16$;
+  EXECUTE $ether_m142s17$
 -- ---------------------------------------------------------------------------
 -- 4. Tables with RLS and no policies. The browser does not read them.
 -- service_role bypasses RLS. No client policy is added.
 -- ---------------------------------------------------------------------------
 
 REVOKE ALL ON TABLE public.processed_stripe_events FROM PUBLIC, anon, authenticated;
-$ether_m142s16$;
-  EXECUTE $ether_m142s17$
-GRANT ALL ON TABLE public.processed_stripe_events TO service_role;
 $ether_m142s17$;
   EXECUTE $ether_m142s18$
-COMMENT ON TABLE public.processed_stripe_events IS
-  'Stripe webhook idempotency. RLS is on and there are no policies on purpose. The browser never reads this table. service_role bypasses RLS. anon and authenticated have no grants.';
+GRANT ALL ON TABLE public.processed_stripe_events TO service_role;
 $ether_m142s18$;
   EXECUTE $ether_m142s19$
-COMMENT ON TABLE public.store_secrets IS
-  'Store payment secrets. RLS is on and there are no policies on purpose. The browser never reads this table. service_role bypasses RLS. anon and authenticated have no grants.';
+COMMENT ON TABLE public.processed_stripe_events IS
+  'Stripe webhook idempotency. RLS is on and there are no policies on purpose. The browser never reads this table. service_role bypasses RLS. anon and authenticated have no grants.';
 $ether_m142s19$;
   EXECUTE $ether_m142s20$
+COMMENT ON TABLE public.store_secrets IS
+  'Store payment secrets. RLS is on and there are no policies on purpose. The browser never reads this table. service_role bypasses RLS. anon and authenticated have no grants.';
+$ether_m142s20$;
+  EXECUTE $ether_m142s21$
 -- ---------------------------------------------------------------------------
 -- 5. profiles realtime would deliver every column of a row the subscriber
 -- can SELECT, including phone and exam fields the public view omits.
 -- The landing stats hook only used the event to refresh a count.
 -- ---------------------------------------------------------------------------
 
+-- Hosted supabase_realtime is owned by supabase_admin. postgres can drop
+-- the table when it owns the publication or is a member of the owner.
+-- When it cannot, leave the migration applied and remove profiles in
+-- Dashboard, Database, Publications. Realtime would otherwise send phone
+-- and exam columns.
 DO $$
 BEGIN
   IF EXISTS (
@@ -16299,11 +16581,30 @@ BEGIN
       AND schemaname = 'public'
       AND tablename = 'profiles'
   ) THEN
-    ALTER PUBLICATION supabase_realtime DROP TABLE public.profiles;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime DROP TABLE public.profiles;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped dropping profiles from supabase_realtime: %. Remove it under Database, Publications.', SQLERRM;
+    END;
   END IF;
 END $$;
-$ether_m142s20$;
-  EXECUTE $ether_m142s21$
+$ether_m142s21$;
+  EXECUTE $ether_m142s22$
+-- user_credits_pool_check is a reconciliation view. The base table already
+-- lets a reader see credit balances, so security invoker does not widen it.
+ALTER VIEW public.user_credits_pool_check SET (security_invoker = true);
+$ether_m142s22$;
+  EXECUTE $ether_m142s23$
+-- profiles_public stays security_invoker = false. profiles SELECT is own-row
+-- only. An invoker view would hide every other profile, and a policy that
+-- exposed those rows on the base table would also expose phone and the exam
+-- score. The view WHERE clause is the exam-only rule. security_barrier is on.
+-- Phone and onboarding_score are not selected.
+COMMENT ON VIEW public.profiles_public IS
+  'Public profile columns only. security_invoker stays false on purpose: profiles SELECT is own-row, and an invoker view would hide every other profile. A broader base-table policy would expose phone and the exam score. The WHERE clause is the exam-only rule. security_barrier is on. Phone and onboarding_score are not selected.';
+$ether_m142s23$;
+  EXECUTE $ether_m142s24$
 -- ---------------------------------------------------------------------------
 -- 6. delete-account lists an avatars bucket. Profile photos are public
 -- URLs in the media bucket, so this bucket is private.
@@ -16312,11 +16613,11 @@ $ether_m142s20$;
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('avatars', 'avatars', false)
 ON CONFLICT (id) DO NOTHING;
-$ether_m142s21$;
-  EXECUTE $ether_m142s22$
+$ether_m142s24$;
+  EXECUTE $ether_m142s25$
 DROP POLICY IF EXISTS "Users can upload own avatars" ON storage.objects;
-$ether_m142s22$;
-  EXECUTE $ether_m142s23$
+$ether_m142s25$;
+  EXECUTE $ether_m142s26$
 CREATE POLICY "Users can upload own avatars"
 ON storage.objects
 FOR INSERT
@@ -16325,11 +16626,11 @@ WITH CHECK (
   bucket_id = 'avatars'
   AND auth.uid()::text = (storage.foldername(name))[1]
 );
-$ether_m142s23$;
-  EXECUTE $ether_m142s24$
+$ether_m142s26$;
+  EXECUTE $ether_m142s27$
 DROP POLICY IF EXISTS "Users can view own avatars" ON storage.objects;
-$ether_m142s24$;
-  EXECUTE $ether_m142s25$
+$ether_m142s27$;
+  EXECUTE $ether_m142s28$
 CREATE POLICY "Users can view own avatars"
 ON storage.objects
 FOR SELECT
@@ -16338,11 +16639,11 @@ USING (
   bucket_id = 'avatars'
   AND auth.uid()::text = (storage.foldername(name))[1]
 );
-$ether_m142s25$;
-  EXECUTE $ether_m142s26$
+$ether_m142s28$;
+  EXECUTE $ether_m142s29$
 DROP POLICY IF EXISTS "Users can update own avatars" ON storage.objects;
-$ether_m142s26$;
-  EXECUTE $ether_m142s27$
+$ether_m142s29$;
+  EXECUTE $ether_m142s30$
 CREATE POLICY "Users can update own avatars"
 ON storage.objects
 FOR UPDATE
@@ -16355,11 +16656,11 @@ WITH CHECK (
   bucket_id = 'avatars'
   AND auth.uid()::text = (storage.foldername(name))[1]
 );
-$ether_m142s27$;
-  EXECUTE $ether_m142s28$
+$ether_m142s30$;
+  EXECUTE $ether_m142s31$
 DROP POLICY IF EXISTS "Users can delete own avatars" ON storage.objects;
-$ether_m142s28$;
-  EXECUTE $ether_m142s29$
+$ether_m142s31$;
+  EXECUTE $ether_m142s32$
 CREATE POLICY "Users can delete own avatars"
 ON storage.objects
 FOR DELETE
@@ -16368,7 +16669,7 @@ USING (
   bucket_id = 'avatars'
   AND auth.uid()::text = (storage.foldername(name))[1]
 );
-$ether_m142s29$;
+$ether_m142s32$;
   INSERT INTO public.ether_schema_migrations (version) VALUES ('20261018211500_lock_definer_grants_and_open_inserts.sql');
 END
 $ether_m142$;

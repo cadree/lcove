@@ -39,7 +39,9 @@ These fail or leak secrets if they are pasted as SQL. They are dashboard steps a
 
 - **Cron jobs owned by `supabase_admin`.** Do not `cron.schedule` a command that contains `https://aykopqinnnssxdhxqruo.supabase.co` plus the service role key or `INTERNAL_FUNCTION_SECRET`. Create `process-email-queue` and `auto-event-reminders` in Integrations, Cron. The reminder job must send header `x-internal-secret`.
 - **Vault secrets owned by `supabase_admin`.** Do not `vault.create_secret` for `email_queue_service_role_key` inside a file in this repo. If the email worker reads that name, create it in the Vault UI.
-- **Publication owner.** `supabase_realtime` is owned by `supabase_admin`. The bundle skips a table that is already in the publication. If the SQL editor says the role must own the publication, add the tables listed in `docs/go-live-checklist.md` under Database, Publications.
+- **Publication owner.** `supabase_realtime` is owned by `supabase_admin`. The bundle skips a table that is already in the publication. If this role cannot change the publication, the statement is a notice instead of a failed migration. Add the tables listed in `docs/go-live-checklist.md` under Database, Publications. Do not add `profiles`. If a notice says `profiles` could not be removed, remove it there.
+- **Default privileges for `supabase_admin`.** `postgres` can change default privileges for itself. It cannot change them for `supabase_admin`. The migration skips that role and still revokes `EXECUTE` from `PUBLIC`, `anon`, and `authenticated` for functions `postgres` creates.
+- **`pg_net` in `public`.** The bundle creates `pg_net` in `extensions` when it is missing, and moves an existing install when this role owns it and the build allows `SET SCHEMA`. A permission error or a non-relocatable build leaves it where it is and raises a notice. The extension owner then runs `ALTER EXTENSION pg_net SET SCHEMA extensions`.
 
 ### Auth
 
@@ -77,7 +79,7 @@ psql "<connection-string-for-aykopqinnnssxdhxqruo>" -v ON_ERROR_STOP=1 -f supaba
 
 Or paste `supabase/bundle/ether-schema.sql` into the dashboard SQL editor. Use the connection string from the dashboard. Do not commit it.
 
-The file records each migration name in `public.ether_schema_migrations`. That table has RLS on and no policies. `anon` and `authenticated` have no grants. Running the file a second time skips recorded names. A scratch database that stubs auth, storage, and realtime accepted the file twice. That rehearsal does not prove hosted-only behavior: extension allowlists, `supabase_admin` ownership of `cron`, `vault`, and `supabase_realtime`, or dashboard cron delivery.
+The file records each migration name in `public.ether_schema_migrations`. That table has RLS on and no policies. `anon` and `authenticated` have no grants. Running the file a second time skips recorded names. A scratch database that stubs auth, storage, and realtime accepted the file twice, including once as a non-superuser role that is not a member of a stub `supabase_admin`. That rehearsal does not prove hosted-only behavior: extension allowlists, `supabase_admin` ownership of `cron`, `vault`, and `supabase_realtime`, whether the installed `pg_net` can change schema, or dashboard cron delivery.
 
 `processed_stripe_events` and `store_secrets` also have RLS on and no policies. The browser does not read them. `service_role` bypasses RLS. The function grant table is in `docs/security-definer-grants.md`.
 

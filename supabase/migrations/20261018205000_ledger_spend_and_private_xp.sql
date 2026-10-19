@@ -238,6 +238,7 @@ CREATE OR REPLACE FUNCTION public.xp_level(p_total integer)
 RETURNS integer
 LANGUAGE sql
 IMMUTABLE
+SET search_path = public, pg_temp
 AS $$
   SELECT CASE
     WHEN COALESCE(p_total, 0) >= 400 THEN 5

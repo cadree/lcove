@@ -75,7 +75,8 @@ ALTER TABLE public.user_credits
 
 -- Read-only check Cadre can run after the rewrite:
 --   SELECT * FROM public.user_credits_pool_check WHERE NOT pools_match;
-CREATE OR REPLACE VIEW public.user_credits_pool_check AS
+CREATE OR REPLACE VIEW public.user_credits_pool_check
+WITH (security_invoker = true) AS
 SELECT
   user_id,
   balance,

@@ -1119,13 +1119,67 @@ BEGIN
     RAISE EXCEPTION 'FAIL: authenticated cannot execute sender_blocked_in_conversation';
   END IF;
 
-  IF (SELECT proconfig FROM pg_proc WHERE oid = 'public.enqueue_email(text,jsonb)'::regprocedure) IS NULL
-     OR NOT EXISTS (
-       SELECT 1
-       FROM unnest((SELECT proconfig FROM pg_proc WHERE oid = 'public.enqueue_email(text,jsonb)'::regprocedure)) cfg
-       WHERE cfg LIKE 'search_path=%'
-     ) THEN
-    RAISE EXCEPTION 'FAIL: enqueue_email has no search_path';
+  IF EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname IN (
+        'enqueue_email',
+        'read_email_batch',
+        'delete_email',
+        'move_to_dlq',
+        'ledger_entry_deltas',
+        'request_header',
+        'xp_level'
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM unnest(COALESCE(p.proconfig, ARRAY[]::text[])) cfg
+        WHERE cfg LIKE 'search_path=%'
+      )
+  ) THEN
+    RAISE EXCEPTION 'FAIL: a reported function still has no search_path';
+  END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pg_depend d
+        WHERE d.classid = 'pg_proc'::regclass
+          AND d.objid = p.oid
+          AND d.deptype = 'e'
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM unnest(COALESCE(p.proconfig, ARRAY[]::text[])) cfg
+        WHERE cfg LIKE 'search_path=%'
+      )
+  ) THEN
+    RAISE EXCEPTION 'FAIL: a public function still has no search_path';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relname = 'user_credits_pool_check'
+      AND 'security_invoker=true' = ANY (c.reloptions)
+  ) THEN
+    RAISE EXCEPTION 'FAIL: user_credits_pool_check is not security_invoker';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relname = 'profiles_public'
+      AND 'security_invoker=false' = ANY (c.reloptions)
+  ) THEN
+    RAISE EXCEPTION 'FAIL: profiles_public must stay security_invoker false';
   END IF;
 
   RAISE NOTICE 'PASS: internal functions are service_role only and user functions stay callable';

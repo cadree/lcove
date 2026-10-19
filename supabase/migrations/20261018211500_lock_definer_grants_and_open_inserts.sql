@@ -135,6 +135,9 @@ BEGIN
 END
 $sweep$;
 
+-- Extension objects (pgcrypto in public, and anything owned by an extension)
+-- are left alone. ALTER FUNCTION on those is wiped by an extension upgrade
+-- and is not what the advisor count is about.
 DO $path$
 DECLARE
   fn regprocedure;
@@ -144,7 +147,13 @@ BEGIN
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname = 'public'
-      AND p.prosecdef
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pg_depend d
+        WHERE d.classid = 'pg_proc'::regclass
+          AND d.objid = p.oid
+          AND d.deptype = 'e'
+      )
       AND NOT EXISTS (
         SELECT 1
         FROM unnest(COALESCE(p.proconfig, ARRAY[]::text[])) AS cfg
@@ -160,6 +169,8 @@ $path$;
 -- which gives EXECUTE to PUBLIC on every new function. PUBLIC includes
 -- anon, so a schema-only revoke of anon still leaves the function callable.
 -- The global revoke removes that built-in grant for functions this role creates.
+-- These unqualified statements apply to current_user. On hosted that role
+-- is postgres, which owns the functions these migrations create.
 ALTER DEFAULT PRIVILEGES
   REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
@@ -167,19 +178,44 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT EXECUTE ON FUNCTIONS TO service_role;
 
-DO $$
+-- FOR ROLE only succeeds when current_user is that role, a member of it,
+-- or a superuser. The Management API role is postgres: not a superuser and
+-- not a member of supabase_admin. A 42501 here aborts the whole migration,
+-- so a role we cannot act for is a notice. postgres still gets the same
+-- revoke above, and again below when this session may act for postgres.
+DO $defaults_postgres$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'postgres') THEN
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated';
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated';
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO service_role';
+    IF pg_has_role(current_user, 'postgres', 'MEMBER') THEN
+      EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated';
+      EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated';
+      EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO service_role';
+    ELSE
+      RAISE NOTICE 'skipped default privileges for postgres: % is not a member', current_user;
+    END IF;
   END IF;
+EXCEPTION
+  WHEN insufficient_privilege THEN
+    RAISE NOTICE 'skipped default privileges for postgres: %', SQLERRM;
+END
+$defaults_postgres$;
+
+DO $defaults_admin$
+BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_admin') THEN
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated';
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated';
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO service_role';
+    IF pg_has_role(current_user, 'supabase_admin', 'MEMBER') THEN
+      EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated';
+      EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated';
+      EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO service_role';
+    ELSE
+      RAISE NOTICE 'skipped default privileges for supabase_admin: % is not a member', current_user;
+    END IF;
   END IF;
-END $$;
+EXCEPTION
+  WHEN insufficient_privilege THEN
+    RAISE NOTICE 'skipped default privileges for supabase_admin: %', SQLERRM;
+END
+$defaults_admin$;
 
 -- ---------------------------------------------------------------------------
 -- 2. Bundle bookkeeping. The schema bundle creates this table before the
@@ -320,6 +356,11 @@ COMMENT ON TABLE public.store_secrets IS
 -- The landing stats hook only used the event to refresh a count.
 -- ---------------------------------------------------------------------------
 
+-- Hosted supabase_realtime is owned by supabase_admin. postgres can drop
+-- the table when it owns the publication or is a member of the owner.
+-- When it cannot, leave the migration applied and remove profiles in
+-- Dashboard, Database, Publications. Realtime would otherwise send phone
+-- and exam columns.
 DO $$
 BEGIN
   IF EXISTS (
@@ -329,9 +370,26 @@ BEGIN
       AND schemaname = 'public'
       AND tablename = 'profiles'
   ) THEN
-    ALTER PUBLICATION supabase_realtime DROP TABLE public.profiles;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime DROP TABLE public.profiles;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped dropping profiles from supabase_realtime: %. Remove it under Database, Publications.', SQLERRM;
+    END;
   END IF;
 END $$;
+
+-- user_credits_pool_check is a reconciliation view. The base table already
+-- lets a reader see credit balances, so security invoker does not widen it.
+ALTER VIEW public.user_credits_pool_check SET (security_invoker = true);
+
+-- profiles_public stays security_invoker = false. profiles SELECT is own-row
+-- only. An invoker view would hide every other profile, and a policy that
+-- exposed those rows on the base table would also expose phone and the exam
+-- score. The view WHERE clause is the exam-only rule. security_barrier is on.
+-- Phone and onboarding_score are not selected.
+COMMENT ON VIEW public.profiles_public IS
+  'Public profile columns only. security_invoker stays false on purpose: profiles SELECT is own-row, and an invoker view would hide every other profile. A broader base-table policy would expose phone and the exam score. The WHERE clause is the exam-only rule. security_barrier is on. Phone and onboarding_score are not selected.';
 
 -- ---------------------------------------------------------------------------
 -- 6. delete-account lists an avatars bucket. Profile photos are public

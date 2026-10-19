@@ -128,6 +128,7 @@ CREATE OR REPLACE FUNCTION public.request_header(p_name text)
 RETURNS text
 LANGUAGE plpgsql
 STABLE
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   raw text;

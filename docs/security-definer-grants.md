@@ -11,11 +11,17 @@ Final grants:
 | trigger | `service_role` |
 | internal | `service_role` |
 
-Trigger functions still run for the signed-in role that writes the row. A scratch check updates a profile and inserts a post after `EXECUTE` is revoked from `authenticated`, and both triggers still fire. RLS helpers stay executable by the role that evaluates the policy. `profiles_public` is `security_invoker = false`, so its `has_role` call runs as the view owner.
+Trigger functions still run for the signed-in role that writes the row. A scratch check updates a profile and inserts a post after `EXECUTE` is revoked from `authenticated`, and both triggers still fire. RLS helpers stay executable by the role that evaluates the policy.
 
-`enqueue_email`, `read_email_batch`, `delete_email`, and `move_to_dlq` had no `search_path`. They are set to `public, pg_temp`. The other definer functions already set `search_path`.
+`profiles_public` stays `security_invoker = false` and `security_barrier = true`. `profiles` SELECT is own-row only. An invoker view would hide every other profile. A base-table policy wide enough for the view to see other rows would also expose `phone` and the exam score. The view's `WHERE` clause is the exam-only rule, and it does not select those columns. `has_role` inside the view runs as the view owner.
 
-New functions created by `postgres` are granted to `service_role` only. A signed-in RPC still needs an explicit `GRANT` to `authenticated`.
+`user_credits_pool_check` is `security_invoker = true`. It only reads `user_credits`, and that table already lets a reader see balances, so the invoker view does not widen access. Cadre's reconciliation query still runs as the table owner.
+
+These seven public functions had no fixed `search_path`. They are set to `public, pg_temp`: `enqueue_email`, `read_email_batch`, `delete_email`, `move_to_dlq`, `ledger_entry_deltas`, `request_header`, `xp_level`. Extension functions that happen to live in `public` (pgcrypto) are not altered.
+
+New functions created by the migration role are granted to `service_role` only. A signed-in RPC still needs an explicit `GRANT` to `authenticated`.
+
+`ALTER DEFAULT PRIVILEGES` with no `FOR ROLE` applies to `current_user`. On hosted that is `postgres`, the owner of functions these migrations create. `FOR ROLE postgres` runs only when this session may act for `postgres` (the role itself, a member, or a superuser). `FOR ROLE supabase_admin` runs only when this session may act for `supabase_admin`. The Management API role is not a member of `supabase_admin` and is not a superuser. That statement used to abort the migration with `42501`. It is now a notice. The same notice covers `ALTER PUBLICATION` when `supabase_realtime` is owned by `supabase_admin`. Remove `profiles` in Dashboard, Database, Publications if the notice says the drop was skipped.
 
 `accept_custom_role_proposal` and `ensure_default_pipeline` are called by the signed-in app and do not call `auth.uid()` themselves. `anon` cannot execute them. They still trust the user id argument.
 

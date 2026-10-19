@@ -97,7 +97,12 @@ BEGIN
       AND schemaname = 'public'
       AND tablename = 'donations'
   ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.donations;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.donations;
+    EXCEPTION
+      WHEN insufficient_privilege THEN
+        RAISE NOTICE 'skipped adding donations to supabase_realtime: %', SQLERRM;
+    END;
   END IF;
 END $$;
 

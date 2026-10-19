@@ -37,11 +37,13 @@ Dashboard, Database, Extensions. Turn these on before the schema file runs. `CRE
 
 In the dashboard SQL editor, or with `psql` against this project's connection string, run that file once. It does not connect anywhere by itself. It does not schedule cron jobs and it does not write secrets.
 
-If a statement says it must be the owner of publication `supabase_realtime` (that publication is owned by `supabase_admin`), add these tables under Database, Publications, `supabase_realtime`:
+If a notice says this role could not change publication `supabase_realtime` (that publication is owned by `supabase_admin`), add these tables under Database, Publications, `supabase_realtime`:
 
 `post_likes`, `post_comments`, `messages`, `typing_indicators`, `message_read_receipts`, `notifications`, `live_streams`, `stream_reactions`, `story_views`, `fund_distributions`, `conversation_participants`, `project_checklist_items`, `project_item_suggestions`, `events`, `projects`, `ticket_tiers`, `ticket_orders`, `event_attendees`, `event_check_ins`, `donations`, `stream_chat`, `board_items`.
 
-`profiles` is not in that list. Realtime would send every column of a row the subscriber can select, including phone and exam fields that `profiles_public` omits. The landing stats query does not subscribe to `profiles`.
+`profiles` is not in that list. Realtime would send every column of a row the subscriber can select, including phone and exam fields that `profiles_public` omits. The landing stats query does not subscribe to `profiles`. If a notice says `profiles` could not be removed from the publication, remove it on that same screen.
+
+`pg_net` should live in the `extensions` schema. If a notice says it was left outside `extensions`, the extension owner runs `ALTER EXTENSION pg_net SET SCHEMA extensions`. A build that does not allow `SET SCHEMA` stays where the dashboard installed it. The email migration does not call `net.http_post`.
 
 The scratch rehearsal of this file is in the pull request. It is not a substitute for running it on `aykopqinnnssxdhxqruo`.
 

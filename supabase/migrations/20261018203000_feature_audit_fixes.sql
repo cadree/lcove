@@ -17,6 +17,7 @@ CREATE OR REPLACE FUNCTION public.ledger_entry_deltas(
 RETURNS TABLE (genesis_delta numeric, earned_delta numeric)
 LANGUAGE sql
 IMMUTABLE
+SET search_path = public, pg_temp
 AS $$
   SELECT
     CASE
@@ -475,6 +476,8 @@ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE public.stream_chat;
 EXCEPTION
   WHEN duplicate_object THEN NULL;
+  WHEN insufficient_privilege THEN
+    RAISE NOTICE 'skipped adding stream_chat to supabase_realtime: %', SQLERRM;
 END $$;
 
 DO $$
@@ -482,6 +485,8 @@ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE public.board_items;
 EXCEPTION
   WHEN duplicate_object THEN NULL;
+  WHEN insufficient_privilege THEN
+    RAISE NOTICE 'skipped adding board_items to supabase_realtime: %', SQLERRM;
 END $$;
 
 ALTER TABLE public.content_reports DROP CONSTRAINT IF EXISTS content_reports_target_type_check;

@@ -6,7 +6,7 @@
 CREATE EXTENSION IF NOT EXISTS pg_net SCHEMA extensions;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
-    CREATE EXTENSION pg_cron;
+    CREATE EXTENSION pg_cron WITH SCHEMA pg_catalog;
   END IF;
 END $$;
 CREATE EXTENSION IF NOT EXISTS supabase_vault;
