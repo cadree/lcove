@@ -28,13 +28,13 @@ export function FeedFilters({
   availableRegions,
 }: FeedFiltersProps) {
   return (
-    <div className="flex items-center gap-2 mb-4 flex-wrap">
+    <div className="mb-4 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
       {/* Post Type Select */}
       <Select 
         value={postTypeFilter} 
         onValueChange={(val) => setPostTypeFilter(val as 'all' | 'regular' | 'portfolio')}
       >
-        <SelectTrigger className="w-[130px] h-11 glass border-0 pl-3 gap-2">
+        <SelectTrigger className="h-11 w-[8.5rem] shrink-0 gap-2 border border-border bg-card/70 pl-3">
           <Filter className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
           <SelectValue placeholder="Type" />
         </SelectTrigger>
@@ -50,7 +50,7 @@ export function FeedFilters({
         value={regionFilter || "all"} 
         onValueChange={(val) => setRegionFilter(val === "all" ? null : val)}
       >
-        <SelectTrigger className="w-[150px] h-11 glass border-0 pl-3 gap-2">
+        <SelectTrigger className="h-11 w-[8.5rem] shrink-0 gap-2 border border-border bg-card/70 pl-3">
           <MapPin className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
           <SelectValue placeholder="Region" />
         </SelectTrigger>
@@ -65,7 +65,7 @@ export function FeedFilters({
       </Select>
 
       {/* Media Type Chips - compact inline */}
-      <div className="flex gap-1.5 ml-auto">
+      <div className="flex shrink-0 gap-1.5">
         {["All", "Photo", "Video", "Text"].map((category) => (
           <Button
             key={category}

@@ -11,9 +11,7 @@ import { FriendsDrawer } from "@/components/friends/FriendsDrawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import FirstRunEmpty from "@/components/onboarding/FirstRunEmpty";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Filter, Shuffle, Loader2, Sparkles, Users, User, Bell } from "lucide-react";
-import { MoreMenuButton } from "@/components/navigation/MoreMenu";
+import { Bell, Filter, Loader2, Shuffle, Sparkles, Users } from "lucide-react";
 import { usePosts } from "@/hooks/usePosts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -103,52 +101,32 @@ const Feed = () => {
     return matchesCategory && matchesPostType && matchesRegion;
   });
   return <PageLayout>
-      <div className="px-4 sm:px-6 pt-4">
-        {/* Compact Header with Profile + Actions */}
-        <motion.header initial={{
-        y: -10,
-        opacity: 0
-      }} animate={{
-        y: 0,
-        opacity: 1
-      }} className="flex items-start justify-between gap-3 mb-4 pb-4 border-b border-border">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link to="/profile" aria-label="View my profile" className="shrink-0">
-              <Avatar className="w-11 h-11 rounded-full">
-                <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || "My profile"} className="rounded-full" />
-                <AvatarFallback className="rounded-full bg-muted text-foreground">
-                  <User className="w-5 h-5" />
-                </AvatarFallback>
-              </Avatar>
-            </Link>
-            <div>
-              <p className="eyebrow">Home</p>
-              <h1 className="ether-title text-3xl">Feed</h1>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <MoreMenuButton />
-            <Link to="/notifications" aria-label="Notifications">
+      <div className="px-4 sm:px-6 pt-3">
+        <header className="mb-3 flex min-h-11 items-center justify-between gap-3">
+          <Link to="/feed" className="ether-title inline-flex min-h-11 items-center text-[22px] tracking-[0.22em]" aria-label="Ether home">
+            Ether
+          </Link>
+          <div className="flex items-center">
+            <FriendsDrawer>
+              <Button variant="ghost" size="icon" aria-label="Friends">
+                <Users className="h-5 w-5" />
+              </Button>
+            </FriendsDrawer>
+            <Link to="/notifications" aria-label="Notifications" className="inline-flex">
               <Button variant="ghost" size="icon" aria-label="Notifications">
-                <Bell className="w-4 h-4" />
+                <Bell className="h-5 w-5" />
               </Button>
             </Link>
           </div>
-        </motion.header>
+        </header>
 
         {/* Stories Row */}
         <StoriesRow />
 
-        {/* Action Bar */}
-        <div className="flex items-center justify-between mt-4 mb-4">
-          <FriendsDrawer>
-            <Button variant="glass" size="sm" className="gap-2 min-h-11">
-              <Users className="w-4 h-4" />
-              <span className="text-xs">Friends</span>
-            </Button>
-          </FriendsDrawer>
-          
+        {/* Room for the Novi quest card. Quests ship in a later phase. */}
+        <div data-novi-quest-slot="" />
+
+        <div className="mb-4 mt-2 flex items-center justify-end gap-2">
           <div className="flex gap-2">
             <Button variant={isShuffled ? "default" : "outline"} size="icon" onClick={handleShuffle} title="Shuffle feed" aria-label="Shuffle feed">
               <Shuffle className="w-4 h-4" />

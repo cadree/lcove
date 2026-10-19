@@ -7,8 +7,18 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="ETHER" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="theme-color" content="#080808" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#08080A" />
+    <meta name="color-scheme" content="dark light" />
+    <script>
+      (function () {
+        try {
+          var choice = localStorage.getItem("ether-theme") || "system";
+          var dark = choice === "dark" || (choice !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.add(dark ? "dark" : "light");
+          document.documentElement.style.colorScheme = dark ? "dark" : "light";
+        } catch (e) {}
+      })();
+    </script>
     <meta name="format-detection" content="telephone=no" />
     
     <!-- PWA Manifest -->

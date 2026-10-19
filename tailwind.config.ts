@@ -18,8 +18,11 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ["var(--profile-font, var(--font-display))"],
-        body: ["var(--font-body)"],
+        display: ["var(--profile-font, var(--font-display))", "Georgia", "serif"],
+        body: ["var(--font-body)", "system-ui", "sans-serif"],
+        sans: ["var(--font-sans, var(--font-body))", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+        lore: ["var(--font-lore)", "Georgia", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",

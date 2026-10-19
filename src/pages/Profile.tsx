@@ -1,10 +1,10 @@
-import { useState, useCallback, useRef, type CSSProperties } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useState, useCallback, useRef, useEffect, type CSSProperties } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Grid, Bookmark, FileText, ArrowLeft, LayoutGrid, Users, LayoutDashboard, ShoppingBag, Calendar, PenLine } from "lucide-react";
+import { Loader2, Bookmark, ArrowLeft, LayoutGrid, Users, LayoutDashboard, ShoppingBag, Calendar, PenLine } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
@@ -21,7 +21,7 @@ import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { ProfileStats } from "@/components/profile/ProfileStats";
 import { ProfileAboutSection } from "@/components/profile/ProfileAboutSection";
 import { ProfileFolders } from "@/components/profile/ProfileFolders";
-import { ProfileBookEntry, ProfileQuickLinks } from "@/components/profile/ProfileQuickLinks";
+import { ProfileBookEntry, ProfileQuickLinks, ToolsEntry } from "@/components/profile/ProfileQuickLinks";
 import { FolderDetailView } from "@/components/profile/FolderDetailView";
 import { ProfileLayoutEditor } from "@/components/profile/ProfileLayoutEditor";
 import { ProfileFriendsSection } from "@/components/profile/ProfileFriendsSection";
@@ -47,6 +47,7 @@ import { ProfileEffects } from "@/components/profile/ProfileEffects";
 
 const Profile = () => {
   const { userId: urlUserId } = useParams<{ userId?: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const navigate = useNavigate();
   
@@ -78,6 +79,13 @@ const Profile = () => {
   const volumeSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const hasCreatorRoles = creatorRoles.length > 0;
+
+  useEffect(() => {
+    if (searchParams.get("action") === "create-blog" && isOwnProfile) {
+      setShowCreateBlogDialog(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, isOwnProfile, setSearchParams]);
 
   // Square portfolio grid sits above the rest of the module stack.
   const visibleSections = applyProfileCustomization(layout, customization)
@@ -267,24 +275,21 @@ const Profile = () => {
               <TabsList className="w-full justify-center border-b border-border rounded-none bg-transparent h-auto py-0 px-0">
                 <TabsTrigger 
                   value="posts" 
-                  className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
+                  className="min-h-11 flex-1 rounded-none border-b-2 border-transparent px-2 font-mono text-[10px] uppercase tracking-[0.14em] data-[state=active]:border-primary data-[state=active]:bg-transparent"
                 >
-                  <Grid className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Posts</span>
+                  Posts
                 </TabsTrigger>
                 <TabsTrigger 
                   value="blogs" 
-                  className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
+                  className="min-h-11 flex-1 rounded-none border-b-2 border-transparent px-2 font-mono text-[10px] uppercase tracking-[0.14em] data-[state=active]:border-primary data-[state=active]:bg-transparent"
                 >
-                  <FileText className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Blog</span>
+                  Blogs
                 </TabsTrigger>
                 <TabsTrigger 
                   value="saved" 
-                  className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
+                  className="min-h-11 flex-1 rounded-none border-b-2 border-transparent px-2 font-mono text-[10px] uppercase tracking-[0.14em] data-[state=active]:border-primary data-[state=active]:bg-transparent"
                 >
-                  <Bookmark className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Saved</span>
+                  Saved
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="posts" className="mt-4">
@@ -527,9 +532,11 @@ const Profile = () => {
           onAvatarUpdate={handleAvatarUpdate}
           userId={targetUserId || ''}
           memberTier={isOwnProfile && membership?.subscribed ? membership.tier : null}
+          roleLabel={userCreativeRoles[0]?.name || "Creator"}
         />
 
         <ProfileBookEntry />
+        {isOwnProfile && <ToolsEntry />}
 
         {postsSection && renderSection(postsSection)}
 

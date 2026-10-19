@@ -1,5 +1,8 @@
 // Application entry point - Ether App
 import { lazy, Suspense } from "react";
+import { MotionConfig } from "framer-motion";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { WorldLayer } from "@/components/world/WorldLayer";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -93,6 +96,9 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <BrowserRouter>
+        <ThemeProvider>
+        <WorldLayer />
+        <MotionConfig reducedMotion="user">
         <AuthProvider>
           <PresenceProvider>
             <CreateFlowProvider>
@@ -166,6 +172,8 @@ const App = () => (
             </CreateFlowProvider>
           </PresenceProvider>
         </AuthProvider>
+        </MotionConfig>
+        </ThemeProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

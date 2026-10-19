@@ -1,42 +1,38 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import etherBearLogo from "@/assets/ether-bear-logo.png";
 
 export function LandingHero() {
   const navigate = useNavigate();
 
   return (
-    <section className="relative min-h-[80vh] flex items-center">
-      <div className="container relative px-4 sm:px-6 lg:px-8 py-16 md:py-24">
-        <div className="max-w-xl">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-center lg:text-left"
-          >
-            <p className="eyebrow mb-4">Ether</p>
-            <h1 className="ether-title text-5xl sm:text-6xl lg:text-7xl mb-4">
-              The creative community OS
-            </h1>
-            <span className="mx-auto lg:mx-0 mb-6 block h-px w-16 bg-[hsl(var(--ether-pink))]" aria-hidden="true" />
-            <p className="text-lg text-foreground mb-8">Free to join.</p>
+    <section className="relative px-4 pb-10 pt-8 sm:px-6">
+      <div className="mx-auto flex max-w-md flex-col items-center text-center">
+        <p className="kicker mb-8">Familcy access // Lcove signal</p>
+        <img
+          src={etherBearLogo}
+          alt=""
+          className="logo-cutout mb-6 h-28 w-28 object-contain"
+        />
+        <p className="ether-title mb-3 text-[15px] tracking-[0.28em] text-foreground">Ether</p>
+        <h1 className="ether-title mb-4 max-w-[16ch] text-[38px] leading-[0.95]">
+          The creative community OS
+        </h1>
+        <p className="lore mb-8 text-[22px] text-foreground">Free to join.</p>
 
-            <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
-              <Button size="lg" className="min-h-11" onClick={() => navigate("/auth")}>
-                Join
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                className="min-h-11"
-                onClick={() => navigate("/community")}
-              >
-                Community updates
-              </Button>
-            </div>
-          </motion.div>
+        <div className="file-panel mb-4 w-full px-4 py-4 text-left">
+          <p className="mono-label text-[9px] text-[hsl(var(--brand))]">Signal report</p>
+          <p className="mt-2 font-body text-[15px] font-extrabold text-foreground">Enter the signal</p>
+          <p className="lore mt-1 text-[15px] text-muted-foreground">Finish onboarding and I&apos;ll show you.</p>
+          <Button className="mt-4 w-full" onClick={() => navigate("/auth")}>
+            Join
+          </Button>
         </div>
+
+        <Button variant="outline" className="w-full" onClick={() => navigate("/auth")}>
+          Sign in
+        </Button>
+        <p className="mono-label mt-6 text-[9px] text-muted-foreground">Year 2096 // Creativity preserved</p>
       </div>
     </section>
   );

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, ReactNode } from "react";
-import { CreateShareFlow } from "@/components/create/CreateShareFlow";
+import { CreateSheet } from "@/components/navigation/CreateSheet";
 
 interface CreateFlowContextValue {
   openCreate: () => void;
@@ -13,7 +13,7 @@ export function CreateFlowProvider({ children }: { children: ReactNode }) {
   return (
     <CreateFlowContext.Provider value={{ openCreate: () => setOpen(true) }}>
       {children}
-      <CreateShareFlow open={open} onOpenChange={setOpen} />
+      <CreateSheet open={open} onOpenChange={setOpen} />
     </CreateFlowContext.Provider>
   );
 }

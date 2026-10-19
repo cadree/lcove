@@ -48,6 +48,8 @@ import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
 import { supabase } from "@/integrations/supabase/client";
+import { useThemeMode } from "@/components/theme/ThemeProvider";
+import type { ThemeChoice } from "@/lib/themeMode";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertDialog,
@@ -61,7 +63,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+const appearanceChoices: { id: ThemeChoice; label: string }[] = [
+  { id: "system", label: "System" },
+  { id: "dark", label: "Dark" },
+  { id: "light", label: "Light" },
+];
+
 const Settings = () => {
+  const { choice, setChoice } = useThemeMode();
   const { user, updatePassword, signOut } = useAuth();
   const { isAdmin } = useIsAdmin();
   const navigate = useNavigate();
@@ -305,6 +314,31 @@ const Settings = () => {
           backPath="/profile"
           className="mb-8"
         />
+
+        <section className="file-panel mb-6 p-5" aria-labelledby="appearance-heading">
+          <h2 id="appearance-heading" className="ether-title text-lg">Appearance</h2>
+          <p className="mb-4 text-sm text-muted-foreground">Follows your system unless you choose dark or light.</p>
+          <div className="grid grid-cols-3 gap-2">
+            {appearanceChoices.map((option) => {
+              const active = choice === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setChoice(option.id)}
+                  className={`mono-label min-h-11 rounded-[14px] border px-2 text-[11px] ${
+                    active
+                      ? "border-[hsl(var(--scan))] bg-card text-foreground"
+                      : "border-border text-muted-foreground"
+                  }`}
+                  aria-pressed={active}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
         {/* Profile Section */}
         <motion.section

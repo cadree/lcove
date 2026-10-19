@@ -15,7 +15,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreMenuButton } from '@/components/navigation/MoreMenu';
 
 interface ConversationListProps {
   selectedId: string | null;
@@ -75,29 +74,49 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-border">
-        <div className="flex items-start justify-between gap-2 mb-4">
+      <div className="border-b border-border p-4">
+        <div className="mb-3 flex items-start justify-between gap-2">
           <div>
-            <p className="eyebrow">Inbox</p>
-            <h1 className="ether-title text-3xl text-foreground">Messages</h1>
+            <p className="kicker">Encrypted channel</p>
+            <h1 className="ether-title text-[34px] text-foreground">Messages</h1>
           </div>
-          <div className="flex items-center">
-            <Button variant="ghost" size="icon" onClick={onNewChat} aria-label="New message">
-              <Plus className="w-5 h-5" />
-            </Button>
-            <MoreMenuButton />
-          </div>
+          <Button variant="ghost" size="icon" onClick={onNewChat} aria-label="New message">
+            <Plus className="h-5 w-5" />
+          </Button>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search conversations..."
+            placeholder="SEARCH"
+            aria-label="Search conversations"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 bg-muted/30 border-border/50"
+            className="h-11 rounded-[14px] border-border bg-card/70 pl-10 font-mono text-[12px] uppercase tracking-[0.14em]"
           />
+        </div>
+
+        <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+          {conversations.filter((conv) => {
+            const otherId = getOtherUserId(conv);
+            return otherId ? isOnline(otherId) : false;
+          }).slice(0, 8).map((conv) => (
+            <button
+              key={conv.id}
+              type="button"
+              onClick={() => onSelect(conv.id)}
+              className="flex w-14 shrink-0 flex-col items-center gap-1"
+            >
+              <span className="relative">
+                <Avatar className="h-11 w-11 rounded-full">
+                  <AvatarImage src={getConversationAvatar(conv) || undefined} />
+                  <AvatarFallback className="rounded-full text-xs">{getConversationName(conv).charAt(0)}</AvatarFallback>
+                </Avatar>
+                <OnlineIndicator isOnline size="sm" className="absolute bottom-0 right-0" />
+              </span>
+              <span className="w-full truncate text-center font-body text-[10px]">{getConversationName(conv).split(" ")[0]}</span>
+            </button>
+          ))}
         </div>
       </div>
 
