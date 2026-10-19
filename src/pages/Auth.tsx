@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { logAuthEvent, logAuthError } from '@/lib/authDebug';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, User, Phone, Wifi, WifiOff } from 'lucide-react';
-import lcoveMark from '@/assets/lcove-mark-cutout.png';
+import { EtherWordmark } from '@/components/brand/EtherWordmark';
 
 const signupSchema = z.object({
   email: z.string().email('Please enter a valid email').max(255),
@@ -353,7 +353,7 @@ const Auth = () => {
       case 'forgot': return 'Reset Password';
       case 'reset': return 'New Password';
       case 'confirm-email': return 'Check your email';
-      default: return 'ETHER';
+      default: return '';
     }
   };
 
@@ -393,13 +393,9 @@ const Auth = () => {
             transition={{ delay: 0.1 }}
             className="mb-4"
           >
-            <img 
-              src={lcoveMark} 
-              alt="" 
-              className="mark-cutout h-24 w-24 mx-auto object-contain"
-            />
+            <EtherWordmark className="mx-auto w-[16rem] max-w-full" />
           </motion.div>
-          <p className="eyebrow mb-2">Ether</p>
+          {getTitle() ? (
           <motion.h1 
             className="ether-title text-4xl text-foreground mb-2"
             initial={{ opacity: 0, y: -20 }}
@@ -408,6 +404,7 @@ const Auth = () => {
           >
             {getTitle()}
           </motion.h1>
+          ) : null}
           <motion.p 
             className="text-muted-foreground"
             initial={{ opacity: 0 }}

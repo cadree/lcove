@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
-import lcoveMark from "@/assets/lcove-mark-cutout.png";
+import { EtherWordmark } from "@/components/brand/EtherWordmark";
 import { usePlatformStats } from "@/hooks/usePlatformStats";
 
 const HeroSection = () => {
@@ -29,11 +29,7 @@ const HeroSection = () => {
           transition={{ duration: 0.6 }}
           className="mb-4 sm:mb-6"
         >
-          <img
-            src={lcoveMark}
-            alt=""
-            className="mark-cutout mx-auto h-16 w-16 object-contain sm:h-24 sm:w-24 md:h-32 md:w-32"
-          />
+          <EtherWordmark className="w-[20rem] max-w-full" />
         </motion.div>
 
         {/* Badge */}

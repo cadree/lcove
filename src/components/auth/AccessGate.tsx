@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { motion } from 'framer-motion';
-import lcoveMark from '@/assets/lcove-mark-cutout.png';
+import { EtherWordmark } from '@/components/brand/EtherWordmark';
 
 interface AccessGateProps {
   children: React.ReactNode;
@@ -153,14 +153,14 @@ const AccessGate = ({ children }: AccessGateProps) => {
             className="file-panel p-8 md:p-12 text-center max-w-md mx-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <motion.img
-              src={lcoveMark}
-              alt=""
+            <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
-              className="mark-cutout mx-auto mb-6 h-24 w-24 object-contain"
-            />
+              className="mb-6 flex justify-center"
+            >
+              <EtherWordmark className="w-56" />
+            </motion.div>
             
             <h2 className="ether-title mb-4 text-3xl text-foreground md:text-4xl">
               Welcome home Familcy

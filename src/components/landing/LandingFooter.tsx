@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { EtherWordmark } from "@/components/brand/EtherWordmark";
 
 const columns = [
   {
@@ -48,7 +49,7 @@ export function LandingFooter() {
         </div>
 
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pt-8 border-t border-border">
-          <span className="ether-title text-xl">Ether</span>
+          <EtherWordmark className="h-8" />
           <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Ether</p>
         </div>
       </div>

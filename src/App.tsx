@@ -12,6 +12,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { PresenceProvider } from "@/hooks/usePresence";
 import { CreateFlowProvider } from "@/components/create/CreateFlowContext";
 import AccessGate from "@/components/auth/AccessGate";
+import { EtherSplash } from "@/components/brand/EtherSplash";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
 
 const Landing = lazy(() => import("./pages/Landing"));
@@ -177,6 +178,7 @@ const App = () => (
           </PresenceProvider>
         </AuthProvider>
         </MotionConfig>
+        <EtherSplash />
         </ThemeProvider>
       </BrowserRouter>
     </TooltipProvider>
