@@ -42,15 +42,11 @@ const StoryAvatar = ({
       <div className="w-16 h-16 rounded-full relative">
         {/* Animated gradient ring */}
         <div 
-          className={`absolute inset-0 rounded-full p-[2px] ${
-            hasUnviewed
-              ? 'bg-gradient-to-br from-primary via-primary/80 to-primary/60 animate-pulse'
-              : 'bg-gradient-to-br from-muted-foreground/40 to-muted-foreground/20'
-          }`}
+          className="absolute inset-0 rounded-full p-[2px]"
           style={{
-            background: hasUnviewed 
-              ? 'conic-gradient(from 0deg, hsl(340 82% 65%), hsl(350 75% 55%), hsl(340 82% 65%))'
-              : undefined
+            background: hasUnviewed
+              ? 'conic-gradient(from 120deg, #C4142D, #FF9FC8, #C4142D)'
+              : 'conic-gradient(from 120deg, hsl(var(--border)), hsl(var(--muted-foreground)), hsl(var(--border)))'
           }}
         >
           {/* Glass inner ring */}
@@ -103,7 +99,7 @@ const StoryAvatar = ({
       </div>
 
       {/* Username */}
-      <span className="text-[10px] text-muted-foreground mt-1.5 block text-center truncate w-16 group-hover:text-foreground transition-colors">
+      <span className="text-[10px] text-foreground mt-1.5 block text-center truncate w-16">
         {displayName.split(' ')[0]}
       </span>
     </motion.button>

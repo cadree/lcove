@@ -37,7 +37,7 @@ const Nuance = () => {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <p className="text-xs font-medium uppercase tracking-[0.22em] text-[#F5A6CF]">
+          <p className="text-xs font-medium uppercase tracking-[0.22em] text-primary">
             Nuance by LCOVE
           </p>
           <h1 className="font-display text-4xl sm:text-5xl mt-2">Nuance</h1>

@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { 
   Settings, MapPin, Camera, Loader2, Crown, Heart,
-  MessageCircle, Shield, BadgeCheck, UserPlus, UserMinus, Users, Flag, Ban
+  MessageCircle, Shield, BadgeCheck, UserPlus, UserMinus, Flag, Ban
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -45,6 +46,7 @@ interface ProfileHeaderProps {
   userId: string;
   memberTier: "community" | "elite" | null;
   roleLabel?: string;
+  postCount?: number;
 }
 
 export function ProfileHeader({
@@ -62,6 +64,7 @@ export function ProfileHeader({
   userId,
   memberTier,
   roleLabel = "Creator",
+  postCount = 0,
 }: ProfileHeaderProps) {
   const { user } = useAuth();
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -72,7 +75,32 @@ export function ProfileHeader({
   const { data: myXp } = useMyXp();
 
   const isUserFavorite = isFavorite(userId);
-  const friendsCount = favorites?.length || 0;
+  const ownFriends = favorites?.length || 0;
+  const { data: otherFriends = 0 } = useQuery({
+    queryKey: ["profile-friend-count", userId],
+    enabled: !!userId && !isOwnProfile,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("favorite_friends")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId);
+      if (error) return 0;
+      return count ?? 0;
+    },
+  });
+  const { data: projectCount = 0 } = useQuery({
+    queryKey: ["profile-project-count", userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("projects")
+        .select("id", { count: "exact", head: true })
+        .eq("creator_id", userId);
+      if (error) return 0;
+      return count ?? 0;
+    },
+  });
+  const friendsCount = isOwnProfile ? ownFriends : otherFriends;
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -124,11 +152,19 @@ export function ProfileHeader({
         )}
       </div>
 
-      <div className="holo-card mt-2 p-4">
-        {coverImage && <div className="mb-3 h-20 overflow-hidden rounded-[12px]" style={coverImage} />}
-        <div className="relative z-[1] flex items-center gap-3">
+      <div className="holo-card relative mt-2 overflow-hidden">
+        <div className="relative h-32">
+          {coverImage ? (
+            <div className="absolute inset-0" style={coverImage} />
+          ) : (
+            <div className="absolute inset-0 bg-[linear-gradient(115deg,#7d0610_0%,#c4142d_46%,#79c3cf_100%)]" />
+          )}
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,hsl(var(--card))_0%,transparent_58%)]" />
+        </div>
+        <div className="relative z-[1] -mt-10 px-4 pb-4">
+        <div className="flex items-end gap-3">
           <div className="group relative shrink-0">
-            <Avatar className="h-16 w-16 rounded-full border border-border">
+            <Avatar className="h-[72px] w-[72px] rounded-full border-4 border-card">
               <AvatarImage src={avatarUrl || undefined} />
               <AvatarFallback className="rounded-full bg-muted font-body text-xl font-bold text-foreground">
                 {displayName.charAt(0).toUpperCase()}
@@ -176,18 +212,32 @@ export function ProfileHeader({
           </div>
         </div>
 
-        <div className="relative z-[1] mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
-          {isOwnProfile && myXp && (
-            <p className="mono-label text-[10px] text-muted-foreground">Level {myXp.level}</p>
-          )}
-          {isOwnProfile && (
+        {isOwnProfile && myXp && (
+          <p className="mono-label mt-2 text-[10px] text-muted-foreground">Level {myXp.level}</p>
+        )}
+
+        <div className="mt-3 grid grid-cols-3 border-y border-border py-2">
+          <div className="min-h-11 text-center">
+            <span className="block font-body text-[18px] font-extrabold text-foreground">{postCount}</span>
+            <span className="mono-label text-[9px] text-muted-foreground">Posts</span>
+          </div>
+          {isOwnProfile ? (
             <FriendsDrawer>
-              <button type="button" className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground">
-                <Users className="h-3.5 w-3.5" />
-                <span className="font-semibold text-foreground">{friendsCount}</span> friends
+              <button type="button" className="min-h-11 w-full text-center">
+                <span className="block font-body text-[18px] font-extrabold text-foreground">{friendsCount}</span>
+                <span className="mono-label text-[9px] text-muted-foreground">Friends</span>
               </button>
             </FriendsDrawer>
+          ) : (
+            <div className="min-h-11 text-center">
+              <span className="block font-body text-[18px] font-extrabold text-foreground">{friendsCount}</span>
+              <span className="mono-label text-[9px] text-muted-foreground">Friends</span>
+            </div>
           )}
+          <div className="min-h-11 text-center">
+            <span className="block font-body text-[18px] font-extrabold text-foreground">{projectCount}</span>
+            <span className="mono-label text-[9px] text-muted-foreground">Projects</span>
+          </div>
         </div>
 
         <div className="relative z-[1] mt-3 flex gap-2">
@@ -232,6 +282,7 @@ export function ProfileHeader({
             <ReportDialog open={reportOpen} onOpenChange={setReportOpen} targetType="profile" targetId={userId} />
           </div>
         )}
+        </div>
       </div>
     </div>
   );

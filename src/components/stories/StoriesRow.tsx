@@ -79,7 +79,8 @@ const StoriesRow = () => {
     );
   }
   return <>
-      <div className="flex items-center gap-2 px-1 pt-2">
+      <div className="flex items-center justify-between gap-2 px-1 pt-2">
+        <p className="kicker">Stories</p>
         {user && favorites.length > 0 && <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className={`h-8 gap-1.5 text-xs ${showFavoritesOnly ? 'text-primary' : 'text-muted-foreground'}`}>
@@ -112,7 +113,7 @@ const StoriesRow = () => {
       }} onClick={() => userStories.length > 0 ? handleOpenStory(user.id) : setShowUpload(true)} className="relative shrink-0 group">
             <div className="w-16 h-16 rounded-full relative">
               {/* Glass ring */}
-              <div className={`absolute inset-0 rounded-full ${userStories.length > 0 ? 'bg-gradient-to-br from-primary to-primary/60 p-[2px]' : 'bg-gradient-to-br from-muted-foreground/30 to-muted-foreground/10 p-[2px]'}`}>
+              <div className="absolute inset-0 rounded-full bg-[conic-gradient(from_120deg,#C4142D,#FF9FC8,#C4142D)] p-[2px]">
                 <div className="w-full h-full rounded-full bg-card p-[2px]">
                   <div className="w-full h-full rounded-full overflow-hidden bg-muted flex items-center justify-center">
                     {userStories.length > 0 && userStories[0].profile?.avatar_url ? <img src={userStories[0].profile.avatar_url} alt="Your story" className="w-full h-full object-cover" /> : <Plus className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />}
@@ -120,10 +121,9 @@ const StoriesRow = () => {
                 </div>
               </div>
             </div>
-            <span className="text-[10px] text-muted-foreground mt-1.5 block text-center truncate w-16">
-              {userStories.length > 0 ? 'Your Story' : 'Add'}
+            <span className="text-[10px] text-foreground mt-1.5 block text-center truncate w-16">
+              Your story
             </span>
-            {userStories.length === 0}
           </motion.button>}
 
         {/* Other Users' Stories */}

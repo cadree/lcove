@@ -74,7 +74,7 @@ const MessageComposer = ({ onSend, onTyping, isSending }: MessageComposerProps) 
 
   return (
     <div 
-      className="tab-bar border-t border-border p-4"
+      className="border-t border-border bg-background p-4"
       style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 16px), 16px)' }}
     >
       {/* File Preview */}
@@ -143,7 +143,7 @@ const MessageComposer = ({ onSend, onTyping, isSending }: MessageComposerProps) 
             value={content}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            className="min-h-[44px] max-h-32 resize-none rounded-[14px] border-border bg-background/60 pr-12"
+            className="min-h-[44px] max-h-32 resize-none rounded-[14px] border-border bg-input pr-12"
             rows={1}
           />
           <Button

@@ -22,7 +22,7 @@
     --secondary-foreground: 40 27% 89%;
 
     --muted: 240 11% 12%;
-    --muted-foreground: 36 7% 46%;
+    --muted-foreground: 36 8% 66%;
 
     --accent: 240 11% 14%;
     --accent-foreground: 40 27% 89%;
@@ -30,7 +30,7 @@
     --destructive: 351 81% 42%;
     --destructive-foreground: 40 27% 89%;
 
-    --border: 40 2% 16%;
+    --border: 40 8% 40%;
     --input: 240 12% 9%;
     --ring: 334 100% 81%;
 
@@ -44,7 +44,7 @@
     --panel-3: 240 11% 12%;
     --ink: 240 9% 4%;
     --bone: 40 27% 89%;
-    --brand: 351 81% 42%;
+    --brand: 351 68% 74%;
     --bubble: 334 100% 81%;
     --scan: 187 48% 64%;
     --ok: 96 30% 56%;
@@ -92,7 +92,7 @@
     --sidebar-primary-foreground: 0 0% 4%;
     --sidebar-accent: 240 12% 9%;
     --sidebar-accent-foreground: 40 27% 89%;
-    --sidebar-border: 40 2% 16%;
+    --sidebar-border: 40 8% 40%;
     --sidebar-ring: 334 100% 81%;
 
     --tone-a: #7d0610;
@@ -110,14 +110,14 @@
     --popover: 40 33% 95%;
     --popover-foreground: 270 11% 6%;
 
-    --primary: 334 100% 81%;
-    --primary-foreground: 0 0% 4%;
+    --primary: 332 72% 32%;
+    --primary-foreground: 0 0% 98%;
 
     --secondary: 37 28% 87%;
     --secondary-foreground: 270 11% 6%;
 
     --muted: 36 24% 82%;
-    --muted-foreground: 36 7% 46%;
+    --muted-foreground: 36 9% 35%;
 
     --accent: 37 28% 87%;
     --accent-foreground: 270 11% 6%;
@@ -125,9 +125,9 @@
     --destructive: 351 82% 39%;
     --destructive-foreground: 40 33% 95%;
 
-    --border: 36 14% 78%;
+    --border: 36 14% 44%;
     --input: 40 33% 95%;
-    --ring: 332 67% 56%;
+    --ring: 332 72% 32%;
 
     --panel: 40 33% 95%;
     --panel-2: 37 28% 87%;
@@ -136,9 +136,9 @@
     --bone: 40 33% 91%;
     --brand: 351 82% 39%;
     --bubble: 332 67% 56%;
-    --scan: 187 53% 39%;
+    --scan: 187 55% 26%;
     --ok: 145 39% 40%;
-    --gold: 28 43% 64%;
+    --gold: 28 42% 33%;
     --text-2: 36 9% 27%;
     --bar: rgba(239, 234, 224, 0.82);
     --line-2: rgba(14, 13, 16, 0.07);
@@ -148,7 +148,7 @@
     --ether-black: 270 11% 6%;
     --ether-brown: 40 33% 95%;
     --ether-brown-light: 37 28% 87%;
-    --ether-tan: 28 43% 64%;
+    --ether-tan: 28 42% 33%;
     --ether-cream: 270 11% 6%;
 
     --glass-bg: 40 33% 95% / 0.78;
@@ -164,12 +164,12 @@
 
     --sidebar-background: 40 33% 91%;
     --sidebar-foreground: 270 11% 6%;
-    --sidebar-primary: 332 67% 56%;
-    --sidebar-primary-foreground: 0 0% 4%;
+    --sidebar-primary: 332 72% 32%;
+    --sidebar-primary-foreground: 0 0% 98%;
     --sidebar-accent: 37 28% 87%;
     --sidebar-accent-foreground: 270 11% 6%;
-    --sidebar-border: 36 14% 78%;
-    --sidebar-ring: 332 67% 56%;
+    --sidebar-border: 36 14% 44%;
+    --sidebar-ring: 332 72% 32%;
 
     color-scheme: light;
   }
@@ -188,6 +188,12 @@
     overscroll-behavior: contain;
     /* iOS safe area support */
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  #root {
+    isolation: isolate;
+    position: relative;
+    min-height: 100%;
   }
 
   body {
@@ -542,11 +548,15 @@
   }
 }
 
-/* World layer. Sits above page content, under dialogs and the tab bar. */
+/* Atmosphere sits behind type. #root isolates so z-index -1 stays above the page color. */
+#root :where(.min-h-screen.bg-background) {
+  background-color: transparent;
+}
+
 .world {
   position: fixed;
   inset: 0;
-  z-index: 30;
+  z-index: -1;
   pointer-events: none;
   overflow: hidden;
 }
@@ -571,10 +581,10 @@
   position: absolute;
   border-radius: 999px;
   filter: blur(70px);
-  opacity: 1;
+  opacity: 0.16;
 }
 
-.light .world-glow { opacity: 0.55; }
+.light .world-glow { opacity: 0.4; }
 
 .world-glow-a {
   width: 420px;
@@ -615,10 +625,10 @@
   position: absolute;
   inset: 0;
   background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, 0.22) 2px 4px);
-  opacity: 0.45;
+  opacity: 0.22;
 }
 
-.light .world-scanlines { opacity: 0.12; }
+.light .world-scanlines { opacity: 0.1; }
 
 .world-grain {
   position: absolute;

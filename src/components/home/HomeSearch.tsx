@@ -62,7 +62,7 @@ export function HomeSearch({ onNavigate }: HomeSearchProps) {
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setTimeout(() => setIsFocused(false), 150)}
-          className="h-12 border-0 bg-transparent pl-11 pr-10 text-base placeholder:text-muted-foreground/60 focus-visible:ring-0"
+          className="h-12 border-0 bg-transparent pl-11 pr-10 text-base placeholder:text-muted-foreground focus-visible:ring-0"
           aria-label="Search navigation"
         />
         <AnimatePresence>

@@ -533,6 +533,7 @@ const Profile = () => {
           userId={targetUserId || ''}
           memberTier={isOwnProfile && membership?.subscribed ? membership.tier : null}
           roleLabel={userCreativeRoles[0]?.name || "Creator"}
+          postCount={posts.length}
         />
 
         <ProfileBookEntry />

@@ -722,7 +722,7 @@ export const useProjectApplications = (projectId?: string) => {
               .from('profiles_public')
               .select('display_name')
               .eq('user_id', application.applicant_id)
-              .single();
+              .maybeSingle();
 
             await supabase
               .from('messages')

@@ -133,13 +133,15 @@ export function CommunityMall({ query = "" }: { query?: string }) {
         {visible.map((card) => {
           const body = (
             <>
-              <div className="relative h-[66px] overflow-hidden rounded-t-[16px] bg-gradient-to-br from-[hsl(var(--panel-3))] to-[hsl(var(--panel))]">
+              <div className="relative h-[92px] overflow-hidden rounded-t-[16px] bg-[linear-gradient(155deg,hsl(var(--scan)/0.55),hsl(var(--brand)/0.28)_48%,hsl(var(--panel)))]">
                 {card.image && <img src={card.image} alt="" className="h-full w-full object-cover" />}
+                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,transparent_28%,rgba(255,255,255,0.28)_48%,transparent_64%)]" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[hsl(var(--panel))] to-transparent" />
                 {card.mark && (
                   <img
                     src={card.mark}
                     alt=""
-                    className="mark-cutout absolute -bottom-3 left-3 h-10 w-10 object-contain"
+                    className="mark-cutout absolute bottom-2 left-3 h-11 w-11 object-contain"
                   />
                 )}
               </div>
@@ -155,7 +157,7 @@ export function CommunityMall({ query = "" }: { query?: string }) {
               </div>
             </>
           );
-          const className = "file-panel block w-[150px] shrink-0 overflow-hidden text-left";
+          const className = "file-panel block w-[156px] shrink-0 overflow-hidden text-left shadow-[0_18px_34px_-18px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.16)]";
           return card.to && !card.example ? (
             <Link key={card.id} to={card.to} className={className}>
               {body}

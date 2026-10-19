@@ -92,11 +92,19 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
             aria-label="Search conversations"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-11 rounded-[14px] border-border bg-card/70 pl-10 font-mono text-[12px] uppercase tracking-[0.14em]"
+            className="h-11 rounded-[14px] border-border bg-input pl-10 font-mono text-[12px] uppercase tracking-[0.14em]"
           />
         </div>
 
-        <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+        <div>
+          <p className="kicker mb-2">Active now</p>
+          {conversations.filter((conv) => {
+            const otherId = getOtherUserId(conv);
+            return otherId ? isOnline(otherId) : false;
+          }).length === 0 ? (
+            <p className="pb-1 font-body text-sm text-muted-foreground">No one is active right now</p>
+          ) : (
+          <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
           {conversations.filter((conv) => {
             const otherId = getOtherUserId(conv);
             return otherId ? isOnline(otherId) : false;
@@ -114,9 +122,11 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
                 </Avatar>
                 <OnlineIndicator isOnline size="sm" className="absolute bottom-0 right-0" />
               </span>
-              <span className="w-full truncate text-center font-body text-[10px]">{getConversationName(conv).split(" ")[0]}</span>
+              <span className="w-full truncate text-center font-body text-[10px] text-foreground">{getConversationName(conv).split(" ")[0]}</span>
             </button>
           ))}
+          </div>
+          )}
         </div>
       </div>
 
