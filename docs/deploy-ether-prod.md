@@ -24,22 +24,25 @@ Add it to the GitHub repo `cadree/lcove`:
 
 The same screen is **Settings**, then **Secrets and variables**, then **Actions**.
 
-## 2. Run the workflow
+## 2. Re-run the deploy
+
+GitHub only shows a **Run workflow** button for **Deploy Supabase functions** after that workflow file is on `main`. This pull request is not on `main`. Do not merge it to `main` to make that button appear.
+
+A push to `cursor/ether-combined` that changes a function, `supabase/config.toml`, or the workflow file starts **Deploy Supabase functions** and deploys every function to ether-prod. If `SUPABASE_ACCESS_TOKEN` is missing, that run stops immediately and the log says `SUPABASE_ACCESS_TOKEN is empty`.
+
+After you add the secret:
 
 1. Open [https://github.com/cadree/lcove/actions](https://github.com/cadree/lcove/actions).
-2. In the left sidebar, click **Deploy Supabase functions**.
-3. Click **Run workflow**.
-4. Branch: `cursor/ether-combined`. After this pull request is merged, choose `main`. Do not push this branch to `main` yourself.
-5. **functions**: `all`. To deploy a few, type their names separated by commas, such as `stripe-music-webhook,send-push-notification`.
-6. Check **Dry run** the first time. The log lists every function and whether it requires a login token (`verify_jwt` comes from `supabase/config.toml`). It does not deploy and it does not need the other secrets.
-7. Click the green **Run workflow** button.
-8. Run it again with **Dry run** unchecked. That deploys the functions. A green check means it finished.
+2. Open the latest **Deploy Supabase functions** run.
+3. Click **Re-run all jobs**.
 
-The log prints secret **names** it set or skipped. It does not print secret values. A secret that is not filled in is skipped, so a partial setup still succeeds.
+A green check means the functions are on ether-prod. The log lists secret **names** it set or skipped. It does not print secret values. A secret that is not filled in is skipped, so a partial setup still succeeds.
+
+After this pull request is on `main`, **Run workflow** can deploy `all` or a comma-separated list, and **Dry run** only prints the list. Until then, **Re-run all jobs** deploys every function.
 
 Supabase already provides `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Do not add those as GitHub secrets.
 
-Optional names, same **New repository secret** button. Add them when you have the value, then run the workflow again:
+Optional names, same **New repository secret** button. Add them when you have the value, then open the latest **Deploy Supabase functions** run and click **Re-run all jobs**:
 
 | Name | Where the value comes from |
 | --- | --- |
@@ -62,7 +65,7 @@ Resend's free plan includes SMTP, 3 domains, and 100 emails a day. That daily ca
 
 1. Create a free account at [https://resend.com](https://resend.com).
 2. Open **API Keys**, click **Create API key**, choose **Sending access**, and copy the key once.
-3. Add that key as the GitHub secret `RESEND_API_KEY`, then run the workflow again so invite and reminder functions can send.
+3. Add that key as the GitHub secret `RESEND_API_KEY`, then **Re-run all jobs** on the latest **Deploy Supabase functions** run so invite and reminder functions can send.
 4. In Resend, open **Domains**, click **Add Domain**, and enter `notifications.etherbylcove.com`. If it asks for a region, choose North Virginia (`us-east-1`), the same region as ether-prod.
 5. Open that domain's **Records** tab. Add the records below at the DNS host for `etherbylcove.com`. Paste the values Resend shows. The DKIM value is unique to this domain and is not something you invent.
 
@@ -125,7 +128,7 @@ Use Stripe test mode. Do not use the live account for this step.
 4. Open the endpoint, reveal the **Signing secret** (`whsec_...`).
 5. On GitHub, **Settings**, **Secrets and variables**, **Actions**, **New repository secret**. Name: `STRIPE_WEBHOOK_SECRET`. Paste the signing secret. Click **Add secret**.
 6. Add `STRIPE_SECRET_KEY` the same way if it is not there yet. Stripe, **Developers**, **API keys**, the secret key (`sk_test_...`). That is not the publishable key.
-7. Run **Deploy Supabase functions** again with **Dry run** unchecked. The secrets step copies both names onto the project. Deploying `stripe-music-webhook` alone is enough if the other functions are already up: set **functions** to `stripe-music-webhook`.
+7. Open the latest **Deploy Supabase functions** run and click **Re-run all jobs**. That copies both names onto the project and deploys every function.
 8. Send a test event from the Stripe dashboard only after that run is green.
 
 ## 5. Host the site
@@ -170,7 +173,7 @@ Ether is a single-page app. A refresh on `/auth` must return the app, not a 404.
 
 **Do not switch `etherbylcove.com` until the staged site has been tested.** Leave the current DNS records in place. On the `pages.dev` URL, confirm the app loads, signup sends a message you can open, the link returns to that staged URL, and sign-in works.
 
-While you are testing on `pages.dev`, set the GitHub secrets `SITE_URL` and `APP_URL` to that `https://....pages.dev` address and run the workflow again. Email links from the functions use those values. If you leave them unset, the links use `https://etherbylcove.com`, which is still the old site. When you do move the domain, change both secrets to `https://etherbylcove.com` and run the workflow again.
+While you are testing on `pages.dev`, set the GitHub secrets `SITE_URL` and `APP_URL` to that `https://....pages.dev` address and **Re-run all jobs** on the latest **Deploy Supabase functions** run. Email links from the functions use those values. If you leave them unset, the links use `https://etherbylcove.com`, which is still the old site. When you do move the domain, change both secrets to `https://etherbylcove.com` and re-run the same way.
 
 Move the domain only after that staged test:
 

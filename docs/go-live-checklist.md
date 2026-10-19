@@ -111,7 +111,7 @@ Used when those features are turned on: `APPLE_PASS_TYPE_ID`, `APPLE_TEAM_ID`, `
 
 ## 8. Deploy edge functions
 
-Deploy from GitHub Actions, not from the machine coordinating the move. That machine cannot reach Postgres and should not clone the repo. The workflow is "Deploy Supabase functions" on branch `cursor/ether-combined` until this pull request is merged. The ordered steps are in `docs/deploy-ether-prod.md`.
+Deploy from GitHub Actions, not from the machine coordinating the move. That machine cannot reach Postgres and should not clone the repo. A push to `cursor/ether-combined` that changes a function, `supabase/config.toml`, or the workflow file deploys every function. GitHub does not show **Run workflow** until this file is on `main`. After `SUPABASE_ACCESS_TOKEN` is saved, open the latest **Deploy Supabase functions** run and click **Re-run all jobs**. The ordered steps are in `docs/deploy-ether-prod.md`.
 
 The workflow runs `supabase functions deploy --use-api` (no Docker) and reads `verify_jwt` from `supabase/config.toml`. It does not run SQL. Deploy `purchase-event-with-credits` and `delete-account` before members use those buttons. `delete-account` deletes only the person whose token it is. It refuses while a payout, earned credit, escrow, store or booking payout, Stripe balance, or active subscription is still open.
 
