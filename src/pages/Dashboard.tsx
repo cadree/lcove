@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { format, formatDistanceToNow } from "date-fns";
+import { formatEventDate } from "@/lib/eventTime";
 import {
   ArrowLeft,
   Calendar,
@@ -300,7 +301,7 @@ export default function Dashboard() {
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{event.title}</p>
                         <p className="text-xs text-muted-foreground">
-                          {format(new Date(event.start_date), "MMM d, h:mm a")}
+                          {formatEventDate(event.start_date, event.timezone, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                         </p>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant="secondary" className="text-[10px] px-1.5 py-0">

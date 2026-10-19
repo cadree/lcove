@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { eventDateLabel, eventTimeLabel } from "../_shared/event-time.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,19 +39,14 @@ serve(async (req) => {
     // Fetch event data
     const { data: event, error: eventError } = await supabaseAdmin
       .from("events")
-      .select("id, title, start_date, end_date, venue, city, state, image_url, description")
+      .select("id, title, start_date, end_date, venue, city, state, image_url, description, timezone")
       .eq("id", eventId)
       .single();
 
     if (eventError || !event) throw new Error("Event not found");
 
-    const eventDate = new Date(event.start_date);
-    const dateStr = eventDate.toLocaleDateString("en-US", {
-      weekday: "long", month: "long", day: "numeric", year: "numeric",
-    });
-    const timeStr = eventDate.toLocaleTimeString("en-US", {
-      hour: "numeric", minute: "2-digit",
-    });
+    const dateStr = eventDateLabel(event.start_date, event.timezone);
+    const timeStr = eventTimeLabel(event.start_date, event.timezone);
     const location = [event.venue, event.city, event.state].filter(Boolean).join(", ") || "Location TBA";
     const eventUrl = `https://etherbylcove.com/event/${eventId}`;
 

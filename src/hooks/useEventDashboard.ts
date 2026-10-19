@@ -12,6 +12,7 @@ interface DashboardEvent {
   ticket_price: number | null;
   capacity: number | null;
   image_url: string | null;
+  timezone: string | null;
   city: string;
   status: string | null;
   organization_id: string | null;

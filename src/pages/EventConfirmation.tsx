@@ -44,23 +44,37 @@ export default function EventConfirmation() {
   const [params] = useSearchParams();
   const sessionId = params.get("session_id");
   const orderIdParam = params.get("order_id");
+  const freeRsvp = params.get("free") === "1";
   const [loading, setLoading] = useState(true);
   const [order, setOrder] = useState<Order | null>(null);
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [event, setEvent] = useState<EventInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmedFree, setConfirmedFree] = useState(freeRsvp);
 
   useEffect(() => {
     let cancelled = false;
     let attempts = 0;
     const verify = async () => {
+      if (!sessionId && !orderIdParam) {
+        if (!cancelled) {
+          setConfirmedFree(true);
+          setLoading(false);
+        }
+        return;
+      }
       try {
         const { data, error } = await supabase.functions.invoke("verify-event-purchase", {
-          body: { sessionId, orderId: orderIdParam },
+          body: { sessionId, orderId: orderIdParam, eventId },
         });
         if (cancelled) return;
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
+        if (data?.freeRsvp) {
+          setConfirmedFree(true);
+          setLoading(false);
+          return;
+        }
         setOrder(data.order);
         setAttendees(data.attendees || []);
         if (data.order?.payment_status !== "paid" && attempts < 5) {
@@ -71,6 +85,11 @@ export default function EventConfirmation() {
         setLoading(false);
       } catch (e: unknown) {
         if (cancelled) return;
+        if (freeRsvp) {
+          setConfirmedFree(true);
+          setLoading(false);
+          return;
+        }
         setError(errorMessage(e, "Failed to verify purchase"));
         setLoading(false);
       }
@@ -87,7 +106,7 @@ export default function EventConfirmation() {
     }
     verify();
     return () => { cancelled = true; };
-  }, [sessionId, orderIdParam, eventId]);
+  }, [sessionId, orderIdParam, eventId, freeRsvp]);
 
   const locationStr = event ? [event.venue, event.address, event.city, event.state].filter(Boolean).join(", ") : "";
   const directionsUrl = locationStr
@@ -115,7 +134,7 @@ export default function EventConfirmation() {
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-primary" />
             <p className="text-sm text-muted-foreground">Confirming your tickets…</p>
           </div>
-        ) : error ? (
+        ) : error && !confirmedFree ? (
           <Card className="p-6 text-center">
             <p className="text-destructive font-medium mb-2">Something went wrong</p>
             <p className="text-sm text-muted-foreground">{error}</p>
@@ -124,8 +143,11 @@ export default function EventConfirmation() {
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
             <Card className="p-6 text-center bg-gradient-to-br from-emerald-500/10 to-emerald-500/0 border-emerald-500/30">
               <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-2" />
-              <h1 className="text-xl font-display font-semibold">You're in!</h1>
+              <h1 className="text-xl font-display font-semibold">{confirmedFree && !order ? "You're on the list!" : "You're in!"}</h1>
               <p className="text-sm text-muted-foreground mt-1">{event?.title}</p>
+              {confirmedFree && !order && (
+                <p className="text-xs text-muted-foreground mt-2">Your free RSVP is confirmed.</p>
+              )}
               {order && (
                 <p className="text-xs text-muted-foreground mt-2">
                   {order.quantity} ticket{order.quantity > 1 ? "s" : ""} · {order.total_cents === 0 ? "Free" : `$${(order.total_cents / 100).toFixed(2)}`}
@@ -162,7 +184,7 @@ export default function EventConfirmation() {
               </Card>
             )}
 
-            <div className="space-y-3">
+            {(attendees.length > 0 || !confirmedFree) && <div className="space-y-3">
               <h2 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <Ticket className="w-4 h-4" /> Your tickets
               </h2>
@@ -179,12 +201,16 @@ export default function EventConfirmation() {
                   </div>
                 </Card>
               ))}
-            </div>
+            </div>}
 
             <Card className="p-4 text-sm text-muted-foreground">
               <p className="flex items-start gap-2">
                 <Calendar className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
-                <span>Your tickets are saved to your profile under <strong>My Tickets</strong>. Show the QR code at the door.</span>
+                <span>
+                  {confirmedFree && attendees.length === 0
+                    ? "Your RSVP is saved. We'll remind you before the event."
+                    : <>Your tickets are saved to your profile under <strong>My Tickets</strong>. Show the QR code at the door.</>}
+                </span>
               </p>
             </Card>
 

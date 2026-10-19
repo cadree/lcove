@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { format } from 'date-fns';
+import { parseCalendarDate } from '@/lib/calendarDate';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, Play, ExternalLink, Upload, X, Eye, Image as ImageIcon, Camera, Share2, Copy, Pencil, Mail, MessageCircle, UserPlus, Lock } from 'lucide-react';
 import { Project, ProjectRole, useProjectApplications, useProjects } from '@/hooks/useProjects';
@@ -676,9 +677,9 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
               <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground"><Calendar className="h-4 w-4" /><span>Timeline</span></div>
                 <span>
-                  {project.timeline_start && format(new Date(project.timeline_start), 'MMM d, yyyy')}
+                  {project.timeline_start && format(parseCalendarDate(project.timeline_start), 'MMM d, yyyy')}
                   {project.timeline_start && project.timeline_end && ' → '}
-                  {project.timeline_end && format(new Date(project.timeline_end), 'MMM d, yyyy')}
+                  {project.timeline_end && format(parseCalendarDate(project.timeline_end), 'MMM d, yyyy')}
                 </span>
               </div>
             )}

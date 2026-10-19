@@ -90,9 +90,9 @@ export function PipelineSelector({ currentPipeline, onPipelineChange }: Pipeline
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="gap-2 font-display text-xl font-semibold px-2">
-            {currentPipeline?.name || "Pipeline"}
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          <Button variant="ghost" className="h-auto min-w-0 max-w-[8.5rem] gap-1 px-1 font-display text-lg font-semibold sm:max-w-[16rem] sm:text-xl">
+            <span className="truncate">{currentPipeline?.name || "Pipeline"}</span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-64">

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { eventDateLabel, eventTimeLabel } from "../_shared/event-time.mjs";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { requireInternalSecret } from "../_shared/require-caller.ts";
 
@@ -61,7 +62,7 @@ serve(async (req) => {
 
       const { data: events } = await admin
         .from("events")
-        .select("id, title, start_date, end_date, venue, city, state, image_url, description")
+        .select("id, title, start_date, end_date, venue, city, state, image_url, description, timezone")
         .gte("start_date", startWin.toISOString())
         .lte("start_date", endWin.toISOString());
 
@@ -137,9 +138,8 @@ serve(async (req) => {
 
         if (recipients.size === 0) continue;
 
-        const start = new Date(event.start_date);
-        const dateStr = start.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-        const timeStr = start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+        const dateStr = eventDateLabel(event.start_date, event.timezone);
+        const timeStr = eventTimeLabel(event.start_date, event.timezone);
         const location = [event.venue, event.city].filter(Boolean).join(", ") || "Location TBA";
         const eventUrl = `https://etherbylcove.com/event/${event.id}`;
 

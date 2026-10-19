@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { resolveHostIdentity } from "../_shared/host-email-identity.ts";
+import { eventDateLabel, eventStampLabel, eventTimeLabel } from "../_shared/event-time.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,7 +52,7 @@ serve(async (req) => {
 
     const { data: event } = await admin
       .from("events")
-      .select("id, title, start_date, venue, city")
+      .select("id, title, start_date, venue, city, timezone")
       .eq("id", body.eventId)
       .single();
     if (!event) throw new Error("Event not found");
@@ -75,17 +76,11 @@ serve(async (req) => {
     }
 
     const channels = body.channels || { push: true, email: true, sms: false };
-    const eventTime = new Date(event.start_date).toLocaleString("en-US", {
-      weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-    });
+    const eventTime = eventStampLabel(event.start_date, event.timezone);
     const eventUrl = `https://etherbylcove.com/event/${event.id}`;
     const identity = await resolveHostIdentity(admin, body.eventId);
-    const eventDateLong = new Date(event.start_date).toLocaleDateString("en-US", {
-      weekday: "long", month: "long", day: "numeric", year: "numeric",
-    });
-    const eventTimeShort = new Date(event.start_date).toLocaleTimeString("en-US", {
-      hour: "numeric", minute: "2-digit",
-    });
+    const eventDateLong = eventDateLabel(event.start_date, event.timezone);
+    const eventTimeShort = eventTimeLabel(event.start_date, event.timezone);
     const eventPlace = event as unknown as { venue?: string | null; city?: string | null };
     const location = [eventPlace.venue, eventPlace.city].filter(Boolean).join(", ") || "Location TBA";
 

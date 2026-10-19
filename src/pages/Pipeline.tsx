@@ -213,8 +213,8 @@ const PipelinePage = () => {
       <div className="min-h-screen bg-background">
         {/* Header */}
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
-          <div className="flex items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -223,13 +223,15 @@ const PipelinePage = () => {
               >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-primary" />
-                <PipelineSelector 
-                  currentPipeline={currentPipeline} 
-                  onPipelineChange={setCurrentPipeline} 
-                />
-                <span className="text-sm text-muted-foreground">({totalContacts})</span>
+              <div className="flex min-w-0 items-center gap-2">
+                <Users className="w-5 h-5 shrink-0 text-primary" />
+                <div className="min-w-0">
+                  <PipelineSelector 
+                    currentPipeline={currentPipeline} 
+                    onPipelineChange={setCurrentPipeline} 
+                  />
+                </div>
+                <span className="shrink-0 text-sm text-muted-foreground">({totalContacts})</span>
               </div>
             </div>
             
@@ -247,7 +249,7 @@ const PipelinePage = () => {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex w-full shrink-0 items-center justify-end gap-2 sm:ml-auto sm:w-auto">
               <EnergyIndicator />
               <Button
                 variant="outline"

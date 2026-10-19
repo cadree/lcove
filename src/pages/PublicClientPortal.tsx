@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { parseCalendarDate } from '@/lib/calendarDate';
 import { Calendar, Download, FileText, Users, MapPin, Wrench, Package, BarChart3, Clock, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -122,8 +123,8 @@ export default function PublicClientPortal() {
   const calendarEvent = project.timeline_start ? {
     title: project.title,
     description: project.description,
-    startDate: new Date(project.timeline_start),
-    endDate: project.timeline_end ? new Date(project.timeline_end) : null,
+    startDate: parseCalendarDate(project.timeline_start),
+    endDate: project.timeline_end ? parseCalendarDate(project.timeline_end) : null,
     location: project.venue,
   } : null;
 
@@ -179,9 +180,9 @@ export default function PublicClientPortal() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <div>
               <span className="font-medium">Timeline: </span>
-              {project.timeline_start && format(new Date(project.timeline_start), 'MMM d, yyyy')}
+              {project.timeline_start && format(parseCalendarDate(project.timeline_start), 'MMM d, yyyy')}
               {project.timeline_start && project.timeline_end && ' → '}
-              {project.timeline_end && format(new Date(project.timeline_end), 'MMM d, yyyy')}
+              {project.timeline_end && format(parseCalendarDate(project.timeline_end), 'MMM d, yyyy')}
             </div>
           </div>
         )}

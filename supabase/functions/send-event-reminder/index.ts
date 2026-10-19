@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { resolveHostIdentity } from "../_shared/host-email-identity.ts";
+import { eventDateLabel, eventTimeLabel } from "../_shared/event-time.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,7 +39,7 @@ serve(async (req) => {
 
     const { data: event, error: eventError } = await supabaseAdmin
       .from("events")
-      .select("id, title, start_date, end_date, venue, city, creator_id, ticket_price")
+      .select("id, title, start_date, end_date, venue, city, creator_id, ticket_price, timezone")
       .eq("id", eventId)
       .single();
 
@@ -71,12 +72,8 @@ serve(async (req) => {
     const twilioAuth = Deno.env.get("TWILIO_AUTH_TOKEN");
     const twilioPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
 
-    const eventDate = new Date(event.start_date).toLocaleDateString("en-US", {
-      weekday: "long", month: "long", day: "numeric", year: "numeric",
-    });
-    const eventTime = new Date(event.start_date).toLocaleTimeString("en-US", {
-      hour: "numeric", minute: "2-digit",
-    });
+    const eventDate = eventDateLabel(event.start_date, event.timezone);
+    const eventTime = eventTimeLabel(event.start_date, event.timezone);
     const eventPlace = event as unknown as { venue?: string | null; city?: string | null };
     const location = [eventPlace.venue, eventPlace.city].filter(Boolean).join(", ") || "Location TBA";
     const eventUrl = `https://etherbylcove.com/event/${eventId}`;

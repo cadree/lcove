@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, formatDistanceToNow, isPast } from 'date-fns';
+import { parseCalendarDate } from '@/lib/calendarDate';
 import {
   ChevronDown, ChevronUp, MapPin, Wrench, Package, DollarSign,
   Target, Calendar, Users, Image as ImageIcon, FileText, Play,
@@ -241,7 +242,7 @@ const ProjectCommandCenter = ({ project, isOwner }: ProjectCommandCenterProps) =
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      {project.timeline_start ? format(new Date(project.timeline_start), 'MMM d') : '?'} → {project.timeline_end ? format(new Date(project.timeline_end), 'MMM d, yyyy') : '?'}
+                      {project.timeline_start ? format(parseCalendarDate(project.timeline_start), 'MMM d') : '?'} → {project.timeline_end ? format(parseCalendarDate(project.timeline_end), 'MMM d, yyyy') : '?'}
                     </p>
                   )}
                 </Section>

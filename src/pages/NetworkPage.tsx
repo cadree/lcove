@@ -339,9 +339,19 @@ const NetworkPage = () => {
             </div>
 
             {/* Title */}
-            <h1 className="font-display text-3xl md:text-5xl lg:text-6xl font-bold text-foreground mb-2 leading-[1.1]">
-              {heroContent?.title || 'Welcome'}
-            </h1>
+            {heroContent ? (
+              <button
+                type="button"
+                className="mb-2 text-left font-display text-3xl font-bold leading-[1.1] text-foreground md:text-5xl lg:text-6xl"
+                onClick={() => setSelectedContent(heroContent)}
+              >
+                {heroContent.title}
+              </button>
+            ) : (
+              <h1 className="mb-2 font-display text-3xl font-bold leading-[1.1] text-foreground md:text-5xl lg:text-6xl">
+                Welcome
+              </h1>
+            )}
 
             {/* Meta badges */}
             {heroContent && (
@@ -940,6 +950,16 @@ const ContentCard = ({
         </div>
       )}
     </div>
+    <button
+      type="button"
+      className="mt-1.5 w-full truncate px-0.5 text-left text-xs font-medium text-foreground"
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect(content);
+      }}
+    >
+      {content.title}
+    </button>
   </motion.div>
 );
 

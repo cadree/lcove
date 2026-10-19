@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, parseISO } from "date-fns";
+import { formatEventDate } from "@/lib/eventTime";
 import {
   ArrowLeft,
   Calendar,
@@ -47,6 +48,7 @@ interface EventWithStats {
   title: string;
   start_date: string;
   end_date: string | null;
+  timezone: string | null;
   image_url: string | null;
   ticket_type: string;
   status: string | null;
@@ -501,7 +503,7 @@ function ListView({ events, onEventClick, onEdit, onShare, onDuplicate }: ListVi
             <div className="flex-1 min-w-0 pr-8">
               <h3 className="font-medium text-sm truncate">{event.title}</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {format(new Date(event.start_date), "EEE, MMM d · h:mm a")}
+                {formatEventDate(event.start_date, event.timezone, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
               </p>
               <p className="text-xs text-muted-foreground">{event.city}</p>
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">

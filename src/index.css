@@ -73,6 +73,7 @@
     /* Typography */
     --font-display: 'Cormorant Garamond', Georgia, serif;
     --font-body: 'DM Sans', system-ui, sans-serif;
+    --font-sans: 'DM Sans', system-ui, sans-serif;
 
     /* Spacing */
     --space-section: 2rem;
@@ -117,8 +118,13 @@
     max-width: 100vw;
   }
 
+  .profile-theme,
+  .profile-theme :where(h1, h2, h3, h4, h5, h6, .font-display, .ether-title, button, p, span, a) {
+    font-family: var(--profile-font), var(--font-body);
+  }
+
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-display);
+    font-family: var(--profile-font, var(--font-display));
     font-weight: 500;
     letter-spacing: -0.025em;
     line-height: 1.2;
@@ -240,7 +246,7 @@
   }
 
   .eyebrow {
-    font-family: var(--font-body);
+    font-family: var(--profile-font, var(--font-body));
     font-size: 0.6875rem;
     font-weight: 500;
     letter-spacing: 0.16em;
@@ -250,7 +256,7 @@
   }
 
   .ether-title {
-    font-family: var(--font-display);
+    font-family: var(--profile-font, var(--font-display));
     font-weight: 500;
     letter-spacing: -0.02em;
     line-height: 1.1;

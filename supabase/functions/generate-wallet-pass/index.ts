@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { eventDateLabel, eventTimeLabel } from "../_shared/event-time.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,7 +32,7 @@ serve(async (req) => {
   }
 
   try {
-    const { eventId, eventTitle, eventDate, eventEndDate, venue, guestName, ticketType } = await req.json();
+    const { eventId, eventTitle, eventDate, eventEndDate, venue, guestName, ticketType, timezone } = await req.json();
     logStep("Request received", { eventId, eventTitle, guestName, ticketType });
 
     if (!eventId || !eventTitle) {
@@ -75,9 +76,6 @@ serve(async (req) => {
       const serviceAccountKey = Deno.env.get("GOOGLE_WALLET_SERVICE_ACCOUNT_KEY");
       if (!serviceAccountKey) throw new Error("GOOGLE_WALLET_SERVICE_ACCOUNT_KEY not set");
 
-      const startDate = new Date(eventDate);
-      const endDate = eventEndDate ? new Date(eventEndDate) : new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
-
       // Create a generic pass object
       const objectId = `${googleWalletIssuerId}.event-${eventId}-${Date.now()}`;
       
@@ -96,12 +94,12 @@ serve(async (req) => {
           {
             id: "date",
             header: "DATE",
-            body: startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }),
+            body: eventDateLabel(eventDate, timezone),
           },
           {
             id: "time",
             header: "TIME",
-            body: `${startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – ${endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`,
+            body: `${eventTimeLabel(eventDate, timezone)} – ${eventTimeLabel(eventEndDate || eventDate, timezone)}`,
           },
           {
             id: "attendee",

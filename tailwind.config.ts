@@ -18,8 +18,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ['Cormorant Garamond', 'Georgia', 'serif'],
-        body: ['DM Sans', 'system-ui', 'sans-serif'],
+        display: ["var(--profile-font, var(--font-display))"],
+        body: ["var(--font-body)"],
       },
       colors: {
         border: "hsl(var(--border))",

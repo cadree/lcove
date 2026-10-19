@@ -35,8 +35,15 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { sessionId, orderId } = await req.json();
-    if (!sessionId && !orderId) throw new Error("sessionId or orderId required");
+    const { sessionId, orderId, eventId } = await req.json();
+    if (!sessionId && !orderId) {
+      if (eventId) {
+        return new Response(JSON.stringify({ freeRsvp: true, order: null, attendees: [] }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw new Error("sessionId or orderId required");
+    }
 
     // If we only got sessionId, look up the order
     let order: TicketOrder | null = null;
@@ -49,8 +56,15 @@ serve(async (req) => {
     }
     if (!order) throw new Error("Order not found");
 
-    // If already paid (free order or webhook updated), return immediately
-    if (order.payment_status === "paid") {
+    const orderRecord = order as TicketOrder & { total_cents?: number | null; payment_method?: string | null };
+    const isFreeOrder = orderRecord.payment_method === "free" || (orderRecord.total_cents ?? 0) === 0;
+
+    // Free RSVPs are already confirmed. Do not ask Stripe.
+    if (order.payment_status === "paid" || isFreeOrder) {
+      if (order.payment_status !== "paid") {
+        await supabase.from("ticket_orders").update({ payment_status: "paid" }).eq("id", order.id);
+        order.payment_status = "paid";
+      }
       const { data: attendees } = await supabase
         .from("event_attendees")
         .select("id, qr_code, ticket_number, attendee_name, attendee_email, status")

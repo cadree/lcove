@@ -60,6 +60,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsAdmin } from "@/hooks/useAdmin";
+import { formatEventDate, formatEventTime } from "@/lib/eventTime";
 import BottomNav from "@/components/navigation/BottomNav";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -116,6 +118,7 @@ export default function EventDetail() {
   const navigate = useNavigate();
   const { eventId } = useParams();
   const { user } = useAuth();
+  const { isAdmin, isLoading: adminLoading } = useIsAdmin();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("orders");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -138,6 +141,10 @@ export default function EventDetail() {
     enabled: !!eventId,
   });
 
+  const isHost = !!user && event?.creator_id === user.id;
+  const canManage = isHost || isAdmin;
+  const accessPending = eventLoading || (!isHost && adminLoading);
+
   // Fetch RSVPs (includes orders/attendees)
   const { data: rsvps, isLoading: rsvpsLoading } = useQuery({
     queryKey: ["event-rsvps", eventId],
@@ -151,7 +158,7 @@ export default function EventDetail() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!eventId,
+    enabled: !!eventId && canManage,
   });
 
   // Fetch attendee profiles
@@ -183,7 +190,7 @@ export default function EventDetail() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!event?.organization_id,
+    enabled: !!event?.organization_id && canManage,
   });
 
   // Fetch team member profiles
@@ -203,8 +210,8 @@ export default function EventDetail() {
   });
 
   // NEW: Phase-3 ticketing data (orders, attendees, tiers) and check-ins
-  const { orders: v2Orders, attendees: v2Attendees, tiers: v2Tiers, isLoading: v2Loading } = useEventTicketingData(eventId);
-  const { data: v2CheckIns = [] } = useEventCheckIns(eventId);
+  const { orders: v2Orders, attendees: v2Attendees, tiers: v2Tiers, isLoading: v2Loading } = useEventTicketingData(eventId, canManage);
+  const { data: v2CheckIns = [] } = useEventCheckIns(eventId, canManage);
 
   // Build profile map for v2 attendees (registered users)
   const { data: v2AttendeeProfiles } = useQuery({
@@ -253,6 +260,28 @@ export default function EventDetail() {
   if (!user) {
     navigate("/auth");
     return null;
+  }
+
+  if (accessPending) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center pb-24">
+        <p className="text-sm text-muted-foreground">Loading event…</p>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  if (event && !canManage) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 px-6 text-center pb-24">
+        <h1 className="font-display text-2xl">Host only</h1>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          Orders, attendees, check-in, and marketing are visible to this event's host.
+        </p>
+        <Button onClick={() => navigate("/dashboard/events")}>Back to events</Button>
+        <BottomNav />
+      </div>
+    );
   }
 
   const isLoading = eventLoading;
@@ -345,12 +374,12 @@ export default function EventDetail() {
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      {format(new Date(event.start_date), "EEE, MMM d")}
+                      {formatEventDate(event.start_date, event.timezone, { weekday: "short", month: "short", day: "numeric" })}
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {format(new Date(event.start_date), "h:mm a")}
-                      {event.end_date && ` - ${format(new Date(event.end_date), "h:mm a")}`}
+                      {formatEventTime(event.start_date, event.timezone)}
+                      {event.end_date && ` - ${formatEventTime(event.end_date, event.timezone)}`}
                     </span>
                     {(event.venue || event.city) && (
                       <span className="flex items-center gap-1">

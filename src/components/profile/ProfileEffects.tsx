@@ -27,7 +27,7 @@ export const ProfileEffects = ({
       {/* Grain Effect */}
       {grain && (
         <div 
-          className="absolute inset-0 opacity-[0.03] mix-blend-overlay"
+          className="absolute inset-0 opacity-30 mix-blend-overlay"
           style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
           }}
@@ -37,7 +37,7 @@ export const ProfileEffects = ({
       {/* Scanlines Effect */}
       {scanlines && (
         <div 
-          className="absolute inset-0 opacity-[0.05]"
+          className="absolute inset-0 opacity-40"
           style={{
             backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px)',
             backgroundSize: '100% 4px',
@@ -51,9 +51,9 @@ export const ProfileEffects = ({
           className="absolute inset-0"
           animate={{
             boxShadow: [
-              'inset 0 0 60px rgba(0, 255, 159, 0.1)',
-              'inset 0 0 80px rgba(0, 255, 159, 0.15)',
-              'inset 0 0 60px rgba(0, 255, 159, 0.1)',
+              'inset 0 0 80px rgba(0, 255, 159, 0.45), 0 0 24px rgba(0, 255, 159, 0.35)',
+              'inset 0 0 120px rgba(0, 255, 159, 0.6), 0 0 40px rgba(0, 255, 159, 0.5)',
+              'inset 0 0 80px rgba(0, 255, 159, 0.45), 0 0 24px rgba(0, 255, 159, 0.35)',
             ],
           }}
           transition={{
@@ -69,7 +69,7 @@ export const ProfileEffects = ({
         <motion.div
           className="absolute inset-0 rounded-inherit"
           style={{
-            background: 'linear-gradient(90deg, transparent, rgba(0,255,159,0.1), rgba(255,0,255,0.1), rgba(0,255,255,0.1), transparent)',
+            background: 'linear-gradient(110deg, transparent 10%, rgba(0,255,159,0.35), rgba(255,0,255,0.4), rgba(0,255,255,0.35), transparent 90%)',
             backgroundSize: '200% 100%',
           }}
           animate={{
@@ -86,7 +86,7 @@ export const ProfileEffects = ({
       {/* Motion Gradient Background */}
       {motionGradient && !prefersReducedMotion && (
         <motion.div
-          className="absolute inset-0 opacity-20"
+          className="absolute inset-0 opacity-50"
           style={{
             background: 'linear-gradient(45deg, #00ff9f, #ff00ff, #00ffff, #ff00ff, #00ff9f)',
             backgroundSize: '400% 400%',

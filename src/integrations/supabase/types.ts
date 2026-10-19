@@ -7713,6 +7713,15 @@ export type Database = {
         Args: { p_event_id: string; p_user_id: string }
         Returns: boolean
       }
+      create_guest_event_rsvp: {
+        Args: {
+          p_event_id: string
+          p_guest_email: string
+          p_guest_name: string
+          p_guest_phone?: string
+        }
+        Returns: string
+      }
       check_in_attendee: {
         Args: {
           p_event_id?: string
@@ -7774,6 +7783,10 @@ export type Database = {
       }
       get_campaign_analytics: { Args: { p_event_id?: string }; Returns: Json }
       get_client_project_by_token: { Args: { p_token: string }; Returns: Json }
+      public_event_attendance_count: {
+        Args: { p_event_id: string }
+        Returns: number
+      }
       get_platform_stats: {
         Args: never
         Returns: {

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, type CSSProperties } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
@@ -34,7 +34,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useProfileCustomization } from "@/hooks/useProfileCustomization";
 import { useProfilePosts } from "@/hooks/useProfilePosts";
-import { useProfileBlogs, BlogPost } from "@/hooks/useProfileBlogs";
+import { useProfileBlogs } from "@/hooks/useProfileBlogs";
 import { useCreatorRoles } from "@/hooks/useCreatorModules";
 import { useUserSkills, useUserPassions, useUserCreativeRoles } from "@/hooks/useUserDetails";
 import { useUserIsAdmin } from "@/hooks/useUserIsAdmin";
@@ -42,6 +42,8 @@ import { usePortfolioFolders, PortfolioFolder } from "@/hooks/usePortfolioFolder
 import { useProfileLayout, ProfileSection } from "@/hooks/useProfileLayout";
 import { toast } from "sonner";
 import { ProfilePost } from "@/types/post";
+import { applyProfileCustomization, hexToHslChannels } from "@/lib/profileSections";
+import { ProfileEffects } from "@/components/profile/ProfileEffects";
 
 const Profile = () => {
   const { userId: urlUserId } = useParams<{ userId?: string }>();
@@ -72,14 +74,15 @@ const Profile = () => {
   const [showEditDetailsDialog, setShowEditDetailsDialog] = useState(false);
   const [showLayoutEditor, setShowLayoutEditor] = useState(false);
   const [selectedPost, setSelectedPost] = useState<ProfilePost | null>(null);
-  const [selectedBlog, setSelectedBlog] = useState<BlogPost | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<PortfolioFolder | null>(null);
   const volumeSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const hasCreatorRoles = creatorRoles.length > 0;
 
   // Square portfolio grid sits above the rest of the module stack.
-  const visibleSections = layout.filter(s => s.visible).sort((a, b) => a.order - b.order);
+  const visibleSections = applyProfileCustomization(layout, customization)
+    .filter(s => s.visible)
+    .sort((a, b) => a.order - b.order);
   const postsSection = visibleSections.find((section) => section.id === "posts_tabs");
   const moduleSections = visibleSections.filter((section) => section.id !== "posts_tabs");
 
@@ -305,7 +308,7 @@ const Profile = () => {
                 )}
                 <ProfileBlogsGrid 
                   blogs={blogs}
-                  onBlogClick={(blog) => setSelectedBlog(blog)}
+                  onBlogClick={(blog) => navigate(`/blog/${blog.id}`)}
                   isLoading={blogsLoading}
                   isOwner={isOwnProfile}
                 />
@@ -454,9 +457,43 @@ const Profile = () => {
     }
   };
 
+  const accentChannels = customization?.accent_color_override
+    ? hexToHslChannels(customization.accent_color_override)
+    : null;
+  const profileFont = customization?.custom_font || undefined;
+  const themeVars: Record<string, string> = {};
+  if (profileFont) themeVars["--profile-font"] = profileFont;
+  if (accentChannels) {
+    themeVars["--primary"] = accentChannels;
+    themeVars["--ring"] = accentChannels;
+    themeVars["--accent"] = accentChannels;
+    themeVars["--foreground"] = accentChannels;
+  }
+  const themeStyle = themeVars as CSSProperties;
+  const showEffects = !!(
+    customization?.effect_grain
+    || customization?.effect_scanlines
+    || customization?.effect_neon_glow
+    || customization?.effect_holographic
+    || customization?.effect_motion_gradient
+  );
+
   return (
     <PageLayout showNotificationBell={false}>
-      <div className="min-h-screen pb-20">
+      <div
+        className={`relative min-h-screen pb-20 ${profileFont ? "profile-theme" : ""}`}
+        style={themeStyle}
+      >
+        {showEffects && (
+          <ProfileEffects
+            className="fixed inset-0 z-30"
+            grain={customization?.effect_grain}
+            scanlines={customization?.effect_scanlines}
+            neonGlow={customization?.effect_neon_glow}
+            holographic={customization?.effect_holographic}
+            motionGradient={customization?.effect_motion_gradient}
+          />
+        )}
         {!isOwnProfile && (
           <div className="px-5 pt-4 pb-2">
             <Button

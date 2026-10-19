@@ -1,5 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
+import { parseCalendarDate } from '@/lib/calendarDate';
 import { Calendar, DollarSign, Users, Clock, ChevronRight, Paperclip, Target, Share2, Lock } from 'lucide-react';
 import { Project } from '@/hooks/useProjects';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -161,7 +162,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <div className="flex items-center gap-1"><Users className="h-3.5 w-3.5" /><span>{filledSlots}/{totalSlots}</span></div>
           {project.timeline_end && (
-            <div className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /><span>{format(new Date(project.timeline_end), 'MMM d')}</span></div>
+            <div className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /><span>{format(parseCalendarDate(project.timeline_end), 'MMM d')}</span></div>
           )}
         </div>
       </div>

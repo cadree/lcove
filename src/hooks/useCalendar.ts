@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useEnergy, ENERGY_GAINS } from "@/hooks/useEnergy";
+import { parseCalendarDate } from "@/lib/calendarDate";
 
 export interface CalendarEvent {
   id: string;
@@ -271,8 +272,8 @@ export function useCalendarItems(filters?: { city?: string; state?: string; type
           id: project.id,
           type: 'project',
           title: project.title,
-          start_date: project.timeline_start,
-          end_date: project.timeline_end,
+          start_date: parseCalendarDate(project.timeline_start).toISOString(),
+          end_date: project.timeline_end ? parseCalendarDate(project.timeline_end).toISOString() : null,
           color: '#8B4513', // brown for projects
           data: project,
         });
@@ -347,6 +348,8 @@ export function useRSVP() {
       queryClient.invalidateQueries({ queryKey: ['event', eventId] });
       queryClient.invalidateQueries({ queryKey: ['events'] });
       queryClient.invalidateQueries({ queryKey: ['my-rsvps'] });
+      queryClient.invalidateQueries({ queryKey: ['my-event-rsvp', eventId] });
+      queryClient.invalidateQueries({ queryKey: ['public-event-attendee-count', eventId] });
 
       if (status === 'interested') {
         toast.success('Marked as interested! Reminder enabled.');

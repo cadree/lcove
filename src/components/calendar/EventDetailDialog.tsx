@@ -15,6 +15,7 @@ import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { supabase } from "@/integrations/supabase/client";
 import { shareLink, shareToChannel, buildShareUrl } from "@/lib/shareLink";
 import { format, formatDistanceToNow } from "date-fns";
+import { formatEventDate, formatEventTime } from "@/lib/eventTime";
 import { 
   MapPin, 
   Calendar, 
@@ -427,14 +428,12 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
         )}
 
         <div className="p-6 space-y-5">
-          <DialogHeader className="space-y-2">
-            <div className="flex items-start justify-between gap-4">
-              <DialogTitle className="font-display text-2xl leading-tight">
-                {event.title}
-              </DialogTitle>
-              
-              {/* Quick Actions */}
-              <div className="flex gap-1 shrink-0">
+          <DialogHeader className="space-y-3">
+            <DialogTitle className="pr-8 text-left font-display text-2xl leading-tight">
+              {event.title}
+            </DialogTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap gap-1">
                 {/* Add to Calendar - using the compact variant */}
                 <AddToCalendarButtons
                   event={{
@@ -527,11 +526,11 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
               </div>
               <div>
                 <p className="text-foreground font-medium">
-                  {format(eventDate, 'EEEE, MMMM d, yyyy')}
+                  {formatEventDate(event.start_date, event.timezone)}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {format(eventDate, 'h:mm a')}
-                  {event.end_date && ` - ${format(new Date(event.end_date), 'h:mm a')}`}
+                  {formatEventTime(event.start_date, event.timezone)}
+                  {event.end_date && ` - ${formatEventTime(event.end_date, event.timezone)}`}
                 </p>
               </div>
             </div>

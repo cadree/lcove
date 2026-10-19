@@ -2,7 +2,8 @@ import { useState, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { format } from "date-fns";
+import { formatEventDate, formatEventTime } from "@/lib/eventTime";
+import { useRSVP } from "@/hooks/useCalendar";
 import {
   Calendar,
   MapPin,
@@ -42,6 +43,7 @@ export default function PublicEventPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const { rsvp, isRsvping } = useRSVP();
   const queryClient = useQueryClient();
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
@@ -150,21 +152,28 @@ export default function PublicEventPage() {
   const { data: rsvpCount } = useQuery({
     queryKey: ["public-event-attendee-count", eventId],
     queryFn: async () => {
-      const [{ count: aCount }, { count: rCount }] = await Promise.all([
-        supabase
-          .from("event_attendees")
-          .select("*", { count: "exact", head: true })
-          .eq("event_id", eventId!)
-          .in("status", ["confirmed", "checked_in"]),
-        supabase
-          .from("event_rsvps")
-          .select("*", { count: "exact", head: true })
-          .eq("event_id", eventId!)
-          .eq("status", "going"),
-      ]);
-      return (aCount || 0) + (rCount || 0);
+      const { data, error } = await supabase.rpc("public_event_attendance_count", {
+        p_event_id: eventId!,
+      });
+      if (error) throw error;
+      return data ?? 0;
     },
     enabled: !!eventId,
+  });
+
+  const { data: myRsvp } = useQuery({
+    queryKey: ["my-event-rsvp", eventId, user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("event_rsvps")
+        .select("id, status")
+        .eq("event_id", eventId!)
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!eventId && !!user,
   });
 
   // Fetch ticket tiers (for type detection)
@@ -185,40 +194,30 @@ export default function PublicEventPage() {
   const guestRsvpMutation = useMutation({
     mutationFn: async () => {
       if (!eventId) throw new Error("No event");
-      const { error } = await supabase.from("event_rsvps").insert({
-        event_id: eventId,
-        status: "going",
-        guest_name: guestName.trim(),
-        guest_email: guestEmail.trim().toLowerCase(),
-        guest_phone: guestPhone.trim() || null,
+      const { data: rsvpId, error } = await supabase.rpc("create_guest_event_rsvp", {
+        p_event_id: eventId,
+        p_guest_name: guestName.trim(),
+        p_guest_email: guestEmail.trim().toLowerCase(),
+        p_guest_phone: guestPhone.trim() || undefined,
       });
       if (error) {
-        if (error.code === "23505") {
+        if (error.message.toLowerCase().includes("already")) {
           throw new Error("You've already RSVP'd with this email!");
         }
         throw error;
       }
+      return rsvpId;
     },
-    onSuccess: async (_, _vars, _ctx) => {
-      // Re-fetch the rsvp we just inserted to get its id, then fire confirmation
-      try {
-        const { data: created } = await supabase
-          .from('event_rsvps')
-          .select('id')
-          .eq('event_id', eventId!)
-          .eq('guest_email', guestEmail.trim().toLowerCase())
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (created?.id) {
-          supabase.functions.invoke('send-rsvp-confirmation', {
-            body: { event_id: eventId, rsvp_id: created.id },
-          }).catch((err) => console.error('Confirmation email failed:', err));
-        }
-      } catch (e) { console.error(e); }
+    onSuccess: async (rsvpId) => {
+      if (rsvpId) {
+        supabase.functions.invoke('send-rsvp-confirmation', {
+          body: { event_id: eventId, rsvp_id: rsvpId },
+        }).catch((err) => console.error('Confirmation email failed:', err));
+      }
       setRsvpSuccess(true);
       queryClient.invalidateQueries({ queryKey: ["public-event-attendee-count", eventId] });
       toast.success("You're on the list!");
+      navigate(`/event/${eventId}/confirmation?free=1`);
     },
     onError: (err: Error) => {
       toast.error(err.message || "Failed to RSVP");
@@ -359,13 +358,13 @@ export default function PublicEventPage() {
 
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4 text-primary shrink-0" />
-                <span>{format(new Date(event.start_date), "EEEE, MMMM d, yyyy")}</span>
+                <span>{formatEventDate(event.start_date, event.timezone)}</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4 text-primary shrink-0" />
                 <span>
-                  {format(new Date(event.start_date), "h:mm a")}
-                  {event.end_date && ` – ${format(new Date(event.end_date), "h:mm a")}`}
+                  {formatEventTime(event.start_date, event.timezone)}
+                  {event.end_date && ` – ${formatEventTime(event.end_date, event.timezone)}`}
                 </span>
               </div>
 
@@ -428,7 +427,7 @@ export default function PublicEventPage() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
             <Card className="mt-4 border-border/50 shadow-lg bg-card/95 backdrop-blur-md">
               <CardContent className="p-5">
-                {rsvpSuccess ? (
+                {rsvpSuccess || myRsvp?.status === "going" ? (
                   <div className="text-center py-4 space-y-3">
                     <CheckCircle2 className="h-12 w-12 text-primary mx-auto" />
                     <h3 className="text-lg font-display font-semibold">You're on the list!</h3>
@@ -526,6 +525,28 @@ export default function PublicEventPage() {
                         <Bell className="h-3 w-3" /> Push notifications enabled
                       </p>
                     )}
+                    {user && (
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        disabled={isRsvping}
+                        onClick={() => rsvp({ eventId: event.id, status: "cancelled" })}
+                      >
+                        {isRsvping ? "Updating…" : "Cancel RSVP"}
+                      </Button>
+                    )}
+                  </div>
+                ) : user ? (
+                  <div className="space-y-3 text-center">
+                    <h3 className="text-lg font-display font-semibold">RSVP</h3>
+                    <p className="text-sm text-muted-foreground">You're signed in. Save your spot with your profile.</p>
+                    <Button
+                      className="w-full"
+                      disabled={isRsvping}
+                      onClick={() => rsvp({ eventId: event.id, status: "going" })}
+                    >
+                      {isRsvping ? "Saving…" : "I'm going"}
+                    </Button>
                   </div>
                 ) : (
                   <>

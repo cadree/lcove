@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { eventStampLabel } from "../_shared/event-time.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,7 +48,7 @@ serve(async (req) => {
     // Fetch event
     const { data: event, error: ee } = await admin
       .from("events")
-      .select("id, title, start_date, venue, city, creator_id")
+      .select("id, title, start_date, venue, city, creator_id, timezone")
       .eq("id", body.eventId)
       .single();
     if (ee || !event) throw new Error("Event not found");
@@ -98,9 +99,7 @@ serve(async (req) => {
     }
 
     const firstName = (displayName || "there").split(" ")[0];
-    const eventTime = new Date(event.start_date).toLocaleString("en-US", {
-      weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-    });
+    const eventTime = eventStampLabel(event.start_date, event.timezone);
     const vars = {
       first_name: firstName,
       event_name: event.title,
