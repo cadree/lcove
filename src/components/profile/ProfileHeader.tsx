@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Settings, MapPin, Camera, Loader2, Sparkles, 
+  Settings, MapPin, Camera, Loader2, Sparkles, Crown, Heart,
   ArrowLeft, MessageCircle, Edit, Shield, BadgeCheck, UserPlus, UserMinus, Users, Flag, Ban
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -50,6 +50,7 @@ interface ProfileHeaderProps {
   onMessageClick: () => void;
   onAvatarUpdate: (url: string) => void;
   userId: string;
+  memberTier: "community" | "elite" | null;
 }
 
 export function ProfileHeader({
@@ -65,6 +66,7 @@ export function ProfileHeader({
   onMessageClick,
   onAvatarUpdate,
   userId,
+  memberTier,
 }: ProfileHeaderProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -252,6 +254,18 @@ export function ProfileHeader({
                 {displayName}
               </h1>
               <ProfileVerificationBadge userId={userId} />
+              {memberTier === "elite" && (
+                <Badge className="bg-gradient-to-r from-amber-400 to-orange-500 text-white border-0 gap-1 text-xs">
+                  <Crown className="w-3 h-3" />
+                  Elite
+                </Badge>
+              )}
+              {memberTier === "community" && (
+                <Badge className="bg-primary/20 text-primary border-primary/30 gap-1 text-xs">
+                  <Heart className="w-3 h-3" />
+                  Community
+                </Badge>
+              )}
               {isProfileAdmin && (
                 <Badge className="bg-primary/20 text-primary border-primary/30 gap-1 text-xs">
                   <Shield className="w-3 h-3" />

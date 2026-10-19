@@ -51,7 +51,7 @@ const Membership = () => {
   const iosApp = isIosApp();
   const { membership, isLoading, isCheckingOut, checkMembership, startCheckout, openCustomerPortal } = useMembership();
   const [searchParams] = useSearchParams();
-  const [communityAmount, setCommunityAmount] = useState<number>(10);
+  const [communityAmount, setCommunityAmount] = useState<number>(5);
 
   // Handle success/cancel redirects
   useEffect(() => {
@@ -84,7 +84,13 @@ const Membership = () => {
         <div className="max-w-5xl mx-auto">
           {/* Header */}
           <PageHeader
-            title="Become a Member"
+            title={
+              membership?.subscribed
+                ? membership.tier === "elite"
+                  ? "Elite Member"
+                  : "Community Member"
+                : "Become a Member"
+            }
             description="Support the creative community and unlock exclusive benefits. Every contribution goes directly into community grants, events, and education."
             icon={<Heart className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
             className="mb-12 text-center"
@@ -151,7 +157,12 @@ const Membership = () => {
             </motion.div>
           )}
 
-          {/* Membership Tiers */}
+          {/* Membership Tiers. Hide join buttons until the membership row has loaded. */}
+          {isLoading && !membership?.subscribed ? (
+            <div className="flex justify-center py-16 mb-12">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
           <div className="grid md:grid-cols-2 gap-6 mb-12">
             {/* Community Member */}
             <motion.div
@@ -359,6 +370,7 @@ const Membership = () => {
               </Card>
             </motion.div>
           </div>
+          )}
 
           {/* Impact Section */}
           <motion.div

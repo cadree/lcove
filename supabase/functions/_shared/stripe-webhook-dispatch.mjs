@@ -1,5 +1,6 @@
 import {
   mapMembershipStatus,
+  subscriptionPeriodUnix,
   tierFromStripeSubscription,
 } from "./membership-products.mjs";
 
@@ -199,7 +200,7 @@ export function createSupabaseStripeDb(supabase, stripe) {
       let interval = "monthly";
       if (subscriptionId) {
         const sub = await stripe.subscriptions.retrieve(subscriptionId);
-        currentPeriodEnd = isoFromUnix(sub.current_period_end);
+        currentPeriodEnd = isoFromUnix(subscriptionPeriodUnix(sub).end);
         amountCents = sub.items?.data?.[0]?.price?.unit_amount ?? 0;
         interval = sub.items?.data?.[0]?.price?.recurring?.interval === "year" ? "yearly" : "monthly";
       }
@@ -269,8 +270,9 @@ export function createSupabaseStripeDb(supabase, stripe) {
       let monthlyAmount = (session.amount_total ?? 0) / 100;
       if (subscriptionId) {
         const sub = await stripe.subscriptions.retrieve(subscriptionId);
-        if (sub.current_period_start) periodStart = isoFromUnix(sub.current_period_start);
-        if (sub.current_period_end) periodEnd = isoFromUnix(sub.current_period_end);
+        const period = subscriptionPeriodUnix(sub);
+        if (period.start) periodStart = isoFromUnix(period.start);
+        if (period.end) periodEnd = isoFromUnix(period.end);
         status = mapMembershipStatus(sub, "checkout.session.completed");
         const unit = sub.items?.data?.[0]?.price?.unit_amount;
         if (typeof unit === "number") monthlyAmount = unit / 100;
@@ -329,8 +331,9 @@ export function createSupabaseStripeDb(supabase, stripe) {
       let periodEnd = null;
       if (subscriptionId) {
         const sub = await stripe.subscriptions.retrieve(subscriptionId);
-        if (sub.current_period_start) periodStart = isoFromUnix(sub.current_period_start);
-        periodEnd = isoFromUnix(sub.current_period_end);
+        const period = subscriptionPeriodUnix(sub);
+        if (period.start) periodStart = isoFromUnix(period.start);
+        periodEnd = isoFromUnix(period.end);
       }
       const { error } = await supabase.from("network_subscriptions").upsert({
         network_id: meta.network_id,
@@ -381,34 +384,39 @@ export function createSupabaseStripeDb(supabase, stripe) {
     },
 
     async syncSubscription(sub, eventType) {
-      const periodEnd = isoFromUnix(sub.current_period_end);
+      const period = subscriptionPeriodUnix(sub);
+      const periodStart = isoFromUnix(period.start);
+      const periodEnd = isoFromUnix(period.end);
       const failed = eventType === "invoice.payment_failed";
       const deleted = eventType === "customer.subscription.deleted";
       const artistStatus = failed
         ? "past_due"
         : (!deleted && (sub.status === "active" || sub.status === "trialing") ? "active" : "canceled");
 
+      const artistPatch = {
+        status: artistStatus,
+        cancel_at_period_end: !!sub.cancel_at_period_end,
+      };
+      if (periodEnd) artistPatch.current_period_end = periodEnd;
       const { error: artistError } = await supabase
         .from("artist_subscriptions")
-        .update({
-          status: artistStatus,
-          current_period_end: periodEnd,
-          cancel_at_period_end: !!sub.cancel_at_period_end,
-        })
+        .update(artistPatch)
         .eq("stripe_subscription_id", sub.id);
       throwIf(artistError);
 
       const meta = sub.metadata || {};
       const tier = tierFromStripeSubscription(sub);
       if (tier && meta.type !== "network_subscription") {
+        const membershipPatch = {
+          status: mapMembershipStatus(sub, eventType),
+          tier,
+          updated_at: new Date().toISOString(),
+        };
+        if (periodStart) membershipPatch.current_period_start = periodStart;
+        if (periodEnd) membershipPatch.current_period_end = periodEnd;
         const { error } = await supabase
           .from("memberships")
-          .update({
-            status: mapMembershipStatus(sub, eventType),
-            current_period_end: periodEnd,
-            tier,
-            updated_at: new Date().toISOString(),
-          })
+          .update(membershipPatch)
           .eq("stripe_subscription_id", sub.id);
         throwIf(error);
       }
@@ -417,12 +425,11 @@ export function createSupabaseStripeDb(supabase, stripe) {
         const networkStatus = failed
           ? "past_due"
           : (deleted ? "canceled" : (sub.status === "active" || sub.status === "trialing" ? "active" : sub.status || "canceled"));
+        const networkPatch = { status: networkStatus };
+        if (periodEnd) networkPatch.current_period_end = periodEnd;
         const { error } = await supabase
           .from("network_subscriptions")
-          .update({
-            status: networkStatus,
-            current_period_end: periodEnd,
-          })
+          .update(networkPatch)
           .eq("stripe_subscription_id", sub.id);
         throwIf(error);
       }

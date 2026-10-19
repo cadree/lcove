@@ -4,9 +4,14 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import Stripe from "stripe";
-import { handleSignedStripeWebhook } from "../supabase/functions/_shared/stripe-webhook-dispatch.mjs";
 import {
+  createSupabaseStripeDb,
+  handleSignedStripeWebhook,
+} from "../supabase/functions/_shared/stripe-webhook-dispatch.mjs";
+import {
+  invoiceSubscriptionId,
   requireMembershipConfig,
+  subscriptionPeriodUnix,
   tierFromStripeSubscription,
 } from "../supabase/functions/_shared/membership-products.mjs";
 
@@ -277,6 +282,172 @@ test("metadata tier is used without a product secret", () => {
     metadata: { type: "artist_subscription" },
     items: { data: [{ price: { product: "prod_artist" } }] },
   }, { get: () => "" }), null);
+});
+
+// Stripe API 2025-03-31.basil and later: the billing period is on the
+// subscription item. The subscription object itself has no current_period_*.
+function basilMembershipSubscription() {
+  return {
+    id: "sub_basil_elite",
+    object: "subscription",
+    status: "active",
+    customer: "cus_basil",
+    cancel_at_period_end: false,
+    metadata: { type: "membership", tier: "elite", user_id: "user_1" },
+    items: {
+      object: "list",
+      data: [
+        {
+          id: "si_basil_elite",
+          object: "subscription_item",
+          current_period_start: 1760908800,
+          current_period_end: 1763500800,
+          price: {
+            id: "price_elite_fixture",
+            object: "price",
+            unit_amount: 2500,
+            product: "prod_elite_fixture",
+            recurring: { interval: "month" },
+          },
+        },
+      ],
+    },
+  };
+}
+
+function memorySupabase() {
+  const ops = [];
+  function builder(table, op, payload) {
+    const record = { table, op, payload, eq: [] };
+    ops.push(record);
+    const api = {
+      select() {
+        return api;
+      },
+      eq(column, value) {
+        record.eq.push([column, value]);
+        return api;
+      },
+      maybeSingle: async () => ({
+        data: table === "memberships" && op === "upsert"
+          ? { id: "mem_1", lifetime_contribution: 0 }
+          : null,
+        error: null,
+      }),
+      then(onFulfilled, onRejected) {
+        const data = table === "membership_contributions" && op === "select"
+          ? [{ amount: 25 }]
+          : null;
+        return Promise.resolve({ data, error: null }).then(onFulfilled, onRejected);
+      },
+    };
+    return api;
+  }
+  return {
+    ops,
+    from(table) {
+      return {
+        upsert: (payload) => builder(table, "upsert", payload),
+        insert: (payload) => builder(table, "insert", payload),
+        update: (payload) => builder(table, "update", payload),
+        select: (payload) => builder(table, "select", payload),
+      };
+    },
+  };
+}
+
+test("basil subscription periods are read from the item for checkout and subscription.updated", async () => {
+  const sub = basilMembershipSubscription();
+  assert.equal(sub.current_period_start, undefined);
+  assert.equal(sub.current_period_end, undefined);
+  const period = subscriptionPeriodUnix(sub);
+  assert.deepEqual(period, { start: 1760908800, end: 1763500800 });
+
+  const start = new Date(1760908800 * 1000).toISOString();
+  const end = new Date(1763500800 * 1000).toISOString();
+  assert.notEqual(start, end);
+
+  const { ops, ...supabase } = memorySupabase();
+  const stripeClient = {
+    subscriptions: {
+      retrieve: async (id) => {
+        assert.equal(id, "sub_basil_elite");
+        return sub;
+      },
+    },
+  };
+  const db = createSupabaseStripeDb(supabase, stripeClient);
+
+  await db.upsertMembershipFromCheckout({
+    id: "cs_basil_elite",
+    amount_total: 2500,
+    currency: "usd",
+    mode: "subscription",
+    customer: "cus_basil",
+    subscription: "sub_basil_elite",
+    invoice: "in_basil_elite",
+    metadata: { type: "membership", tier: "elite", user_id: "user_1" },
+  });
+
+  const upsert = ops.find((op) => op.table === "memberships" && op.op === "upsert");
+  assert.equal(upsert.payload.current_period_start, start);
+  assert.equal(upsert.payload.current_period_end, end);
+  assert.equal(upsert.payload.tier, "elite");
+  assert.equal(upsert.payload.status, "active");
+  assert.equal(upsert.payload.monthly_amount, 25);
+
+  const contribution = ops.find((op) => op.table === "membership_contributions" && op.op === "insert");
+  assert.equal(contribution.payload.period_start, start);
+  assert.equal(contribution.payload.period_end, end);
+
+  await db.syncSubscription(sub, "customer.subscription.updated");
+  const synced = ops.filter((op) => op.table === "memberships" && op.op === "update").at(-1);
+  assert.equal(synced.payload.current_period_start, start);
+  assert.equal(synced.payload.current_period_end, end);
+  assert.equal(synced.payload.status, "active");
+  assert.equal(synced.payload.tier, "elite");
+  assert.deepEqual(synced.eq, [["stripe_subscription_id", "sub_basil_elite"]]);
+});
+
+test("subscription period falls back to the top-level fields", () => {
+  const legacy = {
+    id: "sub_legacy",
+    status: "active",
+    current_period_start: 1700000000,
+    current_period_end: 1702592000,
+    items: { data: [{ price: { unit_amount: 500 } }] },
+  };
+  assert.deepEqual(subscriptionPeriodUnix(legacy), {
+    start: 1700000000,
+    end: 1702592000,
+  });
+
+  const itemWins = {
+    current_period_start: 10,
+    current_period_end: 20,
+    items: { data: [{ current_period_start: 100, current_period_end: 200 }] },
+  };
+  assert.deepEqual(subscriptionPeriodUnix(itemWins), { start: 100, end: 200 });
+  assert.deepEqual(subscriptionPeriodUnix({ items: { data: [{}] } }), { start: null, end: null });
+});
+
+test("basil invoices expose the subscription id on parent", () => {
+  assert.equal(invoiceSubscriptionId({
+    id: "in_basil",
+    parent: {
+      type: "subscription_details",
+      subscription_details: { subscription: "sub_basil_elite" },
+    },
+  }), "sub_basil_elite");
+  assert.equal(invoiceSubscriptionId({
+    id: "in_legacy",
+    subscription: "sub_legacy",
+  }), "sub_legacy");
+  const source = readFileSync(join(root, "supabase/functions/check-membership/index.ts"), "utf8");
+  assert.match(source, /subscriptionPeriodUnix/);
+  assert.match(source, /invoiceSubscriptionId/);
+  assert.equal(source.includes("membershipSub.current_period_end"), false);
+  assert.equal(source.includes("membershipSub.current_period_start"), false);
 });
 
 test("event and store fee constants match the edge function and the app", () => {

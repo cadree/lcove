@@ -94,3 +94,35 @@ export function mapMembershipStatus(sub, eventType) {
   if (sub.status === "past_due" || sub.status === "unpaid") return "past_due";
   return "cancelled";
 }
+
+function unixSeconds(value) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return null;
+  return value;
+}
+
+// Basil (2025-03-31+) moved the billing period onto each subscription item.
+// Older API versions still send it on the subscription. Prefer the item.
+export function subscriptionPeriodUnix(sub) {
+  const item = sub?.items?.data?.[0];
+  return {
+    start: unixSeconds(item?.current_period_start) ?? unixSeconds(sub?.current_period_start),
+    end: unixSeconds(item?.current_period_end) ?? unixSeconds(sub?.current_period_end),
+  };
+}
+
+function idOf(value) {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  return value.id || null;
+}
+
+// Basil invoices put the subscription under parent.subscription_details.
+// Older invoices still have a top-level subscription id.
+export function invoiceSubscriptionId(invoice) {
+  const parent = invoice?.parent;
+  if (parent?.type === "subscription_details" || parent?.subscription_details) {
+    const fromParent = idOf(parent.subscription_details?.subscription);
+    if (fromParent) return fromParent;
+  }
+  return idOf(invoice?.subscription);
+}

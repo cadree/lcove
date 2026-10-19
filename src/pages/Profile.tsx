@@ -29,6 +29,7 @@ import { ProfileFriendsSection } from "@/components/profile/ProfileFriendsSectio
 import { ProfileEventsDashboard } from "@/components/profile/ProfileEventsDashboard";
 import { ProfileMyTickets } from "@/components/profile/ProfileMyTickets";
 import { useProfile } from "@/hooks/useProfile";
+import { useMembership } from "@/hooks/useMembership";
 import { useConversations } from "@/hooks/useConversations";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
@@ -52,6 +53,7 @@ const Profile = () => {
   const isOwnProfile = !urlUserId || urlUserId === user?.id;
   
   const { profile, loading, updateProfile } = useProfile(targetUserId);
+  const { membership } = useMembership();
   const { credits } = useCredits();
   const { customization, isOwner, saveCustomization } = useProfileCustomization(targetUserId);
   const { posts, isLoading: postsLoading, deletePost } = useProfilePosts(targetUserId);
@@ -473,6 +475,7 @@ const Profile = () => {
           onMessageClick={handleMessageClick}
           onAvatarUpdate={handleAvatarUpdate}
           userId={targetUserId || ''}
+          memberTier={isOwnProfile && membership?.subscribed ? membership.tier : null}
         />
 
 

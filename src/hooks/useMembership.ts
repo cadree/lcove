@@ -13,6 +13,42 @@ export interface MembershipStatus {
   grant_eligible: boolean;
 }
 
+interface MembershipRow {
+  tier: string;
+  status: string;
+  monthly_amount: number | null;
+  lifetime_contribution: number | null;
+  grant_eligible: boolean | null;
+  current_period_end: string | null;
+}
+
+function membershipFromRow(row: MembershipRow | null): MembershipStatus | null {
+  if (!row) return null;
+  const tier = row.tier === "community" || row.tier === "elite" ? row.tier : null;
+  const subscribed = !!tier && (row.status === "active" || row.status === "trialing");
+  return {
+    subscribed,
+    tier,
+    subscription_end: row.current_period_end,
+    monthly_amount: row.monthly_amount,
+    lifetime_contribution: Number(row.lifetime_contribution || 0),
+    grant_eligible: Boolean(row.grant_eligible),
+  };
+}
+
+async function readOwnMembership(userId: string): Promise<MembershipStatus | null> {
+  const { data, error } = await supabase
+    .from("memberships")
+    .select("tier, status, monthly_amount, lifetime_contribution, grant_eligible, current_period_end")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    console.error("Error reading membership row", error);
+    return null;
+  }
+  return membershipFromRow(data);
+}
+
 export const useMembership = () => {
   const { user } = useAuth();
   const [membership, setMembership] = useState<MembershipStatus | null>(null);
@@ -26,11 +62,21 @@ export const useMembership = () => {
       return;
     }
 
+    // The webhook writes memberships. RLS lets the owner read that row.
+    // Show it immediately, then refresh from Stripe. A failed refresh must
+    // not hide an active row.
+    let row: MembershipStatus | null = null;
+    try {
+      row = await readOwnMembership(user.id);
+      if (row) setMembership(row);
+    } catch (error) {
+      console.error("Error reading membership row", error);
+    }
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        setMembership(null);
-        setIsLoading(false);
+        if (!row) setMembership(null);
         return;
       }
 
@@ -40,11 +86,15 @@ export const useMembership = () => {
         },
       });
 
-      if (error) throw error;
+      if (error || !data || data.error) {
+        if (!row) setMembership(null);
+        if (error) console.error("Error checking membership:", error);
+        return;
+      }
       setMembership(data);
     } catch (error) {
       console.error("Error checking membership:", error);
-      setMembership(null);
+      if (!row) setMembership(null);
     } finally {
       setIsLoading(false);
     }
