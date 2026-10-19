@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { SplashScreen } from "@capacitor/splash-screen";
-import { EtherWordmark } from "@/components/brand/EtherWordmark";
+import wordmark from "@/assets/ether-wordmark-splash.png";
 import { POWER_MS, REDUCED_MS, splashFrame, type SplashFrame } from "@/lib/etherSplash";
 import { shotSessionEnabled } from "@/lib/shotSession";
 
@@ -60,9 +60,10 @@ export function EtherSplash() {
       role="img"
       aria-label="Ether"
     >
-      <EtherWordmark
+      <img
+        src={wordmark}
         alt=""
-        className="w-[min(86vw,26rem)]"
+        className="block h-auto w-auto max-w-full object-contain w-[min(86vw,26rem)]"
         style={{ opacity: frame.logo, filter: `brightness(${frame.brightness})` }}
       />
     </div>

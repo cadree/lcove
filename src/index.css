@@ -701,18 +701,6 @@
   filter: drop-shadow(0 6px 14px rgba(60, 40, 30, 0.28));
 }
 
-/* Neon wordmark sits on a full-bleed ink band so it never lands on cream. */
-.ether-ink-band {
-  display: flex;
-  justify-content: center;
-  box-sizing: border-box;
-  width: 100vw;
-  max-width: 100vw;
-  margin-left: calc(50% - 50vw);
-  padding: 1.35rem 1.25rem;
-  background: #08080a;
-}
-
 .novi-peek {
   position: absolute;
   right: 0;

@@ -10,11 +10,7 @@ export function LandingHero() {
     <section className="relative pb-10 pt-8">
       <div className="mx-auto flex max-w-md flex-col items-center px-4 text-center sm:px-6">
         <p className="kicker mb-8">Familcy access // Lcove signal</p>
-      </div>
-      <div className="ether-ink-band mb-6">
-        <EtherWordmark className="w-[18rem] max-w-full" />
-      </div>
-      <div className="mx-auto flex max-w-md flex-col items-center px-4 text-center sm:px-6">
+        <EtherWordmark className="mb-6 w-[18rem] max-w-full" />
         <h1 className="ether-title mb-4 max-w-[16ch] text-[38px] leading-[0.95]">
           THE CULTURE OF ASPIRATIONS
         </h1>
