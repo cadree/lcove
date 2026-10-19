@@ -168,7 +168,10 @@ const CalendarPage = () => {
 
   return (
     <PageLayout>
-      <div className="px-4 sm:px-6 pt-6 pb-24">
+      <div
+        className="px-4 sm:px-6 pt-6"
+        style={{ paddingBottom: "calc(84px + 2.5rem + env(safe-area-inset-bottom, 0px))" }}
+      >
         {/* Header */}
         <PageHeader
           title="Calendar"
@@ -324,7 +327,7 @@ const CalendarPage = () => {
             <span>Events</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-accent" />
+            <div className="w-3 h-3 rounded bg-[hsl(var(--scan))]" />
             <span>Projects</span>
           </div>
           <div className="flex items-center gap-2">

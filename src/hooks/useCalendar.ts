@@ -279,7 +279,7 @@ export function useCalendarItems(filters?: { city?: string; state?: string; type
         title: project.title,
         start_date: parseCalendarDate(start).toISOString(),
         end_date: project.timeline_end ? parseCalendarDate(project.timeline_end).toISOString() : null,
-        color: '#8B4513',
+        color: '#79C3CF',
         data: project,
       });
     });
