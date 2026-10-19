@@ -343,7 +343,7 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
                       </p>
                     )}
                     {isIosApp() && item.price > 0 && item.type !== 'product' && (
-                      <IosDigitalGoodsNotice />
+                      <IosDigitalGoodsNotice variant="short" />
                     )}
                     <div className="flex gap-2">
                       {item.price > 0 && !isIosApp() && (

@@ -42,6 +42,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "@/hooks/useAdmin";
 import { useNotificationPreferences } from "@/hooks/useNotifications";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { isIosApp } from "@/lib/platform";
 import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
@@ -735,7 +736,7 @@ const Settings = () => {
                     : pushStatus === 'not_supported' 
                       ? "Not supported in this browser" 
                       : pushStatus === 'permission_denied' 
-                        ? "Blocked in browser settings" 
+                        ? (isIosApp() ? "Blocked in iOS Settings" : "Blocked in browser settings") 
                         : pushStatus === 'subscribed' 
                           ? "Enabled - receiving notifications" 
                           : pushStatus === 'error'

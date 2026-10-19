@@ -9,6 +9,7 @@ import { useStream, useStreamReactions, useSendReaction, useTipStream, useJoinSt
 import { StreamChat } from './StreamChat';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
+import { isIosApp } from '@/lib/platform';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WebRTCStreamViewer } from './WebRTCStreamViewer';
 import { WebRTCStreamHost } from './WebRTCStreamHost';
@@ -90,6 +91,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   };
 
   const handleTip = () => {
+    if (isIosApp()) return;
     const amount = parseInt(tipAmount);
     if (!amount || amount < 1) return;
     tipStream.mutate({ streamId, amount, message: tipMessage });
@@ -323,7 +325,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
                 )}
 
                 {/* Tip Button (viewers only) */}
-                {user && !isHost && streamStatus === 'live' && (
+                {user && !isHost && streamStatus === 'live' && !isIosApp() && (
                   <Button 
                     variant="outline" 
                     className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
@@ -337,7 +339,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
             </div>
 
             {/* Tip Input */}
-            {showTipInput && (
+            {showTipInput && !isIosApp() && (
               <motion.div 
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}

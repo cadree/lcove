@@ -25,6 +25,13 @@ The service worker subscribes with `VITE_VAPID_PUBLIC_KEY`. The same public key 
 
 ## iOS (APNs)
 
-The Capacitor app calls `@capacitor/push-notifications` only when `Capacitor.getPlatform() === 'ios'`. It stores the device token in `push_subscriptions` with `platform = 'apns'` and an `apns:` endpoint. The web sender skips those rows.
+The Capacitor app calls `@capacitor/push-notifications` only when `Capacitor.getPlatform() === 'ios'`. Turning push on in Settings asks for permission and stores the device token in `push_subscriptions` with `platform = 'apns'` and an `apns:` endpoint. A later launch refreshes the token if permission is already granted. The app does not prompt on launch. The web sender skips those rows.
 
-Sending to the device needs an APNs authentication key (`.p8`), the Key ID, and the Team ID from Cadre's Apple Developer account, plus the app's bundle id. That sender is not implemented here. Registration alone does not deliver a notification.
+Sending to the device is not implemented. Registration does not need the key, and neither does the Xcode build.
+
+The owner creates the key in the Apple Developer account. Do not commit it.
+
+1. Identifiers: register App ID `com.etherbylcove.app` with Push Notifications.
+2. Keys: create a key with Apple Push Notifications service (APNs) enabled. Download the `.p8` once. Apple does not offer a second download.
+3. Save three values with the `.p8`: the Key ID shown on that key, the Team ID (Membership details, 10 characters), and the bundle id `com.etherbylcove.app`.
+4. A sender that talks to APNs uses those three values plus the `.p8`. `send-push-notification` does not do that yet.

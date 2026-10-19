@@ -1,9 +1,10 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 import { NATIVE_APP_ID, NATIVE_APP_NAME } from "./src/config/nativeIds";
+import { NATIVE_SPLASH_BACKSTOP_MS } from "./src/lib/nativeShellPolicy";
 
 /**
- * CONFIRM WITH CADRE: appId is a placeholder (reverse-domain of
- * etherbylcove.com). It is not registered in Apple Developer or Google Play.
+ * Bundle id: com.etherbylcove.app (src/config/nativeIds.ts).
+ * The owner registers that id with Apple before archiving.
  *
  * Do not set `server.url`. That key loads a dev server instead of the
  * bundled web assets and must stay unset for TestFlight and App Store builds.
@@ -22,10 +23,15 @@ const config: CapacitorConfig = {
     contentInset: "always",
     preferredContentMode: "mobile",
     allowsLinkPreview: false,
+    backgroundColor: "#080808",
   },
   plugins: {
     SplashScreen: {
-      launchAutoHide: false,
+      // JS hides this on first paint. The backstop covers a bundle that never
+      // runs. launchAutoHide: false with no SplashScreen.hide() left the bear
+      // and spinner up for the life of the process.
+      launchAutoHide: true,
+      launchShowDuration: NATIVE_SPLASH_BACKSTOP_MS,
       backgroundColor: "#080808",
       showSpinner: true,
       spinnerColor: "#ffffff",

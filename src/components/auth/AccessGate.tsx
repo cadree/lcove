@@ -24,6 +24,7 @@ const PUBLIC_EXACT = new Set([
   '/privacy',
   '/terms',
   '/guidelines',
+  '/support',
   '/community',
   '/nuance',
 ]);

@@ -1,5 +1,5 @@
 // Application entry point - Ether App
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,7 +9,10 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { PresenceProvider } from "@/hooks/usePresence";
 import { CreateFlowProvider } from "@/components/create/CreateFlowContext";
 import AccessGate from "@/components/auth/AccessGate";
+import { IosPushRegistration } from "@/components/ios/IosPushRegistration";
+import { NativeLinkRouter } from "@/components/ios/NativeLinkRouter";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
+import { hideNativeSplash } from "@/lib/nativeShell";
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Feed = lazy(() => import("./pages/Feed"));
@@ -50,6 +53,7 @@ const Portfolios = lazy(() => import("./pages/Portfolios"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Guidelines = lazy(() => import("./pages/Guidelines"));
+const Support = lazy(() => import("./pages/Support"));
 const BrandPartners = lazy(() => import("./pages/BrandPartners"));
 const Collectives = lazy(() => import("./pages/Collectives"));
 const PartnerPortal = lazy(() => import("./pages/PartnerPortal"));
@@ -67,6 +71,14 @@ const ActivityTracker = () => {
   useTrackActivity();
   return null;
 };
+
+/** Runs even when a route is still waiting on auth or a lazy chunk. */
+function HideSplashOnMount() {
+  useEffect(() => {
+    hideNativeSplash();
+  }, []);
+  return null;
+}
 
 function RouteFallback() {
   return (
@@ -91,10 +103,13 @@ const queryClient = new QueryClient({
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
+      <HideSplashOnMount />
       <BrowserRouter>
         <AuthProvider>
           <PresenceProvider>
             <CreateFlowProvider>
+              <NativeLinkRouter />
+              <IosPushRegistration />
               <AccessGate>
                 <ActivityTracker />
                 <Toaster />
@@ -145,6 +160,7 @@ const App = () => (
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/guidelines" element={<Guidelines />} />
+                <Route path="/support" element={<Support />} />
                 <Route path="/brand-partners" element={<BrandPartners />} />
                 <Route path="/partner-portal" element={<PartnerPortal />} />
                 <Route path="/collectives" element={<Collectives />} />
