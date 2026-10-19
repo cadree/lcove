@@ -101,11 +101,11 @@ const PostCreator = ({
       {/* Actions - Always visible */}
       <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
         <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={() => photoInputRef.current?.click()} className="text-muted-foreground hover:text-foreground gap-2">
+          <Button variant="ghost" size="sm" onClick={() => photoInputRef.current?.click()} className="text-muted-foreground hover:text-foreground gap-2 min-h-11">
             <Image className="w-4 h-4" />
             Photo
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => videoInputRef.current?.click()} className="text-muted-foreground hover:text-foreground gap-2">
+          <Button variant="ghost" size="sm" onClick={() => videoInputRef.current?.click()} className="text-muted-foreground hover:text-foreground gap-2 min-h-11">
             <Video className="w-4 h-4" />
             Video
           </Button>

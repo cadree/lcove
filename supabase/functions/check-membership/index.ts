@@ -1,21 +1,30 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import {
+  invoiceSubscriptionId,
+  mapMembershipStatus,
+  subscriptionPeriodUnix,
+  tierFromStripeSubscription,
+} from "../_shared/membership-products.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MEMBERSHIP_PRODUCTS = {
-  "prod_TcmECcqnCALhUv": "community",
-  "prod_TcmEthbJUKGwjv": "elite",
-};
-
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CHECK-MEMBERSHIP] ${step}${detailsStr}`);
 };
+
+function isoPeriod(sub: object) {
+  const period = subscriptionPeriodUnix(sub);
+  return {
+    start: period.start ? new Date(period.start * 1000).toISOString() : null,
+    end: period.end ? new Date(period.end * 1000).toISOString() : null,
+  };
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -47,8 +56,18 @@ serve(async (req) => {
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    let customerId = customers.data[0]?.id || null;
+    if (!customerId) {
+      const { data: storedMembership } = await supabaseClient
+        .from("memberships")
+        .select("stripe_customer_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      customerId = storedMembership?.stripe_customer_id || null;
+      logStep("No Stripe customer for this email", { storedCustomerId: customerId });
+    }
 
-    if (customers.data.length === 0) {
+    if (!customerId) {
       logStep("No Stripe customer found");
       return new Response(JSON.stringify({ 
         subscribed: false,
@@ -62,45 +81,91 @@ serve(async (req) => {
       });
     }
 
-    const customerId = customers.data[0].id;
     logStep("Found Stripe customer", { customerId });
 
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
-      status: "active",
-      limit: 10,
+      status: "all",
+      limit: 20,
     });
 
-    // Find membership subscription
-    let membershipSub: Stripe.Subscription | null = null;
-    let tier: string | null = null;
-    let monthlyAmount = 0;
+    const membershipSubs = subscriptions.data.filter((sub) => tierFromStripeSubscription(sub));
+    const rank = (status: string) => {
+      if (status === "active" || status === "trialing") return 0;
+      if (status === "past_due" || status === "unpaid") return 1;
+      return 2;
+    };
+    membershipSubs.sort((a, b) => rank(a.status) - rank(b.status));
+    const membershipSub = membershipSubs[0] ?? null;
+    const tier = membershipSub ? tierFromStripeSubscription(membershipSub) : null;
 
-    for (const sub of subscriptions.data) {
-      const productId = sub.items.data[0]?.price?.product as string;
-      if (productId && MEMBERSHIP_PRODUCTS[productId as keyof typeof MEMBERSHIP_PRODUCTS]) {
-        membershipSub = sub;
-        tier = MEMBERSHIP_PRODUCTS[productId as keyof typeof MEMBERSHIP_PRODUCTS];
-        monthlyAmount = (sub.items.data[0]?.price?.unit_amount || 0) / 100;
-        break;
-      }
-    }
-
-    if (!membershipSub) {
-      logStep("No active membership subscription found");
+    if (!membershipSub || !tier) {
+      logStep("No membership subscription found");
+      const { data: existingMembership } = await supabaseClient
+        .from("memberships")
+        .select("lifetime_contribution")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      await supabaseClient
+        .from("memberships")
+        .update({ status: "cancelled", updated_at: new Date().toISOString() })
+        .eq("user_id", user.id)
+        .in("status", ["active", "trialing", "past_due"]);
       return new Response(JSON.stringify({ 
         subscribed: false,
         tier: null,
         subscription_end: null,
         monthly_amount: null,
-        lifetime_contribution: 0,
+        lifetime_contribution: Number(existingMembership?.lifetime_contribution || 0),
+        cancel_at_period_end: false,
+        status: "cancelled",
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
     }
 
-    const subscriptionEnd = new Date(membershipSub.current_period_end * 1000).toISOString();
+    const membershipStatus = mapMembershipStatus(membershipSub, "customer.subscription.updated");
+    const subscribed = membershipStatus === "active" || membershipStatus === "trialing";
+    const monthlyAmount = (membershipSub.items.data[0]?.price?.unit_amount || 0) / 100;
+
+    const period = isoPeriod(membershipSub);
+
+    if (!subscribed) {
+      logStep("Membership is not active", { status: membershipSub.status, tier });
+      const { data: existingMembership } = await supabaseClient
+        .from("memberships")
+        .select("lifetime_contribution")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      await supabaseClient
+        .from("memberships")
+        .update({
+          tier,
+          status: membershipStatus,
+          stripe_customer_id: customerId,
+          stripe_subscription_id: membershipSub.id,
+          current_period_start: period.start,
+          current_period_end: period.end,
+          monthly_amount: monthlyAmount,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", user.id);
+      return new Response(JSON.stringify({
+        subscribed: false,
+        tier: null,
+        subscription_end: period.end,
+        monthly_amount: monthlyAmount,
+        lifetime_contribution: Number(existingMembership?.lifetime_contribution || 0),
+        cancel_at_period_end: membershipSub.cancel_at_period_end,
+        status: membershipStatus,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    const subscriptionEnd = period.end;
     logStep("Active membership found", { tier, subscriptionEnd, monthlyAmount });
 
     // Calculate lifetime contribution from invoices
@@ -110,12 +175,32 @@ serve(async (req) => {
       limit: 100,
     });
 
+    const { data: existingMembership } = await supabaseClient
+      .from("memberships")
+      .select("lifetime_contribution")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const storedLifetime = Number(existingMembership?.lifetime_contribution || 0);
+
     let lifetimeContribution = 0;
     for (const invoice of invoices.data) {
-      // Only count membership invoices
-      if (invoice.subscription === membershipSub.id) {
+      // Only count membership invoices. Basil moved this id under parent.
+      if (invoiceSubscriptionId(invoice) === membershipSub.id) {
         lifetimeContribution += (invoice.amount_paid || 0) / 100;
       }
+    }
+    const { data: refundRows, error: refundError } = await supabaseClient
+      .from("membership_payment_refunds")
+      .select("amount")
+      .eq("stripe_subscription_id", membershipSub.id);
+    if (refundError) throw new Error(refundError.message);
+    const refunded = (refundRows || []).reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    // A refund already lowered the stored total. Paid invoices still report
+    // amount_paid, so do not raise the stored total back over the refund.
+    if (refunded > 0) {
+      lifetimeContribution = storedLifetime;
+    } else if (lifetimeContribution < storedLifetime) {
+      lifetimeContribution = storedLifetime;
     }
 
     // Upsert membership record in database
@@ -124,10 +209,10 @@ serve(async (req) => {
       .upsert({
         user_id: user.id,
         tier,
-        status: membershipSub.status,
+        status: membershipStatus,
         stripe_customer_id: customerId,
         stripe_subscription_id: membershipSub.id,
-        current_period_start: new Date(membershipSub.current_period_start * 1000).toISOString(),
+        current_period_start: period.start,
         current_period_end: subscriptionEnd,
         monthly_amount: monthlyAmount,
         lifetime_contribution: lifetimeContribution,
@@ -147,6 +232,8 @@ serve(async (req) => {
       lifetime_contribution: lifetimeContribution,
       grant_eligible: lifetimeContribution >= 50 || tier === "elite",
       stripe_subscription_id: membershipSub.id,
+      cancel_at_period_end: membershipSub.cancel_at_period_end,
+      status: membershipStatus,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

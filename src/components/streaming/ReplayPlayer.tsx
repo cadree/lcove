@@ -108,48 +108,6 @@ export const ReplayPlayer: React.FC<ReplayPlayerProps> = ({ src, poster, classNa
     };
   }, []);
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!videoRef.current) return;
-      
-      switch (e.key) {
-        case ' ':
-        case 'k':
-          e.preventDefault();
-          togglePlay();
-          break;
-        case 'ArrowLeft':
-          e.preventDefault();
-          skip(-10);
-          break;
-        case 'ArrowRight':
-          e.preventDefault();
-          skip(10);
-          break;
-        case 'ArrowUp':
-          e.preventDefault();
-          handleVolumeChange([Math.min(1, volume + 0.1)]);
-          break;
-        case 'ArrowDown':
-          e.preventDefault();
-          handleVolumeChange([Math.max(0, volume - 0.1)]);
-          break;
-        case 'm':
-          e.preventDefault();
-          toggleMute();
-          break;
-        case 'f':
-          e.preventDefault();
-          toggleFullscreen();
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [volume, isPlaying]);
-
   const togglePlay = () => {
     if (!videoRef.current) return;
     if (isPlaying) {
@@ -206,6 +164,61 @@ export const ReplayPlayer: React.FC<ReplayPlayerProps> = ({ src, poster, classNa
     }
     resetControlsTimeout();
   };
+
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
+  const togglePlayRef = useRef(togglePlay);
+  const skipRef = useRef(skip);
+  const handleVolumeChangeRef = useRef(handleVolumeChange);
+  const toggleMuteRef = useRef(toggleMute);
+  const toggleFullscreenRef = useRef(toggleFullscreen);
+  togglePlayRef.current = togglePlay;
+  skipRef.current = skip;
+  handleVolumeChangeRef.current = handleVolumeChange;
+  toggleMuteRef.current = toggleMute;
+  toggleFullscreenRef.current = toggleFullscreen;
+
+  // Keyboard shortcuts always call the latest handlers.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!videoRef.current) return;
+
+      switch (e.key) {
+        case ' ':
+        case 'k':
+          e.preventDefault();
+          togglePlayRef.current();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          skipRef.current(-10);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          skipRef.current(10);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          handleVolumeChangeRef.current([Math.min(1, volumeRef.current + 0.1)]);
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          handleVolumeChangeRef.current([Math.max(0, volumeRef.current - 0.1)]);
+          break;
+        case 'm':
+          e.preventDefault();
+          toggleMuteRef.current();
+          break;
+        case 'f':
+          e.preventDefault();
+          toggleFullscreenRef.current();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleRetry = () => {
     setHasError(false);

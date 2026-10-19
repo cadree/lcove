@@ -35,7 +35,7 @@ const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
     }
 
     // Basic validation - no special characters that could be problematic
-    const nameRegex = /^[a-zA-Z\s\-'\.]+$/;
+    const nameRegex = /^[a-zA-Z\s\-'.]+$/;
     if (!nameRegex.test(trimmedName)) {
       setError('Please use only letters, spaces, hyphens, or apostrophes');
       return;

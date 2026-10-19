@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { requireInternalSecret } from "../_shared/require-caller.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,8 +8,19 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const log = (s: string, d?: any) =>
+const log = (s: string, d?: unknown) =>
   console.log(`[AUTO-EVENT-REMINDERS] ${s}${d ? ` - ${JSON.stringify(d)}` : ""}`);
+
+interface ReminderSettingsRow {
+  event_id: string;
+  enabled_24h?: boolean | null;
+  enabled_2h?: boolean | null;
+  enabled_at_door?: boolean | null;
+}
+
+function asReminderSettings(value: unknown): ReminderSettingsRow[] {
+  return Array.isArray(value) ? value as unknown as ReminderSettingsRow[] : [];
+}
 
 interface Window {
   type: string;
@@ -26,6 +38,9 @@ const WINDOWS: Window[] = [
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const denied = requireInternalSecret(req, corsHeaders);
+  if (denied) return denied;
 
   try {
     log("Started");
@@ -58,9 +73,9 @@ serve(async (req) => {
         .from("event_auto_reminders")
         .select("event_id, enabled_24h, enabled_2h, enabled_at_door, last_24h_sent_at, last_2h_sent_at")
         .in("event_id", eventIds);
-      const settingsMap = new Map((settingsRows || []).map((r: any) => [r.event_id, r]));
+      const settingsMap = new Map(asReminderSettings(settingsRows).map((r) => [r.event_id, r]));
       const isEnabled = (eid: string) => {
-        const s: any = settingsMap.get(eid);
+        const s = settingsMap.get(eid);
         if (!s) return true;
         if (win.type === "1day") return s.enabled_24h !== false;
         if (win.type === "2hour") return s.enabled_2h !== false;
@@ -90,7 +105,7 @@ serve(async (req) => {
         for (const a of attendees || []) {
           if (!a.attendee_email && !a.attendee_user_id) continue;
           let email = a.attendee_email || null;
-          let name = a.attendee_name || "there";
+          const name = a.attendee_name || "there";
           if (!email && a.attendee_user_id) {
             const { data: u } = await admin.auth.admin.getUserById(a.attendee_user_id);
             email = u?.user?.email || null;

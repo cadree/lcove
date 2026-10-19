@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 
 interface Post {
@@ -24,6 +26,7 @@ interface Post {
 export function usePosts() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { blockedIds } = useUserBlocks();
 
   const { data: posts = [], isLoading, refetch } = useQuery({
     queryKey: ['posts'],
@@ -39,7 +42,7 @@ export function usePosts() {
       // Get profiles for post creators
       const userIds = [...new Set(postsData?.map(p => p.user_id) || [])];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url, city, city_display')
         .in('user_id', userIds);
 
@@ -71,7 +74,7 @@ export function usePosts() {
       return (postsData || []).map(post => ({
         ...post,
         post_type: post.post_type || 'regular',
-        profile: profileMap.get(post.user_id) || { display_name: null, avatar_url: null, city: null, city_display: null },
+        profile: profileMap.get(post.user_id),
         reactions: Array.from(reactionsByPost.get(post.id)?.entries() || []).map(([emoji, count]) => ({ emoji, count })),
         user_reaction: userReactions.get(post.id) || null,
       })) as Post[];
@@ -114,6 +117,7 @@ export function usePosts() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['profile-posts'] });
       toast.success('Post created!');
     },
     onError: (error) => {
@@ -185,6 +189,7 @@ export function usePosts() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['profile-posts'] });
       toast.success('Post deleted');
     },
     onError: () => {
@@ -192,8 +197,13 @@ export function usePosts() {
     },
   });
 
+  const visiblePosts = useMemo(
+    () => posts.filter((post) => !blockedIds.includes(post.user_id)),
+    [posts, blockedIds],
+  );
+
   return {
-    posts,
+    posts: visiblePosts,
     isLoading,
     createPost,
     addReaction,

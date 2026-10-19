@@ -3,6 +3,7 @@ import { BoardItem } from "./BoardItem";
 import { ConnectorLayer } from "./ConnectorLayer";
 import { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 type ItemType = 'note' | 'todo' | 'link' | 'image' | 'column' | 'board_ref' | 'line' | 'connector';
@@ -44,6 +45,7 @@ interface BoardCanvasProps {
   onDeleteConnector: (id: string) => void;
   onCreateItem?: (type: ItemType, content: Json, x: number, y: number) => void;
   onItemClickForConnect?: (itemId: string) => Promise<boolean>;
+  onViewChange?: (view: { offset: { x: number; y: number }; scale: number }) => void;
 }
 
 export const BoardCanvas = memo(function BoardCanvas({
@@ -59,7 +61,9 @@ export const BoardCanvas = memo(function BoardCanvas({
   onDeleteConnector,
   onCreateItem,
   onItemClickForConnect,
+  onViewChange,
 }: BoardCanvasProps) {
+  const { user } = useAuth();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -76,7 +80,8 @@ export const BoardCanvas = memo(function BoardCanvas({
   // Dispatch custom event when offset changes for connector updates
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('board-canvas-pan'));
-  }, [offset, scale]);
+    onViewChange?.({ offset, scale });
+  }, [offset, scale, onViewChange]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('canvas-inner')) {
@@ -252,8 +257,12 @@ export const BoardCanvas = memo(function BoardCanvas({
       
       try {
         const fileExt = file.name.split('.').pop();
+        if (!user) {
+          toast.error("Sign in to upload");
+          return;
+        }
         const fileName = `${crypto.randomUUID()}.${fileExt}`;
-        const filePath = `board-media/${fileName}`;
+        const filePath = `${user.id}/board-media/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
           .from('board-uploads')
@@ -286,7 +295,7 @@ export const BoardCanvas = memo(function BoardCanvas({
         toast.error(`Failed to upload ${file.name}`);
       }
     }
-  }, [offset, onCreateItem]);
+  }, [offset, onCreateItem, user]);
 
   const nonConnectorItems = items.filter(item => item.type !== 'connector');
 

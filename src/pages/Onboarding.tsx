@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,7 +14,7 @@ import OnboardingRoles from '@/components/onboarding/OnboardingRoles';
 import OnboardingQuestionnaire from '@/components/onboarding/OnboardingQuestionnaire';
 import OnboardingConnections from '@/components/onboarding/OnboardingConnections';
 import OnboardingCompletion from '@/components/onboarding/OnboardingCompletion';
-import OnboardingDenied from '@/components/onboarding/OnboardingDenied';
+import { buildUserPassionInserts } from '@/lib/onboardingPassions';
 
 export interface OnboardingData {
   displayName: string;
@@ -55,9 +55,12 @@ const Onboarding = () => {
     }
   }, [user, authLoading, navigate]);
 
-  // Pre-fill name from profile if available
+  // Pre-fill name from profile if the field is still empty. displayName is read
+  // from a ref so typing in the field does not re-run this effect.
+  const displayNameRef = useRef(data.displayName);
+  displayNameRef.current = data.displayName;
   useEffect(() => {
-    if (profile?.display_name && !data.displayName) {
+    if (profile?.display_name && !displayNameRef.current) {
       setData(prev => ({ ...prev, displayName: profile.display_name || '' }));
     }
   }, [profile]);
@@ -66,12 +69,8 @@ const Onboarding = () => {
   useEffect(() => {
     if (!profileLoading && !initialized && profile) {
       setInitialized(true);
-      if (profile.onboarding_completed) {
-        if (profile.access_status === 'denied' || profile.access_level === 'level_1') {
-          navigate('/locked');
-        } else {
-          navigate('/feed');
-        }
+      if (profile.onboarding_completed && profile.access_status !== 'banned') {
+        navigate('/feed');
       }
     }
   }, [profile, profileLoading, initialized, navigate]);
@@ -106,7 +105,8 @@ const Onboarding = () => {
     }
 
     const { level, score } = calculateMindsetLevel(data.questionnaireResponses);
-    setAccessLevel(level === 2 ? 'level_2' : 'level_1');
+    const passedExam = score >= ACCEPTANCE_THRESHOLD;
+    setAccessLevel(passedExam ? 'level_2' : 'level_1');
 
     try {
       // Save questionnaire responses
@@ -116,16 +116,22 @@ const Onboarding = () => {
         total_score: score
       }, { onConflict: 'user_id' });
 
-      // Save passions
-      const { data: passions } = await supabase
+      // Seeded names link to passions.id. Typed names that are not in the
+      // catalog are stored as custom_name. Replace this user's rows so a
+      // retry cannot leave only the first matching seed.
+      const { data: passionCatalog, error: passionCatalogError } = await supabase
         .from('passions')
-        .select('id, name')
-        .in('name', data.passions);
-      if (passions && passions.length > 0) {
-        await supabase.from('user_passions').upsert(
-          passions.map(p => ({ user_id: user.id, passion_id: p.id })),
-          { onConflict: 'user_id,passion_id' }
-        );
+        .select('id, name');
+      if (passionCatalogError) throw passionCatalogError;
+      const passionRows = buildUserPassionInserts(user.id, data.passions, passionCatalog ?? []);
+      const { error: clearPassionsError } = await supabase
+        .from('user_passions')
+        .delete()
+        .eq('user_id', user.id);
+      if (clearPassionsError) throw clearPassionsError;
+      if (passionRows.length > 0) {
+        const { error } = await supabase.from('user_passions').insert(passionRows);
+        if (error) throw error;
       }
 
       // Save skills
@@ -152,28 +158,25 @@ const Onboarding = () => {
         );
       }
 
-      const accessStatus = level === 2 ? 'active' : 'denied';
       sessionStorage.setItem('onboarding_just_completed', 'true');
 
-      // Update profile with all onboarding data INCLUDING display_name
+      // Finishing onboarding always grants access. The score is stored
+      // and passed_exam is derived (score >= 20). It does not lock anyone out.
       await updateProfile({
         display_name: data.displayName.trim(),
         city: data.city,
         city_display: data.cityDisplay,
         city_key: data.cityKey,
         passion_seriousness: data.passionSeriousness,
-        access_level: level === 2 ? 'level_2' : 'level_1',
+        access_level: passedExam ? 'level_2' : 'level_1',
         onboarding_completed: true,
         mindset_level: level,
-        access_status: accessStatus,
-        onboarding_score: score
+        access_status: 'active',
+        onboarding_score: score,
+        passed_exam: passedExam,
       });
 
-      if (level === 1) {
-        setCurrentStep(9); // Show denied screen
-      } else {
-        setCurrentStep(7); // Show connections screen
-      }
+      setCurrentStep(7);
     } catch (error) {
       console.error('Error saving onboarding data:', error);
       toast({
@@ -219,7 +222,6 @@ const Onboarding = () => {
     <OnboardingQuestionnaire key="questionnaire" data={data} updateData={updateData} onComplete={handleComplete} onBack={prevStep} />,
     <OnboardingConnections key="connections" onComplete={() => setCurrentStep(8)} onBack={prevStep} />,
     <OnboardingCompletion key="completion" accessLevel={accessLevel} />,
-    <OnboardingDenied key="denied" />
   ];
 
   return (

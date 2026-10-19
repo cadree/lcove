@@ -29,13 +29,13 @@ import {
   ThumbsUp,
   Send,
   Download,
-  Check,
   Volume2,
   VolumeX,
   Info,
   ChevronDown,
 } from 'lucide-react';
-import { NetworkContent, useTVSeasons } from '@/hooks/useCinema';
+import { NetworkContent, useContentLike, useTVSeasons } from '@/hooks/useCinema';
+import { isIosApp } from '@/lib/platform';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -55,8 +55,7 @@ export const ContentDetailDialog = ({
   const { data: seasons = [] } = useTVSeasons(content?.id || '');
   const [selectedSeason, setSelectedSeason] = useState(seasons[0]?.season_number?.toString() || '1');
   const [isMuted, setIsMuted] = useState(true);
-  const [isInList, setIsInList] = useState(false);
-  const [isLiked, setIsLiked] = useState(false);
+  const like = useContentLike(content?.id);
   
   const isTVShow = content?.content_type === 'tv_show';
   const currentSeason = seasons.find(s => s.season_number.toString() === selectedSeason);
@@ -187,6 +186,11 @@ export const ContentDetailDialog = ({
                   <Play className="w-5 h-5 fill-current" />
                   {isTVShow ? 'Resume' : 'Play'}
                 </>
+              ) : isIosApp() ? (
+                <>
+                  <Play className="w-5 h-5 fill-current" />
+                  Preview
+                </>
               ) : (
                 <>
                   <Lock className="w-5 h-5" />
@@ -201,7 +205,8 @@ export const ContentDetailDialog = ({
                 size="lg"
                 variant="secondary"
                 className="w-full gap-2 h-12"
-                disabled={!isSubscribed}
+                disabled
+                title="Downloads aren't available"
               >
                 <Download className="w-5 h-5" />
                 Download S{selectedSeason}:E{currentEpisode.episode_number}
@@ -211,16 +216,16 @@ export const ContentDetailDialog = ({
             {/* Action Bar */}
             <div className="flex items-center justify-around py-4 border-t border-border/50">
               <ActionButton
-                icon={isInList ? Check : Plus}
+                icon={Plus}
                 label="My List"
-                active={isInList}
-                onClick={() => setIsInList(!isInList)}
+                disabled
+                title="My List isn't saved yet"
               />
               <ActionButton
                 icon={ThumbsUp}
-                label="Rated"
-                active={isLiked}
-                onClick={() => setIsLiked(!isLiked)}
+                label={like.data?.count ? `Liked ${like.data.count}` : 'Like'}
+                active={!!like.data?.liked}
+                onClick={() => like.toggle.mutate()}
               />
               <ActionButton
                 icon={Send}
@@ -237,14 +242,15 @@ export const ContentDetailDialog = ({
                 <ActionButton
                   icon={Download}
                   label={`Download Season ${selectedSeason}`}
-                  disabled={!isSubscribed}
+                  disabled
+                  title="Downloads aren't available"
                 />
               )}
             </div>
 
             {/* Tabs Section */}
             <Tabs defaultValue="episodes" className="w-full">
-              <TabsList className="w-full grid grid-cols-3 md:grid-cols-4 bg-transparent border-b border-border/50 rounded-none h-auto p-0">
+              <TabsList className="w-full flex bg-transparent border-b border-border/50 rounded-none h-auto p-0 [&>button]:flex-1">
                 {isTVShow && (
                   <TabsTrigger 
                     value="episodes" 
@@ -258,12 +264,6 @@ export const ContentDetailDialog = ({
                   className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
                 >
                   {isTVShow ? 'Collection' : 'Details'}
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="similar" 
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
-                >
-                  More Like This
                 </TabsTrigger>
                 {content.trailer_url && (
                   <TabsTrigger 
@@ -354,14 +354,6 @@ export const ContentDetailDialog = ({
                 </div>
               </TabsContent>
 
-              {/* Similar Content Tab */}
-              <TabsContent value="similar" className="mt-4">
-                <div className="text-center py-8 text-muted-foreground">
-                  <Film className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>More recommendations coming soon</p>
-                </div>
-              </TabsContent>
-
               {/* Trailers Tab */}
               <TabsContent value="trailers" className="mt-4">
                 {content.trailer_url ? (
@@ -394,17 +386,20 @@ const ActionButton = ({
   label,
   active = false,
   disabled = false,
+  title,
   onClick,
 }: {
   icon: React.ElementType;
   label: string;
   active?: boolean;
   disabled?: boolean;
+  title?: string;
   onClick?: () => void;
 }) => (
   <button
     onClick={onClick}
     disabled={disabled}
+    title={title}
     className={cn(
       "flex flex-col items-center gap-1.5 text-center transition-colors",
       disabled ? "opacity-50 cursor-not-allowed" : "hover:text-foreground",

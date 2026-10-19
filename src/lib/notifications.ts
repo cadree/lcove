@@ -1,7 +1,17 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 
-type NotificationType = 'message' | 'like' | 'comment' | 'project_invite' | 'event_reminder' | 'live_stream';
+type NotificationType = 'message' | 'like' | 'comment' | 'follow' | 'project_invite' | 'event_reminder' | 'live_stream';
+
+const PREFERENCE_COLUMN: Partial<Record<NotificationType, string>> = {
+  message: 'messages_enabled',
+  like: 'likes_enabled',
+  comment: 'comments_enabled',
+  follow: 'follows_enabled',
+  project_invite: 'project_invites_enabled',
+  event_reminder: 'event_reminders_enabled',
+  live_stream: 'live_streams_enabled',
+};
 
 interface CreateNotificationParams {
   userId: string;
@@ -23,6 +33,18 @@ export const createNotification = async ({
   data = {},
 }: CreateNotificationParams) => {
   try {
+    const prefColumn = PREFERENCE_COLUMN[type];
+    if (prefColumn) {
+      const { data: prefs } = await supabase
+        .from('notification_preferences')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (prefs && prefs[prefColumn as keyof typeof prefs] === false) {
+        return null;
+      }
+    }
+
     // Insert notification into database
     const { data: notification, error } = await supabase
       .from('notifications')
@@ -83,6 +105,16 @@ export const notifyNewMessage = (userId: string, senderName: string) => {
     title: 'New Message',
     body: `${senderName} sent you a message`,
     data: { action: 'open_messages' },
+  });
+};
+
+export const notifyFollow = (userId: string, followerName: string) => {
+  return createNotification({
+    userId,
+    type: 'follow',
+    title: 'New follower',
+    body: `${followerName} added you to favorites`,
+    data: { action: 'open_profile' },
   });
 };
 

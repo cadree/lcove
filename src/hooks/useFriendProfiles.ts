@@ -18,7 +18,7 @@ export function useFriendProfiles(friendIds: string[]) {
       console.log('[useFriendProfiles] Fetching profiles for', friendIds.length, 'friends');
 
       const { data, error } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url, city, bio')
         .in('user_id', friendIds);
 

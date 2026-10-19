@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMyStore, useStoreItems, useMyStoreItems, useDeleteStoreItem, StoreItem, Store as StoreType } from '@/hooks/useStore';
+import { useMyStore, useStoreItems, useMyStoreItems, useDeleteStoreItem, StoreItem, Store as StoreType, STORE_PUBLIC_COLUMNS } from '@/hooks/useStore';
 import { supabase } from '@/integrations/supabase/client';
 import PageLayout from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -11,6 +11,8 @@ import { StoreItemCard } from '@/components/store/StoreItemCard';
 import { StoreItemDialog } from '@/components/store/StoreItemDialog';
 import { CreateItemDialog } from '@/components/store/CreateItemDialog';
 import { StoreSetupDialog } from '@/components/store/StoreSetupDialog';
+import { StorePayoutSetup } from '@/components/store/StorePayoutSetup';
+import { BuyerOrders, SellerOrders } from '@/components/store/StoreOrdersPanel';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -41,7 +43,9 @@ import {
   ArrowLeft,
   Trash2,
   ExternalLink,
+  Receipt,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const Store = () => {
   const { user } = useAuth();
@@ -52,7 +56,20 @@ const Store = () => {
   const { data: myStore, isLoading: isLoadingStore } = useMyStore();
   const { data: myItems } = useMyStoreItems();
   const deleteItem = useDeleteStoreItem();
-  const [activeTab, setActiveTab] = useState<'products' | 'services' | 'rentals' | 'my-store'>('products');
+  const tabParam = searchParams.get('tab');
+  const categoryParam = searchParams.get('category');
+  const isStoreTab = (
+    value: string | null,
+  ): value is 'products' | 'services' | 'rentals' | 'my-store' | 'orders' =>
+    value === 'products' || value === 'services' || value === 'rentals' || value === 'my-store' || value === 'orders';
+  const [activeTab, setActiveTab] = useState<'products' | 'services' | 'rentals' | 'my-store' | 'orders'>(
+    isStoreTab(tabParam) ? tabParam : 'products',
+  );
+  useEffect(() => {
+    if (isStoreTab(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState<StoreItem | null>(null);
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
@@ -61,6 +78,41 @@ const Store = () => {
   const [editItem, setEditItem] = useState<StoreItem | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<StoreItem | null>(null);
+  const handledQuery = useRef('');
+
+  useEffect(() => {
+    const key = searchParams.toString();
+    if (!key || handledQuery.current === key) return;
+    const purchase = searchParams.get('purchase');
+    const orderId = searchParams.get('order');
+    const connectReturn = searchParams.get('connect_success') || searchParams.get('connect_refresh');
+    if (!purchase && !connectReturn) return;
+    handledQuery.current = key;
+
+    if (connectReturn) {
+      setActiveTab('my-store');
+    }
+
+    if (purchase === 'success') {
+      toast.success('Payment received. The order is confirmed when Stripe notifies Ether.');
+    } else if (purchase === 'cancel' || purchase === 'cancelled') {
+      toast.message('Checkout canceled.');
+      if (orderId) {
+        supabase.functions.invoke('purchase-store-item', {
+          body: { action: 'cancel', orderId },
+        }).catch(() => {
+          toast.error('The pending charge could not be cleared. It expires if checkout is not finished.');
+        });
+      }
+    }
+
+    if (purchase) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('purchase');
+      next.delete('order');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   // Fetch the specific store if viewing another user's store
   const { data: viewingStore } = useQuery({
@@ -69,7 +121,7 @@ const Store = () => {
       if (!storeIdParam) return null;
       const { data, error } = await supabase
         .from('stores')
-        .select('*')
+        .select(STORE_PUBLIC_COLUMNS)
         .eq('id', storeIdParam)
         .eq('is_active', true)
         .maybeSingle();
@@ -79,10 +131,10 @@ const Store = () => {
       // Fetch owner profile
       if (data) {
         const { data: profile } = await supabase
-          .from('profiles')
+          .from('profiles_public')
           .select('display_name, avatar_url, city')
           .eq('user_id', data.user_id)
-          .single();
+          .maybeSingle();
         
         return { ...data, profile } as StoreType & { profile?: { display_name: string; avatar_url: string; city: string } };
       }
@@ -99,7 +151,9 @@ const Store = () => {
     services: 'service' as const,
     rentals: 'rental' as const,
   };
-  const currentType = activeTab !== 'my-store' ? typeMap[activeTab] : undefined;
+  const currentType = activeTab === 'products' || activeTab === 'services' || activeTab === 'rentals'
+    ? typeMap[activeTab]
+    : undefined;
   
   // When viewing a specific store, always filter by that store ID
   const effectiveStoreId = storeIdParam || undefined;
@@ -113,10 +167,12 @@ const Store = () => {
     ? (currentType ? items.filter(item => item.type === currentType) : items)
     : items;
 
-  const filteredItems = (activeTab === 'my-store' ? myItems : typeFilteredItems)?.filter((item) =>
-    item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  const filteredItems = (activeTab === 'my-store' ? myItems : typeFilteredItems)?.filter((item) => {
+    const matchesQuery = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = !categoryParam || item.category_id === categoryParam;
+    return matchesQuery && matchesCategory;
+  }) || [];
 
   const handleItemClick = (item: StoreItem) => {
     setSelectedItem(item);
@@ -147,9 +203,9 @@ const Store = () => {
   };
 
   const tabConfig = [
-    { id: 'products', label: 'Products', icon: Package },
-    { id: 'services', label: 'Services', icon: Wrench },
-    { id: 'rentals', label: 'Studios', icon: Building2 },
+    { id: 'products' as const, label: 'Products', icon: Package },
+    { id: 'services' as const, label: 'Services', icon: Wrench },
+    { id: 'rentals' as const, label: 'Studios', icon: Building2 },
   ];
 
   return (
@@ -309,12 +365,26 @@ const Store = () => {
                     )}
                   </TabsTrigger>
                 )}
+                {user && !storeIdParam && (
+                  <TabsTrigger value="orders" className="flex items-center gap-2">
+                    <Receipt className="w-4 h-4" />
+                    Orders
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               {/* Content */}
-              {['products', 'services', 'rentals', 'my-store'].map((tabId) => (
+              {['products', 'services', 'rentals', 'my-store', 'orders'].map((tabId) => (
                 <TabsContent key={tabId} value={tabId}>
-                  {isLoading || isLoadingStore ? (
+                  {tabId === 'orders' ? (
+                    <BuyerOrders />
+                  ) : tabId === 'my-store' && myStore ? (
+                    <div className="space-y-6 mb-6">
+                      <StorePayoutSetup storeId={myStore.id} storeName={myStore.name} />
+                      <SellerOrders />
+                    </div>
+                  ) : null}
+                  {tabId === 'orders' ? null : isLoading || isLoadingStore ? (
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                       {Array.from({ length: 8 }).map((_, i) => (
                         <div key={i} className="space-y-3">

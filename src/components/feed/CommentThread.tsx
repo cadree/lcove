@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
-import { Trash2, Reply, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trash2, Reply, ChevronDown, ChevronUp, Flag } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
+import { ReportDialog } from '@/components/safety/ReportDialog';
 
 interface Comment {
   id: string;
@@ -41,6 +42,7 @@ const CommentItem = ({
 }) => {
   const { user } = useAuth();
   const [showReplies, setShowReplies] = useState(depth === 0);
+  const [reportOpen, setReportOpen] = useState(false);
   const isOwner = user?.id === comment.user_id;
   const hasReplies = comment.replies && comment.replies.length > 0;
 
@@ -55,14 +57,14 @@ const CommentItem = ({
         <Avatar className="w-8 h-8 shrink-0">
           <AvatarImage src={comment.profile?.avatar_url || undefined} />
           <AvatarFallback className="bg-muted text-muted-foreground text-xs">
-            {comment.profile?.display_name?.charAt(0).toUpperCase() || '?'}
+            {(comment.profile ? (comment.profile.display_name || 'User') : 'Private profile').charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 flex-wrap">
             <span className="font-medium text-sm text-foreground">
-              {comment.profile?.display_name || 'User'}
+              {comment.profile ? (comment.profile.display_name || 'User') : 'Private profile'}
             </span>
             <span className="text-xs text-muted-foreground">
               {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
@@ -117,6 +119,18 @@ const CommentItem = ({
                 <Trash2 className="w-3 h-3" />
               </Button>
             )}
+
+            {user && !isOwner && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setReportOpen(true)}
+                className="text-muted-foreground hover:text-foreground h-auto py-1 px-2 text-xs"
+              >
+                <Flag className="w-3 h-3 mr-1" />
+                Report
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -141,6 +155,12 @@ const CommentItem = ({
           </motion.div>
         )}
       </AnimatePresence>
+      <ReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        targetType="comment"
+        targetId={comment.id}
+      />
     </motion.div>
   );
 };
@@ -180,7 +200,7 @@ const CommentThread = ({
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Replying to</span>
               <span className="font-medium text-foreground">
-                {replyingToComment.profile?.display_name || 'User'}
+                {replyingToComment.profile ? (replyingToComment.profile.display_name || 'User') : 'Private profile'}
               </span>
               <Button
                 variant="ghost"

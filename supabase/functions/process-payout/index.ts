@@ -1,13 +1,14 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { ledgerBalances } from "../_shared/credit-balances.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   console.log(`[PROCESS-PAYOUT] ${step}`, details ? JSON.stringify(details) : '');
 };
 
@@ -45,22 +46,41 @@ serve(async (req) => {
 
     // If using credits, convert from credit balance
     if (use_credits) {
-      // Check user's EARNED credit balance - only earned credits can be paid out
-      const { data: credits } = await supabaseClient
-        .from('user_credits')
-        .select('balance, earned_balance, genesis_balance')
-        .eq('user_id', user.id)
-        .single();
+      const credits = await ledgerBalances(supabaseClient, user.id);
+      const earnedBalance = credits.earned_balance;
 
-      const earnedBalance = credits?.earned_balance || 0;
-      
-      if (earnedBalance < amount) {
-        throw new Error(`Insufficient Earned Credit. You have ${earnedBalance} Earned LC, need ${amount} LC. Only Earned Credit can be withdrawn.`);
+      // Only server-issued earned credits from a verified source are withdrawable.
+      // Transfers and client-minted rows are not, even if earned_balance includes them.
+      const verifiedSources = ["event_ticket_sale", "store_order", "studio_booking", "stream_tip"];
+      const { data: ledgerRows, error: ledgerReadError } = await supabaseClient
+        .from("credit_ledger")
+        .select("amount, earned_amount, credit_type, reference_type, verified_by, type, server_issued")
+        .eq("user_id", user.id)
+        .eq("credit_type", "earned");
+
+      if (ledgerReadError) throw ledgerReadError;
+
+      let verifiedIn = 0;
+      let convertedOut = 0;
+      for (const row of ledgerRows ?? []) {
+        const earned = Number(row.earned_amount ?? row.amount ?? 0);
+        if (row.type === "payout_conversion") {
+          convertedOut += Math.abs(earned);
+          continue;
+        }
+        const fromVerifiedSource = row.server_issued === true && (
+          row.verified_by != null || verifiedSources.includes(row.reference_type)
+        );
+        if (fromVerifiedSource && earned > 0) verifiedIn += earned;
+      }
+      const withdrawable = Math.min(earnedBalance, Math.max(0, verifiedIn - convertedOut));
+
+      if (withdrawable < amount) {
+        throw new Error(`Insufficient verified Earned Credit. Withdrawable ${withdrawable} LC, need ${amount} LC. Only credits from verified sources can be withdrawn.`);
       }
 
       // Deduct from earned credits only
-      const newEarnedBalance = earnedBalance - amount;
-      const newTotalBalance = (credits?.balance || 0) - amount;
+      const newTotalBalance = credits.balance - amount;
       
       await supabaseClient.from('credit_ledger').insert({
         user_id: user.id,
@@ -117,8 +137,8 @@ serve(async (req) => {
     if (methodError || !payoutMethod) throw new Error("Payout method not found");
 
     // Create Stripe transfer/payout
-    let stripeTransferId = null;
-    let stripePayoutId = null;
+    const stripeTransferId = null;
+    const stripePayoutId = null;
 
     // For bank accounts, create a payout
     if (payoutMethod.type === 'bank_account' && payoutMethod.stripe_bank_account_id) {

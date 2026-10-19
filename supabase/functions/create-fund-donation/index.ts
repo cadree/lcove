@@ -8,13 +8,10 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : "";
   console.log(`[CREATE-FUND-DONATION] ${step}${detailsStr}`);
 };
-
-// Reuse the community product for recurring; one-time uses price_data
-const COMMUNITY_PRODUCT_ID = "prod_Tiqd9bhgTKWRRo";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -75,7 +72,7 @@ serve(async (req) => {
       }
     }
 
-    const origin = req.headers.get("origin") || "https://lcove.lovable.app";
+    const origin = req.headers.get("origin") || "https://etherbylcove.com";
 
     let sessionConfig: Stripe.Checkout.SessionCreateParams;
 
@@ -87,7 +84,7 @@ serve(async (req) => {
           {
             price_data: {
               currency: "usd",
-              product: COMMUNITY_PRODUCT_ID,
+              product_data: { name: "Community Fund monthly donation" },
               unit_amount: amountCents,
               recurring: { interval: "month" },
             },
@@ -98,8 +95,17 @@ serve(async (req) => {
         success_url: `${origin}/fund?donated=true`,
         cancel_url: `${origin}/fund?cancelled=true`,
         metadata: {
+          type: "fund_donation",
           source: "fund_donation",
+          mode: "recurring",
           user_id: userId || "guest",
+        },
+        subscription_data: {
+          metadata: {
+            type: "fund_donation",
+            source: "fund_donation",
+            user_id: userId || "guest",
+          },
         },
       };
     } else {
@@ -110,7 +116,7 @@ serve(async (req) => {
           {
             price_data: {
               currency: "usd",
-              product: COMMUNITY_PRODUCT_ID,
+              product_data: { name: "Community Fund donation" },
               unit_amount: amountCents,
             },
             quantity: 1,
@@ -120,7 +126,9 @@ serve(async (req) => {
         success_url: `${origin}/fund?donated=true`,
         cancel_url: `${origin}/fund?cancelled=true`,
         metadata: {
+          type: "fund_donation",
           source: "fund_donation",
+          mode: "one_time",
           user_id: userId || "guest",
         },
       };

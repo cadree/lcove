@@ -6,7 +6,7 @@
 CREATE EXTENSION IF NOT EXISTS pg_net SCHEMA extensions;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
-    CREATE EXTENSION pg_cron;
+    CREATE EXTENSION pg_cron WITH SCHEMA pg_catalog;
   END IF;
 END $$;
 CREATE EXTENSION IF NOT EXISTS supabase_vault;
@@ -270,23 +270,22 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_unsubscribe_tokens_token ON public.email_unsubscribe_tokens(token);
 
 -- ============================================================
--- POST-MIGRATION STEPS (applied dynamically by setup_email_infra)
--- These steps contain project-specific secrets and URLs and
--- cannot be expressed as static SQL. They are applied via the
--- Supabase Management API (ExecuteSQL) each time the tool runs.
+-- POST-MIGRATION (dashboard only — do not run as SQL)
+-- cron and vault are owned by supabase_admin. Do not put the
+-- project URL or a secret in this file.
 -- ============================================================
 --
--- 1. VAULT SECRET
---    Stores (or updates) the Supabase service_role key in
---    vault as 'email_queue_service_role_key'.
---    Uses vault.create_secret / vault.update_secret (upsert).
---    To revert: DELETE FROM vault.secrets WHERE name = 'email_queue_service_role_key';
+-- 1. VAULT
+--    ether-prod already has vault secret 'internal_function_secret'.
+--    The GitHub Actions secret INTERNAL_FUNCTION_SECRET must be that
+--    same value. Do not create 'email_queue_service_role_key'.
+--    process-email-queue does not read a service role key from Vault.
 --
--- 2. CRON JOB (pg_cron)
---    Creates job 'process-email-queue' with a 5-second interval.
---    The job checks:
---      a) rate-limit cooldown (email_send_state.retry_after_until)
---      b) whether auth_emails or transactional_emails queues have messages
---    If conditions are met, it calls the process-email-queue Edge Function
---    via net.http_post using the vault-stored service_role key.
---    To revert: SELECT cron.unschedule('process-email-queue');
+-- 2. CRON
+--    Create job 'process-email-queue' in the dashboard (Integrations, Cron).
+--    Schedule: * * * * * (every minute).
+--    HTTP POST the function URL.
+--    Header: x-internal-secret = vault secret internal_function_secret.
+--    Do not send the service_role JWT. verify_jwt is false; the function
+--    checks the header. See docs/deploy-ether-prod.md.
+--    To remove the job later, unschedule it in the dashboard.

@@ -37,6 +37,26 @@ interface UserProfile {
   onboarding_completed: boolean | null;
 }
 
+type AdminListUser = NonNullable<ReturnType<typeof useAllUsers>['data']>[number];
+
+function toUserProfile(user: AdminListUser): UserProfile | null {
+  if (!user.id || !user.user_id) return null;
+  // profiles_public does not include passions; the column may still be present at runtime.
+  const withPassions = user as unknown as { passions?: string[] | null };
+  return {
+    id: user.id,
+    user_id: user.user_id,
+    display_name: user.display_name,
+    avatar_url: user.avatar_url,
+    city: user.city,
+    passions: withPassions.passions || null,
+    mindset_level: user.mindset_level || null,
+    access_status: user.access_status || null,
+    onboarding_score: user.onboarding_score || null,
+    onboarding_completed: user.onboarding_completed,
+  };
+}
+
 const AdminOnboarding: React.FC = () => {
   const navigate = useNavigate();
   const { userId } = useParams<{ userId?: string }>();
@@ -63,22 +83,13 @@ const AdminOnboarding: React.FC = () => {
   // If userId is provided in URL, find and select that user
   useEffect(() => {
     if (userId && allUsers) {
-      const foundUser = allUsers.find((u: any) => u.user_id === userId);
+      const foundUser = allUsers.find((u) => u.user_id === userId);
       if (foundUser) {
-        const userProfile: UserProfile = {
-          id: foundUser.id,
-          user_id: foundUser.user_id,
-          display_name: foundUser.display_name,
-          avatar_url: foundUser.avatar_url,
-          city: foundUser.city,
-          passions: (foundUser as any).passions || null,
-          mindset_level: (foundUser as any).mindset_level || null,
-          access_status: (foundUser as any).access_status || null,
-          onboarding_score: (foundUser as any).onboarding_score || null,
-          onboarding_completed: foundUser.onboarding_completed,
-        };
-        setSelectedUser(userProfile);
-        setEditedPassions(userProfile.passions || []);
+        const userProfile = toUserProfile(foundUser);
+        if (userProfile) {
+          setSelectedUser(userProfile);
+          setEditedPassions(userProfile.passions || []);
+        }
       }
     }
   }, [userId, allUsers]);
@@ -104,7 +115,7 @@ const AdminOnboarding: React.FC = () => {
     return <Navigate to="/" replace />;
   }
 
-  const filteredUsers = allUsers?.filter((u: any) =>
+  const filteredUsers = allUsers?.filter((u) =>
     u.display_name?.toLowerCase().includes(search.toLowerCase()) ||
     u.user_id?.toLowerCase().includes(search.toLowerCase())
   );
@@ -240,7 +251,7 @@ const AdminOnboarding: React.FC = () => {
     }
   };
 
-  const handleStatusChange = (status: 'active' | 'denied' | 'banned') => {
+  const handleStatusChange = (status: 'active' | 'pending' | 'banned') => {
     if (!selectedUser) return;
     changeAccessStatus.mutate(
       { userId: selectedUser.user_id, status },
@@ -305,23 +316,14 @@ const AdminOnboarding: React.FC = () => {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {filteredUsers?.map((u: any) => (
+                    {filteredUsers?.map((u) => {
+                      const userProfile = toUserProfile(u);
+                      if (!userProfile) return null;
+                      return (
                       <Card
-                        key={u.id}
+                        key={userProfile.id}
                         className="cursor-pointer hover:bg-accent/50 transition-colors"
                         onClick={() => {
-                          const userProfile: UserProfile = {
-                            id: u.id,
-                            user_id: u.user_id,
-                            display_name: u.display_name,
-                            avatar_url: u.avatar_url,
-                            city: u.city,
-                            passions: u.passions || null,
-                            mindset_level: u.mindset_level || null,
-                            access_status: u.access_status || null,
-                            onboarding_score: u.onboarding_score || null,
-                            onboarding_completed: u.onboarding_completed,
-                          };
                           setSelectedUser(userProfile);
                           setEditedPassions(userProfile.passions || []);
                         }}
@@ -345,7 +347,8 @@ const AdminOnboarding: React.FC = () => {
                           <User className="h-4 w-4 text-muted-foreground" />
                         </CardContent>
                       </Card>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </ScrollArea>
@@ -393,8 +396,8 @@ const AdminOnboarding: React.FC = () => {
                 <CardContent>
                   <div className="flex items-center gap-4">
                     <Select
-                      value={selectedUser.access_status || 'pending'}
-                      onValueChange={(value) => handleStatusChange(value as 'active' | 'denied' | 'banned')}
+                      value={selectedUser.access_status === 'denied' ? 'active' : (selectedUser.access_status || 'pending')}
+                      onValueChange={(value) => handleStatusChange(value as 'active' | 'pending' | 'banned')}
                     >
                       <SelectTrigger className="w-48">
                         <SelectValue />
@@ -402,7 +405,6 @@ const AdminOnboarding: React.FC = () => {
                       <SelectContent>
                         <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="denied">Denied</SelectItem>
                         <SelectItem value="banned">Banned</SelectItem>
                       </SelectContent>
                     </Select>

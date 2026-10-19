@@ -42,7 +42,7 @@ export function useMyRSVPs() {
         .in('status', ['going', 'interested'])
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return (data || []).filter((r: any) => r.event) as unknown as MyRSVP[];
+      return (data || []).filter((r) => r.event) as unknown as MyRSVP[];
     },
     enabled: !!user,
   });

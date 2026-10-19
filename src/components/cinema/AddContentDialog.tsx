@@ -22,6 +22,7 @@ import {
 import { useAddContent, useContentGenres } from '@/hooks/useCinema';
 import { Film, Upload, Link as LinkIcon, X, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 interface AddContentDialogProps {
@@ -50,10 +51,12 @@ export const AddContentDialog = ({ open, onOpenChange, networkId }: AddContentDi
 
   const { data: genres = [] } = useContentGenres();
   const addContent = useAddContent();
+  const { user } = useAuth();
 
   const uploadFile = async (file: File, path: string): Promise<string | null> => {
+    if (!user) return null;
     const fileExt = file.name.split('.').pop();
-    const fileName = `${path}/${Date.now()}.${fileExt}`;
+    const fileName = `${user.id}/${path}/${Date.now()}.${fileExt}`;
 
     const { error } = await supabase.storage
       .from('media')
@@ -178,7 +181,7 @@ export const AddContentDialog = ({ open, onOpenChange, networkId }: AddContentDi
 
             <div className="space-y-2">
               <Label>Content Type *</Label>
-              <Select value={contentType} onValueChange={(v: any) => setContentType(v)}>
+              <Select value={contentType} onValueChange={(v: 'short_film' | 'feature_film' | 'tv_show') => setContentType(v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

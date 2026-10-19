@@ -62,17 +62,17 @@ const EnergyDetailSheet = ({ open, onOpenChange }: EnergyDetailSheetProps) => {
 
   // Calculate stats for badges
   const totalEarned = transactions
-    .filter((t: any) => t.transaction_type === "earn")
-    .reduce((sum: number, t: any) => sum + t.amount, 0);
+    .filter((t) => t.transaction_type === "earn")
+    .reduce((sum, t) => sum + t.amount, 0);
   
   const tasksCompleted = transactions
-    .filter((t: any) => t.source?.includes("task_complete")).length;
+    .filter((t) => t.source?.includes("task_complete")).length;
   
   const deepWorkSessions = transactions
-    .filter((t: any) => t.source === "deep_work").length;
+    .filter((t) => t.source === "deep_work").length;
   
   const collaborations = transactions
-    .filter((t: any) => t.source === "collaboration_join").length;
+    .filter((t) => t.source === "collaboration_join").length;
 
   // Check badge unlock status
   const getBadgeStatus = (badge: typeof MOMENTUM_BADGES[0]) => {
@@ -280,7 +280,7 @@ const EnergyDetailSheet = ({ open, onOpenChange }: EnergyDetailSheetProps) => {
               
               {transactions.length > 0 ? (
                 <div className="space-y-2">
-                  {transactions.slice(0, 10).map((tx: any) => (
+                  {transactions.slice(0, 10).map((tx) => (
                     <div
                       key={tx.id}
                       className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/20"

@@ -1,13 +1,13 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { ledgerBalances } from "../_shared/credit-balances.ts";
+import { COMMUNITY_FUND_FEE_PERCENT } from "../_shared/fees.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-const PLATFORM_FEE_PERCENT = 20;
 
 const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
@@ -55,7 +55,7 @@ serve(async (req) => {
         *,
         item:store_items(
           id, title, description, price, credits_price, currency, images,
-          store:stores(id, user_id, name, stripe_connect_account_id, payout_enabled, accepts_cash, accepts_credits)
+          store:stores(id, user_id, name, payout_enabled, accepts_cash, accepts_credits)
         )
       `)
       .eq("id", bookingId)
@@ -77,6 +77,13 @@ serve(async (req) => {
       throw new Error("Item or store not found");
     }
 
+    const { data: storeSecrets } = await supabaseAdmin
+      .from("store_secrets")
+      .select("stripe_connect_account_id")
+      .eq("store_id", store.id)
+      .maybeSingle();
+    const connectAccountId = storeSecrets?.stripe_connect_account_id ?? null;
+
     const totalPrice = booking.total_price || (item.price * (booking.duration_hours || 1));
     const totalCredits = booking.credits_spent || (item.credits_price ? item.credits_price * (booking.duration_hours || 1) : 0);
 
@@ -91,18 +98,11 @@ serve(async (req) => {
         throw new Error("This item cannot be purchased with credits");
       }
 
-      // Calculate 80/20 split
-      const sellerCredits = Math.floor(totalCredits * 0.80);
+      const sellerCredits = Math.floor(totalCredits * (100 - COMMUNITY_FUND_FEE_PERCENT) / 100);
       const platformCredits = totalCredits - sellerCredits;
 
-      // Check user's credit balance
-      const { data: userCredits } = await supabaseClient
-        .from("user_credits")
-        .select("balance")
-        .eq("user_id", user.id)
-        .single();
-
-      const balance = userCredits?.balance || 0;
+      const userCredits = await ledgerBalances(supabaseAdmin, user.id);
+      const balance = userCredits.balance;
       if (balance < totalCredits) {
         throw new Error(`Insufficient credits. You have ${balance} LC, but need ${totalCredits} LC`);
       }
@@ -118,32 +118,35 @@ serve(async (req) => {
         reference_id: bookingId,
       });
 
-      // Add 80% to seller
-      const { data: sellerCreditsData } = await supabaseAdmin
-        .from("user_credits")
-        .select("balance")
-        .eq("user_id", store.user_id)
-        .single();
-
-      const sellerBalance = sellerCreditsData?.balance || 0;
+      const sellerCreditsData = await ledgerBalances(supabaseAdmin, store.user_id);
+      const sellerBalance = sellerCreditsData.balance;
       await supabaseAdmin.from("credit_ledger").insert({
         user_id: store.user_id,
         amount: sellerCredits,
         balance_after: sellerBalance + sellerCredits,
         type: "sale",
-        description: `Studio booking sale (80%): ${item.title}`,
+        description: `Studio booking sale (${100 - COMMUNITY_FUND_FEE_PERCENT}%): ${item.title}`,
         reference_type: "studio_booking",
         reference_id: bookingId,
       });
 
-      // Record platform fee in treasury
+      // Credit payments finish here. Card payments record the fee in the webhook.
       await supabaseAdmin.from("platform_treasury").insert({
         source_type: "studio_booking",
         source_id: bookingId,
         amount: 0,
         credits_amount: platformCredits,
-        description: `Platform fee (20%): ${item.title}`,
+        description: `Community fund fee (${COMMUNITY_FUND_FEE_PERCENT}%): ${item.title}`,
       });
+      const { error: fundFeeError } = await supabaseAdmin.from("community_fund_fees").insert({
+        source_type: "studio_booking",
+        source_id: bookingId,
+        amount: 0,
+        credits_amount: platformCredits,
+        currency: "usd",
+        description: `Community fund fee (${COMMUNITY_FUND_FEE_PERCENT}%): ${item.title}`,
+      });
+      if (fundFeeError && fundFeeError.code !== "23505") throw new Error(fundFeeError.message);
 
       // Update booking status and fee breakdown
       await supabaseAdmin
@@ -186,7 +189,7 @@ serve(async (req) => {
       }
 
       // Calculate fee amounts
-      const platformFeeAmount = Math.round(totalPrice * 100 * (PLATFORM_FEE_PERCENT / 100));
+      const platformFeeAmount = Math.round(totalPrice * 100 * (COMMUNITY_FUND_FEE_PERCENT / 100));
       const sellerAmount = (totalPrice * 100) - platformFeeAmount;
 
       // Create checkout session with or without Connect
@@ -219,17 +222,17 @@ serve(async (req) => {
       };
 
       // If seller has Stripe Connect enabled, use application fee
-      if (store.stripe_connect_account_id && store.payout_enabled) {
+      if (connectAccountId && store.payout_enabled) {
         sessionConfig.payment_intent_data = {
           application_fee_amount: platformFeeAmount,
           transfer_data: {
-            destination: store.stripe_connect_account_id,
+            destination: connectAccountId,
           },
         };
         logStep("Using Stripe Connect with application fee", { 
           platformFeeAmount, 
           sellerAmount,
-          connectAccountId: store.stripe_connect_account_id 
+          connectAccountId 
         });
       }
 
@@ -248,15 +251,7 @@ serve(async (req) => {
         })
         .eq("id", bookingId);
 
-      // Record platform fee in treasury
-      await supabaseAdmin.from("platform_treasury").insert({
-        source_type: "studio_booking",
-        source_id: bookingId,
-        amount: platformFeeAmount / 100,
-        credits_amount: 0,
-        description: `Platform fee (20%): ${item.title}`,
-      });
-
+      // The community-fund fee is recorded when checkout.session.completed arrives.
       logStep("Checkout session created", { sessionUrl: session.url });
 
       return new Response(

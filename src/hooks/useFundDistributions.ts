@@ -197,15 +197,23 @@ export function useRecentDistributions(limit = 10) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fund_distributions')
-        .select(`
-          *,
-          recipient:profiles!fund_distributions_recipient_id_fkey(display_name, avatar_url)
-        `)
+        .select('*')
         .order('distributed_at', { ascending: false })
         .limit(limit);
 
       if (error) throw error;
-      return data;
+      const recipientIds = [...new Set((data ?? []).map((row) => row.recipient_id).filter(Boolean))] as string[];
+      const { data: profiles } = recipientIds.length
+        ? await supabase
+            .from('profiles_public')
+            .select('user_id, display_name, avatar_url')
+            .in('user_id', recipientIds)
+        : { data: [] };
+      const profileMap = new Map((profiles ?? []).map((profile) => [profile.user_id, profile]));
+      return (data ?? []).map((row) => ({
+        ...row,
+        recipient: row.recipient_id ? profileMap.get(row.recipient_id) ?? null : null,
+      }));
     },
     staleTime: 30000,
   });

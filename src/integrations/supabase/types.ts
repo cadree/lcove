@@ -2709,6 +2709,7 @@ export type Database = {
           end_date: string | null
           event_type: string
           external_url: string | null
+          recurrence: string | null
           id: string
           image_url: string | null
           is_public: boolean | null
@@ -2739,6 +2740,7 @@ export type Database = {
           end_date?: string | null
           event_type?: string
           external_url?: string | null
+          recurrence?: string | null
           id?: string
           image_url?: string | null
           is_public?: boolean | null
@@ -2769,6 +2771,7 @@ export type Database = {
           end_date?: string | null
           event_type?: string
           external_url?: string | null
+          recurrence?: string | null
           id?: string
           image_url?: string | null
           is_public?: boolean | null
@@ -4260,6 +4263,7 @@ export type Database = {
           created_at: string
           email_enabled: boolean | null
           event_reminders_enabled: boolean | null
+          follows_enabled: boolean | null
           id: string
           likes_enabled: boolean | null
           live_streams_enabled: boolean | null
@@ -4279,6 +4283,7 @@ export type Database = {
           created_at?: string
           email_enabled?: boolean | null
           event_reminders_enabled?: boolean | null
+          follows_enabled?: boolean | null
           id?: string
           likes_enabled?: boolean | null
           live_streams_enabled?: boolean | null
@@ -4298,6 +4303,7 @@ export type Database = {
           created_at?: string
           email_enabled?: boolean | null
           event_reminders_enabled?: boolean | null
+          follows_enabled?: boolean | null
           id?: string
           likes_enabled?: boolean | null
           live_streams_enabled?: boolean | null
@@ -4342,6 +4348,27 @@ export type Database = {
           title?: string
           type?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      nuance_interest: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          item: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          item: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          item?: string
         }
         Relationships: []
       }
@@ -5951,6 +5978,7 @@ export type Database = {
           endpoint: string
           id: string
           p256dh: string
+          platform: string
           updated_at: string
           user_agent: string | null
           user_id: string
@@ -5961,6 +5989,7 @@ export type Database = {
           endpoint: string
           id?: string
           p256dh: string
+          platform?: string
           updated_at?: string
           user_agent?: string | null
           user_id: string
@@ -5971,6 +6000,7 @@ export type Database = {
           endpoint?: string
           id?: string
           p256dh?: string
+          platform?: string
           updated_at?: string
           user_agent?: string | null
           user_id?: string
@@ -6166,6 +6196,9 @@ export type Database = {
           currency: string
           description: string | null
           duration_minutes: number | null
+          external_handle: string | null
+          external_source: string | null
+          external_url: string | null
           id: string
           images: string[] | null
           inventory_count: number | null
@@ -6189,6 +6222,9 @@ export type Database = {
           currency?: string
           description?: string | null
           duration_minutes?: number | null
+          external_handle?: string | null
+          external_source?: string | null
+          external_url?: string | null
           id?: string
           images?: string[] | null
           inventory_count?: number | null
@@ -6212,6 +6248,9 @@ export type Database = {
           currency?: string
           description?: string | null
           duration_minutes?: number | null
+          external_handle?: string | null
+          external_source?: string | null
+          external_url?: string | null
           id?: string
           images?: string[] | null
           inventory_count?: number | null
@@ -6321,6 +6360,7 @@ export type Database = {
           cover_image_url: string | null
           created_at: string
           description: string | null
+          flat_shipping_cents: number
           id: string
           is_active: boolean | null
           logo_url: string | null
@@ -6331,6 +6371,8 @@ export type Database = {
           shopify_access_token: string | null
           shopify_store_url: string | null
           stripe_connect_account_id: string | null
+          tax_line_cents: number
+          tax_line_label: string | null
           updated_at: string
           user_id: string
         }
@@ -6340,6 +6382,7 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           description?: string | null
+          flat_shipping_cents?: number
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
@@ -6350,6 +6393,8 @@ export type Database = {
           shopify_access_token?: string | null
           shopify_store_url?: string | null
           stripe_connect_account_id?: string | null
+          tax_line_cents?: number
+          tax_line_label?: string | null
           updated_at?: string
           user_id: string
         }
@@ -6359,6 +6404,7 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           description?: string | null
+          flat_shipping_cents?: number
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
@@ -6369,6 +6415,8 @@ export type Database = {
           shopify_access_token?: string | null
           shopify_store_url?: string | null
           stripe_connect_account_id?: string | null
+          tax_line_cents?: number
+          tax_line_label?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -7493,6 +7541,7 @@ export type Database = {
           rtmp_stream_key: string | null
           started_at: string | null
           stream_type: string | null
+          thumbnail_focal_point: Json | null
           thumbnail_url: string | null
           ticket_price: number | null
           title: string | null
@@ -7521,6 +7570,7 @@ export type Database = {
           rtmp_stream_key?: never
           started_at?: string | null
           stream_type?: string | null
+          thumbnail_focal_point?: Json | null
           thumbnail_url?: string | null
           ticket_price?: number | null
           title?: string | null
@@ -7549,6 +7599,7 @@ export type Database = {
           rtmp_stream_key?: never
           started_at?: string | null
           stream_type?: string | null
+          thumbnail_focal_point?: Json | null
           thumbnail_url?: string | null
           ticket_price?: number | null
           title?: string | null

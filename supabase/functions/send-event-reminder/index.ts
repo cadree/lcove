@@ -8,7 +8,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : "";
   console.log(`[SEND-EVENT-REMINDER] ${step}${detailsStr}`);
 };
@@ -77,7 +77,8 @@ serve(async (req) => {
     const eventTime = new Date(event.start_date).toLocaleTimeString("en-US", {
       hour: "numeric", minute: "2-digit",
     });
-    const location = [(event as any).venue, (event as any).city].filter(Boolean).join(", ") || "Location TBA";
+    const eventPlace = event as unknown as { venue?: string | null; city?: string | null };
+    const location = [eventPlace.venue, eventPlace.city].filter(Boolean).join(", ") || "Location TBA";
     const eventUrl = `https://etherbylcove.com/event/${eventId}`;
     const identity = await resolveHostIdentity(supabaseAdmin, eventId);
 

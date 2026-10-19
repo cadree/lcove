@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { notifyFollow } from '@/lib/notifications';
 
 export function useFavorites() {
   const { user } = useAuth();
@@ -35,13 +36,20 @@ export function useFavorites() {
         });
 
       if (error) throw error;
+
+      const { data: profile } = await supabase
+        .from('profiles_public')
+        .select('display_name')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      notifyFollow(friendUserId, profile?.display_name || 'Someone').catch(() => undefined);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['favorite-friends', user?.id] });
       toast.success('Added to favorites');
     },
-    onError: () => {
-      toast.error('Failed to add favorite');
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Failed to add favorite');
     },
   });
 

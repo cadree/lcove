@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Trash2, Play } from 'lucide-react';
+import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Trash2, Play, Flag } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { usePostInteractions } from '@/hooks/usePostInteractions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { shareLink, buildShareUrl } from '@/lib/shareLink';
+import { ReportDialog } from '@/components/safety/ReportDialog';
 
 interface Post {
   id: string;
@@ -43,7 +44,6 @@ const FeedPost = ({ post }: { post: Post }) => {
     likesCount,
     hasLiked,
     comments,
-    commentsCount,
     isSaved,
     toggleLike,
     addComment,
@@ -55,9 +55,13 @@ const FeedPost = ({ post }: { post: Post }) => {
 
   const [showComments, setShowComments] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const isOwner = user?.id === post.user_id;
 
+  const authorName = post.profile ? (post.profile.display_name || 'User') : 'Private profile';
+
   const handleProfileClick = () => {
+    if (!post.profile) return;
     navigate(`/profile/${post.user_id}`);
   };
 
@@ -90,7 +94,7 @@ const FeedPost = ({ post }: { post: Post }) => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      className="glass-strong rounded-2xl overflow-hidden"
+      className="bg-card border border-border rounded-[2px] overflow-hidden"
     >
       {/* Header */}
       <header className="flex items-center justify-between p-4 sm:p-5">
@@ -101,7 +105,7 @@ const FeedPost = ({ post }: { post: Post }) => {
           >
             <AvatarImage src={post.profile?.avatar_url || undefined} />
             <AvatarFallback className="bg-muted text-muted-foreground font-medium">
-              {post.profile?.display_name?.charAt(0).toUpperCase() || '?'}
+              {authorName.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div>
@@ -109,7 +113,7 @@ const FeedPost = ({ post }: { post: Post }) => {
               className="text-sm font-semibold text-foreground cursor-pointer hover:text-primary transition-colors"
               onClick={handleProfileClick}
             >
-              {post.profile?.display_name || 'User'}
+              {authorName}
             </h3>
             <time className="text-xs text-muted-foreground">
               {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
@@ -117,24 +121,44 @@ const FeedPost = ({ post }: { post: Post }) => {
           </div>
         </div>
 
-        {isOwner && (
+        {user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="iconSm" className="text-muted-foreground">
+              <Button variant="ghost" size="iconSm" className="text-muted-foreground" aria-label="Post actions">
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-card border-border/50">
-              <DropdownMenuItem
-                onClick={handleDelete}
-                className="text-destructive focus:text-destructive gap-2"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete post
-              </DropdownMenuItem>
+              {isOwner && (
+                <DropdownMenuItem
+                  onClick={handleDelete}
+                  className="text-destructive focus:text-destructive gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete post
+                </DropdownMenuItem>
+              )}
+              {!isOwner && (
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    setReportOpen(true);
+                  }}
+                  className="gap-2"
+                >
+                  <Flag className="w-4 h-4" />
+                  Report
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )}
+        <ReportDialog
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+          targetType="post"
+          targetId={post.id}
+        />
       </header>
 
       {/* Content */}
@@ -148,12 +172,12 @@ const FeedPost = ({ post }: { post: Post }) => {
 
       {/* Media */}
       {post.media_url && post.media_type !== 'text' && (
-        <div className="relative bg-muted/10">
+        <div className="relative bg-muted/10 aspect-square">
           {post.media_type === 'video' ? (
-            <div className="relative">
+            <div className="relative h-full">
               <video
                 src={post.media_url}
-                className="w-full max-h-[500px] object-cover cursor-pointer"
+                className="w-full h-full object-cover cursor-pointer"
                 onClick={toggleVideo}
                 playsInline
                 loop
@@ -177,7 +201,7 @@ const FeedPost = ({ post }: { post: Post }) => {
             <img
               src={post.media_url}
               alt=""
-              className="w-full max-h-[500px] object-cover"
+              className="w-full h-full object-cover"
               loading="lazy"
             />
           )}
@@ -185,84 +209,56 @@ const FeedPost = ({ post }: { post: Post }) => {
       )}
 
       {/* Action Bar */}
-      <div className="px-4 sm:px-5 py-4 border-t border-border/20">
+      <div className="px-3 sm:px-4 py-2 border-t border-border">
         <div className="flex items-center justify-between">
-          {/* Left Actions */}
-          <div className="flex items-center gap-1">
-            {/* Like Button */}
+          <div className="flex items-center">
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={toggleLike}
               disabled={!user || isLiking}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-300 ${
-                hasLiked
-                  ? 'text-primary bg-primary/10'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/40'
+              aria-label={hasLiked ? "Unlike" : "Like"}
+              className={`flex items-center justify-center min-h-11 min-w-11 ${
+                hasLiked ? 'text-primary' : 'text-foreground'
               }`}
             >
-              <motion.div
-                animate={hasLiked ? { scale: [1, 1.3, 1] } : {}}
-                transition={{ duration: 0.3 }}
-              >
-                <Heart
-                  className={`w-5 h-5 transition-all ${hasLiked ? 'fill-primary' : ''}`}
-                />
-              </motion.div>
-              {likesCount > 0 && (
-                <span className="text-sm font-medium">{likesCount}</span>
-              )}
+              <Heart className={`w-6 h-6 ${hasLiked ? 'fill-primary' : ''}`} />
             </motion.button>
 
-            {/* Comment Button */}
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowComments(!showComments)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-300 ${
-                showComments
-                  ? 'text-foreground bg-accent/40'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/40'
-              }`}
+              aria-label="Comment"
+              className="flex items-center justify-center min-h-11 min-w-11 text-foreground"
             >
-              <MessageCircle className="w-5 h-5" />
-              {commentsCount > 0 && (
-                <span className="text-sm font-medium">{commentsCount}</span>
-              )}
+              <MessageCircle className="w-6 h-6" />
             </motion.button>
 
-            {/* Share Button */}
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={handleShare}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-all duration-300"
+              aria-label="Share"
+              className="flex items-center justify-center min-h-11 min-w-11 text-foreground"
             >
-              <Share2 className="w-5 h-5" />
+              <Share2 className="w-6 h-6" />
             </motion.button>
           </div>
 
-          {/* Right Actions */}
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={toggleSave}
             disabled={!user}
-            className={`p-2 rounded-xl transition-all duration-300 ${
-              isSaved
-                ? 'text-primary bg-primary/10'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent/40'
+            aria-label={isSaved ? "Unsave" : "Save"}
+            className={`flex items-center justify-center min-h-11 min-w-11 ${
+              isSaved ? 'text-primary' : 'text-foreground'
             }`}
           >
-            <motion.div
-              animate={isSaved ? { scale: [1, 1.2, 1] } : {}}
-              transition={{ duration: 0.3 }}
-            >
-              <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-primary' : ''}`} />
-            </motion.div>
+            <Bookmark className={`w-6 h-6 ${isSaved ? 'fill-primary' : ''}`} />
           </motion.button>
         </div>
 
-        {/* Likes Summary */}
-        {likesCount > 0 && (
-          <p className="text-sm font-medium text-foreground mt-3">
-            {likesCount} {likesCount === 1 ? 'like' : 'likes'}
+        {isOwner && likesCount > 0 && (
+          <p className="px-2 pb-2 text-xs text-muted-foreground">
+            Only you can see this: {likesCount} {likesCount === 1 ? 'like' : 'likes'}
           </p>
         )}
       </div>

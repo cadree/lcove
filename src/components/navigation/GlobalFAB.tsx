@@ -1,29 +1,31 @@
-import { useState } from "react";
 import { Plus } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "react-router-dom";
-import { FABActionSheet } from "./FABActionSheet";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCreateFlow } from "@/components/create/CreateFlowContext";
 
-// Pages where FAB should NOT appear
 const excludedPaths = ["/", "/landing", "/auth", "/onboarding", "/locked", "/sign-contract"];
+
+/**
+ * The old floating plus rendered an empty AnimatePresence, so the control
+ * was invisible. Create now lives on the bottom tab. This export stays for
+ * any caller that still mounts a plus: it opens the same pick, crop, caption,
+ * share flow.
+ */
 export function GlobalFAB() {
-  const {
-    user
-  } = useAuth();
+  const { user } = useAuth();
   const location = useLocation();
-  const [isOpen, setIsOpen] = useState(false);
+  const { openCreate } = useCreateFlow();
+  const hidden = !user || excludedPaths.some((path) => location.pathname === path || location.pathname.startsWith("/sign-contract/"));
+  if (hidden) return null;
 
-  // Don't show FAB on excluded paths or if not authenticated
-  const shouldShow = user && !excludedPaths.some(path => location.pathname === path || location.pathname.startsWith("/sign-contract/"));
-  if (!shouldShow) return null;
-  return <>
-      {/* FAB Button */}
-      <AnimatePresence>
-        
-      </AnimatePresence>
-
-      {/* Action Sheet */}
-      <FABActionSheet open={isOpen} onOpenChange={setIsOpen} />
-    </>;
+  return (
+    <button
+      type="button"
+      onClick={openCreate}
+      aria-label="Create"
+      className="fixed z-40 bottom-24 right-4 flex h-14 w-14 items-center justify-center rounded-[2px] bg-primary text-primary-foreground"
+    >
+      <Plus className="h-6 w-6" />
+    </button>
+  );
 }

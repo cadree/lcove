@@ -25,33 +25,34 @@ export function ProfileFriendsSection() {
 
   // Normalize favorites into a string[] of friend user IDs
   const friendIds: string[] = useMemo(() => {
-    if (!favorites) return [];
+    const source: unknown = favorites;
+    if (!source) return [];
+
+    const isRecord = (value: unknown): value is Record<string, unknown> =>
+      typeof value === "object" && value !== null && !Array.isArray(value);
 
     // Case 1: already string[]
-    if (Array.isArray(favorites) && favorites.every((v) => typeof v === "string")) {
-      return favorites as string[];
+    if (Array.isArray(source) && source.every((v) => typeof v === "string")) {
+      return source;
     }
 
     // Case 2: object wrapper
-    if (
-      typeof favorites === "object" &&
-      !Array.isArray(favorites) &&
-      "friendIds" in (favorites as any) &&
-      Array.isArray((favorites as any).friendIds)
-    ) {
-      return ((favorites as any).friendIds as unknown[]).filter((v): v is string => typeof v === "string");
+    if (isRecord(source) && Array.isArray(source.friendIds)) {
+      return source.friendIds.filter((v): v is string => typeof v === "string");
     }
 
     // Case 3: array of rows/objects
-    if (Array.isArray(favorites)) {
+    if (Array.isArray(source)) {
       const candidates = ["friend_user_id", "friendUserId", "friend_id", "friendId", "user_id", "userId"];
       const ids: string[] = [];
 
-      for (const row of favorites as any[]) {
-        if (!row || typeof row !== "object") continue;
+      for (const row of source) {
+        if (!isRecord(row)) continue;
 
-        const foundKey = candidates.find((k) => typeof row?.[k] === "string");
-        if (foundKey) ids.push(row[foundKey]);
+        const foundKey = candidates.find((k) => typeof row[k] === "string");
+        if (!foundKey) continue;
+        const value = row[foundKey];
+        if (typeof value === "string") ids.push(value);
       }
 
       // Deduplicate

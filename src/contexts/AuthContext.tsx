@@ -3,12 +3,13 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { getAuthRedirectUrl, clearAllAuthStorage } from '@/lib/capacitorStorage';
 import { logAuthEvent, logAuthError, logSessionState } from '@/lib/authDebug';
+import { applyPendingSignupProfile } from '@/lib/pendingSignup';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string) => Promise<{ error: Error | null; session: Session | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
@@ -33,6 +34,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           userId: session?.user?.id,
         });
         
+        if (session?.user) {
+          void applyPendingSignupProfile(session.user.id);
+        }
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -73,13 +77,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signUp = async (email: string, password: string) => {
-    const redirectUrl = getAuthRedirectUrl('/');
+    const redirectUrl = getAuthRedirectUrl('/auth?confirmed=1');
     logAuthEvent('Sign up attempt', { 
       email: email.replace(/(.{2}).*(@.*)/, '$1***$2'),
       redirectUrl 
     });
     
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -90,10 +94,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) {
       logAuthError('Sign up failed', error);
     } else {
-      logAuthEvent('Sign up successful');
+      logAuthEvent('Sign up successful', { hasSession: !!data.session });
     }
     
-    return { error };
+    return { error, session: data.session };
   };
 
   const signIn = async (email: string, password: string) => {

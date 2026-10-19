@@ -96,10 +96,10 @@ export async function getMyPipeline(pipelineId?: string): Promise<PipelineData> 
   let events: PipelineEvent[] = [];
   
   if (pipelineId) {
-    const { data, error } = await (supabase
+    const { data, error } = await supabase
       .from('pipeline_stages')
       .select('*')
-      .eq('owner_user_id', userId) as any)
+      .eq('owner_user_id', userId)
       .eq('pipeline_id', pipelineId)
       .order('sort_order', { ascending: true });
     if (error) throw new Error(`Failed to fetch stages: ${error.message}`);

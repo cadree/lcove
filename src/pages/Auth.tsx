@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { z } from 'zod';
 import { Capacitor } from '@capacitor/core';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
+import { PENDING_SIGNUP_KEY, applyPendingSignupProfile } from '@/lib/pendingSignup';
+import { getAuthRedirectUrl } from '@/lib/capacitorStorage';
+import { resendCooldownRemaining } from '@/lib/resendCooldown';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { logAuthEvent, logAuthError } from '@/lib/authDebug';
@@ -14,7 +17,7 @@ import etherBearLogo from '@/assets/ether-bear-logo.png';
 
 const signupSchema = z.object({
   email: z.string().email('Please enter a valid email').max(255),
-  password: z.string().min(6, 'Password must be at least 6 characters').max(100),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(100),
   displayName: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name must be less than 50 characters'),
   phone: z.string().optional().refine(val => !val || /^[\d\s\-+()]*$/.test(val), 'Please enter a valid phone number'),
 });
@@ -29,10 +32,10 @@ const emailSchema = z.object({
 });
 
 const passwordSchema = z.object({
-  password: z.string().min(6, 'Password must be at least 6 characters').max(100),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(100),
 });
 
-type AuthMode = 'login' | 'signup' | 'forgot' | 'reset';
+type AuthMode = 'login' | 'signup' | 'forgot' | 'reset' | 'confirm-email';
 
 /**
  * Map Supabase auth errors to user-friendly messages
@@ -88,7 +91,7 @@ const getAuthErrorMessage = (error: Error): { title: string; description: string
   if (message.includes('password') && message.includes('weak')) {
     return {
       title: 'Weak Password',
-      description: 'Please choose a stronger password with at least 6 characters.',
+      description: 'Please choose a stronger password with at least 8 characters.',
     };
   }
   
@@ -113,6 +116,9 @@ const Auth = () => {
   const [errors, setErrors] = useState<{ email?: string; password?: string; displayName?: string; phone?: string }>({});
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [confirmationSentAt, setConfirmationSentAt] = useState<number | null>(null);
+  const [resendNow, setResendNow] = useState(() => Date.now());
+  const [isResending, setIsResending] = useState(false);
 
   const { signIn, signUp, user, resetPassword, updatePassword } = useAuth();
   const navigate = useNavigate();
@@ -132,22 +138,75 @@ const Auth = () => {
     };
   }, []);
 
-  // Log platform info on mount
+  useEffect(() => {
+    if (confirmationSentAt == null) return;
+    setResendNow(Date.now());
+    const id = window.setInterval(() => setResendNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [confirmationSentAt]);
+
+  const resendWaitMs = resendCooldownRemaining(confirmationSentAt, resendNow);
+
+  const handleResendConfirmation = async () => {
+    if (resendWaitMs > 0 || isResending || !email) return;
+    setIsResending(true);
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: getAuthRedirectUrl('/auth?confirmed=1') },
+    });
+    setIsResending(false);
+    if (error) {
+      const { title, description } = getAuthErrorMessage(error);
+      toast({ title, description, variant: 'destructive' });
+      return;
+    }
+    setConfirmationSentAt(Date.now());
+    toast({
+      title: 'Email sent',
+      description: 'We sent another confirmation link.',
+    });
+  };
+
+  // Log platform info on mount. mode is read from a ref so this stays mount-only.
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
   useEffect(() => {
     logAuthEvent('Auth page mounted', {
       platform: Capacitor.getPlatform(),
       isNative: Capacitor.isNativePlatform(),
       isOnline: navigator.onLine,
-      mode,
+      mode: modeRef.current,
     });
   }, []);
 
   useEffect(() => {
-    if (user && mode !== 'reset') {
-      logAuthEvent('User authenticated, navigating to onboarding');
-      navigate('/onboarding');
+    if (!user || searchParams.get('confirmed') !== '1') return;
+    let cancelled = false;
+    applyPendingSignupProfile(user.id).finally(() => {
+      if (!cancelled) {
+        logAuthEvent('Confirmed email, resuming onboarding');
+        navigate('/onboarding', { replace: true });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, searchParams, navigate]);
+
+  useEffect(() => {
+    if (searchParams.get('confirmed') === '1') return;
+    if (!user || mode === 'reset') return;
+    if (mode === 'confirm-email') {
+      applyPendingSignupProfile(user.id).finally(() => {
+        logAuthEvent('Email confirmed in this browser, resuming onboarding');
+        navigate('/onboarding');
+      });
+      return;
     }
-  }, [user, navigate, mode]);
+    logAuthEvent('User authenticated, navigating to onboarding');
+    navigate('/onboarding');
+  }, [user, navigate, mode, searchParams]);
 
   useEffect(() => {
     if (isResetMode) {
@@ -225,21 +284,25 @@ const Auth = () => {
           navigate('/onboarding');
         }
       } else if (mode === 'signup') {
-        const { error } = await signUp(email, password);
+        const { error, session } = await signUp(email, password);
         if (error) {
           logAuthError('Signup failed', error);
           const { title, description } = getAuthErrorMessage(error);
           toast({ title, description, variant: 'destructive' });
+        } else if (!session) {
+          logAuthEvent('Signup needs email confirmation');
+          sessionStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({
+            displayName: displayName.trim(),
+            phone: phone.trim(),
+          }));
+          setConfirmationSentAt(Date.now());
+          setMode('confirm-email');
         } else {
           logAuthEvent('Signup successful');
-          // Save display name and phone to profile after signup
-          const { data: { user: newUser } } = await supabase.auth.getUser();
-          if (newUser) {
-            await supabase.from('profiles').update({
-              display_name: displayName.trim(),
-              phone: phone.trim() || null,
-            }).eq('id', newUser.id);
-          }
+          await supabase.from('profiles').update({
+            display_name: displayName.trim(),
+            phone: phone.trim() || null,
+          }).eq('user_id', session.user.id);
           navigate('/onboarding');
         }
       } else if (mode === 'forgot') {
@@ -289,16 +352,18 @@ const Auth = () => {
     switch (mode) {
       case 'forgot': return 'Reset Password';
       case 'reset': return 'New Password';
+      case 'confirm-email': return 'Check your email';
       default: return 'ETHER';
     }
   };
 
   const getSubtitle = () => {
     switch (mode) {
-      case 'login': return 'Welcome back, creative soul';
-      case 'signup': return 'Join the creative community';
+      case 'login': return 'Log in';
+      case 'signup': return 'Create an account. Free to join.';
       case 'forgot': return resetEmailSent ? 'Check your inbox' : 'Enter your email to reset';
       case 'reset': return 'Create your new password';
+      case 'confirm-email': return 'Confirm your email to continue';
     }
   };
 
@@ -334,8 +399,9 @@ const Auth = () => {
               className="h-24 w-auto mx-auto object-contain"
             />
           </motion.div>
+          <p className="eyebrow mb-2">Ether</p>
           <motion.h1 
-            className="font-display text-3xl font-medium text-foreground mb-2"
+            className="ether-title text-4xl text-foreground mb-2"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
@@ -353,26 +419,26 @@ const Auth = () => {
         </div>
 
         <motion.div
-          className="glass-strong rounded-2xl p-8"
+          className="border border-border rounded-[2px] bg-card p-8"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
         >
           {(mode === 'login' || mode === 'signup') && (
-            <div className="flex mb-8 bg-muted rounded-xl p-1">
+            <div className="flex mb-8 border border-border p-1">
               <button
                 onClick={() => setMode('login')}
-                className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                className={`flex-1 min-h-11 rounded-[2px] text-sm font-medium transition-all ${
                   mode === 'login' 
                     ? 'bg-primary text-primary-foreground' 
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                Log In
+                Log in
               </button>
               <button
                 onClick={() => setMode('signup')}
-                className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                className={`flex-1 min-h-11 rounded-[2px] text-sm font-medium transition-all ${
                   mode === 'signup' 
                     ? 'bg-primary text-primary-foreground' 
                     : 'text-muted-foreground hover:text-foreground'
@@ -397,7 +463,34 @@ const Auth = () => {
             </button>
           )}
 
-          {resetEmailSent && mode === 'forgot' ? (
+          {mode === 'confirm-email' ? (
+            <div className="text-center py-4">
+              <Mail className="h-12 w-12 text-primary mx-auto mb-4" />
+              <p className="text-foreground mb-2">Check your email to confirm</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                We sent a confirmation link to <span className="text-primary">{email}</span>.
+                Open it to finish creating your account. You will continue onboarding after you confirm.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handleResendConfirmation()}
+                disabled={isResending || resendWaitMs > 0}
+                className="w-full mb-3"
+              >
+                {resendWaitMs > 0
+                  ? `Resend email (${Math.ceil(resendWaitMs / 1000)}s)`
+                  : 'Resend email'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setMode('login')}
+                className="w-full"
+              >
+                Back to log in
+              </Button>
+            </div>
+          ) : resetEmailSent && mode === 'forgot' ? (
             <div className="text-center py-4">
               <Mail className="h-12 w-12 text-primary mx-auto mb-4" />
               <p className="text-foreground mb-2">Reset link sent!</p>
@@ -499,10 +592,13 @@ const Auth = () => {
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       type={showPassword ? 'text' : 'password'}
-                      placeholder={mode === 'reset' ? 'New password' : 'Password'}
+                      placeholder={mode === 'reset' ? 'New password *' : 'Password *'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="pl-11 pr-11 h-12 bg-input border-border focus:border-primary"
+                      required
+                      minLength={mode === 'login' ? 6 : 8}
+                      aria-describedby={mode === 'signup' || mode === 'reset' ? 'password-rules' : undefined}
                     />
                     <button
                       type="button"
@@ -512,6 +608,11 @@ const Auth = () => {
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
+                  {(mode === 'signup' || mode === 'reset') && (
+                    <p id="password-rules" className="text-xs text-muted-foreground pl-1">
+                      At least 8 characters.
+                    </p>
+                  )}
                   {errors.password && (
                     <p className="text-sm text-destructive">{errors.password}</p>
                   )}
@@ -536,7 +637,7 @@ const Auth = () => {
                   </>
                 ) : (
                   <>
-                    {mode === 'login' && 'Enter'}
+                    {mode === 'login' && 'Log in'}
                     {mode === 'signup' && 'Begin Journey'}
                     {mode === 'forgot' && 'Send Reset Link'}
                     {mode === 'reset' && 'Update Password'}
@@ -568,9 +669,19 @@ const Auth = () => {
                   className="mt-6 text-center text-xs text-muted-foreground"
                 >
                   {mode === 'login' ? (
-                    "Don't have an account? Use the Sign Up tab above."
+                    <>
+                      Don&apos;t have an account? Use the Sign Up tab above.{" "}
+                      <Link to="/privacy" className="text-primary underline">Privacy</Link>
+                      {" · "}
+                      <Link to="/terms" className="text-primary underline">Terms</Link>
+                    </>
                   ) : (
-                    "By signing up, you agree to our community guidelines."
+                    <>
+                      By signing up, you agree to the{" "}
+                      <Link to="/privacy" className="text-primary underline">Privacy Policy</Link>
+                      {" "}and{" "}
+                      <Link to="/terms" className="text-primary underline">Terms</Link>.
+                    </>
                   )}
                 </motion.p>
               </AnimatePresence>

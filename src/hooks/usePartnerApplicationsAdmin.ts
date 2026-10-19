@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 
 export interface PartnerApplication {
   id: string;
@@ -118,8 +119,8 @@ export function useAcceptPartnerApplication() {
       queryClient.invalidateQueries({ queryKey: ['brand-partnerships'] });
       toast.success('Partner application accepted! They will receive an email to customize their profile.');
     },
-    onError: (error: any) => {
-      toast.error('Failed to accept application: ' + error.message);
+    onError: (error: unknown) => {
+      toast.error('Failed to accept application: ' + errorMessage(error));
     },
   });
 }
@@ -150,8 +151,8 @@ export function useRejectPartnerApplication() {
       queryClient.invalidateQueries({ queryKey: ['partner-applications'] });
       toast.success('Partner application rejected');
     },
-    onError: (error: any) => {
-      toast.error('Failed to reject application: ' + error.message);
+    onError: (error: unknown) => {
+      toast.error('Failed to reject application: ' + errorMessage(error));
     },
   });
 }
@@ -174,8 +175,8 @@ export function useRemovePartnership() {
       queryClient.invalidateQueries({ queryKey: ['my-partnership'] });
       toast.success('Partnership removed successfully');
     },
-    onError: (error: any) => {
-      toast.error('Failed to remove partnership: ' + error.message);
+    onError: (error: unknown) => {
+      toast.error('Failed to remove partnership: ' + errorMessage(error));
     },
   });
 }

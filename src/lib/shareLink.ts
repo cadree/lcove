@@ -19,14 +19,14 @@ export async function shareLink(opts: ShareLinkOptions): Promise<void> {
   const { title, text, url, copyMessage = 'Link copied!', silentOnNative = true } = opts;
 
   // 1. Native share (mobile / supported browsers). Blocked in iframes (NotAllowedError) — fall through.
-  if (typeof navigator !== 'undefined' && typeof (navigator as any).share === 'function') {
+  if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
     try {
-      await (navigator as any).share({ title, text, url });
+      await navigator.share({ title, text, url });
       if (!silentOnNative) toast.success('Shared!');
       return;
-    } catch (err: any) {
+    } catch (err: unknown) {
       // User cancelled — do nothing, do not fall through to copy.
-      if (err?.name === 'AbortError') return;
+      if (typeof err === 'object' && err !== null && 'name' in err && err.name === 'AbortError') return;
       // NotAllowedError (iframe), TypeError, etc → fall through to clipboard.
     }
   }
@@ -118,7 +118,9 @@ function tryAppSchemeWithFallback(appUrl: string, webUrl: string): void {
 
   try {
     window.location.href = appUrl;
-  } catch {}
+  } catch {
+    // Custom URL schemes throw when the app is not installed.
+  }
 
   window.setTimeout(() => {
     document.removeEventListener('visibilitychange', onVisibilityChange);
@@ -134,7 +136,9 @@ async function copyToClipboardSilent(text: string): Promise<boolean> {
       await navigator.clipboard.writeText(text);
       return true;
     }
-  } catch {}
+  } catch {
+    // Clipboard can be blocked; fall through to the legacy copy path.
+  }
   try {
     const ta = document.createElement('textarea');
     ta.value = text;
@@ -213,7 +217,9 @@ export async function shareToChannel(
       // so copy the link as a safety net.
       try {
         window.location.href = `sms:?&body=${body}`;
-      } catch {}
+      } catch {
+        // sms: is unsupported in some browsers.
+      }
       // Best-effort copy in case the sms: handler did nothing (e.g. desktop)
       const ok = await copyToClipboardSilent(url);
       if (ok) toast.success('Link copied — paste into a text');
@@ -225,7 +231,9 @@ export async function shareToChannel(
       const body = encodeURIComponent(fullText);
       try {
         window.location.href = `mailto:?subject=${subject}&body=${body}`;
-      } catch {}
+      } catch {
+        // mailto: can throw when no mail client is registered.
+      }
       return;
     }
 
@@ -237,7 +245,9 @@ export async function shareToChannel(
       if (isMobile) {
         try {
           window.location.href = 'instagram://library';
-        } catch {}
+        } catch {
+          // Instagram's app scheme is unavailable; the link is still copied.
+        }
       }
       const ok = await copyToClipboardSilent(url);
       if (ok) {

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 
 export interface CheckInResult {
   success: boolean;
@@ -50,8 +51,8 @@ export function useCheckInAttendee(eventId?: string) {
       queryClient.invalidateQueries({ queryKey: ["event-attendees-v2", eventId] });
       queryClient.invalidateQueries({ queryKey: ["event-check-ins", eventId] });
     },
-    onError: (err: any) => {
-      toast.error(err?.message || "Check-in failed");
+    onError: (err: unknown) => {
+      toast.error(errorMessage(err, "Check-in failed"));
     },
   });
 }

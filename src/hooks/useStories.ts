@@ -57,7 +57,7 @@ export function useStories() {
       // Get profiles for story creators
       const userIds = [...new Set(storiesData.map(s => s.user_id))];
       const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', userIds);
 
@@ -99,7 +99,7 @@ export function useStories() {
 
           return {
             ...story,
-            profile: profileMap.get(story.user_id) || { display_name: null, avatar_url: null },
+            profile: profileMap.get(story.user_id) || { display_name: 'Private profile', avatar_url: null },
             view_count: viewCount,
             has_viewed: hasViewed,
           } as StoryWithProfile;

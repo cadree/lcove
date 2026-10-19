@@ -1,8 +1,10 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
+import { notifyPostComment, notifyPostLike } from '@/lib/notifications';
 
 interface Comment {
   id: string;
@@ -21,6 +23,7 @@ interface Comment {
 export function usePostInteractions(postId: string) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { blockedIds } = useUserBlocks();
 
   // Fetch likes count and user's like status
   const { data: likesData, refetch: refetchLikes } = useQuery({
@@ -61,16 +64,16 @@ export function usePostInteractions(postId: string) {
       // Get profiles for commenters
       const userIds = [...new Set(commentsData?.map(c => c.user_id) || [])];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', userIds);
 
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]));
 
-      // Add profiles to comments
+      // Add profiles to comments. A missing row is a private profile.
       const commentsWithProfiles = (commentsData || []).map(c => ({
         ...c,
-        profile: profileMap.get(c.user_id) || { display_name: null, avatar_url: null },
+        profile: profileMap.get(c.user_id),
       }));
 
       // Build thread structure
@@ -127,6 +130,20 @@ export function usePostInteractions(postId: string) {
         await supabase
           .from('post_likes')
           .insert({ post_id: postId, user_id: user.id });
+
+        const { data: post } = await supabase
+          .from('posts')
+          .select('user_id')
+          .eq('id', postId)
+          .maybeSingle();
+        if (post && post.user_id !== user.id) {
+          const { data: profile } = await supabase
+            .from('profiles_public')
+            .select('display_name')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          notifyPostLike(post.user_id, profile?.display_name || 'Someone', postId).catch(() => undefined);
+        }
       }
     },
     onSuccess: () => {
@@ -149,6 +166,20 @@ export function usePostInteractions(postId: string) {
         });
 
       if (error) throw error;
+
+      const { data: post } = await supabase
+        .from('posts')
+        .select('user_id')
+        .eq('id', postId)
+        .maybeSingle();
+      if (post && post.user_id !== user.id) {
+        const { data: profile } = await supabase
+          .from('profiles_public')
+          .select('display_name')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        notifyPostComment(post.user_id, profile?.display_name || 'Someone', postId).catch(() => undefined);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['post-comments', postId] });
@@ -227,11 +258,16 @@ export function usePostInteractions(postId: string) {
     };
   }, [postId, refetchLikes, refetchComments]);
 
+  const visibleComments = useMemo(
+    () => hideBlockedComments(comments, new Set(blockedIds)),
+    [comments, blockedIds],
+  );
+
   return {
     likesCount: likesData?.count || 0,
     hasLiked: likesData?.hasLiked || false,
-    comments,
-    commentsCount: comments.reduce((acc, c) => acc + 1 + (c.replies?.length || 0), 0),
+    comments: visibleComments,
+    commentsCount: countComments(visibleComments),
     isSaved,
     toggleLike: () => likeMutation.mutate(),
     addComment: (content: string, parentId?: string) => commentMutation.mutate({ content, parentId }),
@@ -241,4 +277,21 @@ export function usePostInteractions(postId: string) {
     isCommenting: commentMutation.isPending,
     isSaving: saveMutation.isPending,
   };
+}
+
+function hideBlockedComments(comments: Comment[], blocked: Set<string>): Comment[] {
+  const visible: Comment[] = [];
+  for (const comment of comments) {
+    const replies = hideBlockedComments(comment.replies ?? [], blocked);
+    if (blocked.has(comment.user_id)) {
+      visible.push(...replies);
+    } else {
+      visible.push({ ...comment, replies });
+    }
+  }
+  return visible;
+}
+
+function countComments(comments: Comment[]): number {
+  return comments.reduce((acc, comment) => acc + 1 + countComments(comment.replies ?? []), 0);
 }

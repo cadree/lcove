@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Send, Plus, X, Loader2, Mail, Phone, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 
 interface Invitee {
   id: string;
@@ -75,8 +76,8 @@ export function InviteGuestsDialog({ eventId, eventTitle, children }: InviteGues
       toast.success(`${sentCount} invitation${sentCount !== 1 ? "s" : ""} sent!`);
       setOpen(false);
       setInvitees([{ id: crypto.randomUUID(), name: "", email: "", phone: "" }]);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to send invitations");
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, "Failed to send invitations"));
     } finally {
       setSending(false);
     }

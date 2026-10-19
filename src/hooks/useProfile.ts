@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -30,6 +30,9 @@ export interface Profile {
   mindset_level: number | null;
   access_status: 'pending' | 'active' | 'denied' | 'banned' | null;
   onboarding_score: number | null;
+  // Own profile only. Never copied from another member's row.
+  passed_exam: boolean;
+  show_only_to_passed_exam: boolean;
   // Contact info - only available for own profile
   phone: string | null;
   social_links: SocialLinks | null;
@@ -43,16 +46,7 @@ export const useProfile = (userId?: string) => {
   const targetUserId = userId || user?.id;
   const isOwnProfile = targetUserId === user?.id;
 
-  useEffect(() => {
-    if (targetUserId) {
-      fetchProfile();
-    } else {
-      setProfile(null);
-      setLoading(false);
-    }
-  }, [targetUserId, isOwnProfile]);
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     if (!targetUserId) return;
     
     setLoading(true);
@@ -60,7 +54,8 @@ export const useProfile = (userId?: string) => {
     let data: Record<string, unknown> | null = null;
     let error: Error | null = null;
     
-    // Use profiles table for own profile (has access to phone), profiles_public for others
+    // Own row includes phone and the exam score. Other members come from
+    // profiles_public, which omits both.
     if (isOwnProfile) {
       const result = await supabase
         .from('profiles')
@@ -71,10 +66,10 @@ export const useProfile = (userId?: string) => {
       error = result.error;
     } else {
       const result = await supabase
-        .from('profiles')
-        .select('*')
+        .from('profiles_public')
+        .select('id, user_id, display_name, city, city_display, city_key, bio, avatar_url, passion_seriousness, access_level, onboarding_completed, created_at, updated_at, mindset_level, access_status, social_links')
         .eq('user_id', targetUserId)
-        .single();
+        .maybeSingle();
       data = result.data as Record<string, unknown> | null;
       error = result.error;
     }
@@ -96,22 +91,34 @@ export const useProfile = (userId?: string) => {
         updated_at: data.updated_at as string,
         mindset_level: (data.mindset_level as number | null) ?? null,
         access_status: (data.access_status as Profile['access_status']) ?? 'pending',
-        onboarding_score: (data.onboarding_score as number | null) ?? null,
-        // Phone is only available for own profile (not in profiles_public view)
+        onboarding_score: isOwnProfile ? ((data.onboarding_score as number | null) ?? null) : null,
+        passed_exam: isOwnProfile ? Boolean(data.passed_exam) : false,
+        show_only_to_passed_exam: isOwnProfile ? Boolean(data.show_only_to_passed_exam) : false,
         phone: isOwnProfile ? ((data.phone as string | null) ?? null) : null,
         social_links: (data.social_links as SocialLinks | null) ?? null,
       };
       setProfile(profileData);
+    } else if (!isOwnProfile) {
+      setProfile(null);
     }
     setLoading(false);
-  };
+  }, [targetUserId, isOwnProfile]);
+
+  useEffect(() => {
+    if (targetUserId) {
+      fetchProfile();
+    } else {
+      setProfile(null);
+      setLoading(false);
+    }
+  }, [targetUserId, fetchProfile]);
 
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) return { error: new Error('Not authenticated') };
 
     const { error } = await supabase
       .from('profiles')
-      .update(updates)
+      .update(updates as never)
       .eq('user_id', user.id);
 
     if (!error) {

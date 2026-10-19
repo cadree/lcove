@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -10,6 +11,56 @@ export interface MembershipStatus {
   monthly_amount: number | null;
   lifetime_contribution: number;
   grant_eligible: boolean;
+}
+
+interface MembershipRow {
+  tier: string;
+  status: string;
+  monthly_amount: number | null;
+  lifetime_contribution: number | null;
+  grant_eligible: boolean | null;
+  current_period_end: string | null;
+}
+
+function membershipFromRow(row: MembershipRow | null): MembershipStatus | null {
+  if (!row) return null;
+  const tier = row.tier === "community" || row.tier === "elite" ? row.tier : null;
+  const subscribed = !!tier && (row.status === "active" || row.status === "trialing");
+  return {
+    subscribed,
+    tier: subscribed ? tier : null,
+    subscription_end: row.current_period_end,
+    monthly_amount: row.monthly_amount,
+    lifetime_contribution: Number(row.lifetime_contribution || 0),
+    grant_eligible: subscribed ? Boolean(row.grant_eligible) : false,
+  };
+}
+
+function membershipFromPayload(data: Partial<MembershipStatus> | null): MembershipStatus | null {
+  if (!data) return null;
+  const tier = data.tier === "community" || data.tier === "elite" ? data.tier : null;
+  const subscribed = Boolean(data.subscribed) && !!tier;
+  return {
+    subscribed,
+    tier: subscribed ? tier : null,
+    subscription_end: data.subscription_end ?? null,
+    monthly_amount: data.monthly_amount ?? null,
+    lifetime_contribution: Number(data.lifetime_contribution || 0),
+    grant_eligible: subscribed ? Boolean(data.grant_eligible) : false,
+  };
+}
+
+async function readOwnMembership(userId: string): Promise<MembershipStatus | null> {
+  const { data, error } = await supabase
+    .from("memberships")
+    .select("tier, status, monthly_amount, lifetime_contribution, grant_eligible, current_period_end")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    console.error("Error reading membership row", error);
+    return null;
+  }
+  return membershipFromRow(data);
 }
 
 export const useMembership = () => {
@@ -25,11 +76,21 @@ export const useMembership = () => {
       return;
     }
 
+    // The webhook writes memberships. RLS lets the owner read that row.
+    // Show it immediately, then refresh from Stripe. A failed refresh must
+    // not hide an active row.
+    let row: MembershipStatus | null = null;
+    try {
+      row = await readOwnMembership(user.id);
+      if (row) setMembership(membershipFromPayload(row));
+    } catch (error) {
+      console.error("Error reading membership row", error);
+    }
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        setMembership(null);
-        setIsLoading(false);
+        if (!row) setMembership(null);
         return;
       }
 
@@ -39,11 +100,15 @@ export const useMembership = () => {
         },
       });
 
-      if (error) throw error;
-      setMembership(data);
+      if (error || !data || data.error) {
+        if (!row) setMembership(null);
+        if (error) console.error("Error checking membership:", error);
+        return;
+      }
+      setMembership(membershipFromPayload(data));
     } catch (error) {
       console.error("Error checking membership:", error);
-      setMembership(null);
+      if (!row) setMembership(null);
     } finally {
       setIsLoading(false);
     }
@@ -61,6 +126,11 @@ export const useMembership = () => {
   }, [user, checkMembership]);
 
   const startCheckout = async (tier: "community" | "elite", customAmount?: number) => {
+    if (Capacitor.getPlatform() === "ios") {
+      toast.error("Membership checkout isn't available in the iOS app.");
+      return;
+    }
+
     if (!user) {
       toast.error("Please sign in to become a member");
       return;
@@ -105,6 +175,11 @@ export const useMembership = () => {
   };
 
   const openCustomerPortal = async () => {
+    if (Capacitor.getPlatform() === "ios") {
+      toast.error("Subscription billing isn't available in the iOS app.");
+      return;
+    }
+
     if (!user) {
       toast.error("Please sign in first");
       return;

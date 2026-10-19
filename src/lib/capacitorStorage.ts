@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
+import { NATIVE_APP_ID } from '@/config/nativeIds';
 import { logStorageOperation } from './authDebug';
 
 /**
@@ -15,11 +16,11 @@ export const capacitorStorage = {
     try {
       if (Capacitor.isNativePlatform()) {
         const { value } = await Preferences.get({ key });
-        logStorageOperation('get', key, true, value || undefined);
+        logStorageOperation('get', key, true);
         return value;
       }
       const value = localStorage.getItem(key);
-      logStorageOperation('get', key, true, value || undefined);
+      logStorageOperation('get', key, true);
       return value;
     } catch (error) {
       console.error('[CapacitorStorage] getItem error:', error);
@@ -37,10 +38,10 @@ export const capacitorStorage = {
     try {
       if (Capacitor.isNativePlatform()) {
         await Preferences.set({ key, value });
-        logStorageOperation('set', key, true, value);
+        logStorageOperation('set', key, true);
       } else {
         localStorage.setItem(key, value);
-        logStorageOperation('set', key, true, value);
+        logStorageOperation('set', key, true);
       }
     } catch (error) {
       console.error('[CapacitorStorage] setItem error:', error);
@@ -82,12 +83,16 @@ export const capacitorStorage = {
  */
 export const clearAllAuthStorage = async (): Promise<void> => {
   const authKeys = [
+    'sb-aykopqinnnssxdhxqruo-auth-token',
+    'sb-aykopqinnnssxdhxqruo-auth-token-code-verifier',
     'sb-wjbyvlgsxscwukkolehg-auth-token',
     'sb-wjbyvlgsxscwukkolehg-auth-token-code-verifier',
     'supabase.auth.token',
   ];
 
-  console.log('[CapacitorStorage] Clearing all auth storage keys...');
+  if (import.meta.env.DEV) {
+    console.log('[CapacitorStorage] Clearing auth storage keys');
+  }
 
   try {
     if (Capacitor.isNativePlatform()) {
@@ -99,7 +104,9 @@ export const clearAllAuthStorage = async (): Promise<void> => {
       
       // Also try to clear any other sb- prefixed keys by getting all keys
       // Note: Capacitor Preferences doesn't have a keys() method, so we clear known ones
-      console.log('[CapacitorStorage] Native auth storage cleared');
+      if (import.meta.env.DEV) {
+        console.log('[CapacitorStorage] Native auth storage cleared');
+      }
     } else {
       // Clear from localStorage on web
       for (const key of authKeys) {
@@ -116,7 +123,9 @@ export const clearAllAuthStorage = async (): Promise<void> => {
       }
       keysToRemove.forEach(key => localStorage.removeItem(key));
       
-      console.log('[CapacitorStorage] Web auth storage cleared:', keysToRemove);
+      if (import.meta.env.DEV) {
+        console.log('[CapacitorStorage] Web auth storage cleared', { count: keysToRemove.length });
+      }
     }
   } catch (error) {
     console.error('[CapacitorStorage] Error clearing auth storage:', error);
@@ -136,9 +145,11 @@ export const isNativePlatform = (): boolean => {
  */
 export const getAuthRedirectUrl = (path: string = '/'): string => {
   if (Capacitor.isNativePlatform()) {
-    // Use the app's URL scheme for deep linking
-    // Format: app.lovable.{projectId}://path
-    return `app.lovable.e07d9c457fd949f78f3cc7d5998be668:/${path}`;
+    // Custom URL scheme registered in ios/App/App/Info.plist.
+    // CONFIRM WITH CADRE: NATIVE_APP_ID is a placeholder, and Supabase Auth
+    // redirect URLs must allow this scheme before native login works.
+    // path already starts with "/", so this becomes scheme://...
+    return `${NATIVE_APP_ID}:/${path}`;
   }
   return `${window.location.origin}${path}`;
 };

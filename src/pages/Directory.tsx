@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Search, MapPin, Briefcase, Users, Loader2, Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { NewMembersSection } from "@/components/directory/NewMembersSection";
+import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { FriendsDrawer } from "@/components/friends/FriendsDrawer";
 import { computeCityKey, computeCityDisplay } from "@/lib/cityNormalization";
+import { dedupeProfilesByUserId } from "@/lib/directoryProfiles";
 
 interface Profile {
   id: string;
@@ -33,7 +34,8 @@ interface CityOption {
 
 interface UserPassion {
   user_id: string;
-  passions: { name: string } | null;
+  custom_name: string | null;
+  passions: { name: string } | { name: string }[] | null;
 }
 
 interface UserSkill {
@@ -41,8 +43,17 @@ interface UserSkill {
   skills: { name: string } | null;
 }
 
+function passionLabel(row: UserPassion): string | null {
+  const custom = row.custom_name?.trim();
+  if (custom) return custom;
+  const related = Array.isArray(row.passions) ? row.passions[0] : row.passions;
+  const name = related?.name?.trim();
+  return name || null;
+}
+
 const Directory = () => {
   const navigate = useNavigate();
+  const { blockedIds } = useUserBlocks();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCityKey, setSelectedCityKey] = useState<string | null>(null); // null = All Cities
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -70,7 +81,7 @@ const Directory = () => {
     // Fetch user passions with passion names
     const { data: passionsData } = await supabase
       .from('user_passions')
-      .select('user_id, passions(name)');
+      .select('user_id, custom_name, passions(name)');
     
     // Fetch user skills with skill names
     const { data: skillsData } = await supabase
@@ -81,11 +92,11 @@ const Directory = () => {
     const passionsByUser = new Map<string, string[]>();
     if (passionsData) {
       (passionsData as UserPassion[]).forEach(up => {
-        if (up.passions?.name) {
-          const existing = passionsByUser.get(up.user_id) || [];
-          existing.push(up.passions.name);
-          passionsByUser.set(up.user_id, existing);
-        }
+        const name = passionLabel(up);
+        if (!name) return;
+        const existing = passionsByUser.get(up.user_id) || [];
+        existing.push(name);
+        passionsByUser.set(up.user_id, existing);
       });
     }
     
@@ -108,7 +119,7 @@ const Directory = () => {
       skills: skillsByUser.get(profile.user_id) || []
     }));
     
-    setProfiles(profilesWithDetails as Profile[]);
+    setProfiles(dedupeProfilesByUserId(profilesWithDetails as Profile[]));
     setLoading(false);
   };
 
@@ -148,6 +159,7 @@ const Directory = () => {
   };
 
   const filteredProfiles = profiles.filter((profile) => {
+    if (blockedIds.includes(profile.user_id)) return false;
     const cityDisplay = getProfileCityDisplay(profile);
     const searchLower = searchQuery.toLowerCase();
     const matchesSearch = 
@@ -172,13 +184,13 @@ const Directory = () => {
       <div className="px-6 pt-6 pb-24">
         {/* Header */}
         <PageHeader
+          eyebrow="People"
           title="Directory"
           description="Find creatives by name, city, or interests"
-          icon={<Users className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
           className="mb-6"
           actions={
             <FriendsDrawer>
-              <Button variant="glass" size="icon" className="w-10 h-10" title="Friends">
+              <Button variant="outline" size="icon" title="Friends" aria-label="Friends">
                 <Heart className="w-4 h-4" />
               </Button>
             </FriendsDrawer>
@@ -215,7 +227,7 @@ const Directory = () => {
             variant={selectedCityKey === null ? "default" : "glass"}
             size="sm"
             onClick={() => setSelectedCityKey(null)}
-            className="whitespace-nowrap"
+            className="whitespace-nowrap min-h-11"
           >
             <MapPin className="w-3 h-3 mr-1" />
             All Cities
@@ -227,16 +239,13 @@ const Directory = () => {
               variant={selectedCityKey === cityOption.key ? "default" : "glass"}
               size="sm"
               onClick={() => setSelectedCityKey(cityOption.key)}
-              className="whitespace-nowrap"
+              className="whitespace-nowrap min-h-11"
             >
               <MapPin className="w-3 h-3 mr-1" />
               {cityOption.display}
             </Button>
           ))}
         </motion.div>
-
-        {/* New Members Section */}
-        {!loading && <NewMembersSection profiles={profiles} />}
 
         {/* Loading State */}
         {loading && (
@@ -255,22 +264,27 @@ const Directory = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: index * 0.05 }}
                 onClick={() => handleProfileClick(profile.user_id)}
-                className="glass-strong rounded-2xl p-5 hover:bg-accent/20 transition-all duration-300 cursor-pointer group"
+                className="bg-card border border-border rounded-[2px] p-5 cursor-pointer group"
               >
                 <div className="flex items-start gap-4">
                   {/* Avatar */}
-                  <Avatar className="w-16 h-16 rounded-xl border-2 border-border group-hover:border-primary/50 transition-colors">
-                    <AvatarImage src={profile.avatar_url || undefined} />
-                    <AvatarFallback className="bg-muted text-muted-foreground text-xl font-medium rounded-xl">
+                  <Avatar className="w-16 h-16 rounded-[2px] border border-border">
+                    <AvatarImage src={profile.avatar_url || undefined} className="rounded-[2px]" />
+                    <AvatarFallback className="bg-muted text-foreground text-xl font-medium rounded-[2px]">
                       {profile.display_name?.charAt(0).toUpperCase() || '?'}
                     </AvatarFallback>
                   </Avatar>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
                     <h3 className="font-display text-lg font-medium text-foreground truncate group-hover:text-primary transition-colors">
                       {profile.display_name || 'Anonymous'}
                     </h3>
+                    {profile.created_at && Date.now() - new Date(profile.created_at).getTime() < 14 * 24 * 60 * 60 * 1000 && (
+                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-primary">New</span>
+                    )}
+                  </div>
                     {getProfileCityDisplay(profile) && (
                       <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
                         <MapPin className="w-3 h-3" />
@@ -278,7 +292,7 @@ const Directory = () => {
                       </p>
                     )}
                     {profile.bio && (
-                      <p className="text-xs text-muted-foreground/70 line-clamp-2">
+                      <p className="text-xs text-muted-foreground line-clamp-2">
                         {profile.bio}
                       </p>
                     )}

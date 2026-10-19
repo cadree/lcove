@@ -93,8 +93,9 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
 
   // Cleanup debounce timers on unmount
   useEffect(() => {
+    const timers = debounceTimers.current;
     return () => {
-      Object.values(debounceTimers.current).forEach(clearTimeout);
+      Object.values(timers).forEach(clearTimeout);
     };
   }, []);
 

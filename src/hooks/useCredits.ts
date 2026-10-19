@@ -2,6 +2,30 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { callRpc } from '@/lib/rpc';
+
+interface LedgerSums {
+  genesis_balance: number;
+  earned_balance: number;
+  balance: number;
+}
+
+/** Same rule as ledger_entry_deltas: a 0 split column means use amount. */
+function ledgerDeltas(entry: {
+  credit_type: string | null;
+  amount: number;
+  genesis_amount: number;
+  earned_amount: number;
+}) {
+  const creditType = entry.credit_type || 'earned';
+  const genesis = creditType === 'genesis'
+    ? (entry.genesis_amount === 0 ? entry.amount : entry.genesis_amount)
+    : entry.genesis_amount;
+  const earned = creditType === 'earned'
+    ? (entry.earned_amount === 0 ? entry.amount : entry.earned_amount)
+    : entry.earned_amount;
+  return { genesis, earned };
+}
 
 export interface UserCredits {
   id: string;
@@ -96,21 +120,23 @@ export const useCredits = (userId?: string) => {
         .from('user_credits')
         .select('*')
         .eq('user_id', targetUserId)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') throw error;
-      
-      if (!data) return null;
+      if (error) throw error;
+
+      const sums = await callRpc<LedgerSums>('credit_ledger_balances', { p_user_id: targetUserId });
+      if (!data && !sums) return null;
 
       return {
-        ...data,
-        balance: Number(data.balance),
-        genesis_balance: Number(data.genesis_balance) || 0,
-        earned_balance: Number(data.earned_balance) || 0,
-        genesis_lifetime_minted: Number(data.genesis_lifetime_minted) || 0,
-        genesis_burned: Number(data.genesis_burned) || 0,
-        lifetime_earned: Number(data.lifetime_earned),
-        lifetime_spent: Number(data.lifetime_spent),
+        id: data?.id ?? '',
+        user_id: targetUserId,
+        balance: Number(sums?.balance ?? 0),
+        genesis_balance: Number(sums?.genesis_balance ?? 0),
+        earned_balance: Number(sums?.earned_balance ?? 0),
+        genesis_lifetime_minted: Number(data?.genesis_lifetime_minted) || 0,
+        genesis_burned: Number(data?.genesis_burned) || 0,
+        lifetime_earned: Number(data?.lifetime_earned) || 0,
+        lifetime_spent: Number(data?.lifetime_spent) || 0,
       } as UserCredits;
     },
     enabled: !!targetUserId,
@@ -148,14 +174,31 @@ export const useCreditLedger = (creditType?: 'genesis' | 'earned') => {
       const { data, error } = await query;
 
       if (error) throw error;
-      
-      return data.map(entry => ({
-        ...entry,
-        amount: Number(entry.amount),
-        balance_after: Number(entry.balance_after),
-        genesis_amount: Number(entry.genesis_amount) || 0,
-        earned_amount: Number(entry.earned_amount) || 0,
-      })) as CreditLedgerEntry[];
+
+      const sums = await callRpc<LedgerSums>('credit_ledger_balances', { p_user_id: user.id });
+      let running = creditType === 'genesis'
+        ? Number(sums?.genesis_balance ?? 0)
+        : creditType === 'earned'
+          ? Number(sums?.earned_balance ?? 0)
+          : Number(sums?.balance ?? 0);
+
+      return data.map(entry => {
+        const numeric = {
+          ...entry,
+          amount: Number(entry.amount),
+          genesis_amount: Number(entry.genesis_amount) || 0,
+          earned_amount: Number(entry.earned_amount) || 0,
+        };
+        const deltas = ledgerDeltas(numeric);
+        const delta = creditType === 'genesis'
+          ? deltas.genesis
+          : creditType === 'earned'
+            ? deltas.earned
+            : deltas.genesis + deltas.earned;
+        const balance_after = running;
+        running -= delta;
+        return { ...numeric, balance_after } as CreditLedgerEntry;
+      });
     },
     enabled: !!user?.id,
   });

@@ -2,6 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
+function projectSummary(value: unknown): { id: string; title: string; status: string } | null {
+  const row = Array.isArray(value) ? value[0] : value;
+  if (!row || typeof row !== "object") return null;
+  if (!("id" in row) || !("title" in row) || !("status" in row)) return null;
+  if (typeof row.id !== "string" || typeof row.title !== "string" || typeof row.status !== "string") return null;
+  return { id: row.id, title: row.title, status: row.status };
+}
+
 /**
  * Check if user is an accepted member of a project
  * Used to control access to advanced features like escrow details
@@ -66,11 +74,10 @@ export function useUserActiveProjects() {
         .eq('applicant_id', user.id)
         .eq('status', 'accepted');
 
-      const collaboratorProjects = acceptedApplications?.map(app => ({
-        id: (app.projects as any).id,
-        title: (app.projects as any).title,
-        status: (app.projects as any).status,
-      })) || [];
+      const collaboratorProjects = (acceptedApplications ?? []).flatMap((app) => {
+        const project = projectSummary(app.projects);
+        return project ? [project] : [];
+      });
 
       return [...(createdProjects || []), ...collaboratorProjects];
     },

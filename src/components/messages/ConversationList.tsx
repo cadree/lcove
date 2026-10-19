@@ -15,6 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { MoreMenuButton } from '@/components/navigation/MoreMenu';
 
 interface ConversationListProps {
   selectedId: string | null;
@@ -28,6 +29,9 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
   const { conversations, isLoading, toggleMute, deleteConversation } = useConversations();
   const { isOnline } = usePresence();
   const [search, setSearch] = useState('');
+
+  const isConversationMuted = (conv: typeof conversations[0]) =>
+    !!conv.participants?.find(p => p.user_id === user?.id)?.is_muted;
 
   const getOtherUserId = (conv: typeof conversations[0]) => {
     if (conv.type !== 'direct') return null;
@@ -71,12 +75,18 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-border/50">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display text-xl font-medium text-foreground">Messages</h2>
-          <Button variant="glass" size="icon" onClick={onNewChat}>
-            <Plus className="w-5 h-5" />
-          </Button>
+      <div className="p-4 border-b border-border">
+        <div className="flex items-start justify-between gap-2 mb-4">
+          <div>
+            <p className="eyebrow">Inbox</p>
+            <h1 className="ether-title text-3xl text-foreground">Messages</h1>
+          </div>
+          <div className="flex items-center">
+            <Button variant="ghost" size="icon" onClick={onNewChat} aria-label="New message">
+              <Plus className="w-5 h-5" />
+            </Button>
+            <MoreMenuButton />
+          </div>
         </div>
 
         {/* Search */}
@@ -204,10 +214,10 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
-                        toggleMute.mutate({ conversationId: conv.id, muted: !(conv as any).is_muted });
+                        toggleMute.mutate({ conversationId: conv.id, muted: !isConversationMuted(conv) });
                       }}
                     >
-                      {(conv as any).is_muted ? (
+                      {isConversationMuted(conv) ? (
                         <>
                           <Bell className="w-4 h-4 mr-2" />
                           Unmute

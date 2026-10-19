@@ -1,0 +1,4 @@
+comment = 'Scratch stub of supabase_vault for local migration checks. Not the real extension.'
+default_version = '1.0'
+relocatable = false
+schema = vault

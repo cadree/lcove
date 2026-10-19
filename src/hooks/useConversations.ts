@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 
 interface Participant {
@@ -49,6 +50,7 @@ interface Conversation {
 export function useConversations() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { blockedIds } = useUserBlocks();
 
   const { data: conversations = [], isLoading, refetch } = useQuery({
     queryKey: ['conversations', user?.id],
@@ -82,7 +84,7 @@ export function useConversations() {
         .in('conversation_id', conversationIds);
 
       // Fetch project details for project-linked conversations
-      const projectIds = convos?.filter(c => (c as any).project_id).map(c => (c as any).project_id) || [];
+      const projectIds = (convos ?? []).flatMap((c) => (c.project_id ? [c.project_id] : []));
       let projectMap = new Map<string, ProjectInfo>();
       
       if (projectIds.length > 0) {
@@ -97,7 +99,7 @@ export function useConversations() {
       // Get profiles for all participants using profiles table for authenticated identity resolution
       const userIds = [...new Set(allParticipants?.map(p => p.user_id) || [])];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .in('user_id', userIds);
 
@@ -138,7 +140,7 @@ export function useConversations() {
       const mutedMap = new Map(participations.map(p => [p.conversation_id, p.is_muted]));
 
       return (convos || []).map(conv => {
-        const projectId = (conv as any).project_id;
+        const projectId = conv.project_id;
         return {
           ...conv,
           project_id: projectId,
@@ -147,7 +149,7 @@ export function useConversations() {
             ?.filter(p => p.conversation_id === conv.id)
             .map(p => ({
               ...p,
-              project_role_name: (p as any).project_role_name,
+              project_role_name: p.project_role_name,
               profile: profileMap.get(p.user_id),
             })),
           last_message: lastMessageMap.get(conv.id),
@@ -354,8 +356,24 @@ export function useConversations() {
     };
   }, [user, refetch]);
 
+  const visibleConversations = useMemo(() => {
+    const blocked = new Set(blockedIds);
+    return conversations
+      .filter((conversation) => {
+        if (conversation.type !== 'direct') return true;
+        const other = conversation.participants?.find((participant) => participant.user_id !== user?.id);
+        return !other || !blocked.has(other.user_id);
+      })
+      .map((conversation) => {
+        if (conversation.last_message && blocked.has(conversation.last_message.sender_id)) {
+          return { ...conversation, last_message: undefined };
+        }
+        return conversation;
+      });
+  }, [conversations, blockedIds, user?.id]);
+
   return {
-    conversations,
+    conversations: visibleConversations,
     isLoading,
     createDirectConversation,
     createGroupConversation,

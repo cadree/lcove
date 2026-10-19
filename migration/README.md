@@ -1,3 +1,9 @@
+# STALE — DO NOT RUN
+
+This `migration/` folder is a one-time export aimed at a different Supabase project (`waafzlorvnozeujjhvxu`). It is not the schema for this repo. The SQL here is out of date and must not be applied to the live Ether / Lovable Cloud database or to local development.
+
+The live schema lives in `supabase/migrations/`. Change that directory, not the files below.
+
 # Migration Package: Lovable Cloud → External Supabase
 
 This package migrates the ETHER app from Lovable Cloud Supabase (`wjbyvlgsxscwukkolehg`) to your external Supabase project (`waafzlorvnozeujjhvxu`).
@@ -45,7 +51,7 @@ In Supabase Dashboard → Authentication → URL Configuration:
 
 - **Site URL**: `https://lcove.lovable.app`
 - **Redirect URLs**:
-  - `app.lovable.e07d9c457fd949f78f3cc7d5998be668://`
+  - `com.etherbylcove.app://` (placeholder — confirm with Cadre; see `src/config/nativeIds.ts` and `docs/ios-release.md`)
   - `capacitor://localhost`
   - `https://id-preview--e07d9c45-7fd9-49f7-8f3c-c7d5998be668.lovable.app`
   - `https://lcove.lovable.app`
@@ -107,7 +113,7 @@ The app is already configured for native platforms:
 - ✅ PKCE flow enabled
 - ✅ Capacitor Preferences storage adapter
 - ✅ `detectSessionInUrl: false` on native
-- ✅ Deep link scheme: `app.lovable.e07d9c457fd949f78f3cc7d5998be668://`
+- ✅ Deep link scheme: `com.etherbylcove.app://` (placeholder until Cadre confirms the bundle id)
 
 ## Verification Checklist
 

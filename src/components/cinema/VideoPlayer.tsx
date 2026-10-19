@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { NetworkContent, useUpdateWatchProgress } from '@/hooks/useCinema';
+import { NetworkContent, useContentPlayback, useIncrementViewCount, useUpdateWatchProgress } from '@/hooks/useCinema';
+import { isIosApp } from '@/lib/platform';
 import { cn } from '@/lib/utils';
 
 interface VideoPlayerProps {
@@ -56,9 +57,38 @@ export const VideoPlayer = ({
   const [previewEnded, setPreviewEnded] = useState(false);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const updateProgress = useUpdateWatchProgress();
+  const { mutate: saveWatchProgress } = useUpdateWatchProgress();
+  const recordView = useIncrementViewCount();
+  const { data: playback } = useContentPlayback(content.id, episodeId);
+  const externalUrl = playback?.external_video_url || null;
+  const fileUrl = playback?.video_url || null;
+  const isEmbed = !!externalUrl && (
+    externalUrl.includes('youtube.com') ||
+    externalUrl.includes('vimeo.com') ||
+    externalUrl.includes('youtu.be')
+  );
+  const videoUrl = fileUrl || (isEmbed ? null : externalUrl);
+  const recorded = useRef(false);
+  const progressSnapshot = useRef({
+    currentTime,
+    duration,
+    contentId: content.id,
+    episodeId,
+    isPreviewOnly,
+  });
+  progressSnapshot.current = {
+    currentTime,
+    duration,
+    contentId: content.id,
+    episodeId,
+    isPreviewOnly,
+  };
 
-  const videoUrl = content.video_url || content.external_video_url;
+  useEffect(() => {
+    if ((!videoUrl && !externalUrl) || recorded.current || isPreviewOnly) return;
+    recorded.current = true;
+    recordView.mutate(content.id);
+  }, [videoUrl, externalUrl, content.id, isPreviewOnly, recordView]);
 
   // Handle preview mode - pause and show paywall when preview time reached
   useEffect(() => {
@@ -78,7 +108,7 @@ export const VideoPlayer = ({
     
     const interval = setInterval(() => {
       if (currentTime > 0 && duration > 0) {
-        updateProgress.mutate({
+        saveWatchProgress({
           contentId: content.id,
           episodeId,
           progressSeconds: Math.floor(currentTime),
@@ -88,22 +118,23 @@ export const VideoPlayer = ({
     }, 30000); // Save every 30 seconds
 
     return () => clearInterval(interval);
-  }, [currentTime, duration, content.id, episodeId, isPreviewOnly]);
+  }, [currentTime, duration, content.id, episodeId, isPreviewOnly, saveWatchProgress]);
 
   // Save progress on unmount (only if not preview mode)
   useEffect(() => {
     return () => {
-      if (isPreviewOnly) return;
-      if (currentTime > 0 && duration > 0) {
-        updateProgress.mutate({
-          contentId: content.id,
-          episodeId,
-          progressSeconds: Math.floor(currentTime),
-          durationSeconds: Math.floor(duration),
+      const snapshot = progressSnapshot.current;
+      if (snapshot.isPreviewOnly) return;
+      if (snapshot.currentTime > 0 && snapshot.duration > 0) {
+        saveWatchProgress({
+          contentId: snapshot.contentId,
+          episodeId: snapshot.episodeId,
+          progressSeconds: Math.floor(snapshot.currentTime),
+          durationSeconds: Math.floor(snapshot.duration),
         });
       }
     };
-  }, []);
+  }, [saveWatchProgress]);
 
   // Auto-hide controls
   const resetControlsTimeout = useCallback(() => {
@@ -117,6 +148,47 @@ export const VideoPlayer = ({
       }, 3000);
     }
   }, [isPlaying, showPaywall]);
+
+  const togglePlay = useCallback(() => {
+    if (previewEnded && isPreviewOnly) {
+      setShowPaywall(true);
+      return;
+    }
+    
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  }, [previewEnded, isPreviewOnly, isPlaying]);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!containerRef.current) return;
+
+    if (!isFullscreen) {
+      await containerRef.current.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      await document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  }, [isFullscreen]);
+
+  const seek = useCallback((seconds: number) => {
+    if (videoRef.current) {
+      let newTime = videoRef.current.currentTime + seconds;
+      
+      // In preview mode, don't allow seeking past preview duration
+      if (isPreviewOnly) {
+        newTime = Math.min(newTime, previewDuration);
+      }
+      
+      videoRef.current.currentTime = Math.max(0, Math.min(duration, newTime));
+    }
+  }, [isPreviewOnly, previewDuration, duration]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -153,48 +225,7 @@ export const VideoPlayer = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen, showPaywall]);
-
-  const togglePlay = () => {
-    if (previewEnded && isPreviewOnly) {
-      setShowPaywall(true);
-      return;
-    }
-    
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const toggleFullscreen = async () => {
-    if (!containerRef.current) return;
-
-    if (!isFullscreen) {
-      await containerRef.current.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      await document.exitFullscreen();
-      setIsFullscreen(false);
-    }
-  };
-
-  const seek = (seconds: number) => {
-    if (videoRef.current) {
-      let newTime = videoRef.current.currentTime + seconds;
-      
-      // In preview mode, don't allow seeking past preview duration
-      if (isPreviewOnly) {
-        newTime = Math.min(newTime, previewDuration);
-      }
-      
-      videoRef.current.currentTime = Math.max(0, Math.min(duration, newTime));
-    }
-  };
+  }, [isFullscreen, showPaywall, onClose, seek, toggleFullscreen, togglePlay]);
 
   const handleSeek = (value: number[]) => {
     if (videoRef.current) {
@@ -230,11 +261,7 @@ export const VideoPlayer = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Check if it's an external embed (YouTube, Vimeo, etc.)
-  const isEmbed = content.external_video_url && 
-    (content.external_video_url.includes('youtube.com') || 
-     content.external_video_url.includes('vimeo.com') ||
-     content.external_video_url.includes('youtu.be'));
+  // Embeds use the playback URL. Public selects do not include video_url.
 
   // Calculate preview progress percentage
   const previewProgress = isPreviewOnly 
@@ -275,7 +302,7 @@ export const VideoPlayer = ({
       {isEmbed ? (
         // External Embed (YouTube, Vimeo) - For embeds, we can't control preview
         <iframe
-          src={content.external_video_url?.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+          src={externalUrl?.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
           className="w-full h-full"
           allowFullScreen
           allow="autoplay; encrypted-media"
@@ -332,10 +359,12 @@ export const VideoPlayer = ({
                 </h2>
                 
                 <p className="text-white/70 mb-6">
-                  Subscribe to this network to watch the full content and access all exclusive films and shows.
+                  {isIosApp()
+                    ? "The rest of this network isn't available to purchase in the iOS app."
+                    : "Subscribe to this network to watch the full content and access all exclusive films and shows."}
                 </p>
 
-                {networkPrice && (
+                {!isIosApp() && networkPrice && (
                   <div className="mb-6 p-4 rounded-lg bg-white/10 border border-white/20">
                     <div className="flex items-center justify-center gap-2 text-primary">
                       <Crown className="w-5 h-5" />
@@ -348,6 +377,7 @@ export const VideoPlayer = ({
                 )}
 
                 <div className="flex flex-col gap-3">
+                  {!isIosApp() && (
                   <Button
                     size="lg"
                     className="w-full gap-2"
@@ -359,6 +389,7 @@ export const VideoPlayer = ({
                     <Crown className="w-5 h-5" />
                     Subscribe Now
                   </Button>
+                  )}
                   
                   <Button
                     variant="ghost"

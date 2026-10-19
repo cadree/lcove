@@ -2,8 +2,8 @@ import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Settings, MapPin, Camera, Loader2, Sparkles, 
-  ArrowLeft, MessageCircle, Edit, Shield, BadgeCheck, UserPlus, UserMinus, Users 
+  Settings, MapPin, Camera, Loader2, Sparkles, Crown, Heart,
+  ArrowLeft, MessageCircle, Edit, Shield, BadgeCheck, UserPlus, UserMinus, Users, Flag, Ban
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -15,6 +15,11 @@ import { ProfileEffects } from './ProfileEffects';
 import type { ProfileCustomization } from '@/hooks/useProfileCustomization';
 import { useCreatorVerification } from '@/hooks/useCreatorVerification';
 import { useFavorites } from '@/hooks/useFavorites';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
+import { useAuth } from '@/contexts/AuthContext';
+import { useMyXp } from '@/hooks/useXp';
+import { ReportDialog } from '@/components/safety/ReportDialog';
+import { MoreMenuButton } from '@/components/navigation/MoreMenu';
 import { FriendsDrawer } from '@/components/friends/FriendsDrawer';
 import type { ThemePreset } from '@/lib/profileThemes';
 import { THEME_PRESETS } from '@/lib/profileThemes';
@@ -45,6 +50,7 @@ interface ProfileHeaderProps {
   onMessageClick: () => void;
   onAvatarUpdate: (url: string) => void;
   userId: string;
+  memberTier: "community" | "elite" | null;
 }
 
 export function ProfileHeader({
@@ -60,11 +66,16 @@ export function ProfileHeader({
   onMessageClick,
   onAvatarUpdate,
   userId,
+  memberTier,
 }: ProfileHeaderProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const { isBlocked, blockUser, unblockUser } = useUserBlocks();
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
+  const { data: myXp } = useMyXp();
 
   const isUserFavorite = isFavorite(userId);
   const friendsCount = favorites?.length || 0;
@@ -171,7 +182,7 @@ export function ProfileHeader({
                 if (window.history.length > 1) {
                   navigate(-1);
                 } else {
-                  navigate('/home');
+                  navigate('/feed');
                 }
               }}
             >
@@ -183,10 +194,11 @@ export function ProfileHeader({
           
           {isOwnProfile && (
             <div className="flex gap-2">
-              <Button variant="glass" size="icon" className="w-10 h-10" onClick={onCustomizeClick}>
+              <MoreMenuButton className="bg-background/80 border border-border" />
+              <Button variant="outline" size="icon" className="bg-background/80" onClick={onCustomizeClick} aria-label="Customize profile">
                 <Sparkles className="w-5 h-5" />
               </Button>
-              <Button variant="glass" size="icon" className="w-10 h-10" onClick={onSettingsClick}>
+              <Button variant="outline" size="icon" className="bg-background/80" onClick={onSettingsClick} aria-label="Settings">
                 <Settings className="w-5 h-5" />
               </Button>
             </div>
@@ -204,7 +216,7 @@ export function ProfileHeader({
         >
           {/* Avatar */}
           <div className="relative group flex-shrink-0">
-            <Avatar className="w-24 h-24 sm:w-28 sm:h-28 border-4 border-background shadow-xl ring-2 ring-primary/20">
+            <Avatar className="w-24 h-24 sm:w-28 sm:h-28 rounded-[2px] border border-border">
               <AvatarImage src={avatarUrl || undefined} />
               <AvatarFallback className="bg-muted text-muted-foreground text-2xl font-display">
                 {displayName.charAt(0).toUpperCase()}
@@ -242,6 +254,18 @@ export function ProfileHeader({
                 {displayName}
               </h1>
               <ProfileVerificationBadge userId={userId} />
+              {memberTier === "elite" && (
+                <Badge className="bg-gradient-to-r from-amber-400 to-orange-500 text-white border-0 gap-1 text-xs">
+                  <Crown className="w-3 h-3" />
+                  Elite
+                </Badge>
+              )}
+              {memberTier === "community" && (
+                <Badge className="bg-primary/20 text-primary border-primary/30 gap-1 text-xs">
+                  <Heart className="w-3 h-3" />
+                  Community
+                </Badge>
+              )}
               {isProfileAdmin && (
                 <Badge className="bg-primary/20 text-primary border-primary/30 gap-1 text-xs">
                   <Shield className="w-3 h-3" />
@@ -255,6 +279,9 @@ export function ProfileHeader({
                 <MapPin className="w-3.5 h-3.5" />
                 {city}
               </p>
+              {isOwnProfile && myXp && (
+                <p className="text-sm text-muted-foreground">Level {myXp.level}</p>
+              )}
               
               {isOwnProfile && (
                 <FriendsDrawer>
@@ -314,6 +341,34 @@ export function ProfileHeader({
             </>
           )}
         </motion.div>
+        {!isOwnProfile && user && (
+          <div className="flex gap-2 mt-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (isBlocked(userId)) {
+                  unblockUser.mutate(userId);
+                } else {
+                  blockUser.mutate(userId);
+                }
+              }}
+            >
+              <Ban className="w-4 h-4 mr-2" />
+              {isBlocked(userId) ? 'Unblock' : 'Block'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setReportOpen(true)}>
+              <Flag className="w-4 h-4 mr-2" />
+              Report
+            </Button>
+            <ReportDialog
+              open={reportOpen}
+              onOpenChange={setReportOpen}
+              targetType="profile"
+              targetId={userId}
+            />
+          </div>
+        )}
       </div>
     </>
   );

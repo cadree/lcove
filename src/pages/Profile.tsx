@@ -10,7 +10,7 @@ import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
 import { ProfileCustomizationDialog } from "@/components/profile/ProfileCustomizationDialog";
 import { ProfileRecordPlayer } from "@/components/profile/ProfileRecordPlayer";
-import { CreatePostDialog } from "@/components/profile/CreatePostDialog";
+import { useCreateFlow } from "@/components/create/CreateFlowContext";
 import { ProfilePostsGrid } from "@/components/profile/ProfilePostsGrid";
 import { PostDetailModal } from "@/components/profile/PostDetailModal";
 import { CreateBlogDialog } from "@/components/profile/CreateBlogDialog";
@@ -29,6 +29,7 @@ import { ProfileFriendsSection } from "@/components/profile/ProfileFriendsSectio
 import { ProfileEventsDashboard } from "@/components/profile/ProfileEventsDashboard";
 import { ProfileMyTickets } from "@/components/profile/ProfileMyTickets";
 import { useProfile } from "@/hooks/useProfile";
+import { useMembership } from "@/hooks/useMembership";
 import { useConversations } from "@/hooks/useConversations";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
@@ -52,9 +53,10 @@ const Profile = () => {
   const isOwnProfile = !urlUserId || urlUserId === user?.id;
   
   const { profile, loading, updateProfile } = useProfile(targetUserId);
+  const { membership } = useMembership();
   const { credits } = useCredits();
   const { customization, isOwner, saveCustomization } = useProfileCustomization(targetUserId);
-  const { posts, isLoading: postsLoading, createPost, deletePost } = useProfilePosts(targetUserId);
+  const { posts, isLoading: postsLoading, deletePost } = useProfilePosts(targetUserId);
   const { blogs, isLoading: blogsLoading, createBlog, deleteBlog } = useProfileBlogs(targetUserId);
   const { data: creatorRoles = [] } = useCreatorRoles(targetUserId);
   const { data: userSkills = [] } = useUserSkills(targetUserId);
@@ -64,10 +66,10 @@ const Profile = () => {
   const { folders } = usePortfolioFolders(targetUserId);
   const { layout } = useProfileLayout(targetUserId);
   const { createDirectConversation } = useConversations();
+  const { openCreate } = useCreateFlow();
   
   const [showMusicDialog, setShowMusicDialog] = useState(false);
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
-  const [showCreatePostDialog, setShowCreatePostDialog] = useState(false);
   const [showCreateBlogDialog, setShowCreateBlogDialog] = useState(false);
   const [showEditDetailsDialog, setShowEditDetailsDialog] = useState(false);
   const [showLayoutEditor, setShowLayoutEditor] = useState(false);
@@ -78,8 +80,10 @@ const Profile = () => {
   
   const hasCreatorRoles = creatorRoles.length > 0;
 
-  // Get sorted visible sections
+  // Square portfolio grid sits above the rest of the module stack.
   const visibleSections = layout.filter(s => s.visible).sort((a, b) => a.order - b.order);
+  const postsSection = visibleSections.find((section) => section.id === "posts_tabs");
+  const moduleSections = visibleSections.filter((section) => section.id !== "posts_tabs");
 
   const handleVolumeChange = useCallback((volume: number) => {
     if (volumeSaveTimeoutRef.current) {
@@ -101,7 +105,7 @@ const Profile = () => {
       navigate(`/messages?chat=${conversation.id}`);
     } catch (error) {
       console.error('Failed to create conversation:', error);
-      toast.error('Failed to start conversation');
+      toast.error(error instanceof Error ? error.message : 'Failed to start conversation');
     }
   };
 
@@ -133,8 +137,8 @@ const Profile = () => {
     return (
       <PageLayout>
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
-          <h2 className="font-display text-2xl text-foreground">Profile not found</h2>
-          <p className="text-muted-foreground text-center">This user doesn't exist.</p>
+          <h2 className="font-display text-2xl text-foreground">Private profile</h2>
+          <p className="text-muted-foreground text-center">This profile is not available.</p>
           <Button onClick={() => navigate(-1)}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Go Back
@@ -471,16 +475,20 @@ const Profile = () => {
           onMessageClick={handleMessageClick}
           onAvatarUpdate={handleAvatarUpdate}
           userId={targetUserId || ''}
+          memberTier={isOwnProfile && membership?.subscribed ? membership.tier : null}
         />
 
+
+        {postsSection && renderSection(postsSection)}
+
+        <div className="ether-rule mx-5" />
 
         {/* Edit Layout Button - Only for owner */}
         {isOwnProfile && (
           <div className="px-5 py-2">
             <Button
               variant="outline"
-              size="sm"
-              className="w-full"
+              className="w-full min-h-11"
               onClick={() => setShowLayoutEditor(true)}
             >
               <LayoutGrid className="w-4 h-4 mr-2" />
@@ -489,8 +497,7 @@ const Profile = () => {
           </div>
         )}
 
-        {/* Dynamic Sections based on layout */}
-        {visibleSections.map(section => renderSection(section))}
+        {moduleSections.map(section => renderSection(section))}
 
         {/* Floating Create Buttons - Always visible */}
         {isOwnProfile && (
@@ -505,9 +512,10 @@ const Profile = () => {
             </Button>
             <Button
               size="icon"
-              className="w-14 h-14 rounded-full shadow-lg bg-primary hover:bg-primary/90"
-              onClick={() => setShowCreatePostDialog(true)}
+              className="w-14 h-14 rounded-[2px]"
+              onClick={openCreate}
               title="Create post"
+              aria-label="Create post"
             >
               <Plus className="w-6 h-6" />
             </Button>
@@ -519,13 +527,6 @@ const Profile = () => {
           <>
             <ConnectMusicDialog open={showMusicDialog} onOpenChange={setShowMusicDialog} />
             <ProfileCustomizationDialog open={showCustomizationDialog} onOpenChange={setShowCustomizationDialog} />
-            <CreatePostDialog
-              open={showCreatePostDialog}
-              onOpenChange={setShowCreatePostDialog}
-              onCreatePost={async (data) => { await createPost.mutateAsync(data); }}
-              userAvatar={avatarUrl}
-              userName={displayName}
-            />
             <CreateBlogDialog
               open={showCreateBlogDialog}
               onOpenChange={setShowCreateBlogDialog}

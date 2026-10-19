@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : "";
   console.log(`[GENERATE-WALLET-PASS] ${step}${detailsStr}`);
 };
@@ -87,7 +87,7 @@ serve(async (req) => {
         genericType: "GENERIC_EVENT_TICKET",
         hexBackgroundColor: "#1a1a2e",
         logo: {
-          sourceUri: { uri: "https://lcove.lovable.app/favicon.png" },
+          sourceUri: { uri: "https://etherbylcove.com/favicon.png" },
         },
         cardTitle: { defaultValue: { language: "en", value: "ETHER" } },
         header: { defaultValue: { language: "en", value: eventTitle } },

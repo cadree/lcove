@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 import { sendBulkReminder } from "@/hooks/useNotificationCampaigns";
 
 interface Props {
@@ -40,8 +41,8 @@ export function BulkReminderDialog({ open, onOpenChange, eventId, tiers }: Props
       });
       toast.success(`Reminder queued for ${res.recipientCount} attendees`);
       onOpenChange(false);
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to send");
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "Failed to send"));
     } finally {
       setSending(false);
     }

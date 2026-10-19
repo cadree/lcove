@@ -61,7 +61,7 @@ serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "ETHER <noreply@notify.etherbylcove.com>",
+            from: "ETHER <notifications@notifications.etherbylcove.com>",
             to: [email],
             subject: "Verify your host reply-to address",
             html: `<div style="font-family:Arial,sans-serif;padding:24px;max-width:480px;margin:0 auto;">

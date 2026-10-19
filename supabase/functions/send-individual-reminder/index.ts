@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const log = (s: string, d?: any) =>
+const log = (s: string, d?: unknown) =>
   console.log(`[SEND-INDIVIDUAL-REMINDER] ${s}${d ? " - " + JSON.stringify(d) : ""}`);
 
 interface Body {
@@ -64,7 +64,7 @@ serve(async (req) => {
     let displayName = body.attendeeName || "there";
     let pushEnabled = false;
     let emailEnabled = true;
-    let smsEnabled = true;
+    const smsEnabled = true;
 
     if (body.attendeeUserId) {
       if (!email) {

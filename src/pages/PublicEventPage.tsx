@@ -16,8 +16,8 @@ import {
   LogIn,
   Phone,
   Loader2,
-  Wallet,
   Bell,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,11 +28,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
+import { errorMessage } from "@/lib/errorMessage";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { shareLink, buildShareUrl } from "@/lib/shareLink";
 import { EventMoodboardView } from "@/components/calendar/EventMoodboardView";
 import { AddToCalendarButtons } from "@/components/calendar/AddToCalendarButtons";
+
+const walletPassesEnabled = import.meta.env.VITE_WALLET_PASSES_ENABLED === "true";
 
 export default function PublicEventPage() {
   const { eventId } = useParams();
@@ -246,8 +249,8 @@ export default function PublicEventPage() {
   };
 
   const isPast = event ? new Date(event.end_date || event.start_date) < new Date() : false;
-  const hasPaidTier = (tiers || []).some((t: any) => (t.price_cents || 0) > 0);
-  const hasFreeTier = (tiers || []).some((t: any) => (t.price_cents || 0) === 0 && (t.credits_price || 0) === 0);
+  const hasPaidTier = (tiers || []).some((t) => (t.price_cents || 0) > 0);
+  const hasFreeTier = (tiers || []).some((t) => (t.price_cents || 0) === 0 && (t.credits_price || 0) === 0);
   const isFree = !hasPaidTier && (!event?.ticket_price || event.ticket_price <= 0);
   const eventType: { label: string; tone: "free" | "paid" | "hybrid" | "info" } =
     hasPaidTier && hasFreeTier
@@ -474,6 +477,7 @@ export default function PublicEventPage() {
                       <ExternalLink className="h-4 w-4" />
                       Download .ics File
                     </Button>
+                    {walletPassesEnabled && (
                     <Button
                       variant="outline"
                       className="w-full gap-2 text-sm"
@@ -504,6 +508,7 @@ export default function PublicEventPage() {
                       <Wallet className="h-4 w-4" />
                       Add to Wallet
                     </Button>
+                    )}
                     {/* Get Notified - Push */}
                     {pushStatus !== 'subscribed' && (
                       <Button
@@ -649,6 +654,7 @@ export default function PublicEventPage() {
                       <ExternalLink className="h-4 w-4" />
                       Download .ics File
                     </Button>
+                    {walletPassesEnabled && (
                     <Button
                       variant="outline"
                       className="w-full gap-2 text-sm"
@@ -679,6 +685,7 @@ export default function PublicEventPage() {
                       <Wallet className="h-4 w-4" />
                       Add to Wallet
                     </Button>
+                    )}
                     {/* Get Notified - Push */}
                     {pushStatus !== 'subscribed' && (
                       <Button
@@ -743,8 +750,8 @@ export default function PublicEventPage() {
                             }
                           }
                         }
-                      } catch (err: any) {
-                        toast.error(err.message || "Failed to start checkout");
+                      } catch (err: unknown) {
+                        toast.error(errorMessage(err, "Failed to start checkout"));
                       } finally {
                         setIsPurchasing(false);
                       }

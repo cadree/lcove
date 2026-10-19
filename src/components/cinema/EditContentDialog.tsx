@@ -20,9 +20,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { NetworkContent, useContentGenres } from '@/hooks/useCinema';
+import { callRpc } from '@/lib/rpc';
 import { useUpdateContent } from '@/hooks/useNetworkContentManage';
 import { Film, Upload, Link as LinkIcon, X, Plus, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 interface EditContentDialogProps {
@@ -59,7 +61,13 @@ export const EditContentDialog = ({ open, onOpenChange, content }: EditContentDi
       setDirector(content.director || '');
       setRuntimeMinutes(content.runtime_minutes?.toString() || '');
       setReleaseDate(content.release_date || '');
-      setExternalVideoUrl(content.external_video_url || '');
+      setExternalVideoUrl('');
+      callRpc<{ video_url: string | null; external_video_url: string | null }[] | null>(
+        'cinema_playback',
+        { p_content_id: content.id, p_episode_id: null },
+      ).then((rows) => {
+        setExternalVideoUrl(rows?.[0]?.external_video_url || '');
+      }).catch(() => undefined);
       setGenreTags(content.genre_tags || []);
       setCastMembers(content.cast_members || []);
       setIsFeatured(content.is_featured);
@@ -68,9 +76,12 @@ export const EditContentDialog = ({ open, onOpenChange, content }: EditContentDi
     }
   }, [content]);
 
+  const { user } = useAuth();
+
   const uploadFile = async (file: File, path: string): Promise<string | null> => {
+    if (!user) return null;
     const fileExt = file.name.split('.').pop();
-    const fileName = `${path}/${Date.now()}.${fileExt}`;
+    const fileName = `${user.id}/${path}/${Date.now()}.${fileExt}`;
 
     const { error } = await supabase.storage
       .from('media')
@@ -205,7 +216,7 @@ export const EditContentDialog = ({ open, onOpenChange, content }: EditContentDi
 
             <div className="space-y-2">
               <Label>Content Type *</Label>
-              <Select value={contentType} onValueChange={(v: any) => setContentType(v)}>
+              <Select value={contentType} onValueChange={(v: 'short_film' | 'feature_film' | 'tv_show') => setContentType(v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

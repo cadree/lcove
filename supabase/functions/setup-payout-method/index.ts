@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   console.log(`[SETUP-PAYOUT-METHOD] ${step}`, details ? JSON.stringify(details) : '');
 };
 
@@ -151,7 +151,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ 
       success: true,
-      payment_methods: paymentMethods.data.map((pm: any) => ({
+      payment_methods: paymentMethods.data.map((pm) => ({
         id: pm.id,
         type: pm.type,
         last_four: pm.card?.last4,

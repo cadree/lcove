@@ -1,0 +1,130 @@
+# Deploys Edge Functions to ether-prod.
+# Does not run SQL, migrations, or any database connection.
+#
+# GitHub lists a workflow_dispatch workflow in the Actions tab only after the
+# file is on the default branch. Push to cursor/ether-combined deploys every
+# function so a run exists to re-run before that merge.
+#
+# supabase/config.toml sets verify_jwt per function. CLI 2.121.0 applies that
+# value when --no-verify-jwt is omitted. Passing the flag would turn JWT
+# checks off for every function named in that one command.
+
+name: Deploy Supabase functions
+
+on:
+  workflow_dispatch:
+    inputs:
+      functions:
+        description: all, or a comma-separated list of function names
+        required: true
+        default: all
+        type: string
+      dry_run:
+        description: Dry run. Print the function list and verify_jwt flags, then stop
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches:
+      - cursor/ether-combined
+    paths:
+      - supabase/functions/**
+      - supabase/config.toml
+      - .github/workflows/deploy-supabase.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-supabase-ether-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      # A push deploys every function. workflow_dispatch can narrow the list or dry-run.
+      FUNCTIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.functions || 'all' }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
+      PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF || 'aykopqinnnssxdhxqruo' }}
+    steps:
+      - name: Require access token
+        if: env.DRY_RUN != 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "${SUPABASE_ACCESS_TOKEN}" ]; then
+            echo "SUPABASE_ACCESS_TOKEN is empty. Add it under Settings > Secrets and variables > Actions, then re-run this job."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Plan functions and verify_jwt
+        run: python3 scripts/function-deploy-plan.py
+
+      - name: Set up Supabase CLI
+        if: env.DRY_RUN != 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.121.0
+
+      - name: Set function secrets
+        if: env.DRY_RUN != 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          APPLE_PASS_TYPE_ID: ${{ secrets.APPLE_PASS_TYPE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_URL: ${{ secrets.APP_URL }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          GOOGLE_WALLET_ISSUER_ID: ${{ secrets.GOOGLE_WALLET_ISSUER_ID }}
+          GOOGLE_WALLET_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_WALLET_SERVICE_ACCOUNT_KEY }}
+          INTERNAL_FUNCTION_SECRET: ${{ secrets.INTERNAL_FUNCTION_SECRET }}
+          LOVABLE_API_KEY: ${{ secrets.LOVABLE_API_KEY }}
+          MUX_TOKEN_ID: ${{ secrets.MUX_TOKEN_ID }}
+          MUX_TOKEN_SECRET: ${{ secrets.MUX_TOKEN_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SITE_URL: ${{ secrets.SITE_URL }}
+          STRIPE_PRICE_COMMUNITY: ${{ secrets.STRIPE_PRICE_COMMUNITY }}
+          STRIPE_PRICE_ELITE: ${{ secrets.STRIPE_PRICE_ELITE }}
+          STRIPE_PRODUCT_COMMUNITY: ${{ secrets.STRIPE_PRODUCT_COMMUNITY }}
+          STRIPE_PRODUCT_ELITE: ${{ secrets.STRIPE_PRODUCT_ELITE }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_PHONE_NUMBER: ${{ secrets.TWILIO_PHONE_NUMBER }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+        run: |
+          set -euo pipefail
+          secret_file="$(mktemp)"
+          chmod 600 "$secret_file"
+          cleanup() { rm -f "$secret_file"; }
+          trap cleanup EXIT
+          python3 scripts/function-deploy-plan.py --write-env "$secret_file"
+          if [ ! -s "$secret_file" ]; then
+            echo "No function secrets are set in GitHub. Skipping supabase secrets set."
+            exit 0
+          fi
+          supabase secrets set --project-ref "$PROJECT_REF" --env-file "$secret_file"
+
+      - name: Deploy functions
+        if: env.DRY_RUN != 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          names_file="$(mktemp)"
+          trap 'rm -f "$names_file"' EXIT
+          python3 scripts/function-deploy-plan.py --names > "$names_file"
+          mapfile -t names < "$names_file"
+          if [ "${#names[@]}" -eq 0 ]; then
+            echo "No functions selected."
+            exit 1
+          fi
+          echo "Deploying ${#names[@]} functions to ${PROJECT_REF} with --use-api."
+          supabase functions deploy "${names[@]}" --project-ref "$PROJECT_REF" --use-api --jobs 4

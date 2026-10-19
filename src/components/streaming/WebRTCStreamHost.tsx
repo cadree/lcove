@@ -16,6 +16,22 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { errorMessage as formatError } from '@/lib/errorMessage';
+
+function readRecord(payload: unknown): Record<string, unknown> {
+  if (typeof payload !== "object" || payload === null) return {};
+  return payload as unknown as Record<string, unknown>;
+}
+
+function asSessionDescription(value: unknown): RTCSessionDescriptionInit | null {
+  if (typeof value !== "object" || value === null) return null;
+  return value as unknown as RTCSessionDescriptionInit;
+}
+
+function asIceCandidate(value: unknown): RTCIceCandidateInit | null {
+  if (typeof value !== "object" || value === null) return null;
+  return value as unknown as RTCIceCandidateInit;
+}
 import { motion } from 'framer-motion';
 import {
   AlertDialog,
@@ -96,21 +112,22 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
           }
         };
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Host] Camera init error:', err);
+      const name = err instanceof Error ? err.name : "";
       
-      if (err.name === 'NotAllowedError') {
+      if (name === 'NotAllowedError') {
         setCameraState('denied');
         setErrorMessage('Camera access was denied. Please allow camera access in your browser settings.');
-      } else if (err.name === 'NotFoundError') {
+      } else if (name === 'NotFoundError') {
         setCameraState('error');
         setErrorMessage('No camera or microphone found. Please connect a device.');
-      } else if (err.name === 'NotReadableError') {
+      } else if (name === 'NotReadableError') {
         setCameraState('error');
         setErrorMessage('Camera is in use by another application.');
       } else {
         setCameraState('error');
-        setErrorMessage(err.message || 'Failed to access camera.');
+        setErrorMessage(formatError(err, 'Failed to access camera.'));
       }
     }
   }, []);
@@ -212,8 +229,9 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
     channelRef.current = channel;
 
     // Listen for viewer-join requests (viewers asking if host is ready)
-    channel.on('broadcast', { event: 'viewer-join' }, ({ payload }: any) => {
-      console.log('[Host] Viewer asking to join:', payload.viewerId);
+    channel.on('broadcast', { event: 'viewer-join' }, ({ payload }) => {
+      const data = readRecord(payload);
+      console.log('[Host] Viewer asking to join:', data.viewerId);
       // Respond with host-ready if we have the camera
       if (localStreamRef.current) {
         channel.send({
@@ -225,8 +243,10 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
     });
 
     // Listen for offers from viewers
-    channel.on('broadcast', { event: 'offer' }, async ({ payload }: any) => {
-      const { offer, senderId } = payload;
+    channel.on('broadcast', { event: 'offer' }, async ({ payload }) => {
+      const data = readRecord(payload);
+      const offer = asSessionDescription(data.offer);
+      const senderId = typeof data.senderId === "string" ? data.senderId : "";
       if (!senderId || senderId === user.id) return;
       
       console.log('[Host] Received offer from viewer:', senderId);
@@ -241,6 +261,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
         peersRef.current.set(senderId, pc);
 
         // Set remote description (viewer's offer)
+        if (!offer) throw new Error("Missing offer");
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
         
         // Process any pending ICE candidates for this viewer
@@ -275,12 +296,15 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
     });
 
     // Listen for ICE candidates from viewers
-    channel.on('broadcast', { event: 'ice-candidate' }, async ({ payload }: any) => {
-      const { candidate, senderId, targetId } = payload;
+    channel.on('broadcast', { event: 'ice-candidate' }, async ({ payload }) => {
+      const data = readRecord(payload);
+      const candidate = asIceCandidate(data.candidate);
+      const senderId = typeof data.senderId === "string" ? data.senderId : "";
+      const targetId = typeof data.targetId === "string" ? data.targetId : undefined;
       
       // Only process candidates meant for us (host)
       if (targetId && targetId !== user.id) return;
-      if (!senderId || senderId === user.id) return;
+      if (!senderId || senderId === user.id || !candidate) return;
       
       console.log('[Host] Received ICE candidate from viewer:', senderId);
       
@@ -455,11 +479,11 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
       }
       
       toast({ title: 'You are now live!' });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Host] Error going live:', err);
       toast({ 
         title: 'Failed to go live', 
-        description: err.message,
+        description: formatError(err),
         variant: 'destructive'
       });
     } finally {
@@ -491,7 +515,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
         if (blob && blob.size > 0 && user) {
           console.log('[Host] Uploading replay, size:', blob.size);
           
-          const fileName = `replays/${user.id}/${streamId}-${Date.now()}.webm`;
+          const fileName = `${user.id}/replays/${streamId}-${Date.now()}.webm`;
           const { error: uploadError } = await supabase.storage
             .from('media')
             .upload(fileName, blob, {
@@ -560,12 +584,25 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
       }
       
       onEnd();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Host] Error ending stream:', err);
       setIsSaving(false);
-      toast({ title: 'Error ending stream', description: err.message, variant: 'destructive' });
+      toast({ title: 'Error ending stream', description: formatError(err), variant: 'destructive' });
     }
   };
+
+  const stopStreamRef = useRef(stopStream);
+  stopStreamRef.current = stopStream;
+
+  useEffect(() => {
+    const channel = supabase.channel(`stream-end-${streamId}`);
+    channel.on('broadcast', { event: 'end' }, () => {
+      void stopStreamRef.current(false);
+    }).subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [streamId]);
 
   // Toggle video
   const toggleVideo = () => {
@@ -588,6 +625,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
   // Start camera on mount
   useEffect(() => {
     initCamera();
+    const peers = peersRef.current;
 
     return () => {
       localStreamRef.current?.getTracks().forEach(track => track.stop());
@@ -596,8 +634,8 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
-      peersRef.current.forEach(pc => pc.close());
-      peersRef.current.clear();
+      peers.forEach(pc => pc.close());
+      peers.clear();
     };
   }, [initCamera]);
 

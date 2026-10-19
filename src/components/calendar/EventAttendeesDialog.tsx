@@ -74,7 +74,7 @@ export function EventAttendeesDialog({
       const attendeesWithProfiles: Attendee[] = await Promise.all(
         (rsvps || []).map(async (rsvp) => {
           const { data: profile } = await supabase
-            .from('profiles')
+            .from('profiles_public')
             .select('display_name, avatar_url')
             .eq('user_id', rsvp.user_id)
             .maybeSingle();

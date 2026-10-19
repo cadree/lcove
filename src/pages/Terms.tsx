@@ -5,7 +5,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 
 const Terms = () => {
   const navigate = useNavigate();
-  const lastUpdated = "January 31, 2026";
+  const lastUpdated = "October 18, 2026";
 
   return (
     <div className="min-h-screen bg-background">
@@ -106,6 +106,13 @@ const Terms = () => {
               <p className="text-sm">
                 We reserve the right to remove content and suspend or terminate accounts that violate these guidelines.
               </p>
+              <div>
+                <h4 className="font-medium text-foreground mb-2">Generative AI</h4>
+                <p className="text-sm">
+                  Generative AI is not allowed on Ether except for tools that improve a creator's workflow.
+                  AI-generated people, fake profiles, and AI-made work presented as human-made can be reported and removed.
+                </p>
+              </div>
             </AccordionContent>
           </AccordionItem>
 
@@ -387,6 +394,10 @@ const Terms = () => {
           <div className="flex justify-center gap-4">
             <Link to="/privacy" className="text-sm text-primary hover:underline">
               Privacy Policy
+            </Link>
+            <span className="text-muted-foreground">•</span>
+            <Link to="/guidelines" className="text-sm text-primary hover:underline">
+              Community Guidelines
             </Link>
             <span className="text-muted-foreground">•</span>
             <Link to="/" className="text-sm text-primary hover:underline">

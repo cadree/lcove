@@ -7,6 +7,7 @@ import { Image as ImageIcon, Link as LinkIcon, StickyNote, Clock, Trash2, Loader
 import { useAuth } from "@/contexts/AuthContext";
 import { useEventMoodboard, useAddMoodboardItem, useDeleteMoodboardItem, uploadMoodboardImage } from "@/hooks/useEventMoodboard";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 import { format } from "date-fns";
 
 interface Props {
@@ -51,9 +52,9 @@ export function EventMoodboardEditor({ eventId }: Props) {
       });
       setTitle('');
       toast.success('Image added');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error(err.message || 'Upload failed');
+      toast.error(errorMessage(err, 'Upload failed'));
     } finally {
       setUploading(false);
     }

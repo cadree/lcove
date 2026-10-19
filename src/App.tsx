@@ -1,69 +1,83 @@
 // Application entry point - Ether App
-import React from "react";
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { NavCustomizationProvider } from "@/hooks/useNavCustomization";
 import { PresenceProvider } from "@/hooks/usePresence";
+import { CreateFlowProvider } from "@/components/create/CreateFlowContext";
 import AccessGate from "@/components/auth/AccessGate";
-import Index from "./pages/Index";
-import Landing from "./pages/Landing";
-import Feed from "./pages/Feed";
-import Directory from "./pages/Directory";
-import Projects from "./pages/Projects";
-import CalendarPage from "./pages/CalendarPage";
-import Profile from "./pages/Profile";
-import Auth from "./pages/Auth";
-import Onboarding from "./pages/Onboarding";
-import Locked from "./pages/Locked";
-import Messages from "./pages/Messages";
-import Notifications from "./pages/Notifications";
-import Wallet from "./pages/Wallet";
-import Store from "./pages/Store";
-import Mall from "./pages/Mall";
-import FundDashboard from "./pages/FundDashboard";
-import Membership from "./pages/Membership";
-import Live from "./pages/Live";
-import Settings from "./pages/Settings";
-import BookOfLcove from "./pages/BookOfLcove";
-import NotFound from "./pages/NotFound";
-import Cinema from "./pages/Cinema";
-import NetworkPage from "./pages/NetworkPage";
-import NetworkManage from "./pages/NetworkManage";
-import Partners from "./pages/Partners";
-import Admin from "./pages/Admin";
-import AdminOnboarding from "./pages/AdminOnboarding";
-import Community from "./pages/Community";
-import BookingSettings from "./pages/BookingSettings";
-import PublicBookingPage from "./pages/PublicBookingPage";
-import Pipeline from "./pages/Pipeline";
-import Today from "./pages/Today";
-import Boards from "./pages/Boards";
-import BoardEditor from "./pages/BoardEditor";
-import SignContract from "./pages/SignContract";
-import Portfolios from "./pages/Portfolios";
-import Privacy from "./pages/Privacy";
-import Terms from "./pages/Terms";
-import BrandPartners from "./pages/BrandPartners";
-import Collectives from "./pages/Collectives";
-import PartnerPortal from "./pages/PartnerPortal";
-import Dashboard from "./pages/Dashboard";
-import EventsDashboard from "./pages/EventsDashboard";
-import EventDetail from "./pages/EventDetail";
-import PublicEventPage from "./pages/PublicEventPage";
-import EventConfirmation from "./pages/EventConfirmation";
-import PublicProjectPage from "./pages/PublicProjectPage";
-import PublicClientPortal from "@/pages/PublicClientPortal";
-import Unsubscribe from "./pages/Unsubscribe";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
+
+const Landing = lazy(() => import("./pages/Landing"));
+const Feed = lazy(() => import("./pages/Feed"));
+const Explore = lazy(() => import("./pages/Explore"));
+const Directory = lazy(() => import("./pages/Directory"));
+const Projects = lazy(() => import("./pages/Projects"));
+const CalendarPage = lazy(() => import("./pages/CalendarPage"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Auth = lazy(() => import("./pages/Auth"));
+const Onboarding = lazy(() => import("./pages/Onboarding"));
+const Locked = lazy(() => import("./pages/Locked"));
+const Messages = lazy(() => import("./pages/Messages"));
+const Notifications = lazy(() => import("./pages/Notifications"));
+const Wallet = lazy(() => import("./pages/Wallet"));
+const Store = lazy(() => import("./pages/Store"));
+const Mall = lazy(() => import("./pages/Mall"));
+const FundDashboard = lazy(() => import("./pages/FundDashboard"));
+const Membership = lazy(() => import("./pages/Membership"));
+const Live = lazy(() => import("./pages/Live"));
+const Settings = lazy(() => import("./pages/Settings"));
+const BookOfLcove = lazy(() => import("./pages/BookOfLcove"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Cinema = lazy(() => import("./pages/Cinema"));
+const NetworkPage = lazy(() => import("./pages/NetworkPage"));
+const NetworkManage = lazy(() => import("./pages/NetworkManage"));
+const Partners = lazy(() => import("./pages/Partners"));
+const Admin = lazy(() => import("./pages/Admin"));
+const AdminOnboarding = lazy(() => import("./pages/AdminOnboarding"));
+const Community = lazy(() => import("./pages/Community"));
+const BookingSettings = lazy(() => import("./pages/BookingSettings"));
+const PublicBookingPage = lazy(() => import("./pages/PublicBookingPage"));
+const Pipeline = lazy(() => import("./pages/Pipeline"));
+const Today = lazy(() => import("./pages/Today"));
+const Boards = lazy(() => import("./pages/Boards"));
+const BoardEditor = lazy(() => import("./pages/BoardEditor"));
+const SignContract = lazy(() => import("./pages/SignContract"));
+const Portfolios = lazy(() => import("./pages/Portfolios"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Guidelines = lazy(() => import("./pages/Guidelines"));
+const BrandPartners = lazy(() => import("./pages/BrandPartners"));
+const Collectives = lazy(() => import("./pages/Collectives"));
+const PartnerPortal = lazy(() => import("./pages/PartnerPortal"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const EventsDashboard = lazy(() => import("./pages/EventsDashboard"));
+const EventDetail = lazy(() => import("./pages/EventDetail"));
+const PublicEventPage = lazy(() => import("./pages/PublicEventPage"));
+const EventConfirmation = lazy(() => import("./pages/EventConfirmation"));
+const PublicProjectPage = lazy(() => import("./pages/PublicProjectPage"));
+const PublicClientPortal = lazy(() => import("@/pages/PublicClientPortal"));
+const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
+const Nuance = lazy(() => import("./pages/Nuance"));
 
 const ActivityTracker = () => {
   useTrackActivity();
   return null;
 };
+
+function RouteFallback() {
+  return (
+    <div
+      role="status"
+      className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground"
+    >
+      Loading…
+    </div>
+  );
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -80,22 +94,25 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <PresenceProvider>
-            <NavCustomizationProvider>
+            <CreateFlowProvider>
               <AccessGate>
                 <ActivityTracker />
                 <Toaster />
               <Sonner />
+              <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/" element={<Landing />} />
-                <Route path="/home" element={<Index />} />
-                <Route path="/landing" element={<Landing />} />
+                <Route path="/home" element={<Navigate to="/feed" replace />} />
+                <Route path="/landing" element={<Navigate to="/" replace />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/onboarding" element={<Onboarding />} />
                 <Route path="/locked" element={<Locked />} />
                 <Route path="/feed" element={<Feed />} />
+                <Route path="/explore" element={<Explore />} />
                 <Route path="/directory" element={<Directory />} />
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/events" element={<Navigate to="/calendar" replace />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/profile/:userId" element={<Profile />} />
                 <Route path="/settings" element={<Settings />} />
@@ -104,6 +121,7 @@ const App = () => (
                 <Route path="/wallet" element={<Wallet />} />
                 <Route path="/store" element={<Store />} />
                 <Route path="/mall" element={<Mall />} />
+                <Route path="/nuance" element={<Nuance />} />
                 <Route path="/fund" element={<FundDashboard />} />
                 <Route path="/membership" element={<Membership />} />
                 <Route path="/live" element={<Live />} />
@@ -126,6 +144,7 @@ const App = () => (
                 <Route path="/portfolios" element={<Portfolios />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
+                <Route path="/guidelines" element={<Guidelines />} />
                 <Route path="/brand-partners" element={<BrandPartners />} />
                 <Route path="/partner-portal" element={<PartnerPortal />} />
                 <Route path="/collectives" element={<Collectives />} />
@@ -140,8 +159,9 @@ const App = () => (
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </Suspense>
               </AccessGate>
-            </NavCustomizationProvider>
+            </CreateFlowProvider>
           </PresenceProvider>
         </AuthProvider>
       </BrowserRouter>

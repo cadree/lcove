@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Send, Sparkles, MapPin, Users, Image as ImageIcon, X, Plus, FileText, FileVideo, File as FileIcon, Presentation, Paperclip, Search, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 import { sendAudienceInvite, useAudienceEstimate, useAudiencePreview } from "@/hooks/useNotificationCampaigns";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEventMoodboard, useAddMoodboardItem, useDeleteMoodboardItem, uploadMoodboardFile, classifyFile, type MoodboardFileType } from "@/hooks/useEventMoodboard";
@@ -161,8 +162,8 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
         file_size: file.size,
         mime_type: file.type || null,
       });
-    } catch (e: any) {
-      toast.error(e?.message || "Upload failed");
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "Upload failed"));
     } finally {
       setUploadingMood(false);
     }
@@ -229,8 +230,8 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
         toast.success(`Invite sent to ${data?.sentCount ?? validExternals.length} guests`);
       }
       onOpenChange(false);
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to send");
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "Failed to send"));
     } finally {
       setSending(false);
     }

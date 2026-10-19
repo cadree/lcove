@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useCreateStoreItem, useUpdateStoreItem, useStoreCategories, useMyStore, StoreItem } from '@/hooks/useStore';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, X, Upload, Package, Wrench, Building2 } from 'lucide-react';
+import { STORE_PLATFORM_FEE_PERCENT } from '@/lib/fees';
 
 interface CreateItemDialogProps {
   open: boolean;
@@ -38,6 +40,7 @@ const typeOptions = [
 
 export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: CreateItemDialogProps) => {
   const { data: store } = useMyStore();
+  const { user } = useAuth();
   const { data: categories } = useStoreCategories();
   const createItem = useCreateStoreItem();
   const updateItem = useUpdateStoreItem();
@@ -59,6 +62,24 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
   const [isActive, setIsActive] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
 
+  const resetForm = useCallback(() => {
+    setType(defaultType || 'product');
+    setTitle('');
+    setDescription('');
+    setPrice('');
+    setCreditsPrice('');
+    setCategoryId('');
+    setImages([]);
+    setInventoryCount('');
+    setDurationMinutes('');
+    setLocation('');
+    setAmenities([]);
+    setNewAmenity('');
+    setContactEmail('');
+    setContactPhone('');
+    setIsActive(true);
+  }, [defaultType]);
+
   useEffect(() => {
     if (editItem) {
       setType(editItem.type);
@@ -79,31 +100,17 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
       resetForm();
       if (defaultType) setType(defaultType);
     }
-  }, [editItem, defaultType, open]);
-
-  const resetForm = () => {
-    setType(defaultType || 'product');
-    setTitle('');
-    setDescription('');
-    setPrice('');
-    setCreditsPrice('');
-    setCategoryId('');
-    setImages([]);
-    setInventoryCount('');
-    setDurationMinutes('');
-    setLocation('');
-    setAmenities([]);
-    setNewAmenity('');
-    setContactEmail('');
-    setContactPhone('');
-    setIsActive(true);
-  };
+  }, [editItem, defaultType, open, resetForm]);
 
   const filteredCategories = categories?.filter((c) => c.type === type) || [];
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    if (!user) {
+      toast.error('Sign in to upload');
+      return;
+    }
 
     setIsUploading(true);
     const uploadedUrls: string[] = [];
@@ -111,7 +118,7 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
     for (const file of Array.from(files)) {
       const fileExt = file.name.split('.').pop();
       const fileName = `${crypto.randomUUID()}.${fileExt}`;
-      const filePath = `store-items/${fileName}`;
+      const filePath = `${user.id}/store-items/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('media')
@@ -431,6 +438,12 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
               onCheckedChange={setIsActive}
             />
           </div>
+
+          <p className="text-sm text-muted-foreground rounded-lg bg-muted/50 p-3">
+            {editItem?.external_url
+              ? 'This product is linked from Shopify. Buyers pay there. Ether does not take a fee on that sale.'
+              : `Selling this on Ether checkout: Ether keeps ${STORE_PLATFORM_FEE_PERCENT}% of the item price. You receive ${100 - STORE_PLATFORM_FEE_PERCENT}%. Shipping and tax are not part of that fee.`}
+          </p>
 
           {/* Submit */}
           <div className="flex gap-2 pt-4">

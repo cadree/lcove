@@ -42,14 +42,21 @@ serve(async (req) => {
     // Get store with connect account
     const { data: store, error: storeError } = await supabaseClient
       .from("stores")
-      .select("id, user_id, stripe_connect_account_id, payout_enabled")
+      .select("id, user_id, payout_enabled")
       .eq("id", storeId)
       .single();
 
     if (storeError || !store) throw new Error("Store not found");
     if (store.user_id !== user.id) throw new Error("You don't own this store");
 
-    if (!store.stripe_connect_account_id) {
+    const { data: secrets } = await supabaseClient
+      .from("store_secrets")
+      .select("stripe_connect_account_id")
+      .eq("store_id", storeId)
+      .maybeSingle();
+    const connectAccountId = secrets?.stripe_connect_account_id;
+
+    if (!connectAccountId) {
       logStep("No Connect account found");
       return new Response(JSON.stringify({ 
         hasAccount: false,
@@ -67,7 +74,7 @@ serve(async (req) => {
     });
 
     // Retrieve the account status
-    const account = await stripe.accounts.retrieve(store.stripe_connect_account_id);
+    const account = await stripe.accounts.retrieve(connectAccountId);
     logStep("Account retrieved", { 
       accountId: account.id,
       chargesEnabled: account.charges_enabled,

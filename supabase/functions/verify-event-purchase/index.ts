@@ -7,7 +7,24 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const log = (step: string, d?: any) => console.log(`[verify-event-purchase] ${step}${d ? " - " + JSON.stringify(d) : ""}`);
+const log = (step: string, d?: unknown) => console.log(`[verify-event-purchase] ${step}${d ? " - " + JSON.stringify(d) : ""}`);
+
+interface TicketOrder {
+  id: string;
+  payment_status: string | null;
+  stripe_session_id: string | null;
+  quantity: number | null;
+  purchaser_user_id: string | null;
+  event_id: string;
+}
+
+function errorMessage(error: unknown, fallback = "Unknown error"): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error && typeof error.message === "string") {
+    return error.message;
+  }
+  return fallback;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -22,13 +39,13 @@ serve(async (req) => {
     if (!sessionId && !orderId) throw new Error("sessionId or orderId required");
 
     // If we only got sessionId, look up the order
-    let order: any = null;
+    let order: TicketOrder | null = null;
     if (orderId) {
       const { data } = await supabase.from("ticket_orders").select("*").eq("id", orderId).single();
-      order = data;
+      order = data as unknown as TicketOrder | null;
     } else {
       const { data } = await supabase.from("ticket_orders").select("*").eq("stripe_session_id", sessionId).single();
-      order = data;
+      order = data as unknown as TicketOrder | null;
     }
     if (!order) throw new Error("Order not found");
 
@@ -53,42 +70,12 @@ serve(async (req) => {
     log("Session", { status: session.payment_status });
 
     if (session.payment_status === "paid") {
-      // Mark order paid
-      await supabase
-        .from("ticket_orders")
-        .update({
-          payment_status: "paid",
-          stripe_payment_intent_id: typeof session.payment_intent === "string" ? session.payment_intent : null,
-        })
-        .eq("id", order.id);
-
-      // Bump tier sold count (best-effort)
-      const { data: oneAttendee } = await supabase
-        .from("event_attendees")
-        .select("tier_id")
-        .eq("order_id", order.id)
-        .limit(1)
-        .maybeSingle();
-      if (oneAttendee?.tier_id) {
-        const { data: tier } = await supabase.from("ticket_tiers").select("quantity_sold").eq("id", oneAttendee.tier_id).single();
-        if (tier) {
-          await supabase
-            .from("ticket_tiers")
-            .update({ quantity_sold: (tier.quantity_sold || 0) + order.quantity })
-            .eq("id", oneAttendee.tier_id);
-        }
-      }
-
-      // Legacy RSVP (best effort)
-      if (order.purchaser_user_id) {
-        await supabase.from("event_rsvps").upsert({
-          event_id: order.event_id,
-          user_id: order.purchaser_user_id,
-          status: "going",
-          ticket_purchased: true,
-          stripe_payment_id: session.id,
-        }, { onConflict: "event_id,user_id" });
-      }
+      const paymentIntent = typeof session.payment_intent === "string" ? session.payment_intent : null;
+      const { error: confirmError } = await supabase.rpc("confirm_event_ticket_order", {
+        p_order_id: order.id,
+        p_payment_intent: paymentIntent,
+      });
+      if (confirmError) throw confirmError;
     }
 
     const { data: refreshedOrder } = await supabase.from("ticket_orders").select("*").eq("id", order.id).single();
@@ -101,9 +88,10 @@ serve(async (req) => {
     return new Response(JSON.stringify({ order: refreshedOrder, attendees: attendees || [] }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (error: any) {
-    log("ERROR", { msg: error?.message });
-    return new Response(JSON.stringify({ error: error?.message || "Unknown error" }), {
+  } catch (error: unknown) {
+    const msg = errorMessage(error);
+    log("ERROR", { msg });
+    return new Response(JSON.stringify({ error: msg }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,
     });

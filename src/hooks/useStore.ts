@@ -3,6 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
+function asStoreRecord(store: unknown): (Store & { user_id: string }) | null {
+  if (!store || typeof store !== "object" || Array.isArray(store)) return null;
+  if (!("user_id" in store) || typeof store.user_id !== "string") return null;
+  return store as Store & { user_id: string };
+}
+
 export interface Store {
   id: string;
   user_id: string;
@@ -14,11 +20,17 @@ export interface Store {
   accepts_credits: boolean;
   accepts_cash: boolean;
   shopify_store_url: string | null;
-  shopify_access_token: string | null;
   peerspace_url: string | null;
+  flat_shipping_cents?: number | null;
+  tax_line_label?: string | null;
+  tax_line_cents?: number | null;
   created_at: string;
   updated_at: string;
 }
+
+/** Columns safe to read from the client. Payment secrets live in store_secrets. */
+export const STORE_PUBLIC_COLUMNS =
+  'id, user_id, name, description, cover_image_url, logo_url, is_active, accepts_credits, accepts_cash, shopify_store_url, peerspace_url, flat_shipping_cents, tax_line_label, tax_line_cents, created_at, updated_at';
 
 export interface StoreItemCategory {
   id: string;
@@ -44,6 +56,9 @@ export interface StoreItem {
   amenities: string[] | null;
   contact_email: string | null;
   contact_phone: string | null;
+  external_source?: string | null;
+  external_handle?: string | null;
+  external_url?: string | null;
   created_at: string;
   updated_at: string;
   category?: StoreItemCategory;
@@ -87,7 +102,7 @@ export const useMyStore = () => {
       if (!user) return null;
       const { data, error } = await supabase
         .from('stores')
-        .select('*')
+        .select(STORE_PUBLIC_COLUMNS)
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -106,7 +121,7 @@ export const useStoreByUser = (userId: string | undefined) => {
       if (!userId) return null;
       const { data, error } = await supabase
         .from('stores')
-        .select('*')
+        .select(STORE_PUBLIC_COLUMNS)
         .eq('user_id', userId)
         .eq('is_active', true)
         .maybeSingle();
@@ -144,7 +159,7 @@ export const useStoreItems = (type?: 'product' | 'service' | 'rental', storeId?:
         .select(`
           *,
           category:store_item_categories(*),
-          store:stores(*)
+          store:stores(${STORE_PUBLIC_COLUMNS})
         `)
         .eq('is_active', true);
 
@@ -159,7 +174,10 @@ export const useStoreItems = (type?: 'product' | 'service' | 'rental', storeId?:
       if (error) throw error;
 
       // Fetch profiles for each store owner using profiles_public view
-      const storeUserIds = [...new Set(data?.map(item => (item.store as any)?.user_id).filter(Boolean))];
+      const storeUserIds = [...new Set((data ?? []).flatMap((item) => {
+        const store = asStoreRecord(item.store);
+        return store ? [store.user_id] : [];
+      }))];
       const { data: profiles } = await supabase
         .from('profiles_public')
         .select('user_id, display_name, avatar_url')
@@ -167,13 +185,16 @@ export const useStoreItems = (type?: 'product' | 'service' | 'rental', storeId?:
 
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
 
-      return data?.map(item => ({
-        ...item,
-        store: item.store ? {
-          ...(item.store as any),
-          profile: profileMap.get((item.store as any).user_id)
-        } : undefined
-      })) as StoreItem[];
+      return data?.map(item => {
+        const store = asStoreRecord(item.store);
+        return {
+          ...item,
+          store: store ? {
+            ...store,
+            profile: profileMap.get(store.user_id)
+          } : undefined
+        };
+      }) as StoreItem[];
     },
   });
 };
@@ -189,7 +210,7 @@ export const useStoreItem = (itemId: string | undefined) => {
         .select(`
           *,
           category:store_item_categories(*),
-          store:stores(*)
+          store:stores(${STORE_PUBLIC_COLUMNS})
         `)
         .eq('id', itemId)
         .single();
@@ -197,17 +218,18 @@ export const useStoreItem = (itemId: string | undefined) => {
       if (error) throw error;
 
       // Fetch profile for store owner using profiles_public view
-      if (data?.store) {
+      const store = asStoreRecord(data?.store);
+      if (store) {
         const { data: profile } = await supabase
           .from('profiles_public')
           .select('user_id, display_name, avatar_url')
-          .eq('user_id', (data.store as any).user_id)
+          .eq('user_id', store.user_id)
           .single();
 
         return {
           ...data,
           store: {
-            ...(data.store as any),
+            ...store,
             profile
           }
         } as StoreItem;
@@ -257,11 +279,16 @@ export const useCreateStore = () => {
         is_active: data.is_active ?? true,
         accepts_credits: data.accepts_credits ?? true,
         accepts_cash: data.accepts_cash ?? true,
+        shopify_store_url: data.shopify_store_url || null,
+        peerspace_url: data.peerspace_url || null,
+        flat_shipping_cents: data.flat_shipping_cents ?? 0,
+        tax_line_label: data.tax_line_label || null,
+        tax_line_cents: data.tax_line_cents ?? 0,
       };
       const { data: store, error } = await supabase
         .from('stores')
-        .insert(insertData)
-        .select()
+        .insert(insertData as never)
+        .select(STORE_PUBLIC_COLUMNS)
         .single();
 
       if (error) throw error;
@@ -285,9 +312,9 @@ export const useUpdateStore = () => {
     mutationFn: async ({ id, ...data }: Partial<Store> & { id: string }) => {
       const { data: store, error } = await supabase
         .from('stores')
-        .update(data)
+        .update(data as never)
         .eq('id', id)
-        .select()
+        .select(STORE_PUBLIC_COLUMNS)
         .single();
 
       if (error) throw error;

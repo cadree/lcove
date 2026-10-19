@@ -4,6 +4,18 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "./useAdmin";
 import { toast } from "sonner";
 import type { Json } from "@/integrations/supabase/types";
+import { callRpc } from "@/lib/rpc";
+
+function relationName(relation: unknown): string | undefined {
+  const row = Array.isArray(relation) ? relation[0] : relation;
+  if (!row || typeof row !== "object" || !("name" in row)) return undefined;
+  return typeof row.name === "string" ? row.name : undefined;
+}
+
+function socialLinksFromJson(value: Json | null): SocialLinks | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as unknown as SocialLinks;
+}
 
 export interface SocialLinks {
   instagram?: string;
@@ -82,7 +94,7 @@ export function useAdminUserData() {
       const { data: skills } = await supabase.from("user_skills").select("user_id, skills(name)");
       const { data: passions } = await supabase.from("user_passions").select("user_id, passions(name)");
       const { data: roles } = await supabase.from("user_creative_roles").select("user_id, creative_roles(name)");
-      const { data: credits } = await supabase.from("user_credits").select("user_id, balance");
+      const credits = await callRpc<Array<{ user_id: string; balance: number }>>("credit_balance_rows");
       const { data: adminRoles } = await supabase.from("user_roles").select("user_id, role");
 
       const skillsMap = new Map<string, string[]>();
@@ -91,40 +103,44 @@ export function useAdminUserData() {
       const creditsMap = new Map<string, number>();
       const adminMap = new Map<string, boolean>();
 
-      skills?.forEach((s: any) => {
+      skills?.forEach((s) => {
         const arr = skillsMap.get(s.user_id) || [];
-        if (s.skills?.name) arr.push(s.skills.name);
+        const name = relationName(s.skills);
+        if (name) arr.push(name);
         skillsMap.set(s.user_id, arr);
       });
 
-      passions?.forEach((p: any) => {
+      passions?.forEach((p) => {
         const arr = passionsMap.get(p.user_id) || [];
-        if (p.passions?.name) arr.push(p.passions.name);
+        const name = relationName(p.passions);
+        if (name) arr.push(name);
         passionsMap.set(p.user_id, arr);
       });
 
-      roles?.forEach((r: any) => {
+      roles?.forEach((r) => {
         const arr = rolesMap.get(r.user_id) || [];
-        if (r.creative_roles?.name) arr.push(r.creative_roles.name);
+        const name = relationName(r.creative_roles);
+        if (name) arr.push(name);
         rolesMap.set(r.user_id, arr);
       });
 
-      credits?.forEach((c: any) => {
+      credits?.forEach((c) => {
         creditsMap.set(c.user_id, c.balance || 0);
       });
 
-      adminRoles?.forEach((ar: any) => {
+      adminRoles?.forEach((ar) => {
         if (ar.role === "admin") adminMap.set(ar.user_id, true);
       });
 
       // Fetch social_links from profiles
-      const { data: profilesData } = await supabase.from("profiles").select("user_id, social_links");
+      const { data: profilesData } = await supabase.from("profiles_public").select("user_id, social_links");
       const socialLinksMap = new Map<string, SocialLinks | null>();
-      profilesData?.forEach((p: any) => {
-        socialLinksMap.set(p.user_id, p.social_links || null);
+      profilesData?.forEach((p) => {
+        if (!p.user_id) return;
+        socialLinksMap.set(p.user_id, socialLinksFromJson(p.social_links));
       });
 
-      return (userData || []).map((u: any) => ({
+      return (userData || []).map((u) => ({
         user_id: u.user_id,
         email: u.email || "",
         display_name: u.display_name,
@@ -160,11 +176,11 @@ export function useAdminAnnouncements() {
 
       if (error) throw error;
 
-      return (data || []).map((item: any) => ({
+      return (data || []).map((item) => ({
         id: item.id,
         title: item.title,
         message: item.message,
-        target_audience: item.target_audience as AdminAnnouncement["target_audience"],
+        target_audience: item.target_audience as unknown as AdminAnnouncement["target_audience"],
         sent_by: item.sent_by,
         sent_at: item.sent_at,
         recipient_count: item.recipient_count,
@@ -212,32 +228,42 @@ export function useAdjustUserCredits() {
     mutationFn: async (data: { userId: string; amount: number; reason: string }) => {
       if (!user?.id) throw new Error("Not authenticated");
 
-      const { data: currentCredits, error: creditsErr } = await supabase
-        .from("user_credits")
-        .select("balance")
-        .eq("user_id", data.userId)
-        .single();
-
-      if (creditsErr && creditsErr.code !== "PGRST116") throw creditsErr;
-
-      const currentBalance = currentCredits?.balance || 0;
+      const currentCredits = await callRpc<{ balance: number }>("credit_ledger_balances", {
+        p_user_id: data.userId,
+      });
+      const currentBalance = Number(currentCredits?.balance ?? 0);
       const newBalance = currentBalance + data.amount;
 
       if (newBalance < 0) {
         throw new Error("Cannot deduct more credits than available");
       }
 
-      const { error: ledgerError } = await supabase.from("credit_ledger").insert([
-        {
-          user_id: data.userId,
-          amount: data.amount,
-          balance_after: newBalance,
-          type: data.amount > 0 ? "admin_award" : "admin_deduct",
-          description: data.reason,
-        },
-      ]);
-
-      if (ledgerError) throw ledgerError;
+      // Positive awards go through the admin-only edge function so the ledger
+      // row is server-issued and withdrawable. Deductions stay a direct insert:
+      // they cannot increase a withdrawable balance (server_issued stays false).
+      if (data.amount > 0) {
+        const { data: awarded, error: awardError } = await supabase.functions.invoke("award-credits", {
+          body: {
+            target_user_id: data.userId,
+            amount: data.amount,
+            description: data.reason,
+            reference_type: "admin_award",
+          },
+        });
+        if (awardError) throw awardError;
+        if (awarded?.error) throw new Error(awarded.error);
+      } else {
+        const { error: ledgerError } = await supabase.from("credit_ledger").insert([
+          {
+            user_id: data.userId,
+            amount: data.amount,
+            balance_after: newBalance,
+            type: "admin_deduct",
+            description: data.reason,
+          },
+        ]);
+        if (ledgerError) throw ledgerError;
+      }
 
       await logAdminActionSafe({
         admin_id: user.id,
@@ -271,24 +297,16 @@ export function useBulkAwardCredits() {
 
       const results = await Promise.allSettled(
         data.userIds.map(async (userId) => {
-          const { data: currentCredits } = await supabase
-            .from("user_credits")
-            .select("balance")
-            .eq("user_id", userId)
-            .single();
-
-          const currentBalance = currentCredits?.balance || 0;
-          const newBalance = currentBalance + data.amount;
-
-          await supabase.from("credit_ledger").insert([
-            {
-              user_id: userId,
+          const { data: awarded, error: awardError } = await supabase.functions.invoke("award-credits", {
+            body: {
+              target_user_id: userId,
               amount: data.amount,
-              balance_after: newBalance,
-              type: "admin_award",
               description: data.reason,
+              reference_type: "admin_award",
             },
-          ]);
+          });
+          if (awardError) throw awardError;
+          if (awarded?.error) throw new Error(awarded.error);
 
           return userId;
         })

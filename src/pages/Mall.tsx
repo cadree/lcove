@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { STORE_PUBLIC_COLUMNS } from '@/hooks/useStore';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -67,7 +68,7 @@ const Mall = () => {
     queryFn: async () => {
       const { data: storesData, error } = await supabase
         .from('stores')
-        .select('*')
+        .select(STORE_PUBLIC_COLUMNS)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
@@ -76,7 +77,7 @@ const Mall = () => {
       // Fetch profiles for store owners
       const userIds = storesData?.map(s => s.user_id) || [];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('user_id, display_name, avatar_url, city')
         .in('user_id', userIds);
 

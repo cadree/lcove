@@ -41,8 +41,9 @@ export function BenefitsCarousel() {
           transition={{ duration: 0.5 }}
           className="text-center mb-8"
         >
-          <h2 className="font-display text-2xl sm:text-3xl font-medium">
-            Everything you need to <span className="text-gradient">thrive</span>
+          <p className="eyebrow mb-2">In the app</p>
+          <h2 className="ether-title text-2xl sm:text-3xl">
+            Places you can open after you join
           </h2>
         </motion.div>
 

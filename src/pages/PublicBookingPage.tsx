@@ -20,6 +20,7 @@ import { useBookingPageBySlug, useAppointmentsByOwner } from "@/hooks/useAppoint
 import type { AvailabilityConfig } from "@/hooks/useAppointments";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 import { format, addDays, startOfDay, parseISO, isSameDay, setHours, setMinutes } from "date-fns";
 
 const PublicBookingPage = () => {
@@ -150,9 +151,9 @@ const PublicBookingPage = () => {
 
       setIsConfirmed(true);
       toast.success("Booking confirmed!");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Booking error:", error);
-      toast.error(error.message || "Failed to create booking");
+      toast.error(errorMessage(error, "Failed to create booking"));
     } finally {
       setIsSubmitting(false);
     }

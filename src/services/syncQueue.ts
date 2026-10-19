@@ -17,7 +17,24 @@ const RETRY_DELAY_BASE = 1000; // 1 second base delay
 type SyncStatus = 'idle' | 'syncing' | 'error';
 
 let syncStatus: SyncStatus = 'idle';
-let syncListeners: Set<(status: SyncStatus, pendingCount: number) => void> = new Set();
+const syncListeners: Set<(status: SyncStatus, pendingCount: number) => void> = new Set();
+
+interface SyncTable {
+  insert: (row: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+  update: (row: Record<string, unknown>) => {
+    eq: (column: "id", value: unknown) => Promise<{ error: { message: string } | null }>;
+  };
+  delete: () => {
+    eq: (column: "id", value: unknown) => Promise<{ error: { message: string } | null }>;
+  };
+}
+
+function fromSyncTable(table: string): SyncTable {
+  const client = supabase as unknown as {
+    from: (name: string) => SyncTable;
+  };
+  return client.from(table);
+}
 
 /**
  * Subscribe to sync status changes
@@ -44,7 +61,7 @@ async function processSyncOp(op: {
   id?: number;
   table: string;
   operation: 'insert' | 'update' | 'delete';
-  data: any;
+  data: Record<string, unknown>;
   retries: number;
 }): Promise<boolean> {
   if (!op.id) return false;
@@ -54,22 +71,20 @@ async function processSyncOp(op: {
 
     switch (operation) {
       case 'insert': {
-        const { error } = await supabase.from(table as any).insert(data);
+        const { error } = await fromSyncTable(table).insert(data);
         if (error) throw error;
         break;
       }
       case 'update': {
         const { id, ...updateData } = data;
-        const { error } = await supabase
-          .from(table as any)
+        const { error } = await fromSyncTable(table)
           .update(updateData)
           .eq('id', id);
         if (error) throw error;
         break;
       }
       case 'delete': {
-        const { error } = await supabase
-          .from(table as any)
+        const { error } = await fromSyncTable(table)
           .delete()
           .eq('id', data.id);
         if (error) throw error;

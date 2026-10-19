@@ -1,7 +1,17 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { requireUserOrService } from "../_shared/require-caller.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+
+function errorMessage(error: unknown, fallback = "Unknown error"): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error && typeof error.message === "string") {
+    return error.message;
+  }
+  return fallback;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,7 +31,36 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const denied = requireUserOrService(req, corsHeaders);
+  if (denied) return denied;
+
   try {
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data: adminRole } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userData.user.id)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!adminRole) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { applicationId, email, businessName }: PartnerAcceptedRequest = await req.json();
 
     console.log(`Sending partner acceptance email to ${email} for ${businessName}`);
@@ -31,7 +70,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Missing required fields: email and businessName");
     }
 
-    const appUrl = Deno.env.get("SITE_URL") || "https://lcove.lovable.app";
+    const appUrl = Deno.env.get("SITE_URL") || "https://etherbylcove.com";
     const partnerPortalUrl = `${appUrl}/partner-portal`;
 
     const emailResponse = await resend.emails.send({
@@ -99,10 +138,10 @@ const handler = async (req: Request): Promise<Response> => {
         ...corsHeaders,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in notify-partner-accepted function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage(error) }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },

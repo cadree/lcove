@@ -9,6 +9,7 @@ import { Loader2, Mail, CheckCircle2, Upload } from "lucide-react";
 import { useEventEmailBranding } from "@/hooks/useEventEmailBranding";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 
 interface Props {
   eventId: string;
@@ -61,8 +62,8 @@ export function EventEmailIdentitySettings({ eventId, hostDisplayName }: Props) 
         reply_to_email: replyTo.trim() || null,
       });
       toast.success("Email identity saved");
-    } catch (e: any) {
-      toast.error(e.message || "Failed to save");
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "Failed to save"));
     } finally {
       setSaving(false);
     }
@@ -83,8 +84,8 @@ export function EventEmailIdentitySettings({ eventId, hostDisplayName }: Props) 
       if (error) throw error;
       toast.success("Verification code sent");
       setVerifyMode(true);
-    } catch (e: any) {
-      toast.error(e.message || "Failed to send code");
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "Failed to send code"));
     } finally {
       setSendingCode(false);
     }
@@ -107,8 +108,8 @@ export function EventEmailIdentitySettings({ eventId, hostDisplayName }: Props) 
       setVerifyMode(false);
       setCode("");
       await refresh();
-    } catch (e: any) {
-      toast.error(e.message || "Invalid code");
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "Invalid code"));
     } finally {
       setConfirming(false);
     }
@@ -126,8 +127,8 @@ export function EventEmailIdentitySettings({ eventId, hostDisplayName }: Props) 
       const { data } = supabase.storage.from("media").getPublicUrl(path);
       setHeaderImageUrl(data.publicUrl);
       toast.success("Header image uploaded");
-    } catch (e: any) {
-      toast.error(e.message || "Upload failed");
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "Upload failed"));
     } finally {
       setUploading(false);
     }
@@ -151,7 +152,7 @@ export function EventEmailIdentitySettings({ eventId, hostDisplayName }: Props) 
       <Card className="p-4 bg-muted/30 space-y-1">
         <div className="text-xs text-muted-foreground">Recipients will see:</div>
         <div className="text-sm font-medium">
-          From: <span className="text-primary">{effectiveFromName}</span> &lt;events@notify.etherbylcove.com&gt;
+          From: <span className="text-primary">{effectiveFromName}</span> &lt;events@notifications.etherbylcove.com&gt;
         </div>
         <div className="text-sm">
           Reply-To: {replyTo || "support@notify.etherbylcove.com"}

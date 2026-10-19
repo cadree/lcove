@@ -43,17 +43,21 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
 
   const currentStory = stories[currentIndex];
   const isOwner = user?.id === currentStory?.user_id;
+  const storyId = currentStory?.id;
+  const storyHasViewed = currentStory?.has_viewed;
+  const storyMediaType = currentStory?.media_type;
+  const recordStoryView = recordView.mutate;
 
   // Fetch and subscribe to real-time view count for owner
   useEffect(() => {
-    if (!currentStory || !isOwner) return;
+    if (!storyId || !isOwner) return;
 
     // Initial fetch
     const fetchViewCount = async () => {
       const { count } = await supabase
         .from('story_views')
         .select('*', { count: 'exact', head: true })
-        .eq('story_id', currentStory.id);
+        .eq('story_id', storyId);
       setViewCount(count || 0);
     };
 
@@ -61,14 +65,14 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
 
     // Subscribe to real-time updates
     const channel = supabase
-      .channel(`story-views-${currentStory.id}`)
+      .channel(`story-views-${storyId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'story_views',
-          filter: `story_id=eq.${currentStory.id}`,
+          filter: `story_id=eq.${storyId}`,
         },
         () => {
           // Increment view count on new view
@@ -80,27 +84,36 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentStory?.id, isOwner]);
+  }, [storyId, isOwner]);
 
   // Record view when story opens (only once per story)
   useEffect(() => {
-    if (!currentStory || isOwner || !user) return;
+    if (!storyId || isOwner || !user) return;
     
     // Check if we already recorded this view in this session
-    if (recordedViewsRef.current.has(currentStory.id)) return;
+    if (recordedViewsRef.current.has(storyId)) return;
     
     // Mark as recorded before making the call to prevent duplicates
-    recordedViewsRef.current.add(currentStory.id);
+    recordedViewsRef.current.add(storyId);
     
     // Only record if not already viewed
-    if (!currentStory.has_viewed) {
-      recordView.mutate(currentStory.id);
+    if (!storyHasViewed) {
+      recordStoryView(storyId);
     }
-  }, [currentStory?.id, isOwner, user, currentStory?.has_viewed]);
+  }, [storyId, isOwner, user, storyHasViewed, recordStoryView]);
+
+  const handleNext = useCallback(() => {
+    if (currentIndex < stories.length - 1) {
+      setCurrentIndex((prev) => prev + 1);
+      setProgress(0);
+    } else {
+      onNextUser();
+    }
+  }, [currentIndex, stories.length, onNextUser]);
 
   // Auto-progress timer
   useEffect(() => {
-    const duration = currentStory?.media_type === 'video' ? 15000 : 5000;
+    const duration = storyMediaType === 'video' ? 15000 : 5000;
     const interval = 50;
     const increment = (interval / duration) * 100;
 
@@ -115,16 +128,7 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
     }, interval);
 
     return () => clearInterval(timer);
-  }, [currentIndex, currentStory?.media_type]);
-
-  const handleNext = useCallback(() => {
-    if (currentIndex < stories.length - 1) {
-      setCurrentIndex((prev) => prev + 1);
-      setProgress(0);
-    } else {
-      onNextUser();
-    }
-  }, [currentIndex, stories.length, onNextUser]);
+  }, [storyMediaType, handleNext]);
 
   const handlePrev = useCallback(() => {
     if (currentIndex > 0) {

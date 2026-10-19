@@ -13,9 +13,26 @@ interface LineItem {
   total: number;
 }
 
-function generateInvoiceHTML(invoice: any, senderName: string, senderEmail: string): string {
-  const lineItems = (invoice.line_items as LineItem[]) || [];
-  const attachedImages = (invoice.attached_images as string[]) || [];
+interface InvoiceRecord {
+  line_items: LineItem[] | null;
+  attached_images: string[] | null;
+  currency: string | null;
+  invoice_number: string;
+  title: string;
+  description: string | null;
+  due_date: string | null;
+  total: number;
+  subtotal: number;
+  tax_amount: number;
+  tax_rate: number;
+  owner_user_id: string;
+  recipient_email: string | null;
+  recipient_phone: string | null;
+}
+
+function generateInvoiceHTML(invoice: InvoiceRecord, senderName: string, senderEmail: string): string {
+  const lineItems = invoice.line_items || [];
+  const attachedImages = invoice.attached_images || [];
   
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -148,11 +165,25 @@ serve(async (req) => {
   try {
     const { invoiceId, via, recipient, senderName: customSenderName, senderEmail: customSenderEmail } = await req.json();
 
-    console.log(`Sending invoice ${invoiceId} via ${via} to ${recipient}`);
-
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData.user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Fetch invoice details
     const { data: invoice, error: fetchError } = await supabase
@@ -168,6 +199,26 @@ serve(async (req) => {
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    if (invoice.owner_user_id !== userData.user.id) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const storedRecipient = via === 'email' ? invoice.recipient_email : invoice.recipient_phone;
+    const destination = (typeof storedRecipient === 'string' && storedRecipient.trim())
+      ? storedRecipient.trim()
+      : recipient;
+    if (!destination || typeof destination !== 'string') {
+      return new Response(JSON.stringify({ error: 'Recipient required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log(`Sending invoice ${invoiceId} via ${via}`);
 
     // Get owner profile for sender info
     const { data: profile } = await supabase
@@ -201,7 +252,7 @@ serve(async (req) => {
         body: JSON.stringify({
           from: `${senderName} <notifications@etherbylcove.com>`,
           reply_to: senderEmail !== 'notifications@etherbylcove.com' ? senderEmail : undefined,
-          to: [recipient],
+          to: [destination],
           subject: `Invoice ${invoice.invoice_number} - ${invoice.title}`,
           html: invoiceHTML,
         }),
@@ -256,7 +307,7 @@ Thank you for your business!`;
             'Authorization': `Basic ${btoa(`${twilioAccountSid}:${twilioAuthToken}`)}`,
           },
           body: new URLSearchParams({
-            To: recipient,
+            To: destination,
             From: twilioPhoneNumber,
             Body: smsMessage,
           }),

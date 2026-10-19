@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Radio, Users, Coins, Send, X, Clock, PlayCircle, Trash2 } from 'lucide-react';
-import { useStream, useStreamReactions, useSendReaction, useTipStream, useJoinStream, useDeleteStream } from '@/hooks/useLiveStreams';
+import { useStream, useStreamReactions, useSendReaction, useTipStream, useJoinStream, useDeleteStream, useStreamPresence } from '@/hooks/useLiveStreams';
+import { StreamChat } from './StreamChat';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -50,6 +51,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   const sendReaction = useSendReaction();
   const tipStream = useTipStream();
   const joinStream = useJoinStream();
+  const joinStreamMutate = joinStream.mutate;
   const deleteStream = useDeleteStream();
 
   const [tipAmount, setTipAmount] = useState('');
@@ -60,15 +62,16 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   const isHost = user?.id === stream?.host_id;
+  useStreamPresence(streamId, open && !!user && !isHost && stream?.is_live === true);
   const streamStatus = stream ? getStreamStatus(stream) : 'draft';
   const hasReplay = streamStatus === 'ended' && stream?.replay_available && stream?.replay_url;
 
   // Join stream on mount (for viewers only, when stream is live)
   useEffect(() => {
     if (open && user && !isHost && streamStatus === 'live') {
-      joinStream.mutate(streamId);
+      joinStreamMutate(streamId);
     }
-  }, [open, user, streamId, isHost, streamStatus]);
+  }, [open, user, streamId, isHost, streamStatus, joinStreamMutate]);
 
   // Show floating reactions
   useEffect(() => {
@@ -169,7 +172,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
 
     // YouTube embed
     if (stream.stream_type === 'youtube' && stream.external_url) {
-      const videoId = stream.external_url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
+      const videoId = stream.external_url.match(/(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/)?.[1];
       if (videoId) {
         return (
           <iframe
@@ -377,6 +380,8 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
               </div>
             )}
           </div>
+
+          {stream && <StreamChat streamId={stream.id || streamId} />}
         </DialogContent>
       </Dialog>
 

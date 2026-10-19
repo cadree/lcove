@@ -13,11 +13,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ProjectChatData } from '@/hooks/useProjectChatData';
-import { useCreateMilestone, useUpdateMilestoneStatus } from '@/hooks/useProjectMilestones';
+import { useCreateMilestone, useUpdateMilestoneStatus, type ProjectMilestone } from '@/hooks/useProjectMilestones';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import ProjectChecklist from './ProjectChecklist';
+
+type DeliverableEntry = string | { title?: string; name?: string };
+
+function deliverableLabel(entry: DeliverableEntry): string {
+  if (typeof entry === 'string') return entry;
+  return entry.title || entry.name || JSON.stringify(entry);
+}
 
 interface ProjectCommandCenterProps {
   project: ProjectChatData;
@@ -111,13 +118,14 @@ const ProjectCommandCenter = ({ project, isOwner }: ProjectCommandCenterProps) =
 
   const cycleMilestoneStatus = (ms: ProjectChatData['milestones'][0]) => {
     if (!isOwner) return;
-    const order = ['pending', 'in_progress', 'submitted', 'approved', 'paid'];
-    const idx = order.indexOf(ms.status);
+    const order: ProjectMilestone['status'][] = ['pending', 'in_progress', 'submitted', 'approved', 'paid'];
+    const current = order.find((status) => status === ms.status);
+    const idx = current ? order.indexOf(current) : -1;
     const next = order[Math.min(idx + 1, order.length - 1)];
     if (next === ms.status) return;
     updateMilestoneStatus.mutate({
       milestoneId: ms.id,
-      status: next as any,
+      status: next,
       projectId: project.id,
     }, {
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ['project-chat-data', project.id] }),
@@ -274,10 +282,10 @@ const ProjectCommandCenter = ({ project, isOwner }: ProjectCommandCenterProps) =
               {project.deliverables && project.deliverables.length > 0 && (
                 <Section icon={<CheckCircle2 className="w-4 h-4 text-primary" />} title="Deliverables">
                   <ul className="space-y-1">
-                    {project.deliverables.map((d: any, i: number) => (
+                    {(project.deliverables as unknown as DeliverableEntry[]).map((d, i) => (
                       <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
                         <span className="text-primary mt-0.5">•</span>
-                        {typeof d === 'string' ? d : d.title || d.name || JSON.stringify(d)}
+                        {deliverableLabel(d)}
                       </li>
                     ))}
                   </ul>

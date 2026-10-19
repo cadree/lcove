@@ -34,7 +34,7 @@ export function FeedFilters({
         value={postTypeFilter} 
         onValueChange={(val) => setPostTypeFilter(val as 'all' | 'regular' | 'portfolio')}
       >
-        <SelectTrigger className="w-[130px] h-9 glass border-0 pl-3 gap-2">
+        <SelectTrigger className="w-[130px] h-11 glass border-0 pl-3 gap-2">
           <Filter className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
           <SelectValue placeholder="Type" />
         </SelectTrigger>
@@ -50,7 +50,7 @@ export function FeedFilters({
         value={regionFilter || "all"} 
         onValueChange={(val) => setRegionFilter(val === "all" ? null : val)}
       >
-        <SelectTrigger className="w-[150px] h-9 glass border-0 pl-3 gap-2">
+        <SelectTrigger className="w-[150px] h-11 glass border-0 pl-3 gap-2">
           <MapPin className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
           <SelectValue placeholder="Region" />
         </SelectTrigger>
@@ -72,7 +72,7 @@ export function FeedFilters({
             variant={activeCategory === category ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveCategory(category)}
-            className="h-8 px-3 text-xs"
+            className="min-h-11 h-11 px-3 text-xs"
           >
             {category}
           </Button>

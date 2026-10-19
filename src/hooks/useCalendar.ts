@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { addMonths, addWeeks } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -25,6 +26,7 @@ export interface CalendarEvent {
   project_id: string | null;
   external_url: string | null;
   timezone: string | null;
+  recurrence: string | null;
   status: string | null;
   created_at: string;
   rsvp_count?: number;
@@ -78,7 +80,47 @@ export interface CalendarItem {
   city?: string;
   state?: string;
   color?: string;
+  timezone?: string | null;
+  sourceId?: string;
   data: CalendarEvent | PersonalCalendarItem | Project;
+}
+
+function expandCommunityEvent(event: CalendarEvent): CalendarItem[] {
+  const make = (start: string, end: string | null, id: string): CalendarItem => ({
+    id,
+    type: 'event',
+    title: event.title,
+    start_date: start,
+    end_date: end,
+    city: event.city,
+    state: event.state || undefined,
+    color: '#FF69B4',
+    timezone: event.timezone,
+    sourceId: event.id,
+    data: event,
+  });
+
+  if (event.recurrence !== 'FREQ=WEEKLY' && event.recurrence !== 'FREQ=MONTHLY') {
+    return [make(event.start_date, event.end_date, event.id)];
+  }
+
+  const start = new Date(event.start_date);
+  const duration = event.end_date ? new Date(event.end_date).getTime() - start.getTime() : null;
+  const until = Date.now() + 120 * 24 * 60 * 60 * 1000;
+  const items: CalendarItem[] = [];
+  let cursor = new Date(start);
+  for (let i = 0; i < 52 && cursor.getTime() <= until; i++) {
+    if (cursor.getTime() >= Date.now() - 14 * 24 * 60 * 60 * 1000) {
+      const iso = cursor.toISOString();
+      items.push(make(
+        iso,
+        duration === null ? null : new Date(cursor.getTime() + duration).toISOString(),
+        i === 0 ? event.id : `${event.id}@${iso}`,
+      ));
+    }
+    cursor = event.recurrence === 'FREQ=WEEKLY' ? addWeeks(cursor, 1) : addMonths(cursor, 1);
+  }
+  return items;
 }
 
 export function useEvents(filters?: { city?: string; state?: string }) {
@@ -148,7 +190,7 @@ export function useEventWithRSVP(eventId: string) {
       let organizer = null;
       if (event.creator_id) {
         const { data: profile } = await supabase
-          .from('profiles')
+          .from('profiles_public')
           .select('display_name, avatar_url')
           .eq('user_id', event.creator_id)
           .maybeSingle();
@@ -218,17 +260,7 @@ export function useCalendarItems(filters?: { city?: string; state?: string; type
 
   if (showEvents && events) {
     events.forEach(event => {
-      items.push({
-        id: event.id,
-        type: 'event',
-        title: event.title,
-        start_date: event.start_date,
-        end_date: event.end_date,
-        city: event.city,
-        state: event.state || undefined,
-        color: '#FF69B4', // bubblegum pink for events
-        data: event,
-      });
+      items.push(...expandCommunityEvent(event));
     });
   }
 

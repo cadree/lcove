@@ -1,13 +1,14 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { EVENT_PLATFORM_FEE_PERCENT } from "../_shared/fees.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const log = (step: string, details?: any) => {
+const log = (step: string, details?: unknown) => {
   const d = details ? ` - ${JSON.stringify(details)}` : "";
   console.log(`[purchase-event-ticket] ${step}${d}`);
 };
@@ -17,6 +18,30 @@ interface AttendeeInput {
   email?: string;
   phone?: string;
   social?: string;
+}
+
+interface TicketTier {
+  id: string;
+  capacity: number | null;
+  quantity_sold: number | null;
+  price_cents: number | null;
+  currency: string | null;
+  name: string | null;
+  description: string | null;
+}
+
+function errorMessage(error: unknown, fallback = "Unknown error"): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error && typeof error.message === "string") {
+    return error.message;
+  }
+  return fallback;
+}
+
+function attendeeText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
 }
 
 serve(async (req) => {
@@ -58,11 +83,11 @@ serve(async (req) => {
     // Build attendee list
     let attendeeList: AttendeeInput[] = [];
     if (Array.isArray(attendees) && attendees.length > 0) {
-      attendeeList = attendees.map((a: any) => ({
-        name: String(a.name || "").trim(),
-        email: a.email ? String(a.email).trim().toLowerCase() : undefined,
-        phone: a.phone ? String(a.phone).trim() : undefined,
-        social: a.social ? String(a.social).trim().replace(/^@/, "") : undefined,
+      attendeeList = attendees.filter((a): a is Record<string, unknown> => typeof a === "object" && a !== null).map((a) => ({
+        name: attendeeText(a.name).trim(),
+        email: a.email ? attendeeText(a.email).trim().toLowerCase() : undefined,
+        phone: a.phone ? attendeeText(a.phone).trim() : undefined,
+        social: a.social ? attendeeText(a.social).trim().replace(/^@/, "") : undefined,
       })).filter(a => a.name);
     } else {
       // legacy: build a single attendee from purchaser info
@@ -89,7 +114,7 @@ serve(async (req) => {
     if (eventErr || !event) throw new Error("Event not found");
 
     // Resolve tier
-    let tier: any = null;
+    let tier: TicketTier | null = null;
     if (tierId) {
       const { data } = await supabase
         .from("ticket_tiers")
@@ -97,7 +122,7 @@ serve(async (req) => {
         .eq("id", tierId)
         .eq("event_id", eventId)
         .single();
-      tier = data;
+      tier = data as unknown as TicketTier | null;
     }
     if (!tier) {
       // fallback: default tier (sort_order 0) or any active
@@ -109,7 +134,7 @@ serve(async (req) => {
         .order("sort_order", { ascending: true })
         .limit(1)
         .maybeSingle();
-      tier = data;
+      tier = data as unknown as TicketTier | null;
     }
     if (!tier) throw new Error("No active ticket tier available for this event");
 
@@ -286,9 +311,10 @@ serve(async (req) => {
     };
 
     if (creatorConnectId && creatorPayoutEnabled) {
+      const applicationFee = Math.round(totalCents * (EVENT_PLATFORM_FEE_PERCENT / 100));
       sessionConfig.payment_intent_data = {
-        application_fee_amount: 0,
         transfer_data: { destination: creatorConnectId },
+        ...(applicationFee > 0 ? { application_fee_amount: applicationFee } : {}),
       };
     }
 
@@ -308,8 +334,8 @@ serve(async (req) => {
       orderId: order.id,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-  } catch (error: any) {
-    const msg = error?.message || "Unknown error";
+  } catch (error: unknown) {
+    const msg = errorMessage(error);
     log("ERROR", { msg });
     return new Response(JSON.stringify({ error: msg }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

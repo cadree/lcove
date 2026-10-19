@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
+import { format } from 'date-fns';
+import { calendarDayKey, dayDividerLabel, localCalendarDayDelta } from '@/lib/calendarDay';
 import { 
-  ArrowLeft, MoreVertical, Phone, Video, Trash2, 
+  ArrowLeft, MoreVertical, Trash2, 
   Check, CheckCheck, Play, Pause, Image as ImageIcon,
-  Users, Calendar, Info, ChevronDown, ChevronUp, LogOut
+  Users, Calendar, Info, ChevronDown, ChevronUp, LogOut, Flag
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/hooks/useMessages';
@@ -20,6 +21,7 @@ import { OnlineIndicator } from '@/components/ui/online-indicator';
 import MessageComposer from './MessageComposer';
 import ProjectCommandCenter from './ProjectCommandCenter';
 import { toast } from 'sonner';
+import { ReportDialog } from '@/components/safety/ReportDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,14 +51,16 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   const { isOnline } = usePresence();
   
   const conversation = conversations.find(c => c.id === conversationId);
-  const isProjectChat = !!(conversation as any)?.project_id;
-  const projectId = isProjectChat ? (conversation as any)?.project_id : null;
+  const projectId = conversation?.project_id ?? null;
+  const isProjectChat = !!projectId;
   const { data: projectChatData } = useProjectChatData(projectId);
   const isOwner = !!(projectChatData && user && projectChatData.creator_id === user.id);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [showProjectInfo, setShowProjectInfo] = useState(false);
+  const [reportMessageId, setReportMessageId] = useState<string | null>(null);
+  const [reportProfileId, setReportProfileId] = useState<string | null>(null);
 
   
   // Get the other participant's user ID for direct messages
@@ -68,7 +72,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   
   const otherUserId = getOtherUserId();
   const isMuted = conversation?.participants?.find(p => p.user_id === user?.id)?.is_muted || false;
-  const project = (conversation as any)?.project;
+  const project = conversation?.project;
 
   const getConversationName = () => {
     if (!conversation) return 'Chat';
@@ -84,7 +88,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
     return otherParticipant?.profile?.avatar_url;
   };
 
-  const getParticipantRole = (participant: any) => {
+  const getParticipantRole = (participant: { project_role_name?: string | null }) => {
     return participant.project_role_name || null;
   };
 
@@ -99,8 +103,10 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   }, [markAsRead, messages]);
 
   const formatMessageTime = (date: Date) => {
-    if (isToday(date)) return format(date, 'h:mm a');
-    if (isYesterday(date)) return 'Yesterday ' + format(date, 'h:mm a');
+    const time = format(date, 'h:mm a');
+    const delta = localCalendarDayDelta(date, new Date());
+    if (delta === 0) return time;
+    if (delta === -1) return `Yesterday ${time}`;
     return format(date, 'MMM d, h:mm a');
   };
 
@@ -109,7 +115,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
     let currentDate = '';
 
     messages.forEach(msg => {
-      const msgDate = format(new Date(msg.created_at), 'yyyy-MM-dd');
+      const msgDate = calendarDayKey(msg.created_at);
       if (msgDate !== currentDate) {
         currentDate = msgDate;
         groups.push({ date: msgDate, messages: [msg] });
@@ -119,13 +125,6 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
     });
 
     return groups;
-  };
-
-  const formatDateHeader = (dateStr: string) => {
-    const date = new Date(dateStr);
-    if (isToday(date)) return 'Today';
-    if (isYesterday(date)) return 'Yesterday';
-    return format(date, 'MMMM d, yyyy');
   };
 
   const handleSend = async (content?: string, file?: File, mediaType?: 'image' | 'video' | 'audio') => {
@@ -198,32 +197,6 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
               <Info className="w-5 h-5" />
             </Button>
           )}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-muted-foreground hover:text-primary"
-            onClick={() => {
-              toast.info(`Calling ${getConversationName()}...`, {
-                description: 'Voice calls are coming soon! Stay tuned for this feature.',
-                duration: 3000,
-              });
-            }}
-          >
-            <Phone className="w-5 h-5" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-muted-foreground hover:text-primary"
-            onClick={() => {
-              toast.info(`Video calling ${getConversationName()}...`, {
-                description: 'Video calls are coming soon! Stay tuned for this feature.',
-                duration: 3000,
-              });
-            }}
-          >
-            <Video className="w-5 h-5" />
-          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="text-muted-foreground">
@@ -271,6 +244,12 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                   }}
                 >
                   Block user
+                </DropdownMenuItem>
+              )}
+              {otherUserId && conversation?.type === 'direct' && (
+                <DropdownMenuItem onClick={() => setReportProfileId(otherUserId)}>
+                  <Flag className="w-4 h-4 mr-2" />
+                  Report profile
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -324,7 +303,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
               {/* Date Header */}
               <div className="flex items-center justify-center my-4">
                 <span className="px-3 py-1 rounded-full bg-muted/50 text-xs text-muted-foreground">
-                  {formatDateHeader(group.date)}
+                  {dayDividerLabel(group.messages[0].created_at)}
                 </span>
               </div>
 
@@ -418,6 +397,17 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                                 )}
                               </span>
                             )}
+                            {!isOwn && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="w-6 h-6 text-muted-foreground"
+                                aria-label="Report message"
+                                onClick={() => setReportMessageId(msg.id)}
+                              >
+                                <Flag className="w-3 h-3" />
+                              </Button>
+                            )}
                           </div>
 
                           {/* Delete option - always visible on mobile */}
@@ -476,6 +466,26 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
         onTyping={setTypingIndicator}
         isSending={sendMessage.isPending}
       />
+      {reportMessageId && (
+        <ReportDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setReportMessageId(null);
+          }}
+          targetType="message"
+          targetId={reportMessageId}
+        />
+      )}
+      {reportProfileId && (
+        <ReportDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setReportProfileId(null);
+          }}
+          targetType="profile"
+          targetId={reportProfileId}
+        />
+      )}
     </div>
   );
 };

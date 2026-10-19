@@ -15,6 +15,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useFundStats } from "@/hooks/useFundStats";
 import { RecentDistributionsCard } from "@/components/fund/FundDistributions";
 import { DonateDialog } from "@/components/fund/DonateDialog";
+import { IosDigitalGoodsNotice } from "@/components/ios/IosDigitalGoodsNotice";
+import { IOS_DONATIONS_ENABLED, isIosApp } from "@/lib/platform";
 import { toast } from "sonner";
 
 const ALLOCATION_DATA = [
@@ -52,14 +54,30 @@ const AnimatedNumber = forwardRef<HTMLSpanElement, { value: number; prefix?: str
 
 AnimatedNumber.displayName = "AnimatedNumber";
 
-const CustomTooltip = forwardRef<HTMLDivElement, any>(({ active, payload }, ref) => {
+interface FundTooltipEntry {
+  name?: string;
+  value?: number;
+  payload?: {
+    month?: string;
+    name?: string;
+    value?: number;
+    description?: string;
+  };
+}
+
+interface FundTooltipProps {
+  active?: boolean;
+  payload?: FundTooltipEntry[];
+}
+
+const CustomTooltip = forwardRef<HTMLDivElement, FundTooltipProps>(({ active, payload }, ref) => {
   if (active && payload && payload.length) {
     return (
       <div ref={ref} className="bg-card/95 backdrop-blur-sm border border-border rounded-xl p-3 shadow-xl">
-        <p className="text-foreground font-medium">{payload[0].payload.month}</p>
-        {payload.map((entry: any, index: number) => (
+        <p className="text-foreground font-medium">{payload[0].payload?.month}</p>
+        {payload.map((entry, index) => (
           <p key={index} className="text-sm text-muted-foreground">
-            {entry.name}: {formatCurrency(entry.value)}
+            {entry.name}: {formatCurrency(entry.value ?? 0)}
           </p>
         ))}
       </div>
@@ -70,13 +88,14 @@ const CustomTooltip = forwardRef<HTMLDivElement, any>(({ active, payload }, ref)
 
 CustomTooltip.displayName = "CustomTooltip";
 
-const PieTooltip = forwardRef<HTMLDivElement, any>(({ active, payload }, ref) => {
+const PieTooltip = forwardRef<HTMLDivElement, FundTooltipProps>(({ active, payload }, ref) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
+    if (!data) return null;
     return (
       <div ref={ref} className="bg-card/95 backdrop-blur-sm border border-border rounded-xl p-3 shadow-xl">
         <p className="text-foreground font-medium">{data.name}</p>
-        <p className="text-primary text-lg font-bold">{formatCurrency(data.value)}</p>
+        <p className="text-primary text-lg font-bold">{formatCurrency(data.value ?? 0)}</p>
         <p className="text-sm text-muted-foreground max-w-[200px]">{data.description}</p>
       </div>
     );
@@ -91,8 +110,11 @@ export default function FundDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { membership, isLoading: membershipLoading, startCheckout, openCustomerPortal } = useMembership();
-  const { data: fundStats, isLoading: fundLoading, refetch, isFetching } = useFundStats();
+  const { data: fundStats, isLoading: fundLoading, isError: fundFailed, refetch, isFetching } = useFundStats();
+  const fundEmpty = !fundLoading && !fundFailed && (fundStats?.lifetime.totalCollected ?? 0) === 0 && (fundStats?.lifetime.totalDistributed ?? 0) === 0 && (fundStats?.recentDistributions.length ?? 0) === 0;
   
+  const iosApp = isIosApp();
+  const showDonations = !iosApp || IOS_DONATIONS_ENABLED;
   const stats = view === "lifetime" ? fundStats?.lifetime : fundStats?.monthly;
   const isMember = membership?.subscribed;
 
@@ -162,14 +184,26 @@ export default function FundDashboard() {
             </Button>
           </div>
 
-          {/* Live indicator */}
           <div className="flex justify-center mb-6">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Live updates enabled
-            </div>
+            {fundLoading ? (
+              <p className="text-xs text-muted-foreground">Loading fund totals…</p>
+            ) : fundFailed ? (
+              <div className="text-center space-y-2">
+                <p className="text-sm text-destructive">Fund totals could not be loaded.</p>
+                <Button size="sm" variant="outline" onClick={() => refetch()}>Try again</Button>
+              </div>
+            ) : fundEmpty ? (
+              <p className="text-sm text-muted-foreground">No contributions recorded yet.</p>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                Live updates enabled
+              </div>
+            )}
           </div>
 
+          {fundFailed ? null : (
+          <>
           {/* Stats Grid */}
           <motion.div
             key={view}
@@ -409,6 +443,8 @@ export default function FundDashboard() {
               </CardContent>
             </Card>
           </motion.div>
+          </>
+          )}
 
           {/* Member Impact or CTA Section */}
           <motion.div
@@ -470,15 +506,22 @@ export default function FundDashboard() {
                       )}
                     </div>
                     <div className="flex flex-wrap gap-2">
+                      {showDonations ? (
                       <DonateDialog>
                         <Button variant="default" size="sm">
                           <Heart className="w-3.5 h-3.5 mr-1.5" />
                           Extra Donation
                         </Button>
                       </DonateDialog>
-                      <Button variant="outline" size="sm" onClick={handleManageSubscription}>
-                        Manage Subscription
-                      </Button>
+                      ) : (
+                        <IosDigitalGoodsNotice kind="donation" className="max-w-xs" />
+                      )}
+                      {!iosApp && (
+                        <Button variant="outline" size="sm" onClick={handleManageSubscription}>
+                          Manage Subscription
+                        </Button>
+                      )}
+                      <IosDigitalGoodsNotice kind="billing" />
                     </div>
                   </div>
                 </CardContent>
@@ -497,18 +540,29 @@ export default function FundDashboard() {
                           Support the Community
                         </h3>
                         <p className="text-muted-foreground max-w-md">
-                          Join {fundStats?.lifetime.memberCount || 0}+ members funding grants, events, and creative opportunities. 
-                          Donate once or subscribe monthly — no account required.
+                          Join {fundStats?.lifetime.memberCount || 0}+ members funding grants, events, and creative opportunities.{" "}
+                          {iosApp
+                            ? showDonations
+                              ? "Membership checkout is not available in the iOS app. You can still donate."
+                              : "Membership checkout is not available in the iOS app."
+                            : "Donate once or subscribe monthly — no account required."}
                         </p>
                       </div>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-3">
+                      {showDonations ? (
                       <DonateDialog>
                         <Button size="lg" className="group">
                           Donate Now
                           <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                         </Button>
                       </DonateDialog>
+                      ) : (
+                        <IosDigitalGoodsNotice kind="donation" className="max-w-xs" />
+                      )}
+                      {iosApp ? (
+                        <IosDigitalGoodsNotice className="max-w-xs" />
+                      ) : (
                       <Button 
                         size="lg" 
                         variant="outline"
@@ -516,6 +570,7 @@ export default function FundDashboard() {
                       >
                         Become a Member
                       </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>

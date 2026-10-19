@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Loader2, Building2 } from "lucide-react";
+import { errorMessage } from "@/lib/errorMessage";
 
 const categories = [
   { value: 'studio', label: 'Studio', icon: '🎬' },
@@ -95,8 +96,8 @@ export function BrandApplicationForm() {
         contribution: "",
         memberBenefits: "",
       });
-    } catch (error: any) {
-      toast.error(error.message || "Failed to submit application");
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, "Failed to submit application"));
     } finally {
       setLoading(false);
     }

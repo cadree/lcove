@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { jwtRole } from "../_shared/require-caller.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const EMAIL_FROM = "ETHER <notifications@etherbylcove.com>";
@@ -91,8 +92,39 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const role = jwtRole(req.headers.get("Authorization"));
+  if (role !== "authenticated" && role !== "service_role" && role !== "anon") {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const { project_id, project_title, role_name, applicant_name, applicant_email, project_creator_id, portfolio_link, message } = await req.json();
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    // Guests call this with the anon key. Require a real application row so the
+    // function cannot email an arbitrary address.
+    const { data: application } = await supabase
+      .from("guest_role_applications")
+      .select("id")
+      .eq("project_id", project_id)
+      .eq("email", applicant_email)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!application) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const results: { channel: string; status: string; error?: string }[] = [];
 
@@ -116,11 +148,6 @@ serve(async (req) => {
     }
 
     // 2. Notify project owner
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
     // Get owner email
     const { data: ownerData } = await supabase.auth.admin.getUserById(project_creator_id);
 

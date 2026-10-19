@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -33,6 +33,8 @@ import { Network, useContentGenres } from '@/hooks/useCinema';
 import { Settings, Trash2, CreditCard, CheckCircle, AlertCircle, ExternalLink, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
+import { COMMUNITY_FUND_FEE_PERCENT } from '@/lib/fees';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
@@ -70,19 +72,7 @@ export const NetworkSettingsDialog = ({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (open) {
-      setName(network.name);
-      setDescription(network.description || '');
-      setGenre(network.genre || '');
-      setIsPublic(network.is_public);
-      setIsPaid(network.is_paid);
-      setSubscriptionPrice(network.subscription_price.toString());
-      checkConnectStatus();
-    }
-  }, [open, network]);
-
-  const checkConnectStatus = async () => {
+  const checkConnectStatus = useCallback(async () => {
     setLoadingConnect(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -102,7 +92,19 @@ export const NetworkSettingsDialog = ({
     } finally {
       setLoadingConnect(false);
     }
-  };
+  }, [network.id]);
+
+  useEffect(() => {
+    if (open) {
+      setName(network.name);
+      setDescription(network.description || '');
+      setGenre(network.genre || '');
+      setIsPublic(network.is_public);
+      setIsPaid(network.is_paid);
+      setSubscriptionPrice(network.subscription_price.toString());
+      checkConnectStatus();
+    }
+  }, [open, network, checkConnectStatus]);
 
   const handleSetupPayout = async () => {
     setSettingUpPayout(true);
@@ -122,8 +124,8 @@ export const NetworkSettingsDialog = ({
         window.open(data.url, '_blank');
         toast.success('Complete your payout setup in the new tab');
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to start payout setup');
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, 'Failed to start payout setup'));
     } finally {
       setSettingUpPayout(false);
     }
@@ -157,8 +159,8 @@ export const NetworkSettingsDialog = ({
       queryClient.invalidateQueries({ queryKey: ['networks'] });
       queryClient.invalidateQueries({ queryKey: ['my-networks'] });
       onOpenChange(false);
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error: unknown) {
+      toast.error(errorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -180,8 +182,8 @@ export const NetworkSettingsDialog = ({
       queryClient.invalidateQueries({ queryKey: ['my-networks'] });
       onOpenChange(false);
       navigate('/cinema');
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error: unknown) {
+      toast.error(errorMessage(error));
     } finally {
       setDeleting(false);
     }
@@ -278,7 +280,7 @@ export const NetworkSettingsDialog = ({
                   onChange={(e) => setSubscriptionPrice(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  You receive 80% of subscription revenue. 20% goes to platform fees.
+                  You receive {100 - COMMUNITY_FUND_FEE_PERCENT}% of subscription revenue. {COMMUNITY_FUND_FEE_PERCENT}% goes to the community fund.
                 </p>
               </div>
             )}
@@ -301,7 +303,7 @@ export const NetworkSettingsDialog = ({
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm text-green-600">
                     <CheckCircle className="w-4 h-4" />
-                    Payouts are enabled! You'll receive 80% of subscription revenue.
+                    Payouts are enabled! You'll receive {100 - COMMUNITY_FUND_FEE_PERCENT}% of subscription revenue.
                   </div>
                   <Button
                     variant="outline"
@@ -354,7 +356,7 @@ export const NetworkSettingsDialog = ({
                 <div className="space-y-3">
                   <p className="text-sm text-muted-foreground">
                     Connect your bank account or debit card to receive payments from subscribers.
-                    You'll receive 80% of all subscription revenue.
+                    You'll receive {100 - COMMUNITY_FUND_FEE_PERCENT}% of subscription revenue. {COMMUNITY_FUND_FEE_PERCENT}% goes to the community fund.
                   </p>
                   <Button
                     onClick={handleSetupPayout}

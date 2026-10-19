@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +18,7 @@ interface CreateStreamDialogProps {
   onStreamCreated?: (streamId: string) => void;
 }
 
-type StreamType = 'webrtc' | 'youtube' | 'twitch' | 'soundcloud';
+type StreamType = 'webrtc' | 'youtube' | 'twitch' | 'soundcloud' | 'obs_rtmp';
 
 export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, onClose, onStreamCreated }) => {
   const { user } = useAuth();
@@ -32,6 +33,16 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const { data: muxStatus } = useQuery({
+    queryKey: ['mux-status'],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('mux-status');
+      if (error) return { configured: false };
+      return (data ?? { configured: false }) as { configured: boolean };
+    },
+    enabled: open,
+  });
+  const muxConfigured = muxStatus?.configured === true;
 
   const handleThumbnailSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,7 +77,7 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
     
     try {
       const fileExt = thumbnailFile.name.split('.').pop();
-      const fileName = `stream-thumbnails/${user.id}/${Date.now()}.${fileExt}`;
+      const fileName = `${user.id}/stream-thumbnails/${Date.now()}.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage
         .from('media')
@@ -102,16 +113,34 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
         if (url) thumbnailUrl = url;
       }
 
+      let muxFields: {
+        mux_live_stream_id?: string;
+        mux_playback_id?: string;
+        rtmp_ingest_url?: string;
+        rtmp_stream_key?: string;
+        playback_url?: string;
+      } = {};
+
+      if (streamType === 'obs_rtmp') {
+        if (!muxConfigured) throw new Error('OBS streaming needs Mux keys');
+        const { data: muxData, error: muxError } = await supabase.functions.invoke('mux-stream', {
+          body: { action: 'create' },
+        });
+        if (muxError) throw muxError;
+        if (muxData?.error) throw new Error(muxData.error);
+        muxFields = muxData;
+      }
+
       const result = await createStream.mutateAsync({
         title,
         description,
         stream_type: streamType,
-        external_url: streamType !== 'webrtc' ? externalUrl : undefined,
+        external_url: streamType !== 'webrtc' && streamType !== 'obs_rtmp' ? externalUrl : undefined,
         thumbnail_url: thumbnailUrl,
+        ...muxFields,
       });
 
-      // Open the stream viewer for WebRTC streams
-      if (streamType === 'webrtc' && result?.id && onStreamCreated) {
+      if ((streamType === 'webrtc' || streamType === 'obs_rtmp') && result?.id && onStreamCreated) {
         onStreamCreated(result.id);
       }
 
@@ -271,7 +300,7 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
               
               <Label
                 htmlFor="soundcloud"
-                className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors col-span-2 ${
+                className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
                   streamType === 'soundcloud' ? 'border-primary bg-primary/10' : 'border-border'
                 }`}
               >
@@ -279,11 +308,27 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
                 <Music2 className="h-4 w-4" />
                 <span className="text-sm">SoundCloud</span>
               </Label>
+
+              <Label
+                htmlFor="obs_rtmp"
+                className={`flex items-center gap-2 p-3 rounded-lg border transition-colors ${
+                  !muxConfigured ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                } ${streamType === 'obs_rtmp' ? 'border-primary bg-primary/10' : 'border-border'}`}
+              >
+                <RadioGroupItem value="obs_rtmp" id="obs_rtmp" disabled={!muxConfigured} />
+                <Radio className="h-4 w-4" />
+                <div className="text-sm">
+                  <span className="font-medium">OBS / RTMP</span>
+                  <p className="text-xs text-muted-foreground">
+                    {muxConfigured ? 'Mux live stream' : 'Unavailable until Mux keys are set'}
+                  </p>
+                </div>
+              </Label>
             </RadioGroup>
           </div>
 
           {/* URL input for external services */}
-          {streamType !== 'webrtc' && (
+          {streamType !== 'webrtc' && streamType !== 'obs_rtmp' && (
             <div className="space-y-2">
               <Label>{getUrlLabel()}</Label>
               <Input
@@ -312,7 +357,7 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
               {(createStream.isPending || isUploading) && (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               )}
-              {streamType === 'webrtc' ? 'Setup Stream' : 'Create Stream'}
+              {streamType === 'webrtc' ? 'Setup Stream' : streamType === 'obs_rtmp' ? 'Create OBS stream' : 'Create Stream'}
             </Button>
           </div>
         </form>

@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { useMembership } from "@/hooks/useMembership";
 import { useAuth } from "@/contexts/AuthContext";
+import { IosDigitalGoodsNotice } from "@/components/ios/IosDigitalGoodsNotice";
+import { isIosApp } from "@/lib/platform";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -46,9 +48,10 @@ const ELITE_PERKS = [
 
 const Membership = () => {
   const { user } = useAuth();
+  const iosApp = isIosApp();
   const { membership, isLoading, isCheckingOut, checkMembership, startCheckout, openCustomerPortal } = useMembership();
   const [searchParams] = useSearchParams();
-  const [communityAmount, setCommunityAmount] = useState<number>(10);
+  const [communityAmount, setCommunityAmount] = useState<number>(5);
 
   // Handle success/cancel redirects
   useEffect(() => {
@@ -81,7 +84,13 @@ const Membership = () => {
         <div className="max-w-5xl mx-auto">
           {/* Header */}
           <PageHeader
-            title="Become a Member"
+            title={
+              membership?.subscribed
+                ? membership.tier === "elite"
+                  ? "Elite Member"
+                  : "Community Member"
+                : "Become a Member"
+            }
             description="Support the creative community and unlock exclusive benefits. Every contribution goes directly into community grants, events, and education."
             icon={<Heart className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
             className="mb-12 text-center"
@@ -127,15 +136,20 @@ const Membership = () => {
                         )}
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={checkMembership}>
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Refresh
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={openCustomerPortal}>
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Manage
-                      </Button>
+                    <div className="flex flex-col items-start gap-2">
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={checkMembership}>
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Refresh
+                        </Button>
+                        {!iosApp && (
+                          <Button variant="outline" size="sm" onClick={openCustomerPortal}>
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            Manage
+                          </Button>
+                        )}
+                      </div>
+                      <IosDigitalGoodsNotice kind="billing" />
                     </div>
                   </div>
                 </CardContent>
@@ -143,7 +157,12 @@ const Membership = () => {
             </motion.div>
           )}
 
-          {/* Membership Tiers */}
+          {/* Membership Tiers. Hide join buttons until the membership row has loaded. */}
+          {isLoading && !membership?.subscribed ? (
+            <div className="flex justify-center py-16 mb-12">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
           <div className="grid md:grid-cols-2 gap-6 mb-12">
             {/* Community Member */}
             <motion.div
@@ -174,7 +193,7 @@ const Membership = () => {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Price Selector */}
-                  {!membership?.subscribed && (
+                  {!membership?.subscribed && !iosApp && (
                     <div className="space-y-3">
                       <label className="text-sm font-medium text-foreground">
                         Choose your contribution
@@ -217,6 +236,9 @@ const Membership = () => {
 
                   {/* CTA */}
                   {!membership?.subscribed ? (
+                    iosApp ? (
+                      <IosDigitalGoodsNotice />
+                    ) : (
                     <Button 
                       className="w-full" 
                       onClick={handleCommunityJoin}
@@ -234,11 +256,14 @@ const Membership = () => {
                         </>
                       )}
                     </Button>
+                    )
                   ) : membership?.tier !== "community" ? (
                     <Button variant="outline" className="w-full" disabled>
                       <Check className="w-4 h-4 mr-2" />
                       Included in Elite
                     </Button>
+                  ) : iosApp ? (
+                    <IosDigitalGoodsNotice kind="billing" />
                   ) : (
                     <Button variant="outline" className="w-full" onClick={openCustomerPortal}>
                       Manage Subscription
@@ -301,6 +326,9 @@ const Membership = () => {
 
                   {/* CTA */}
                   {!membership?.subscribed ? (
+                    iosApp ? (
+                      <IosDigitalGoodsNotice />
+                    ) : (
                     <Button 
                       className="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white border-0"
                       onClick={handleEliteJoin}
@@ -318,10 +346,17 @@ const Membership = () => {
                         </>
                       )}
                     </Button>
+                    )
                   ) : membership?.tier === "elite" ? (
+                    iosApp ? (
+                      <IosDigitalGoodsNotice kind="billing" />
+                    ) : (
                     <Button variant="outline" className="w-full" onClick={openCustomerPortal}>
                       Manage Subscription
                     </Button>
+                    )
+                  ) : iosApp ? (
+                    <IosDigitalGoodsNotice />
                   ) : (
                     <Button 
                       className="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white border-0"
@@ -335,6 +370,7 @@ const Membership = () => {
               </Card>
             </motion.div>
           </div>
+          )}
 
           {/* Impact Section */}
           <motion.div

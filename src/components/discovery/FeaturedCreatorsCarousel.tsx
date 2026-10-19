@@ -14,6 +14,12 @@ import {
   CarouselPrevious,
 } from '@/components/ui/carousel';
 
+type CreatorVerificationType = 'standard' | 'premium' | 'partner';
+
+function isCreatorVerificationType(value: string): value is CreatorVerificationType {
+  return value === 'standard' || value === 'premium' || value === 'partner';
+}
+
 interface FeaturedCreatorsCarouselProps {
   featureType?: 'weekly' | 'monthly' | 'spotlight';
   onCreatorClick?: (userId: string) => void;
@@ -101,9 +107,9 @@ export function FeaturedCreatorsCarousel({
                         <h4 className="font-medium text-foreground truncate">
                           {creator.profile?.display_name || 'Creator'}
                         </h4>
-                        {creator.verification && (
+                        {creator.verification && isCreatorVerificationType(creator.verification.verification_type) && (
                           <VerificationBadge 
-                            type={creator.verification.verification_type as any} 
+                            type={creator.verification.verification_type} 
                             size="sm"
                           />
                         )}

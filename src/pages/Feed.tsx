@@ -9,9 +9,11 @@ import FeedPost from "@/components/feed/FeedPost";
 import { FeedFilters } from "@/components/feed/FeedFilters";
 import { FriendsDrawer } from "@/components/friends/FriendsDrawer";
 import { EmptyState } from "@/components/ui/empty-state";
+import FirstRunEmpty from "@/components/onboarding/FirstRunEmpty";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Filter, Shuffle, Loader2, Sparkles, Compass, Users, User, Bell } from "lucide-react";
+import { Filter, Shuffle, Loader2, Sparkles, Users, User, Bell } from "lucide-react";
+import { MoreMenuButton } from "@/components/navigation/MoreMenu";
 import { usePosts } from "@/hooks/usePosts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -110,32 +112,26 @@ const Feed = () => {
       }} animate={{
         y: 0,
         opacity: 1
-      }} className="flex items-center justify-between mb-4">
-          {/* Left - Profile Avatar */}
-          <Link to="/profile" aria-label="View my profile">
-            <Avatar className="w-10 h-10 ring-2 ring-primary/20 hover:ring-primary/40 transition-all">
-              <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || "My profile"} />
-              <AvatarFallback className="bg-primary/10 text-primary">
-                <User className="w-5 h-5" />
-              </AvatarFallback>
-            </Avatar>
-          </Link>
-
-          {/* Center - Title */}
-          <div className="flex items-center gap-2">
-            <Compass className="w-5 h-5 text-primary" />
-            <h1 className="text-lg font-semibold">Feed</h1>
+      }} className="flex items-start justify-between gap-3 mb-4 pb-4 border-b border-border">
+          <div className="flex items-center gap-3 min-w-0">
+            <Link to="/profile" aria-label="View my profile" className="shrink-0">
+              <Avatar className="w-11 h-11 rounded-[2px]">
+                <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || "My profile"} className="rounded-[2px]" />
+                <AvatarFallback className="rounded-[2px] bg-muted text-foreground">
+                  <User className="w-5 h-5" />
+                </AvatarFallback>
+              </Avatar>
+            </Link>
+            <div>
+              <p className="eyebrow">Home</p>
+              <h1 className="ether-title text-3xl">Feed</h1>
+            </div>
           </div>
 
-          {/* Right - Quick Actions */}
           <div className="flex items-center gap-1">
-            <Link to="/home" aria-label="Go home">
-              <Button variant="ghost" size="icon" className="w-9 h-9 rounded-xl">
-                
-              </Button>
-            </Link>
+            <MoreMenuButton />
             <Link to="/notifications" aria-label="Notifications">
-              <Button variant="ghost" size="icon" className="w-9 h-9 rounded-xl">
+              <Button variant="ghost" size="icon" aria-label="Notifications">
                 <Bell className="w-4 h-4" />
               </Button>
             </Link>
@@ -148,17 +144,17 @@ const Feed = () => {
         {/* Action Bar */}
         <div className="flex items-center justify-between mt-4 mb-4">
           <FriendsDrawer>
-            <Button variant="glass" size="sm" className="gap-2">
+            <Button variant="glass" size="sm" className="gap-2 min-h-11">
               <Users className="w-4 h-4" />
               <span className="text-xs">Friends</span>
             </Button>
           </FriendsDrawer>
           
           <div className="flex gap-2">
-            <Button variant={isShuffled ? "default" : "glass"} size="icon" className="w-9 h-9" onClick={handleShuffle} title="Shuffle feed">
+            <Button variant={isShuffled ? "default" : "outline"} size="icon" onClick={handleShuffle} title="Shuffle feed" aria-label="Shuffle feed">
               <Shuffle className="w-4 h-4" />
             </Button>
-            <Button variant={showFilters ? "default" : "glass"} size="icon" className="w-9 h-9" onClick={() => setShowFilters(!showFilters)} title="Toggle filters">
+            <Button variant={showFilters ? "default" : "outline"} size="icon" onClick={() => setShowFilters(!showFilters)} title="Toggle filters" aria-label="Toggle filters">
               <Filter className="w-4 h-4" />
             </Button>
           </div>
@@ -214,8 +210,18 @@ const Feed = () => {
                 </motion.div>)}
             </AnimatePresence>
 
-            {/* Empty State */}
-            {filteredPosts.length === 0 && <EmptyState icon={Sparkles} title={activeCategory === "All" ? "The feed is waiting for you" : `No ${activeCategory.toLowerCase()} posts yet`} description="This is your space to share what you're creating, thinking, or discovering. Your voice matters here." action={user ? {
+            {filteredPosts.length === 0 && posts.length === 0 && user && <FirstRunEmpty title="Your feed is empty" description="Start with a post, look through the directory, or read community updates." actions={[{
+          label: "Share something",
+          onClick: () => document.querySelector<HTMLTextAreaElement>('[placeholder*="mind"]')?.focus()
+        }, {
+          label: "Browse directory",
+          to: "/directory"
+        }, {
+          label: "Community updates",
+          to: "/community"
+        }]} />}
+
+            {filteredPosts.length === 0 && !(posts.length === 0 && user) && <EmptyState icon={Sparkles} title={activeCategory === "All" ? "The feed is waiting for you" : `No ${activeCategory.toLowerCase()} posts yet`} description="This is your space to share what you're creating, thinking, or discovering. Your voice matters here." action={user ? {
           label: "Share Something",
           onClick: () => document.querySelector<HTMLTextAreaElement>('[placeholder*="mind"]')?.focus()
         } : undefined} />}

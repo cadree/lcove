@@ -9,11 +9,39 @@ interface AccessGateProps {
   children: React.ReactNode;
 }
 
-// Routes that don't require access gate checks (for unauthenticated users)
-const PUBLIC_ROUTES = ['/', '/landing', '/auth', '/onboarding', '/locked', '/admin/onboarding', '/denied', '/admin', '/fund', '/unsubscribe'];
+// Exact paths a logged-out visitor can open.
+const PUBLIC_EXACT = new Set([
+  '/',
+  '/landing',
+  '/auth',
+  '/onboarding',
+  '/locked',
+  '/admin/onboarding',
+  '/denied',
+  '/admin',
+  '/fund',
+  '/unsubscribe',
+  '/privacy',
+  '/terms',
+  '/guidelines',
+  '/community',
+  '/nuance',
+]);
 
-// Routes that should redirect authenticated users to /home
+// Signed-in people leave the public landing for the feed.
 const LANDING_ROUTES = ['/', '/landing'];
+
+function isPublicPath(pathname: string) {
+  if (PUBLIC_EXACT.has(pathname)) return true;
+  return (
+    pathname.startsWith('/admin/onboarding') ||
+    pathname.startsWith('/event/') ||
+    pathname.startsWith('/project/') ||
+    pathname.startsWith('/book/') ||
+    pathname.startsWith('/sign-contract') ||
+    pathname.startsWith('/client/')
+  );
+}
 
 const AccessGate = ({ children }: AccessGateProps) => {
   const { user, loading: authLoading } = useAuth();
@@ -23,16 +51,15 @@ const AccessGate = ({ children }: AccessGateProps) => {
   const [showWelcome, setShowWelcome] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
 
-  const isPublicRoute = PUBLIC_ROUTES.includes(location.pathname) || location.pathname.startsWith('/admin/onboarding') || location.pathname.startsWith('/event/') || location.pathname.startsWith('/project/');
+  const isPublicRoute = isPublicPath(location.pathname);
   const isLandingRoute = LANDING_ROUTES.includes(location.pathname);
 
   useEffect(() => {
     // Wait for auth to load first
     if (authLoading) return;
 
-    // If user is authenticated and on a landing route, redirect to /home
     if (user && isLandingRoute) {
-      navigate('/home', { replace: true });
+      navigate('/feed', { replace: true });
       return;
     }
 
@@ -64,14 +91,19 @@ const AccessGate = ({ children }: AccessGateProps) => {
         sessionStorage.removeItem('onboarding_just_completed');
       }
 
-      // Check access_status
+      // Banned accounts stay on the locked screen. Finishing onboarding
+      // never denies access, and existing denied rows are opened by migration.
       const accessStatus = profile.access_status || 'pending';
       
-      if (accessStatus === 'denied' || accessStatus === 'banned') {
-        // Already on locked route is fine
+      if (accessStatus === 'banned') {
         if (location.pathname !== '/locked') {
           navigate('/locked');
         }
+        return;
+      }
+
+      if (location.pathname === '/locked') {
+        navigate(profile.onboarding_completed ? '/feed' : '/onboarding');
         return;
       }
 

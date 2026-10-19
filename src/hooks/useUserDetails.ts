@@ -1,6 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+function relatedSkill(relation: unknown): { id: string; name: string; category: string | null } | null {
+  const row = Array.isArray(relation) ? relation[0] : relation;
+  if (!row || typeof row !== "object") return null;
+  if (!("id" in row) || !("name" in row)) return null;
+  if (typeof row.id !== "string" || typeof row.name !== "string") return null;
+  const category = "category" in row && (typeof row.category === "string" || row.category === null) ? row.category : null;
+  return { id: row.id, name: row.name, category };
+}
+
 export interface UserSkill {
   id: string;
   name: string;
@@ -44,22 +53,24 @@ export function useUserSkills(userId?: string) {
 
       if (error) throw error;
       
-      return (data || []).map((item: any) => {
+      return (data || []).flatMap((item): UserSkill[] => {
         if (item.custom_name && !item.skill_id) {
-          return {
+          return [{
             id: `custom-${item.id}`,
             name: item.custom_name,
             category: 'Custom',
             description: item.description,
             isCustom: true,
-          };
+          }];
         }
-        return {
-          ...item.skills,
+        const skill = relatedSkill(item.skills);
+        if (!skill?.name) return [];
+        return [{
+          ...skill,
           description: item.description,
           isCustom: false,
-        };
-      }).filter((item: any) => item.name) as UserSkill[];
+        }];
+      });
     },
     enabled: !!userId,
   });
@@ -84,22 +95,24 @@ export function useUserPassions(userId?: string) {
 
       if (error) throw error;
       
-      return (data || []).map((item: any) => {
+      return (data || []).flatMap((item): UserPassion[] => {
         if (item.custom_name && !item.passion_id) {
-          return {
+          return [{
             id: `custom-${item.id}`,
             name: item.custom_name,
             category: 'Custom',
             description: item.description,
             isCustom: true,
-          };
+          }];
         }
-        return {
-          ...item.passions,
+        const passion = relatedSkill(item.passions);
+        if (!passion?.name) return [];
+        return [{
+          ...passion,
           description: item.description,
           isCustom: false,
-        };
-      }).filter((item: any) => item.name) as UserPassion[];
+        }];
+      });
     },
     enabled: !!userId,
   });
@@ -124,22 +137,24 @@ export function useUserCreativeRoles(userId?: string) {
 
       if (error) throw error;
       
-      return (data || []).map((item: any) => {
+      return (data || []).flatMap((item): UserCreativeRole[] => {
         if (item.custom_name && !item.role_id) {
-          return {
+          return [{
             id: `custom-${item.id}`,
             name: item.custom_name,
             category: 'Custom',
             description: item.description,
             isCustom: true,
-          };
+          }];
         }
-        return {
-          ...item.creative_roles,
+        const role = relatedSkill(item.creative_roles);
+        if (!role?.name) return [];
+        return [{
+          ...role,
           description: item.description,
           isCustom: false,
-        };
-      }).filter((item: any) => item.name) as UserCreativeRole[];
+        }];
+      });
     },
     enabled: !!userId,
   });

@@ -21,6 +21,7 @@ import {
 import { useCreateNetwork, useContentGenres } from '@/hooks/useCinema';
 import { Film, Upload, DollarSign } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 interface CreateNetworkDialogProps {
@@ -40,10 +41,12 @@ export const CreateNetworkDialog = ({ open, onOpenChange }: CreateNetworkDialogP
 
   const { data: genres = [] } = useContentGenres();
   const createNetwork = useCreateNetwork();
+  const { user } = useAuth();
 
   const uploadImage = async (file: File, path: string): Promise<string | null> => {
+    if (!user) return null;
     const fileExt = file.name.split('.').pop();
-    const fileName = `${path}/${Date.now()}.${fileExt}`;
+    const fileName = `${user.id}/${path}/${Date.now()}.${fileExt}`;
 
     const { error } = await supabase.storage
       .from('media')

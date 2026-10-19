@@ -5,6 +5,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Image, Upload, Video, Loader2, X, Maximize2 } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 interface ImageContent {
@@ -19,6 +20,7 @@ interface BoardItemImageProps {
 }
 
 export function BoardItemImage({ content, onChange }: BoardItemImageProps) {
+  const { user } = useAuth();
   const imageContent = content as ImageContent;
   const [url, setUrl] = useState(imageContent?.url || "");
   const [alt, setAlt] = useState(imageContent?.alt || "");
@@ -54,8 +56,12 @@ export function BoardItemImage({ content, onChange }: BoardItemImageProps) {
     setIsUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
+      if (!user) {
+        toast.error("Sign in to upload");
+        return;
+      }
       const fileName = `${crypto.randomUUID()}.${fileExt}`;
-      const filePath = `board-media/${fileName}`;
+      const filePath = `${user.id}/board-media/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('board-uploads')

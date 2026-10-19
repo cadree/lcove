@@ -18,6 +18,7 @@ import {
   Lock,
   ExternalLink,
   Sparkles,
+  Flag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,8 +37,11 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesInsert } from "@/integrations/supabase/types";
+import { errorMessage } from "@/lib/errorMessage";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { ReportDialog } from "@/components/safety/ReportDialog";
 import { shareLink, buildShareUrl } from "@/lib/shareLink";
 import { cn } from "@/lib/utils";
 import { ProjectDetail } from "@/components/projects/ProjectDetail";
@@ -75,6 +79,7 @@ export default function PublicProjectPage() {
   const [guestPortfolio, setGuestPortfolio] = useState("");
   const [guestMessage, setGuestMessage] = useState("");
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const { data: project, isLoading } = useQuery({
     queryKey: ["public-project", projectId],
@@ -152,7 +157,9 @@ export default function PublicProjectPage() {
             },
           });
         }
-      } catch {}
+      } catch {
+        // Application already succeeded; notification failure is non-fatal.
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-project-applications"] });
@@ -160,26 +167,27 @@ export default function PublicProjectPage() {
       setSelectedRoleId(null);
       setApplicationMessage("");
     },
-    onError: (error: any) => {
-      toast.error(error.message || "Failed to apply");
+    onError: (error: unknown) => {
+      toast.error(errorMessage(error, "Failed to apply"));
     },
   });
 
   // Guest apply mutation
   const guestApplyMutation = useMutation({
     mutationFn: async ({ roleId }: { roleId: string }) => {
-      const { error } = await supabase.from("guest_role_applications" as any).insert({
+      const application: TablesInsert<"guest_role_applications"> = {
         project_id: projectId!,
         role_id: roleId,
         name: guestName.trim(),
         email: guestEmail.trim(),
         portfolio_link: guestPortfolio.trim() || null,
         message: guestMessage.trim() || null,
-      } as any);
+      };
+      const { error } = await supabase.from("guest_role_applications").insert(application);
       if (error) throw error;
 
       // Notify via edge function (fire-and-forget, don't block success)
-      const roleName = project?.roles?.find((r: any) => r.id === roleId)?.role_name || "Unknown Role";
+      const roleName = project?.roles?.find((r) => r.id === roleId)?.role_name || "Unknown Role";
       supabase.functions.invoke("notify-guest-application", {
         body: {
           project_id: projectId,
@@ -191,7 +199,9 @@ export default function PublicProjectPage() {
           portfolio_link: guestPortfolio.trim() || null,
           message: guestMessage.trim() || null,
         },
-      }).catch(() => {});
+      }).catch(() => {
+        // Guest notification is best-effort.
+      });
     },
     onSuccess: () => {
       setShowSuccessDialog(true);
@@ -201,8 +211,8 @@ export default function PublicProjectPage() {
       setGuestPortfolio("");
       setGuestMessage("");
     },
-    onError: (error: any) => {
-      toast.error(error.message || "Failed to submit application");
+    onError: (error: unknown) => {
+      toast.error(errorMessage(error, "Failed to submit application"));
     },
   });
 
@@ -221,10 +231,10 @@ export default function PublicProjectPage() {
   };
 
   const hasAppliedToRole = (roleId: string) =>
-    myApplications.some((a: any) => a.role_id === roleId);
+    myApplications.some((a) => a.role_id === roleId);
 
   const getApplicationStatus = (roleId: string) =>
-    myApplications.find((a: any) => a.role_id === roleId)?.status;
+    myApplications.find((a) => a.role_id === roleId)?.status;
 
   const handleApplyClick = (roleId: string) => {
     setSelectedRoleId(selectedRoleId === roleId ? null : roleId);
@@ -274,9 +284,9 @@ export default function PublicProjectPage() {
     );
   }
 
-  const totalRolePayout = project.roles?.reduce((sum: number, r: any) => sum + r.payout_amount * r.slots_available, 0) || 0;
-  const filledSlots = project.roles?.reduce((sum: number, r: any) => sum + r.slots_filled, 0) || 0;
-  const totalSlots = project.roles?.reduce((sum: number, r: any) => sum + r.slots_available, 0) || 0;
+  const totalRolePayout = project.roles?.reduce((sum, r) => sum + r.payout_amount * r.slots_available, 0) || 0;
+  const filledSlots = project.roles?.reduce((sum, r) => sum + r.slots_filled, 0) || 0;
+  const totalSlots = project.roles?.reduce((sum, r) => sum + r.slots_available, 0) || 0;
   const outcomeLabels = project.expected_outcome?.split(", ").filter(Boolean) || [];
   const isCreator = user?.id === project.creator_id;
 
@@ -303,7 +313,26 @@ export default function PublicProjectPage() {
           <Button variant="secondary" size="icon" className="h-9 w-9 rounded-full backdrop-blur-md bg-background/60" onClick={handleShare}>
             <Share2 className="h-4 w-4" />
           </Button>
+          {user && !isCreator && projectId && (
+            <Button
+              variant="secondary"
+              size="icon"
+              className="h-9 w-9 rounded-full backdrop-blur-md bg-background/60"
+              aria-label="Report project"
+              onClick={() => setReportOpen(true)}
+            >
+              <Flag className="h-4 w-4" />
+            </Button>
+          )}
         </div>
+        {projectId && (
+          <ReportDialog
+            open={reportOpen}
+            onOpenChange={setReportOpen}
+            targetType="project"
+            targetId={projectId}
+          />
+        )}
       </div>
 
       <div className="max-w-lg mx-auto px-4 -mt-12 relative z-10 pb-12 space-y-4">
@@ -412,7 +441,7 @@ export default function PublicProjectPage() {
                 </p>
 
                 <div className="space-y-2">
-                  {project.roles.map((role: any) => {
+                  {project.roles.map((role) => {
                     const applied = user ? hasAppliedToRole(role.id) : false;
                     const appStatus = user ? getApplicationStatus(role.id) : undefined;
                     const isFull = role.is_locked || role.slots_filled >= role.slots_available;

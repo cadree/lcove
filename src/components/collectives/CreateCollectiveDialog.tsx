@@ -21,10 +21,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { useCreateCollective, COLLECTIVE_TOPICS } from "@/hooks/useCollectives";
 import { useUserSearch } from "@/hooks/useUserSearch";
 import { Camera, X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 
 interface CreateCollectiveDialogProps {
   open: boolean;
@@ -59,6 +61,7 @@ export function CreateCollectiveDialog({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<Array<{ id: string; display_name: string; avatar_url: string | null }>>([]);
   const [uploading, setUploading] = useState(false);
+  const { user } = useAuth();
 
   const createMutation = useCreateCollective();
   const { data: searchResults } = useUserSearch(searchQuery);
@@ -68,13 +71,13 @@ export function CreateCollectiveDialog({
     type: "avatar" | "cover"
   ) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
 
     setUploading(true);
     try {
       const fileExt = file.name.split(".").pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `collectives/${fileName}`;
+      const filePath = `${user.id}/collectives/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from("media")
@@ -89,8 +92,8 @@ export function CreateCollectiveDialog({
       } else {
         setCoverImageUrl(data.publicUrl);
       }
-    } catch (error: any) {
-      toast.error("Failed to upload image: " + error.message);
+    } catch (error: unknown) {
+      toast.error("Failed to upload image: " + errorMessage(error));
     } finally {
       setUploading(false);
     }
@@ -213,7 +216,7 @@ export function CreateCollectiveDialog({
           <div className="space-y-4">
             <div className="space-y-3">
               <Label>Who can join?</Label>
-              <RadioGroup value={visibility} onValueChange={(v) => setVisibility(v as any)}>
+              <RadioGroup value={visibility} onValueChange={(v: "public" | "private" | "discoverable") => setVisibility(v)}>
                 <div className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer">
                   <RadioGroupItem value="public" id="public" className="mt-0.5" />
                   <div>
