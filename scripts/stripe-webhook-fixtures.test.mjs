@@ -5,6 +5,10 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import Stripe from "stripe";
 import { handleSignedStripeWebhook } from "../supabase/functions/_shared/stripe-webhook-dispatch.mjs";
+import {
+  requireMembershipConfig,
+  tierFromStripeSubscription,
+} from "../supabase/functions/_shared/membership-products.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const webhookSecret = "whsec_local_fixture_not_a_real_secret";
@@ -216,6 +220,63 @@ test("a handler failure returns non-200 and releases the event id", async () => 
   }), { db });
   assert.equal(result.status, 500);
   assert.ok(methods(calls).includes("releaseEvent"));
+});
+
+function membershipEnv(overrides = {}) {
+  const values = {
+    STRIPE_PRODUCT_COMMUNITY: "prod_community_fixture",
+    STRIPE_PRICE_COMMUNITY: "price_community_fixture",
+    STRIPE_PRODUCT_ELITE: "prod_elite_fixture",
+    STRIPE_PRICE_ELITE: "price_elite_fixture",
+    ...overrides,
+  };
+  return { get: (name) => values[name] || "" };
+}
+
+test("membership config names every missing variable and has no built-in Stripe id", () => {
+  const source = readFileSync(join(root, "supabase/functions/_shared/membership-products.mjs"), "utf8");
+  assert.equal(source.includes("prod_"), false);
+  assert.equal(source.includes("price_1"), false);
+  assert.throws(
+    () => requireMembershipConfig({ get: () => "" }),
+    /membership not configured: missing STRIPE_PRODUCT_COMMUNITY, STRIPE_PRICE_COMMUNITY, STRIPE_PRODUCT_ELITE, STRIPE_PRICE_ELITE/,
+  );
+});
+
+test("product id maps to the configured tier and a missing product secret fails closed", () => {
+  const community = tierFromStripeSubscription({
+    metadata: {},
+    items: { data: [{ price: { product: "prod_community_fixture" } }] },
+  }, membershipEnv());
+  const elite = tierFromStripeSubscription({
+    metadata: {},
+    items: { data: [{ price: { product: "prod_elite_fixture" } }] },
+  }, membershipEnv());
+  const other = tierFromStripeSubscription({
+    metadata: {},
+    items: { data: [{ price: { product: "prod_other_account" } }] },
+  }, membershipEnv());
+  assert.equal(community, "community");
+  assert.equal(elite, "elite");
+  assert.equal(other, null);
+  assert.throws(
+    () => tierFromStripeSubscription({
+      metadata: {},
+      items: { data: [{ price: { product: "prod_other_account" } }] },
+    }, membershipEnv({ STRIPE_PRODUCT_ELITE: "" })),
+    /membership not configured: missing STRIPE_PRODUCT_ELITE/,
+  );
+});
+
+test("metadata tier is used without a product secret", () => {
+  assert.equal(tierFromStripeSubscription({
+    metadata: { type: "membership", tier: "elite" },
+    items: { data: [{ price: { product: "prod_from_another_account" } }] },
+  }, { get: () => "" }), "elite");
+  assert.equal(tierFromStripeSubscription({
+    metadata: { type: "artist_subscription" },
+    items: { data: [{ price: { product: "prod_artist" } }] },
+  }, { get: () => "" }), null);
 });
 
 test("event and store fee constants match the edge function and the app", () => {

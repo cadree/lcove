@@ -1,14 +1,12 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { MEMBERSHIP_TIER_CONFIG } from "../_shared/membership-products.mjs";
+import { requireMembershipConfig } from "../_shared/membership-products.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-const MEMBERSHIP_TIERS = MEMBERSHIP_TIER_CONFIG;
 
 const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
@@ -41,11 +39,11 @@ serve(async (req) => {
     const { tier, customAmount } = await req.json();
     logStep("Request params", { tier, customAmount });
 
-    if (!tier || !MEMBERSHIP_TIERS[tier as keyof typeof MEMBERSHIP_TIERS]) {
+    if (tier !== "community" && tier !== "elite") {
       throw new Error("Invalid membership tier");
     }
 
-    const tierConfig = MEMBERSHIP_TIERS[tier as keyof typeof MEMBERSHIP_TIERS];
+    const tierConfig = requireMembershipConfig()[tier];
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
 

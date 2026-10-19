@@ -12,11 +12,34 @@ Set these in the Supabase dashboard: Project Settings, Edge Functions, Secrets.
 | --- | --- |
 | `STRIPE_SECRET_KEY` | Stripe dashboard, Developers, API keys. Use the secret key (`sk_live_...` in production, `sk_test_...` on a test account). |
 | `STRIPE_WEBHOOK_SECRET` | The signing secret for the endpoint below (`whsec_...`). This is not the API key. |
+| `STRIPE_PRODUCT_COMMUNITY` | Community product id (`prod_...`) on this Stripe account. See Membership products below. |
+| `STRIPE_PRICE_COMMUNITY` | A monthly price id (`price_...`) on that Community product. |
+| `STRIPE_PRODUCT_ELITE` | Elite product id (`prod_...`) on this Stripe account. |
+| `STRIPE_PRICE_ELITE` | Elite price id (`price_...`), $25 every month. |
 | `SUPABASE_URL` | Already provided by Supabase to every function. |
 | `SUPABASE_ANON_KEY` | Already provided by Supabase to every function. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Already provided by Supabase to every function. The webhook uses it to write payments. Never ship it in the client. |
 
 `stripe-music-webhook` is the one webhook. `verify_jwt` is false in `supabase/config.toml` because Stripe does not send a Supabase JWT. The function rejects any request that does not carry a valid `Stripe-Signature` for `STRIPE_WEBHOOK_SECRET`. A handler failure returns a non-200 status so Stripe retries. A repeated event id is ignored after it is stored in `processed_stripe_events`.
+
+## Membership products
+
+Create these in the Stripe account this project uses. Use test mode until launch. The ids are not in the repo. Checkout, the billing portal, and product-id tier mapping read them from function secrets and do not fall back to an id from another Stripe account.
+
+| Secret | What to create |
+| --- | --- |
+| `STRIPE_PRODUCT_COMMUNITY` | Product named Community Member. This is the pay-what-you-want donation tier. Checkout charges a monthly amount the member chooses. The minimum is $5 (500 cents). |
+| `STRIPE_PRICE_COMMUNITY` | A monthly recurring price on that Community product. Checkout does not charge this fixed price. It uses the product with the chosen amount. The price id is still required so the catalog is complete. |
+| `STRIPE_PRODUCT_ELITE` | Product named Elite Member. |
+| `STRIPE_PRICE_ELITE` | Monthly recurring price of $25 (2500 cents) on the Elite product. Checkout charges this price. |
+
+1. In Stripe, open **Product catalog**, then **Add product**.
+2. Community: recurring, monthly. Copy the product id and the price id.
+3. Elite: recurring, $25 per month. Copy the product id and the price id.
+4. On GitHub, **Settings**, **Secrets and variables**, **Actions**, add the four names. Do not paste the ids into git or chat.
+5. Re-run **Deploy Supabase functions** so the workflow copies them. The click path is in `docs/deploy-ether-prod.md`.
+
+If any name is unset, membership checkout, the customer portal, and a subscription that has to be recognized by product id fail with `membership not configured: missing` and the missing name. A subscription that already carries `metadata.tier` of `community` or `elite` still maps from that metadata.
 
 ## Endpoint
 

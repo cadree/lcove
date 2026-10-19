@@ -49,6 +49,7 @@ Optional names, same **New repository secret** button. Add them when you have th
 | `RESEND_API_KEY` | Resend, API Keys. Also the Auth SMTP password in the next step. |
 | `STRIPE_SECRET_KEY` | Stripe, Developers, API keys. Use the test secret key (`sk_test_...`) until launch. |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret from the step below (`whsec_...`). |
+| `STRIPE_PRODUCT_COMMUNITY`, `STRIPE_PRICE_COMMUNITY`, `STRIPE_PRODUCT_ELITE`, `STRIPE_PRICE_ELITE` | Membership products on this Stripe account. Community is pay-what-you-want, minimum $5 a month. Elite is $25 a month. What to copy is in `docs/stripe-setup.md`. Checkout fails if any name is unset. |
 | `INTERNAL_FUNCTION_SECRET` | The same value as the ether-prod Vault secret `internal_function_secret` (already created). Database, Vault. The email-queue cron and the reminder cron send it as `x-internal-secret`. |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | Twilio, only if texts are turned on. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | `docs/push-setup.md`. Optional `VAPID_SUBJECT` (`mailto:you@domain`). |

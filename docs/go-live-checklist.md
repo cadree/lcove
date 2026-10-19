@@ -88,6 +88,7 @@ Supabase injects `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE
 - `EMAIL_FROM` (optional; default `notifications@notifications.etherbylcove.com`)
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET` (from `docs/stripe-setup.md`, for this project's endpoint)
+- `STRIPE_PRODUCT_COMMUNITY`, `STRIPE_PRICE_COMMUNITY`, `STRIPE_PRODUCT_ELITE`, `STRIPE_PRICE_ELITE` (this Stripe account; `docs/stripe-setup.md`)
 - `RESEND_API_KEY`
 - `TWILIO_ACCOUNT_SID`
 - `TWILIO_AUTH_TOKEN`
