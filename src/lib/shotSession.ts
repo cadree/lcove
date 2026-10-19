@@ -5,6 +5,11 @@ export function shotSessionEnabled(): boolean {
   return import.meta.env.DEV === true && typeof localStorage !== "undefined" && localStorage.getItem("ether-shot-user") === "1";
 }
 
+/** Dev screenshots of a signed-in archive with no stories, posts, or presence. */
+export function shotContentThin(): boolean {
+  return shotSessionEnabled() && localStorage.getItem("ether-shot-thin") === "1";
+}
+
 export const shotProfile = {
   id: SHOT_USER_ID,
   user_id: SHOT_USER_ID,
@@ -131,5 +136,6 @@ export function shotConversations(userId: string) {
 }
 
 export function shotOnline(userId: string): boolean {
+  if (shotContentThin()) return false;
   return shotFavoriteIds.includes(userId);
 }

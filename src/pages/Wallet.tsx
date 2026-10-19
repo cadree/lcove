@@ -147,8 +147,9 @@ const WalletPage: React.FC = () => {
       <div className="p-4 sm:p-6 pb-32 max-w-4xl mx-auto">
         {/* Header */}
         <PageHeader
+          eyebrow="Credits"
           title="Wallet"
-          description={myXp ? `Your LC Credit balance and contribution history · Level ${myXp.level}` : "Your LC Credit balance and contribution history"}
+          description={myXp ? `Ledger, payouts, and level ${myXp.level}` : "Ledger and payouts"}
           icon={<Wallet className="w-5 h-5" />}
           tile="gold"
           className="mb-6"
@@ -290,8 +291,9 @@ const WalletPage: React.FC = () => {
         <Card className="mb-6">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-lg">Payout Methods</CardTitle>
-              <CardDescription>For converting Earned Credit to USD</CardDescription>
+              <p className="kicker">// Payout</p>
+              <CardTitle className="ether-title text-[22px]">Methods</CardTitle>
+              <CardDescription>Earned credit converts to USD</CardDescription>
             </div>
             <Button 
               variant="outline" 
@@ -346,11 +348,12 @@ const WalletPage: React.FC = () => {
 
         {/* Activity Tabs */}
         <Tabs defaultValue="all">
-          <TabsList className="w-full grid grid-cols-4">
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="genesis">Genesis</TabsTrigger>
-            <TabsTrigger value="earned">Earned</TabsTrigger>
-            <TabsTrigger value="payouts">Payouts</TabsTrigger>
+          <p className="kicker mb-2">// Ledger</p>
+          <TabsList className="grid h-auto w-full grid-cols-4 gap-1 rounded-none border-0 bg-transparent p-0">
+            <TabsTrigger value="all" className="mono-label h-11 rounded-none border-0 border-b-2 border-transparent text-[10px] shadow-none data-[state=active]:border-[hsl(var(--bubble))] data-[state=active]:bg-transparent data-[state=active]:shadow-none">All</TabsTrigger>
+            <TabsTrigger value="genesis" className="mono-label h-11 rounded-none border-0 border-b-2 border-transparent text-[10px] shadow-none data-[state=active]:border-[hsl(var(--bubble))] data-[state=active]:bg-transparent data-[state=active]:shadow-none">Genesis</TabsTrigger>
+            <TabsTrigger value="earned" className="mono-label h-11 rounded-none border-0 border-b-2 border-transparent text-[10px] shadow-none data-[state=active]:border-[hsl(var(--bubble))] data-[state=active]:bg-transparent data-[state=active]:shadow-none">Earned</TabsTrigger>
+            <TabsTrigger value="payouts" className="mono-label h-11 rounded-none border-0 border-b-2 border-transparent text-[10px] shadow-none data-[state=active]:border-[hsl(var(--bubble))] data-[state=active]:bg-transparent data-[state=active]:shadow-none">Payouts</TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="mt-4">

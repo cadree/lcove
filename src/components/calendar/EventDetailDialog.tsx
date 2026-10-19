@@ -402,7 +402,7 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="glass-strong border-border/30 max-w-lg max-h-[90vh] overflow-y-auto p-0">
+      <DialogContent className="event-dialog glass-strong max-h-[90vh] min-w-0 overflow-x-hidden overflow-y-auto border-border/30 p-0">
         {/* Event Image */}
         {event.image_url && (
           <div 
@@ -427,9 +427,9 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
           </div>
         )}
 
-        <div className="p-6 space-y-5">
-          <DialogHeader className="space-y-3">
-            <DialogTitle className="pr-8 text-left font-display text-2xl leading-tight">
+        <div className="min-w-0 max-w-full space-y-5 overflow-x-hidden p-6">
+          <DialogHeader className="min-w-0 space-y-3">
+            <DialogTitle className="break-words pr-8 text-left font-display text-2xl leading-tight">
               {event.title}
             </DialogTitle>
             <div className="flex flex-wrap items-center gap-2">
@@ -452,7 +452,7 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
                 {/* Share */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Button variant="ghost" size="icon" data-icon className="h-8 w-8">
                       <Share2 className="w-4 h-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -540,9 +540,9 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
               <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
                 <MapPin className="w-5 h-5 text-primary" />
               </div>
-              <div className="flex-1">
-                <p className="text-foreground font-medium">{event.venue || 'Location TBA'}</p>
-                <p className="text-sm text-muted-foreground">
+              <div className="min-w-0 flex-1">
+                <p className="break-words font-medium text-foreground">{event.venue || 'Location TBA'}</p>
+                <p className="break-words text-sm text-muted-foreground">
                   {event.city}{event.state ? `, ${event.state}` : ''}
                 </p>
                 {event.venue && (
@@ -905,14 +905,14 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
             )}
 
             {/* Quick Actions Row */}
-            <div className="flex gap-2 pt-2">
+            <div className="grid min-w-0 grid-cols-1 gap-2 pt-2">
               {/* Add to My Day */}
               <Button
                 variant={isEventInMyDay ? "default" : "glass"}
                 size="sm"
                 onClick={handleAddToMyDay}
                 disabled={isAddingToMyDay}
-                className="flex-1"
+                className="w-full"
                 role="button"
                 aria-label={isEventInMyDay ? "Remove from My Day" : "Add to My Day"}
               >
@@ -930,7 +930,7 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
                 size="sm"
                 onClick={handleAddToPersonalCalendar}
                 disabled={isAddingToCalendar}
-                className="flex-1"
+                className="w-full"
                 role="button"
                 aria-label="Save to personal calendar"
               >

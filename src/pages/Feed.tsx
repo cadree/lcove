@@ -214,6 +214,18 @@ const Feed = () => {
             <span className="mono-label rounded-full bg-[hsl(var(--brand))] px-2 py-1 text-[8px] text-[#0A0A0A]">Live</span>
           </Link>
         )}
+        {!isLoading && lane !== "live" && !lanePosts.some((post) => post.media_url && post.media_type !== "text") && (
+          <article className="file-panel mb-5 overflow-hidden">
+            <p className="mono-label px-4 pt-3 text-[8px] text-[hsl(var(--brand))]">File // open</p>
+            <div className="relative mx-4 mb-4 mt-3 aspect-[3/4] overflow-hidden rounded-[14px] border border-border bg-[radial-gradient(circle_at_28%_18%,rgba(255,159,200,0.42),transparent_52%),linear-gradient(180deg,hsl(var(--panel-2)),hsl(var(--panel)))]">
+              <div className="absolute inset-x-0 bottom-0 p-4">
+                <p className="kicker">// Feed</p>
+                <p className="ether-title mt-1 text-[28px]">The file is open</p>
+                <p className="lore mt-1 text-[16px] text-foreground/85">A hero lands here when a post carries a picture.</p>
+              </div>
+            </div>
+          </article>
+        )}
         {isLoading ? <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div> : <div className="space-y-5 pb-32">

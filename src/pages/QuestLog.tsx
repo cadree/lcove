@@ -31,12 +31,11 @@ const QuestLog = () => {
     <PageLayout>
       <div className="mx-auto max-w-md px-4 pb-28 pt-4">
         <p className="kicker">// Neo gold</p>
-        <div className="mt-3 flex items-end justify-between gap-3">
-          <div>
-            <h1 className="ether-title text-[34px]">Level {bar.level}</h1>
-            <p className="lore text-[18px] text-foreground">Creator</p>
-          </div>
-          <NoviCutout className="h-28 w-24" />
+        <div className="relative mt-3 overflow-hidden rounded-[18px] border border-[color-mix(in_srgb,#FF9FC8_55%,transparent)] bg-[radial-gradient(circle_at_70%_18%,rgba(255,159,200,0.34),transparent_58%)] px-4 pb-4 pt-3">
+          <p className="mono-label text-[8px] text-[hsl(var(--brand))]">Novi // Hero</p>
+          <NoviCutout className="mx-auto h-64 w-52" />
+          <h1 className="ether-title text-center text-[40px]">Level {bar.level}</h1>
+          <p className="lore text-center text-[18px] text-foreground">Creator</p>
         </div>
         <div className="mt-3">
           <div className="mb-1 flex items-center justify-between">

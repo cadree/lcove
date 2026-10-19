@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Coins, Flame, Sparkles, Info } from 'lucide-react';
+import { Flame, Sparkles, Info } from 'lucide-react';
 import { SquircleIcon } from '@/components/world/SquircleIcon';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -110,9 +110,8 @@ export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({
     >
       <Card className={cn("relative overflow-hidden", className)}>
         <CardHeader>
-          <CardDescription className="mono-label flex items-center gap-2 text-[10px]">
-            <Coins className="h-4 w-4" />
-            Total Balance
+          <CardDescription className="kicker">
+            // Balance
           </CardDescription>
           <CardTitle className="font-body text-4xl font-extrabold tabular-nums">
             {totalBalance.toLocaleString()} <span className="text-2xl text-muted-foreground font-medium">LC</span>

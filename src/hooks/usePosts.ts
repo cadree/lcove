@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
-import { shotPosts, shotSessionEnabled } from '@/lib/shotSession';
+import { shotContentThin, shotPosts, shotSessionEnabled } from '@/lib/shotSession';
 
 interface Post {
   id: string;
@@ -32,7 +32,7 @@ export function usePosts() {
   const { data: posts = [], isLoading, refetch } = useQuery({
     queryKey: ['posts'],
     queryFn: async () => {
-      if (shotSessionEnabled()) return shotPosts();
+      if (shotSessionEnabled()) return shotContentThin() ? [] : shotPosts();
       // Get all posts, ordered chronologically (newest first)
       const { data: postsData, error } = await supabase
         .from('posts')

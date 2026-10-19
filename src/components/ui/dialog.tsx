@@ -31,19 +31,20 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, style, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden p-4">
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
-          "relative z-50 grid w-full max-w-lg",
+          "relative z-50 grid w-full min-w-0 max-w-lg",
           "gap-4 rounded-[16px] border border-border bg-card p-6 shadow-elevated",
           "data-[state=open]:animate-scale-in data-[state=closed]:animate-scale-out",
-          "max-h-[85vh] overflow-y-auto scrollbar-thin",
+          "max-h-[85vh] overflow-x-hidden overflow-y-auto scrollbar-thin",
           className
         )}
+        style={{ maxWidth: "min(32rem, calc(100vw - 2rem))", ...style }}
         {...props}
       >
         {children}

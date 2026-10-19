@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { shotSessionEnabled, shotStories } from '@/lib/shotSession';
+import { shotContentThin, shotSessionEnabled, shotStories } from '@/lib/shotSession';
 
 interface Story {
   id: string;
@@ -35,7 +35,7 @@ export function useStories() {
   const { data, isLoading, refetch, error } = useQuery({
     queryKey: ['stories'],
     queryFn: async () => {
-      if (shotSessionEnabled()) return shotStories();
+      if (shotSessionEnabled()) return shotContentThin() ? { stories: [], grouped: {} } : shotStories();
       console.log('[useStories] Fetching stories...');
       
       // Get all non-expired stories

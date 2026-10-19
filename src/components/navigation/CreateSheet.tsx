@@ -87,7 +87,8 @@ export function CreateSheet({ open, onOpenChange }: CreateSheetProps) {
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent
           side="bottom"
-          overlayClassName="bg-black/20 backdrop-blur-xl"
+          overlayClassName="!bg-transparent"
+          overlayStyle={{ backgroundColor: "transparent", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}
           className="rounded-t-[28px] border-border bg-card/95 px-4 pb-8 backdrop-blur-xl"
           style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
           aria-labelledby="create-sheet-title"

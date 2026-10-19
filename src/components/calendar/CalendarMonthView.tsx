@@ -62,19 +62,23 @@ export function CalendarMonthView({
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
-    <div className="file-panel p-3">
-      <div className="mb-2 grid grid-cols-7 gap-1">
+    <section className="file-panel overflow-hidden p-3">
+      <div className="mb-2 flex items-center justify-between px-1">
+        <p className="kicker">// Month grid</p>
+        <p className="mono-label text-[8px] text-muted-foreground">Filed</p>
+      </div>
+      <div className="grid grid-cols-7 border-b border-border">
         {weekDays.map(day => (
           <div
             key={day}
-            className="mono-label py-2 text-center text-[8px] text-muted-foreground"
+            className="mono-label py-2 text-center text-[9px] text-[hsl(var(--scan))]"
           >
             {day}
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-px bg-border">
         {calendarDays.map((date, index) => (
           <motion.div
             key={index}
@@ -82,10 +86,10 @@ export function CalendarMonthView({
             animate={{ opacity: 1 }}
             transition={{ delay: index * 0.008 }}
             className={cn(
-              "min-h-[76px] rounded-[12px] border p-1 sm:min-h-[96px]",
-              date ? "cursor-pointer border-border bg-card/40" : "border-transparent",
+              "min-h-[78px] bg-card p-1 sm:min-h-[96px]",
+              date ? "cursor-pointer" : "bg-background/50",
               date && selectedDate?.toDateString() === date.toDateString()
-                ? "border-[hsl(var(--scan))] shadow-[inset_0_0_12px_rgba(121,195,207,0.28)]"
+                ? "bg-[color-mix(in_srgb,hsl(var(--scan))_18%,hsl(var(--card)))] shadow-[inset_0_0_0_1px_hsl(var(--scan))]"
                 : ""
             )}
             onClick={() => date && handleDateClick(date)}
@@ -98,8 +102,8 @@ export function CalendarMonthView({
                 )}>
                   {date.getDate()}
                 </span>
-                <div className="mt-1 space-y-1 relative z-10">
-                  {getItemsForDate(date).slice(0, 3).map(item => (
+                <div className="relative z-10 mt-1 space-y-1">
+                  {getItemsForDate(date).slice(0, 2).map(item => (
                     <button
                       key={item.id}
                       type="button"
@@ -109,19 +113,18 @@ export function CalendarMonthView({
                         onItemClick(item);
                       }}
                       className={cn(
-                        "w-full text-left text-[10px] sm:text-xs px-1.5 py-1 rounded truncate cursor-pointer transition-all",
-                        "hover:ring-2 hover:ring-primary/50 hover:scale-[1.02] active:scale-[0.98]",
-                        item.type === 'event' ? "bg-primary/30 text-primary font-medium" : "",
-                        item.type === 'project' ? "bg-[hsl(var(--scan)/0.45)] font-medium text-foreground" : "",
-                        item.type === 'personal' ? "bg-secondary/50 text-secondary-foreground" : ""
+                        "block w-full cursor-pointer truncate rounded-full px-1.5 py-0.5 text-left font-mono text-[8px] uppercase tracking-wide",
+                        item.type === 'event' ? "bg-[linear-gradient(180deg,#FFD6E8,#FF9FC8)] text-[#0A0A0A]" : "",
+                        item.type === 'project' ? "bg-[hsl(var(--scan))] text-[#0A0A0A]" : "",
+                        item.type === 'personal' ? "border border-border bg-[hsl(var(--panel-2))] text-foreground" : ""
                       )}
                     >
                       {item.title}
                     </button>
                   ))}
-                  {getItemsForDate(date).length > 3 && (
-                    <div className="text-[10px] text-muted-foreground">
-                      +{getItemsForDate(date).length - 3} more
+                  {getItemsForDate(date).length > 2 && (
+                    <div className="mono-label text-[7px] text-muted-foreground">
+                      +{getItemsForDate(date).length - 2}
                     </div>
                   )}
                 </div>
@@ -130,6 +133,6 @@ export function CalendarMonthView({
           </motion.div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

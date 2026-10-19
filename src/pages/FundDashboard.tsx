@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, Users, Calendar, GraduationCap, Building2, Briefcase, Heart, Crown, ArrowRight, Wallet, CheckCircle2, PiggyBank, RefreshCw, DollarSign } from "lucide-react";
+import { Users, Calendar, GraduationCap, Building2, Briefcase, Heart, Crown, ArrowRight, Wallet, CheckCircle2, PiggyBank, RefreshCw } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useMembership } from "@/hooks/useMembership";
@@ -157,22 +157,22 @@ export default function FundDashboard() {
         <div className="max-w-6xl mx-auto px-4 py-8 pb-24">
           {/* Hero Section */}
           <PageHeader
-            title="Community Fund"
-            description="Every dollar, every decision, fully visible. See exactly how community contributions fuel creative dreams."
+            eyebrow="Neo gold"
+            title="Fund"
+            description="Every dollar, every decision, fully visible."
             icon={<PiggyBank className="w-5 h-5" />}
             tile="gold"
-            className="mb-8"
+            className="mb-6"
           />
 
-          {/* View Toggle with Refresh */}
-          <div className="flex justify-center items-center gap-4 mb-8">
+          <div className="mb-6 flex items-center gap-3">
             <Tabs value={view} onValueChange={(v) => setView(v as "lifetime" | "monthly")} className="w-auto">
-              <TabsList className="bg-card/50 backdrop-blur-sm border border-border">
-                <TabsTrigger value="lifetime" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsList className="h-auto gap-1 rounded-none border-0 bg-transparent p-0">
+                <TabsTrigger value="lifetime" className="mono-label h-11 rounded-none border-0 border-b-2 border-transparent text-[11px] shadow-none data-[state=active]:border-[hsl(var(--bubble))] data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">
                   Lifetime
                 </TabsTrigger>
-                <TabsTrigger value="monthly" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  This Month
+                <TabsTrigger value="monthly" className="mono-label h-11 rounded-none border-0 border-b-2 border-transparent text-[11px] shadow-none data-[state=active]:border-[hsl(var(--bubble))] data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">
+                  This month
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -215,61 +215,23 @@ export default function FundDashboard() {
             transition={{ duration: 0.4 }}
             className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12"
           >
-            <Card className="relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-primary/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-              <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground mb-1">Total Collected</p>
+            {[
+              ["// Collected", stats?.totalCollected || 0, "$"],
+              ["// Distributed", stats?.totalDistributed || 0, "$"],
+              ["// Grants", stats?.grantsAwarded || 0, ""],
+              ["// Creators", stats?.creatorsSupported || 0, ""],
+            ].map(([label, value, prefix]) => (
+              <div key={String(label)} className="file-panel px-4 py-4">
+                <p className="kicker">{label}</p>
                 {fundLoading ? (
-                  <Skeleton className="h-8 w-24" />
+                  <Skeleton className="mt-2 h-8 w-24" />
                 ) : (
-                  <p className="text-2xl md:text-3xl font-bold text-foreground">
-                    <AnimatedNumber value={stats?.totalCollected || 0} prefix="$" />
+                  <p className="ether-title mt-2 text-[28px] text-foreground">
+                    <AnimatedNumber value={Number(value)} prefix={String(prefix)} />
                   </p>
                 )}
-              </CardContent>
-            </Card>
-
-            <Card className="border-border bg-card overflow-hidden relative">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-secondary/20 rounded-full -translate-y-1/2 translate-x-1/2" />
-              <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground mb-1">Distributed</p>
-                {fundLoading ? (
-                  <Skeleton className="h-8 w-24" />
-                ) : (
-                  <p className="text-2xl md:text-3xl font-bold text-foreground">
-                    <AnimatedNumber value={stats?.totalDistributed || 0} prefix="$" />
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="border-border bg-card overflow-hidden relative">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-secondary/20 rounded-full -translate-y-1/2 translate-x-1/2" />
-              <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground mb-1">Grants Awarded</p>
-                {fundLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  <p className="text-2xl md:text-3xl font-bold text-foreground">
-                    <AnimatedNumber value={stats?.grantsAwarded || 0} />
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="border-border bg-card overflow-hidden relative">
-              <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground mb-1">Creators Supported</p>
-                {fundLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  <p className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
-                    <AnimatedNumber value={stats?.creatorsSupported || 0} />
-                    <Heart className="w-5 h-5 text-primary fill-primary" />
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+              </div>
+            ))}
           </motion.div>
 
           {/* Charts Section */}
@@ -282,10 +244,8 @@ export default function FundDashboard() {
             >
               <Card className="border-border bg-card h-full">
                 <CardHeader>
-                  <CardTitle className="text-xl ether-title flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-primary" />
-                    Allocation Breakdown
-                  </CardTitle>
+                  <p className="kicker">// Allocation</p>
+                  <CardTitle className="ether-title text-[22px]">Breakdown</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-[300px]">
@@ -335,10 +295,8 @@ export default function FundDashboard() {
             >
               <Card className="border-border bg-card h-full">
                 <CardHeader>
-                  <CardTitle className="text-xl ether-title flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-primary" />
-                    6-Month Trend
-                  </CardTitle>
+                  <p className="kicker">// Trend</p>
+                  <CardTitle className="ether-title text-[22px]">Six months</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-[300px]">
@@ -397,7 +355,8 @@ export default function FundDashboard() {
           >
             <Card className="border-border bg-card">
               <CardHeader>
-                <CardTitle className="text-xl ether-title">Where Your Contribution Goes</CardTitle>
+                <p className="kicker">// File</p>
+                <CardTitle className="ether-title text-[22px]">Where it goes</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4">
