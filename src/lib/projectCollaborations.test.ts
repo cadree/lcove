@@ -8,6 +8,8 @@ import {
   canViewProject,
   chatAlertChannels,
   formatRoleCompensation,
+  milestonesForInsert,
+  roleCreditAmount,
   shouldEnqueueChatEmail,
   shouldNotifyCommunity,
 } from "./projectCollaborations.ts";
@@ -209,6 +211,28 @@ describe("edge function rules stay aligned", () => {
       emailEnabled: null,
     };
     assert.deepEqual(chatAlertChannels(alert), edgeChatAlertChannels(alert));
+  });
+});
+
+describe("project create payload", () => {
+  it("skips a blank milestone and stores a missing date as null", () => {
+    assert.deepEqual(
+      milestonesForInsert([
+        { title: "Pre-production", phase: "pre_production", due_date: "" },
+        { title: "   ", phase: "custom", due_date: "" },
+        { title: "Delivery", phase: "final_delivery", due_date: "2026-12-01" },
+      ]),
+      [
+        { title: "Pre-production", phase: "pre_production", due_date: null },
+        { title: "Delivery", phase: "final_delivery", due_date: "2026-12-01" },
+      ],
+    );
+  });
+
+  it("keeps a pay-only role at 0 XP", () => {
+    assert.equal(roleCreditAmount(0), 0);
+    assert.equal(roleCreditAmount(undefined), 0);
+    assert.equal(roleCreditAmount(40), 40);
   });
 });
 

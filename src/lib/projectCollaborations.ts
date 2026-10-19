@@ -104,6 +104,38 @@ export function calendarInclusion(input: {
   return { visible: true, start: input.timelineStart || input.createdAt };
 }
 
+export interface MilestoneDraft {
+  title: string;
+  phase?: string;
+  due_date?: string | null;
+}
+
+/** Drop untitled milestone rows. A blank date is null, not "", so the date column accepts the insert. */
+export function milestonesForInsert(rows: MilestoneDraft[]): {
+  title: string;
+  phase: string | null;
+  due_date: string | null;
+}[] {
+  return rows.flatMap((row) => {
+    const title = row.title.trim();
+    if (!title) return [];
+    const due = row.due_date?.trim() ?? "";
+    const phase = row.phase?.trim() ?? "";
+    return [{
+      title,
+      phase: phase || null,
+      due_date: due || null,
+    }];
+  });
+}
+
+/** XP is only the amount the owner typed on that role. A pay-only role stays at 0. */
+export function roleCreditAmount(credit: number | null | undefined): number {
+  const value = Number(credit);
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return value;
+}
+
 export function youtubeId(url: string): string | null {
   const match = url.match(
     /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/,
