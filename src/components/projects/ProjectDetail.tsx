@@ -21,6 +21,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { SquircleIcon } from '@/components/world/SquircleIcon';
 import { useToast } from '@/hooks/use-toast';
 import { shareLink } from '@/lib/shareLink';
 import { EditProjectDialog } from '@/components/projects/EditProjectDialog';
@@ -336,9 +337,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
     if (att.file_type === 'video') {
       return (
         <div className="w-full h-32 bg-muted/40 flex flex-col items-center justify-center gap-2">
-          <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
-            <Play className="h-5 w-5 text-purple-400" />
-          </div>
+          <SquircleIcon icon={Play} fill="ink" size={40} />
           <span className="text-[10px] text-muted-foreground">Video</span>
         </div>
       );

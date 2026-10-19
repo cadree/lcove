@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { logAuthEvent, logAuthError } from '@/lib/authDebug';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, User, Phone, Wifi, WifiOff } from 'lucide-react';
-import etherBearLogo from '@/assets/ether-bear-logo.png';
+import lcoveMark from '@/assets/lcove-mark-cutout.png';
 
 const signupSchema = z.object({
   email: z.string().email('Please enter a valid email').max(255),
@@ -394,9 +394,9 @@ const Auth = () => {
             className="mb-4"
           >
             <img 
-              src={etherBearLogo} 
-              alt="Ether" 
-              className="h-24 w-auto mx-auto object-contain"
+              src={lcoveMark} 
+              alt="" 
+              className="mark-cutout h-24 w-24 mx-auto object-contain"
             />
           </motion.div>
           <p className="eyebrow mb-2">Ether</p>
@@ -419,18 +419,18 @@ const Auth = () => {
         </div>
 
         <motion.div
-          className="border border-border rounded-[2px] bg-card p-8"
+          className="file-panel p-8"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
         >
           {(mode === 'login' || mode === 'signup') && (
-            <div className="flex mb-8 border border-border p-1">
+            <div className="mb-8 flex rounded-[16px] border border-border p-1">
               <button
                 onClick={() => setMode('login')}
-                className={`flex-1 min-h-11 rounded-[2px] text-sm font-medium transition-all ${
+                className={`mono-label flex-1 min-h-11 rounded-[14px] text-[12px] transition-all ${
                   mode === 'login' 
-                    ? 'bg-primary text-primary-foreground' 
+                    ? 'bg-gradient-to-br from-[#FFD6E8] to-[#FF9FC8] text-[#0A0A0A]' 
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
@@ -438,9 +438,9 @@ const Auth = () => {
               </button>
               <button
                 onClick={() => setMode('signup')}
-                className={`flex-1 min-h-11 rounded-[2px] text-sm font-medium transition-all ${
+                className={`mono-label flex-1 min-h-11 rounded-[14px] text-[12px] transition-all ${
                   mode === 'signup' 
-                    ? 'bg-primary text-primary-foreground' 
+                    ? 'bg-gradient-to-br from-[#FFD6E8] to-[#FF9FC8] text-[#0A0A0A]' 
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >

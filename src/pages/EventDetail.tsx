@@ -32,6 +32,7 @@ import {
   QrCode,
   ScanLine,
 } from "lucide-react";
+import { SquircleIcon } from "@/components/world/SquircleIcon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1225,9 +1226,7 @@ function FinanceTab({ orders, event, totalRevenue, totalCredits }: FinanceTabPro
         <CardContent>
           {totalRevenue > 0 ? (
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-                <Clock className="h-5 w-5 text-amber-500" />
-              </div>
+              <SquircleIcon icon={Clock} fill="gold" size={40} />
               <div>
                 <p className="font-medium text-sm">Pending</p>
                 <p className="text-xs text-muted-foreground">
@@ -1775,9 +1774,7 @@ function FinanceTabV2({
         <CardContent>
           {grossCents > 0 ? (
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-                <Clock className="h-5 w-5 text-amber-500" />
-              </div>
+              <SquircleIcon icon={Clock} fill="gold" size={40} />
               <div>
                 <p className="font-medium text-sm">Pending</p>
                 <p className="text-xs text-muted-foreground">Payouts processed after the event ends</p>

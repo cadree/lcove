@@ -74,7 +74,7 @@ const MessageComposer = ({ onSend, onTyping, isSending }: MessageComposerProps) 
 
   return (
     <div 
-      className="p-4 border-t border-border/50 bg-card/50 backdrop-blur-sm"
+      className="tab-bar border-t border-border p-4"
       style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 16px), 16px)' }}
     >
       {/* File Preview */}
@@ -143,7 +143,7 @@ const MessageComposer = ({ onSend, onTyping, isSending }: MessageComposerProps) 
             value={content}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            className="min-h-[44px] max-h-32 resize-none bg-muted/30 border-border/50 rounded-2xl pr-12"
+            className="min-h-[44px] max-h-32 resize-none rounded-[14px] border-border bg-background/60 pr-12"
             rows={1}
           />
           <Button
@@ -160,7 +160,7 @@ const MessageComposer = ({ onSend, onTyping, isSending }: MessageComposerProps) 
           onClick={handleSend}
           disabled={(!content.trim() && !selectedFile) || isSending}
           size="icon"
-          className="rounded-full w-11 h-11 shrink-0"
+          className="h-11 w-11 shrink-0 rounded-[14px]"
         >
           {isSending ? (
             <Loader2 className="w-5 h-5 animate-spin" />

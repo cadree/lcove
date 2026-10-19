@@ -164,7 +164,7 @@ export default function EventsDashboard() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-lg font-display font-semibold">My Events</h1>
+              <h1 className="ether-title text-lg">My Events</h1>
               <p className="text-xs text-muted-foreground">{events?.length || 0} events</p>
             </div>
           </div>

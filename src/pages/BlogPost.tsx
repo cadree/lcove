@@ -59,23 +59,24 @@ export default function BlogPostPage() {
           <div className="h-40 animate-pulse rounded-lg bg-muted" />
         ) : isError || !post || hidden ? (
           <div className="space-y-3 text-center">
-            <h1 className="font-display text-2xl">Post unavailable</h1>
+            <h1 className="ether-title text-2xl">Post unavailable</h1>
             <Button asChild variant="outline">
               <Link to="/feed">Go home</Link>
             </Button>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="file-panel space-y-4 p-4 sm:p-6">
             {post.cover_image_url && (
               <img
                 src={post.cover_image_url}
                 alt=""
-                className="aspect-video w-full rounded-lg object-cover"
+                className="aspect-video w-full object-cover"
               />
             )}
-            <h1 className="font-display text-3xl leading-tight text-foreground">{post.title}</h1>
-            <p className="text-sm text-muted-foreground">
-              {authorName}
+            <p className="kicker">Blog</p>
+            <h1 className="ether-title text-3xl leading-tight text-foreground">{post.title}</h1>
+            <p className="font-body text-sm text-muted-foreground">
+              <span className="font-bold text-foreground">{authorName}</span>
               {when ? ` · ${format(new Date(when), "MMMM d, yyyy")}` : ""}
             </p>
             <div className="space-y-4 text-base leading-relaxed text-foreground">

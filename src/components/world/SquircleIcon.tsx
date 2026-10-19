@@ -18,6 +18,10 @@ export type IconFill = keyof typeof iconFills;
 
 const INK_GLYPH = new Set<IconFill>(["pink", "bone", "gold"]);
 
+export function glyphColor(fill: IconFill) {
+  return INK_GLYPH.has(fill) ? "#0A0A0A" : "#FFFFFF";
+}
+
 interface SquircleIconProps {
   icon: LucideIcon;
   fill: IconFill;
@@ -36,7 +40,7 @@ export function SquircleIcon({ icon: Icon, fill, size = 40, glyph, className }: 
         width: size,
         height: size,
         backgroundImage: iconFills[fill],
-        color: INK_GLYPH.has(fill) ? "#0A0A0A" : "#FFFFFF",
+        color: glyphColor(fill),
       }}
       aria-hidden="true"
     >

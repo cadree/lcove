@@ -92,7 +92,8 @@ const Membership = () => {
                 : "Become a Member"
             }
             description="Support the creative community and unlock exclusive benefits. Every contribution goes directly into community grants, events, and education."
-            icon={<Heart className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+            icon={<Heart className="w-5 h-5" />}
+            tile="gold"
             className="mb-12 text-center"
           />
 

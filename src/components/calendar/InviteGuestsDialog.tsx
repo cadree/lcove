@@ -88,7 +88,7 @@ export function InviteGuestsDialog({ eventId, eventTitle, children }: InviteGues
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 font-serif">
+          <DialogTitle className="ether-title flex items-center gap-2 text-2xl">
             <UserPlus className="w-5 h-5 text-primary" />
             Invite Guests to {eventTitle}
           </DialogTitle>

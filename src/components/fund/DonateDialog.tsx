@@ -77,7 +77,7 @@ export function DonateDialog({ children }: { children: React.ReactNode }) {
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 font-serif">
+          <DialogTitle className="ether-title flex items-center gap-2 text-2xl">
             <Heart className="w-5 h-5 text-primary" />
             Support the Community Fund
           </DialogTitle>

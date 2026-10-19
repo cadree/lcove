@@ -111,7 +111,8 @@ const Projects: React.FC = () => {
         <PageHeader
           title="Projects"
           description="Find collaborators, share budgets transparently"
-          icon={<FolderKanban className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+          icon={<FolderKanban className="w-5 h-5" />}
+          tile="cyan"
           backPath="/"
           actions={
             user && (

@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Coins, Flame, Sparkles, Info } from 'lucide-react';
+import { SquircleIcon } from '@/components/world/SquircleIcon';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
@@ -27,39 +28,19 @@ export const CreditBalanceCard: React.FC<CreditBalanceCardProps> = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <Card className={cn(
-        "relative overflow-hidden",
-        isGenesis 
-          ? "bg-gradient-to-br from-orange-500/10 via-orange-400/5 to-background border-orange-500/20" 
-          : "bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20",
-        className
-      )}>
-        {/* Decorative element */}
-        <div className={cn(
-          "absolute -right-8 -top-8 h-24 w-24 rounded-full blur-2xl opacity-30",
-          isGenesis ? "bg-orange-500" : "bg-primary"
-        )} />
-        
+      <Card className={cn("relative overflow-hidden", className)}>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {isGenesis ? (
-                <div className="p-2 rounded-full bg-orange-500/10">
-                  <Flame className="h-4 w-4 text-orange-500" />
-                </div>
-              ) : (
-                <div className="p-2 rounded-full bg-primary/10">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                </div>
-              )}
-              <CardTitle className="text-base font-medium">
+              <SquircleIcon icon={isGenesis ? Flame : Sparkles} fill={isGenesis ? "gold" : "pink"} size={32} glyph={16} />
+              <CardTitle className="ether-title text-[15px]">
                 {isGenesis ? 'Genesis Credit' : 'Earned Credit'}
               </CardTitle>
             </div>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button className="text-muted-foreground hover:text-foreground transition-colors">
+                  <button className="inline-flex h-11 w-11 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
                     <Info className="h-4 w-4" />
                   </button>
                 </TooltipTrigger>
@@ -83,16 +64,10 @@ export const CreditBalanceCard: React.FC<CreditBalanceCardProps> = ({
         
         <CardContent>
           <div className="flex items-end gap-2">
-            <span className={cn(
-              "text-3xl font-bold tabular-nums",
-              isGenesis ? "text-orange-600 dark:text-orange-400" : "text-primary"
-            )}>
+            <span className="font-body text-3xl font-extrabold tabular-nums text-foreground">
               {balance.toLocaleString()}
             </span>
-            <span className={cn(
-              "text-lg font-medium mb-1",
-              isGenesis ? "text-orange-500/70" : "text-primary/70"
-            )}>
+            <span className="mono-label mb-1 text-[11px] text-muted-foreground">
               LC
             </span>
           </div>
@@ -100,12 +75,7 @@ export const CreditBalanceCard: React.FC<CreditBalanceCardProps> = ({
           <div className="mt-2 flex items-center gap-2">
             <Badge 
               variant="outline" 
-              className={cn(
-                "text-xs",
-                isGenesis 
-                  ? "border-orange-500/30 text-orange-600 dark:text-orange-400" 
-                  : "border-primary/30 text-primary"
-              )}
+              className="mono-label text-[9px]"
             >
               {isGenesis ? 'Starter' : 'Contribution-Backed'}
             </Badge>
@@ -138,20 +108,13 @@ export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4 }}
     >
-      <Card className={cn(
-        "relative overflow-hidden bg-gradient-to-br from-card via-card to-muted/30",
-        className
-      )}>
-        {/* Decorative elements */}
-        <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/5 blur-3xl" />
-        <div className="absolute -left-8 -bottom-8 h-32 w-32 rounded-full bg-orange-500/5 blur-2xl" />
-        
+      <Card className={cn("relative overflow-hidden", className)}>
         <CardHeader>
-          <CardDescription className="flex items-center gap-2">
+          <CardDescription className="mono-label flex items-center gap-2 text-[10px]">
             <Coins className="h-4 w-4" />
             Total Balance
           </CardDescription>
-          <CardTitle className="text-4xl font-bold tabular-nums">
+          <CardTitle className="font-body text-4xl font-extrabold tabular-nums">
             {totalBalance.toLocaleString()} <span className="text-2xl text-muted-foreground font-medium">LC</span>
           </CardTitle>
         </CardHeader>
@@ -159,7 +122,7 @@ export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({
         <CardContent>
           <div className="flex items-center gap-4 text-sm">
             <div className="flex items-center gap-1.5">
-              <div className="h-2 w-2 rounded-full bg-orange-500" />
+              <div className="h-2 w-2 rounded-full bg-[#CAA07E]" />
               <span className="text-muted-foreground">Genesis:</span>
               <span className="font-medium">{genesisBalance.toLocaleString()}</span>
             </div>
@@ -175,7 +138,7 @@ export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({
             <div className="mt-3 h-2 rounded-full bg-muted overflow-hidden flex">
               {genesisBalance > 0 && (
                 <div 
-                  className="bg-orange-500 transition-all duration-500"
+                  className="bg-[#CAA07E] transition-all duration-500"
                   style={{ width: `${(genesisBalance / totalBalance) * 100}%` }}
                 />
               )}

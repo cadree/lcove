@@ -83,9 +83,9 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
         xl: "calc(var(--radius) + 4px)",
-        "2xl": "calc(var(--radius) + 8px)",
+        "2xl": "16px",
         "3xl": "calc(var(--radius) + 16px)",
-        media: "2px",
+        media: "0px",
       },
       letterSpacing: {
         eyebrow: "0.16em",

@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
-import lcBearLogo from "@/assets/lc-bear-logo.png";
+import lcoveMark from "@/assets/lcove-mark-cutout.png";
 import { usePlatformStats } from "@/hooks/usePlatformStats";
 
 const HeroSection = () => {
@@ -30,9 +30,9 @@ const HeroSection = () => {
           className="mb-4 sm:mb-6"
         >
           <img
-            src={lcBearLogo}
-            alt="LC Bear Logo"
-            className="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 mx-auto object-contain"
+            src={lcoveMark}
+            alt=""
+            className="mark-cutout mx-auto h-16 w-16 object-contain sm:h-24 sm:w-24 md:h-32 md:w-32"
           />
         </motion.div>
 

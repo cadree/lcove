@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SquircleIcon } from '@/components/world/SquircleIcon';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -148,7 +149,8 @@ const WalletPage: React.FC = () => {
         <PageHeader
           title="Wallet"
           description={myXp ? `Your LC Credit balance and contribution history · Level ${myXp.level}` : "Your LC Credit balance and contribution history"}
-          icon={<Wallet className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+          icon={<Wallet className="w-5 h-5" />}
+          tile="gold"
           className="mb-6"
         />
 
@@ -382,9 +384,7 @@ const WalletPage: React.FC = () => {
                 {payouts.map((payout) => (
                   <div key={payout.id} className="flex items-center justify-between p-3 rounded-lg bg-card border border-border">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                        <ArrowUpRight className="h-4 w-4" />
-                      </div>
+                      <SquircleIcon icon={ArrowUpRight} fill="gold" size={32} glyph={16} />
                       <div>
                         <p className="font-medium text-sm">Payout</p>
                         <p className="text-xs text-muted-foreground">

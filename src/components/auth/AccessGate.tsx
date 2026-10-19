@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { motion } from 'framer-motion';
-import lcBearLogo from '@/assets/lc-bear-logo.png';
+import lcoveMark from '@/assets/lcove-mark-cutout.png';
 
 interface AccessGateProps {
   children: React.ReactNode;
@@ -150,19 +150,19 @@ const AccessGate = ({ children }: AccessGateProps) => {
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
-            className="bg-card border border-border rounded-2xl p-8 md:p-12 text-center max-w-md mx-4 shadow-2xl"
+            className="file-panel p-8 md:p-12 text-center max-w-md mx-4"
             onClick={(e) => e.stopPropagation()}
           >
             <motion.img
-              src={lcBearLogo}
-              alt="Ether"
+              src={lcoveMark}
+              alt=""
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
-              className="w-24 h-24 mx-auto mb-6 object-contain"
+              className="mark-cutout mx-auto mb-6 h-24 w-24 object-contain"
             />
             
-            <h2 className="font-display text-3xl md:text-4xl text-foreground mb-4">
+            <h2 className="ether-title mb-4 text-3xl text-foreground md:text-4xl">
               Welcome home Familcy
             </h2>
             

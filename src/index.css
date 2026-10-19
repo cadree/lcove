@@ -644,13 +644,12 @@
   background: radial-gradient(125% 105% at 50% 38%, transparent 55%, rgba(60, 40, 30, 0.16));
 }
 
-.logo-cutout {
-  mix-blend-mode: multiply;
+.mark-cutout {
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.45));
 }
 
-.dark .logo-cutout {
-  filter: invert(1);
-  mix-blend-mode: screen;
+.light .mark-cutout {
+  filter: drop-shadow(0 6px 14px rgba(60, 40, 30, 0.28));
 }
 
 .squircle-icon {

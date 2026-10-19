@@ -1,8 +1,9 @@
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, X } from 'lucide-react';
+import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, X, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Notification, NotificationType } from '@/hooks/useNotifications';
+import { SquircleIcon, type IconFill } from '@/components/world/SquircleIcon';
 
 interface NotificationItemProps {
   notification: Notification;
@@ -11,46 +12,14 @@ interface NotificationItemProps {
   onProjectInviteTap?: (notification: Notification) => void;
 }
 
-const getNotificationIcon = (type: NotificationType) => {
-  switch (type) {
-    case 'message':
-      return <MessageSquare className="h-5 w-5" />;
-    case 'like':
-      return <Heart className="h-5 w-5 text-pink-500" />;
-    case 'comment':
-      return <MessageCircle className="h-5 w-5" />;
-    case 'project_invite':
-      return <Users className="h-5 w-5 text-blue-500" />;
-    case 'project_client_invite':
-      return <Users className="h-5 w-5 text-purple-500" />;
-    case 'event_reminder':
-      return <Calendar className="h-5 w-5 text-amber-500" />;
-    case 'live_stream':
-      return <Radio className="h-5 w-5 text-red-500" />;
-    default:
-      return <MessageSquare className="h-5 w-5" />;
-  }
-};
-
-const getNotificationColor = (type: NotificationType) => {
-  switch (type) {
-    case 'message':
-      return 'bg-primary/10';
-    case 'like':
-      return 'bg-pink-500/10';
-    case 'comment':
-      return 'bg-secondary/50';
-    case 'project_invite':
-      return 'bg-blue-500/10';
-    case 'project_client_invite':
-      return 'bg-purple-500/10';
-    case 'event_reminder':
-      return 'bg-amber-500/10';
-    case 'live_stream':
-      return 'bg-red-500/10';
-    default:
-      return 'bg-muted';
-  }
+const notificationMark: Record<NotificationType, { icon: LucideIcon; fill: IconFill }> = {
+  message: { icon: MessageSquare, fill: 'violet' },
+  like: { icon: Heart, fill: 'pink' },
+  comment: { icon: MessageCircle, fill: 'bone' },
+  project_invite: { icon: Users, fill: 'cyan' },
+  project_client_invite: { icon: Users, fill: 'denim' },
+  event_reminder: { icon: Calendar, fill: 'gold' },
+  live_stream: { icon: Radio, fill: 'red' },
 };
 
 export const NotificationItem: React.FC<NotificationItemProps> = ({
@@ -74,9 +43,8 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
     <div
       onClick={handleClick}
       className={cn(
-        "flex items-start gap-3 p-4 cursor-pointer transition-colors relative group",
-        isUnread ? "bg-primary/5" : "bg-transparent",
-        "hover:bg-muted/50"
+        "file-panel relative mb-2 flex cursor-pointer items-start gap-3 p-4 transition-colors group",
+        isUnread ? "border-[hsl(var(--scan))]" : "",
       )}
     >
       {/* Unread indicator */}
@@ -85,18 +53,17 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
       )}
 
       {/* Icon */}
-      <div className={cn(
-        "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center",
-        getNotificationColor(notification.type as NotificationType)
-      )}>
-        {getNotificationIcon(notification.type as NotificationType)}
-      </div>
+      <SquircleIcon
+        icon={notificationMark[notification.type]?.icon ?? MessageSquare}
+        fill={notificationMark[notification.type]?.fill ?? 'bone'}
+        size={40}
+      />
 
       {/* Content */}
       <div className="flex-1 min-w-0">
         <p className={cn(
-          "text-sm",
-          isUnread ? "font-medium text-foreground" : "text-muted-foreground"
+          "font-body text-sm",
+          isUnread ? "font-bold text-foreground" : "text-muted-foreground"
         )}>
           {notification.title}
         </p>
@@ -105,7 +72,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
             {notification.body}
           </p>
         )}
-        <p className="text-xs text-muted-foreground/70 mt-1">
+        <p className="mono-label mt-1 text-[9px] text-muted-foreground">
           {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
         </p>
       </div>

@@ -230,12 +230,16 @@ const Store = () => {
                   Back to All Stores
                 </Button>
                 <div className="flex items-center gap-4">
-                  <Avatar className="w-16 h-16 border-2 border-border">
-                    <AvatarImage src={viewingStore.logo_url || viewingStore.profile?.avatar_url || undefined} />
-                    <AvatarFallback className="text-lg">{viewingStore.name.charAt(0)}</AvatarFallback>
-                  </Avatar>
+                  {viewingStore.logo_url ? (
+                    <img src={viewingStore.logo_url} alt="" className="mark-cutout h-16 w-16 object-contain" />
+                  ) : (
+                    <Avatar className="h-16 w-16 border-2 border-border">
+                      <AvatarImage src={viewingStore.profile?.avatar_url || undefined} />
+                      <AvatarFallback className="text-lg">{viewingStore.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                  )}
                   <div>
-                    <h1 className="text-2xl font-bold text-foreground">{viewingStore.name}</h1>
+                    <h1 className="ether-title text-2xl text-foreground">{viewingStore.name}</h1>
                     <p className="text-muted-foreground">
                       {viewingStore.profile?.display_name}
                       {viewingStore.profile?.city && ` • ${viewingStore.profile.city}`}
@@ -282,7 +286,8 @@ const Store = () => {
               <PageHeader
                 title="Store"
                 description="Discover products, services & studio rentals"
-                icon={<ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+                icon={<ShoppingBag className="w-5 h-5" />}
+                tile="gold"
                 className="mb-5"
                 actions={
                   user && !storeIdParam && (

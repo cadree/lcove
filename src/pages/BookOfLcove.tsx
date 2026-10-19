@@ -103,7 +103,7 @@ const BookOfLcove: React.FC = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center space-y-4">
-          <h1 className="text-2xl font-serif">The Book of LCOVE</h1>
+          <h1 className="ether-title text-2xl">The Book of LCOVE</h1>
           <p className="text-muted-foreground">Please sign in to read</p>
           <Button onClick={() => navigate('/auth')}>Sign in</Button>
         </div>
@@ -112,7 +112,7 @@ const BookOfLcove: React.FC = () => {
   }
 
   return (
-    <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-[#0d0a08] text-[#e8e0d5]">
+    <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-background text-foreground">
       {/* Paper texture overlay */}
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
            style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 400 400\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }} />
@@ -129,9 +129,9 @@ const BookOfLcove: React.FC = () => {
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-[#1a1512] rounded-lg p-8 max-w-md text-center space-y-6 border border-primary/20"
+              className="file-panel max-w-md space-y-6 p-8 text-center"
             >
-              <h2 className="text-xl font-serif">Continue where you left off?</h2>
+              <h2 className="ether-title text-xl">Continue where you left off?</h2>
               <p className="text-muted-foreground">
                 You were on page {savedPage} of {TOTAL_PAGES}
               </p>
@@ -146,7 +146,7 @@ const BookOfLcove: React.FC = () => {
 
       {/* Header */}
       <header
-        className="relative z-40 shrink-0 border-b border-white/10 bg-[#0d0a08]/95 px-4 pb-3 backdrop-blur-md"
+        className="tab-bar relative z-40 shrink-0 border-b border-border px-4 pb-3"
         style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
       >
         <div className="max-w-4xl mx-auto flex items-center gap-2">
@@ -164,7 +164,7 @@ const BookOfLcove: React.FC = () => {
           </Button>
           
           <div className="min-w-0 flex-1 text-center">
-            <p className="truncate text-xs text-muted-foreground uppercase tracking-widest">
+            <p className="mono-label truncate text-[10px] text-muted-foreground">
               {currentChapter?.title || 'The Book of LCOVE'}
             </p>
           </div>
@@ -184,11 +184,11 @@ const BookOfLcove: React.FC = () => {
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent className="w-80 bg-[#1a1512] border-l-primary/20">
+              <SheetContent className="w-80 border-l border-border bg-card">
                 <ScrollArea className="h-full pr-4">
                   <div className="space-y-6 py-4">
                     <div>
-                      <h3 className="font-serif text-lg mb-3">Chapters</h3>
+                      <h3 className="ether-title mb-3 text-lg">Chapters</h3>
                       <div className="space-y-2">
                         {BOOK_CHAPTERS.map(ch => (
                           <button
@@ -208,7 +208,7 @@ const BookOfLcove: React.FC = () => {
                     <Separator className="bg-primary/20" />
 
                     <div>
-                      <h3 className="font-serif text-lg mb-3 flex items-center gap-2">
+                      <h3 className="ether-title mb-3 text-lg flex items-center gap-2">
                         <Bookmark className="h-4 w-4" /> Bookmarks
                       </h3>
                       {bookmarks.length === 0 ? (
@@ -231,7 +231,7 @@ const BookOfLcove: React.FC = () => {
                     <Separator className="bg-primary/20" />
 
                     <div>
-                      <h3 className="font-serif text-lg mb-3 flex items-center gap-2">
+                      <h3 className="ether-title mb-3 text-lg flex items-center gap-2">
                         <Star className="h-4 w-4" /> Key Takeaways
                       </h3>
                       {importantHighlights.length === 0 ? (
@@ -271,18 +271,18 @@ const BookOfLcove: React.FC = () => {
             {currentPageData && (
               <article className="space-y-6">
                 {currentPageData.chapter && (
-                  <p className="text-primary text-sm uppercase tracking-widest text-center">
+                  <p className="kicker text-center">
                     {currentPageData.chapter}
                   </p>
                 )}
                 
                 {currentPageData.title && (
-                  <h1 className="text-2xl sm:text-4xl font-serif text-center leading-tight text-balance">
+                  <h1 className="ether-title text-balance text-center text-2xl leading-tight sm:text-4xl">
                     {currentPageData.title}
                   </h1>
                 )}
 
-                <div className="space-y-4 font-serif text-lg leading-relaxed text-[#c9c0b5]">
+                <div className="lore space-y-4 text-lg leading-relaxed text-foreground">
                   {currentPageData.content.map((paragraph, i) => (
                     <p key={i} className={paragraph.startsWith('•') ? 'pl-4' : ''}>
                       {paragraph}
@@ -297,12 +297,12 @@ const BookOfLcove: React.FC = () => {
 
       {/* Footer Navigation */}
       <footer
-        className="relative z-40 shrink-0 border-t border-white/10 bg-[#0d0a08]/95 px-4 pt-4 backdrop-blur-md"
+        className="tab-bar relative z-40 shrink-0 border-t border-border px-4 pt-4"
         style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
       >
         <div className="max-w-4xl mx-auto">
           {/* Progress bar */}
-          <div className="h-1 bg-[#2a2520] rounded-full mb-4 overflow-hidden">
+          <div className="mb-4 h-1 overflow-hidden rounded-full bg-muted">
             <div 
               className="h-full bg-primary transition-all duration-300"
               style={{ width: `${(currentPage / TOTAL_PAGES) * 100}%` }}
@@ -332,7 +332,7 @@ const BookOfLcove: React.FC = () => {
                     )}
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="bg-[#1a1512] border-primary/20">
+                <DialogContent className="border-border bg-card">
                   <DialogHeader>
                     <DialogTitle>Notes for Page {currentPage}</DialogTitle>
                   </DialogHeader>
@@ -341,7 +341,7 @@ const BookOfLcove: React.FC = () => {
                       placeholder="Add a note..."
                       value={noteText}
                       onChange={(e) => setNoteText(e.target.value)}
-                      className="bg-[#0d0a08] border-primary/20"
+                      className="border-border bg-background"
                     />
                     <Button onClick={handleAddNote} disabled={!noteText.trim()}>
                       Save Note
@@ -350,7 +350,7 @@ const BookOfLcove: React.FC = () => {
                       <div className="space-y-2 mt-4">
                         <p className="text-sm text-muted-foreground">Your notes:</p>
                         {pageNotes.map(note => (
-                          <div key={note.id} className="p-3 bg-[#0d0a08] rounded text-sm">
+                          <div key={note.id} className="rounded-[12px] bg-background p-3 text-sm">
                             {note.note_text}
                           </div>
                         ))}

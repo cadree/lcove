@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MoreMenuButton } from "@/components/navigation/MoreMenu";
+import { glyphColor, iconFills, type IconFill } from "@/components/world/SquircleIcon";
 import { cn } from "@/lib/utils";
 
 interface PageHeaderProps {
@@ -10,6 +11,7 @@ interface PageHeaderProps {
   description?: string;
   eyebrow?: string;
   icon?: ReactNode;
+  tile?: IconFill;
   actions?: ReactNode;
   showBack?: boolean;
   showMore?: boolean;
@@ -22,6 +24,7 @@ export const PageHeader = ({
   description,
   eyebrow,
   icon,
+  tile = "pink",
   actions,
   showBack = true,
   showMore = true,
@@ -54,7 +57,15 @@ export const PageHeader = ({
         <div className="min-w-0 flex-1">
           {eyebrow && <p className="eyebrow">{eyebrow}</p>}
           <div className="flex items-center gap-2 min-w-0">
-            {icon && <span className="shrink-0 text-foreground" aria-hidden="true">{icon}</span>}
+            {icon && (
+              <span
+                className="squircle-icon shrink-0 [&_svg]:!h-[18px] [&_svg]:!w-[18px] [&_svg]:!text-current"
+                style={{ width: 34, height: 34, backgroundImage: iconFills[tile], color: glyphColor(tile) }}
+                aria-hidden="true"
+              >
+                {icon}
+              </span>
+            )}
             <h1 className="ether-title text-2xl sm:text-3xl leading-tight">{title}</h1>
           </div>
         </div>

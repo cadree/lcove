@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Bell, Check, Trash2 } from 'lucide-react';
+import { SquircleIcon } from '@/components/world/SquircleIcon';
 import { useNotifications, Notification, NotificationType } from '@/hooks/useNotifications';
 import { NotificationItem } from './NotificationItem';
 import { ProjectAcceptedDialog } from '@/components/projects/ProjectAcceptedDialog';
@@ -72,7 +73,7 @@ export const NotificationList: React.FC = () => {
       <div className="space-y-4 p-4">
         {[...Array(5)].map((_, i) => (
           <div key={i} className="flex items-start gap-3">
-            <Skeleton className="h-10 w-10 rounded-full" />
+            <Skeleton className="h-10 w-10 rounded-[9px]" />
             <div className="flex-1 space-y-2">
               <Skeleton className="h-4 w-3/4" />
               <Skeleton className="h-3 w-1/2" />
@@ -127,7 +128,7 @@ export const NotificationList: React.FC = () => {
               <TabsTrigger
                 key={type.value}
                 value={type.value}
-                className="shrink-0 rounded-full px-3 py-1.5 text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+                className="mono-label h-11 shrink-0 rounded-full border border-transparent px-3 text-[11px] data-[state=active]:border-[hsl(var(--scan))] data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_0_12px_rgba(121,195,207,0.35)]"
               >
                 {type.label}
               </TabsTrigger>
@@ -147,11 +148,11 @@ export const NotificationList: React.FC = () => {
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.1 }}
-                className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-6"
+                className="mb-6"
               >
-                <Bell className="w-10 h-10 text-primary/60" />
+                <SquircleIcon icon={Bell} fill="rose" size={52} />
               </motion.div>
-              <h3 className="font-display text-xl font-medium text-foreground mb-2">
+              <h3 className="ether-title mb-2 text-xl text-foreground">
                 All caught up
               </h3>
               <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">
@@ -162,10 +163,10 @@ export const NotificationList: React.FC = () => {
             <div>
               {Object.entries(groupedNotifications).map(([date, items]) => (
                 <div key={date}>
-                  <div className="px-4 py-2 bg-muted/30">
-                    <span className="text-xs font-medium text-muted-foreground">{date}</span>
+                  <div className="px-1 py-2">
+                    <span className="mono-label text-[9px] text-muted-foreground">{date}</span>
                   </div>
-                  <div className="divide-y divide-border/50">
+                  <div className="space-y-2">
                     {items.map(notification => (
                       <NotificationItem
                         key={notification.id}

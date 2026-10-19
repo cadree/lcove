@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { STORE_PUBLIC_COLUMNS } from "@/hooks/useStore";
-import etherBearLogo from "@/assets/ether-bear-logo.png";
+import lcoveMark from "@/assets/lcove-mark-cutout.png";
 
 type MallKind = "creators" | "clothing" | "studios";
 
@@ -88,7 +88,7 @@ export function CommunityMall({ query = "" }: { query?: string }) {
       kindLabel: "Clothing",
       countLabel: "Drops",
       to: "/nuance",
-      mark: etherBearLogo,
+      mark: lcoveMark,
     };
     const merged = [...live, nuance].sort((a, b) => a.name.localeCompare(b.name));
     return live.length < 2 ? [...merged, ...EXAMPLES] : merged;
@@ -139,7 +139,7 @@ export function CommunityMall({ query = "" }: { query?: string }) {
                   <img
                     src={card.mark}
                     alt=""
-                    className="logo-cutout absolute -bottom-3 left-3 h-10 w-10 object-contain"
+                    className="mark-cutout absolute -bottom-3 left-3 h-10 w-10 object-contain"
                   />
                 )}
               </div>

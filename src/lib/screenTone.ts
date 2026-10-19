@@ -1,6 +1,6 @@
 export type ScreenTone = "blood" | "crimson" | "cyan" | "pink" | "denim" | "gold" | "flare";
 
-/** Per-screen gradient tone. Quest gold is reserved for a later phase. */
+/** Per-screen gradient tone. Quest log is not built yet; gold is the credit wash. */
 export function toneForPath(pathname: string): ScreenTone {
   const path = pathname.split("?")[0] || "/";
 
@@ -14,7 +14,7 @@ export function toneForPath(pathname: string): ScreenTone {
     return "blood";
   }
 
-  if (path === "/home" || path.startsWith("/feed")) return "crimson";
+  if (path === "/home" || path.startsWith("/feed") || path.startsWith("/notifications")) return "crimson";
 
   if (
     path.startsWith("/explore") ||
@@ -23,20 +23,34 @@ export function toneForPath(pathname: string): ScreenTone {
     path.startsWith("/community") ||
     path.startsWith("/collectives") ||
     path.startsWith("/mall") ||
+    path.startsWith("/store") ||
     path.startsWith("/nuance") ||
     path.startsWith("/brand-partners") ||
     path.startsWith("/live") ||
     path.startsWith("/cinema") ||
-    path.startsWith("/event")
+    path.startsWith("/event") ||
+    path.startsWith("/calendar") ||
+    path.startsWith("/projects") ||
+    path.startsWith("/boards") ||
+    path.startsWith("/booking")
   ) {
     return "cyan";
   }
 
-  if (path.startsWith("/profile") || path.startsWith("/settings") || path.startsWith("/book")) {
+  if (
+    path.startsWith("/profile") ||
+    path.startsWith("/settings") ||
+    path.startsWith("/book") ||
+    path.startsWith("/blog")
+  ) {
     return "pink";
   }
 
   if (path.startsWith("/messages")) return "denim";
+
+  if (path.startsWith("/wallet") || path.startsWith("/fund") || path.startsWith("/membership")) {
+    return "gold";
+  }
 
   return "crimson";
 }

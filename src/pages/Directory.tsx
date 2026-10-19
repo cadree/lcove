@@ -244,7 +244,7 @@ const Directory = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: index * 0.05 }}
                 onClick={() => handleProfileClick(profile.user_id)}
-                className="bg-card border border-border rounded-[2px] p-5 cursor-pointer group"
+                className="file-panel cursor-pointer p-5 group"
               >
                 <div className="flex items-start gap-4">
                   {/* Avatar */}
@@ -258,7 +258,7 @@ const Directory = () => {
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
-                    <h3 className="font-display text-lg font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                    <h3 className="truncate font-body text-[15px] font-extrabold text-foreground transition-colors group-hover:text-primary">
                       {profile.display_name || 'Anonymous'}
                     </h3>
                     {profile.created_at && Date.now() - new Date(profile.created_at).getTime() < 14 * 24 * 60 * 60 * 1000 && (

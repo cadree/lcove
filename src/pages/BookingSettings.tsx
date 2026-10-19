@@ -194,7 +194,8 @@ const BookingSettings = () => {
         <PageHeader
           title="Booking Pages"
           description="Let others book time with you"
-          icon={<Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+          icon={<Calendar className="w-5 h-5" />}
+          tile="cyan"
           backPath="/settings"
           actions={
             !isCreating && (

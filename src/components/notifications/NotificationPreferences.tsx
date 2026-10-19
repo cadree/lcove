@@ -6,6 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import { iconFills } from '@/components/world/SquircleIcon';
 
 interface PreferenceItemProps {
   icon: React.ReactNode;
@@ -26,7 +27,10 @@ const PreferenceItem: React.FC<PreferenceItemProps> = ({
 }) => (
   <div className="flex items-center justify-between py-3">
     <div className="flex items-center gap-3">
-      <div className="flex-shrink-0 w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+      <div
+        className="squircle-icon shrink-0 text-[#0A0A0A] [&_svg]:!h-4 [&_svg]:!w-4 [&_svg]:!text-current"
+        style={{ width: 36, height: 36, backgroundImage: iconFills.bone }}
+      >
         {icon}
       </div>
       <div>

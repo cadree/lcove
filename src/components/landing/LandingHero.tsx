@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import etherBearLogo from "@/assets/ether-bear-logo.png";
+import lcoveMark from "@/assets/lcove-mark-cutout.png";
 
 export function LandingHero() {
   const navigate = useNavigate();
@@ -10,9 +10,9 @@ export function LandingHero() {
       <div className="mx-auto flex max-w-md flex-col items-center text-center">
         <p className="kicker mb-8">Familcy access // Lcove signal</p>
         <img
-          src={etherBearLogo}
+          src={lcoveMark}
           alt=""
-          className="logo-cutout mb-6 h-28 w-28 object-contain"
+          className="mark-cutout mb-6 h-28 w-28 object-contain"
         />
         <p className="ether-title mb-3 text-[15px] tracking-[0.28em] text-foreground">Ether</p>
         <h1 className="ether-title mb-4 max-w-[16ch] text-[38px] leading-[0.95]">

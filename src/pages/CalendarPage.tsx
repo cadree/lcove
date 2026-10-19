@@ -173,7 +173,8 @@ const CalendarPage = () => {
         <PageHeader
           title="Calendar"
           description="Community events, projects, and personal schedule"
-          icon={<CalendarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+          icon={<CalendarIcon className="w-5 h-5" />}
+          tile="cyan"
           backPath="/"
           actions={
             user && (
@@ -253,7 +254,7 @@ const CalendarPage = () => {
             <Button variant="glass" size="sm" onClick={goToToday}>
               Today
             </Button>
-            <h2 className="font-display text-lg font-medium text-foreground min-w-[160px] text-center">
+            <h2 className="ether-title min-w-[160px] text-center text-lg text-foreground">
               {getNavigationLabel()}
             </h2>
             <Button variant="glass" size="icon" onClick={navigateNext}>

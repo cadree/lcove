@@ -134,7 +134,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   return (
     <div className="h-full w-full flex flex-col bg-background">
       {/* Header */}
-      <div className="flex items-center gap-3 p-4 border-b border-border/50 bg-card/50 backdrop-blur-sm">
+      <div className="tab-bar flex items-center gap-3 border-b border-border p-4">
         <Button variant="ghost" size="icon" onClick={onBack}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -158,7 +158,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="font-medium text-foreground truncate">{getConversationName()}</h3>
+            <h3 className="truncate font-body text-[15px] font-bold text-foreground">{getConversationName()}</h3>
             {isProjectChat && (
               <Badge variant="secondary" className="text-xs">Project</Badge>
             )}
@@ -302,7 +302,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
             <div key={group.date}>
               {/* Date Header */}
               <div className="flex items-center justify-center my-4">
-                <span className="px-3 py-1 rounded-full bg-muted/50 text-xs text-muted-foreground">
+                <span className="mono-label rounded-full border border-border px-3 py-1 text-[9px] text-muted-foreground">
                   {dayDividerLabel(group.messages[0].created_at)}
                 </span>
               </div>
@@ -373,10 +373,10 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                           {/* Text Content */}
                           {msg.content && (
                             <div
-                              className={`px-4 py-2 rounded-2xl ${
+                              className={`px-4 py-2.5 ${
                                 isOwn
-                                  ? 'bg-primary text-primary-foreground rounded-br-md'
-                                  : 'bg-muted/60 text-foreground rounded-bl-md'
+                                  ? 'rounded-[18px] rounded-br-[6px] bg-gradient-to-br from-[#FFD6E8] to-[#FF9FC8] text-[#0A0A0A]'
+                                  : 'file-panel rounded-[18px] rounded-bl-[6px] px-4 py-2.5 text-foreground'
                               }`}
                             >
                               <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
@@ -385,7 +385,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
 
                           {/* Time & Read Receipt */}
                           <div className={`flex items-center gap-1 mt-1 ${isOwn ? 'justify-end' : ''}`}>
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="mono-label text-[9px] text-muted-foreground">
                               {formatMessageTime(new Date(msg.created_at))}
                             </span>
                             {isOwn && (
@@ -446,7 +446,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                   {typingUsers[0]?.profile?.display_name?.charAt(0) || '?'}
                 </AvatarFallback>
               </Avatar>
-              <div className="px-4 py-3 rounded-2xl bg-muted/60 rounded-bl-md">
+              <div className="file-panel rounded-[18px] rounded-bl-[6px] px-4 py-3">
                 <div className="flex gap-1">
                   <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                   <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />

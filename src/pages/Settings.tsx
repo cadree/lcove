@@ -48,6 +48,7 @@ import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
 import { supabase } from "@/integrations/supabase/client";
+import { SquircleIcon } from "@/components/world/SquircleIcon";
 import { useThemeMode } from "@/components/theme/ThemeProvider";
 import type { ThemeChoice } from "@/lib/themeMode";
 import { useQuery } from "@tanstack/react-query";
@@ -310,7 +311,8 @@ const Settings = () => {
         {/* Header */}
         <PageHeader
           title="Settings"
-          icon={<SettingsIcon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+          icon={<SettingsIcon className="w-5 h-5" />}
+          tile="bone"
           backPath="/profile"
           className="mb-8"
         />
@@ -345,14 +347,12 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <User className="w-5 h-5 text-primary" />
-            </div>
+            <SquircleIcon icon={User} fill="pink" size={40} />
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Profile</h2>
+              <h2 className="ether-title text-lg text-foreground">Profile</h2>
               <p className="text-sm text-muted-foreground">Customize how others see you</p>
             </div>
           </div>
@@ -429,14 +429,12 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.12 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Phone className="w-5 h-5 text-primary" />
-            </div>
+            <SquircleIcon icon={Phone} fill="cyan" size={40} />
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Contact Info</h2>
+              <h2 className="ether-title text-lg text-foreground">Contact Info</h2>
               <p className="text-sm text-muted-foreground">Add your phone and social media</p>
             </div>
           </div>
@@ -571,14 +569,12 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Lock className="w-5 h-5 text-primary" />
-            </div>
+            <SquircleIcon icon={Lock} fill="ink" size={40} />
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Security</h2>
+              <h2 className="ether-title text-lg text-foreground">Security</h2>
               <p className="text-sm text-muted-foreground">Update your password</p>
             </div>
           </div>
@@ -633,14 +629,12 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Bell className="w-5 h-5 text-primary" />
-            </div>
+            <SquircleIcon icon={Bell} fill="rose" size={40} />
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Notifications</h2>
+              <h2 className="ether-title text-lg text-foreground">Notifications</h2>
               <p className="text-sm text-muted-foreground">Choose what updates you receive</p>
             </div>
           </div>
@@ -824,37 +818,29 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Activity className="w-5 h-5 text-primary" />
-            </div>
+            <SquircleIcon icon={Activity} fill="gold" size={40} />
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Your Activity</h2>
+              <h2 className="ether-title text-lg text-foreground">Your Activity</h2>
               <p className="text-sm text-muted-foreground">See what you've been up to</p>
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-background/50 rounded-xl p-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-pink-500/10 flex items-center justify-center mx-auto mb-2">
-                <Heart className="w-5 h-5 text-pink-500" />
-              </div>
+              <SquircleIcon icon={Heart} fill="pink" size={40} className="mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{activityStats?.likesGiven || 0}</p>
               <p className="text-xs text-muted-foreground">Likes Given</p>
             </div>
             <div className="bg-background/50 rounded-xl p-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-2">
-                <MessageSquare className="w-5 h-5 text-blue-500" />
-              </div>
+              <SquircleIcon icon={MessageSquare} fill="violet" size={40} className="mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{activityStats?.commentsGiven || 0}</p>
               <p className="text-xs text-muted-foreground">Comments</p>
             </div>
             <div className="bg-background/50 rounded-xl p-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-2">
-                <Archive className="w-5 h-5 text-green-500" />
-              </div>
+              <SquircleIcon icon={Archive} fill="green" size={40} className="mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{activityStats?.postsCreated || 0}</p>
               <p className="text-xs text-muted-foreground">Posts</p>
             </div>
@@ -866,37 +852,29 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-primary" />
-            </div>
+            <SquircleIcon icon={BarChart3} fill="cyan" size={40} />
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Insights</h2>
+              <h2 className="ether-title text-lg text-foreground">Insights</h2>
               <p className="text-sm text-muted-foreground">Your profile engagement</p>
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-background/50 rounded-xl p-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-pink-500/10 flex items-center justify-center mx-auto mb-2">
-                <Heart className="w-5 h-5 text-pink-500" />
-              </div>
+              <SquircleIcon icon={Heart} fill="pink" size={40} className="mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{insightsData?.likesReceived || 0}</p>
               <p className="text-xs text-muted-foreground">Likes Received</p>
             </div>
             <div className="bg-background/50 rounded-xl p-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-2">
-                <MessageSquare className="w-5 h-5 text-blue-500" />
-              </div>
+              <SquircleIcon icon={MessageSquare} fill="violet" size={40} className="mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{insightsData?.commentsReceived || 0}</p>
               <p className="text-xs text-muted-foreground">Comments</p>
             </div>
             <div className="bg-background/50 rounded-xl p-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center mx-auto mb-2">
-                <Users className="w-5 h-5 text-purple-500" />
-              </div>
+              <SquircleIcon icon={Users} fill="denim" size={40} className="mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{insightsData?.followers || 0}</p>
               <p className="text-xs text-muted-foreground">Saved as favorite</p>
             </div>
@@ -908,14 +886,14 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
               <Ban className="w-5 h-5 text-destructive" />
             </div>
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Blocked Users</h2>
+              <h2 className="ether-title text-lg text-foreground">Blocked Users</h2>
               <p className="text-sm text-muted-foreground">Manage blocked accounts</p>
             </div>
           </div>
@@ -959,15 +937,13 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.36 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <Link to="/settings/booking" className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <SettingsIcon className="w-5 h-5 text-primary" />
-              </div>
+              <SquircleIcon icon={SettingsIcon} fill="bone" size={40} />
               <div>
-                <h2 className="font-display text-lg font-medium text-foreground">Booking Pages</h2>
+                <h2 className="ether-title text-lg text-foreground">Booking Pages</h2>
                 <p className="text-sm text-muted-foreground">Let others book time with you</p>
               </div>
             </div>
@@ -981,15 +957,13 @@ const Settings = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
-            className="glass-strong rounded-2xl p-6 mb-6"
+            className="file-panel p-6 mb-6"
           >
             <Link to="/admin" className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Shield className="w-5 h-5 text-primary" />
-                </div>
+                <SquircleIcon icon={Shield} fill="denim" size={40} />
                 <div>
-                  <h2 className="font-display text-lg font-medium text-foreground">Admin Dashboard</h2>
+                  <h2 className="ether-title text-lg text-foreground">Admin Dashboard</h2>
                   <p className="text-sm text-muted-foreground">Manage users, credits, and announcements</p>
                 </div>
               </div>
@@ -1003,14 +977,12 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.38 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Scale className="w-5 h-5 text-primary" />
-            </div>
+            <SquircleIcon icon={Scale} fill="bone" size={40} />
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Legal</h2>
+              <h2 className="ether-title text-lg text-foreground">Legal</h2>
               <p className="text-sm text-muted-foreground">Privacy policy and terms of service</p>
             </div>
           </div>
@@ -1065,14 +1037,14 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.42 }}
-          className="glass-strong rounded-2xl p-6"
+          className="file-panel p-6"
         >
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
               <LogOut className="w-5 h-5 text-destructive" />
             </div>
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Account</h2>
+              <h2 className="ether-title text-lg text-foreground">Account</h2>
               <p className="text-sm text-muted-foreground">Sign out or delete your account</p>
             </div>
           </div>

@@ -18,6 +18,7 @@ import { DonateDialog } from "@/components/fund/DonateDialog";
 import { IosDigitalGoodsNotice } from "@/components/ios/IosDigitalGoodsNotice";
 import { IOS_DONATIONS_ENABLED, isIosApp } from "@/lib/platform";
 import { toast } from "sonner";
+import { SquircleIcon, iconFills } from "@/components/world/SquircleIcon";
 
 const ALLOCATION_DATA = [
   { name: "Community Grants", key: "communityGrants", color: "hsl(330, 100%, 71%)", icon: Users, description: "Direct support for creative projects and artist grants" },
@@ -158,7 +159,8 @@ export default function FundDashboard() {
           <PageHeader
             title="Community Fund"
             description="Every dollar, every decision, fully visible. See exactly how community contributions fuel creative dreams."
-            icon={<PiggyBank className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+            icon={<PiggyBank className="w-5 h-5" />}
+            tile="gold"
             className="mb-8"
           />
 
@@ -213,7 +215,7 @@ export default function FundDashboard() {
             transition={{ duration: 0.4 }}
             className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12"
           >
-            <Card className="bg-gradient-to-br from-primary/20 to-primary/5 border-primary/20 overflow-hidden relative">
+            <Card className="relative overflow-hidden">
               <div className="absolute top-0 right-0 w-20 h-20 bg-primary/10 rounded-full -translate-y-1/2 translate-x-1/2" />
               <CardContent className="p-5">
                 <p className="text-sm text-muted-foreground mb-1">Total Collected</p>
@@ -227,7 +229,7 @@ export default function FundDashboard() {
               </CardContent>
             </Card>
 
-            <Card className="bg-card/50 backdrop-blur-sm border-border overflow-hidden relative">
+            <Card className="border-border bg-card overflow-hidden relative">
               <div className="absolute top-0 right-0 w-20 h-20 bg-secondary/20 rounded-full -translate-y-1/2 translate-x-1/2" />
               <CardContent className="p-5">
                 <p className="text-sm text-muted-foreground mb-1">Distributed</p>
@@ -241,7 +243,7 @@ export default function FundDashboard() {
               </CardContent>
             </Card>
 
-            <Card className="bg-card/50 backdrop-blur-sm border-border overflow-hidden relative">
+            <Card className="border-border bg-card overflow-hidden relative">
               <div className="absolute top-0 right-0 w-20 h-20 bg-secondary/20 rounded-full -translate-y-1/2 translate-x-1/2" />
               <CardContent className="p-5">
                 <p className="text-sm text-muted-foreground mb-1">Grants Awarded</p>
@@ -255,7 +257,7 @@ export default function FundDashboard() {
               </CardContent>
             </Card>
 
-            <Card className="bg-card/50 backdrop-blur-sm border-border overflow-hidden relative">
+            <Card className="border-border bg-card overflow-hidden relative">
               <CardContent className="p-5">
                 <p className="text-sm text-muted-foreground mb-1">Creators Supported</p>
                 {fundLoading ? (
@@ -278,9 +280,9 @@ export default function FundDashboard() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <Card className="bg-card/50 backdrop-blur-sm border-border h-full">
+              <Card className="border-border bg-card h-full">
                 <CardHeader>
-                  <CardTitle className="text-xl font-serif flex items-center gap-2">
+                  <CardTitle className="text-xl ether-title flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-primary" />
                     Allocation Breakdown
                   </CardTitle>
@@ -331,9 +333,9 @@ export default function FundDashboard() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <Card className="bg-card/50 backdrop-blur-sm border-border h-full">
+              <Card className="border-border bg-card h-full">
                 <CardHeader>
-                  <CardTitle className="text-xl font-serif flex items-center gap-2">
+                  <CardTitle className="text-xl ether-title flex items-center gap-2">
                     <Calendar className="w-5 h-5 text-primary" />
                     6-Month Trend
                   </CardTitle>
@@ -393,9 +395,9 @@ export default function FundDashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <Card className="bg-card/50 backdrop-blur-sm border-border">
+            <Card className="border-border bg-card">
               <CardHeader>
-                <CardTitle className="text-xl font-serif">Where Your Contribution Goes</CardTitle>
+                <CardTitle className="text-xl ether-title">Where Your Contribution Goes</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4">
@@ -465,12 +467,10 @@ export default function FundDashboard() {
           >
             {isMember ? (
               /* Member Impact Card */
-              <Card className="bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border-primary/30 overflow-hidden">
+              <Card className="overflow-hidden">
                 <CardContent className="p-6 md:p-8">
                   <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                      <CheckCircle2 className="w-5 h-5 text-primary" />
-                    </div>
+                    <SquircleIcon icon={CheckCircle2} fill="green" size={40} />
                     <div>
                       <h3 className="font-display text-lg font-medium text-foreground">Your Impact</h3>
                       <p className="text-sm text-muted-foreground">Thank you for being a member</p>
@@ -538,13 +538,11 @@ export default function FundDashboard() {
               </Card>
             ) : (
               /* Non-Member CTA */
-              <Card className="bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border-primary/30 overflow-hidden">
+              <Card className="overflow-hidden">
                 <CardContent className="p-6 md:p-8">
                   <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
-                        <Crown className="w-8 h-8 text-primary-foreground" />
-                      </div>
+                      <SquircleIcon icon={Crown} fill="gold" size={54} glyph={28} />
                       <div>
                         <h3 className="font-display text-xl font-medium text-foreground mb-1">
                           Support the Community
@@ -605,9 +603,9 @@ export default function FundDashboard() {
             transition={{ delay: 0.55 }}
             className="mt-8"
           >
-            <Card className="bg-card/50 backdrop-blur-sm border-border">
+            <Card className="border-border bg-card">
               <CardHeader>
-                <CardTitle className="text-xl font-serif flex items-center gap-2">
+                <CardTitle className="text-xl ether-title flex items-center gap-2">
                   <Wallet className="w-5 h-5 text-primary" />
                   How the Fund Works
                 </CardTitle>
@@ -620,27 +618,21 @@ export default function FundDashboard() {
                 </p>
                 <div className="grid md:grid-cols-3 gap-4 pt-2">
                   <div className="p-4 rounded-xl bg-background/50">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center mb-3">
-                      <span className="text-primary font-bold">1</span>
-                    </div>
+                    <span className="squircle-icon mb-3 font-body text-sm font-extrabold" style={{ width: 32, height: 32, backgroundImage: iconFills.gold, color: "#0A0A0A" }}>1</span>
                     <h4 className="font-medium text-foreground mb-1">Members Contribute</h4>
                     <p className="text-sm text-muted-foreground">
                       Monthly contributions from members pool together
                     </p>
                   </div>
                   <div className="p-4 rounded-xl bg-background/50">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center mb-3">
-                      <span className="text-primary font-bold">2</span>
-                    </div>
+                    <span className="squircle-icon mb-3 font-body text-sm font-extrabold" style={{ width: 32, height: 32, backgroundImage: iconFills.gold, color: "#0A0A0A" }}>2</span>
                     <h4 className="font-medium text-foreground mb-1">Community Decides</h4>
                     <p className="text-sm text-muted-foreground">
                       Allocation priorities set by member voting
                     </p>
                   </div>
                   <div className="p-4 rounded-xl bg-background/50">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center mb-3">
-                      <span className="text-primary font-bold">3</span>
-                    </div>
+                    <span className="squircle-icon mb-3 font-body text-sm font-extrabold" style={{ width: 32, height: 32, backgroundImage: iconFills.gold, color: "#0A0A0A" }}>3</span>
                     <h4 className="font-medium text-foreground mb-1">Creators Benefit</h4>
                     <p className="text-sm text-muted-foreground">
                       Funds distributed to grants, events, and programs

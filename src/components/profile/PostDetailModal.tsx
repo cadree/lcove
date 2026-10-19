@@ -145,7 +145,7 @@ export function PostDetailModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl w-full p-0 gap-0 overflow-hidden max-h-[90vh]">
+        <DialogContent className="max-h-[90vh] w-full max-w-4xl gap-0 overflow-hidden border-border bg-card p-0">
           <VisuallyHidden>
             <DialogTitle>Post by {displayName}</DialogTitle>
           </VisuallyHidden>
@@ -155,7 +155,7 @@ export function PostDetailModal({
             variant="ghost"
             size="icon"
             onClick={handleClose}
-            className="absolute right-3 top-3 z-50 h-10 w-10 rounded-full bg-background/80 backdrop-blur-sm hover:bg-background"
+            className="absolute right-3 top-3 z-50 h-11 w-11 rounded-[14px] bg-background/80 backdrop-blur-sm hover:bg-background"
             aria-label="Close post"
             role="button"
           >
@@ -182,7 +182,7 @@ export function PostDetailModal({
             </div>
 
             {/* Details Section */}
-            <div className="md:w-[40%] flex flex-col bg-background">
+            <div className="flex flex-col bg-card md:w-[40%]">
               {/* Header */}
               <div className="p-4 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -201,7 +201,7 @@ export function PostDetailModal({
                   <div>
                     <button 
                       onClick={handleProfileClick}
-                      className="text-sm font-semibold text-foreground hover:underline"
+                      className="font-body text-sm font-bold text-foreground hover:underline"
                       role="button"
                     >
                       {displayName}
@@ -221,7 +221,7 @@ export function PostDetailModal({
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-8 w-8"
+                        className="h-11 w-11"
                         aria-label="Post options"
                         role="button"
                       >
@@ -247,7 +247,7 @@ export function PostDetailModal({
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="h-8 w-8"
+                    className="h-11 w-11"
                     aria-label="More options"
                     role="button"
                   >
@@ -272,7 +272,7 @@ export function PostDetailModal({
                         <span className="font-semibold mr-1">{displayName}</span>
                         {post.content}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">{timeAgo}</p>
+                      <p className="mono-label mt-1 text-[9px] text-muted-foreground">{timeAgo}</p>
                     </div>
                   </div>
                 )}
@@ -322,7 +322,7 @@ export function PostDetailModal({
                       <Heart 
                         className={cn(
                           "w-6 h-6",
-                          hasLiked ? "fill-red-500 text-red-500" : "text-foreground"
+                          hasLiked ? "fill-[#FF9FC8] text-[#FF9FC8]" : "text-foreground"
                         )} 
                       />
                     </button>
@@ -361,7 +361,7 @@ export function PostDetailModal({
                 {isOwner && likesCount > 0 && (
                   <p className="text-xs text-muted-foreground mb-1">Only you can see this: {likesCount} {likesCount === 1 ? 'like' : 'likes'}</p>
                 )}
-                <p className="text-xs text-muted-foreground mb-3">{timeAgo}</p>
+                <p className="mono-label mb-3 text-[9px] text-muted-foreground">{timeAgo}</p>
 
                 {/* Comment input */}
                 <div className="flex items-center gap-2">
@@ -383,7 +383,7 @@ export function PostDetailModal({
                     size="sm"
                     onClick={handlePostComment}
                     disabled={!comment.trim() || isCommenting}
-                    className="text-primary font-semibold"
+                    className="min-h-11 font-semibold text-primary"
                     role="button"
                   >
                     {isCommenting ? 'Posting...' : 'Post'}

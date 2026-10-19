@@ -94,7 +94,7 @@ const FeedPost = ({ post }: { post: Post }) => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      className="bg-card border border-border rounded-[2px] overflow-hidden"
+      className="file-panel overflow-hidden"
     >
       {/* Header */}
       <header className="flex items-center justify-between p-4 sm:p-5">
