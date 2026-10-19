@@ -2,8 +2,9 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { format } from 'date-fns';
 import { parseCalendarDate } from '@/lib/calendarDate';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, Play, ExternalLink, Upload, X, Eye, Image as ImageIcon, Camera, Share2, Copy, Pencil, Mail, MessageCircle, UserPlus, Lock } from 'lucide-react';
+import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, ExternalLink, Upload, X, Eye, Image as ImageIcon, Camera, Share2, Copy, Pencil, Mail, MessageCircle, UserPlus, Lock } from 'lucide-react';
 import { Project, ProjectRole, useProjectApplications, useProjects } from '@/hooks/useProjects';
+import { formatRoleCompensation } from '@/lib/projectCollaborations';
 import { useProjectAttachments, ProjectAttachment } from '@/hooks/useProjectAttachments';
 import { useProjectUpdates } from '@/hooks/useProjectUpdates';
 import { useProjectMilestones } from '@/hooks/useProjectMilestones';
@@ -21,7 +22,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { SquircleIcon } from '@/components/world/SquircleIcon';
 import { useToast } from '@/hooks/use-toast';
 import { shareLink } from '@/lib/shareLink';
 import { EditProjectDialog } from '@/components/projects/EditProjectDialog';
@@ -336,10 +336,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
 
     if (att.file_type === 'video') {
       return (
-        <div className="w-full h-32 bg-muted/40 flex flex-col items-center justify-center gap-2">
-          <SquircleIcon icon={Play} fill="ink" size={40} />
-          <span className="text-[10px] text-muted-foreground">Video</span>
-        </div>
+        <video src={att.file_url} controls className="w-full h-32 bg-black object-contain" />
       );
     }
 
@@ -636,7 +633,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                     <div key={role.id}>
                       <div className="flex items-center justify-between text-sm mb-1">
                         <span className="text-foreground">{role.role_name}</span>
-                        <span className="text-muted-foreground">{formatCurrency(role.payout_amount)} × {role.slots_available}</span>
+                        <span className="text-muted-foreground">{formatRoleCompensation(role.payout_amount, role.credit_amount || 0)} × {role.slots_available}</span>
                       </div>
                       <div className="h-2 bg-muted rounded-full overflow-hidden">
                         <div className={cn("h-full rounded-full transition-all", colors[index % colors.length])} style={{ width: `${percentage}%` }} />
@@ -764,7 +761,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                           {role.description && <p className="text-sm text-muted-foreground">{role.description}</p>}
                         </div>
                         <div className="text-right">
-                          <span className="text-lg font-bold text-primary">{formatCurrency(role.payout_amount)}</span>
+                          <span className="text-lg font-bold text-primary">{formatRoleCompensation(role.payout_amount, role.credit_amount || 0)}</span>
                           <p className="text-xs text-muted-foreground">per person</p>
                         </div>
                       </div>

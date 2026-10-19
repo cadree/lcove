@@ -31,6 +31,7 @@ export interface NotificationPreferences {
   email_enabled: boolean;
   sms_enabled: boolean;
   new_projects_enabled: boolean;
+  new_gigs_enabled: boolean;
   new_events_enabled: boolean;
   application_updates_enabled: boolean;
 }

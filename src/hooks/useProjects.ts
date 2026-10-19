@@ -38,6 +38,8 @@ export interface Project {
   deliverables: ProjectDeliverable[] | null;
   allow_custom_roles: boolean;
   is_private: boolean;
+  hide_from_calendar: boolean;
+  listing_type: 'project' | 'gig';
   client_chat_in_production: boolean;
   roles?: ProjectRole[];
   creator?: { display_name: string | null; avatar_url: string | null };
@@ -49,6 +51,7 @@ export interface ProjectRole {
   role_name: string;
   description: string | null;
   payout_amount: number;
+  credit_amount: number;
   slots_available: number;
   slots_filled: number;
   is_locked: boolean;
@@ -112,7 +115,8 @@ export const useProjects = (status?: string) => {
         total_budget: Number(project.total_budget),
         roles: roles?.filter(r => r.project_id === project.id).map(r => ({
           ...r,
-          payout_amount: Number(r.payout_amount)
+          payout_amount: Number(r.payout_amount),
+          credit_amount: Number(r.credit_amount ?? 0),
         })) || [],
         creator: profiles?.find(p => p.user_id === project.creator_id)
       })) as Project[];
@@ -142,8 +146,47 @@ export const useProjects = (status?: string) => {
         total_budget: Number(project.total_budget),
         roles: roles?.filter(r => r.project_id === project.id).map(r => ({
           ...r,
-          payout_amount: Number(r.payout_amount)
+          payout_amount: Number(r.payout_amount),
+          credit_amount: Number(r.credit_amount ?? 0),
         })) || []
+      })) as Project[];
+    },
+    enabled: !!user?.id,
+  });
+
+  const { data: joinedProjects = [] } = useQuery({
+    queryKey: ['joined-projects', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data: accepted, error: acceptedError } = await supabase
+        .from('project_applications')
+        .select('project_id')
+        .eq('applicant_id', user.id)
+        .eq('status', 'accepted');
+      if (acceptedError) throw acceptedError;
+      const ids = [...new Set((accepted ?? []).map((row) => row.project_id))];
+      if (ids.length === 0) return [];
+
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .in('id', ids)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+
+      const { data: roles } = await supabase
+        .from('project_roles')
+        .select('*')
+        .in('project_id', ids);
+
+      return data.map((project) => ({
+        ...project,
+        total_budget: Number(project.total_budget),
+        roles: roles?.filter((role) => role.project_id === project.id).map((role) => ({
+          ...role,
+          payout_amount: Number(role.payout_amount),
+          credit_amount: Number(role.credit_amount ?? 0),
+        })) || [],
       })) as Project[];
     },
     enabled: !!user?.id,
@@ -202,7 +245,9 @@ export const useProjects = (status?: string) => {
       deliverables?: ProjectDeliverable[];
       allow_custom_roles?: boolean;
       is_private?: boolean;
-      roles: { role_name: string; description?: string; payout_amount: number; slots_available: number }[];
+      hide_from_calendar?: boolean;
+      listing_type?: 'project' | 'gig';
+      roles: { role_name: string; description?: string; payout_amount: number; credit_amount?: number; slots_available: number }[];
       milestones?: { title: string; phase?: string; due_date?: string }[];
     }) => {
       if (!user?.id) throw new Error('Not authenticated');
@@ -230,6 +275,8 @@ export const useProjects = (status?: string) => {
           deliverables: (data.deliverables || []) as unknown as Json,
           allow_custom_roles: data.allow_custom_roles || false,
           is_private: data.is_private || false,
+          hide_from_calendar: data.hide_from_calendar || false,
+          listing_type: data.listing_type || 'project',
           status: 'open'
         })
         .select()
@@ -246,6 +293,7 @@ export const useProjects = (status?: string) => {
             role_name: role.role_name,
             description: role.description,
             payout_amount: role.payout_amount,
+            credit_amount: role.credit_amount || 0,
             slots_available: role.slots_available
           })));
 
@@ -267,31 +315,8 @@ export const useProjects = (status?: string) => {
         if (msError) console.error('Failed to create milestones:', msError);
       }
 
-      // Create calendar event if timeline_start exists
-      if (data.timeline_start) {
-        const { data: creatorProfile } = await supabase
-          .from('profiles')
-          .select('city')
-          .eq('user_id', user.id)
-          .single();
-
-        await supabase
-          .from('events')
-          .insert({
-            creator_id: user.id,
-            title: data.title,
-            description: data.description || `Project: ${data.title}`,
-            start_date: data.timeline_start,
-            end_date: data.timeline_end || data.timeline_start,
-            city: creatorProfile?.city || 'Global',
-            is_public: true,
-            ticket_type: 'free',
-            project_id: project.id,
-          })
-          .then(({ error: eventError }) => {
-            if (eventError) console.error('Failed to create calendar event:', eventError);
-          });
-      }
+      // The community calendar reads the project row itself. A second public
+      // event duplicated the date and published private projects.
 
       // Auto-create project groupchat
       try {
@@ -317,7 +342,7 @@ export const useProjects = (status?: string) => {
               conversation_id: newConversation.id,
               user_id: user.id,
               role: 'owner',
-              project_role_name: 'Project Creator'
+              project_role_name: 'Owner'
             });
         }
       } catch (chatErr) {
@@ -332,15 +357,17 @@ export const useProjects = (status?: string) => {
         .single();
 
       // Notify opted-in users about the new project
-      supabase.functions.invoke('notify-new-content', {
-        body: {
-          content_type: 'project',
-          content_id: project.id,
-          title: data.title,
-          description: data.description,
-          creator_name: profile?.display_name || 'A creator'
-        }
-      }).catch(err => console.error('Failed to send new project notifications:', err));
+      if (!data.is_private) {
+        supabase.functions.invoke('notify-new-content', {
+          body: {
+            content_type: 'project',
+            content_id: project.id,
+            title: data.title,
+            description: data.description,
+            creator_name: profile?.display_name || 'A creator'
+          }
+        }).catch(err => console.error('Failed to send new project notifications:', err));
+      }
 
       return project;
     },
@@ -456,6 +483,7 @@ export const useProjects = (status?: string) => {
   return {
     projects,
     myProjects,
+    joinedProjects,
     isLoading,
     createProject: createProject.mutate,
     updateProjectStatus: updateProjectStatus.mutate,
@@ -661,6 +689,10 @@ export const useProjectApplications = (projectId?: string) => {
           .select('id')
           .eq('project_id', application.project_id)
           .eq('type', 'group')
+          .eq('is_client_chat', false)
+          .is('parent_conversation_id', null)
+          .order('created_at', { ascending: true })
+          .limit(1)
           .maybeSingle();
 
         const conversationId = existingConversation?.id;
@@ -717,6 +749,7 @@ export const useProjectApplications = (projectId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['project-applications'] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['my-projects'] });
+      queryClient.invalidateQueries({ queryKey: ['joined-projects'] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       toast({ title: status === 'accepted' ? 'Application accepted!' : 'Application rejected' });
       

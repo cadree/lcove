@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { calendarDayKey, dayDividerLabel, localCalendarDayDelta } from '@/lib/calendarDay';
@@ -9,6 +10,7 @@ import {
   Users, Calendar, Info, ChevronDown, ChevronUp, LogOut, Flag
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { useMessages } from '@/hooks/useMessages';
 import { useConversations } from '@/hooks/useConversations';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
@@ -19,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { OnlineIndicator } from '@/components/ui/online-indicator';
 import MessageComposer from './MessageComposer';
+import { CreateSubgroupDialog } from './CreateSubgroupDialog';
 import ProjectCommandCenter from './ProjectCommandCenter';
 import { toast } from 'sonner';
 import { ReportDialog } from '@/components/safety/ReportDialog';
@@ -61,6 +64,11 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   const [showProjectInfo, setShowProjectInfo] = useState(false);
   const [reportMessageId, setReportMessageId] = useState<string | null>(null);
   const [reportProfileId, setReportProfileId] = useState<string | null>(null);
+  const [subgroupOpen, setSubgroupOpen] = useState(false);
+  const [selectingShare, setSelectingShare] = useState(false);
+  const [shareIds, setShareIds] = useState<string[]>([]);
+  const [sharing, setSharing] = useState(false);
+  const queryClient = useQueryClient();
 
   
   // Get the other participant's user ID for direct messages
@@ -73,6 +81,24 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   const otherUserId = getOtherUserId();
   const isMuted = conversation?.participants?.find(p => p.user_id === user?.id)?.is_muted || false;
   const project = conversation?.project;
+  const isParticipant = conversation?.participants?.some((participant) => participant.user_id === user?.id) ?? !conversation?.oversight;
+  const isSubgroup = Boolean(conversation?.parent_conversation_id);
+
+  const { data: subgroups = [] } = useQuery({
+    queryKey: ['project-subgroups', projectId],
+    queryFn: async () => {
+      if (!projectId) return [];
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('id, name, parent_conversation_id')
+        .eq('project_id', projectId)
+        .not('parent_conversation_id', 'is', null)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!projectId && !!isProjectChat,
+  });
 
   const getConversationName = () => {
     if (!conversation) return 'Chat';
@@ -129,6 +155,48 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
 
   const handleSend = async (content?: string, file?: File, mediaType?: 'image' | 'video' | 'audio') => {
     await sendMessage.mutateAsync({ content, file, mediaType });
+  };
+
+  const toggleShare = (messageId: string) => {
+    setShareIds((current) =>
+      current.includes(messageId) ? current.filter((id) => id !== messageId) : [...current, messageId],
+    );
+  };
+
+  const shareToMain = async () => {
+    if (shareIds.length === 0) return;
+    setSharing(true);
+    try {
+      const { error } = await supabase.rpc('share_messages_to_project_main', {
+        p_message_ids: shareIds,
+      });
+      if (error) throw error;
+      const mainId = conversation?.parent_conversation_id;
+      if (mainId && user) {
+        const { data: shared } = await supabase
+          .from('messages')
+          .select('id')
+          .eq('conversation_id', mainId)
+          .eq('sender_id', user.id)
+          .not('shared_from_message_id', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (shared) {
+          supabase.functions.invoke('notify-chat-message', {
+            body: { conversation_id: mainId, message_id: shared.id },
+          }).catch(() => undefined);
+        }
+      }
+      toast.success('Shared to the main project chat');
+      setShareIds([]);
+      setSelectingShare(false);
+      queryClient.invalidateQueries({ queryKey: ['messages'] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not share those messages');
+    } finally {
+      setSharing(false);
+    }
   };
 
   return (
@@ -209,15 +277,30 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                   View profile
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem 
-                onClick={() => {
-                  toggleMute.mutate({ conversationId, muted: !isMuted });
-                  toast.success(isMuted ? 'Notifications unmuted' : 'Notifications muted');
-                }}
-              >
-                {isMuted ? 'Unmute notifications' : 'Mute notifications'}
-              </DropdownMenuItem>
-              {conversation?.type === 'group' && (
+              {isParticipant && (
+                <DropdownMenuItem 
+                  onClick={() => {
+                    toggleMute.mutate({ conversationId, muted: !isMuted });
+                    toast.success(isMuted ? 'Notifications unmuted' : 'Notifications muted');
+                  }}
+                >
+                  {isMuted ? 'Unmute notifications' : 'Mute notifications'}
+                </DropdownMenuItem>
+              )}
+              {isProjectChat && isParticipant && !isSubgroup && (
+                <DropdownMenuItem onClick={() => setSubgroupOpen(true)}>
+                  New subgroup
+                </DropdownMenuItem>
+              )}
+              {isSubgroup && isParticipant && (
+                <DropdownMenuItem onClick={() => {
+                  setSelectingShare((current) => !current);
+                  setShareIds([]);
+                }}>
+                  {selectingShare ? 'Cancel share' : 'Share to main chat'}
+                </DropdownMenuItem>
+              )}
+              {conversation?.type === 'group' && isParticipant && (
                 <DropdownMenuItem 
                   className="text-destructive"
                   onClick={() => {
@@ -284,6 +367,38 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
         <ProjectCommandCenter project={projectChatData} isOwner={isOwner} />
       )}
 
+      {isProjectChat && (subgroups.length > 0 || isSubgroup) && (
+        <div className="flex gap-2 overflow-x-auto px-4 py-2 border-b border-border/50">
+          {isSubgroup && conversation?.parent_conversation_id && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => navigate(`/messages?chat=${conversation.parent_conversation_id}`)}
+            >
+              Main chat
+            </Button>
+          )}
+          {subgroups.map((subgroup) => (
+            <Button
+              key={subgroup.id}
+              type="button"
+              size="sm"
+              variant={subgroup.id === conversationId ? 'default' : 'outline'}
+              onClick={() => navigate(`/messages?chat=${subgroup.id}`)}
+            >
+              {subgroup.name || 'Subgroup'}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {!isParticipant && isProjectChat && (
+        <p className="px-4 py-2 text-xs text-muted-foreground border-b border-border/50">
+          You can read this chat as the project owner.
+        </p>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {isLoading ? (
@@ -334,15 +449,25 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
 
                         <div className={`group flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
                           {/* Sender name with role for group chats */}
-                          {!isOwn && conversation?.type === 'group' && (
+                          {conversation?.type === 'group' && (senderRole || !isOwn) && (
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-medium text-foreground">
-                                {msg.profile?.display_name || conversation?.participants?.find(p => p.user_id === msg.sender_id)?.profile?.display_name || 'Member'}
-                              </span>
+                              {!isOwn && (
+                                <span className="text-xs font-medium text-foreground">
+                                  {msg.profile?.display_name || conversation?.participants?.find(p => p.user_id === msg.sender_id)?.profile?.display_name || 'Member'}
+                                </span>
+                              )}
                               {senderRole && (
                                 <Badge variant="outline" className="text-[10px] py-0 h-4">
                                   {senderRole}
                                 </Badge>
+                              )}
+                              {selectingShare && (
+                                <input
+                                  type="checkbox"
+                                  checked={shareIds.includes(msg.id)}
+                                  onChange={() => toggleShare(msg.id)}
+                                  aria-label="Share this message"
+                                />
                               )}
                             </div>
                           )}
@@ -460,12 +585,32 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Composer */}
-      <MessageComposer 
-        onSend={handleSend} 
-        onTyping={setTypingIndicator}
-        isSending={sendMessage.isPending}
-      />
+      {selectingShare && (
+        <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
+          <span className="text-sm text-muted-foreground">{shareIds.length} selected</span>
+          <Button type="button" size="sm" onClick={shareToMain} disabled={sharing || shareIds.length === 0}>
+            {sharing ? 'Sharing...' : 'Share to main chat'}
+          </Button>
+        </div>
+      )}
+
+      {isParticipant ? (
+        <MessageComposer 
+          onSend={handleSend} 
+          onTyping={setTypingIndicator}
+          isSending={sendMessage.isPending}
+        />
+      ) : null}
+      {projectId && !isSubgroup && (
+        <CreateSubgroupDialog
+          open={subgroupOpen}
+          onOpenChange={setSubgroupOpen}
+          projectId={projectId}
+          mainConversationId={conversationId}
+          members={conversation?.participants || []}
+          onCreated={(id) => navigate(`/messages?chat=${id}`)}
+        />
+      )}
       {reportMessageId && (
         <ReportDialog
           open

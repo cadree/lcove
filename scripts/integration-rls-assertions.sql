@@ -1352,3 +1352,239 @@ END $$;
 
 RESET ROLE;
 
+-- Project collaborations: private discovery, subgroup reads, and share-up.
+-- A owns both projects. B is accepted onto the private one. Admin is a stranger.
+-- The block fixture above would correctly stop B from posting into a chat
+-- that includes A. Those block checks have already passed.
+DELETE FROM public.user_blocks
+WHERE blocker_id = '11111111-1111-4111-8111-111111111111'
+  AND blocked_id = '22222222-2222-4222-8222-222222222222';
+
+SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","email":"a.passed@example.com"}', false);
+SET ROLE authenticated;
+
+INSERT INTO public.projects (id, creator_id, title, status, is_private, listing_type, hide_from_calendar)
+VALUES
+  ('c1c1c1c1-c1c1-41c1-81c1-c1c1c1c1c1c1', '11111111-1111-4111-8111-111111111111', 'Public collab', 'open', false, 'project', false),
+  ('c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2', '11111111-1111-4111-8111-111111111111', 'Private collab', 'open', true, 'gig', false);
+
+INSERT INTO public.project_roles (id, project_id, role_name, payout_amount, credit_amount)
+VALUES ('e1e1e1e1-e1e1-41e1-81e1-e1e1e1e1e1e1', 'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2', 'Model', 200, 15);
+
+INSERT INTO public.conversations (id, type, name, created_by, project_id, visibility)
+VALUES ('d1d1d1d1-d1d1-41d1-81d1-d1d1d1d1d1d1', 'group', 'Private collab', '11111111-1111-4111-8111-111111111111', 'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2', 'private');
+
+INSERT INTO public.conversation_participants (conversation_id, user_id, role, project_role_name)
+VALUES ('d1d1d1d1-d1d1-41d1-81d1-d1d1d1d1d1d1', '11111111-1111-4111-8111-111111111111', 'owner', 'Owner');
+
+INSERT INTO public.project_attachments (project_id, uploaded_by, file_url, file_name, file_type)
+VALUES ('c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2', '11111111-1111-4111-8111-111111111111', 'https://example.com/ref.jpg', 'ref.jpg', 'image');
+
+RESET ROLE;
+
+SELECT set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","email":"b.waiting@example.com"}', false);
+SET ROLE authenticated;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.projects WHERE id = 'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2') THEN
+    RAISE EXCEPTION 'FAIL: non-member B can see the private project';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.projects WHERE id = 'c1c1c1c1-c1c1-41c1-81c1-c1c1c1c1c1c1') THEN
+    RAISE EXCEPTION 'FAIL: B cannot see the public project';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.project_attachments WHERE project_id = 'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2') THEN
+    RAISE EXCEPTION 'FAIL: non-member B can see private project files';
+  END IF;
+  BEGIN
+    INSERT INTO public.project_applications (project_id, role_id, applicant_id, status)
+    VALUES (
+      'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2',
+      'e1e1e1e1-e1e1-41e1-81e1-e1e1e1e1e1e1',
+      '22222222-2222-4222-8222-222222222222',
+      'pending'
+    );
+    RAISE EXCEPTION 'FAIL: non-member B applied to a private project';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS: a non-member cannot apply to a private project';
+  END;
+  RAISE NOTICE 'PASS: a non-member cannot see a private project or its files';
+END $$;
+
+RESET ROLE;
+
+SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","email":"a.passed@example.com"}', false);
+SET ROLE authenticated;
+
+INSERT INTO public.conversations (id, type, name, created_by, project_id, visibility, is_client_chat)
+VALUES (
+  'd3d3d3d3-d3d3-43d3-83d3-d3d3d3d3d3d3',
+  'direct',
+  'Private collab client',
+  '11111111-1111-4111-8111-111111111111',
+  'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2',
+  'private',
+  true
+);
+
+INSERT INTO public.project_clients (project_id, client_user_id, invited_by, status)
+VALUES (
+  'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2',
+  '22222222-2222-4222-8222-222222222222',
+  '11111111-1111-4111-8111-111111111111',
+  'invited'
+);
+
+INSERT INTO public.conversation_participants (conversation_id, user_id, role)
+VALUES
+  ('d3d3d3d3-d3d3-43d3-83d3-d3d3d3d3d3d3', '11111111-1111-4111-8111-111111111111', 'owner'),
+  ('d3d3d3d3-d3d3-43d3-83d3-d3d3d3d3d3d3', '22222222-2222-4222-8222-222222222222', 'member');
+
+RESET ROLE;
+
+SELECT set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","email":"b.waiting@example.com"}', false);
+SET ROLE authenticated;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.projects WHERE id = 'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2') THEN
+    RAISE EXCEPTION 'FAIL: invited person B cannot see the private project';
+  END IF;
+  RAISE NOTICE 'PASS: an invited person can see a private project';
+END $$;
+
+INSERT INTO public.project_applications (project_id, role_id, applicant_id, status)
+VALUES (
+  'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2',
+  'e1e1e1e1-e1e1-41e1-81e1-e1e1e1e1e1e1',
+  '22222222-2222-4222-8222-222222222222',
+  'pending'
+);
+
+RESET ROLE;
+
+SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","email":"a.passed@example.com"}', false);
+SET ROLE authenticated;
+
+UPDATE public.project_applications
+SET status = 'accepted', reviewed_by = '11111111-1111-4111-8111-111111111111'
+WHERE project_id = 'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2'
+  AND applicant_id = '22222222-2222-4222-8222-222222222222';
+
+INSERT INTO public.conversation_participants (conversation_id, user_id, role, project_role_name)
+VALUES ('d1d1d1d1-d1d1-41d1-81d1-d1d1d1d1d1d1', '22222222-2222-4222-8222-222222222222', 'member', 'Model');
+
+RESET ROLE;
+
+SELECT set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","email":"b.waiting@example.com"}', false);
+SET ROLE authenticated;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.projects WHERE id = 'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2') THEN
+    RAISE EXCEPTION 'FAIL: accepted member B cannot see the private project';
+  END IF;
+  RAISE NOTICE 'PASS: an accepted member can see a private project';
+END $$;
+
+INSERT INTO public.conversations (id, type, name, created_by, project_id, parent_conversation_id, visibility)
+VALUES (
+  'd2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2',
+  'group',
+  'Models only',
+  '22222222-2222-4222-8222-222222222222',
+  'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2',
+  'd1d1d1d1-d1d1-41d1-81d1-d1d1d1d1d1d1',
+  'private'
+);
+
+INSERT INTO public.conversation_participants (conversation_id, user_id, role, project_role_name)
+VALUES ('d2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2', '22222222-2222-4222-8222-222222222222', 'member', 'Model');
+
+INSERT INTO public.messages (id, conversation_id, sender_id, content)
+VALUES (
+  'f1f1f1f1-f1f1-41f1-81f1-f1f1f1f1f1f1',
+  'd2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2',
+  '22222222-2222-4222-8222-222222222222',
+  'Call time is 8'
+);
+
+SELECT public.share_messages_to_project_main(ARRAY['f1f1f1f1-f1f1-41f1-81f1-f1f1f1f1f1f1']::uuid[]);
+
+RESET ROLE;
+
+SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","email":"a.passed@example.com"}', false);
+SET ROLE authenticated;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.messages
+    WHERE conversation_id = 'd2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2'
+      AND content = 'Call time is 8'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: owner cannot read a subgroup they were not added to';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.messages
+    WHERE conversation_id = 'd1d1d1d1-d1d1-41d1-81d1-d1d1d1d1d1d1'
+      AND shared_from_message_id = 'f1f1f1f1-f1f1-41f1-81f1-f1f1f1f1f1f1'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: shared subgroup message did not land in the main chat';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.conversation_participants
+    WHERE conversation_id = 'd2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2'
+      AND user_id = '11111111-1111-4111-8111-111111111111'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: reading a subgroup added the owner as a member';
+  END IF;
+  RAISE NOTICE 'PASS: owner reads a subgroup without being added, and the share reached the main chat';
+END $$;
+
+RESET ROLE;
+
+SELECT set_config('request.jwt.claim.sub', '33333333-3333-4333-8333-333333333333', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","email":"admin@example.com"}', false);
+SET ROLE authenticated;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.projects WHERE id = 'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2') THEN
+    RAISE EXCEPTION 'FAIL: stranger can see the private project';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.conversations WHERE id = 'd2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2') THEN
+    RAISE EXCEPTION 'FAIL: stranger can see the subgroup';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.messages WHERE conversation_id = 'd2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2') THEN
+    RAISE EXCEPTION 'FAIL: stranger can read subgroup messages';
+  END IF;
+  BEGIN
+    PERFORM public.claim_chat_email_window(
+      '33333333-3333-4333-8333-333333333333',
+      'd1d1d1d1-d1d1-41d1-81d1-d1d1d1d1d1d1'
+    );
+    RAISE EXCEPTION 'FAIL: authenticated user claimed a chat email window';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS: chat email throttle is service_role only';
+  END;
+  RAISE NOTICE 'PASS: a non-member cannot see the private project or its subgroup';
+END $$;
+
+RESET ROLE;
+

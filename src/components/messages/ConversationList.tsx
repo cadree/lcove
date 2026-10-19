@@ -219,6 +219,8 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
                   <p className={`text-xs truncate ${
                     conv.unread_count > 0 ? 'text-foreground/70 font-medium' : 'text-muted-foreground'
                   }`}>
+                    {conv.parent_conversation_id ? 'Subgroup · ' : ''}
+                    {conv.oversight ? 'Owner view · ' : ''}
                     {getLastMessagePreview(conv)}
                   </p>
                 </div>

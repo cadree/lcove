@@ -75,6 +75,9 @@ verify_jwt = true
 [functions.notify-new-content]
 verify_jwt = true
 
+[functions.notify-chat-message]
+verify_jwt = true
+
 [functions.notify-new-application]
 verify_jwt = true
 
