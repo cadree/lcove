@@ -491,7 +491,7 @@ const Profile = () => {
       >
         {showEffects && (
           <ProfileEffects
-            className="fixed inset-0 z-30"
+            portal
             grain={customization?.effect_grain}
             scanlines={customization?.effect_scanlines}
             neonGlow={customization?.effect_neon_glow}

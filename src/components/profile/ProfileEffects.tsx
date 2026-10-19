@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -8,7 +9,10 @@ interface ProfileEffectsProps {
   holographic?: boolean;
   motionGradient?: boolean;
   className?: string;
+  /** Cover the viewport. A cover-sized layer stays hidden under the page background. */
+  portal?: boolean;
 }
+
 
 export const ProfileEffects = ({
   grain,
@@ -17,92 +21,100 @@ export const ProfileEffects = ({
   holographic,
   motionGradient,
   className,
+  portal = false,
 }: ProfileEffectsProps) => {
-  // Check for reduced motion preference
-  const prefersReducedMotion = typeof window !== 'undefined' 
+  const prefersReducedMotion = typeof window !== 'undefined'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  return (
-    <div className={cn("pointer-events-none absolute inset-0 overflow-hidden", className)}>
-      {/* Grain Effect */}
+  const effect = (
+    <div
+      className={cn(
+        "pointer-events-none inset-0",
+        portal ? "fixed z-40" : "absolute overflow-hidden",
+        className,
+      )}
+      style={portal ? { position: "fixed", inset: 0, zIndex: 40 } : undefined}
+      aria-hidden
+      data-profile-effects=""
+    >
       {grain && (
-        <div 
-          className="absolute inset-0 opacity-30 mix-blend-overlay"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
-          }}
-        />
-      )}
-
-      {/* Scanlines Effect */}
-      {scanlines && (
-        <div 
-          className="absolute inset-0 opacity-40"
-          style={{
-            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px)',
-            backgroundSize: '100% 4px',
-          }}
-        />
-      )}
-
-      {/* Neon Glow Effect */}
-      {neonGlow && !prefersReducedMotion && (
-        <motion.div
+        <div
           className="absolute inset-0"
-          animate={{
+          data-effect="grain"
+          style={{
+            opacity: 0.95,
+            mixBlendMode: "screen",
+            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.95) 0.7px, transparent 0.85px), radial-gradient(circle, rgba(255,255,255,0.55) 0.6px, transparent 0.75px)",
+            backgroundSize: "3px 3px, 5px 4px",
+            backgroundPosition: "0 0, 1px 2px",
+          }}
+        />
+      )}
+
+      {scanlines && (
+        <div
+          className="absolute inset-0"
+          data-effect="scanlines"
+          style={{
+            backgroundImage: "repeating-linear-gradient(to bottom, rgba(255,255,255,0.55) 0px, rgba(255,255,255,0.55) 2px, transparent 2px, transparent 6px)",
+          }}
+        />
+      )}
+
+      {neonGlow && (
+        <motion.div
+          className="absolute inset-3"
+          data-effect="neon"
+          style={{
+            border: "3px solid #00ff9f",
+            borderRadius: 16,
+            boxShadow: "0 0 28px #00ff9f, inset 0 0 48px rgba(0,255,159,0.8), inset 0 0 140px rgba(0,255,159,0.35)",
+          }}
+          animate={prefersReducedMotion ? undefined : {
             boxShadow: [
-              'inset 0 0 80px rgba(0, 255, 159, 0.45), 0 0 24px rgba(0, 255, 159, 0.35)',
-              'inset 0 0 120px rgba(0, 255, 159, 0.6), 0 0 40px rgba(0, 255, 159, 0.5)',
-              'inset 0 0 80px rgba(0, 255, 159, 0.45), 0 0 24px rgba(0, 255, 159, 0.35)',
+              "0 0 28px #00ff9f, inset 0 0 48px rgba(0,255,159,0.8), inset 0 0 140px rgba(0,255,159,0.35)",
+              "0 0 48px #00ff9f, inset 0 0 80px rgba(0,255,159,0.95), inset 0 0 180px rgba(0,255,159,0.5)",
+              "0 0 28px #00ff9f, inset 0 0 48px rgba(0,255,159,0.8), inset 0 0 140px rgba(0,255,159,0.35)",
             ],
           }}
-          transition={{
-            duration: 3,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
         />
       )}
 
-      {/* Holographic Border Effect */}
-      {holographic && !prefersReducedMotion && (
+      {holographic && (
         <motion.div
-          className="absolute inset-0 rounded-inherit"
+          className="absolute inset-0"
+          data-effect="holographic"
           style={{
-            background: 'linear-gradient(110deg, transparent 10%, rgba(0,255,159,0.35), rgba(255,0,255,0.4), rgba(0,255,255,0.35), transparent 90%)',
-            backgroundSize: '200% 100%',
+            opacity: 0.72,
+            mixBlendMode: "screen",
+            background: "linear-gradient(115deg, #ff4d8d 0%, #7af 28%, #0ff 52%, #df0 76%, #f6f 100%)",
+            backgroundSize: "220% 220%",
           }}
-          animate={{
-            backgroundPosition: ['0% 0%', '200% 0%'],
-          }}
-          transition={{
-            duration: 4,
-            repeat: Infinity,
-            ease: 'linear',
-          }}
+          animate={prefersReducedMotion ? undefined : { backgroundPosition: ["0% 0%", "100% 100%", "0% 0%"] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
         />
       )}
 
-      {/* Motion Gradient Background */}
-      {motionGradient && !prefersReducedMotion && (
+      {motionGradient && (
         <motion.div
-          className="absolute inset-0 opacity-50"
+          className="absolute inset-0"
+          data-effect="motion"
           style={{
-            background: 'linear-gradient(45deg, #00ff9f, #ff00ff, #00ffff, #ff00ff, #00ff9f)',
-            backgroundSize: '400% 400%',
+            opacity: 0.7,
+            mixBlendMode: "screen",
+            background: "linear-gradient(120deg, #00ff9f 0%, #ff00aa 46%, #00c2ff 100%)",
+            backgroundSize: "200% 200%",
           }}
-          animate={{
-            backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
-          }}
-          transition={{
-            duration: 15,
-            repeat: Infinity,
-            ease: 'linear',
-          }}
+          animate={prefersReducedMotion ? undefined : { backgroundPosition: ["0% 40%", "100% 60%", "0% 40%"] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
         />
       )}
     </div>
   );
+
+  if (portal && typeof document !== "undefined") return createPortal(effect, document.body);
+  return effect;
 };
 
 // Holographic card wrapper for Cyberpunk theme

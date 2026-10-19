@@ -8,7 +8,6 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ProfileEffects } from './ProfileEffects';
 import type { ProfileCustomization } from '@/hooks/useProfileCustomization';
 import { useCreatorVerification } from '@/hooks/useCreatorVerification';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -127,13 +126,6 @@ export function ProfileHeader({
 
       <div className="holo-card mt-2 p-4">
         {coverImage && <div className="mb-3 h-20 overflow-hidden rounded-[12px]" style={coverImage} />}
-        <ProfileEffects
-          grain={customization?.effect_grain}
-          scanlines={customization?.effect_scanlines}
-          neonGlow={customization?.effect_neon_glow}
-          holographic={customization?.effect_holographic}
-          motionGradient={customization?.effect_motion_gradient}
-        />
         <div className="relative z-[1] flex items-center gap-3">
           <div className="group relative shrink-0">
             <Avatar className="h-16 w-16 rounded-full border border-border">

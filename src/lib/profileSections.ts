@@ -20,39 +20,103 @@ export interface ProfileSectionPrefs {
   show_top_friends?: boolean | null;
 }
 
+/** Written by the old dialog for every save, including a font-only save. */
+export const LEGACY_SECTION_ORDER = ["about", "music", "stats", "links"];
+
+const LAYOUT_TO_CUSTOM: Record<string, string> = {
+  about: "about",
+  music: "music",
+  stats: "stats",
+  quick_links: "links",
+  portfolio: "projects",
+  store: "store",
+  calendar: "events",
+  events_dashboard: "events",
+};
+
+export function isLegacySectionOrder(order: string[] | null | undefined): boolean {
+  if (!order || order.length !== LEGACY_SECTION_ORDER.length) return false;
+  return LEGACY_SECTION_ORDER.every((id, index) => order[index] === id);
+}
+
+/** What the profile already shows, so an untouched save can persist "no override". */
+export function sectionStateFromLayout(layout: LayoutSection[]): {
+  sectionOrder: string[];
+  showTopFriends: boolean;
+} {
+  const sectionOrder: string[] = [];
+  let showTopFriends = true;
+  let sawFriends = false;
+  for (const section of [...layout].sort((a, b) => a.order - b.order)) {
+    if (section.id === "friends") {
+      sawFriends = true;
+      showTopFriends = section.visible;
+      continue;
+    }
+    if (!section.visible) continue;
+    const customId = LAYOUT_TO_CUSTOM[section.id];
+    if (customId && !sectionOrder.includes(customId)) sectionOrder.push(customId);
+  }
+  if (!sawFriends) showTopFriends = true;
+  return { sectionOrder, showTopFriends };
+}
+
+export function sameSectionSelection(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const ids = new Set(a);
+  return b.every((id) => ids.has(id));
+}
+
+/** Null when the stored value is absent or the old implicit default. */
+export function explicitSectionOrder(prefs: ProfileSectionPrefs | null | undefined): string[] | null {
+  const order = prefs?.section_order;
+  if (!Array.isArray(order) || isLegacySectionOrder(order)) return null;
+  return order;
+}
+
+export function explicitShowTopFriends(prefs: ProfileSectionPrefs | null | undefined): boolean | null {
+  if (!prefs || typeof prefs.show_top_friends !== "boolean") return null;
+  if (isLegacySectionOrder(prefs.section_order) && prefs.show_top_friends === false) return null;
+  return prefs.show_top_friends;
+}
+
+export function sectionFieldsForSave(
+  state: { sectionOrder: string[]; showTopFriends: boolean },
+  layout: LayoutSection[],
+): { section_order: string[] | null; show_top_friends: boolean | null } {
+  const derived = sectionStateFromLayout(layout);
+  return {
+    section_order: sameSectionSelection(state.sectionOrder, derived.sectionOrder) ? null : state.sectionOrder,
+    show_top_friends: state.showTopFriends === derived.showTopFriends ? null : state.showTopFriends,
+  };
+}
+
 export function applyProfileCustomization<T extends LayoutSection>(
   layout: T[],
   customization: ProfileSectionPrefs | null | undefined,
 ): T[] {
-  if (!customization) return layout;
+  const order = explicitSectionOrder(customization);
+  const showTopFriends = explicitShowTopFriends(customization);
+  if (!order && showTopFriends === null) return layout;
+
   let next = layout.map((section) => ({ ...section }));
 
-  if (Array.isArray(customization.section_order)) {
+  if (order) {
     const controlled = new Set(Object.values(CUSTOM_TO_LAYOUT).flat());
-    const visibleIds = new Set(
-      customization.section_order.flatMap((id) => CUSTOM_TO_LAYOUT[id] ?? []),
-    );
-    const orderIndex = new Map<string, number>();
-    customization.section_order.forEach((id, index) => {
-      for (const layoutId of CUSTOM_TO_LAYOUT[id] ?? []) orderIndex.set(layoutId, index);
-    });
+    const visibleIds = new Set(order.flatMap((id) => CUSTOM_TO_LAYOUT[id] ?? []));
     next = next.map((section) => {
       if (!controlled.has(section.id)) return section;
-      return {
-        ...section,
-        visible: visibleIds.has(section.id),
-        order: orderIndex.get(section.id) ?? section.order,
-      };
+      return { ...section, visible: visibleIds.has(section.id) };
     });
   }
 
-  if (typeof customization.show_top_friends === "boolean") {
+  if (showTopFriends !== null) {
     next = next.map((section) =>
-      section.id === "friends" ? { ...section, visible: customization.show_top_friends as boolean } : section,
+      section.id === "friends" ? { ...section, visible: showTopFriends } : section,
     );
   }
 
-  return next.sort((a, b) => a.order - b.order);
+  return next;
 }
 
 /** Hex color to "H S% L%" channels for hsl(var(--primary)). */
