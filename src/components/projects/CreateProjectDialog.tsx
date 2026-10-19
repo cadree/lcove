@@ -21,6 +21,7 @@ interface RoleInput {
   role_name: string;
   description: string;
   payout_amount: number;
+  credit_amount: number;
   slots_available: number;
 }
 
@@ -80,6 +81,8 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   const [totalBudget, setTotalBudget] = useState('');
   const [creditsReward, setCreditsReward] = useState(25);
   const [isPrivate, setIsPrivate] = useState(false);
+  const [hideFromCalendar, setHideFromCalendar] = useState(false);
+  const [listingType, setListingType] = useState<'project' | 'gig'>('project');
 
   // Expected outcome
   const [selectedOutcomes, setSelectedOutcomes] = useState<string[]>([]);
@@ -112,7 +115,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
 
   // Roles
   const [roles, setRoles] = useState<RoleInput[]>([
-    { role_name: '', description: '', payout_amount: 0, slots_available: 1 }
+    { role_name: '', description: '', payout_amount: 0, credit_amount: 0, slots_available: 1 }
   ]);
   const [allowCustomRoles, setAllowCustomRoles] = useState(false);
 
@@ -128,7 +131,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     );
   };
 
-  const addRole = () => setRoles([...roles, { role_name: '', description: '', payout_amount: 0, slots_available: 1 }]);
+  const addRole = () => setRoles([...roles, { role_name: '', description: '', payout_amount: 0, credit_amount: 0, slots_available: 1 }]);
   const removeRole = (i: number) => setRoles(roles.filter((_, idx) => idx !== i));
   const updateRole = (i: number, field: keyof RoleInput, value: string | number) => {
     const updated = [...roles];
@@ -278,7 +281,12 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
       deliverables: validDeliverables,
       allow_custom_roles: allowCustomRoles,
       is_private: isPrivate,
-      roles: validRoles,
+      hide_from_calendar: hideFromCalendar,
+      listing_type: listingType,
+      roles: validRoles.map((role) => ({
+        ...role,
+        credit_amount: role.credit_amount > 0 ? role.credit_amount : creditsReward,
+      })),
       milestones: validMilestones,
     }, {
       onSuccess: async (project) => {
@@ -320,7 +328,9 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     setEndDate('');
     setEndTime('');
     setMilestones(DEFAULT_PHASES.map(p => ({ title: p.title, phase: p.phase, due_date: '' })));
-    setRoles([{ role_name: '', description: '', payout_amount: 0, slots_available: 1 }]);
+    setRoles([{ role_name: '', description: '', payout_amount: 0, credit_amount: 0, slots_available: 1 }]);
+    setHideFromCalendar(false);
+    setListingType('project');
     setAllowCustomRoles(false);
     setDeliverables([{ type: '', publish_date: '', publish_location: '' }]);
   };
@@ -398,8 +408,34 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
               </button>
             </div>
             {isPrivate && (
-              <p className="text-xs text-muted-foreground">This project will only be visible to you and invited clients. It won't appear in the public browse feed.</p>
+              <p className="text-xs text-muted-foreground">Hidden from discovery, the community calendar, and new-project notifications. Members and invited people can still open it.</p>
             )}
+            <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+              <div>
+                <Label className="text-sm">Hide from community calendar</Label>
+                <p className="text-xs text-muted-foreground">Public projects are added to the calendar unless you hide them</p>
+              </div>
+              <Switch checked={hideFromCalendar} onCheckedChange={setHideFromCalendar} />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Post as</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['project', 'gig'] as const).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => setListingType(kind)}
+                  className={cn(
+                    "mono-label rounded-[14px] border p-3 text-[11px]",
+                    listingType === kind ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"
+                  )}
+                >
+                  {kind === 'project' ? 'Project idea' : 'Gig'}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Expected Outcome (only for public) */}
@@ -704,14 +740,17 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
                     <div className="col-span-2 sm:col-span-1">
                       <Input value={role.description} onChange={(e) => updateRole(index, 'description', e.target.value)} placeholder="Brief description" />
                     </div>
-                    {(projectType === 'paid' || projectType === 'hybrid') && (
-                      <div>
-                        <div className="relative">
-                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input type="number" value={role.payout_amount || ''} onChange={(e) => updateRole(index, 'payout_amount', parseFloat(e.target.value) || 0)} placeholder="Payout" className="pl-9" min={0} />
-                        </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Pay (USD)</Label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input type="number" value={role.payout_amount || ''} onChange={(e) => updateRole(index, 'payout_amount', parseFloat(e.target.value) || 0)} placeholder="0" className="pl-9" min={0} />
                       </div>
-                    )}
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">XP / barter credit</Label>
+                      <Input type="number" value={role.credit_amount || ''} onChange={(e) => updateRole(index, 'credit_amount', parseFloat(e.target.value) || 0)} placeholder="0" min={0} />
+                    </div>
                     <div>
                       <Input type="number" value={role.slots_available} onChange={(e) => updateRole(index, 'slots_available', parseInt(e.target.value) || 1)} placeholder="Slots" min={1} />
                       <span className="text-xs text-muted-foreground">slots available</span>

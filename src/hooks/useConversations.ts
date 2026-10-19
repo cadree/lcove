@@ -36,6 +36,8 @@ interface Conversation {
   created_at: string;
   updated_at: string;
   project_id?: string | null;
+  parent_conversation_id?: string | null;
+  oversight?: boolean;
   project?: ProjectInfo | null;
   participants?: Participant[];
   last_message?: {
@@ -64,9 +66,19 @@ export function useConversations() {
         .eq('user_id', user.id);
 
       if (partError) throw partError;
-      if (!participations?.length) return [];
 
-      const conversationIds = participations.map(p => p.conversation_id);
+      const participationIds = new Set((participations ?? []).map((row) => row.conversation_id));
+      const { data: projectChats, error: projectChatError } = await supabase
+        .from('conversations')
+        .select('id')
+        .not('project_id', 'is', null);
+      if (projectChatError) throw projectChatError;
+
+      const oversightIds = (projectChats ?? [])
+        .map((row) => row.id)
+        .filter((id) => !participationIds.has(id));
+      const conversationIds = [...participationIds, ...oversightIds];
+      if (conversationIds.length === 0) return [];
 
       // Get conversation details
       const { data: convos, error: convError } = await supabase
@@ -155,6 +167,7 @@ export function useConversations() {
           last_message: lastMessageMap.get(conv.id),
           unread_count: unreadMap.get(conv.id) || 0,
           is_muted: mutedMap.get(conv.id) || false,
+          oversight: !participationIds.has(conv.id),
         };
       }) as Conversation[];
     },

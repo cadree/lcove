@@ -70,6 +70,9 @@ export interface Project {
   timeline_end: string | null;
   status: string;
   creator_id: string;
+  created_at: string;
+  is_private: boolean;
+  hide_from_calendar: boolean;
 }
 
 export interface CalendarItem {
@@ -236,10 +239,11 @@ export function useProjects() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('projects')
-        .select('id, title, description, timeline_start, timeline_end, status, creator_id')
-        .not('timeline_start', 'is', null)
-        .in('status', ['open', 'in_progress'])
-        .order('timeline_start', { ascending: true });
+        .select('id, title, description, timeline_start, timeline_end, status, creator_id, created_at, is_private, hide_from_calendar')
+        .eq('is_private', false)
+        .eq('hide_from_calendar', false)
+        .in('status', ['open', 'in_progress', 'completed'])
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
       return data as Project[];
@@ -261,23 +265,23 @@ export function useCalendarItems(filters?: { city?: string; state?: string; type
 
   if (showEvents && events) {
     events.forEach(event => {
+      if (showProjects && event.project_id) return;
       items.push(...expandCommunityEvent(event));
     });
   }
 
   if (showProjects && projects) {
     projects.forEach(project => {
-      if (project.timeline_start) {
-        items.push({
-          id: project.id,
-          type: 'project',
-          title: project.title,
-          start_date: parseCalendarDate(project.timeline_start).toISOString(),
-          end_date: project.timeline_end ? parseCalendarDate(project.timeline_end).toISOString() : null,
-          color: '#8B4513', // brown for projects
-          data: project,
-        });
-      }
+      const start = project.timeline_start || project.created_at;
+      items.push({
+        id: project.id,
+        type: 'project',
+        title: project.title,
+        start_date: parseCalendarDate(start).toISOString(),
+        end_date: project.timeline_end ? parseCalendarDate(project.timeline_end).toISOString() : null,
+        color: '#8B4513',
+        data: project,
+      });
     });
   }
 

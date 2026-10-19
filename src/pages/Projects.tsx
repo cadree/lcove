@@ -21,7 +21,7 @@ const Projects: React.FC = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState('all');
-  const { projects, myProjects, isLoading } = useProjects(statusFilter);
+  const { projects, myProjects, joinedProjects, isLoading } = useProjects(statusFilter);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -200,7 +200,7 @@ const Projects: React.FC = () => {
 
             {user && (
               <TabsContent value="my-projects">
-                {myProjects.length === 0 ? (
+                {myProjects.length === 0 && joinedProjects.length === 0 ? (
                   <EmptyState
                     icon={Lightbulb}
                     title="Your creative journey awaits"
@@ -211,20 +211,38 @@ const Projects: React.FC = () => {
                     }}
                   />
                 ) : (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {myProjects.map((project, index) => (
-                      <motion.div
-                        key={project.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                      >
-                        <ProjectCard
-                          project={project}
-                          onClick={() => handleProjectClick(project)}
-                        />
-                      </motion.div>
-                    ))}
+                  <div className="space-y-8">
+                    {myProjects.length > 0 && (
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {myProjects.map((project, index) => (
+                          <motion.div
+                            key={project.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                          >
+                            <ProjectCard
+                              project={project}
+                              onClick={() => handleProjectClick(project)}
+                            />
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+                    {joinedProjects.some((project) => project.creator_id !== user.id) && (
+                      <div>
+                        <h3 className="mono-label mb-3 text-[10px] text-muted-foreground">Collaborating</h3>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          {joinedProjects.filter((project) => project.creator_id !== user.id).map((project) => (
+                            <ProjectCard
+                              key={project.id}
+                              project={project}
+                              onClick={() => handleProjectClick(project)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </TabsContent>

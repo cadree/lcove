@@ -27,6 +27,12 @@ export function jwtRole(authorization: string | null): string | null {
   return typeof role === "string" ? role : null;
 }
 
+export function jwtSubject(authorization: string | null): string | null {
+  const payload = decodeJwtPayload(authorization);
+  const sub = payload?.sub;
+  return typeof sub === "string" ? sub : null;
+}
+
 function unauthorized(corsHeaders: Record<string, string>): Response {
   return new Response(JSON.stringify({ error: "Unauthorized" }), {
     status: 401,

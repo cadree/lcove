@@ -85,3 +85,17 @@ Signed-in callers, or a policy that applies only to `authenticated`.
 `apply_stream_tip(uuid, uuid, integer, text, text)`, `award_xp(uuid, text, uuid, integer)`, `calculate_reputation_score(uuid)`, `can_watch_network(uuid, uuid)`, `cancel_pending_store_order(uuid)`, `cancel_pending_ticket_order(uuid)`, `complete_store_credit_purchase(uuid, uuid, integer)`, `confirm_event_ticket_order(uuid, text)`, `confirm_store_card_order(uuid, text)`, `delete_email(text, bigint)`, `enqueue_email(text, jsonb)`, `is_user_blocked(uuid, uuid)`, `mark_store_order_refunded(text)`, `move_to_dlq(text, text, bigint, jsonb)`, `purge_user_personal_data(uuid)`, `read_email_batch(text, integer, integer)`.
 
 `can_watch_network` is only called by `cinema_playback` and `record_content_view`, which run as the function owner. `is_user_blocked` has no caller in the app or in a policy. `calculate_reputation_score` is called by `update_reputation_from_review`.
+
+## Added with project collaborations
+
+`20261019194500_project_collaborations.sql` creates these and grants them itself. The lock migration above does not list them.
+
+| Function | Class | Who can execute |
+| --- | --- | --- |
+| `can_view_project(uuid, uuid)` | anon | `anon`, `authenticated`, `service_role`. Trusts the user id only when it is `auth.uid()` |
+| `can_read_conversation(uuid, uuid)` | anon | Same. Project owner reads every project chat. Posting still requires membership |
+| `share_messages_to_project_main(uuid[])` | user | `authenticated`, `service_role`. Caller must be a member of the subgroup |
+| `claim_chat_email_window(uuid, uuid)` | internal | `service_role` |
+| `enforce_project_conversation()` | trigger | `service_role` |
+| `enforce_project_chat_member()` | trigger | `service_role` |
+| `sync_project_calendar_visibility()` | trigger | `service_role` |

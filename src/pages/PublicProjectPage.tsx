@@ -47,6 +47,7 @@ import { shareLink, buildShareUrl } from "@/lib/shareLink";
 import { cn } from "@/lib/utils";
 import { ProjectDetail } from "@/components/projects/ProjectDetail";
 import type { Project } from "@/hooks/useProjects";
+import { formatRoleCompensation } from "@/lib/projectCollaborations";
 
 const statusColors: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
@@ -279,7 +280,7 @@ export default function PublicProjectPage() {
         <div className="text-center px-6">
           <Target className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
           <h1 className="text-2xl font-display font-bold mb-2">Project Not Found</h1>
-          <p className="text-muted-foreground">This project doesn't exist or has been removed.</p>
+          <p className="text-muted-foreground">This project isn't available.</p>
         </div>
       </div>
     );
@@ -476,7 +477,7 @@ export default function PublicProjectPage() {
                               </span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-primary font-semibold text-sm">{formatCurrency(role.payout_amount)}</span>
+                              <span className="text-primary font-semibold text-sm">{formatRoleCompensation(Number(role.payout_amount), Number(role.credit_amount ?? 0))}</span>
                               {applied && (
                                 <Badge className={cn("text-[10px]",
                                   appStatus === 'accepted' ? "bg-emerald-500/20 text-emerald-400" :

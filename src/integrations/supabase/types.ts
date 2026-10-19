@@ -1583,6 +1583,7 @@ export type Database = {
           join_requests_enabled: boolean | null
           max_members: number | null
           name: string | null
+          parent_conversation_id: string | null
           project_id: string | null
           topic: string | null
           type: string
@@ -1602,6 +1603,7 @@ export type Database = {
           join_requests_enabled?: boolean | null
           max_members?: number | null
           name?: string | null
+          parent_conversation_id?: string | null
           project_id?: string | null
           topic?: string | null
           type: string
@@ -1621,6 +1623,7 @@ export type Database = {
           join_requests_enabled?: boolean | null
           max_members?: number | null
           name?: string | null
+          parent_conversation_id?: string | null
           project_id?: string | null
           topic?: string | null
           type?: string
@@ -3778,6 +3781,8 @@ export type Database = {
           media_url: string | null
           reply_to_id: string | null
           sender_id: string
+          shared_from_conversation_id: string | null
+          shared_from_message_id: string | null
           updated_at: string
         }
         Insert: {
@@ -3790,6 +3795,8 @@ export type Database = {
           media_url?: string | null
           reply_to_id?: string | null
           sender_id: string
+          shared_from_conversation_id?: string | null
+          shared_from_message_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -3802,6 +3809,8 @@ export type Database = {
           media_url?: string | null
           reply_to_id?: string | null
           sender_id?: string
+          shared_from_conversation_id?: string | null
+          shared_from_message_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -4269,6 +4278,7 @@ export type Database = {
           live_streams_enabled: boolean | null
           messages_enabled: boolean | null
           new_events_enabled: boolean | null
+          new_gigs_enabled: boolean | null
           new_projects_enabled: boolean | null
           project_invites_enabled: boolean | null
           push_enabled: boolean | null
@@ -4289,6 +4299,7 @@ export type Database = {
           live_streams_enabled?: boolean | null
           messages_enabled?: boolean | null
           new_events_enabled?: boolean | null
+          new_gigs_enabled?: boolean | null
           new_projects_enabled?: boolean | null
           project_invites_enabled?: boolean | null
           push_enabled?: boolean | null
@@ -4309,6 +4320,7 @@ export type Database = {
           live_streams_enabled?: boolean | null
           messages_enabled?: boolean | null
           new_events_enabled?: boolean | null
+          new_gigs_enabled?: boolean | null
           new_projects_enabled?: boolean | null
           project_invites_enabled?: boolean | null
           push_enabled?: boolean | null
@@ -5814,6 +5826,7 @@ export type Database = {
           description: string | null
           id: string
           is_locked: boolean
+          credit_amount: number
           payout_amount: number
           project_id: string
           role_name: string
@@ -5822,6 +5835,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          credit_amount?: number
           description?: string | null
           id?: string
           is_locked?: boolean
@@ -5833,6 +5847,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          credit_amount?: number
           description?: string | null
           id?: string
           is_locked?: boolean
@@ -5897,9 +5912,11 @@ export type Database = {
           description: string | null
           equipment_needed: string | null
           expected_outcome: string | null
+          hide_from_calendar: boolean
           id: string
           is_moodboard_public: boolean
           is_private: boolean
+          listing_type: string
           location_secured: boolean
           progress_percent: number
           props_needed: string | null
@@ -5925,9 +5942,11 @@ export type Database = {
           description?: string | null
           equipment_needed?: string | null
           expected_outcome?: string | null
+          hide_from_calendar?: boolean
           id?: string
           is_moodboard_public?: boolean
           is_private?: boolean
+          listing_type?: string
           location_secured?: boolean
           progress_percent?: number
           props_needed?: string | null
@@ -5953,9 +5972,11 @@ export type Database = {
           description?: string | null
           equipment_needed?: string | null
           expected_outcome?: string | null
+          hide_from_calendar?: boolean
           id?: string
           is_moodboard_public?: boolean
           is_private?: boolean
+          listing_type?: string
           location_secured?: boolean
           progress_percent?: number
           props_needed?: string | null
@@ -7709,6 +7730,10 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: number
       }
+      claim_chat_email_window: {
+        Args: { p_conversation_id: string; p_user_id: string }
+        Returns: boolean
+      }
       can_manage_event: {
         Args: { p_event_id: string; p_user_id: string }
         Returns: boolean
@@ -7866,6 +7891,10 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      share_messages_to_project_main: {
+        Args: { p_message_ids: string[] }
+        Returns: number
       }
       touch_last_active: { Args: never; Returns: undefined }
       upsert_attendee_note: {

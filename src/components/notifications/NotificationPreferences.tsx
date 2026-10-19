@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Bell, Mail, Smartphone, FolderKanban, CalendarPlus, CheckCircle } from 'lucide-react';
+import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Bell, Mail, Smartphone, FolderKanban, CalendarPlus, CheckCircle, Briefcase } from 'lucide-react';
 import { useNotificationPreferences } from '@/hooks/useNotifications';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { Switch } from '@/components/ui/switch';
@@ -163,11 +163,19 @@ export const NotificationPreferences: React.FC = () => {
       </p>
       <div className="space-y-1 pb-4">
         <PreferenceItem
-          icon={<FolderKanban className="h-4 w-4 text-green-500" />}
+          icon={<FolderKanban className="h-4 w-4 text-primary" />}
           label="New Projects"
-          description="When new collaboration projects are posted"
-          checked={preferences.new_projects_enabled ?? false}
+          description="When a new project idea is posted. Turn this off to stop those alerts."
+          checked={preferences.new_projects_enabled ?? true}
           onCheckedChange={(checked) => updatePreferences({ new_projects_enabled: checked })}
+        />
+
+        <PreferenceItem
+          icon={<Briefcase className="h-4 w-4 text-primary" />}
+          label="New Gigs"
+          description="When a new gig is posted. Turn this off to stop those alerts."
+          checked={preferences.new_gigs_enabled ?? true}
+          onCheckedChange={(checked) => updatePreferences({ new_gigs_enabled: checked })}
         />
 
         <PreferenceItem
