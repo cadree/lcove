@@ -1,7 +1,12 @@
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
+import { appPathFromIncomingUrl } from '@/lib/nativeLinks';
 import { logAuthEvent, logAuthError } from './authDebug';
+
+function openInAppPath(path: string) {
+  window.dispatchEvent(new CustomEvent('ether:navigate', { detail: path }));
+}
 
 /**
  * Parse auth parameters from a deep link URL
@@ -69,7 +74,13 @@ export const setupDeepLinkHandler = (): (() => void) | undefined => {
 
       // Check if this is an auth callback URL
       if (!isAuthUrl(url)) {
-        logAuthEvent('URL is not an auth callback, ignoring');
+        const path = appPathFromIncomingUrl(url);
+        if (path) {
+          logAuthEvent('Opening in-app path from link', { path });
+          openInAppPath(path);
+        } else {
+          logAuthEvent('URL is not an auth callback, ignoring');
+        }
         return;
       }
 

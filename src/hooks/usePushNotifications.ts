@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isIosApp } from '@/lib/platform';
-import { registerIosPush } from '@/lib/nativePush';
+import { registerIosPush, syncIosPushIfGranted, unregisterIosPush, type IosPushPermission } from '@/lib/nativePush';
 
 // VAPID public key - this is safe to expose in client code
 // Must be set via VITE_VAPID_PUBLIC_KEY environment variable
@@ -41,18 +41,38 @@ interface PushNotificationsState {
 
 export const usePushNotifications = () => {
   const { user } = useAuth();
+  const [iosPermission, setIosPermission] = useState<IosPushPermission | null>(null);
   const [state, setState] = useState<PushNotificationsState>({
     status: 'checking',
     error: null,
     isLoading: false,
   });
 
+  const applyIosPermission = useCallback((permission: IosPushPermission) => {
+    setIosPermission(permission);
+    if (permission === 'granted') {
+      setState({ status: 'subscribed', error: null, isLoading: false });
+    } else if (permission === 'denied') {
+      setState({ status: 'permission_denied', error: 'Notifications are off in iOS Settings.', isLoading: false });
+    } else {
+      setState({ status: 'not_subscribed', error: null, isLoading: false });
+    }
+  }, []);
+
   // Check support and current status on mount
   useEffect(() => {
     const checkStatus = async () => {
-      if (user?.id && isIosApp()) {
-        registerIosPush(user.id).catch((error) => console.error('iOS push registration failed', error));
-        setState({ status: 'subscribed', error: null, isLoading: false });
+      if (isIosApp()) {
+        if (!user?.id) {
+          setState({ status: 'not_subscribed', error: null, isLoading: false });
+          return;
+        }
+        try {
+          applyIosPermission(await syncIosPushIfGranted(user.id));
+        } catch (error) {
+          console.error('iOS push registration failed', error);
+          setState({ status: 'error', error: 'Could not check notification permission', isLoading: false });
+        }
         return;
       }
 
@@ -99,7 +119,7 @@ export const usePushNotifications = () => {
     };
 
     checkStatus();
-  }, [user?.id]);
+  }, [user?.id, applyIosPermission]);
 
   // Listen for subscription changes from service worker
   useEffect(() => {
@@ -204,6 +224,31 @@ export const usePushNotifications = () => {
   }, []);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
+    if (isIosApp()) {
+      if (!user?.id) {
+        toast.error('Please sign in to enable push notifications');
+        return false;
+      }
+      setState((prev) => ({ ...prev, isLoading: true, error: null }));
+      try {
+        const permission = await registerIosPush(user.id);
+        applyIosPermission(permission);
+        if (permission === 'granted') {
+          toast.success('Push notifications enabled');
+          return true;
+        }
+        toast.error(permission === 'denied'
+          ? 'Notification permission denied. Enable notifications in iOS Settings.'
+          : 'Notification permission was not granted');
+        return false;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to enable notifications';
+        setState({ status: 'error', error: errorMessage, isLoading: false });
+        toast.error(errorMessage);
+        return false;
+      }
+    }
+
     if (state.status === 'not_supported') {
       toast.error('Push notifications are not supported in this browser');
       return false;
@@ -262,12 +307,26 @@ export const usePushNotifications = () => {
       toast.error(errorMessage);
       return false;
     }
-  }, [state.status, user?.id, registerServiceWorker, subscribeToPush]);
+  }, [state.status, user?.id, registerServiceWorker, subscribeToPush, applyIosPermission]);
 
   const unsubscribe = useCallback(async (): Promise<boolean> => {
     if (!user?.id) return false;
 
     setState(prev => ({ ...prev, isLoading: true }));
+
+    if (isIosApp()) {
+      try {
+        await unregisterIosPush(user.id);
+        setIosPermission('prompt');
+        setState({ status: 'not_subscribed', error: null, isLoading: false });
+        toast.success('Push notifications disabled');
+        return true;
+      } catch (error) {
+        console.error('Error unsubscribing:', error);
+        setState(prev => ({ ...prev, isLoading: false, error: 'Failed to unsubscribe' }));
+        return false;
+      }
+    }
 
     try {
       const registration = await navigator.serviceWorker.ready;
@@ -318,8 +377,8 @@ export const usePushNotifications = () => {
   // Derived values for backwards compatibility
   const isSupported = state.status !== 'not_supported';
   const isSubscribed = state.status === 'subscribed';
-  // Use actual browser permission, not derived from state
-  const permission = typeof Notification !== 'undefined' ? Notification.permission : 'default';
+  const permission = iosPermission
+    ?? (typeof Notification !== 'undefined' ? Notification.permission : 'default');
 
   return {
     // New comprehensive state

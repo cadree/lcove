@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
-import { NATIVE_APP_ID } from '@/config/nativeIds';
+import { nativeAuthRedirectUrl } from '@/lib/nativeLinks';
 import { logStorageOperation } from './authDebug';
 
 /**
@@ -146,10 +146,9 @@ export const isNativePlatform = (): boolean => {
 export const getAuthRedirectUrl = (path: string = '/'): string => {
   if (Capacitor.isNativePlatform()) {
     // Custom URL scheme registered in ios/App/App/Info.plist.
-    // CONFIRM WITH CADRE: NATIVE_APP_ID is a placeholder, and Supabase Auth
-    // redirect URLs must allow this scheme before native login works.
-    // path already starts with "/", so this becomes scheme://...
-    return `${NATIVE_APP_ID}:/${path}`;
+    // Supabase Auth redirect URLs must allow com.etherbylcove.app://
+    // before email confirmation and password reset return into the app.
+    return nativeAuthRedirectUrl(path);
   }
   return `${window.location.origin}${path}`;
 };

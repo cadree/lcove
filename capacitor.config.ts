@@ -2,8 +2,8 @@ import type { CapacitorConfig } from "@capacitor/cli";
 import { NATIVE_APP_ID, NATIVE_APP_NAME } from "./src/config/nativeIds";
 
 /**
- * CONFIRM WITH CADRE: appId is a placeholder (reverse-domain of
- * etherbylcove.com). It is not registered in Apple Developer or Google Play.
+ * Bundle id: com.etherbylcove.app (src/config/nativeIds.ts).
+ * The owner registers that id with Apple before archiving.
  *
  * Do not set `server.url`. That key loads a dev server instead of the
  * bundled web assets and must stay unset for TestFlight and App Store builds.

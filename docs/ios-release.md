@@ -1,156 +1,200 @@
-# Ether iOS release checklist
+# Ether iOS release
 
-This is the work that can be done without a paid Apple Developer account. Signing, push, TestFlight, and App Store upload need a Mac with Xcode and a paid account ($99/year). Nothing in this file asks anyone to buy that account.
+Bundle id: `com.etherbylcove.app`
 
-Placeholder bundle id: `com.etherbylcove.app` (`src/config/nativeIds.ts`). **Cadre has to confirm this** before anyone registers it. It is the reverse-domain of etherbylcove.com. It replaces `app.lovable.e07d9c457fd949f78f3cc7d5998be668`.
+Display name: Ether
 
-App name on the home screen: `Ether`.
+Version: 1.0 (`MARKETING_VERSION`). Build: 1 (`CURRENT_PROJECT_VERSION`). Raise the build number in Xcode before every upload.
 
-## Proof on Linux
+The iOS project is already in `ios/` (Capacitor 8, Swift Package Manager). There is no CocoaPods step.
 
-These ran on Linux, without a Mac and without an Apple Developer account:
+Supabase project: `aykopqinnnssxdhxqruo`. The web build the app talks to is `https://ether-staging.pages.dev` until cutover, then `https://etherbylcove.com`. The native shell bundles the Vite output. It does not load a remote `server.url`.
 
-- `npx tsc -p tsconfig.app.json --noEmit` — passed
-- `npm run build` — passed (Vite production build)
-- `npx cap add ios` — wrote the Xcode project. Capacitor 8 used the Swift Package Manager template. CocoaPods was not required, and `pod install` did not run.
-- `npx capacitor-assets generate --ios` — wrote the 1024 icon and the 2732 splash images from the letterboxed logo
-- `npx cap sync` — copied `dist` into the iOS app and refreshed `Package.swift`. Finished in under a second. No `server` block in the generated `ios/App/App/capacitor.config.json`.
+This Linux checkout cannot run `xcodebuild` or the iOS Simulator. Signing, archive, and TestFlight happen on a Mac.
 
-`ios/App/App/public` and `ios/App/App/capacitor.config.json` are gitignored by the Capacitor template, so the sync output is not in git. Run `npx cap sync` again on the Mac after checkout.
+## On the Mac
 
-## What is already in the repo
+1. Install Xcode from the Mac App Store and open it once so it installs the extra components.
+2. Clone this branch. Copy `.env.example` to `.env` and set the public Supabase values for project `aykopqinnnssxdhxqruo` before the production build. Vite inlines them into the native bundle. An empty `.env` produces an app that cannot sign in.
 
-- [x] `capacitor.config.ts` uses app name `Ether` and the placeholder bundle id.
-- [x] `android.allowMixedContent` is removed. There is no Android project in this repo.
-- [x] No `server.url`. A `server.url` would load a dev site instead of the bundled `dist` files. Leave it unset for TestFlight and the App Store.
-- [x] `server.iosScheme` is unset. The WebView stays on the default `capacitor://localhost` origin so live streaming can call `getUserMedia`.
-- [x] `ios.scheme` is unset. In Capacitor 8 that key is the Xcode build scheme (default `App`), not a URL scheme. The old value was the Lovable app id and would make `xcodebuild` look for a scheme that does not exist.
-- [x] Auth return links use `com.etherbylcove.app://...` from `getAuthRedirectUrl` in `src/lib/capacitorStorage.ts`. The same scheme is in `ios/App/App/Info.plist` under `CFBundleURLTypes`.
-- [x] iOS project generated with `npx cap add ios` (Capacitor 8 default is Swift Package Manager, so CocoaPods is not required).
-- [x] Icon and splash are the existing `src/assets/lc-bear-logo.png` letterboxed on `#080808`. No new artwork.
-- [x] Stripe checkout for membership, exclusive music, artist subscriptions, and cinema or network subscriptions is hidden when `Capacitor.getPlatform() === "ios"`. Donations stay visible while `IOS_DONATIONS_ENABLED` is true.
+```
+VITE_SUPABASE_URL=https://aykopqinnnssxdhxqruo.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=<anon key from Project Settings → API Keys>
+VITE_SUPABASE_PROJECT_ID=aykopqinnnssxdhxqruo
+```
 
-## Digital goods (implemented)
+The anon key is public. Do not put the service role key in `.env`.
 
-Membership ($5/month and up, Elite $25/month), exclusive-track purchases, artist subscriptions, and cinema/network subscriptions are digital goods sold through Stripe. On iOS those purchase buttons are hidden, and the functions that start checkout refuse to run:
+```bash
+npm ci
+npm run build
+npx cap sync ios
+```
 
-- Membership: `src/pages/Membership.tsx`, the Become a Member path on `src/pages/FundDashboard.tsx`, and the onboarding membership card. `startCheckout` and `openCustomerPortal` in `src/hooks/useMembership.ts` return early on iOS. The Stripe billing portal is hidden too, because it is a link out to manage a digital subscription.
-- Exclusive music and artist subscriptions: Buy / Subscribe on `src/components/music/ExclusiveTrackCard.tsx`. `handlePurchase` in `src/components/music/ExclusiveMusicSection.tsx` returns early on iOS.
-- Cinema networks: Subscribe on `src/pages/NetworkPage.tsx`, Subscribe Now in `src/components/cinema/VideoPlayer.tsx`, and the "Subscribe to Watch" label in `src/components/cinema/ContentDetailDialog.tsx`. `useSubscribeToNetwork` throws on iOS. Catalog price badges on `src/pages/Cinema.tsx` are hidden on iOS.
+3. Open the project:
 
-There is no "buy on the web" button. An external purchase link needs Apple's approval (External Link Account entitlement, or the US storefront external-purchase entitlement) and the paid account. Hiding the buttons is the safe state until Cadre has that approval.
+```bash
+open ios/App/App.xcodeproj
+```
 
-People who already subscribed on the web can still open content they have access to. The iOS app does not sell a new subscription.
+`npx cap open ios` does the same thing. Xcode resolves the local Swift package `ios/App/CapApp-SPM`. Wait until package resolution finishes.
 
-### Community Fund donations
+4. Select the **App** target, then **Signing & Capabilities**. Set **Team** to the Apple Developer team that will ship Ether. Automatic signing is already on. The bundle id must stay `com.etherbylcove.app`.
+5. Confirm the same target shows Push Notifications and Associated Domains. Those come from `ios/App/App/App.entitlements`. A paid Apple Developer membership is required. A free personal team cannot ship to TestFlight.
+6. Choose **Any iOS Device (arm64)** as the run destination. Product → Archive.
+7. In the Organizer, **Distribute App** → **App Store Connect** → **Upload**.
+8. In App Store Connect, wait until the build finishes processing, then attach it to TestFlight.
 
-Donations stay visible in the iOS app. `IOS_DONATIONS_ENABLED` in `src/lib/platform.ts` is `true`. `DonateDialog` and the fund page both read that flag. Set it to `false` to hide the donate buttons and stop the dialog from opening Stripe. Membership and exclusive music stay hidden either way.
+Run `npm run build` and `npx cap sync ios` again after every web change before you archive. `ios/App/App/public` and `ios/App/App/capacitor.config.json` are gitignored. The archive only contains the web bundle from the last sync.
 
-Apple guidelines 3.2.1 and 3.1.1 may require in-app purchase for donations to individuals. A nonprofit can qualify for an exception. That is a review risk. The flag is the switch if App Review rejects the Stripe donation flow.
+Do not set `server.url` in `capacitor.config.ts`. That loads a dev server instead of `dist`.
 
-### Payments this build does not hide
+## What the iOS app shows for payments
 
-These are still in the iOS build:
+`IOS_DONATIONS_ENABLED` in `src/lib/iosCheckout.ts` is `false`. `allowsStripeCheckout` is the rule:
 
-- Live-stream tips (`Tip LC` in `src/components/streaming/StreamViewer.tsx`, `tip-stream`). This is a digital purchase inside the app.
-- Community Fund donations, while `IOS_DONATIONS_ENABLED` is true.
-- Event tickets (`purchase-event-ticket`). Real-world tickets are often outside in-app purchase rules. Confirm the events are in-person.
-- Store items (`purchase-store-item`). Card checkout is hidden on iOS. Physical goods can show a text link to the website. Credits still spend. Confirm each item is a physical good or a real-world service. Digital goods in the store would have the same problem as membership.
-- Studio bookings (`purchase-studio-booking`). Treat as a real-world booking unless a booking is only access to digital content.
-
-## Lovable sync and native login
-
-`src/integrations/supabase/client.ts` is marked as generated. The Capacitor storage adapter used to be wired inside that file, so a Lovable regen would put sessions back on `localStorage` and native login would not survive an app restart.
-
-The adapter implementation was already in `src/lib/capacitorStorage.ts`. The client construction now lives in `src/lib/supabaseClient.ts` (not a generated path). Two things point the old import at that file:
-
-- `vite.config.ts` aliases `@/integrations/supabase/client` to `src/lib/supabaseClient.ts`.
-- `tsconfig.json` and `tsconfig.app.json` use the same path.
-
-`client.ts` itself only re-exports `supabaseClient`. If Lovable overwrites `client.ts` and leaves the alias in place, native login still uses Preferences. If Lovable also rewrites `vite.config.ts` or the `paths` entries, the alias is gone and a regenerated `client.ts` will not use the adapter. After every Lovable sync, check those three files and `capacitor.config.ts` (Lovable has previously put back `app.lovable.*` and a `server.url`).
-
-Supabase Auth redirect allow-list must include `com.etherbylcove.app://auth` (and the reset/confirm paths the app already uses) once Cadre confirms the bundle id. Until that allow-list is updated, email confirmation and password reset from the iOS app will not return into the app.
-
-## Info.plist purpose strings
-
-| Key | Why Ether asks |
+| Surface | iOS build |
 | --- | --- |
-| `NSCameraUsageDescription` | Live streams, and the event check-in QR scanner |
-| `NSMicrophoneUsageDescription` | Audio during a live stream |
-| `NSPhotoLibraryUsageDescription` | Choosing a photo for a profile, post, event, message, or other upload |
-| Notifications | iOS has no purpose-string key for notifications. The system dialog has no custom sentence. Ether asks so it can deliver messages, event reminders, and community alerts. `UIBackgroundModes` includes `remote-notification`. Delivery still needs APNs (paid account). |
+| Membership ($5/month and up, Elite $25/month) | Join, price picker, and Stripe billing portal are hidden. People who already subscribed on the web still see an active membership. No link to buy on the web. |
+| Exclusive music and artist subscriptions | Buy and Subscribe are hidden. The purchase functions return before calling Stripe. |
+| Cinema and network subscriptions | Subscribe is hidden. Catalog price badges are hidden. Playback of content the account already has still works. |
+| Live-stream tips (LC) | The Tip LC control is hidden. LC can be paid out, so a tip inside a stream is a digital payment. |
+| Donations | Donate buttons are hidden. The screen says donations are not available in the iOS app and does not link to checkout. |
+| Event tickets | Stripe checkout stays. A ticket to a real-world event is a good or service used outside the app (guideline 3.1.3(e)). |
+| Store products | In-app card checkout is hidden. A physical product can link to `https://etherbylcove.com/store`. LC credit spend still works. |
+| Store services | In-app card checkout is hidden, with no website purchase link. A "service" is not clearly consumed outside the app. |
+| Studio rentals and studio bookings | Stripe stays. Renting a room or booking a studio is a real-world service. Peerspace and Shopify links stay, because those checkouts are also outside the app. |
 
-`NSPhotoLibraryAddUsageDescription` is not set. The app picks existing photos. It does not save into the photo library.
+### Trade-off
 
-## Icon and splash
+Hiding Stripe for memberships, music, cinema, tips, and donations is the setup that can pass review worldwide without an extra Apple entitlement. People cannot buy those digital goods in the iOS app. They can buy them on the website, and the app will show access they already have.
 
-Source artwork: `src/assets/lc-bear-logo.png` (the LC bear already used in the app). It is portrait, 1275×1650, and already sits on black.
+A "buy on the web" button for a digital membership is the US anti-steering option. It still needs Apple's external-purchase entitlement (or the US storefront rules), the disclosure sheet, and it does not cover the rest of the world. That path is not implemented.
 
-`assets/icon.png` (1024×1024) and `assets/splash.png` (2732×2732) are that file scaled to fit inside a plain `#080808` square. The bear is not cropped and no new drawing was added. `#080808` is the splash `backgroundColor` already in `capacitor.config.ts`.
-
-`@capacitor/assets` then wrote the iOS sizes into `ios/App/App/Assets.xcassets`.
-
-## Needs a Mac and Xcode
-
-These commands and clicks do not work on this Linux machine:
-
-1. Install Xcode (App Store on the Mac) and open `ios/App/App.xcodeproj`. Capacitor 8 uses Swift Package Manager (`ios/App/CapApp-SPM`). Xcode resolves the packages. There is no `pod install` step.
-2. Confirm the bundle id with Cadre, then set the same id on the App target. The project already has `PRODUCT_BUNDLE_IDENTIFIER = com.etherbylcove.app`.
-3. Select a Team. This fails until the Apple ID is in the paid Apple Developer Program. Free personal teams cannot ship to TestFlight or the App Store, and they cannot use Push Notifications, Associated Domains, or Sign in with Apple.
-4. Archive (Product → Archive) and upload with the Organizer or `xcodebuild -scheme App`. `npx cap open ios` also needs the Mac.
-5. If native login was tested against the old `app.lovable...` scheme, retest magic links, email confirmation, and password reset against `com.etherbylcove.app`.
-
-`npx cap sync ios` copies `dist` into `ios/App/App/public` and refreshes `ios/App/App/capacitor.config.json` plus `ios/App/CapApp-SPM/Package.swift`. The Capacitor template gitignores `public` and `capacitor.config.json`, so they are not in git. Run sync on the Mac after checkout, and again after any web build, so the archive contains the latest UI and the confirmed bundle id.
-
-## Needs the paid Apple Developer account
-
-- App ID registration for the confirmed bundle id.
-- Distribution certificate and provisioning profile (Xcode managed signing does this once the team is paid).
-- Push Notifications capability and an APNs Auth Key (.p8) in Apple Developer, then the key in the push provider. The plugin is already a dependency (`@capacitor/push-notifications`). The plist background mode does not deliver pushes by itself.
-- Associated Domains, only if universal links are required (`applinks:etherbylcove.com`). That needs the entitlement plus an `apple-app-site-association` file on the website. Custom-scheme auth (`com.etherbylcove.app://`) does not need this. Add associated domains when password autofill or https links should open the app.
-- Sign in with Apple, **only if** a social login (Google, Facebook, and similar) is added. Email and password in `src/pages/Auth.tsx` do not require it. Do not add the button until a third-party login exists.
-- App Store Connect record, screenshots, and TestFlight.
-- Any external-purchase entitlement, if Cadre later wants a link to the website instead of hiding the buttons.
+To show card donations again, set `IOS_DONATIONS_ENABLED` to `true` only after Apple has accepted a nonprofit donation exception. Membership and the other digital goods stay hidden either way.
 
 ## Account deletion, report, and block
 
-Apple requires apps that create accounts to offer account deletion inside the app (guideline 5.1.1(v)). Apps with user-generated content also need a way to report and block people (guideline 1.2).
+Guideline 5.1.1(v): Settings → **Delete my account** is in the same web bundle the native shell loads. It calls the `delete-account` function with the signed-in session. There is no iOS-only branch that hides it. The button is at `/settings`, which requires a signed-in user.
 
-This branch can block someone from a chat (`src/components/messages/ChatView.tsx`) and lists blocked people in Settings. It does not contain account deletion or a report flow. Those are expected from another PR. Do not submit until that PR is merged and the deletion path works on iOS.
+Deletion is refused, and the dialog stays open with the reason, when any of these are true: a payout is pending or processing, earned LC balance is above zero, money is held, Stripe Connect still has a balance, or a Stripe subscription is still billing. The reviewer's deletion account must be empty of those.
 
-## Privacy policy
+Guideline 1.2: Report is on a post, profile, comment, message, project, and live chat. Block is on a profile and in a direct message. Settings lists blocked people and can unblock them. Sign in with Apple is not required. Auth is email and password only. There is no Google, Facebook, or other third-party login.
 
-The in-app policy is the public route `/privacy` (`src/pages/Privacy.tsx`). Logged-out visitors can open it (`AccessGate` treats `/privacy` as public).
+## Permissions and privacy
 
-App Store Connect needs an https URL. Use `https://etherbylcove.com/privacy` after confirming the live site serves that route without a login wall. The page asks people to contact `privacy@ethercreative.co`.
+`ios/App/App/Info.plist` purpose strings:
 
-## App Store Connect metadata
+| Key | Why |
+| --- | --- |
+| `NSCameraUsageDescription` | Live video, and the event check-in QR scanner |
+| `NSMicrophoneUsageDescription` | Live-stream audio |
+| `NSPhotoLibraryUsageDescription` | Choosing an existing photo for a profile, post, event, message, or other upload |
 
-Create the app only after the bundle id is confirmed and the account is paid.
+The app does not request location, contacts, tracking, or saving into the photo library. The city on a profile is typed by the person. There is no Core Location prompt. Notifications have no purpose-string key. `UIBackgroundModes` includes `remote-notification`.
+
+`ITSAppUsesNonExemptEncryption` is `false`. The app uses HTTPS only.
+
+`ios/App/App/PrivacyInfo.xcprivacy` is in the app target. Tracking is off. Collected data matches the in-app policy at `/privacy`: name, email, phone, the profile city (coarse location, not GPS), photos and video, live audio, user id, the APNs device token, purchase history, posts and messages, and product interaction.
+
+## Links
+
+Auth returns through the custom scheme `com.etherbylcove.app`, registered in Info.plist.
+
+Add these on Supabase project `aykopqinnnssxdhxqruo`, Authentication → URL configuration → Redirect URLs:
+
+- `com.etherbylcove.app://**`
+- `https://ether-staging.pages.dev/**`
+- `https://etherbylcove.com/**`
+
+The app sends `com.etherbylcove.app://auth?confirmed=1` and `com.etherbylcove.app://auth?reset=true`.
+
+Universal links are enabled for `applinks:etherbylcove.com` and `applinks:www.etherbylcove.com`. They do nothing until this file is hosted at `https://etherbylcove.com/.well-known/apple-app-site-association` (no file extension, `Content-Type: application/json`):
+
+```json
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID.com.etherbylcove.app",
+        "paths": ["*"]
+      }
+    ]
+  }
+}
+```
+
+Replace `TEAMID` with the 10-character Team ID. Until that file is live, https links open the website. The custom scheme still returns auth into the app. Do not publish a file that still says `TEAMID`.
+
+## Push
+
+Registration is in the app. It does not send notifications, and the build does not need the APNs key.
+
+1. On a signed-in iPhone, Settings → Push Notifications asks for permission and stores the device token in `push_subscriptions` (`platform = apns`, endpoint `apns:<token>`).
+2. If permission was already granted, the next launch refreshes that token. The app does not prompt on launch.
+3. `send-push-notification` skips `apns` rows. Web push is separate. See `docs/push-setup.md`.
+
+Create the key in the Apple Developer account (Certificates, Identifiers & Profiles → Keys):
+
+1. Register the App ID `com.etherbylcove.app` with Push Notifications and Associated Domains.
+2. Create a key, enable Apple Push Notifications service (APNs), and download the `.p8` once. Apple will not offer that file again.
+3. Record the Key ID, the Team ID, and the bundle id `com.etherbylcove.app`.
+4. Keep the `.p8` in a secret store. Do not commit it.
+
+`aps-environment` in the entitlements file is `development`. Xcode's automatic signing uses `production` for an App Store archive.
+
+## Icons and splash
+
+Source artwork: `src/assets/ether-bear-logo.png` (the same file as `src/assets/lc-bear-logo.png`). It is the portrait bear already used on the sign-in screen, 1275×1650, on black.
+
+`assets/icon.png` is that bear letterboxed on `#080808` at 1024×1024, flattened so the App Store icon has no alpha. `assets/splash.png` and `assets/splash-dark.png` are the same treatment at 2732×2732.
+
+Xcode's current icon catalog uses one 1024×1024 image (`AppIcon-512@2x.png`). The splash imageset has the 1x, 2x, and 3x universal images, including dark. `@capacitor/assets` writes those from `assets/icon.png` and `assets/splash.png`.
+
+## App Store Connect
+
+Create the app record with bundle id `com.etherbylcove.app` after the App ID exists.
 
 - Name: Ether
-- Subtitle, promotional text, description, keywords, support URL, marketing URL
+- Subtitle, promotional text, description, keywords, and category. Social Networking is the closest fit.
+- Support URL: `https://etherbylcove.com/support` (public page, no login). Until the domain is cut over, the same route is on `https://ether-staging.pages.dev/support`. App Store Connect needs the URL that stays up after release. Use the production URL once it serves the page.
 - Privacy policy URL: `https://etherbylcove.com/privacy`
-- Category: Social Networking is the closest fit. Confirm with Cadre.
-- Age rating questionnaire (user-generated content, messaging)
-- App Privacy nutrition labels, matching `src/pages/Privacy.tsx` (account data, photos, camera, microphone, purchases, identifiers)
-- Copyright and a support contact
-- Sign-in details for review. If membership content is behind a subscription bought on the web, give review a working account that already has access, and explain that iOS does not sell those digital goods.
-- Screenshots. Apple currently requires the 6.9-inch iPhone set (1320 × 2868) and will scale older sizes. Capture on the iPhone simulator in Xcode. The Xcode project currently sets `TARGETED_DEVICE_FAMILY = "1,2"` (iPhone and iPad) and `IPHONEOS_DEPLOYMENT_TARGET = 15.0`, so App Store Connect will also ask for a 13-inch iPad set unless Cadre changes the target to iPhone only before upload.
-- Export compliance: the app uses HTTPS. Answer the encryption question on the first upload. Do not set `ITSAppUsesNonExemptEncryption` until Cadre confirms there is no other encryption.
+- Marketing URL: `https://etherbylcove.com`
+- Copyright and a contact email (`privacy@ethercreative.co` is the address in the privacy policy)
+- Age rating: answer the questionnaire for user-generated content, messaging, and unrestricted web content. Do not claim the app is made for kids.
+- Export compliance: already declared with `ITSAppUsesNonExemptEncryption = false`.
+- App Privacy nutrition labels, collected and linked to the user, not used for tracking:
+  - Contact info: name, email, phone
+  - Location: coarse (the city someone types on their profile, not GPS)
+  - User content: photos, video, audio (live streams), other user content (posts, comments, messages)
+  - Identifiers: user id, device id (APNs token)
+  - Purchases: purchase history
+  - Usage data: product interaction
+  - Do not declare card numbers. Stripe processes cards. Do not declare precise location, contacts, or tracking.
+- Screenshots. The target includes iPhone and iPad (`TARGETED_DEVICE_FAMILY = 1,2`), deployment target iOS 15.
+  - iPhone 6.9-inch: 1320 × 2868 or 1290 × 2796
+  - iPhone 6.5-inch: 1284 × 2778 or 1242 × 2688, if Connect still asks
+  - iPad 13-inch: 2064 × 2752 or 2048 × 2732
+  Capture on the simulator after `npx cap sync ios`.
+- Reviewer account. Put the username and password in App Review Information.
+  - One account that can sign in, open Settings, and delete itself: no pending payout, earned LC balance of 0, no held money, no Stripe Connect balance, no active Stripe subscription.
+  - One account that already has membership or cinema access, if you want review to see paid content. The iOS app cannot sell that access.
+  - Say in the notes that digital memberships, donations, music purchases, and stream tips are not sold in the iOS app, and that event tickets and studio bookings are for real-world events.
 
 ## TestFlight
 
-1. Paid account, Mac, Xcode archive uploaded to App Store Connect.
-2. Wait for processing.
-3. Internal testers can install from the App Store Connect users on the team without a full Beta App Review.
-4. External testers need a group and a short Beta App Review.
-5. Install the build, then check: email sign-in and the return link, camera and microphone on a live stream, photo pick on a post, a locked cinema title shows no Subscribe button, membership shows no Join button, and an exclusive track shows no Buy button.
+1. Upload the archive and wait for processing.
+2. Internal testers are App Store Connect users on the team.
+3. External testers need a group and Beta App Review.
+4. On a device, check: email sign-in returns through `com.etherbylcove.app`, Settings shows Delete my account, Report and Block are reachable, camera and microphone prompts appear on a live stream, a photo pick explains why, membership has no Join button, donate is absent, and a locked cinema title has no Subscribe button.
 
-## After a Lovable sync
+## After a web-only change
 
-- [ ] `capacitor.config.ts` still has `Ether`, `com.etherbylcove.app` (or Cadre's confirmed id), no `server.url`, no `android.allowMixedContent`.
-- [ ] `vite.config.ts` still aliases `@/integrations/supabase/client` to `src/lib/supabaseClient.ts`.
-- [ ] `tsconfig.app.json` still has the same path.
-- [ ] `src/lib/supabaseClient.ts` still passes `capacitorStorage` when `Capacitor.isNativePlatform()` is true.
-- [ ] Run `npx tsc -p tsconfig.app.json --noEmit`, `npm run build`, and `npx cap sync ios`.
+```bash
+npm ci
+npm run build
+npx cap sync ios
+```
+
+Then archive again. Bump `CURRENT_PROJECT_VERSION` before the upload.

@@ -9,6 +9,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { PresenceProvider } from "@/hooks/usePresence";
 import { CreateFlowProvider } from "@/components/create/CreateFlowContext";
 import AccessGate from "@/components/auth/AccessGate";
+import { IosPushRegistration } from "@/components/ios/IosPushRegistration";
+import { NativeLinkRouter } from "@/components/ios/NativeLinkRouter";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
 
 const Landing = lazy(() => import("./pages/Landing"));
@@ -50,6 +52,7 @@ const Portfolios = lazy(() => import("./pages/Portfolios"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Guidelines = lazy(() => import("./pages/Guidelines"));
+const Support = lazy(() => import("./pages/Support"));
 const BrandPartners = lazy(() => import("./pages/BrandPartners"));
 const Collectives = lazy(() => import("./pages/Collectives"));
 const PartnerPortal = lazy(() => import("./pages/PartnerPortal"));
@@ -95,6 +98,8 @@ const App = () => (
         <AuthProvider>
           <PresenceProvider>
             <CreateFlowProvider>
+              <NativeLinkRouter />
+              <IosPushRegistration />
               <AccessGate>
                 <ActivityTracker />
                 <Toaster />
@@ -145,6 +150,7 @@ const App = () => (
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/guidelines" element={<Guidelines />} />
+                <Route path="/support" element={<Support />} />
                 <Route path="/brand-partners" element={<BrandPartners />} />
                 <Route path="/partner-portal" element={<PartnerPortal />} />
                 <Route path="/collectives" element={<Collectives />} />
