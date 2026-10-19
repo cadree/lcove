@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
@@ -94,7 +95,7 @@ export function CreateSubgroupDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>New subgroup</DialogTitle>
+          <DialogTitle className="font-display">New subgroup</DialogTitle>
           <DialogDescription>
             Pick the people who need this thread. The project owner can still read it.
           </DialogDescription>
@@ -111,20 +112,21 @@ export function CreateSubgroupDialog({
           </div>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {members.filter((member) => member.user_id !== user?.id).map((member) => (
-              <label key={member.user_id} className="flex items-center gap-3 rounded-lg border border-border p-3">
-                <input
-                  type="checkbox"
+              <label key={member.user_id} className="file-panel flex items-center gap-3 p-3">
+                <Checkbox
                   checked={selected.includes(member.user_id)}
-                  onChange={() => toggle(member.user_id)}
+                  onCheckedChange={() => toggle(member.user_id)}
                 />
-                <span className="text-sm">
+                <span className="text-sm text-foreground">
                   {member.profile?.display_name || 'Member'}
-                  {member.project_role_name ? ` · ${member.project_role_name}` : ''}
+                  {member.project_role_name ? (
+                    <span className="mono-label ml-2 text-[9px] text-muted-foreground">{member.project_role_name}</span>
+                  ) : null}
                 </span>
               </label>
             ))}
           </div>
-          <Button type="button" onClick={create} disabled={saving} className="w-full">
+          <Button type="button" onClick={create} disabled={saving} className="w-full rounded-[14px]">
             {saving ? 'Creating...' : 'Create subgroup'}
           </Button>
         </div>

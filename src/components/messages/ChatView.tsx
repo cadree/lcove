@@ -368,12 +368,13 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
       )}
 
       {isProjectChat && (subgroups.length > 0 || isSubgroup) && (
-        <div className="flex gap-2 overflow-x-auto px-4 py-2 border-b border-border/50">
+        <div className="flex gap-2 overflow-x-auto border-b border-border px-4 py-2">
           {isSubgroup && conversation?.parent_conversation_id && (
             <Button
               type="button"
               size="sm"
               variant="outline"
+              className="mono-label h-8 rounded-full border-border px-3 text-[10px]"
               onClick={() => navigate(`/messages?chat=${conversation.parent_conversation_id}`)}
             >
               Main chat
@@ -385,6 +386,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
               type="button"
               size="sm"
               variant={subgroup.id === conversationId ? 'default' : 'outline'}
+              className="mono-label h-8 rounded-full px-3 text-[10px]"
               onClick={() => navigate(`/messages?chat=${subgroup.id}`)}
             >
               {subgroup.name || 'Subgroup'}
@@ -394,7 +396,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
       )}
 
       {!isParticipant && isProjectChat && (
-        <p className="px-4 py-2 text-xs text-muted-foreground border-b border-border/50">
+        <p className="mono-label border-b border-border px-4 py-2 text-[9px] text-muted-foreground">
           You can read this chat as the project owner.
         </p>
       )}
@@ -457,7 +459,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                                 </span>
                               )}
                               {senderRole && (
-                                <Badge variant="outline" className="text-[10px] py-0 h-4">
+                                <Badge variant="outline" className="mono-label h-4 border-border py-0 text-[9px]">
                                   {senderRole}
                                 </Badge>
                               )}
@@ -586,9 +588,9 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
       </div>
 
       {selectingShare && (
-        <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
-          <span className="text-sm text-muted-foreground">{shareIds.length} selected</span>
-          <Button type="button" size="sm" onClick={shareToMain} disabled={sharing || shareIds.length === 0}>
+        <div className="tab-bar flex items-center justify-between gap-3 border-t border-border px-4 py-3">
+          <span className="mono-label text-[10px] text-muted-foreground">{shareIds.length} selected</span>
+          <Button type="button" size="sm" className="rounded-[14px]" onClick={shareToMain} disabled={sharing || shareIds.length === 0}>
             {sharing ? 'Sharing...' : 'Share to main chat'}
           </Button>
         </div>

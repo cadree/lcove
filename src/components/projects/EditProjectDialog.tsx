@@ -282,7 +282,7 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
                   type="button"
                   onClick={() => setListingType(kind)}
                   className={cn(
-                    "p-2 rounded-lg border text-sm",
+                    "mono-label rounded-[14px] border p-3 text-[11px]",
                     listingType === kind ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"
                   )}
                 >

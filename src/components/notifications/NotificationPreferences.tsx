@@ -163,7 +163,7 @@ export const NotificationPreferences: React.FC = () => {
       </p>
       <div className="space-y-1 pb-4">
         <PreferenceItem
-          icon={<FolderKanban className="h-4 w-4 text-green-500" />}
+          icon={<FolderKanban className="h-4 w-4 text-primary" />}
           label="New Projects"
           description="When a new project idea is posted. Turn this off to stop those alerts."
           checked={preferences.new_projects_enabled ?? true}

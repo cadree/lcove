@@ -231,7 +231,7 @@ const Projects: React.FC = () => {
                     )}
                     {joinedProjects.some((project) => project.creator_id !== user.id) && (
                       <div>
-                        <h3 className="text-sm font-medium mb-3">Collaborating</h3>
+                        <h3 className="mono-label mb-3 text-[10px] text-muted-foreground">Collaborating</h3>
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                           {joinedProjects.filter((project) => project.creator_id !== user.id).map((project) => (
                             <ProjectCard

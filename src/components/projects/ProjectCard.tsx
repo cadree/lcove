@@ -74,7 +74,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
               <Badge variant="outline" className="text-[10px] gap-1"><Lock className="h-3 w-3" />Private</Badge>
             )}
             {project.listing_type === 'gig' && (
-              <Badge variant="outline" className="text-[10px]">Gig</Badge>
+              <Badge variant="outline" className="mono-label text-[9px]">Gig</Badge>
             )}
             {outcomeLabels.slice(0, 2).map(o => (
               <Badge key={o} variant="outline" className="text-[10px]">{o}</Badge>

@@ -336,7 +336,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
 
     if (att.file_type === 'video') {
       return (
-        <video src={att.file_url} controls className="w-full h-32 bg-black object-contain" />
+        <video src={att.file_url} controls className="h-32 w-full bg-background object-contain" />
       );
     }
 
