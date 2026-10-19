@@ -707,6 +707,32 @@ const Settings = () => {
 
             <div className="flex items-center justify-between py-2">
               <div>
+                <Label className="text-foreground">New Projects</Label>
+                <p className="text-sm text-muted-foreground">When a new project idea is posted. Turn this off to stop those alerts.</p>
+              </div>
+              <Switch
+                checked={preferences?.new_projects_enabled ?? true}
+                onCheckedChange={(checked) => handleNotificationToggle('new_projects_enabled', checked)}
+              />
+            </div>
+
+            <Separator className="bg-border/50" />
+
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <Label className="text-foreground">New Gigs</Label>
+                <p className="text-sm text-muted-foreground">When a new gig is posted. Turn this off to stop those alerts.</p>
+              </div>
+              <Switch
+                checked={preferences?.new_gigs_enabled ?? true}
+                onCheckedChange={(checked) => handleNotificationToggle('new_gigs_enabled', checked)}
+              />
+            </div>
+
+            <Separator className="bg-border/50" />
+
+            <div className="flex items-center justify-between py-2">
+              <div>
                 <Label className="text-foreground">Event Reminders</Label>
                 <p className="text-sm text-muted-foreground">Upcoming event notifications</p>
               </div>

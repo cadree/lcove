@@ -145,7 +145,7 @@ export function CalendarAgendaView({
                   <div className={cn(
                     "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
                     item.type === 'event' ? "bg-primary/20 text-primary" : "",
-                    item.type === 'project' ? "bg-accent/50 text-accent-foreground" : "",
+                    item.type === 'project' ? "bg-[hsl(var(--scan)/0.45)] text-foreground" : "",
                     item.type === 'personal' ? "bg-secondary/50 text-secondary-foreground" : ""
                   )}>
                     {getTypeIcon(item.type)}
@@ -193,7 +193,7 @@ export function CalendarAgendaView({
                   <span className={cn(
                     "px-2 py-1 rounded-md text-xs capitalize shrink-0",
                     item.type === 'event' ? "bg-primary/20 text-primary" : "",
-                    item.type === 'project' ? "bg-accent/50 text-accent-foreground" : "",
+                    item.type === 'project' ? "bg-[hsl(var(--scan)/0.45)] text-foreground" : "",
                     item.type === 'personal' ? "bg-secondary/50 text-secondary-foreground" : ""
                   )}>
                     {item.type}

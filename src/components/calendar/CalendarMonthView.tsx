@@ -115,7 +115,7 @@ export function CalendarMonthView({
                         "w-full text-left text-[10px] sm:text-xs px-1.5 py-1 rounded truncate cursor-pointer transition-all",
                         "hover:ring-2 hover:ring-primary/50 hover:scale-[1.02] active:scale-[0.98]",
                         item.type === 'event' ? "bg-primary/30 text-primary font-medium" : "",
-                        item.type === 'project' ? "bg-accent/50 text-accent-foreground" : "",
+                        item.type === 'project' ? "bg-[hsl(var(--scan)/0.45)] font-medium text-foreground" : "",
                         item.type === 'personal' ? "bg-secondary/50 text-secondary-foreground" : ""
                       )}
                     >

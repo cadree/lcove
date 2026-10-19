@@ -1365,6 +1365,30 @@ SELECT set_config('request.jwt.claim.role', 'authenticated', false);
 SELECT set_config('request.jwt.claims', '{"role":"authenticated","email":"a.passed@example.com"}', false);
 SET ROLE authenticated;
 
+-- insert().select() is INSERT ... RETURNING. The creator must get the new row
+-- back, including a private project whose helper check cannot see it yet.
+DO $$
+DECLARE
+  returned_id uuid;
+BEGIN
+  INSERT INTO public.projects (id, creator_id, title, status, is_private, listing_type, hide_from_calendar)
+  VALUES (
+    'c4c4c4c4-c4c4-44c4-84c4-c4c4c4c4c4c4',
+    '11111111-1111-4111-8111-111111111111',
+    'Returning collab',
+    'open',
+    true,
+    'project',
+    false
+  )
+  RETURNING id INTO returned_id;
+
+  IF returned_id IS DISTINCT FROM 'c4c4c4c4-c4c4-44c4-84c4-c4c4c4c4c4c4' THEN
+    RAISE EXCEPTION 'FAIL: creator insert-with-returning did not return the new project';
+  END IF;
+  RAISE NOTICE 'PASS: creator insert-with-returning returns the new project';
+END $$;
+
 INSERT INTO public.projects (id, creator_id, title, status, is_private, listing_type, hide_from_calendar)
 VALUES
   ('c1c1c1c1-c1c1-41c1-81c1-c1c1c1c1c1c1', '11111111-1111-4111-8111-111111111111', 'Public collab', 'open', false, 'project', false),
