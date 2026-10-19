@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { motion } from 'framer-motion';
-import { EtherWordmark } from '@/components/brand/EtherWordmark';
+import bearLogo from '@/assets/ether-bear-logo.png';
 
 interface AccessGateProps {
   children: React.ReactNode;
@@ -159,7 +159,7 @@ const AccessGate = ({ children }: AccessGateProps) => {
               transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
               className="mb-6 flex justify-center"
             >
-              <EtherWordmark className="w-56" />
+              <img src={bearLogo} alt="Ether" className="mx-auto h-28 w-auto" />
             </motion.div>
             
             <h2 className="ether-title mb-4 text-3xl text-foreground md:text-4xl">

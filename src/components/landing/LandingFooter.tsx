@@ -29,7 +29,7 @@ const columns = [
 
 export function LandingFooter() {
   return (
-    <footer className="border-t border-border py-12">
+    <footer className="border-t border-border pt-12">
       <div className="container px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-8 mb-12">
           {columns.map((column) => (
@@ -48,9 +48,11 @@ export function LandingFooter() {
           ))}
         </div>
 
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pt-8 border-t border-border">
+      </div>
+      <div className="ether-ink-band">
+        <div className="flex w-full max-w-6xl flex-col items-start justify-between gap-4 md:flex-row md:items-center">
           <EtherWordmark className="h-8" />
-          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Ether</p>
+          <p className="text-sm text-[hsl(var(--bone))]">© 2026 etherbylcove</p>
         </div>
       </div>
     </footer>

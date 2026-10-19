@@ -701,31 +701,39 @@
   filter: drop-shadow(0 6px 14px rgba(60, 40, 30, 0.28));
 }
 
-/* Light mode uses a deeper magenta of the same glyphs. The neon cutout stays for dark and the splash. */
-.ether-mark {
-  display: inline-grid;
-  aspect-ratio: 1214 / 389;
+/* Neon wordmark sits on a full-bleed ink band so it never lands on cream. */
+.ether-ink-band {
+  display: flex;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  padding: 1.35rem 1.25rem;
+  background: #08080a;
+}
+
+.novi-peek {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: block;
+  width: 6.75rem;
+  height: 5.6rem;
+  overflow: hidden;
+  pointer-events: none;
   line-height: 0;
 }
 
-.ether-mark img {
-  grid-area: 1 / 1;
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.ether-mark .ether-wordmark-light {
-  display: none;
-}
-
-.light .ether-mark .ether-wordmark-dark {
-  display: none;
-}
-
-.light .ether-mark .ether-wordmark-light {
-  display: block;
+.novi-peek img {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 6.75rem;
+  max-width: none;
+  height: auto;
+  transform: translateX(-50%);
 }
 
 .ether-splash {

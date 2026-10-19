@@ -23,7 +23,7 @@ export function QuestCard({ quest }: { quest: QuestView }) {
           style={{ width: `${Math.round((quest.progress / quest.target) * 100)}%` }}
         />
       </div>
-      <div className="mt-3 flex items-center justify-between">
+      <div className="mt-3 flex items-center justify-between pr-28">
         <Link to="/quests" className="mono-label inline-flex min-h-11 items-center text-[9px] text-muted-foreground">
           Later
         </Link>
@@ -31,7 +31,7 @@ export function QuestCard({ quest }: { quest: QuestView }) {
           Follow quest →
         </Link>
       </div>
-      <NoviPeek className="absolute -bottom-1 right-1 h-14 w-14" />
+      <NoviPeek />
     </div>
   );
 }

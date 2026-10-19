@@ -21,7 +21,7 @@ import { useFavorites } from "@/hooks/useFavorites";
 import { QuestCard } from "@/components/novi/QuestCard";
 import { useNoviQuests } from "@/hooks/useNoviQuests";
 import { nextQuest } from "@/lib/noviQuests";
-import { EtherWordmark } from "@/components/brand/EtherWordmark";
+import bearLogo from "@/assets/ether-bear-logo.png";
 const Feed = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeCategory, setActiveCategory] = useState("All");
@@ -120,7 +120,7 @@ const Feed = () => {
       <div className="px-4 sm:px-6 pt-3">
         <header className="mb-3 flex min-h-11 items-center justify-between gap-3">
           <Link to="/feed" className="inline-flex min-h-11 items-center" aria-label="Ether home">
-            <EtherWordmark alt="" className="h-8" />
+            <img src={bearLogo} alt="" className="h-14 w-auto" />
           </Link>
           <div className="flex items-center">
             <FriendsDrawer>

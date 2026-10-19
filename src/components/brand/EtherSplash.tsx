@@ -61,7 +61,6 @@ export function EtherSplash() {
       aria-label="Ether"
     >
       <EtherWordmark
-        plain
         alt=""
         className="w-[min(86vw,26rem)]"
         style={{ opacity: frame.logo, filter: `brightness(${frame.brightness})` }}

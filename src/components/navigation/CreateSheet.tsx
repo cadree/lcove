@@ -142,10 +142,10 @@ export function CreateSheet({ open, onOpenChange }: CreateSheetProps) {
               </button>
             ))}
           </div>
-          <div className="quest-card relative mt-5">
-            <NoviPeek className="absolute -right-1 -top-6 h-14 w-14" />
+          <div className="quest-card relative mt-5 min-h-[8.5rem]">
+            <NoviPeek />
             <p className="mono-label text-[8px] text-[hsl(var(--brand))]">Novi // Note</p>
-            <p className="lore pr-12 text-[16px] text-foreground">Your first post writes 10 XP.</p>
+            <p className="lore pr-28 text-[16px] text-foreground">Your first post writes 10 XP.</p>
           </div>
         </SheetContent>
       </Sheet>

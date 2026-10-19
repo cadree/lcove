@@ -1,14 +1,15 @@
-import peek from "@/assets/novi-head-peek.png";
 import cutout from "@/assets/novi-cutout.png";
 import { cn } from "@/lib/utils";
 
+/**
+ * Novi hiding behind an edge. The window shows his head and shoulders from the
+ * full cutout; the card clips the rest of his body.
+ */
 export function NoviPeek({ className }: { className?: string }) {
   return (
-    <img
-      src={peek}
-      alt=""
-      className={cn("pointer-events-none h-16 w-16 object-contain drop-shadow-[0_10px_18px_rgba(255,159,200,0.45)]", className)}
-    />
+    <span className={cn("novi-peek", className)} aria-hidden="true">
+      <img src={cutout} alt="" />
+    </span>
   );
 }
 

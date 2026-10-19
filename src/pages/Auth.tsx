@@ -393,7 +393,9 @@ const Auth = () => {
             transition={{ delay: 0.1 }}
             className="mb-4"
           >
-            <EtherWordmark className="mx-auto w-[16rem] max-w-full" />
+            <div className="ether-ink-band">
+              <EtherWordmark className="w-[16rem] max-w-full" />
+            </div>
           </motion.div>
           {getTitle() ? (
           <motion.h1 

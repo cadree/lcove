@@ -29,7 +29,9 @@ const HeroSection = () => {
           transition={{ duration: 0.6 }}
           className="mb-4 sm:mb-6"
         >
-          <EtherWordmark className="w-[20rem] max-w-full" />
+          <div className="ether-ink-band">
+            <EtherWordmark className="w-[20rem] max-w-full" />
+          </div>
         </motion.div>
 
         {/* Badge */}
