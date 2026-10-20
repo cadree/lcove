@@ -1,6 +1,7 @@
 import { ArrowLeft, Flag } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { AI_CONTENT_RULE_ALLOWED, AI_CONTENT_RULE_FORBIDDEN } from "@/lib/aiContentRule";
 
 const Guidelines = () => {
   const navigate = useNavigate();
@@ -23,7 +24,7 @@ const Guidelines = () => {
             </div>
             <div>
               <h1 className="text-2xl font-display font-semibold">Community Guidelines</h1>
-              <p className="text-sm text-muted-foreground">Last updated: October 18, 2026</p>
+              <p className="text-sm text-muted-foreground">Last updated: October 20, 2026</p>
             </div>
           </div>
         </div>
@@ -33,10 +34,8 @@ const Guidelines = () => {
             Ether is for people and work they made. Do not harass, scam, or post illegal content.
             Do not impersonate someone else.
           </p>
-          <p className="text-foreground">
-            Generative AI is not allowed on Ether except for tools that improve a creator's workflow.
-            AI-generated people, fake profiles, and AI-made work presented as human-made can be reported and removed.
-          </p>
+          <p className="text-foreground">{AI_CONTENT_RULE_ALLOWED}</p>
+          <p className="text-foreground">{AI_CONTENT_RULE_FORBIDDEN}</p>
           <p>
             Use Report on a post, profile, comment, message, or project. Use Block on a profile or in a
             direct message. Blocking hides that person's posts, comments, directory listing, and messages
