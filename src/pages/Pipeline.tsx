@@ -1,7 +1,8 @@
 import { useState, useEffect, DragEvent } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Users, Plus, Search, ArrowLeft, UserPlus, GripVertical, Pencil, Check, X, Sun } from "lucide-react";
+import { Users, Plus, Search, UserPlus, GripVertical, Pencil, Check, X, Sun } from "lucide-react";
+import { BackButton } from "@/components/navigation/BackButton";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -215,14 +216,7 @@ const PipelinePage = () => {
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
           <div className="flex flex-wrap items-center gap-2 px-4 py-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => navigate('/')}
-                className="shrink-0"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
+              <BackButton className="shrink-0" />
               <div className="flex min-w-0 items-center gap-2">
                 <Users className="w-5 h-5 shrink-0 text-primary" />
                 <div className="min-w-0">

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { BackButton } from '@/components/navigation/BackButton';
 import { motion } from 'framer-motion';
 import { 
   Film, 
@@ -13,7 +14,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Users,
-  ArrowLeft,
   Info
 } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
@@ -30,7 +30,6 @@ import { SquircleIcon } from '@/components/world/SquircleIcon';
 
 const Cinema = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState<string | undefined>();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -92,9 +91,7 @@ const Cinema = () => {
             <div className="absolute top-0 left-0 right-0 z-20">
               <div className="flex items-center justify-between px-4 md:px-12 py-4">
                 <div className="flex items-center gap-4">
-                  <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="text-foreground hover:bg-background/20">
-                    <ArrowLeft className="w-5 h-5" />
-                  </Button>
+                  <BackButton className="text-foreground hover:bg-background/20" />
                   <div className="flex items-center gap-2">
                     <SquircleIcon icon={Film} fill="ink" size={40} />
                     <span className="ether-title text-2xl text-foreground">LC Cinema</span>

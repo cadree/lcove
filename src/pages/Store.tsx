@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,15 +40,14 @@ import {
   Settings,
   ShoppingBag,
   Sparkles,
-  ArrowLeft,
   Trash2,
   Receipt,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { BackButton } from '@/components/navigation/BackButton';
 
 const Store = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const storeIdParam = searchParams.get('store');
   
@@ -248,18 +247,7 @@ const Store = () => {
             {/* Show store header when viewing a specific store */}
             {storeIdParam && viewingStore ? (
               <div className="mb-5">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    searchParams.delete('store');
-                    setSearchParams(searchParams);
-                  }}
-                  className="mb-3"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to All Stores
-                </Button>
+                <BackButton showLabel label="Back" className="mb-3" />
                 <StoreBrandPanel
                   store={viewingStore}
                   importResult={isViewingOwnStore ? importResult : null}

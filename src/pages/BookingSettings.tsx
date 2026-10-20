@@ -196,7 +196,6 @@ const BookingSettings = () => {
           description="Let others book time with you"
           icon={<Calendar className="w-5 h-5" />}
           tile="cyan"
-          backPath="/settings"
           actions={
             !isCreating && (
               <Button onClick={() => setIsCreating(true)}>

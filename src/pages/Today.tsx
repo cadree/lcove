@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { format, isToday, isTomorrow, isPast, parseISO, addDays, startOfDay, endOfDay, isWithinInterval } from "date-fns";
-import { ArrowLeft, Sun, AlertCircle, Calendar, Circle, ChevronRight, Loader2, Plus, Search, Filter, Inbox, Clock, CalendarDays, Users } from "lucide-react";
+import { Sun, AlertCircle, Calendar, Circle, ChevronRight, Loader2, Plus, Search, Filter, Inbox, Clock, CalendarDays, Users } from "lucide-react";
+import { BackButton } from "@/components/navigation/BackButton";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -224,14 +225,7 @@ const Today = () => {
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => navigate(-1)}
-                className="shrink-0"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
+              <BackButton className="shrink-0" />
               <div className="flex items-center gap-2">
                 <Sun className="w-5 h-5 text-amber-500" />
                 <h1 className="font-display text-xl font-semibold text-foreground">My Day</h1>

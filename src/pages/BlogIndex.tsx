@@ -42,7 +42,7 @@ export default function BlogIndex() {
   return (
     <PageLayout>
       <div className="mx-auto max-w-2xl px-4 py-6 pb-28">
-        <PageHeader title="Blog" eyebrow="Archive" showBack backPath="/feed" />
+        <PageHeader title="Blog" eyebrow="Archive" showBack />
         {isLoading ? (
           <div className="h-40 animate-pulse rounded-[16px] bg-muted" />
         ) : posts.length === 0 ? (

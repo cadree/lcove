@@ -313,7 +313,6 @@ const Settings = () => {
           title="Settings"
           icon={<SettingsIcon className="w-5 h-5" />}
           tile="bone"
-          backPath="/profile"
           className="mb-8"
         />
 

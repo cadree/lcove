@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
+import { BackButton } from '@/components/navigation/BackButton';
 import PageLayout from '@/components/layout/PageLayout';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { 
-  Radio, Plus, Users, Mic, ArrowLeft, Play, Pencil, 
+  Radio, Plus, Users, Mic, Play, Pencil, 
   Clock, Eye, Coins, PlayCircle, Video, Headphones, Search 
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -240,7 +241,6 @@ const FeaturedLiveCard: React.FC<{
 };
 
 const Live = () => {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { streams: liveStreams, isLoading: loadingLive } = useLiveStreams(true);
@@ -297,9 +297,7 @@ const Live = () => {
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0">
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
+                <BackButton className="shrink-0" />
                 <div>
                   <div className="flex items-center gap-3 mb-2">
                     <div className="p-2.5 bg-primary/20 rounded-xl">
