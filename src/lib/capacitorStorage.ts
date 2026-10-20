@@ -146,8 +146,8 @@ export const isNativePlatform = (): boolean => {
 export const getAuthRedirectUrl = (path: string = '/'): string => {
   if (Capacitor.isNativePlatform()) {
     // Custom URL scheme registered in ios/App/App/Info.plist.
-    // CONFIRM WITH CADRE: NATIVE_APP_ID is a placeholder, and Supabase Auth
-    // redirect URLs must allow this scheme before native login works.
+    // It matches the App Store bundle id. Supabase Auth redirect URLs
+    // must allow this scheme before native login returns into the app.
     // path already starts with "/", so this becomes scheme://...
     return `${NATIVE_APP_ID}:/${path}`;
   }

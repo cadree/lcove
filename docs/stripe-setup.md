@@ -92,4 +92,4 @@ Sellers arrange their own shipping. Checkout adds the amount the seller entered 
 
 The iOS app does not open Stripe for memberships, exclusive music, or store card checkout. Physical goods can show a text link to the Ether website. Credits already on the account can still be spent.
 
-Donations stay visible. `IOS_DONATIONS_ENABLED` in `src/lib/platform.ts` is `true`. Set it to `false` to hide the donate buttons if App Review rejects them. Membership and music stay hidden either way. See `docs/ios-release.md`.
+Donations are off on iOS. `IOS_DONATIONS_ENABLED` in `src/lib/platform.ts` is `false`. Membership and music stay hidden either way. See `docs/ios-release.md`.

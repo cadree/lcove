@@ -2,7 +2,7 @@
 
 This is the work that can be done without a paid Apple Developer account. Signing, push, TestFlight, and App Store upload need a Mac with Xcode and a paid account ($99/year). Nothing in this file asks anyone to buy that account.
 
-Placeholder bundle id: `com.etherbylcove.app` (`src/config/nativeIds.ts`). **Cadre has to confirm this** before anyone registers it. It is the reverse-domain of etherbylcove.com. It replaces `app.lovable.e07d9c457fd949f78f3cc7d5998be668`.
+Bundle id: `app.lovable.e07d9c457fd949f78f3cc7d5998be668` (`src/config/nativeIds.ts`). This is the existing App Store Connect app **ETHER by LCOVE**, Apple ID 6758372010, team 926NTNU4M7. Do not register a new app or change the bundle id. Marketing version is 1.0.1 and the build number is 2, because 1.0 (1) is already uploaded.
 
 App name on the home screen: `Ether`.
 
@@ -20,15 +20,15 @@ These ran on Linux, without a Mac and without an Apple Developer account:
 
 ## What is already in the repo
 
-- [x] `capacitor.config.ts` uses app name `Ether` and the placeholder bundle id.
+- [x] `capacitor.config.ts` uses app name `Ether` and the existing App Store bundle id.
 - [x] `android.allowMixedContent` is removed. There is no Android project in this repo.
 - [x] No `server.url`. A `server.url` would load a dev site instead of the bundled `dist` files. Leave it unset for TestFlight and the App Store.
 - [x] `server.iosScheme` is unset. The WebView stays on the default `capacitor://localhost` origin so live streaming can call `getUserMedia`.
 - [x] `ios.scheme` is unset. In Capacitor 8 that key is the Xcode build scheme (default `App`), not a URL scheme. The old value was the Lovable app id and would make `xcodebuild` look for a scheme that does not exist.
-- [x] Auth return links use `com.etherbylcove.app://...` from `getAuthRedirectUrl` in `src/lib/capacitorStorage.ts`. The same scheme is in `ios/App/App/Info.plist` under `CFBundleURLTypes`.
+- [x] Auth return links use `app.lovable.e07d9c457fd949f78f3cc7d5998be668://...` from `getAuthRedirectUrl` in `src/lib/capacitorStorage.ts`. The same scheme is in `ios/App/App/Info.plist` under `CFBundleURLTypes`.
 - [x] iOS project generated with `npx cap add ios` (Capacitor 8 default is Swift Package Manager, so CocoaPods is not required).
 - [x] The iOS app icon stays the bear head: `src/assets/lc-bear-logo.png` on black. The launch splash is the ETHER wordmark centered on `#08080A`.
-- [x] Stripe checkout for membership, exclusive music, artist subscriptions, and cinema or network subscriptions is hidden when `Capacitor.getPlatform() === "ios"`. Donations stay visible while `IOS_DONATIONS_ENABLED` is true.
+- [x] Stripe checkout for membership, exclusive music, artist subscriptions, and cinema or network subscriptions is hidden when `Capacitor.getPlatform() === "ios"`. Donations are off on iOS because `IOS_DONATIONS_ENABLED` is false. There are no in-app purchases.
 
 ## Digital goods (implemented)
 
@@ -44,16 +44,14 @@ People who already subscribed on the web can still open content they have access
 
 ### Community Fund donations
 
-Donations stay visible in the iOS app. `IOS_DONATIONS_ENABLED` in `src/lib/platform.ts` is `true`. `DonateDialog` and the fund page both read that flag. Set it to `false` to hide the donate buttons and stop the dialog from opening Stripe. Membership and exclusive music stay hidden either way.
-
-Apple guidelines 3.2.1 and 3.1.1 may require in-app purchase for donations to individuals. A nonprofit can qualify for an exception. That is a review risk. The flag is the switch if App Review rejects the Stripe donation flow.
+Donations are off in the iOS app. `IOS_DONATIONS_ENABLED` in `src/lib/platform.ts` is `false`. `DonateDialog` and the fund page both read that flag, so Donate Now and Extra Donation are replaced by the iOS notice. Web and Android still show them. Membership and exclusive music stay hidden either way. This build does not add StoreKit or any in-app purchase.
 
 ### Payments this build does not hide
 
 These are still in the iOS build:
 
 - Live-stream tips (`Tip LC` in `src/components/streaming/StreamViewer.tsx`, `tip-stream`). This is a digital purchase inside the app.
-- Community Fund donations, while `IOS_DONATIONS_ENABLED` is true.
+- Community Fund donations. These are hidden on iOS while `IOS_DONATIONS_ENABLED` is false.
 - Event tickets (`purchase-event-ticket`). Real-world tickets are often outside in-app purchase rules. Confirm the events are in-person.
 - Store items (`purchase-store-item`). Card checkout is hidden on iOS. Physical goods can show a text link to the website. Credits still spend. Confirm each item is a physical good or a real-world service. Digital goods in the store would have the same problem as membership.
 - Studio bookings (`purchase-studio-booking`). Treat as a real-world booking unless a booking is only access to digital content.
@@ -69,7 +67,7 @@ The adapter implementation was already in `src/lib/capacitorStorage.ts`. The cli
 
 `client.ts` itself only re-exports `supabaseClient`. If Lovable overwrites `client.ts` and leaves the alias in place, native login still uses Preferences. If Lovable also rewrites `vite.config.ts` or the `paths` entries, the alias is gone and a regenerated `client.ts` will not use the adapter. After every Lovable sync, check those three files and `capacitor.config.ts` (Lovable has previously put back `app.lovable.*` and a `server.url`).
 
-Supabase Auth redirect allow-list must include `com.etherbylcove.app://auth` (and the reset/confirm paths the app already uses) once Cadre confirms the bundle id. Until that allow-list is updated, email confirmation and password reset from the iOS app will not return into the app.
+Supabase Auth redirect allow-list must include `app.lovable.e07d9c457fd949f78f3cc7d5998be668://` (and the reset/confirm paths the app already uses). Until that allow-list is updated, email confirmation and password reset from the iOS app will not return into the app.
 
 ## Info.plist purpose strings
 
@@ -95,21 +93,21 @@ Splash artwork: `src/assets/ether-wordmark.png`, the neon ETHER wordmark with th
 These commands and clicks do not work on this Linux machine:
 
 1. Install Xcode (App Store on the Mac) and open `ios/App/App.xcodeproj`. Capacitor 8 uses Swift Package Manager (`ios/App/CapApp-SPM`). Xcode resolves the packages. There is no `pod install` step.
-2. Confirm the bundle id with Cadre, then set the same id on the App target. The project already has `PRODUCT_BUNDLE_IDENTIFIER = com.etherbylcove.app`.
-3. Select a Team. This fails until the Apple ID is in the paid Apple Developer Program. Free personal teams cannot ship to TestFlight or the App Store, and they cannot use Push Notifications, Associated Domains, or Sign in with Apple.
+2. The App target already uses `PRODUCT_BUNDLE_IDENTIFIER = app.lovable.e07d9c457fd949f78f3cc7d5998be668`, marketing version 1.0.1, and build 2. Upload that build to the existing app. Do not create a new App Store Connect record.
+3. The target team is `926NTNU4M7`. Select that team when signing. Free personal teams cannot ship to TestFlight or the App Store, and they cannot use Push Notifications, Associated Domains, or Sign in with Apple.
 4. Archive (Product → Archive) and upload with the Organizer or `xcodebuild -scheme App`. `npx cap open ios` also needs the Mac.
-5. If native login was tested against the old `app.lovable...` scheme, retest magic links, email confirmation, and password reset against `com.etherbylcove.app`.
+5. Retest magic links, email confirmation, and password reset against `app.lovable.e07d9c457fd949f78f3cc7d5998be668://`.
 
 `npx cap sync ios` copies `dist` into `ios/App/App/public` and refreshes `ios/App/App/capacitor.config.json` plus `ios/App/CapApp-SPM/Package.swift`. The Capacitor template gitignores `public` and `capacitor.config.json`, so they are not in git. Run sync on the Mac after checkout, and again after any web build, so the archive contains the latest UI and the confirmed bundle id.
 
 ## Needs the paid Apple Developer account
 
-- App ID registration for the confirmed bundle id.
+- The App ID `app.lovable.e07d9c457fd949f78f3cc7d5998be668` is already registered for team 926NTNU4M7. Do not create another.
 - Distribution certificate and provisioning profile (Xcode managed signing does this once the team is paid).
 - Push Notifications capability and an APNs Auth Key (.p8) in Apple Developer, then the key in the push provider. The plugin is already a dependency (`@capacitor/push-notifications`). The plist background mode does not deliver pushes by itself.
-- Associated Domains, only if universal links are required (`applinks:etherbylcove.com`). That needs the entitlement plus an `apple-app-site-association` file on the website. Custom-scheme auth (`com.etherbylcove.app://`) does not need this. Add associated domains when password autofill or https links should open the app.
+- Associated Domains, only if universal links are required (`applinks:etherbylcove.com`). The project has no associated-domains entitlement and no `apple-app-site-association` file. Custom-scheme auth (`app.lovable.e07d9c457fd949f78f3cc7d5998be668://`) does not need them. Add associated domains when password autofill or https links should open the app.
 - Sign in with Apple, **only if** a social login (Google, Facebook, and similar) is added. Email and password in `src/pages/Auth.tsx` do not require it. Do not add the button until a third-party login exists.
-- App Store Connect record, screenshots, and TestFlight.
+- The App Store Connect record already exists (Apple ID 6758372010). Screenshots and TestFlight still need a Mac upload of version 1.0.1 (2).
 - Any external-purchase entitlement, if Cadre later wants a link to the website instead of hiding the buttons.
 
 ## Account deletion, report, and block
@@ -126,9 +124,11 @@ App Store Connect needs an https URL. Use `https://etherbylcove.com/privacy` aft
 
 ## App Store Connect metadata
 
-Create the app only after the bundle id is confirmed and the account is paid.
+Upload to the existing app. Do not create a second record.
 
-- Name: Ether
+- App Store Connect: ETHER by LCOVE, Apple ID 6758372010, bundle id `app.lovable.e07d9c457fd949f78f3cc7d5998be668`, team 926NTNU4M7
+- Version 1.0.1 (2). 1.0 (1) is already on the app.
+- Home screen name: Ether
 - Subtitle, promotional text, description, keywords, support URL, marketing URL
 - Privacy policy URL: `https://etherbylcove.com/privacy`
 - Category: Social Networking is the closest fit. Confirm with Cadre.
@@ -149,7 +149,7 @@ Create the app only after the bundle id is confirmed and the account is paid.
 
 ## After a Lovable sync
 
-- [ ] `capacitor.config.ts` still has `Ether`, `com.etherbylcove.app` (or Cadre's confirmed id), no `server.url`, no `android.allowMixedContent`.
+- [ ] `capacitor.config.ts` still has `Ether`, `app.lovable.e07d9c457fd949f78f3cc7d5998be668`, no `server.url`, no `android.allowMixedContent`.
 - [ ] `vite.config.ts` still aliases `@/integrations/supabase/client` to `src/lib/supabaseClient.ts`.
 - [ ] `tsconfig.app.json` still has the same path.
 - [ ] `src/lib/supabaseClient.ts` still passes `capacitorStorage` when `Capacitor.isNativePlatform()` is true.

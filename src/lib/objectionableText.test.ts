@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { objectionableMessage } from "./objectionableText.ts";
-import { digitalPurchasesAllowed, IOS_DIGITAL_PURCHASES_ENABLED } from "./platform.ts";
+import { digitalPurchasesAllowed, IOS_DIGITAL_PURCHASES_ENABLED, IOS_DONATIONS_ENABLED } from "./platform.ts";
 
 describe("objectionable text", () => {
   it("allows ordinary text", () => {
@@ -21,9 +21,25 @@ describe("objectionable text", () => {
 describe("iOS digital purchases", () => {
   it("stays off on iOS and on everywhere else", () => {
     assert.equal(IOS_DIGITAL_PURCHASES_ENABLED, false);
+    assert.equal(IOS_DONATIONS_ENABLED, false);
     assert.equal(digitalPurchasesAllowed(true), false);
     assert.equal(digitalPurchasesAllowed(false), true);
     assert.equal(digitalPurchasesAllowed(true, true), true);
+  });
+
+  it("uses the existing App Store bundle id and a version after 1.0 (1)", () => {
+    const bundle = "app.lovable.e07d9c457fd949f78f3cc7d5998be668";
+    const ids = readFileSync("src/config/nativeIds.ts", "utf8");
+    const plist = readFileSync("ios/App/App/Info.plist", "utf8");
+    const project = readFileSync("ios/App/App.xcodeproj/project.pbxproj", "utf8");
+    assert.match(ids, new RegExp(bundle.replace(/\./g, "\\.")));
+    assert.equal(plist.includes(bundle), true);
+    assert.equal(plist.includes("com.etherbylcove.app"), false);
+    assert.equal(project.includes(`PRODUCT_BUNDLE_IDENTIFIER = ${bundle};`), true);
+    assert.equal(project.includes("com.etherbylcove.app"), false);
+    assert.equal(project.includes("MARKETING_VERSION = 1.0.1;"), true);
+    assert.equal(project.includes("CURRENT_PROJECT_VERSION = 2;"), true);
+    assert.equal(project.includes("DEVELOPMENT_TEAM = 926NTNU4M7;"), true);
   });
 
   it("keeps the same banned tokens in the database filter", () => {

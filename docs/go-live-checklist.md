@@ -57,7 +57,7 @@ Dashboard, Authentication, URL configuration:
   - `https://etherbylcove.com/**`
   - `https://etherbylcove.com/auth?reset=true`
   - `https://etherbylcove.com/auth?confirmed=1`
-  - `com.etherbylcove.app://`
+  - `app.lovable.e07d9c457fd949f78f3cc7d5998be668://`
   - `capacitor://localhost`
 
 Add the staging host (`pages.dev` or Netlify) the same way, including `/auth?reset=true` and `/auth?confirmed=1`, while you test. Remove it when you no longer want that host to complete login.

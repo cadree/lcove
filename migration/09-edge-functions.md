@@ -67,7 +67,7 @@ https://lcove.lovable.app
 
 **Redirect URLs:**
 ```
-com.etherbylcove.app://
+app.lovable.e07d9c457fd949f78f3cc7d5998be668://
 capacitor://localhost
 https://id-preview--e07d9c45-7fd9-49f7-8f3c-c7d5998be668.lovable.app
 https://lcove.lovable.app

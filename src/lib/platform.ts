@@ -9,10 +9,10 @@ export function isIosApp(): boolean {
 }
 
 /**
- * Card donations stay visible in the iOS app.
- * Set this to false if App Review rejects them. Digital purchases use the flag below.
+ * Card donations stay off in the iOS app. The build is free and has no in-app purchases.
+ * Web and Android ignore this flag.
  */
-export const IOS_DONATIONS_ENABLED = true;
+export const IOS_DONATIONS_ENABLED = false;
 
 /**
  * Digital-content checkout in the native iOS app.
