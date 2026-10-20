@@ -9,6 +9,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import type { ProfileCustomization } from '@/hooks/useProfileCustomization';
 import { useCreatorVerification } from '@/hooks/useCreatorVerification';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -127,7 +128,7 @@ export function ProfileHeader({
       toast.success('Profile picture updated!');
     } catch (error) {
       console.error('Avatar upload error:', error);
-      toast.error('Failed to upload profile picture');
+      toast.error(errorMessage(error, 'Failed to upload profile picture'));
     } finally {
       setUploadingAvatar(false);
     }

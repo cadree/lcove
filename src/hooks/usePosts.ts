@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import { shotContentThin, shotPosts, shotSessionEnabled } from '@/lib/shotSession';
 
 interface Post {
@@ -123,7 +124,7 @@ export function usePosts() {
       toast.success('Post created!');
     },
     onError: (error) => {
-      toast.error('Failed to create post');
+      toast.error(errorMessage(error, 'Failed to create post'));
       console.error(error);
     },
   });

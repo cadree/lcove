@@ -18,6 +18,7 @@ import { explicitSectionOrder, explicitShowTopFriends, sectionFieldsForSave, sec
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 import { cn } from "@/lib/utils";
 import { ProfileMusicSourceSelector, MusicData } from "./ProfileMusicSourceSelector";
 import { ProfileThemeCustomizer, CustomizationState } from "./ProfileThemeCustomizer";
@@ -177,7 +178,7 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
       toast.success('Background image uploaded!');
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Failed to upload image');
+      toast.error(errorMessage(error, 'Failed to upload image'));
     } finally {
       setUploading(false);
     }

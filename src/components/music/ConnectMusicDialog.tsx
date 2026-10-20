@@ -15,6 +15,7 @@ import { useMusicProfile, PlatformLink, TrackInfo, AlbumInfo } from "@/hooks/use
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ConnectMusicDialogProps {
@@ -310,7 +311,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
       toast.success("Artist image uploaded!");
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error("Failed to upload image");
+      toast.error(errorMessage(error, "Failed to upload image"));
     } finally {
       setIsUploadingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = "";

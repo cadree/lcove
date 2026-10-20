@@ -22,6 +22,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import { Plus, X, Upload, Package, Wrench, Building2 } from 'lucide-react';
 import { STORE_PLATFORM_FEE_PERCENT } from '@/lib/fees';
 
@@ -125,7 +126,7 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
         .upload(filePath, file);
 
       if (uploadError) {
-        toast.error(`Failed to upload ${file.name}`);
+        toast.error(errorMessage(uploadError, `Failed to upload ${file.name}`));
         continue;
       }
 

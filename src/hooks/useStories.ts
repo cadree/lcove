@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import { shotContentThin, shotSessionEnabled, shotStories } from '@/lib/shotSession';
 
 interface Story {
@@ -180,7 +181,7 @@ export function useStories() {
       toast.success('Story uploaded!');
     },
     onError: (error) => {
-      toast.error('Failed to upload story');
+      toast.error(errorMessage(error, 'Failed to upload story'));
       console.error(error);
     },
   });

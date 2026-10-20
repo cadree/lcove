@@ -26,6 +26,7 @@ import { Film, Upload, Link as LinkIcon, X, Plus, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 
 interface EditContentDialogProps {
   open: boolean;
@@ -87,10 +88,7 @@ export const EditContentDialog = ({ open, onOpenChange, content }: EditContentDi
       .from('media')
       .upload(fileName, file);
 
-    if (error) {
-      console.error('Upload error:', error);
-      return null;
-    }
+    if (error) throw error;
 
     const { data } = supabase.storage.from('media').getPublicUrl(fileName);
     return data.publicUrl;
@@ -156,7 +154,7 @@ export const EditContentDialog = ({ open, onOpenChange, content }: EditContentDi
         if (uploadedUrl) {
           coverArtUrl = uploadedUrl;
         } else {
-          toast.error('Failed to upload cover image');
+          toast.error('Sign in to upload');
           setUploading(false);
           return;
         }
@@ -182,6 +180,7 @@ export const EditContentDialog = ({ open, onOpenChange, content }: EditContentDi
       onOpenChange(false);
     } catch (error) {
       console.error('Failed to update content:', error);
+      toast.error(errorMessage(error, 'Failed to update content'));
     } finally {
       setUploading(false);
     }

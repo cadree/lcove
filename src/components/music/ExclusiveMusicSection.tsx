@@ -241,7 +241,7 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
       setShowUpload(false);
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error("Failed to upload track");
+      toast.error(errorMessage(error, "Failed to upload track"));
     } finally {
       setIsUploading(false);
     }
