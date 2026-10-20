@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { APP_STORE_URL, INSTAGRAM_URL, SLACK_URL } from "../config/launch.ts";
+import { APP_STORE_URL, APPLE_TEAM_ID, INSTAGRAM_URL, SLACK_URL } from "../config/launch.ts";
 import {
   APP_STORE_COMING,
   HERO_TAGLINE,
@@ -163,5 +163,33 @@ describe("campaign copy", () => {
     assert.equal(invite.includes(SLACK_URL), false);
     assert.equal(readFileSync("index.html", "utf8").includes(HERO_TAGLINE), true);
     assert.equal(readFileSync("public/manifest.json", "utf8").includes(HERO_TAGLINE), true);
+  });
+});
+
+describe("apple app site association", () => {
+  it("uses the lovable app id and stripe return paths, served as json", () => {
+    const aasaPath = "public/.well-known/apple-app-site-association";
+    const jsonPath = "public/.well-known/apple-app-site-association.json";
+    const aasa = readFileSync(aasaPath, "utf8");
+    assert.equal(aasa, readFileSync(jsonPath, "utf8"));
+    const parsed = JSON.parse(aasa);
+    const detail = parsed.applinks.details[0];
+    assert.equal(detail.appID, "926NTNU4M7.app.lovable.e07d9c457fd949f78f3cc7d5998be668");
+    assert.equal(APPLE_TEAM_ID, "926NTNU4M7");
+    assert.equal(detail.appID.startsWith(`${APPLE_TEAM_ID}.`), true);
+    assert.deepEqual(detail.paths, ["/membership*", "/fund*", "*"]);
+    assert.equal(aasa.includes("TEAMID"), false);
+    const rules = readFileSync("public/_redirects", "utf8")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#"));
+    const aasaRule = rules.findIndex((line) => line.startsWith("/.well-known/apple-app-site-association "));
+    const spaRule = rules.findIndex((line) => line.startsWith("/* "));
+    assert.equal(aasaRule >= 0 && spaRule > aasaRule, true);
+    assert.equal(rules[aasaRule], "/.well-known/apple-app-site-association /.well-known/apple-app-site-association.json 200");
+    assert.equal(/\b30[1278]\b/.test(rules[aasaRule]), false);
+    const headers = readFileSync("public/_headers", "utf8");
+    assert.equal(headers.includes("/.well-known/apple-app-site-association\n  Content-Type: application/json"), true);
+    assert.equal(headers.includes("/.well-known/apple-app-site-association.json\n  Content-Type: application/json"), true);
   });
 });

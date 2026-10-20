@@ -17,10 +17,10 @@ export const APP_STORE_URL = "";
 export const APP_STORE_APPLE_ID = "";
 
 /**
- * Replace with the Apple Team ID before universal links work.
- * Used only in /.well-known/apple-app-site-association.
+ * Apple Team ID. The universal-link appID is written in
+ * public/.well-known/apple-app-site-association as this team plus the Lovable bundle.
  */
-export const APPLE_TEAM_ID = "TEAMID";
+export const APPLE_TEAM_ID = "926NTNU4M7";
 
 export const NATIVE_BUNDLE_ID = "com.etherbylcove.app";
 

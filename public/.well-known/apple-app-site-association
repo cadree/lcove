@@ -3,8 +3,8 @@
     "apps": [],
     "details": [
       {
-        "appID": "TEAMID.com.etherbylcove.app",
-        "paths": ["*"]
+        "appID": "926NTNU4M7.app.lovable.e07d9c457fd949f78f3cc7d5998be668",
+        "paths": ["/membership*", "/fund*", "*"]
       }
     ]
   }
