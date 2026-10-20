@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Music, Store, Crown, ChevronLeft } from 'lucide-react';
-import { isIosApp } from '@/lib/platform';
+import { digitalPurchasesEnabled } from '@/lib/platform';
 
 interface Props {
   onComplete: () => void;
@@ -79,7 +79,7 @@ const OnboardingConnections = ({ onComplete, onBack }: Props) => {
 
         {/* Options */}
         <div className="space-y-4 mb-8">
-          {options.filter((option) => option.id !== 'membership' || !isIosApp()).map((option, index) => (
+          {options.filter((option) => option.id !== 'membership' || digitalPurchasesEnabled()).map((option, index) => (
             <motion.button
               key={option.id}
               onClick={() => handleOptionClick(option.route)}

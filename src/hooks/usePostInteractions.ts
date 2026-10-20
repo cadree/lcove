@@ -6,6 +6,7 @@ import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { notifyPostComment, notifyPostLike } from '@/lib/notifications';
 import { isQueryablePostId } from '@/lib/postId';
+import { assertCleanText, OBJECTIONABLE_MESSAGE } from '@/lib/objectionableText';
 
 interface Comment {
   id: string;
@@ -163,6 +164,7 @@ export function usePostInteractions(postId: string) {
   const commentMutation = useMutation({
     mutationFn: async ({ content, parentId }: { content: string; parentId?: string }) => {
       if (!user) throw new Error('Must be logged in');
+      assertCleanText(content);
 
       const { error } = await supabase
         .from('post_comments')
@@ -193,8 +195,8 @@ export function usePostInteractions(postId: string) {
       queryClient.invalidateQueries({ queryKey: ['post-comments', postId] });
       toast.success('Comment added');
     },
-    onError: () => {
-      toast.error('Failed to add comment');
+    onError: (error) => {
+      toast.error(error instanceof Error && error.message === OBJECTIONABLE_MESSAGE ? error.message : 'Failed to add comment');
     },
   });
 

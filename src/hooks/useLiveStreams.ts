@@ -6,6 +6,8 @@ import { useEffect, useRef } from 'react';
 import { callRpc } from '@/lib/rpc';
 import { notifyLiveStream } from '@/lib/notifications';
 import { shotPeople, shotSessionEnabled } from '@/lib/shotSession';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
+import { assertCleanText } from '@/lib/objectionableText';
 
 export const SHOT_STREAM_ID = "0412aaaa-0000-4000-8000-0000000000c1";
 
@@ -74,6 +76,7 @@ export interface StreamReaction {
 
 export const useLiveStreams = (liveOnly = false) => {
   const queryClient = useQueryClient();
+  const { blockedIds } = useUserBlocks();
 
   const { data: streams = [], isLoading } = useQuery({
     queryKey: ['live-streams', liveOnly],
@@ -116,11 +119,14 @@ export const useLiveStreams = (liveOnly = false) => {
     };
   }, [queryClient]);
 
-  return { streams, isLoading };
+  const visibleStreams = streams.filter((stream) => !blockedIds.includes(stream.host_id));
+
+  return { streams: visibleStreams, isLoading };
 };
 
 export const useStream = (streamId: string | undefined) => {
   const queryClient = useQueryClient();
+  const { blockedIds } = useUserBlocks();
 
   const { data: stream, isLoading } = useQuery({
     queryKey: ['stream', streamId],
@@ -162,7 +168,9 @@ export const useStream = (streamId: string | undefined) => {
     };
   }, [streamId, queryClient]);
 
-  return { stream, isLoading };
+  const visibleStream = stream && blockedIds.includes(stream.host_id) ? null : stream;
+
+  return { stream: visibleStream, isLoading };
 };
 
 export const useStreamReactions = (streamId: string | undefined) => {
@@ -227,6 +235,8 @@ export const useCreateStream = () => {
       playback_url?: string;
     }) => {
       if (!user) throw new Error('Not authenticated');
+      assertCleanText(data.title);
+      assertCleanText(data.description);
 
       const { data: stream, error } = await supabase
         .from('live_streams')

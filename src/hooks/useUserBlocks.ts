@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { callRpc } from '@/lib/rpc';
 import { toast } from 'sonner';
 
 export function useUserBlocks() {
@@ -13,14 +14,18 @@ export function useUserBlocks() {
     queryFn: async () => {
       if (!user) return { blockedIds: [] as string[], profiles: [] as { user_id: string; display_name: string | null; avatar_url: string | null }[] };
 
-      const { data: blocks, error } = await supabase
-        .from('user_blocks')
-        .select('blocked_id')
-        .eq('blocker_id', user.id);
-
-      if (error) throw error;
-
-      const blockedIds = blocks?.map(b => b.blocked_id) || [];
+      let blockedIds: string[] = [];
+      try {
+        const peers = await callRpc<string[]>("blocked_peer_ids");
+        blockedIds = Array.isArray(peers) ? peers.filter(Boolean) : [];
+      } catch {
+        const { data: blocks, error } = await supabase
+          .from('user_blocks')
+          .select('blocked_id')
+          .eq('blocker_id', user.id);
+        if (error) throw error;
+        blockedIds = blocks?.map(b => b.blocked_id) || [];
+      }
       if (blockedIds.length === 0) return { blockedIds, profiles: [] };
 
       const { data: profiles } = await supabase

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { fromUntyped } from "@/lib/safetyTables";
+import { callRpc } from "@/lib/rpc";
 import type { ReportStatus, ReportTargetType } from "@/lib/reportReasons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -75,7 +76,22 @@ export function ContentReportsTab() {
     queryClient.invalidateQueries({ queryKey: ["content-reports"] });
   };
 
-  const openReports = reports.filter((report) => report.status === "open");
+  const removeContent = async (id: string) => {
+    setUpdatingId(id);
+    try {
+      await callRpc("moderate_report", { p_report_id: id, p_action: "remove" });
+      toast.success("Content removed");
+      queryClient.invalidateQueries({ queryKey: ["content-reports"] });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not remove the content");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const openReports = reports
+    .filter((report) => report.status === "open")
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   const closedReports = reports.filter((report) => report.status !== "open");
 
   if (isLoading) {
@@ -100,6 +116,7 @@ export function ContentReportsTab() {
             reports={openReports}
             updatingId={updatingId}
             onUpdate={updateStatus}
+            onRemove={removeContent}
           />
           <ReportList
             title="Reviewed"
@@ -113,16 +130,28 @@ export function ContentReportsTab() {
   );
 }
 
+function ReportDeadline({ createdAt }: { createdAt: string }) {
+  const due = new Date(createdAt).getTime() + 24 * 60 * 60 * 1000;
+  const overdue = Date.now() > due;
+  return (
+    <span className={overdue ? "text-destructive" : undefined}>
+      {" "}· {overdue ? "Overdue" : "Act within 24h"}
+    </span>
+  );
+}
+
 function ReportList({
   title,
   reports,
   updatingId,
   onUpdate,
+  onRemove,
 }: {
   title: string;
   reports: ContentReportRow[];
   updatingId: string | null;
   onUpdate: (id: string, status: "actioned" | "dismissed") => void;
+  onRemove?: (id: string) => void;
 }) {
   if (reports.length === 0) return null;
 
@@ -143,6 +172,7 @@ function ReportList({
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {report.reporter_name || "Member"} · {formatDistanceToNow(new Date(report.created_at), { addSuffix: true })}
+                  {report.status === "open" && <ReportDeadline createdAt={report.created_at} />}
                 </p>
               </div>
             </div>
@@ -152,8 +182,18 @@ function ReportList({
             <p className="text-xs text-muted-foreground break-all">Target {report.target_id}</p>
             {report.status === "open" && (
               <div className="flex gap-2">
+                {onRemove && (
+                  <Button
+                    size="sm"
+                    onClick={() => onRemove(report.id)}
+                    disabled={updatingId === report.id}
+                  >
+                    Remove content
+                  </Button>
+                )}
                 <Button
                   size="sm"
+                  variant="outline"
                   onClick={() => onUpdate(report.id, "actioned")}
                   disabled={updatingId === report.id}
                 >

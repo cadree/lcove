@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { SquircleIcon, type IconFill } from "@/components/world/SquircleIcon";
 import { useHomeUsage } from "@/hooks/useHomeUsage";
 import { useNoviQuests } from "@/hooks/useNoviQuests";
-import { isIosApp } from "@/lib/platform";
+import { digitalPurchasesEnabled, isIosApp } from "@/lib/platform";
 import type { LucideIcon } from "lucide-react";
 
 interface ToolsSheetProps {
@@ -106,7 +106,8 @@ export function ToolsSheet({ open, onOpenChange }: ToolsSheetProps) {
       .map((group) => ({
         ...group,
         items: group.items.filter((item) => {
-          if (item.iosHidden && hideIos) return false;
+          if (item.id === "membership" && !digitalPurchasesEnabled()) return false;
+          if (item.id !== "membership" && item.iosHidden && hideIos) return false;
           if (!needle) return true;
           return item.label.toLowerCase().includes(needle) || group.label.toLowerCase().includes(needle);
         }),

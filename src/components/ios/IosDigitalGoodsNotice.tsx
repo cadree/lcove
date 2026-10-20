@@ -1,4 +1,4 @@
-import { isIosApp } from "@/lib/platform";
+import { digitalPurchasesEnabled } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 
 interface IosDigitalGoodsNoticeProps {
@@ -16,7 +16,7 @@ export function IosDigitalGoodsNotice({
   kind = "purchase",
   className,
 }: IosDigitalGoodsNoticeProps) {
-  if (!isIosApp()) return null;
+  if (digitalPurchasesEnabled()) return null;
 
   const text =
     kind === "donation"

@@ -6,6 +6,7 @@ import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { shotContentThin, shotPosts, shotSessionEnabled } from '@/lib/shotSession';
 import { isQueryablePostId } from '@/lib/postId';
+import { assertCleanText, OBJECTIONABLE_MESSAGE } from '@/lib/objectionableText';
 
 interface Post {
   id: string;
@@ -95,6 +96,7 @@ export function usePosts() {
   const createPost = useMutation({
     mutationFn: async ({ content, file, mediaType }: { content?: string; file?: File; mediaType?: 'photo' | 'video' | 'text' }) => {
       if (!user) throw new Error('Must be logged in');
+      assertCleanText(content);
 
       let mediaUrl: string | null = null;
 
@@ -156,7 +158,7 @@ export function usePosts() {
     onError: (error, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(['posts'], context.previous);
       if (context?.preview) URL.revokeObjectURL(context.preview);
-      toast.error('Failed to create post');
+      toast.error(error instanceof Error && error.message === OBJECTIONABLE_MESSAGE ? error.message : 'Failed to create post');
       console.error(error);
     },
   });

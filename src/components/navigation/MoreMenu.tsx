@@ -4,7 +4,7 @@ import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { moreNavItems, visibleMoreItems } from "@/config/appNav";
-import { isIosApp } from "@/lib/platform";
+import { digitalPurchasesEnabled } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 
 export function MoreMenuButton({ className }: { className?: string }) {
@@ -30,7 +30,7 @@ export function MoreMenuButton({ className }: { className?: string }) {
           <SheetTitle className="ether-title text-3xl font-medium text-left">More</SheetTitle>
         </div>
         <ul className="ether-rule">
-          {visibleMoreItems(moreNavItems, isIosApp()).map((item) => {
+          {visibleMoreItems(moreNavItems, !digitalPurchasesEnabled()).map((item) => {
             const active = location.pathname === item.path;
             return (
               <li key={item.id} className="border-b border-border">

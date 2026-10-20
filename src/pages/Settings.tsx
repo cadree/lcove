@@ -45,6 +45,7 @@ import { useIsAdmin } from "@/hooks/useAdmin";
 import { useNotificationPreferences } from "@/hooks/useNotifications";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useUserBlocks } from "@/hooks/useUserBlocks";
+import { assertCleanText, OBJECTIONABLE_MESSAGE } from "@/lib/objectionableText";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
 import { supabase } from "@/integrations/supabase/client";
@@ -219,6 +220,8 @@ const Settings = () => {
         }
       });
 
+      assertCleanText(displayName);
+      assertCleanText(bio);
       const resolvedCity = resolveCity(city);
       const { error } = await updateProfile({
         display_name: displayName || null,
@@ -234,7 +237,7 @@ const Settings = () => {
       toast.success("Profile updated successfully!");
     } catch (error) {
       console.error("Error updating profile:", error);
-      toast.error("Failed to update profile");
+      toast.error(error instanceof Error && error.message === OBJECTIONABLE_MESSAGE ? error.message : "Failed to update profile");
     } finally {
       setSaving(false);
     }
@@ -1104,7 +1107,7 @@ const Settings = () => {
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete my account</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This deletes your login and personal data, including your profile, posts, comments, and messages.
+                  This deletes your login, cancels Stripe subscriptions, and removes or anonymizes your profile, posts, comments, and messages.
                   If a payout or other payment is still pending, deletion is refused until that money is settled.
                 </AlertDialogDescription>
               </AlertDialogHeader>

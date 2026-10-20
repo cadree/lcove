@@ -23,7 +23,7 @@ const Guidelines = () => {
             </div>
             <div>
               <h1 className="text-2xl font-display font-semibold">Community Guidelines</h1>
-              <p className="text-sm text-muted-foreground">Last updated: October 18, 2026</p>
+              <p className="text-sm text-muted-foreground">Last updated: October 20, 2026</p>
             </div>
           </div>
         </div>
@@ -38,12 +38,13 @@ const Guidelines = () => {
             AI-generated people, fake profiles, and AI-made work presented as human-made can be reported and removed.
           </p>
           <p>
-            Use Report on a post, profile, comment, message, or project. Use Block on a profile or in a
-            direct message. Blocking hides that person's posts, comments, directory listing, and messages
-            from you. They cannot message you or follow you.
+            Use Report on a post, profile, comment, message, project, or live stream. Use Block on a profile or in a
+            direct message. Blocking hides that person's posts, comments, stories, streams, and messages from you,
+            and hides yours from them. Neither of you can message the other.
           </p>
           <p>
-            Admins review reports and can remove content or restrict an account.
+            Admins review open reports within 24 hours and can remove the content or dismiss the report.
+            Posts, comments, messages, and live chat are checked for objectionable text before they are saved.
           </p>
           <div className="flex gap-4 pt-4 border-t">
             <Link to="/terms" className="text-primary hover:underline">Terms of Service</Link>

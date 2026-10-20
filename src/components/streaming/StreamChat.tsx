@@ -6,7 +6,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ReportDialog } from "@/components/safety/ReportDialog";
+import { useUserBlocks } from "@/hooks/useUserBlocks";
+import { assertCleanText, OBJECTIONABLE_MESSAGE } from "@/lib/objectionableText";
 import { Flag } from "lucide-react";
+import { toast } from "sonner";
 
 interface ChatRow {
   id: string;
@@ -19,6 +22,7 @@ interface ChatRow {
 
 export function StreamChat({ streamId }: { streamId: string }) {
   const { user } = useAuth();
+  const { blockedIds } = useUserBlocks();
   const queryClient = useQueryClient();
   const [body, setBody] = useState("");
   const [reportId, setReportId] = useState<string | null>(null);
@@ -63,6 +67,12 @@ export function StreamChat({ streamId }: { streamId: string }) {
   const send = async () => {
     const text = body.trim();
     if (!user || !text) return;
+    try {
+      assertCleanText(text);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : OBJECTIONABLE_MESSAGE);
+      return;
+    }
     setBody("");
     const { error } = await fromUntyped("stream_chat").insert({
       stream_id: streamId,
@@ -79,7 +89,7 @@ export function StreamChat({ streamId }: { streamId: string }) {
     <div className="border-t border-border/40 px-4 py-3 space-y-2">
       <div className="max-h-40 overflow-y-auto space-y-1 text-sm">
         {messages.length === 0 && <p className="text-muted-foreground">No chat yet.</p>}
-        {messages.map((message) => (
+        {messages.filter((message) => !blockedIds.includes(message.user_id)).map((message) => (
           <div key={message.id} className="flex items-start justify-between gap-2">
             <p>
               <span className="font-medium">{message.display_name || "Member"}: </span>

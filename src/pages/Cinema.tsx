@@ -24,7 +24,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useNetworks, useMyNetworks, useContentGenres, Network } from '@/hooks/useCinema';
 import { useAuth } from '@/contexts/AuthContext';
 import { CreateNetworkDialog } from '@/components/cinema/CreateNetworkDialog';
-import { isIosApp } from '@/lib/platform';
+import { digitalPurchasesEnabled } from '@/lib/platform';
 import { cn } from '@/lib/utils';
 import { SquircleIcon } from '@/components/world/SquircleIcon';
 
@@ -156,7 +156,7 @@ const Cinema = () => {
                     <Users className="w-4 h-4" />
                     {currentFeatured.subscriber_count} subscribers
                   </span>
-                  {currentFeatured.is_paid && !isIosApp() && (
+                  {currentFeatured.is_paid && digitalPurchasesEnabled() && (
                     <Badge className="bg-primary/20 text-primary border-primary/30">
                       ${currentFeatured.subscription_price}/mo
                     </Badge>
@@ -394,7 +394,7 @@ const NetworkCard = ({ network, showManage = false, isRow = false }: { network: 
       </div>
 
       {/* Price Badge */}
-      {network.is_paid && !isIosApp() && (
+      {network.is_paid && digitalPurchasesEnabled() && (
         <Badge className="absolute top-2 right-2 text-[10px] px-1.5 py-0.5 bg-primary/90 text-primary-foreground">
           ${network.subscription_price}/mo
         </Badge>

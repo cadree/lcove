@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Radio, Users, Coins, Send, X, Clock, PlayCircle, Trash2, Share2 } from 'lucide-react';
+import { Radio, Users, Coins, Send, X, Clock, PlayCircle, Trash2, Share2, Flag } from 'lucide-react';
+import { ReportDialog } from '@/components/safety/ReportDialog';
+import { digitalPurchasesEnabled } from '@/lib/platform';
 import { shareLink, buildShareUrl } from '@/lib/shareLink';
 import { useStream, useStreamReactions, useSendReaction, useTipStream, useJoinStream, useDeleteStream, useStreamPresence } from '@/hooks/useLiveStreams';
 import { StreamChat } from './StreamChat';
@@ -62,6 +64,8 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   const [showTipInput, setShowTipInput] = useState(false);
   const [floatingReactions, setFloatingReactions] = useState<{ id: string; emoji: string }[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const cardGifts = digitalPurchasesEnabled();
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   const isHost = user?.id === stream?.host_id;
@@ -347,6 +351,16 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
                 )}
 
                 {/* Tip Button (viewers only) */}
+                {user && !isHost && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setReportOpen(true)}
+                  >
+                    <Flag className="h-4 w-4 mr-2" />
+                    Report
+                  </Button>
+                )}
                 {user && !isHost && streamStatus === 'live' && (
                   <>
                     <Button
@@ -368,7 +382,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
                       <Coins className="h-4 w-4 mr-2" />
                       Tip LC
                     </Button>
-                    {(["rose", "star", "crown"] as const).map((gift) => (
+                    {cardGifts && (["rose", "star", "crown"] as const).map((gift) => (
                       <Button
                         key={gift}
                         type="button"
@@ -433,6 +447,12 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
+      <ReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        targetType="stream"
+        targetId={streamId}
+      />
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>

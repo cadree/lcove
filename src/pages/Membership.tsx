@@ -23,7 +23,7 @@ import {
 import { useMembership } from "@/hooks/useMembership";
 import { useAuth } from "@/contexts/AuthContext";
 import { IosDigitalGoodsNotice } from "@/components/ios/IosDigitalGoodsNotice";
-import { isIosApp } from "@/lib/platform";
+import { digitalPurchasesEnabled } from "@/lib/platform";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -48,7 +48,7 @@ const ELITE_PERKS = [
 
 const Membership = () => {
   const { user } = useAuth();
-  const iosApp = isIosApp();
+  const iosApp = !digitalPurchasesEnabled();
   const { membership, isLoading, isCheckingOut, checkMembership, startCheckout, openCustomerPortal } = useMembership();
   const [searchParams] = useSearchParams();
   const [communityAmount, setCommunityAmount] = useState<number>(5);
@@ -322,12 +322,14 @@ const Membership = () => {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Price */}
+                  {digitalPurchasesEnabled() && (
                   <div>
                     <div className="flex items-baseline gap-1">
                       <span className="text-4xl font-display font-medium text-foreground">$25</span>
                       <span className="text-muted-foreground">/month</span>
                     </div>
                   </div>
+                  )}
 
                   {/* Perks */}
                   <ul className="space-y-3">

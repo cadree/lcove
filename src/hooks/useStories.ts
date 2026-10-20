@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { shotContentThin, shotSessionEnabled, shotStories } from '@/lib/shotSession';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
 
 interface Story {
   id: string;
@@ -30,6 +31,7 @@ interface StoryWithProfile extends Story {
 
 export function useStories() {
   const { user } = useAuth();
+  const { blockedIds } = useUserBlocks();
   const queryClient = useQueryClient();
 
   const { data, isLoading, refetch, error } = useQuery({
@@ -262,9 +264,14 @@ export function useStories() {
     },
   });
 
+  const stories = (data?.stories || []).filter((story) => !blockedIds.includes(story.user_id));
+  const groupedStories = Object.fromEntries(
+    Object.entries(data?.grouped || {}).filter(([userId]) => !blockedIds.includes(userId)),
+  );
+
   return {
-    stories: data?.stories || [],
-    groupedStories: data?.grouped || {},
+    stories,
+    groupedStories,
     isLoading,
     error,
     uploadStory,

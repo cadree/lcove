@@ -16,7 +16,7 @@ import { useFundStats } from "@/hooks/useFundStats";
 import { RecentDistributionsCard } from "@/components/fund/FundDistributions";
 import { DonateDialog } from "@/components/fund/DonateDialog";
 import { IosDigitalGoodsNotice } from "@/components/ios/IosDigitalGoodsNotice";
-import { IOS_DONATIONS_ENABLED, isIosApp } from "@/lib/platform";
+import { IOS_DONATIONS_ENABLED, digitalPurchasesEnabled, isIosApp } from "@/lib/platform";
 import { toast } from "sonner";
 import { SquircleIcon, iconFills } from "@/components/world/SquircleIcon";
 
@@ -116,6 +116,7 @@ export default function FundDashboard() {
   
   const iosApp = isIosApp();
   const showDonations = !iosApp || IOS_DONATIONS_ENABLED;
+  const hideDigitalPurchases = !digitalPurchasesEnabled();
   const stats = view === "lifetime" ? fundStats?.lifetime : fundStats?.monthly;
   const isMember = membership?.subscribed;
 
@@ -485,7 +486,7 @@ export default function FundDashboard() {
                       ) : (
                         <IosDigitalGoodsNotice kind="donation" className="max-w-xs" />
                       )}
-                      {!iosApp && (
+                      {digitalPurchasesEnabled() && (
                         <Button variant="outline" size="sm" onClick={handleManageSubscription}>
                           Manage Subscription
                         </Button>
@@ -508,7 +509,7 @@ export default function FundDashboard() {
                         </h3>
                         <p className="text-muted-foreground max-w-md">
                           Join {fundStats?.lifetime.memberCount || 0}+ members funding grants, events, and creative opportunities.{" "}
-                          {iosApp
+                          {hideDigitalPurchases
                             ? showDonations
                               ? "Membership checkout is not available in the iOS app. You can still donate."
                               : "Membership checkout is not available in the iOS app."
@@ -527,7 +528,7 @@ export default function FundDashboard() {
                       ) : (
                         <IosDigitalGoodsNotice kind="donation" className="max-w-xs" />
                       )}
-                      {iosApp ? (
+                      {hideDigitalPurchases ? (
                         <IosDigitalGoodsNotice className="max-w-xs" />
                       ) : (
                       <Button 
