@@ -100,7 +100,7 @@ export const LiveStreamCard: React.FC<LiveStreamCardProps> = ({ stream, onClick 
         <div className="flex gap-2 mt-2 flex-wrap">
           <Badge variant="outline" className="text-xs">
             {stream.stream_type === 'webrtc' ? '📹 Camera/Mic' : 
-             stream.stream_type === 'obs_rtmp' ? '🎬 OBS' :
+             stream.stream_type === 'obs_rtmp' ? 'Unavailable' :
              stream.stream_type === 'youtube' ? '▶️ YouTube' :
              stream.stream_type === 'twitch' ? '🟣 Twitch' :
              stream.stream_type === 'soundcloud' ? '🎵 SoundCloud' :

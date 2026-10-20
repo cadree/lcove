@@ -45,11 +45,11 @@ verify_jwt = true
 [functions.check-network-subscription]
 verify_jwt = true
 
-[functions.mux-stream]
-verify_jwt = false
-
-[functions.mux-status]
+[functions.livekit-token]
 verify_jwt = true
+
+[functions.livekit-webhook]
+verify_jwt = false
 
 [functions.create-connect-account]
 verify_jwt = true

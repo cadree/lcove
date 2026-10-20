@@ -133,7 +133,14 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   const renderEmbed = () => {
     if (!stream) return null;
 
-    // WebRTC streaming (P2P with OPUS audio)
+    if (stream.stream_type === 'obs_rtmp') {
+      return (
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-muted/20 to-background px-6 text-center">
+          <p className="text-muted-foreground">OBS streaming has been removed.</p>
+        </div>
+      );
+    }
+
     if (stream.stream_type === 'webrtc') {
       // REPLAY VIEW: Anyone can watch a replay (host or viewer)
       if (streamStatus === 'ended' && hasReplay) {
