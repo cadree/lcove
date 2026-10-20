@@ -22,6 +22,8 @@ export interface NoviBoard {
   studioOpened: boolean;
 }
 
+const filedQuestKeys = new Set<string>();
+
 const emptyBoard: NoviBoard = {
   total: 0,
   level: 1,
@@ -85,7 +87,6 @@ export function useNoviQuests() {
     studioOpened: board.studioOpened,
   });
   const today = new Date().toISOString().slice(0, 10);
-  const filed = useRef(new Set<string>());
 
   const complete = useMutation({
     mutationFn: async (questId: string) => {
@@ -105,15 +106,28 @@ export function useNoviQuests() {
     },
   });
 
+  const completeQuest = useRef(complete.mutate);
+  completeQuest.current = complete.mutate;
+
   useEffect(() => {
-    if (!user || shotSessionEnabled() || !boardQuery.isSuccess) return;
-    for (const quest of quests) {
-      if (quest.xp > 0 && quest.state === "decrypted" && !filed.current.has(quest.id)) {
-        filed.current.add(quest.id);
-        complete.mutate(quest.id);
-      }
+    if (!user || shotSessionEnabled() || !boardQuery.isSuccess || !boardQuery.data) return;
+    const board = boardQuery.data;
+    const views = questViews({
+      profileReady: board.profileReady,
+      postCount: board.postCount,
+      connectionCount: board.connectionCount,
+      bookOpened: board.bookOpened,
+      completedProjects: board.completedProjects,
+      studioOpened: board.studioOpened,
+    });
+    for (const quest of views) {
+      if (quest.xp <= 0 || quest.state !== "decrypted") continue;
+      const key = `${user.id}:${quest.id}`;
+      if (filedQuestKeys.has(key)) continue;
+      filedQuestKeys.add(key);
+      completeQuest.current(quest.id);
     }
-  }, [boardQuery.dataUpdatedAt, boardQuery.isSuccess, complete, quests, user]);
+  }, [boardQuery.data, boardQuery.dataUpdatedAt, boardQuery.isSuccess, user]);
 
   return {
     quests,

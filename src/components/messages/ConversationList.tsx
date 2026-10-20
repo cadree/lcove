@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useConversations } from '@/hooks/useConversations';
 import { usePresence } from '@/hooks/usePresence';
 import { shotOnline, shotSessionEnabled } from '@/lib/shotSession';
+import { messagePreview } from '@/lib/shareCard';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,7 +58,7 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
     if (conv.last_message.media_type === 'image') return '📷 Photo';
     if (conv.last_message.media_type === 'video') return '🎥 Video';
     if (conv.last_message.media_type === 'audio') return '🎵 Audio';
-    return conv.last_message.content || 'Message';
+    return messagePreview(conv.last_message.content) || conv.last_message.content || 'Message';
   };
 
   const filteredConversations = conversations.filter(conv => {

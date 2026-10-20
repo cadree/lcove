@@ -9,6 +9,7 @@ import {
   parseOpenGraph,
   parseShopifyMeta,
   shopHost,
+  storeFetchHeaders,
 } from "../_shared/store-import.mjs";
 
 const corsHeaders = {
@@ -18,7 +19,7 @@ const corsHeaders = {
 
 async function readHtml(url: string): Promise<string> {
   const response = await fetch(url, {
-    headers: { accept: "text/html,application/xhtml+xml" },
+    headers: storeFetchHeaders("text/html,application/xhtml+xml"),
     redirect: "follow",
   });
   if (!response.ok) throw new Error("That website did not respond");
@@ -62,7 +63,7 @@ serve(async (req) => {
     const site = pageUrl(shopUrl || store.shopify_store_url || host);
     const productsUrl = `https://${host}/products.json?limit=250`;
     const response = await fetch(productsUrl, {
-      headers: { accept: "application/json" },
+      headers: storeFetchHeaders("application/json"),
       redirect: "follow",
     });
 
@@ -90,7 +91,7 @@ serve(async (req) => {
     let meta = { name: "", description: "" };
     try {
       const metaResponse = await fetch(`https://${host}/meta.json`, {
-        headers: { accept: "application/json" },
+        headers: storeFetchHeaders("application/json"),
         redirect: "follow",
       });
       if (metaResponse.ok) meta = parseShopifyMeta(await metaResponse.json());
@@ -131,6 +132,11 @@ serve(async (req) => {
     const message = importStatusMessage(source, imported);
     const status = source === "shopify" ? "imported" : "link";
     const visibleUrl = source === "shopify" ? host : site;
+    let brandSaved = true;
+    if (Object.keys(brand).length > 0) {
+      const { error: brandError } = await supabaseAdmin.from("stores").update(brand).eq("id", storeId);
+      brandSaved = !brandError;
+    }
     const statusUpdate = {
       shopify_store_url: visibleUrl,
       website_url: site,
@@ -138,7 +144,6 @@ serve(async (req) => {
       import_error: null,
       import_count: imported,
       imported_at: new Date().toISOString(),
-      ...brand,
     };
     const { error: statusError } = await supabaseAdmin.from("stores").update(statusUpdate).eq("id", storeId);
     if (statusError) {
@@ -153,6 +158,7 @@ serve(async (req) => {
       message,
       website: site,
       brand,
+      brandSaved,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

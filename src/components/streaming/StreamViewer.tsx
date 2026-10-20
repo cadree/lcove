@@ -249,14 +249,17 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   return (
     <>
       <Dialog open={open} onOpenChange={() => onClose()}>
-        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-background">
+        <DialogContent
+          className="flex w-full min-w-0 max-w-full flex-col gap-0 overflow-x-hidden overflow-y-auto bg-background p-0"
+          style={{ maxWidth: "100%", maxHeight: "calc(100dvh - 2rem)" }}
+        >
           <DialogTitle className="sr-only">{stream?.title || 'Live Stream'}</DialogTitle>
           <DialogDescription className="sr-only">
             {stream?.description || 'Watch this live stream'}
           </DialogDescription>
           
           {/* Video Area */}
-          <div className="relative aspect-video bg-black">
+          <div className="relative aspect-video max-h-[34vh] w-full min-w-0 shrink-0 overflow-hidden bg-black">
             {streamLoading ? (
               <div className="w-full h-full flex items-center justify-center">
                 <Radio className="h-16 w-16 text-primary animate-pulse" />
@@ -315,10 +318,10 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
           </div>
 
           {/* Controls */}
-          <div className="p-4 space-y-4">
+          <div className="min-w-0 space-y-4 p-4">
             {/* Host Info */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="flex min-w-0 flex-col gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <Avatar>
                   <AvatarImage src={profile?.avatar_url || undefined} />
                   <AvatarFallback>{profile?.display_name?.charAt(0) || 'D'}</AvatarFallback>
@@ -329,7 +332,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex min-w-0 flex-wrap gap-2">
                 {/* Delete Button (Host only) */}
                 {isHost && (
                   <Button 

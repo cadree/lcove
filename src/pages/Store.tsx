@@ -259,7 +259,7 @@ const Store = () => {
 
   return (
     <PageLayout>
-      <div className="min-h-screen">
+      <div className="min-h-screen overflow-x-hidden">
         {/* Header */}
         <div className="sticky top-0 z-10 glass-strong border-b border-border/30">
           <div className="container mx-auto px-4 py-5">
@@ -333,15 +333,8 @@ const Store = () => {
             transition={{ delay: 0.15 }}
           >
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-              <div
-                className="mb-6 max-w-full min-w-0 overflow-x-auto overscroll-x-contain"
-                onMouseDown={() => {
-                  const x = window.scrollX;
-                  const y = window.scrollY;
-                  requestAnimationFrame(() => window.scrollTo(x, y));
-                }}
-              >
-              <TabsList className="h-auto w-max min-w-full justify-start">
+              <div className="mb-6 w-full min-w-0 max-w-full">
+              <TabsList className="flex h-auto w-full max-w-full flex-wrap justify-start gap-1">
                 {tabConfig.map((tab) => {
                   const Icon = tab.icon;
                   // Count items per tab when viewing a specific store

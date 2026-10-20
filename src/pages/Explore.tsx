@@ -84,9 +84,14 @@ const Explore = () => {
     }
   };
   const { data: people = [] } = useQuery({
-    queryKey: ["explore-people", query],
+    queryKey: ["explore-people", query, user?.id],
     queryFn: async () => {
-      if (shotSessionEnabled()) return shotPeople;
+      if (shotSessionEnabled()) {
+        const self = user
+          ? [{ user_id: user.id, display_name: "Shot Member", city_display: "Charlotte, NC", avatar_url: null }]
+          : [];
+        return [...self, ...shotPeople];
+      }
       const request = supabase
         .from("profiles_public")
         .select("user_id, display_name, city_display, avatar_url")
@@ -149,7 +154,12 @@ const Explore = () => {
             </div>
             <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
               {people.map((person) => (
-                <PeopleMatchCard key={person.user_id} person={person} onInvite={sendMatch} />
+                <PeopleMatchCard
+                  key={person.user_id}
+                  person={person}
+                  isSelf={person.user_id === user?.id}
+                  onInvite={sendMatch}
+                />
               ))}
             </div>
             {openQuest && segment === "for-you" && <div className="mt-4"><QuestCard quest={openQuest} /></div>}

@@ -42,7 +42,14 @@ const WalletPage: React.FC = () => {
   const { credits, isLoading: creditsLoading, genesisBalance, earnedBalance, balance } = useCredits();
   const { data: myXp } = useMyXp();
   const { ledger, isLoading: ledgerLoading } = useCreditLedger();
-  const { data: connect, isLoading: connectLoading, refetch: refetchConnect, open: openConnect } = useCreatorConnect();
+  const {
+    data: connect,
+    isLoading: connectLoading,
+    isError: connectFailed,
+    error: connectError,
+    refetch: refetchConnect,
+    open: openConnect,
+  } = useCreatorConnect();
   const { payouts, isLoading: payoutsLoading, requestPayout, isRequesting } = usePayouts();
   const { transactions, isLoading: transactionsLoading } = useTransactions();
 
@@ -236,6 +243,19 @@ const WalletPage: React.FC = () => {
           <CardContent className="space-y-3">
             {connectLoading ? (
               <Skeleton className="h-16 w-full" />
+            ) : connectFailed ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-foreground">Status</span>
+                  <Badge className={statusColors.failed}>Couldn't load</Badge>
+                </div>
+                <p className="text-sm text-destructive">
+                  {connectError instanceof Error ? connectError.message : "The payout status call failed. Nothing was marked pending."}
+                </p>
+                <Button type="button" variant="outline" onClick={() => refetchConnect()}>
+                  Retry
+                </Button>
+              </div>
             ) : (
               <>
                 <div className="flex items-center justify-between gap-3">

@@ -9,6 +9,7 @@ import {
   parseOpenGraph,
   parseShopifyMeta,
   shopHost,
+  storeFetchHeaders,
 } from "../../supabase/functions/_shared/store-import.mjs";
 
 const NUANCE_FIXTURE = {
@@ -77,6 +78,31 @@ describe("open graph fallback", () => {
     });
     assert.deepEqual(emptyBrandPatch({ logo_url: "https://custom/logo.png", description: "Mine", cover_image_url: "https://custom/cover.png" }, og, meta), {});
     assert.equal(meta.name, "Studio North");
+  });
+
+  it("reads the Nuance homepage logo and Shopify meta description", () => {
+    const html = `
+      <meta name="description" content="Nuance by LCOVE is a Charlotte, NC streetwear and jewelry brand." />
+      <meta property="og:description" content="Nuance by LCOVE is a Charlotte, NC streetwear and jewelry brand." />
+      <meta property="og:image" content="https://nuancebylcove.com/cdn/shop/files/Screenshot.png?v=1777557089&width=1200" />
+      <script type="application/ld+json">
+        {"@context":"https://schema.org","@type":"Organization","name":"Nuance by LCOVE","logo":"https://nuancebylcove.com/cdn/shop/t/22/assets/lcove-symbol-bear.webp","description":"JSON-LD copy"}
+      </script>`;
+    const og = parseOpenGraph(html, "https://nuancebylcove.com/");
+    const meta = parseShopifyMeta({
+      name: "LCOVE",
+      description: "The Legacy Necklace ($99) and Legacy Bracelet ($40): 316 stainless steel, waterproof.",
+    });
+    assert.equal(og.logo, "https://nuancebylcove.com/cdn/shop/t/22/assets/lcove-symbol-bear.webp");
+    assert.match(og.image, /Screenshot\.png\?v=1777557089&width=1200/);
+    assert.match(og.description, /Charlotte, NC streetwear/);
+    assert.deepEqual(emptyBrandPatch({ logo_url: null, description: null, cover_image_url: null }, og, meta), {
+      logo_url: "https://nuancebylcove.com/cdn/shop/t/22/assets/lcove-symbol-bear.webp",
+      description: "Nuance by LCOVE is a Charlotte, NC streetwear and jewelry brand.",
+      cover_image_url: "https://nuancebylcove.com/cdn/shop/files/Screenshot.png?v=1777557089&width=1200",
+    });
+    assert.match(storeFetchHeaders("text/html")["user-agent"], /Mozilla/);
+    assert.equal(emptyBrandPatch({ logo_url: null, description: null, cover_image_url: null }, { description: "", image: "", logo: "" }, meta).description, meta.description);
   });
 
   it("normalizes a store host and refuses local addresses", () => {

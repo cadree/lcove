@@ -194,22 +194,24 @@ const FeedPost = ({ post }: { post: Post }) => {
             <span className="mono-label absolute left-3 top-3 z-[1] rounded-full bg-black/55 px-2 py-1 text-[8px] text-white">
               {fileCode(post.id)}
             </span>
-            {post.media_type === 'video' ? (
-              <video
-                src={post.media_url}
-                className="mx-auto aspect-[4/5] max-h-[min(52vh,420px)] w-full bg-black object-contain"
-                playsInline
-                muted
-                loop
-              />
-            ) : (
-              <img
-                src={post.media_url}
-                alt=""
-                className="mx-auto aspect-[4/5] max-h-[min(52vh,420px)] w-full bg-muted object-contain"
-                loading="lazy"
-              />
-            )}
+            <span className="relative mx-auto block aspect-[4/5] w-full overflow-hidden bg-black">
+              {post.media_type === 'video' ? (
+                <video
+                  src={post.media_url}
+                  className="absolute inset-0 h-full w-full object-contain"
+                  playsInline
+                  muted
+                  loop
+                />
+              ) : (
+                <img
+                  src={post.media_url}
+                  alt=""
+                  className="absolute inset-0 h-full w-full bg-muted object-contain"
+                  loading="lazy"
+                />
+              )}
+            </span>
           </button>
           <Dialog open={lightbox} onOpenChange={setLightbox}>
             <DialogContent className="max-w-[min(100vw-1.5rem,720px)] border-border bg-background p-3">

@@ -132,7 +132,11 @@ export function shotConversations(userId: string) {
         timeline_end: null,
       },
     },
-    direct("conv-kofi", shotPeople[2], "The book chapter landed."),
+    direct(
+      "conv-kofi",
+      shotPeople[2],
+      'ether-card:{"kind":"reel","id":"0412aaaa-0000-4000-8000-000000000041","userId":"0412bbbb-0000-4000-8000-0000000000b1","title":"Kofi","href":"/profile/0412bbbb-0000-4000-8000-0000000000b1"}',
+    ),
   ];
 }
 

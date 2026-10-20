@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { shotContentThin, shotPosts, shotSessionEnabled } from '@/lib/shotSession';
+import { isQueryablePostId } from '@/lib/postId';
 
 interface Post {
   id: string;
@@ -42,20 +43,28 @@ export function usePosts() {
       if (error) throw error;
 
       // Get profiles for post creators
-      const userIds = [...new Set(postsData?.map(p => p.user_id) || [])];
-      const { data: profiles } = await supabase
-        .from('profiles_public')
-        .select('user_id, display_name, avatar_url, city, city_display')
-        .in('user_id', userIds);
+      const userIds = [...new Set(postsData?.map(p => p.user_id) || [])].filter(isQueryablePostId);
+      let profiles: { user_id: string; display_name: string | null; avatar_url: string | null; city: string | null; city_display: string | null }[] = [];
+      if (userIds.length) {
+        const { data } = await supabase
+          .from('profiles_public')
+          .select('user_id, display_name, avatar_url, city, city_display')
+          .in('user_id', userIds);
+        profiles = data ?? [];
+      }
 
-      const profileMap = new Map(profiles?.map(p => [p.user_id, p]));
+      const profileMap = new Map(profiles.map(p => [p.user_id, p]));
 
-      // Get reactions for each post
-      const postIds = postsData?.map(p => p.id) || [];
-      const { data: reactions } = await supabase
-        .from('post_reactions')
-        .select('post_id, emoji, user_id')
-        .in('post_id', postIds);
+      // Get reactions for each post. A non-uuid id makes the whole filter 400.
+      const postIds = (postsData?.map(p => p.id) || []).filter(isQueryablePostId);
+      let reactions: { post_id: string; emoji: string; user_id: string }[] = [];
+      if (postIds.length) {
+        const { data } = await supabase
+          .from('post_reactions')
+          .select('post_id, emoji, user_id')
+          .in('post_id', postIds);
+        reactions = data ?? [];
+      }
 
       // Group reactions by post and emoji
       const reactionsByPost = new Map<string, Map<string, number>>();

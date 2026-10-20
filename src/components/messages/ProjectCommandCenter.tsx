@@ -32,6 +32,19 @@ interface ProjectCommandCenterProps {
   isOwner: boolean;
 }
 
+function timelineRange(start: string | null, end: string | null) {
+  const label = (value: string | null, pattern: string) => {
+    if (!value) return null;
+    const date = parseCalendarDate(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return format(date, pattern);
+  };
+  const startLabel = label(start, 'MMM d');
+  const endLabel = label(end, 'MMM d, yyyy');
+  if (startLabel && endLabel) return `${startLabel} → ${endLabel}`;
+  return startLabel || endLabel;
+}
+
 function getYouTubeId(url: string): string | null {
   const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/);
   return match ? match[1] : null;
@@ -239,7 +252,7 @@ const ProjectCommandCenter = ({ project, isOwner }: ProjectCommandCenterProps) =
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      {project.timeline_start ? format(parseCalendarDate(project.timeline_start), 'MMM d') : '?'} → {project.timeline_end ? format(parseCalendarDate(project.timeline_end), 'MMM d, yyyy') : '?'}
+                      {timelineRange(project.timeline_start, project.timeline_end) || (isOwner ? 'Add dates' : '')}
                     </p>
                   )}
                 </Section>

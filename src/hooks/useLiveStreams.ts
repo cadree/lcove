@@ -5,6 +5,35 @@ import { useToast } from '@/hooks/use-toast';
 import { useEffect, useRef } from 'react';
 import { callRpc } from '@/lib/rpc';
 import { notifyLiveStream } from '@/lib/notifications';
+import { shotPeople, shotSessionEnabled } from '@/lib/shotSession';
+
+export const SHOT_STREAM_ID = "0412aaaa-0000-4000-8000-0000000000c1";
+
+function shotLiveStream(): LiveStream {
+  return {
+    id: SHOT_STREAM_ID,
+    host_id: shotPeople[1].user_id,
+    title: "Open Studio",
+    description: "Live from the floor",
+    stream_type: "youtube",
+    external_url: "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    thumbnail_url: null,
+    thumbnail_focal_point: null,
+    is_live: true,
+    started_at: "2026-10-19T15:00:00.000Z",
+    ended_at: null,
+    viewer_count: 12,
+    total_tips: 0,
+    created_at: "2026-10-19T15:00:00.000Z",
+    replay_available: false,
+    replay_url: null,
+    rtmp_stream_key: null,
+    rtmp_ingest_url: null,
+    playback_url: null,
+    mux_live_stream_id: null,
+    mux_playback_id: null,
+  };
+}
 
 export interface LiveStream {
   id: string;
@@ -49,6 +78,7 @@ export const useLiveStreams = (liveOnly = false) => {
   const { data: streams = [], isLoading } = useQuery({
     queryKey: ['live-streams', liveOnly],
     queryFn: async () => {
+      if (shotSessionEnabled()) return liveOnly ? [shotLiveStream()] : [shotLiveStream()];
       let query = supabase
         .from('live_streams_public')
         .select('*')
@@ -96,6 +126,7 @@ export const useStream = (streamId: string | undefined) => {
     queryKey: ['stream', streamId],
     queryFn: async () => {
       if (!streamId) return null;
+      if (shotSessionEnabled()) return shotLiveStream();
       const { data, error } = await supabase
         .from('live_streams_public')
         .select('*')

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { decodeShareCard, encodeShareCard, splitShareMessage } from "./shareCard.ts";
+import { decodeShareCard, encodeShareCard, messagePreview, splitShareMessage } from "./shareCard.ts";
 
 const card = {
   kind: "post" as const,
@@ -19,6 +19,14 @@ test("a share card round-trips and a note stays separate", () => {
   const split = splitShareMessage(`Look at this\n${encoded}`);
   assert.equal(split.note, "Look at this");
   assert.equal(split.card?.id, "p1");
+});
+
+test("a conversation preview names the shared card", () => {
+  assert.equal(messagePreview(encodeShareCard(card)), "Shared a post");
+  assert.equal(messagePreview(encodeShareCard({ ...card, kind: "reel" })), "Shared a reel");
+  assert.equal(messagePreview(`note\n${encodeShareCard({ ...card, kind: "reel" })}`), "Shared a reel");
+  assert.equal(messagePreview("ether-card:{not json"), "Shared a post");
+  assert.equal(messagePreview("See you tonight"), null);
 });
 
 test("a bad card is not treated as a card", () => {
