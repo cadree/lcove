@@ -7,12 +7,26 @@ import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import {
   excludeBlocked,
+  pickDirectConversation,
   shareMessageInsert,
+  storyReplyInsert,
   type SharePerson,
   type ShareTarget,
 } from '@/lib/sharing';
 
-async function findOrCreateDirectConversation(userId: string, otherUserId: string) {
+const directChatLocks = new Map<string, Promise<string>>();
+
+function missingDirectChatRpc(error: { code?: string; message?: string }) {
+  return error.code === 'PGRST202' || /get_or_create_direct_conversation/i.test(error.message ?? '');
+}
+
+async function createDirectConversation(userId: string, otherUserId: string) {
+  const { data: rpcId, error: rpcError } = await supabase.rpc('get_or_create_direct_conversation', {
+    p_other: otherUserId,
+  });
+  if (!rpcError && rpcId) return rpcId;
+  if (rpcError && !missingDirectChatRpc(rpcError)) throw rpcError;
+
   const { data: mine, error: mineError } = await supabase
     .from('conversation_participants')
     .select('conversation_id')
@@ -27,16 +41,15 @@ async function findOrCreateDirectConversation(userId: string, otherUserId: strin
       .eq('user_id', otherUserId)
       .in('conversation_id', myIds);
     if (theirsError) throw theirsError;
-
-    for (const row of theirs ?? []) {
-      const { data: conv, error: convError } = await supabase
+    const sharedIds = [...new Set((theirs ?? []).map((row) => row.conversation_id))];
+    if (sharedIds.length > 0) {
+      const { data: convs, error: convError } = await supabase
         .from('conversations')
-        .select('id')
-        .eq('id', row.conversation_id)
-        .eq('type', 'direct')
-        .maybeSingle();
+        .select('id, type, project_id, created_at')
+        .in('id', sharedIds);
       if (convError) throw convError;
-      if (conv) return conv.id;
+      const existing = pickDirectConversation(convs ?? []);
+      if (existing) return existing;
     }
   }
 
@@ -53,6 +66,17 @@ async function findOrCreateDirectConversation(userId: string, otherUserId: strin
   ]);
   if (partError) throw partError;
   return created.id;
+}
+
+function findOrCreateDirectConversation(userId: string, otherUserId: string) {
+  const key = [userId, otherUserId].sort().join(':');
+  const pending = directChatLocks.get(key);
+  if (pending) return pending;
+  const run = createDirectConversation(userId, otherUserId).finally(() => {
+    if (directChatLocks.get(key) === run) directChatLocks.delete(key);
+  });
+  directChatLocks.set(key, run);
+  return run;
 }
 
 async function loadProfiles(userIds: string[]): Promise<SharePerson[]> {
@@ -293,12 +317,7 @@ export function useSharingActions() {
       const conversationId = await findOrCreateDirectConversation(user.id, ownerId);
       const { data: message, error } = await supabase
         .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          sender_id: user.id,
-          content: trimmed,
-          shared_story_id: storyId,
-        })
+        .insert(storyReplyInsert(user.id, conversationId, storyId, trimmed))
         .select('id')
         .single();
       if (error) throw error;

@@ -7885,6 +7885,10 @@ export type Database = {
         Args: { p_event_id: string }
         Returns: number
       }
+      get_or_create_direct_conversation: {
+        Args: { p_other: string }
+        Returns: string
+      }
       get_own_post_view_counts: {
         Args: { p_post_ids?: string[] | null }
         Returns: {
@@ -7989,6 +7993,10 @@ export type Database = {
         Returns: number
       }
       touch_last_active: { Args: never; Returns: undefined }
+      viewer_liked_story: {
+        Args: { p_story_id: string; p_owner: string }
+        Returns: boolean
+      }
       upsert_attendee_note: {
         Args: { p_email: string; p_note: string; p_user_id: string }
         Returns: string

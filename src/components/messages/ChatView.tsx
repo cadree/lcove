@@ -475,7 +475,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                             </div>
                           )}
                           
-                          {msg.share && (
+                          {msg.share && msg.share.kind !== 'story' && (
                             <div className="mb-1">
                               <SharedContentCard share={msg.share} />
                             </div>
@@ -514,6 +514,11 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                               }`}
                             >
                               <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                            </div>
+                          )}
+                          {msg.share?.kind === 'story' && (
+                            <div className="mt-1">
+                              <SharedContentCard share={msg.share} compact />
                             </div>
                           )}
 

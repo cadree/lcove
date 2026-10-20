@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
-import { messageSharePreview, type MessageSharePreview } from '@/lib/sharing';
+import { keepDeliveredMessages, messageSharePreview, type MessageSharePreview } from '@/lib/sharing';
 
 interface Message {
   id: string;
@@ -134,7 +134,7 @@ export function useMessages(conversationId: string | null) {
         profileRows?.forEach((profile) => profileLookup.set(profile.user_id, profile));
       }
 
-      return base.map((message) => ({
+      return keepDeliveredMessages(base).map((message) => ({
         ...message,
         share: messageSharePreview(message, { posts: postLookup, stories: storyLookup, profiles: profileLookup }),
       })) as Message[];

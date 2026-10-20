@@ -12,7 +12,7 @@
     "typecheck": "tsc -b --pretty false",
     "preview": "vite preview",
     "test:webhook": "node scripts/stripe-webhook-fixtures.test.mjs",
-    "test:unit": "node --experimental-strip-types --test src/lib/calendarDay.test.ts src/lib/calendarDate.test.ts src/lib/cityNormalization.test.ts src/lib/directoryProfiles.test.ts src/lib/grantEligibility.test.ts src/lib/onboardingPassions.test.ts src/lib/profileSections.test.ts src/lib/resendCooldown.test.ts src/lib/profilePosts.test.ts src/lib/projectCollaborations.test.ts src/lib/themeMode.test.ts src/lib/screenTone.test.ts src/lib/contrast.test.ts src/lib/noviQuests.test.ts src/lib/etherSplash.test.ts src/lib/sharing.test.ts"
+    "test:unit": "node --experimental-strip-types --test src/lib/calendarDay.test.ts src/lib/calendarDate.test.ts src/lib/cityNormalization.test.ts src/lib/directoryProfiles.test.ts src/lib/grantEligibility.test.ts src/lib/onboardingPassions.test.ts src/lib/profileSections.test.ts src/lib/resendCooldown.test.ts src/lib/profilePosts.test.ts src/lib/projectCollaborations.test.ts src/lib/themeMode.test.ts src/lib/screenTone.test.ts src/lib/contrast.test.ts src/lib/noviQuests.test.ts src/lib/etherSplash.test.ts src/lib/sharing.test.ts src/lib/displayName.test.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.1",

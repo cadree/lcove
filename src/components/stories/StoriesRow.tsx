@@ -156,7 +156,7 @@ const StoriesRow = () => {
 
       {/* Story Viewer Modal */}
       <AnimatePresence>
-        {selectedUserId && groupedStories[selectedUserId] && <StoryViewer stories={groupedStories[selectedUserId]} onClose={handleCloseStory} onNextUser={handleNextUser} />}
+        {selectedUserId && groupedStories[selectedUserId] && <StoryViewer key={selectedUserId} stories={groupedStories[selectedUserId]} onClose={handleCloseStory} onNextUser={handleNextUser} />}
       </AnimatePresence>
 
       {/* Upload Dialog */}

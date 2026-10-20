@@ -3,6 +3,10 @@ import test from "node:test";
 import {
   canRepostMedia,
   excludeBlocked,
+  keepDeliveredMessages,
+  pickDirectConversation,
+  storyAdvanceHeld,
+  storyReplyInsert,
   gridViewCount,
   mergePostsAndReposts,
   messageSharePreview,
@@ -59,6 +63,38 @@ test("reposts keep the original post and sort by the repost time", () => {
   assert.equal(canRepostMedia("photo", "maya", "ada"), true);
   assert.equal(canRepostMedia("photo", "maya", "maya"), false);
   assert.equal(canRepostMedia("text", "maya", "ada"), false);
+  assert.equal(canRepostMedia("video", "maya", null), false);
+});
+
+test("story playback waits while a reply or the share sheet is open", () => {
+  assert.equal(storyAdvanceHeld({ replyFocused: false, shareOpen: false }), false);
+  assert.equal(storyAdvanceHeld({ replyFocused: true, shareOpen: false }), true);
+  assert.equal(storyAdvanceHeld({ replyFocused: false, shareOpen: true }), true);
+  assert.equal(storyAdvanceHeld({ replyFocused: false, shareOpen: false, sending: true }), true);
+  assert.equal(storyAdvanceHeld({ replyFocused: false, shareOpen: false, hasDraft: true }), true);
+});
+
+test("two story replies stay two messages in one chat", () => {
+  const first = storyReplyInsert("ada", "conv-1", "story-1", " first ");
+  const second = storyReplyInsert("ada", "conv-1", "story-1", "second");
+  assert.equal(first.conversation_id, second.conversation_id);
+  assert.equal(first.shared_story_id, second.shared_story_id);
+  assert.notEqual(first.content, second.content);
+  const delivered = keepDeliveredMessages([
+    { id: "m1", content: first.content, shared_story_id: first.shared_story_id },
+    { id: "m2", content: second.content, shared_story_id: second.shared_story_id },
+    { id: "m2", content: second.content, shared_story_id: second.shared_story_id },
+  ]);
+  assert.deepEqual(delivered.map((message) => message.content), ["first", "second"]);
+  assert.equal(
+    pickDirectConversation([
+      { id: "project", type: "direct", project_id: "p", created_at: "2026-01-01T00:00:00.000Z" },
+      { id: "newer", type: "direct", project_id: null, created_at: "2026-02-01T00:00:00.000Z" },
+      { id: "older", type: "direct", project_id: null, created_at: "2026-01-02T00:00:00.000Z" },
+      { id: "group", type: "group", project_id: null, created_at: "2020-01-01T00:00:00.000Z" },
+    ]),
+    "older",
+  );
 });
 
 test("blocked authors and reposters stay out of the profile grid", () => {

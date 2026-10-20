@@ -84,6 +84,54 @@ export function shouldRecordPostView(viewerId: string | null | undefined, ownerI
   return Boolean(viewerId && ownerId && viewerId !== ownerId);
 }
 
+export function storyAdvanceHeld(input: {
+  replyFocused: boolean;
+  shareOpen: boolean;
+  sending?: boolean;
+  hasDraft?: boolean;
+}): boolean {
+  return input.replyFocused || input.shareOpen || Boolean(input.sending) || Boolean(input.hasDraft);
+}
+
+export interface DirectConversationPick {
+  id: string;
+  type: string;
+  project_id?: string | null;
+  created_at: string;
+}
+
+/** Personal direct chats only, oldest first, so two replies cannot split across chats. */
+export function pickDirectConversation(conversations: DirectConversationPick[]): string | null {
+  const personal = conversations
+    .filter((conversation) => conversation.type === "direct" && !conversation.project_id)
+    .slice()
+    .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
+  return personal[0]?.id ?? null;
+}
+
+export function storyReplyInsert(senderId: string, conversationId: string, storyId: string, text: string) {
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error("Write a message");
+  return {
+    conversation_id: conversationId,
+    sender_id: senderId,
+    content: trimmed,
+    shared_story_id: storyId,
+  };
+}
+
+/** Keep every delivered row. Same story id is not a duplicate. Same message id is. */
+export function keepDeliveredMessages<T extends { id: string }>(messages: T[]): T[] {
+  const seen = new Set<string>();
+  const kept: T[] = [];
+  for (const message of messages) {
+    if (!message.id || seen.has(message.id)) continue;
+    seen.add(message.id);
+    kept.push(message);
+  }
+  return kept;
+}
+
 export function canRepostMedia(
   mediaType: string | null | undefined,
   ownerId: string,

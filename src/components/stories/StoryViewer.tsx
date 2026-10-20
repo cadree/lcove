@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { notifyStoryLike } from '@/lib/notifications';
+import { storyAdvanceHeld } from '@/lib/sharing';
 import { ShareSheet } from '@/components/share/ShareSheet';
 import { toast } from 'sonner';
 
@@ -53,9 +54,26 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const recordedViewsRef = useRef<Set<string>>(new Set());
+  const heldRef = useRef(false);
+  const replyFocusedRef = useRef(false);
+  const shareOpenRef = useRef(false);
+  const replyRef = useRef('');
 
   const currentStory = stories[currentIndex];
   const isOwner = user?.id === currentStory?.user_id;
+
+  const syncHold = () => {
+    const held = storyAdvanceHeld({
+      replyFocused: replyFocusedRef.current,
+      shareOpen: shareOpenRef.current,
+      sending: sendStoryReply.isPending,
+      hasDraft: replyRef.current.trim().length > 0,
+    });
+    heldRef.current = held;
+    setPaused(held);
+  };
+  const syncHoldRef = useRef(syncHold);
+  syncHoldRef.current = syncHold;
   const storyId = currentStory?.id;
   const storyHasViewed = currentStory?.has_viewed;
   const storyMediaType = currentStory?.media_type;
@@ -137,11 +155,17 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
       .then(({ data }) => {
         if (!cancel) setHearted(data?.emoji === '❤️');
       });
+    replyRef.current = '';
     setReply('');
+    syncHoldRef.current();
     return () => {
       cancel = true;
     };
   }, [storyId, isOwner, user]);
+
+  useEffect(() => {
+    syncHoldRef.current();
+  }, [sendStoryReply.isPending]);
 
   useEffect(() => {
     if (paused) return;
@@ -150,7 +174,9 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
     const increment = (interval / duration) * 100;
 
     const timer = setInterval(() => {
+      if (heldRef.current) return;
       setProgress((prev) => {
+        if (heldRef.current) return prev;
         if (prev >= 100) {
           handleNext();
           return 0;
@@ -197,7 +223,11 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
       .select('display_name')
       .eq('user_id', user.id)
       .maybeSingle();
-    notifyStoryLike(currentStory.user_id, profile?.display_name || 'Someone', currentStory.id).catch(() => undefined);
+    try {
+      await notifyStoryLike(currentStory.user_id, profile?.display_name || 'Someone', currentStory.id);
+    } catch {
+      toast.error('Could not notify');
+    }
   };
 
   const handleReply = async (event: React.FormEvent) => {
@@ -209,7 +239,9 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
         ownerId: currentStory.user_id,
         text: reply,
       });
+      replyRef.current = '';
       setReply('');
+      syncHold();
       toast.success('Sent');
     } catch {
       // The send action already reports the error.
@@ -219,6 +251,8 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target;
+      if (target instanceof HTMLElement && target.closest('input, textarea')) return;
       if (e.key === 'ArrowLeft') handlePrev();
       if (e.key === 'ArrowRight') handleNext();
       if (e.key === 'Escape') onClose();
@@ -342,12 +376,12 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
           {/* Navigation Areas */}
           <button
             onClick={handlePrev}
-            className="absolute left-0 top-0 bottom-0 w-1/3 z-10"
+            className="absolute left-0 top-0 bottom-28 w-1/3 z-10"
             aria-label="Previous"
           />
           <button
             onClick={handleNext}
-            className="absolute right-0 top-0 bottom-0 w-1/3 z-10"
+            className="absolute right-0 top-0 bottom-28 w-1/3 z-10"
             aria-label="Next"
           />
 
@@ -408,21 +442,43 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
                   variant="glass"
                   size="icon"
                   aria-label="Share"
+                  onPointerDown={() => {
+                    shareOpenRef.current = true;
+                    syncHold();
+                  }}
                   onClick={() => {
+                    shareOpenRef.current = true;
                     setShareOpen(true);
-                    setPaused(true);
+                    syncHold();
                   }}
                 >
                   <Share2 className="h-5 w-5" />
                 </Button>
               </div>
             ) : (
-              <form onSubmit={handleReply} className="flex items-center gap-2">
+              <form
+                onSubmit={handleReply}
+                onPointerDown={() => {
+                  replyFocusedRef.current = true;
+                  syncHold();
+                }}
+                className="flex items-center gap-2"
+              >
                 <Input
                   value={reply}
-                  onChange={(event) => setReply(event.target.value)}
-                  onFocus={() => setPaused(true)}
-                  onBlur={() => setPaused(false)}
+                  onChange={(event) => {
+                    replyRef.current = event.target.value;
+                    setReply(event.target.value);
+                    syncHold();
+                  }}
+                  onFocus={() => {
+                    replyFocusedRef.current = true;
+                    syncHold();
+                  }}
+                  onBlur={() => {
+                    replyFocusedRef.current = false;
+                    syncHold();
+                  }}
                   placeholder="Send message"
                   aria-label="Send message"
                   className="min-h-11 flex-1 bg-background/80"
@@ -446,9 +502,19 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
                   variant="glass"
                   size="icon"
                   aria-label="Share"
+                  onPointerDown={() => {
+                    shareOpenRef.current = true;
+                    syncHold();
+                  }}
+                  onPointerCancel={() => {
+                    if (!shareOpenRef.current) return;
+                    shareOpenRef.current = shareOpen;
+                    syncHold();
+                  }}
                   onClick={() => {
+                    shareOpenRef.current = true;
                     setShareOpen(true);
-                    setPaused(true);
+                    syncHold();
                   }}
                 >
                   <Share2 className="h-5 w-5" />
@@ -461,8 +527,9 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
       <ShareSheet
         open={shareOpen}
         onOpenChange={(next) => {
+          shareOpenRef.current = next;
           setShareOpen(next);
-          if (!next) setPaused(false);
+          syncHold();
         }}
         target={{
           kind: 'story',
