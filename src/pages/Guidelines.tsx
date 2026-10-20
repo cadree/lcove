@@ -1,12 +1,15 @@
 import { ArrowLeft, Flag } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { GENERATIVE_AI_RULE } from "@/content/copy";
 import { Button } from "@/components/ui/button";
+import { PageMeta } from "@/components/seo/PageMeta";
 
 const Guidelines = () => {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-background">
+      <PageMeta title="Guidelines · Ether" description={GENERATIVE_AI_RULE} />
       <div className="container max-w-3xl mx-auto px-4 py-8 safe-area-top safe-area-bottom">
         <div className="flex items-center gap-3 mb-8">
           <Button
@@ -34,8 +37,7 @@ const Guidelines = () => {
             Do not impersonate someone else.
           </p>
           <p className="text-foreground">
-            Generative AI is not allowed on Ether except for tools that improve a creator's workflow.
-            AI-generated people, fake profiles, and AI-made work presented as human-made can be reported and removed.
+            {GENERATIVE_AI_RULE}
           </p>
           <p>
             Use Report on a post, profile, comment, message, or project. Use Block on a profile or in a

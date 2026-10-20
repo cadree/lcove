@@ -4,44 +4,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { motion } from 'framer-motion';
 import bearLogo from '@/assets/ether-bear-logo.png';
+import { isKnownPath, isPublicPath } from "@/lib/appRoutes";
 
 interface AccessGateProps {
   children: React.ReactNode;
 }
 
-// Exact paths a logged-out visitor can open.
-const PUBLIC_EXACT = new Set([
-  '/',
-  '/landing',
-  '/auth',
-  '/onboarding',
-  '/locked',
-  '/admin/onboarding',
-  '/denied',
-  '/admin',
-  '/fund',
-  '/unsubscribe',
-  '/privacy',
-  '/terms',
-  '/guidelines',
-  '/community',
-  '/nuance',
-]);
-
 // Signed-in people leave the public landing for the feed.
 const LANDING_ROUTES = ['/', '/landing'];
-
-function isPublicPath(pathname: string) {
-  if (PUBLIC_EXACT.has(pathname)) return true;
-  return (
-    pathname.startsWith('/admin/onboarding') ||
-    pathname.startsWith('/event/') ||
-    pathname.startsWith('/project/') ||
-    pathname.startsWith('/book/') ||
-    pathname.startsWith('/sign-contract') ||
-    pathname.startsWith('/client/')
-  );
-}
 
 const AccessGate = ({ children }: AccessGateProps) => {
   const { user, loading: authLoading } = useAuth();
@@ -51,10 +21,12 @@ const AccessGate = ({ children }: AccessGateProps) => {
   const [showWelcome, setShowWelcome] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
 
+  const knownRoute = isKnownPath(location.pathname);
   const isPublicRoute = isPublicPath(location.pathname);
   const isLandingRoute = LANDING_ROUTES.includes(location.pathname);
 
   useEffect(() => {
+    if (!knownRoute) return;
     // Wait for auth to load first
     if (authLoading) return;
 
@@ -118,7 +90,11 @@ const AccessGate = ({ children }: AccessGateProps) => {
         }
       }
     }
-  }, [user, profile, authLoading, profileLoading, isPublicRoute, isLandingRoute, navigate, location.pathname, hasSeenWelcome]);
+  }, [user, profile, authLoading, profileLoading, isPublicRoute, isLandingRoute, knownRoute, navigate, location.pathname, hasSeenWelcome]);
+
+  if (!knownRoute) {
+    return <>{children}</>;
+  }
 
   // Show loading state while checking auth/profile
   if (!isPublicRoute && (authLoading || profileLoading)) {

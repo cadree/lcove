@@ -535,6 +535,7 @@ const Profile = () => {
           memberTier={isOwnProfile && membership?.subscribed ? membership.tier : null}
           roleLabel={userCreativeRoles[0]?.name || "Creator"}
           postCount={posts.length}
+          founding={profile?.founding}
         />
 
         {isOwnProfile && <div className="px-4 pt-4"><ProfileNovi /></div>}

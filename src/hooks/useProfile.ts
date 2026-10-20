@@ -37,6 +37,7 @@ export interface Profile {
   // Contact info - only available for own profile
   phone: string | null;
   social_links: SocialLinks | null;
+  founding: boolean;
 }
 
 export const useProfile = (userId?: string) => {
@@ -74,7 +75,7 @@ export const useProfile = (userId?: string) => {
     } else {
       const result = await supabase
         .from('profiles_public')
-        .select('id, user_id, display_name, city, city_display, city_key, bio, avatar_url, passion_seriousness, access_level, onboarding_completed, created_at, updated_at, mindset_level, access_status, social_links')
+        .select('id, user_id, display_name, city, city_display, city_key, bio, avatar_url, passion_seriousness, access_level, onboarding_completed, created_at, updated_at, mindset_level, access_status, social_links, founding')
         .eq('user_id', targetUserId)
         .maybeSingle();
       data = result.data as Record<string, unknown> | null;
@@ -103,6 +104,7 @@ export const useProfile = (userId?: string) => {
         show_only_to_passed_exam: isOwnProfile ? Boolean(data.show_only_to_passed_exam) : false,
         phone: isOwnProfile ? ((data.phone as string | null) ?? null) : null,
         social_links: (data.social_links as SocialLinks | null) ?? null,
+        founding: Boolean(data.founding),
       };
       setProfile(profileData);
     } else if (!isOwnProfile) {

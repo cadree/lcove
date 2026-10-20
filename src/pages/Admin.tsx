@@ -6,6 +6,8 @@ import {
   MessageCircle, Building2, Flag, Shirt, Film
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { WaitlistAdminDialog } from '@/components/admin/WaitlistAdminDialog';
+import { WaitlistExportButton } from '@/components/admin/WaitlistExportButton';
 import { cityMatchesQuery, citiesShareGroup } from '@/lib/cityNormalization';
 import PageLayout from '@/components/layout/PageLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -408,6 +410,8 @@ const Admin: React.FC = () => {
             <Download className="h-4 w-4" />
             Export CSV
           </Button>
+          <WaitlistExportButton />
+          <WaitlistAdminDialog />
         </div>
 
         {/* Tabs */}

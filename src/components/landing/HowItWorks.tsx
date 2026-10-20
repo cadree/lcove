@@ -1,5 +1,6 @@
 import { UserPlus, Share2, Handshake } from "lucide-react";
 import { motion } from "framer-motion";
+import { revealMotion } from "@/lib/reveal";
 
 const steps = [
   {
@@ -30,10 +31,7 @@ export function HowItWorks() {
       
       <div className="container relative px-4 sm:px-6 lg:px-8">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
+          {...revealMotion({ y: 20 })}
           className="text-center mb-12 md:mb-16"
         >
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-medium mb-4">
@@ -52,10 +50,7 @@ export function HowItWorks() {
             {steps.map((step, index) => (
               <motion.div
                 key={step.step}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.15 }}
+                {...revealMotion({ y: 20, delay: index * 0.15 })}
                 className={`relative flex flex-col sm:flex-row gap-6 mb-12 last:mb-0 ${
                   index % 2 === 1 ? "sm:flex-row-reverse" : ""
                 }`}

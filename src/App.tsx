@@ -1,5 +1,5 @@
 // Application entry point - Ether App
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { MotionConfig } from "framer-motion";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { WorldLayer } from "@/components/world/WorldLayer";
@@ -14,8 +14,10 @@ import { CreateFlowProvider } from "@/components/create/CreateFlowContext";
 import AccessGate from "@/components/auth/AccessGate";
 import { EtherSplash } from "@/components/brand/EtherSplash";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
+import { APP_STORE_APPLE_ID, APP_STORE_URL } from "@/config/launch";
 
 const Landing = lazy(() => import("./pages/Landing"));
+const Waitlist = lazy(() => import("./pages/Waitlist"));
 const Feed = lazy(() => import("./pages/Feed"));
 const Explore = lazy(() => import("./pages/Explore"));
 const Directory = lazy(() => import("./pages/Directory"));
@@ -75,6 +77,20 @@ const ActivityTracker = () => {
   return null;
 };
 
+function StoreListingMeta() {
+  useEffect(() => {
+    if (!APP_STORE_URL || !APP_STORE_APPLE_ID) return;
+    const meta = document.createElement("meta");
+    meta.name = "apple-itunes-app";
+    meta.content = `app-id=${APP_STORE_APPLE_ID}`;
+    document.head.appendChild(meta);
+    return () => {
+      meta.remove();
+    };
+  }, []);
+  return null;
+}
+
 function RouteFallback() {
   return (
     <div
@@ -107,11 +123,13 @@ const App = () => (
             <CreateFlowProvider>
               <AccessGate>
                 <ActivityTracker />
+                <StoreListingMeta />
                 <Toaster />
               <Sonner />
               <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/" element={<Landing />} />
+                <Route path="/waitlist" element={<Waitlist />} />
                 <Route path="/home" element={<Navigate to="/feed" replace />} />
                 <Route path="/landing" element={<Navigate to="/" replace />} />
                 <Route path="/auth" element={<Auth />} />

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { GoldInterestForm } from "@/components/nuance/GoldInterestForm";
 import { useAuth } from "@/contexts/AuthContext";
 import { NUANCE_BRAND_LINE, NUANCE_STORE_URL, nuanceProducts, type NuanceProduct } from "@/data/nuance";
+import { PageMeta } from "@/components/seo/PageMeta";
 
 const Nuance = () => {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ const Nuance = () => {
 
   return (
     <PageLayout>
+      <PageMeta title="Nuance · Ether" description="Nuance on Ether." />
       <div className="mx-auto max-w-5xl px-4 py-8">
         <motion.header
           initial={{ opacity: 0, y: -12 }}
@@ -114,7 +116,7 @@ function ProductCard({ product, index }: { product: NuanceProduct; index: number
           <div className="space-y-4">
             <p className="text-sm leading-relaxed">
               Sold out. Everyone who joins the interest list gets{" "}
-              <span className="text-[#F5A6CF] font-medium">40% off</span> when pre-orders open.
+              <span className="text-[#F5A6CF] font-medium">40% off</span>. This offer is valid during pre-orders only.
             </p>
             <GoldInterestForm />
           </div>
