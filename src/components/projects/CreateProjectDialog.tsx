@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { milestonesForInsert, roleCreditAmount } from '@/lib/projectCollaborations';
+import { ItemListField, XpExplainer } from '@/components/projects/ItemListField';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
@@ -585,21 +586,16 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
           {/* Budget & Resources */}
           <div className="space-y-4">
             <Label className="flex items-center gap-2"><Wrench className="h-4 w-4" /> Budget & Resources</Label>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-sm text-muted-foreground">Budget Range</Label>
-                <Select value={budgetRange} onValueChange={setBudgetRange}>
-                  <SelectTrigger><SelectValue placeholder="Select range" /></SelectTrigger>
-                  <SelectContent>
-                    {BUDGET_RANGES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-sm text-muted-foreground">Equipment Needed</Label>
-                <Input value={equipmentNeeded} onChange={(e) => setEquipmentNeeded(e.target.value)} placeholder="Camera, lights, etc." />
-              </div>
+            <div>
+              <Label className="text-sm text-muted-foreground">Budget Range</Label>
+              <Select value={budgetRange} onValueChange={setBudgetRange}>
+                <SelectTrigger><SelectValue placeholder="Select range" /></SelectTrigger>
+                <SelectContent>
+                  {BUDGET_RANGES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
+            <ItemListField label="Equipment needed" value={equipmentNeeded} onChange={setEquipmentNeeded} placeholder="Camera, lights, stand" />
 
             <div className="grid grid-cols-2 gap-3">
               <div className="flex items-center justify-between p-3 border border-border rounded-lg">
@@ -614,10 +610,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
               )}
             </div>
 
-            <div>
-              <Label className="text-sm text-muted-foreground">Props Needed</Label>
-              <Input value={propsNeeded} onChange={(e) => setPropsNeeded(e.target.value)} placeholder="Props, wardrobe, etc." />
-            </div>
+            <ItemListField label="Props needed" value={propsNeeded} onChange={setPropsNeeded} placeholder="Props, wardrobe" />
 
             <div className="grid grid-cols-2 gap-3">
               <div className="flex items-center justify-between p-3 border border-border rounded-lg">
@@ -693,6 +686,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
 
           {/* Roles */}
           <div className="space-y-4">
+            <XpExplainer />
             <div className="flex items-center justify-between">
               <Label className="flex items-center gap-2"><Users2 className="h-4 w-4" /> Roles Needed</Label>
               <Button type="button" variant="outline" size="sm" onClick={addRole}>

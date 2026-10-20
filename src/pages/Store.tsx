@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMyStore, useStoreItems, useMyStoreItems, useDeleteStoreItem, readRememberedStoreImport, readStoreImportMeta, StoreItem, Store as StoreType, StoreImportResult, STORE_PUBLIC_COLUMNS } from '@/hooks/useStore';
+import { useMyStore, useStoreItems, useMyStoreItems, useDeleteStoreItem, importStoreCatalog, readRememberedStoreImport, readStoreImportMeta, StoreItem, Store as StoreType, StoreImportResult, STORE_PUBLIC_COLUMNS } from '@/hooks/useStore';
 import { StoreBrandPanel } from '@/components/store/StoreBrandPanel';
 import { supabase } from '@/integrations/supabase/client';
 import PageLayout from '@/components/layout/PageLayout';
@@ -48,6 +48,7 @@ import { BackButton } from '@/components/navigation/BackButton';
 
 const Store = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const storeIdParam = searchParams.get('store');
   
@@ -74,6 +75,7 @@ const Store = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [storeSetupOpen, setStoreSetupOpen] = useState(false);
   const [importResult, setImportResult] = useState<StoreImportResult | null>(null);
+  const [importing, setImporting] = useState(false);
   const [showContinue, setShowContinue] = useState(
     () => searchParams.get('setup') === '1' || sessionStorage.getItem('ether-continue-feed') === '1',
   );
@@ -232,6 +234,23 @@ const Store = () => {
     }
   };
 
+  const reimportStore = async (store: StoreType) => {
+    const url = store.website_url || store.shopify_store_url;
+    if (!url) {
+      toast.error('Add a website before importing');
+      return;
+    }
+    setImporting(true);
+    const result = await importStoreCatalog(store.id, url);
+    setImportResult(result);
+    if (result.ok) toast.success(result.message);
+    else toast.error(result.message);
+    await queryClient.invalidateQueries({ queryKey: ['my-store'] });
+    await queryClient.invalidateQueries({ queryKey: ['store'] });
+    await queryClient.invalidateQueries({ queryKey: ['store-items'] });
+    setImporting(false);
+  };
+
   const tabConfig = [
     { id: 'products' as const, label: 'Products', icon: Package },
     { id: 'services' as const, label: 'Services', icon: Wrench },
@@ -251,7 +270,9 @@ const Store = () => {
                 <StoreBrandPanel
                   store={viewingStore}
                   importResult={isViewingOwnStore ? importResult : null}
+                  importing={!!isViewingOwnStore && importing}
                   showContinue={!!isViewingOwnStore && showContinue}
+                  onReimport={isViewingOwnStore ? () => reimportStore(viewingStore) : undefined}
                 />
               </div>
             ) : (
@@ -366,7 +387,9 @@ const Store = () => {
                     <StoreBrandPanel
                       store={myStore}
                       importResult={importResult}
+                      importing={importing}
                       showContinue={showContinue}
+                      onReimport={() => reimportStore(myStore)}
                     />
                   )}
                   {tabId === 'orders' ? (

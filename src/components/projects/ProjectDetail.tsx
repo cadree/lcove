@@ -1,10 +1,12 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { format } from 'date-fns';
 import { parseCalendarDate } from '@/lib/calendarDate';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, ExternalLink, Upload, X, Eye, Image as ImageIcon, Camera, Share2, Copy, Pencil, Mail, MessageCircle, UserPlus, Lock } from 'lucide-react';
 import { Project, ProjectRole, useProjectApplications, useProjects } from '@/hooks/useProjects';
 import { formatRoleCompensation } from '@/lib/projectCollaborations';
+import { parseItemList } from '@/lib/itemList';
 import { useProjectAttachments, ProjectAttachment } from '@/hooks/useProjectAttachments';
 import { useProjectUpdates } from '@/hooks/useProjectUpdates';
 import { useProjectMilestones, useUpdateMilestoneStatus } from '@/hooks/useProjectMilestones';
@@ -667,13 +669,23 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
               <div className="bg-muted/30 rounded-xl p-4 space-y-3">
                 <h4 className="font-medium flex items-center gap-2"><Wrench className="h-4 w-4" /> Resources</h4>
                 {project.equipment_needed && (
-                  <div className="text-sm"><span className="text-muted-foreground">Equipment:</span> {project.equipment_needed}</div>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Equipment</span>
+                    <ul className="mt-1 list-disc pl-4">
+                      {parseItemList(project.equipment_needed).map((item) => <li key={item}>{item}</li>)}
+                    </ul>
+                  </div>
                 )}
                 {project.venue && (
                   <div className="text-sm flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-muted-foreground" /> {project.venue} {project.location_secured && <Badge className="text-[10px] bg-emerald-500/20 text-emerald-400">Secured</Badge>}</div>
                 )}
                 {project.props_needed && (
-                  <div className="text-sm"><span className="text-muted-foreground">Props:</span> {project.props_needed}</div>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Props</span>
+                    <ul className="mt-1 list-disc pl-4">
+                      {parseItemList(project.props_needed).map((item) => <li key={item}>{item}</li>)}
+                    </ul>
+                  </div>
                 )}
                 <div className="flex gap-2 flex-wrap">
                   {project.sponsorship_needed && <Badge variant="outline">Sponsorship Needed</Badge>}
@@ -966,7 +978,9 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                               <AvatarFallback>{app.applicant?.display_name?.[0] || '?'}</AvatarFallback>
                             </Avatar>
                             <div>
-                              <p className="font-medium">{app.applicant?.display_name || 'Anonymous'}</p>
+                              <RouterLink to={`/profile/${app.applicant_id}`} className="font-medium underline">
+                                {app.applicant?.display_name || 'Anonymous'}
+                              </RouterLink>
                               <p className="text-xs text-muted-foreground">
                                 {app.message?.startsWith('[Custom Role Proposal:') ? 'Proposed custom role' : `Applied for ${app.role?.role_name}`} • {format(new Date(app.created_at), 'MMM d')}
                               </p>

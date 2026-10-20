@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { dailyDecodeCopy, fileCode, nextQuest, questViews, streakFromDays, xpBar, xpLevel } from "./noviQuests.ts";
+import { dailyDecodeCopy, fileCode, nextQuest, questViews, streakFromDays, studioQuest, xpBar, xpLevel } from "./noviQuests.ts";
 
 describe("novi quests", () => {
   it("uses the same level bands as the XP ledger", () => {
@@ -22,9 +22,11 @@ describe("novi quests", () => {
       completedProjects: 0,
     });
     assert.equal(quests.find((quest) => quest.id === "enter_signal")?.state, "decrypted");
-    assert.equal(quests.find((quest) => quest.id === "find_people")?.state, "progress");
+    assert.equal(quests.find((quest) => quest.id === "find_people")?.state, "decrypted");
     assert.equal(quests.find((quest) => quest.id === "read_book")?.state, "sealed");
+    assert.equal(quests.find((quest) => quest.id === "open_studio")?.state, "sealed");
     assert.equal(nextQuest(quests)?.id, "first_post");
+    assert.equal(studioQuest(quests)?.id, "open_studio");
   });
 
   it("counts a streak only on consecutive stored days", () => {

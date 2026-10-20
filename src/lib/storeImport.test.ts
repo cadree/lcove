@@ -5,7 +5,9 @@ import {
   linkCardFromOpenGraph,
   mapShopifyProducts,
   pageUrl,
+  emptyBrandPatch,
   parseOpenGraph,
+  parseShopifyMeta,
   shopHost,
 } from "../../supabase/functions/_shared/store-import.mjs";
 
@@ -60,6 +62,21 @@ describe("open graph fallback", () => {
     assert.equal(card.images[0], "https://studionorth.example/cover.jpg");
     assert.equal(card.external_source, "link");
     assert.equal(card.external_handle, "site");
+  });
+
+  it("fills an empty logo and description and keeps a custom logo", () => {
+    const og = parseOpenGraph(
+      `<meta property="og:image" content="https://cdn.example/logo.png" /><meta property="og:description" content="A room for the work." />`,
+      "https://studionorth.example/",
+    );
+    const meta = parseShopifyMeta({ name: "Studio North", description: "Shopify copy" });
+    assert.deepEqual(emptyBrandPatch({ logo_url: null, description: null, cover_image_url: null }, og, meta), {
+      logo_url: "https://cdn.example/logo.png",
+      description: "A room for the work.",
+      cover_image_url: "https://cdn.example/logo.png",
+    });
+    assert.deepEqual(emptyBrandPatch({ logo_url: "https://custom/logo.png", description: "Mine", cover_image_url: "https://custom/cover.png" }, og, meta), {});
+    assert.equal(meta.name, "Studio North");
   });
 
   it("normalizes a store host and refuses local addresses", () => {

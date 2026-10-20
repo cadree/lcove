@@ -5,11 +5,15 @@ import { Search } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { CommunityMall } from "@/components/explore/CommunityMall";
 import { ExploreBrowse } from "@/components/explore/ExploreBrowse";
+import { toast } from "sonner";
+import { PeopleMatchCard } from "@/components/explore/PeopleMatchCard";
+import { useAuth } from "@/contexts/AuthContext";
+import { sendCollabInvite } from "@/lib/collabInvite";
 import { QuestCard } from "@/components/novi/QuestCard";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useNoviQuests } from "@/hooks/useNoviQuests";
-import { nextQuest } from "@/lib/noviQuests";
+import { nextQuest, studioQuest } from "@/lib/noviQuests";
 import { shotPeople, shotSessionEnabled } from "@/lib/shotSession";
 
 const segments = [
@@ -61,10 +65,24 @@ const destinations: Record<Exclude<SegmentId, "for-you" | "mall" | "browse">, { 
 };
 
 const Explore = () => {
+  const { user } = useAuth();
   const [segment, setSegment] = useState<SegmentId>("for-you");
   const [query, setQuery] = useState("");
   const { quests } = useNoviQuests();
   const openQuest = nextQuest(quests);
+  const studio = studioQuest(quests);
+  const sendMatch = async (recipientId: string) => {
+    if (!user) {
+      toast.error("Sign in to send a match");
+      return;
+    }
+    if (recipientId === user.id) return;
+    try {
+      await sendCollabInvite(recipientId);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not send that invite");
+    }
+  };
   const { data: people = [] } = useQuery({
     queryKey: ["explore-people", query],
     queryFn: async () => {
@@ -131,22 +149,11 @@ const Explore = () => {
             </div>
             <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
               {people.map((person) => (
-                <Link
-                  key={person.user_id}
-                  to={`/profile/${person.user_id}`}
-                  className="file-panel flex w-[132px] shrink-0 flex-col items-center px-3 py-4 text-center"
-                >
-                  <span className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-[conic-gradient(from_120deg,#FF9FC8,#C4142D,#FF9FC8)] p-[2px]">
-                    <span className="flex h-full w-full items-center justify-center rounded-full bg-card font-body text-sm font-extrabold">
-                      {(person.display_name || "?").charAt(0)}
-                    </span>
-                  </span>
-                  <span className="line-clamp-2 font-body text-[13px] font-extrabold">{person.display_name || "Member"}</span>
-                  <span className="mono-label mt-1 text-[8px] text-muted-foreground">{person.city_display || "City open"}</span>
-                </Link>
+                <PeopleMatchCard key={person.user_id} person={person} onInvite={sendMatch} />
               ))}
             </div>
             {openQuest && segment === "for-you" && <div className="mt-4"><QuestCard quest={openQuest} /></div>}
+            {studio && segment === "for-you" && <div className="mt-4"><QuestCard quest={studio} /></div>}
           </section>
         )}
 

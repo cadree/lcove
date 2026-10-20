@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Radio, Users, Coins, Send, X, Clock, PlayCircle, Trash2 } from 'lucide-react';
+import { Radio, Users, Coins, Send, X, Clock, PlayCircle, Trash2, Share2 } from 'lucide-react';
+import { shareLink, buildShareUrl } from '@/lib/shareLink';
 import { useStream, useStreamReactions, useSendReaction, useTipStream, useJoinStream, useDeleteStream, useStreamPresence } from '@/hooks/useLiveStreams';
 import { StreamChat } from './StreamChat';
 import { useProfile } from '@/hooks/useProfile';
@@ -345,8 +346,19 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
                 {/* Tip Button (viewers only) */}
                 {user && !isHost && streamStatus === 'live' && (
                   <>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => shareLink({
+                        title: stream?.title || "Live on Ether",
+                        url: buildShareUrl.live(stream?.id || streamId),
+                      })}
+                    >
+                      <Share2 className="h-4 w-4 mr-2" />
+                      Share
+                    </Button>
+                    <Button
+                      variant="outline"
                       className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                       onClick={() => setShowTipInput(!showTipInput)}
                     >

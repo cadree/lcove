@@ -105,7 +105,7 @@ export async function readStoreImportMeta(storeId: string) {
 
 /** Columns safe to read from the client. Payment secrets live in store_secrets. */
 export const STORE_PUBLIC_COLUMNS =
-  'id, user_id, name, description, cover_image_url, logo_url, is_active, accepts_credits, accepts_cash, shopify_store_url, peerspace_url, flat_shipping_cents, tax_line_label, tax_line_cents, created_at, updated_at';
+  'id, user_id, name, description, cover_image_url, logo_url, is_active, accepts_credits, accepts_cash, shopify_store_url, website_url, import_status, import_error, import_count, imported_at, peerspace_url, flat_shipping_cents, tax_line_label, tax_line_cents, created_at, updated_at';
 
 export interface StoreItemCategory {
   id: string;

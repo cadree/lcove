@@ -8,6 +8,7 @@ interface StoreBrandPanelProps {
   importResult?: StoreImportResult | null;
   importing?: boolean;
   showContinue?: boolean;
+  onReimport?: () => void;
 }
 
 function websiteHref(store: Store) {
@@ -16,7 +17,7 @@ function websiteHref(store: Store) {
   return raw.startsWith('http') ? raw : `https://${raw}`;
 }
 
-export function StoreBrandPanel({ store, importResult, importing, showContinue }: StoreBrandPanelProps) {
+export function StoreBrandPanel({ store, importResult, importing, showContinue, onReimport }: StoreBrandPanelProps) {
   const href = websiteHref(store);
   const knownLink = importResult?.source === 'link' || store.import_status === 'link';
   const knownShopify = importResult?.source === 'shopify' || store.import_status === 'imported';
@@ -55,14 +56,21 @@ export function StoreBrandPanel({ store, importResult, importing, showContinue }
           {store.description && (
             <p className="mt-2 text-sm text-muted-foreground">{store.description}</p>
           )}
-          {href && (
-            <Button variant="outline" size="sm" className="mt-3" asChild>
-              <a href={href} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="mr-2 h-4 w-4" />
-                {shopify ? 'Shop on Shopify' : 'Visit store'}
-              </a>
-            </Button>
-          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {href && (
+              <Button variant="outline" size="sm" asChild>
+                <a href={href} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  {shopify ? 'Shop on Shopify' : 'Visit store'}
+                </a>
+              </Button>
+            )}
+            {onReimport && (
+              <Button type="button" variant="outline" size="sm" onClick={onReimport} disabled={importing}>
+                {importing ? 'Importing…' : store.import_status ? 'Import again' : 'Import'}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
       {(status || showContinue) && (

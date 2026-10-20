@@ -697,7 +697,31 @@ export const useProjectApplications = (projectId?: string) => {
           .limit(1)
           .maybeSingle();
 
-        const conversationId = existingConversation?.id;
+        let conversationId = existingConversation?.id;
+
+        if (!conversationId && project?.creator_id) {
+          const { data: createdChat, error: chatError } = await supabase
+            .from('conversations')
+            .insert({
+              type: 'group',
+              name: project.title || finalProjectTitle,
+              description: project.description || `Project group chat for ${finalProjectTitle}`,
+              avatar_url: project.cover_image_url || null,
+              created_by: project.creator_id,
+              visibility: 'private',
+              project_id: application.project_id,
+            })
+            .select('id')
+            .single();
+          if (chatError) throw chatError;
+          conversationId = createdChat.id;
+          await supabase.from('conversation_participants').insert({
+            conversation_id: conversationId,
+            user_id: project.creator_id,
+            role: 'owner',
+            project_role_name: 'Owner',
+          });
+        }
 
         // Add accepted applicant to the group chat
         if (conversationId) {
@@ -726,13 +750,20 @@ export const useProjectApplications = (projectId?: string) => {
               .eq('user_id', application.applicant_id)
               .maybeSingle();
 
-            await supabase
+            const { data: joinMessage } = await supabase
               .from('messages')
               .insert({
                 conversation_id: conversationId,
                 sender_id: project?.creator_id || user?.id,
                 content: `🎉 ${applicantProfile?.display_name || 'New member'} joined the project as ${finalRoleTitle}`
-              });
+              })
+              .select('id')
+              .single();
+            if (joinMessage?.id) {
+              supabase.functions.invoke('notify-chat-message', {
+                body: { conversation_id: conversationId, message_id: joinMessage.id },
+              }).catch((err) => console.error('Failed to notify the project chat', err));
+            }
           }
         }
 

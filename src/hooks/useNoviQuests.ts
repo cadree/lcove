@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { callRpc } from "@/lib/rpc";
 import { questViews, streakFromDays, xpBar, type QuestView } from "@/lib/noviQuests";
@@ -18,6 +19,7 @@ export interface NoviBoard {
   connectionCount: number;
   completedProjects: number;
   profileReady: boolean;
+  studioOpened: boolean;
 }
 
 const emptyBoard: NoviBoard = {
@@ -32,6 +34,7 @@ const emptyBoard: NoviBoard = {
   connectionCount: 0,
   completedProjects: 0,
   profileReady: false,
+  studioOpened: false,
 };
 
 function normalizeBoard(data: Partial<NoviBoard> | null | undefined): NoviBoard {
@@ -79,6 +82,7 @@ export function useNoviQuests() {
     connectionCount: board.connectionCount,
     bookOpened: board.bookOpened,
     completedProjects: board.completedProjects,
+    studioOpened: board.studioOpened,
   });
   const today = new Date().toISOString().slice(0, 10);
   const filed = useRef(new Set<string>());
@@ -89,8 +93,15 @@ export function useNoviQuests() {
       return callRpc<NoviBoard>("complete_novi_quest", { p_quest: questId });
     },
     onSuccess: (data) => {
-      if (data) queryClient.setQueryData(["novi-board", user?.id], normalizeBoard(data));
+      const previous = queryClient.getQueryData<NoviBoard>(["novi-board", user?.id]);
+      const next = data ? normalizeBoard(data) : null;
+      if (next) queryClient.setQueryData(["novi-board", user?.id], next);
       queryClient.invalidateQueries({ queryKey: ["my-xp", user?.id] });
+      const gained = next && previous ? next.total - previous.total : 0;
+      if (gained > 0) {
+        toast.success(`+${gained} XP`);
+        window.dispatchEvent(new CustomEvent("ether-novi-xp", { detail: { gained, total: next?.total ?? 0 } }));
+      }
     },
   });
 
@@ -102,7 +113,7 @@ export function useNoviQuests() {
         complete.mutate(quest.id);
       }
     }
-  }, [boardQuery.dataUpdatedAt, complete, quests, user]);
+  }, [boardQuery.dataUpdatedAt, boardQuery.isSuccess, complete, quests, user]);
 
   return {
     quests,

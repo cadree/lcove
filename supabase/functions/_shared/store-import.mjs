@@ -124,6 +124,25 @@ export function mapShopifyProducts(body, host) {
   return rows;
 }
 
+export function parseShopifyMeta(body) {
+  const shop = body && typeof body === "object" ? (body.shop || body) : {};
+  return {
+    name: String(shop.name || "").trim().slice(0, 180),
+    description: String(shop.description || "").trim().slice(0, 500),
+  };
+}
+
+/** Fill logo, description, and cover only where the store row is still empty. */
+export function emptyBrandPatch(existing, og, meta) {
+  const patch = {};
+  const logo = String(og?.image || "").trim();
+  const description = String(og?.description || meta?.description || "").trim().slice(0, 500);
+  if (!existing?.logo_url && logo) patch.logo_url = logo;
+  if (!existing?.description && description) patch.description = description;
+  if (!existing?.cover_image_url && logo) patch.cover_image_url = logo;
+  return patch;
+}
+
 export function linkCardFromOpenGraph(og) {
   if (!og || (!og.title && !og.description && !og.image)) return null;
   let host = "store";

@@ -2,10 +2,12 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import {
   importStatusMessage,
+  emptyBrandPatch,
   linkCardFromOpenGraph,
   mapShopifyProducts,
   pageUrl,
   parseOpenGraph,
+  parseShopifyMeta,
   shopHost,
 } from "../_shared/store-import.mjs";
 
@@ -48,7 +50,7 @@ serve(async (req) => {
 
     const { data: store, error: storeError } = await supabaseAdmin
       .from("stores")
-      .select("id, user_id, shopify_store_url")
+      .select("id, user_id, shopify_store_url, logo_url, description, cover_image_url")
       .eq("id", storeId)
       .single();
     if (storeError || !store || store.user_id !== user.id) {
@@ -78,9 +80,27 @@ serve(async (req) => {
       }
     }
 
+    let html = "";
+    try {
+      html = await readHtml(site);
+    } catch {
+      html = "";
+    }
+    const og = html ? parseOpenGraph(html, site) : { title: "", description: "", image: "", url: site };
+    let meta = { name: "", description: "" };
+    try {
+      const metaResponse = await fetch(`https://${host}/meta.json`, {
+        headers: { accept: "application/json" },
+        redirect: "follow",
+      });
+      if (metaResponse.ok) meta = parseShopifyMeta(await metaResponse.json());
+    } catch {
+      meta = { name: "", description: "" };
+    }
+    const brand = emptyBrandPatch(store, og, meta);
+
     if (!rows) {
-      const html = await readHtml(site);
-      const card = linkCardFromOpenGraph(parseOpenGraph(html, site));
+      const card = linkCardFromOpenGraph(og);
       if (!card) {
         throw new Error("That website did not publish a Shopify catalog or a page preview");
       }
@@ -118,6 +138,7 @@ serve(async (req) => {
       import_error: null,
       import_count: imported,
       imported_at: new Date().toISOString(),
+      ...brand,
     };
     const { error: statusError } = await supabaseAdmin.from("stores").update(statusUpdate).eq("id", storeId);
     if (statusError) {
@@ -131,6 +152,7 @@ serve(async (req) => {
       status,
       message,
       website: site,
+      brand,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

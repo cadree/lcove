@@ -167,6 +167,7 @@ test("invoices, project pay, and stream gifts record the community fund fee", as
     [{ id: "cs_inv", amount_total: 5000, metadata: { type: "contact_invoice", invoice_id: "inv_1" } }, "markContactInvoicePaid"],
     [{ id: "cs_ms", amount_total: 8000, metadata: { type: "project_payment", milestone_id: "ms_1" } }, "markMilestonePaid"],
     [{ id: "cs_gift_live", amount_total: 500, metadata: { type: "stream_gift", stream_id: "st", sender_id: "a", host_id: "b", gift: "star" } }, "recordStreamGift"],
+    [{ id: "cs_film", amount_total: 1200, metadata: { type: "profile_film", film_id: "film_1", buyer_id: "buyer_1", owner_id: "owner_1" } }, "recordFilmUnlock"],
   ];
   for (const [object, method] of cases) {
     const { db, calls } = makeDb();

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Calendar,
@@ -23,6 +23,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { SquircleIcon, type IconFill } from "@/components/world/SquircleIcon";
 import { useHomeUsage } from "@/hooks/useHomeUsage";
+import { useNoviQuests } from "@/hooks/useNoviQuests";
 import { isIosApp } from "@/lib/platform";
 import type { LucideIcon } from "lucide-react";
 
@@ -89,7 +90,15 @@ export function ToolsSheet({ open, onOpenChange }: ToolsSheetProps) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const { pinnedItems, recentItems, trackClick } = useHomeUsage();
+  const { complete } = useNoviQuests();
+  const filedStudio = useRef(false);
   const hideIos = isIosApp();
+
+  useEffect(() => {
+    if (!open || filedStudio.current) return;
+    filedStudio.current = true;
+    complete.mutate("open_studio");
+  }, [complete, open]);
 
   const visibleGroups = useMemo(() => {
     const needle = query.trim().toLowerCase();

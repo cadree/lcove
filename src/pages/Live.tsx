@@ -251,6 +251,11 @@ const Live = () => {
   const [editingStream, setEditingStream] = useState<LiveStream | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
+  useEffect(() => {
+    const streamId = searchParams.get("stream");
+    if (streamId) setSelectedStreamId(streamId);
+  }, [searchParams]);
+
   // Handle action param from FAB
   useEffect(() => {
     if (searchParams.get('action') === 'create' && user) {

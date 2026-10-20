@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import FirstRunEmpty from "@/components/onboarding/FirstRunEmpty";
 import { Button } from "@/components/ui/button";
 import { Bell, Filter, Loader2, Shuffle, Sparkles, Users } from "lucide-react";
+import { ToolsSheet } from "@/components/navigation/ToolsSheet";
 import { usePosts } from "@/hooks/usePosts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -20,7 +21,7 @@ import { cityFilterOptions, cityMatchesFilter } from "@/lib/cityNormalization";
 import { useFavorites } from "@/hooks/useFavorites";
 import { QuestCard } from "@/components/novi/QuestCard";
 import { useNoviQuests } from "@/hooks/useNoviQuests";
-import { nextQuest } from "@/lib/noviQuests";
+import { nextQuest, studioQuest } from "@/lib/noviQuests";
 import bearLogo from "@/assets/ether-bear-logo.png";
 const Feed = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -31,9 +32,11 @@ const Feed = () => {
   const [isShuffled, setIsShuffled] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [lane, setLane] = useState<"for-you" | "friends" | "city" | "live">("for-you");
+  const [studioOpen, setStudioOpen] = useState(false);
   const { favorites } = useFavorites();
   const { quests } = useNoviQuests();
   const openQuest = nextQuest(quests);
+  const studio = studioQuest(quests);
   const {
     user
   } = useAuth();
@@ -47,6 +50,14 @@ const Feed = () => {
   const postCreatorRef = useRef<HTMLTextAreaElement>(null);
 
   // Handle action params from FAB
+  useEffect(() => {
+    if (searchParams.get("studio") !== "1") return;
+    setStudioOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("studio");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   useEffect(() => {
     if (searchParams.get('action') === 'create-post' && user) {
       // Focus the post creator after a brief delay
@@ -123,6 +134,9 @@ const Feed = () => {
             <img src={bearLogo} alt="" className="h-14 w-auto" />
           </Link>
           <div className="flex items-center">
+            <Button variant="ghost" className="font-body font-extrabold" onClick={() => setStudioOpen(true)} aria-label="Studio">
+              Studio
+            </Button>
             <FriendsDrawer>
               <Button variant="ghost" size="icon" aria-label="Friends">
                 <Users className="h-5 w-5" />
@@ -135,6 +149,7 @@ const Feed = () => {
             </Link>
           </div>
         </header>
+        <ToolsSheet open={studioOpen} onOpenChange={setStudioOpen} />
 
         <StoriesRow />
 
@@ -161,6 +176,7 @@ const Feed = () => {
         </div>
 
         {openQuest && <div className="mb-4"><QuestCard quest={openQuest} /></div>}
+        {studio && <div className="mb-4"><QuestCard quest={studio} /></div>}
 
         <div className="mb-4 mt-2 flex items-center justify-end gap-2">
           <div className="flex gap-2">

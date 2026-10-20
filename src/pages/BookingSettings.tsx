@@ -372,6 +372,7 @@ const BookingSettings = () => {
                     Cancel
                   </Button>
                   <Button 
+                    type="button"
                     onClick={handleSave}
                     disabled={createBookingPage.isPending || updateBookingPage.isPending}
                   >

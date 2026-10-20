@@ -300,13 +300,42 @@ export const VideoPlayer = ({
       )}
 
       {isEmbed ? (
-        // External Embed (YouTube, Vimeo) - For embeds, we can't control preview
-        <iframe
-          src={externalUrl?.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
-          className="w-full h-full"
-          allowFullScreen
-          allow="autoplay; encrypted-media"
-        />
+        isPreviewOnly ? (
+          <div
+            className="flex h-full w-full items-center justify-center bg-black px-6 text-center"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="max-w-md">
+              <Lock className="mx-auto mb-4 h-10 w-10 text-primary" />
+              <h2 className="mb-2 text-2xl font-display font-bold text-white">Locked</h2>
+              <p className="mb-6 text-white/70">
+                {isIosApp()
+                  ? "This film isn't available to purchase in the iOS app."
+                  : "Subscribe to this network to watch. The embed stays off until the lock opens."}
+              </p>
+              {!isIosApp() && (
+                <Button
+                  size="lg"
+                  className="w-full"
+                  onClick={() => {
+                    onSubscribe?.();
+                    onClose();
+                  }}
+                >
+                  Subscribe Now
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <iframe
+            src={externalUrl?.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+            className="w-full h-full"
+            allowFullScreen
+            allow="encrypted-media"
+            title={content.title || "Film"}
+          />
+        )
       ) : videoUrl ? (
         // Native Video Player
         <>
