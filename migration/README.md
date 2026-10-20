@@ -63,8 +63,9 @@ In Supabase Dashboard → Edge Functions → Secrets, add:
 |--------|-------------|
 | `STRIPE_SECRET_KEY` | Stripe API key |
 | `RESEND_API_KEY` | Resend email API key |
-| `MUX_TOKEN_ID` | Mux streaming token ID |
-| `MUX_TOKEN_SECRET` | Mux streaming secret |
+| `LIVEKIT_URL` | LiveKit Cloud websocket URL |
+| `LIVEKIT_API_KEY` | LiveKit API key |
+| `LIVEKIT_API_SECRET` | LiveKit API secret |
 | `TWILIO_ACCOUNT_SID` | Twilio account SID |
 | `TWILIO_AUTH_TOKEN` | Twilio auth token |
 | `TWILIO_PHONE_NUMBER` | Twilio phone number |

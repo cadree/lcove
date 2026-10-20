@@ -6,8 +6,9 @@
 |--------|--------------|
 | `STRIPE_SECRET_KEY` | Payments, subscriptions, Stripe Connect |
 | `RESEND_API_KEY` | Email notifications |
-| `MUX_TOKEN_ID` | Live streaming |
-| `MUX_TOKEN_SECRET` | Live streaming |
+| `LIVEKIT_URL` | Live streaming (LiveKit Cloud) |
+| `LIVEKIT_API_KEY` | Live streaming |
+| `LIVEKIT_API_SECRET` | Live streaming |
 | `TWILIO_ACCOUNT_SID` | SMS notifications |
 | `TWILIO_AUTH_TOKEN` | SMS notifications |
 | `TWILIO_PHONE_NUMBER` | SMS notifications |
@@ -34,7 +35,8 @@ supabase functions deploy --project-ref waafzlorvnozeujjhvxu
 - create-network-subscription
 - create-store-connect-account
 - customer-portal
-- mux-stream
+- livekit-token
+- livekit-webhook
 - notify-application-accepted
 - notify-content-submission
 - notify-new-application

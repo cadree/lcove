@@ -95,8 +95,7 @@ Supabase injects `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE
 - `TWILIO_PHONE_NUMBER`
 - `VAPID_PUBLIC_KEY`
 - `VAPID_PRIVATE_KEY`
-- `MUX_TOKEN_ID`
-- `MUX_TOKEN_SECRET`
+- `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (LiveKit Cloud. Camera streams do not use Mux.)
 - `SITE_URL` = `https://etherbylcove.com` (use the `pages.dev` URL until the domain moves)
 - `APP_URL` = `https://etherbylcove.com` (same as `SITE_URL`)
 
@@ -118,6 +117,8 @@ Deploy from GitHub Actions, not from the machine coordinating the move. That mac
 The workflow runs `supabase functions deploy --use-api` (no Docker) and reads `verify_jwt` from `supabase/config.toml`. It does not run SQL. Deploy `purchase-event-with-credits` and `delete-account` before members use those buttons. `delete-account` deletes only the person whose token it is. It refuses while a payout, earned credit, escrow, store or booking payout, Stripe balance, or active subscription is still open.
 
 Stripe webhook events are listed in `docs/stripe-setup.md`.
+
+Live video is LiveKit Cloud, not Mux. After the functions deploy, set `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET`, and point the LiveKit webhook at `https://aykopqinnnssxdhxqruo.supabase.co/functions/v1/livekit-webhook`. A full deploy does not delete functions already on the project. Delete `mux-stream` and `mux-status` in the Supabase dashboard if they are still there. Until the LiveKit secrets exist, Go Live shows "Live video not configured" and does not open the camera.
 
 ## 9. Regenerate database types
 

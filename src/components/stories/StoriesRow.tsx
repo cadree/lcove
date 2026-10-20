@@ -114,7 +114,9 @@ const StoriesRow = () => {
         {user && <motion.div role="button" tabIndex={0} whileTap={{
         scale: 0.95
       }} onClick={() => userStories.length > 0 ? handleOpenStory(user.id) : setShowUpload(true)} onKeyDown={(event) => {
-        if (event.key === "Enter") userStories.length > 0 ? handleOpenStory(user.id) : setShowUpload(true);
+        if (event.key !== "Enter") return;
+        if (userStories.length > 0) handleOpenStory(user.id);
+        else setShowUpload(true);
       }} className="relative shrink-0 group">
             <div className="w-20 h-20 rounded-full relative">
               {/* Glass ring */}
