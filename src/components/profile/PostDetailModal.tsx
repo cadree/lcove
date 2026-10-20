@@ -43,6 +43,8 @@ import { usePostInteractions } from "@/hooks/usePostInteractions";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { shareLink, buildShareUrl } from "@/lib/shareLink";
+import { EmbedPlayer } from "@/components/feed/EmbedPlayer";
+import { embedFromPost } from "@/lib/videoEmbed";
 
 interface PostDetailModalProps {
   post: ProfilePost | null;
@@ -82,6 +84,7 @@ export function PostDetailModal({
 
   if (!post) return null;
 
+  const embed = embedFromPost(post);
   const displayName = post.profile?.display_name || 'Anonymous';
   const avatarUrl = post.profile?.avatar_url;
   const timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true });
@@ -165,11 +168,14 @@ export function PostDetailModal({
           <div className="flex flex-col md:flex-row h-full">
             {/* Media Section */}
             <div className="md:w-[60%] bg-black flex items-center justify-center relative">
-              {post.media_type === 'video' ? (
+              {embed ? (
+                <EmbedPlayer embed={embed} title={post.embed_title || post.content} className="max-h-[60vh] md:max-h-[80vh]" />
+              ) : post.media_type === 'video' ? (
                 <video
                   src={post.media_url || undefined}
                   controls
                   autoPlay
+                  playsInline
                   className="max-w-full max-h-[60vh] md:max-h-[80vh] object-contain"
                 />
               ) : (

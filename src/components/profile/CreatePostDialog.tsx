@@ -29,19 +29,15 @@ import {
   LayoutGrid,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { VideoLinkField } from "@/components/feed/VideoLinkField";
+import { EmbedThumbnail } from "@/components/feed/EmbedPlayer";
+import type { ComposePostInput } from "@/types/post";
+import type { EmbedDraft } from "@/lib/videoEmbed";
 
 interface CreatePostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreatePost: (data: {
-    content?: string;
-    file?: File;
-    files?: File[];
-    mediaType?: 'photo' | 'video' | 'text' | 'collage';
-    location?: string;
-    altText?: string;
-    commentsEnabled?: boolean;
-  }) => Promise<void>;
+  onCreatePost: (data: ComposePostInput) => Promise<void>;
   userAvatar?: string | null;
   userName?: string | null;
 }
@@ -69,6 +65,8 @@ export function CreatePostDialog({
   const [altText, setAltText] = useState("");
   const [commentsEnabled, setCommentsEnabled] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [embed, setEmbed] = useState<EmbedDraft | null>(null);
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -85,6 +83,8 @@ export function CreatePostDialog({
     setAltText("");
     setCommentsEnabled(true);
     setIsSubmitting(false);
+    setLinkUrl("");
+    setEmbed(null);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'photo' | 'video') => {
@@ -93,6 +93,8 @@ export function CreatePostDialog({
 
     setSelectedFiles([file]);
     setMediaType(type);
+    setLinkUrl("");
+    setEmbed(null);
     
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -191,12 +193,13 @@ export function CreatePostDialog({
     try {
       await onCreatePost({
         content: caption || undefined,
-        file: selectedFiles[0] || undefined,
-        files: selectedFiles.length > 1 ? selectedFiles : undefined,
-        mediaType: mediaType || 'text',
+        file: embed ? undefined : selectedFiles[0] || undefined,
+        files: embed ? undefined : selectedFiles.length > 1 ? selectedFiles : undefined,
+        mediaType: embed ? 'video' : mediaType || 'text',
         location: location || undefined,
         altText: altText || undefined,
         commentsEnabled,
+        embed: embed ?? undefined,
       });
       handleClose();
     } catch (error) {
@@ -219,7 +222,7 @@ export function CreatePostDialog({
 
   const canProceed = () => {
     switch (currentStep) {
-      case 'upload': return selectedFiles.length > 0;
+      case 'upload': return selectedFiles.length > 0 || !!embed;
       case 'preview': return true;
       case 'caption': return true;
       case 'metadata': return true;
@@ -306,6 +309,18 @@ export function CreatePostDialog({
                     <Video className="w-4 h-4 mr-2" />
                     Select Video
                   </Button>
+                  <VideoLinkField
+                    url={linkUrl}
+                    onUrlChange={(value) => {
+                      setLinkUrl(value);
+                      if (value.trim()) {
+                        setSelectedFiles([]);
+                        setMediaPreviews([]);
+                        setMediaType(null);
+                      }
+                    }}
+                    onDraft={setEmbed}
+                  />
                 </div>
 
                 <input
@@ -334,7 +349,7 @@ export function CreatePostDialog({
             )}
 
             {/* Step 2: Preview */}
-            {currentStep === 'preview' && mediaPreviews.length > 0 && (
+            {currentStep === 'preview' && (mediaPreviews.length > 0 || embed) && (
               <motion.div
                 key="preview"
                 initial={{ opacity: 0, x: 20 }}
@@ -343,10 +358,13 @@ export function CreatePostDialog({
                 className="relative"
               >
                 <div className="aspect-square bg-black flex items-center justify-center overflow-hidden relative">
-                  {mediaType === 'video' ? (
+                  {embed ? (
+                    <EmbedThumbnail embed={embed} thumbnailUrl={embed.thumbnailUrl} title={embed.title} />
+                  ) : mediaType === 'video' ? (
                     <video 
                       src={mediaPreviews[0]} 
                       controls 
+                      playsInline
                       className="w-full h-full object-contain"
                     />
                   ) : (

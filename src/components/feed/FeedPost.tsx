@@ -23,8 +23,10 @@ import { toast } from 'sonner';
 import { shareLink, buildShareUrl } from '@/lib/shareLink';
 import { fileCode } from '@/lib/noviQuests';
 import { ReportDialog } from '@/components/safety/ReportDialog';
+import { EmbedPlayer } from '@/components/feed/EmbedPlayer';
+import { embedFromPost, type StoredEmbedFields } from '@/lib/videoEmbed';
 
-interface Post {
+interface Post extends StoredEmbedFields {
   id: string;
   user_id: string;
   content: string | null;
@@ -58,6 +60,7 @@ const FeedPost = ({ post, hero = false }: { post: Post; hero?: boolean }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const isOwner = user?.id === post.user_id;
+  const embed = embedFromPost(post);
 
   const authorName = post.profile ? (post.profile.display_name || 'User') : 'Private profile';
 
@@ -175,7 +178,14 @@ const FeedPost = ({ post, hero = false }: { post: Post; hero?: boolean }) => {
       )}
 
       {/* Media */}
-      {post.media_url && post.media_type !== 'text' && (
+      {embed ? (
+        <div className="relative bg-black">
+          <span className="mono-label absolute left-3 top-3 z-[1] rounded-full bg-black/55 px-2 py-1 text-[8px] text-white">
+            {fileCode(post.id)}
+          </span>
+          <EmbedPlayer embed={embed} title={post.embed_title} />
+        </div>
+      ) : post.media_url && post.media_type !== 'text' && (
         <div className={`relative bg-muted/10 ${hero ? "aspect-[3/4]" : "aspect-square"}`}>
           <span className="mono-label absolute left-3 top-3 z-[1] rounded-full bg-black/55 px-2 py-1 text-[8px] text-white">
             {fileCode(post.id)}

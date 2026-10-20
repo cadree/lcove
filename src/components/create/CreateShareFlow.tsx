@@ -5,6 +5,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { usePosts } from "@/hooks/usePosts";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
+import { VideoLinkField } from "@/components/feed/VideoLinkField";
+import { EmbedPlayer, EmbedThumbnail } from "@/components/feed/EmbedPlayer";
+import type { EmbedDraft } from "@/lib/videoEmbed";
 
 type Step = "pick" | "crop" | "caption" | "share";
 
@@ -60,6 +63,8 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [embed, setEmbed] = useState<EmbedDraft | null>(null);
 
   const reset = () => {
     setStep("pick");
@@ -71,6 +76,8 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
     setOffset({ x: 0, y: 0 });
     setNatural(null);
     setError(null);
+    setLinkUrl("");
+    setEmbed(null);
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -80,6 +87,8 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
 
   const onPick = (file: File | undefined) => {
     if (!file) return;
+    setLinkUrl("");
+    setEmbed(null);
     const reader = new FileReader();
     reader.onload = () => {
       const src = reader.result as string;
@@ -113,11 +122,12 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
   };
 
   const share = async () => {
-    if (!caption.trim() && !croppedFile) return;
+    if (!caption.trim() && !croppedFile && !embed) return;
     await createPost.mutateAsync({
       content: caption.trim() || undefined,
-      file: croppedFile || undefined,
-      mediaType: croppedFile ? "photo" : "text",
+      file: embed ? undefined : croppedFile || undefined,
+      mediaType: embed ? "video" : croppedFile ? "photo" : "text",
+      embed: embed ?? undefined,
     });
     handleOpenChange(false);
   };
@@ -143,6 +153,16 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
               <Button variant="outline" className="w-full min-h-11" onClick={() => setStep("caption")}>
                 Caption only
               </Button>
+              <VideoLinkField
+                url={linkUrl}
+                onUrlChange={setLinkUrl}
+                onDraft={setEmbed}
+              />
+              {embed && (
+                <Button className="w-full min-h-11" onClick={() => setStep("caption")}>
+                  Next
+                </Button>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -218,7 +238,9 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
 
           {user && step === "caption" && (
             <div className="space-y-4">
-              {croppedUrl && (
+              {embed ? (
+                <EmbedPlayer embed={embed} title={embed.title} />
+              ) : croppedUrl && (
                 <img src={croppedUrl} alt="" className="media-frame aspect-square w-full object-cover" />
               )}
               <Textarea
@@ -232,13 +254,13 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
                 <Button
                   variant="outline"
                   className="min-h-11 flex-1"
-                  onClick={() => setStep(preview ? "crop" : "pick")}
+                  onClick={() => setStep(embed ? "pick" : preview ? "crop" : "pick")}
                 >
                   Back
                 </Button>
                 <Button
                   className="min-h-11 flex-1"
-                  disabled={!caption.trim() && !croppedFile}
+                  disabled={!caption.trim() && !croppedFile && !embed}
                   onClick={() => setStep("share")}
                 >
                   Next
@@ -249,7 +271,12 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
 
           {user && step === "share" && (
             <div className="space-y-4">
-              {croppedUrl && (
+              {embed ? (
+                <div className="space-y-2">
+                  <EmbedThumbnail embed={embed} thumbnailUrl={embed.thumbnailUrl} title={embed.title} className="aspect-video" />
+                  {embed.title && <p className="text-sm text-foreground">{embed.title}</p>}
+                </div>
+              ) : croppedUrl && (
                 <img src={croppedUrl} alt="" className="media-frame aspect-square w-full object-cover" />
               )}
               {caption.trim() && <p className="text-sm text-foreground whitespace-pre-wrap">{caption}</p>}

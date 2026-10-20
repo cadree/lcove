@@ -4,6 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { ProfilePost } from '@/types/post';
+import { embedColumnMissing, embedColumnsForInsert, type EmbedDraft } from '@/lib/videoEmbed';
+import { shotEmbedEnabled, shotEmbedPost } from '@/lib/shotSession';
 
 export function useProfilePosts(userId?: string) {
   const { user } = useAuth();
@@ -16,6 +18,29 @@ export function useProfilePosts(userId?: string) {
     queryKey: ['profile-posts', targetUserId],
     queryFn: async (): Promise<ProfilePost[]> => {
       if (!targetUserId) return [];
+
+      if (shotEmbedEnabled() && targetUserId === shotEmbedPost().user_id) {
+        const post = shotEmbedPost();
+        return [{
+          id: post.id,
+          user_id: post.user_id,
+          content: post.content,
+          media_url: post.media_url,
+          media_type: post.media_type,
+          created_at: post.created_at,
+          location: post.location,
+          collaborators: post.collaborators,
+          alt_text: post.alt_text,
+          comments_enabled: post.comments_enabled,
+          folder_id: post.folder_id,
+          embed_provider: post.embed_provider,
+          embed_video_id: post.embed_video_id,
+          embed_hash: post.embed_hash,
+          embed_thumbnail_url: post.embed_thumbnail_url,
+          embed_title: post.embed_title,
+          profile: { display_name: post.profile.display_name, avatar_url: null },
+        }];
+      }
 
       // Get posts for the user
       const { data: postsData, error } = await supabase
@@ -46,6 +71,11 @@ export function useProfilePosts(userId?: string) {
         alt_text: post.alt_text ?? null,
         comments_enabled: post.comments_enabled ?? true,
         folder_id: post.folder_id ?? null,
+        embed_provider: post.embed_provider ?? null,
+        embed_video_id: post.embed_video_id ?? null,
+        embed_hash: post.embed_hash ?? null,
+        embed_thumbnail_url: post.embed_thumbnail_url ?? null,
+        embed_title: post.embed_title ?? null,
         profile: profile || { display_name: null, avatar_url: null },
       }));
     },
@@ -62,6 +92,7 @@ export function useProfilePosts(userId?: string) {
       location,
       altText,
       commentsEnabled = true,
+      embed,
     }: { 
       content?: string; 
       file?: File;
@@ -70,8 +101,25 @@ export function useProfilePosts(userId?: string) {
       location?: string;
       altText?: string;
       commentsEnabled?: boolean;
+      embed?: EmbedDraft;
     }) => {
       if (!user) throw new Error('Must be logged in');
+
+      if (embed) {
+        const columns = embedColumnsForInsert(embed);
+        const { error: insertError } = await supabase
+          .from('posts')
+          .insert({
+            user_id: user.id,
+            content: content || null,
+            location: location || null,
+            alt_text: altText || null,
+            comments_enabled: commentsEnabled,
+            ...columns,
+          });
+        if (insertError) throw insertError;
+        return;
+      }
 
       let mediaUrl: string | null = null;
       let additionalMediaUrls: string[] = [];
@@ -143,7 +191,9 @@ export function useProfilePosts(userId?: string) {
       toast.success('Post shared!');
     },
     onError: (error) => {
-      toast.error('Failed to share post');
+      toast.error(embedColumnMissing(error)
+        ? 'Video links need the database update in supabase/migrations/20261020120000_post_video_embeds.sql before they can be published.'
+        : 'Failed to share post');
       console.error(error);
     },
   });

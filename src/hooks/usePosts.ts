@@ -5,8 +5,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { shotContentThin, shotPosts, shotSessionEnabled } from '@/lib/shotSession';
+import { embedColumnMissing, embedColumnsForInsert, type EmbedDraft, type StoredEmbedFields } from '@/lib/videoEmbed';
 
-interface Post {
+interface Post extends StoredEmbedFields {
   id: string;
   user_id: string;
   content: string | null;
@@ -84,8 +85,21 @@ export function usePosts() {
   });
 
   const createPost = useMutation({
-    mutationFn: async ({ content, file, mediaType }: { content?: string; file?: File; mediaType?: 'photo' | 'video' | 'text' }) => {
+    mutationFn: async ({ content, file, mediaType, embed }: { content?: string; file?: File; mediaType?: 'photo' | 'video' | 'text'; embed?: EmbedDraft }) => {
       if (!user) throw new Error('Must be logged in');
+
+      if (embed) {
+        const columns = embedColumnsForInsert(embed);
+        const { error: insertError } = await supabase
+          .from('posts')
+          .insert({
+            user_id: user.id,
+            content: content || null,
+            ...columns,
+          });
+        if (insertError) throw insertError;
+        return;
+      }
 
       let mediaUrl: string | null = null;
 
@@ -123,7 +137,9 @@ export function usePosts() {
       toast.success('Post created!');
     },
     onError: (error) => {
-      toast.error('Failed to create post');
+      toast.error(embedColumnMissing(error)
+        ? 'Video links need the database update in supabase/migrations/20261020120000_post_video_embeds.sql before they can be published.'
+        : 'Failed to create post');
       console.error(error);
     },
   });

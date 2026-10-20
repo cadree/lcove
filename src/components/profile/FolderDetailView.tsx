@@ -25,6 +25,8 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { embedFromPost } from '@/lib/videoEmbed';
+import { EmbedThumbnail } from '@/components/feed/EmbedPlayer';
 
 interface FolderDetailViewProps {
   folder: PortfolioFolder;
@@ -50,7 +52,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
 
   // Filter posts that aren't already in this folder
   const availablePosts = allPosts.filter(
-    post => post.media_url && post.folder_id !== folder.id
+    post => (post.media_url || embedFromPost(post)) && post.folder_id !== folder.id
   );
 
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -336,6 +338,17 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
                     </div>
                   )}
                 </>
+              ) : embedFromPost(item) ? (
+                <>
+                  <EmbedThumbnail
+                    embed={embedFromPost(item)!}
+                    thumbnailUrl={item.embed_thumbnail_url}
+                    title={item.embed_title || item.content}
+                  />
+                  <div className="absolute top-2 right-2">
+                    <Play className="w-4 h-4 text-white drop-shadow-lg" fill="white" />
+                  </div>
+                </>
               ) : item.media_type === 'video' ? (
                 <>
                   <video
@@ -397,7 +410,13 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
                           : "ring-transparent hover:ring-primary/50"
                       )}
                     >
-                      {post.media_type === 'video' ? (
+                      {embedFromPost(post) ? (
+                        <EmbedThumbnail
+                          embed={embedFromPost(post)!}
+                          thumbnailUrl={post.embed_thumbnail_url}
+                          title={post.embed_title || post.content}
+                        />
+                      ) : post.media_type === 'video' ? (
                         <>
                           <video
                             src={post.media_url || undefined}

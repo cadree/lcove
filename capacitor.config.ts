@@ -13,6 +13,12 @@ import { NATIVE_APP_ID, NATIVE_APP_NAME } from "./src/config/nativeIds";
  *
  * `ios.scheme` is the Xcode build scheme (default "App"), not a URL scheme.
  * Auth return links use NATIVE_APP_ID in Info.plist and getAuthRedirectUrl.
+ *
+ * YouTube and Vimeo posts play in an iframe (youtube-nocookie.com or
+ * player.vimeo.com) with playsinline=1. Capacitor's WKWebView already sets
+ * allowsInlineMediaPlayback and an empty mediaTypesRequiringUserActionForPlayback
+ * list, so those players can run inline. Do not set
+ * limitsNavigationsToAppBoundDomains. That setting blocks the player hosts.
  */
 const config: CapacitorConfig = {
   appId: NATIVE_APP_ID,
