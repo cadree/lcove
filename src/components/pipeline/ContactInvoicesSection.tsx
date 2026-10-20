@@ -179,7 +179,7 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
       });
       if (error) throw error;
       if (data?.needs_connect) {
-        toast.error(data.error || "Connect payouts in Wallet first");
+        toast.error(data.error || "Set up payouts in Wallet before sending a pay link");
         return;
       }
       if (data?.error) throw new Error(data.error);
