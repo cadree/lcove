@@ -10,7 +10,7 @@ import PageLayout from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCredits, useCreditLedger, usePayouts, useTransactions } from '@/hooks/useCredits';
-import { connectStatusLabel, useCreatorConnect } from '@/hooks/useCreatorConnect';
+import { connectSetupAction, connectStatusCopy, connectStatusLabel, resolveConnectStatus, useCreatorConnect, withdrawalsEnabled } from '@/hooks/useCreatorConnect';
 import { useMyXp } from '@/hooks/useXp';
 import { TotalBalanceCard, CreditBalanceCard } from '@/components/credits/CreditBalanceCard';
 import { TransferCreditsDialog } from '@/components/credits/TransferCreditsDialog';
@@ -56,6 +56,13 @@ const WalletPage: React.FC = () => {
   const [payoutAmount, setPayoutAmount] = useState('');
   const [payoutDialogOpen, setPayoutDialogOpen] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const connectStatus = resolveConnectStatus(connect);
+  const setupAction = connectSetupAction(connectStatus);
+  const connectBadgeClass = connectStatus === "verified"
+    ? statusColors.completed
+    : connectStatus === "needs_info" || connectStatus === "pending"
+      ? statusColors.pending
+      : statusColors.processing;
 
   // Handle Stripe setup callback
   useEffect(() => {
@@ -65,7 +72,7 @@ const WalletPage: React.FC = () => {
       toast({
         title: connectResult === 'success' ? 'Checking payout status' : 'Payout setup needs another step',
         description: connectResult === 'success'
-          ? 'Stripe sent you back. Status updates when the account is verified.'
+          ? 'Stripe sent you back. Wallet shows whether you can accept payments and whether payouts are enabled.'
           : 'Open payout setup again to finish.',
       });
       searchParams.delete('connect');
@@ -90,10 +97,11 @@ const WalletPage: React.FC = () => {
       return;
     }
 
-    if (connect?.status !== 'verified') {
+    if (!withdrawalsEnabled(connect)) {
+      const status = resolveConnectStatus(connect);
       toast({
-        title: 'Payouts are not verified yet',
-        description: 'Finish Stripe Connect setup before requesting a payout.',
+        title: status === 'accepting' ? 'Payouts are under review' : 'Payouts are not enabled yet',
+        description: connectStatusCopy(status),
         variant: 'destructive',
       });
       return;
@@ -224,7 +232,7 @@ const WalletPage: React.FC = () => {
 
                 <Button 
                   onClick={handleRequestPayout} 
-                  disabled={!payoutAmount || connect?.status !== 'verified' || isRequesting || parseFloat(payoutAmount) > earnedBalance}
+                  disabled={!payoutAmount || !withdrawalsEnabled(connect) || isRequesting || parseFloat(payoutAmount) > earnedBalance}
                   className="w-full"
                 >
                   {isRequesting ? 'Processing...' : 'Request Payout'}
@@ -258,26 +266,24 @@ const WalletPage: React.FC = () => {
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex items-start justify-between gap-3">
                   <span className="text-sm text-foreground">Status</span>
-                  <Badge className={connect?.status === "verified" ? statusColors.completed : connect?.status === "needs_info" ? statusColors.pending : statusColors.processing}>
-                    {connectStatusLabel(connect?.status || "pending")}
+                  <Badge className={cn("h-auto max-w-[16rem] whitespace-normal text-right leading-snug", connectBadgeClass)}>
+                    {connectStatusLabel(connectStatus)}
                   </Badge>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {connect?.status === "verified" && "Payouts are verified. Request a payout sends earned LC to this Stripe account."}
-                  {connect?.status === "needs_info" && "Stripe needs more information before payouts can be sent."}
-                  {connect?.status !== "verified" && connect?.status !== "needs_info" && "Payout setup has not been finished. No bank details are stored in Ether."}
-                </p>
+                <p className="text-sm text-muted-foreground">{connectStatusCopy(connectStatus)}</p>
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={openConnect.isPending}
-                    onClick={() => openConnect.mutate("onboard")}
-                  >
-                    {connect?.status === "pending" ? "Set up payouts" : "Continue setup"}
-                  </Button>
+                  {setupAction !== "manage" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={openConnect.isPending}
+                      onClick={() => openConnect.mutate("onboard")}
+                    >
+                      {setupAction === "continue" ? "Continue setup" : "Set up payouts"}
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="outline"

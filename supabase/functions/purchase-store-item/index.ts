@@ -211,7 +211,7 @@ serve(async (req) => {
           status: "pending",
           seller_amount: sellerAmount / 100,
           platform_fee: platformFeeAmount / 100,
-          seller_payout_status: store.payout_enabled ? "processing" : "pending_setup",
+          seller_payout_status: connectAccountId ? "processing" : "pending_setup",
         })
         .select()
         .single();
@@ -280,7 +280,7 @@ serve(async (req) => {
       // Ether does not collect a shipping address or limit countries.
       // Connect fee is STORE_PLATFORM_FEE_PERCENT of the item price. Shipping and tax are not in the fee.
       // Linked Shopify items are rejected above and never reach this split.
-      if (connectAccountId && store.payout_enabled) {
+      if (connectAccountId) {
         sessionConfig.payment_intent_data = {
           ...sessionConfig.payment_intent_data,
           ...(platformFeeAmount > 0 ? { application_fee_amount: platformFeeAmount } : {}),

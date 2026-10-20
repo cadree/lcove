@@ -61,6 +61,8 @@ serve(async (req) => {
         charges_enabled: false,
         payouts_enabled: false,
         details_submitted: false,
+        transfers_active: false,
+        can_accept_charges: false,
         currently_due: [],
         disabled_reason: null,
       });

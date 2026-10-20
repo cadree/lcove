@@ -1,7 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  type ConnectStatus,
+  connectSetupAction,
+  connectStatusCopy,
+  connectStatusLabel,
+  resolveConnectStatus,
+  withdrawalsEnabled,
+} from "@/lib/creatorConnectStatus";
+import { shotSessionEnabled } from "@/lib/shotSession";
 
-export type ConnectStatus = "pending" | "needs_info" | "verified";
+export type { ConnectStatus };
+export { connectSetupAction, connectStatusCopy, connectStatusLabel, resolveConnectStatus, withdrawalsEnabled };
 
 export interface CreatorConnectState {
   status: ConnectStatus;
@@ -9,6 +19,8 @@ export interface CreatorConnectState {
   charges_enabled: boolean;
   payouts_enabled: boolean;
   details_submitted: boolean;
+  transfers_active: boolean;
+  can_accept_charges: boolean;
   currently_due: string[];
   disabled_reason: string | null;
 }
@@ -19,9 +31,39 @@ const emptyState: CreatorConnectState = {
   charges_enabled: false,
   payouts_enabled: false,
   details_submitted: false,
+  transfers_active: false,
+  can_accept_charges: false,
   currently_due: [],
   disabled_reason: null,
 };
+
+function shotConnectState(): CreatorConnectState {
+  const mode = typeof localStorage !== "undefined" ? localStorage.getItem("ether-shot-connect") : null;
+  if (mode === "pending") return { ...emptyState };
+  if (mode === "verified") {
+    return {
+      ...emptyState,
+      status: "verified",
+      accountId: "acct_shot_verified",
+      charges_enabled: true,
+      payouts_enabled: true,
+      details_submitted: true,
+      transfers_active: true,
+      can_accept_charges: true,
+    };
+  }
+  return {
+    ...emptyState,
+    status: "accepting",
+    accountId: "acct_shot_accepting",
+    charges_enabled: true,
+    payouts_enabled: false,
+    details_submitted: true,
+    transfers_active: true,
+    can_accept_charges: true,
+    disabled_reason: "other",
+  };
+}
 
 async function callConnect(action: "status" | "onboard" | "dashboard") {
   const { data, error } = await supabase.functions.invoke("manage-creator-connect", { body: { action } });
@@ -35,6 +77,7 @@ export function useCreatorConnect() {
   const query = useQuery({
     queryKey: ["creator-connect"],
     queryFn: async () => {
+      if (shotSessionEnabled()) return shotConnectState();
       const data = await callConnect("status");
       return { ...emptyState, ...data } as CreatorConnectState;
     },
@@ -52,10 +95,4 @@ export function useCreatorConnect() {
   });
 
   return { ...query, open };
-}
-
-export function connectStatusLabel(status: ConnectStatus) {
-  if (status === "verified") return "Verified";
-  if (status === "needs_info") return "Needs info";
-  return "Pending";
 }

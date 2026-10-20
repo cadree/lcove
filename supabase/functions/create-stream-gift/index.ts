@@ -48,7 +48,7 @@ serve(async (req) => {
     if (!destination) {
       return json({
         needs_connect: true,
-        error: "This host can't receive card gifts until payouts are verified. LC tips still work.",
+        error: "This host can't receive card gifts until their Stripe account can accept payments. LC tips still work.",
       });
     }
 

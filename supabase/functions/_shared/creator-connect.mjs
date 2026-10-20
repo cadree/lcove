@@ -1,6 +1,9 @@
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { assertStripeTestKey } from "./stripe-mode.mjs";
 import { COMMUNITY_FUND_FEE_PERCENT, communityFundFeeCents } from "./fees.mjs";
+import { canAcceptCharges, classifyConnectAccount } from "./creator-connect-status.mjs";
+
+export { canAcceptCharges, classifyConnectAccount, transfersActive, withdrawalBlockedReason } from "./creator-connect-status.mjs";
 
 export const STRIPE_API_VERSION = "2025-08-27.basil";
 
@@ -8,25 +11,6 @@ export function testStripe() {
   return new Stripe(assertStripeTestKey(Deno.env.get("STRIPE_SECRET_KEY")), {
     apiVersion: STRIPE_API_VERSION,
   });
-}
-
-export function classifyConnectAccount(account) {
-  const due = [
-    ...(account?.requirements?.currently_due ?? []),
-    ...(account?.requirements?.past_due ?? []),
-  ];
-  let status = "pending";
-  if (!account) status = "pending";
-  else if (due.length > 0) status = "needs_info";
-  else if (account.charges_enabled && account.payouts_enabled) status = "verified";
-  return {
-    status,
-    charges_enabled: account?.charges_enabled === true,
-    payouts_enabled: account?.payouts_enabled === true,
-    details_submitted: account?.details_submitted === true,
-    currently_due: due,
-    disabled_reason: account?.requirements?.disabled_reason ?? null,
-  };
 }
 
 export async function loadProfileConnect(supabase, userId) {
@@ -40,11 +24,23 @@ export async function loadProfileConnect(supabase, userId) {
   return data;
 }
 
-/** Verified Express account on the creator's profile. Null when they cannot be paid yet. */
+/**
+ * Express account that can take a destination charge.
+ * profiles.payout_enabled caches canAcceptCharges (charges + transfers), not bank payouts.
+ * A false cache is refreshed once, because older syncs only set the flag when payouts were enabled too.
+ */
 export async function verifiedDestination(supabase, userId) {
   const profile = await loadProfileConnect(supabase, userId);
-  if (!profile?.stripe_connect_account_id || profile.payout_enabled !== true) return null;
-  return profile.stripe_connect_account_id;
+  if (!profile?.stripe_connect_account_id) return null;
+  if (profile.payout_enabled === true) return profile.stripe_connect_account_id;
+  try {
+    const stripe = testStripe();
+    const state = await syncPayoutEnabled(stripe, supabase, userId, profile.stripe_connect_account_id);
+    if (state.can_accept_charges) return profile.stripe_connect_account_id;
+  } catch (error) {
+    console.error("[creator-connect] could not refresh charge status", error);
+  }
+  return null;
 }
 
 export function destinationCharge(accountId, amountCents, feePercent = COMMUNITY_FUND_FEE_PERCENT) {
@@ -84,7 +80,7 @@ export async function syncPayoutEnabled(stripe, supabase, userId, accountId) {
   const state = classifyConnectAccount(account);
   const { error } = await supabase
     .from("profiles")
-    .update({ payout_enabled: state.status === "verified" })
+    .update({ payout_enabled: canAcceptCharges(account) })
     .eq("user_id", userId);
   if (error) throw new Error(error.message);
   return { accountId, ...state };

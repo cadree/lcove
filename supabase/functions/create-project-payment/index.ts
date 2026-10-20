@@ -54,7 +54,7 @@ serve(async (req) => {
     if (!destination) {
       return json({
         needs_connect: true,
-        error: "The project owner needs to finish payout setup in Wallet before this can be paid.",
+        error: "The project owner can't accept card payments yet. They need charges and transfers enabled in Wallet.",
       });
     }
 

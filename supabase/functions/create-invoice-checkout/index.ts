@@ -44,7 +44,7 @@ serve(async (req) => {
     if (!destination) {
       return json({
         needs_connect: true,
-        error: "Connect payouts in Wallet before sending a pay link. Card payments go to your Stripe account.",
+        error: "Set up payouts in Wallet before sending a pay link. Card payments need charges and transfers enabled on your Stripe account.",
       });
     }
 

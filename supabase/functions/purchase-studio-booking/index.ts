@@ -226,7 +226,7 @@ serve(async (req) => {
       };
 
       // If seller has Stripe Connect enabled, use application fee
-      if (connectAccountId && store.payout_enabled) {
+      if (connectAccountId) {
         sessionConfig.payment_intent_data = {
           application_fee_amount: platformFeeAmount,
           transfer_data: {
@@ -251,7 +251,7 @@ serve(async (req) => {
           payment_type: "cash",
           seller_amount: sellerAmount / 100,
           platform_fee: platformFeeAmount / 100,
-          seller_payout_status: store.payout_enabled ? "processing" : "pending_setup",
+          seller_payout_status: connectAccountId ? "processing" : "pending_setup",
         })
         .eq("id", bookingId);
 

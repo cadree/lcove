@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { ledgerBalances } from "../_shared/credit-balances.ts";
-import { loadProfileConnect, syncPayoutEnabled, testStripe } from "../_shared/creator-connect.mjs";
+import { loadProfileConnect, syncPayoutEnabled, testStripe, withdrawalBlockedReason } from "../_shared/creator-connect.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -84,11 +84,8 @@ serve(async (req) => {
         throw new Error("Set up payouts in Wallet before requesting a payout.");
       }
       const state = await syncPayoutEnabled(stripe, supabaseClient, user.id, profile.stripe_connect_account_id);
-      if (state.status !== "verified") {
-        throw new Error(state.status === "needs_info"
-          ? "Stripe still needs information before a payout can be sent."
-          : "Payouts are still pending. Finish setup in Wallet.");
-      }
+      const blocked = withdrawalBlockedReason(state);
+      if (blocked) throw new Error(blocked);
 
       const { data: payout, error: payoutError } = await supabaseClient
         .from("payouts")
