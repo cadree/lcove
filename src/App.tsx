@@ -14,6 +14,7 @@ import { CreateFlowProvider } from "@/components/create/CreateFlowContext";
 import AccessGate from "@/components/auth/AccessGate";
 import { EtherSplash } from "@/components/brand/EtherSplash";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
+import { IosCheckoutReturn } from "@/components/ios/IosCheckoutReturn";
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Feed = lazy(() => import("./pages/Feed"));
@@ -104,6 +105,7 @@ const App = () => (
         <WorldLayer />
         <MotionConfig reducedMotion="user">
         <AuthProvider>
+          <IosCheckoutReturn />
           <PresenceProvider>
             <CreateFlowProvider>
               <AccessGate>

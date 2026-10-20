@@ -8,8 +8,8 @@ interface IosDigitalGoodsNoticeProps {
 }
 
 /**
- * Shown in place of Stripe checkout buttons on iOS.
- * No external purchase link: Apple has to approve that separately.
+ * Shown in place of Stripe checkout on iOS when the App Store storefront
+ * is not USA. The US storefront uses Safari instead of this notice.
  */
 export function IosDigitalGoodsNotice({
   variant = "full",

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
+import { checkoutOrigin } from "../_shared/checkout-origin.mjs";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 const corsHeaders = {
@@ -27,7 +28,7 @@ serve(async (req) => {
 
     const stripe = new Stripe(assertStripeTestKey(stripeKey), { apiVersion: "2025-08-27.basil" });
 
-    const { amount, mode, email: guestEmail } = await req.json();
+    const { amount, mode, email: guestEmail, return_origin } = await req.json();
     // amount is in dollars (number), mode is "one_time" or "recurring"
     if (!amount || amount < 1) throw new Error("Minimum donation is $1");
     if (!mode || !["one_time", "recurring"].includes(mode))
@@ -73,7 +74,7 @@ serve(async (req) => {
       }
     }
 
-    const origin = req.headers.get("origin") || "https://etherbylcove.com";
+    const origin = checkoutOrigin(return_origin, req.headers.get("origin"), "https://etherbylcove.com");
 
     let sessionConfig: Stripe.Checkout.SessionCreateParams;
 

@@ -28,32 +28,35 @@ These ran on Linux, without a Mac and without an Apple Developer account:
 - [x] Auth return links use `app.lovable.e07d9c457fd949f78f3cc7d5998be668://...` from `getAuthRedirectUrl` in `src/lib/capacitorStorage.ts`. The same scheme is in `ios/App/App/Info.plist` under `CFBundleURLTypes`.
 - [x] iOS project generated with `npx cap add ios` (Capacitor 8 default is Swift Package Manager, so CocoaPods is not required).
 - [x] The iOS app icon stays the bear head: `src/assets/lc-bear-logo.png` on black. The launch splash is the ETHER wordmark centered on `#08080A`.
-- [x] Stripe checkout for membership, exclusive music, artist subscriptions, and cinema or network subscriptions is hidden when `Capacitor.getPlatform() === "ios"`. Donations are off on iOS because `IOS_DONATIONS_ENABLED` is false. There are no in-app purchases.
+- [x] On iOS, membership, the billing portal, and community-fund donations open Safari only when StoreKit reports the USA storefront. Every other storefront, and an unknown storefront, keeps those buttons hidden. Paid films, exclusive music, and live card gifts stay hidden on every storefront. There are no in-app purchases. Web and Android are unchanged.
 
 ## Digital goods (implemented)
 
-Membership ($5/month and up, Elite $25/month), exclusive-track purchases, artist subscriptions, and cinema/network subscriptions are digital goods sold through Stripe. On iOS those purchase buttons are hidden, and the functions that start checkout refuse to run:
+Membership ($5/month and up, Elite $25/month), community-fund donations, exclusive-track purchases, artist subscriptions, and cinema/network subscriptions are digital goods sold through Stripe. `IOS_DIGITAL_PURCHASES_ENABLED` and `IOS_DONATIONS_ENABLED` stay false, so the iOS app never runs an in-app purchase and never shows those buttons on a non-US storefront.
 
-- Membership: `src/pages/Membership.tsx`, the Become a Member path on `src/pages/FundDashboard.tsx`, and the onboarding membership card. `startCheckout` and `openCustomerPortal` in `src/hooks/useMembership.ts` return early on iOS. The Stripe billing portal is hidden too, because it is a link out to manage a digital subscription.
-- Exclusive music and artist subscriptions: Buy / Subscribe on `src/components/music/ExclusiveTrackCard.tsx`. `handlePurchase` in `src/components/music/ExclusiveMusicSection.tsx` returns early on iOS.
-- Cinema networks: Subscribe on `src/pages/NetworkPage.tsx`, Subscribe Now in `src/components/cinema/VideoPlayer.tsx`, and the "Subscribe to Watch" label in `src/components/cinema/ContentDetailDialog.tsx`. `useSubscribeToNetwork` throws on iOS. Catalog price badges on `src/pages/Cinema.tsx` are hidden on iOS.
+Guideline 3.1.1(a) lets a US-storefront app link out to the website with no entitlement and no commission. The App target plugin `EtherStorefront` reads `Storefront.current.countryCode`. The link-out buttons render only when that code is `USA`. Nil, empty, or any other code keeps the buttons hidden. The button calls `UIApplication.shared.open` so Safari opens outside the app. It does not use `@capacitor/browser` or `SFSafariViewController`.
 
-There is no "buy on the web" button. An external purchase link needs Apple's approval (External Link Account entitlement, or the US storefront external-purchase entitlement) and the paid account. Hiding the buttons is the safe state until Cadre has that approval.
+- USA storefront, linked out in Safari: Membership join, Become Elite, Upgrade to Elite, Manage, and Manage Subscription (`src/pages/Membership.tsx`, `startCheckout` and `openCustomerPortal`). Fund Donate Now, Extra Donation, and the fund Become a Member entry, which opens `/membership` (`src/pages/FundDashboard.tsx`, `DonateDialog`). More and Tools show Membership, and Tools shows Fund, only for this storefront. Onboarding shows Become a Member only for this storefront.
+- Every other storefront, and an unknown storefront: those same controls stay hidden behind `IosDigitalGoodsNotice`.
+- Still hidden on every storefront, including USA: exclusive music Buy / Subscribe, cinema and network Subscribe, video-player Subscribe Now, content-detail Subscribe to Watch, and live Rose / Star / Crown gifts. They are not the same membership or fund checkout.
+- Web and Android ignore the storefront and keep their existing Stripe buttons. They do not send `return_origin`.
 
-People who already subscribed on the web can still open content they have access to. The iOS app does not sell a new subscription.
+The checkout functions accept `return_origin` only when it is exactly `https://etherbylcove.com`. Stripe then sends Safari to `/membership` or `/fund` on that site. `public/.well-known/apple-app-site-association` claims those paths, and `App.entitlements` includes `applinks:etherbylcove.com`. Reopening the app also refreshes membership. The association file is served only after this site is deployed.
+
+People who already subscribed on the web can still open content they have access to.
 
 ### Community Fund donations
 
-Donations are off in the iOS app. `IOS_DONATIONS_ENABLED` in `src/lib/platform.ts` is `false`. `DonateDialog` and the fund page both read that flag, so Donate Now and Extra Donation are replaced by the iOS notice. Web and Android still show them. Membership and exclusive music stay hidden either way. This build does not add StoreKit or any in-app purchase.
+`IOS_DONATIONS_ENABLED` stays `false`. Donate Now and Extra Donation are hidden unless the storefront is USA, in which case the dialog's confirm button opens the same Stripe donation in Safari. Web and Android still show the original buttons. This build does not add an in-app purchase.
 
 ### Payments this build does not hide
 
 These are still in the iOS build:
 
 - Live-stream tips (`Tip LC` in `src/components/streaming/StreamViewer.tsx`, `tip-stream`). This is a digital purchase inside the app.
-- Community Fund donations. These are hidden on iOS while `IOS_DONATIONS_ENABLED` is false.
+- Community Fund donations on the USA storefront. They open Safari. They stay hidden on every other storefront.
 - Event tickets (`purchase-event-ticket`). Real-world tickets are often outside in-app purchase rules. Confirm the events are in-person.
-- Store items (`purchase-store-item`). Card checkout is hidden on iOS. Physical goods can show a text link to the website. Credits still spend. Confirm each item is a physical good or a real-world service. Digital goods in the store would have the same problem as membership.
+- Store items (`purchase-store-item`). Card checkout stays for products, services, and rentals. Those are real-world goods and services.
 - Studio bookings (`purchase-studio-booking`). Treat as a real-world booking unless a booking is only access to digital content.
 
 ## Lovable sync and native login
@@ -105,10 +108,10 @@ These commands and clicks do not work on this Linux machine:
 - The App ID `app.lovable.e07d9c457fd949f78f3cc7d5998be668` is already registered for team 926NTNU4M7. Do not create another.
 - Distribution certificate and provisioning profile (Xcode managed signing does this once the team is paid).
 - Push Notifications capability and an APNs Auth Key (.p8) in Apple Developer, then the key in the push provider. The plugin is already a dependency (`@capacitor/push-notifications`). The plist background mode does not deliver pushes by itself.
-- Associated Domains, only if universal links are required (`applinks:etherbylcove.com`). The project has no associated-domains entitlement and no `apple-app-site-association` file. Custom-scheme auth (`app.lovable.e07d9c457fd949f78f3cc7d5998be668://`) does not need them. Add associated domains when password autofill or https links should open the app.
+- Associated Domains. `ios/App/App/App.entitlements` includes `applinks:etherbylcove.com`. Turn on Associated Domains for App ID `app.lovable.e07d9c457fd949f78f3cc7d5998be668` in the Apple Developer portal before signing. `public/.well-known/apple-app-site-association` must be live on `https://etherbylcove.com` (Content-Type `application/json`) or the return from Safari will not open the app. Custom-scheme auth (`app.lovable.e07d9c457fd949f78f3cc7d5998be668://`) does not use that file. Reopening the app still refreshes membership if the universal link is not live yet.
 - Sign in with Apple, **only if** a social login (Google, Facebook, and similar) is added. Email and password in `src/pages/Auth.tsx` do not require it. Do not add the button until a third-party login exists.
 - The App Store Connect record already exists (Apple ID 6758372010). Screenshots and TestFlight still need a Mac upload of version 1.0.1 (2).
-- Any external-purchase entitlement, if Cadre later wants a link to the website instead of hiding the buttons.
+- No external-purchase entitlement. The US storefront link uses guideline 3.1.1(a). Other storefronts do not show the link.
 
 ## Account deletion, report, and block
 

@@ -1,5 +1,5 @@
-import { useState, forwardRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, forwardRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,6 +11,7 @@ import { Users, Calendar, GraduationCap, Building2, Briefcase, Heart, Crown, Arr
 import PageLayout from "@/components/layout/PageLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useMembership } from "@/hooks/useMembership";
+import { useIosExternalCheckout } from "@/hooks/useIosExternalCheckout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFundStats } from "@/hooks/useFundStats";
 import { RecentDistributionsCard } from "@/components/fund/FundDistributions";
@@ -110,13 +111,28 @@ export default function FundDashboard() {
   const [view, setView] = useState<"lifetime" | "monthly">("lifetime");
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { membership, isLoading: membershipLoading, startCheckout, openCustomerPortal } = useMembership();
+  const { membership, isLoading: membershipLoading, checkMembership, openCustomerPortal } = useMembership();
+  const [searchParams] = useSearchParams();
+  const { linkOut } = useIosExternalCheckout();
   const { data: fundStats, isLoading: fundLoading, isError: fundFailed, refetch, isFetching } = useFundStats();
   const fundEmpty = !fundLoading && !fundFailed && (fundStats?.lifetime.totalCollected ?? 0) === 0 && (fundStats?.lifetime.totalDistributed ?? 0) === 0 && (fundStats?.recentDistributions.length ?? 0) === 0;
   
   const iosApp = isIosApp();
-  const showDonations = !iosApp || IOS_DONATIONS_ENABLED;
-  const hideDigitalPurchases = !digitalPurchasesEnabled();
+  const showDonations = !iosApp || IOS_DONATIONS_ENABLED || linkOut;
+  const hideDigitalPurchases = !digitalPurchasesEnabled() && !linkOut;
+
+  useEffect(() => {
+    const donated = searchParams.get("donated") === "true";
+    const cancelled = searchParams.get("cancelled") === "true";
+    if (!donated && !cancelled) return;
+    if (cancelled) {
+      toast.info("Donation was cancelled");
+      return;
+    }
+    toast.success("Thank you. Your donation shows here after Stripe confirms it.");
+    void checkMembership();
+    void refetch();
+  }, [searchParams, checkMembership, refetch]);
   const stats = view === "lifetime" ? fundStats?.lifetime : fundStats?.monthly;
   const isMember = membership?.subscribed;
 
@@ -480,18 +496,18 @@ export default function FundDashboard() {
                       <DonateDialog>
                         <Button variant="default" size="sm">
                           <Heart className="w-3.5 h-3.5 mr-1.5" />
-                          Extra Donation
+                          {linkOut ? "Extra donation in Safari" : "Extra Donation"}
                         </Button>
                       </DonateDialog>
                       ) : (
                         <IosDigitalGoodsNotice kind="donation" className="max-w-xs" />
                       )}
-                      {digitalPurchasesEnabled() && (
+                      {!hideDigitalPurchases && (
                         <Button variant="outline" size="sm" onClick={handleManageSubscription}>
-                          Manage Subscription
+                          {linkOut ? "Manage in Safari" : "Manage Subscription"}
                         </Button>
                       )}
-                      <IosDigitalGoodsNotice kind="billing" />
+                      {hideDigitalPurchases && <IosDigitalGoodsNotice kind="billing" />}
                     </div>
                   </div>
                 </CardContent>
@@ -509,7 +525,9 @@ export default function FundDashboard() {
                         </h3>
                         <p className="text-muted-foreground max-w-md">
                           Join {fundStats?.lifetime.memberCount || 0}+ members funding grants, events, and creative opportunities.{" "}
-                          {hideDigitalPurchases
+                          {linkOut
+                            ? "Donate once or subscribe monthly. Checkout opens in Safari."
+                            : hideDigitalPurchases
                             ? showDonations
                               ? "Membership checkout is not available in the iOS app. You can still donate."
                               : "Membership checkout is not available in the iOS app."
@@ -521,7 +539,7 @@ export default function FundDashboard() {
                       {showDonations ? (
                       <DonateDialog>
                         <Button size="lg" className="group">
-                          Donate Now
+                          {linkOut ? "Donate in Safari" : "Donate Now"}
                           <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                         </Button>
                       </DonateDialog>

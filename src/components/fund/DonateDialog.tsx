@@ -8,12 +8,16 @@ import { Heart, ArrowRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { IOS_DONATIONS_ENABLED, isIosApp } from "@/lib/platform";
+import { useIosExternalCheckout } from "@/hooks/useIosExternalCheckout";
+import { openExternalCheckout, readStorefrontCountry } from "@/lib/externalCheckout";
+import { isUsStorefront } from "@/lib/iosStorefront";
+import { ETHER_WEB_ORIGIN, isIosApp } from "@/lib/platform";
 
 const PRESET_AMOUNTS = [5, 10, 25, 50];
 
 export function DonateDialog({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const { linkOut } = useIosExternalCheckout();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"one_time" | "recurring">("one_time");
   const [amount, setAmount] = useState<number>(10);
@@ -24,9 +28,13 @@ export function DonateDialog({ children }: { children: React.ReactNode }) {
   const effectiveAmount = isCustom ? Number(customAmount) : amount;
 
   const handleDonate = async () => {
-    if (isIosApp() && !IOS_DONATIONS_ENABLED) {
-      toast.error("Donations aren't available in the iOS app.");
-      return;
+    const ios = isIosApp();
+    if (ios) {
+      const country = await readStorefrontCountry();
+      if (!isUsStorefront(country)) {
+        toast.error("Donations aren't available in the iOS app.");
+        return;
+      }
     }
     if (!effectiveAmount || effectiveAmount < 1) {
       toast.error("Minimum donation is $1");
@@ -45,12 +53,17 @@ export function DonateDialog({ children }: { children: React.ReactNode }) {
       }
 
       const { data, error } = await supabase.functions.invoke("create-fund-donation", {
-        body: { amount: effectiveAmount, mode },
+        body: { amount: effectiveAmount, mode, ...(ios ? { return_origin: ETHER_WEB_ORIGIN } : {}) },
         headers,
       });
 
       if (error) throw error;
       if (data?.url) {
+        if (ios) {
+          await openExternalCheckout(data.url);
+          setOpen(false);
+          return;
+        }
         const win = window.open(data.url, "_blank");
         if (!win || win.closed) {
           try {
@@ -153,7 +166,7 @@ export function DonateDialog({ children }: { children: React.ReactNode }) {
             ) : (
               <Heart className="w-4 h-4 mr-2" />
             )}
-            {loading ? "Redirecting..." : "Donate Now"}
+            {loading ? "Redirecting..." : linkOut ? "Continue in Safari" : "Donate Now"}
             {!loading && <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />}
           </Button>
         </div>

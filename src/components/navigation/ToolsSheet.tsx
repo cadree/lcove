@@ -24,7 +24,8 @@ import { Input } from "@/components/ui/input";
 import { SquircleIcon, type IconFill } from "@/components/world/SquircleIcon";
 import { useHomeUsage } from "@/hooks/useHomeUsage";
 import { useNoviQuests } from "@/hooks/useNoviQuests";
-import { digitalPurchasesEnabled, isIosApp } from "@/lib/platform";
+import { useIosExternalCheckout } from "@/hooks/useIosExternalCheckout";
+import { isIosApp } from "@/lib/platform";
 import type { LucideIcon } from "lucide-react";
 
 interface ToolsSheetProps {
@@ -93,6 +94,7 @@ export function ToolsSheet({ open, onOpenChange }: ToolsSheetProps) {
   const { complete } = useNoviQuests();
   const filedStudio = useRef(false);
   const hideIos = isIosApp();
+  const { linkOut } = useIosExternalCheckout();
 
   useEffect(() => {
     if (!open || filedStudio.current) return;
@@ -106,14 +108,17 @@ export function ToolsSheet({ open, onOpenChange }: ToolsSheetProps) {
       .map((group) => ({
         ...group,
         items: group.items.filter((item) => {
-          if (item.id === "membership" && !digitalPurchasesEnabled()) return false;
-          if (item.id !== "membership" && item.iosHidden && hideIos) return false;
+          if (item.id === "membership" || item.id === "fund") {
+            if (hideIos && !linkOut) return false;
+          } else if (item.iosHidden && hideIos) {
+            return false;
+          }
           if (!needle) return true;
           return item.label.toLowerCase().includes(needle) || group.label.toLowerCase().includes(needle);
         }),
       }))
       .filter((group) => group.items.length > 0);
-  }, [hideIos, query]);
+  }, [hideIos, linkOut, query]);
 
   const openPath = (path: string, id: string) => {
     trackClick(id);
