@@ -312,7 +312,15 @@ const Store = () => {
             transition={{ delay: 0.15 }}
           >
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-              <TabsList className="mb-6">
+              <div
+                className="mb-6 max-w-full min-w-0 overflow-x-auto overscroll-x-contain"
+                onMouseDown={() => {
+                  const x = window.scrollX;
+                  const y = window.scrollY;
+                  requestAnimationFrame(() => window.scrollTo(x, y));
+                }}
+              >
+              <TabsList className="h-auto w-max min-w-full justify-start">
                 {tabConfig.map((tab) => {
                   const Icon = tab.icon;
                   // Count items per tab when viewing a specific store
@@ -320,7 +328,7 @@ const Store = () => {
                     ? items.filter(item => item.type === typeMap[tab.id as keyof typeof typeMap]).length
                     : undefined;
                   return (
-                    <TabsTrigger key={tab.id} value={tab.id} className="flex items-center gap-2">
+                    <TabsTrigger key={tab.id} value={tab.id} className="flex shrink-0 items-center gap-2">
                       <Icon className="w-4 h-4" />
                       {tab.label}
                       {storeIdParam && tabItemCount !== undefined && tabItemCount > 0 && (
@@ -332,7 +340,7 @@ const Store = () => {
                   );
                 })}
                 {user && myStore && !storeIdParam && (
-                  <TabsTrigger value="my-store" className="flex items-center gap-2">
+                  <TabsTrigger value="my-store" className="flex shrink-0 items-center gap-2">
                     <StoreIcon className="w-4 h-4" />
                     My Store
                     {myItems && myItems.length > 0 && (
@@ -343,12 +351,13 @@ const Store = () => {
                   </TabsTrigger>
                 )}
                 {user && !storeIdParam && (
-                  <TabsTrigger value="orders" className="flex items-center gap-2">
+                  <TabsTrigger value="orders" className="flex shrink-0 items-center gap-2">
                     <Receipt className="w-4 h-4" />
                     Orders
                   </TabsTrigger>
                 )}
               </TabsList>
+              </div>
 
               {/* Content */}
               {['products', 'services', 'rentals', 'my-store', 'orders'].map((tabId) => (

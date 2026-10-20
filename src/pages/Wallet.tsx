@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useSearchParams } from 'react-router-dom';
 import { 
-  Wallet, Plus, CreditCard, Building2, Smartphone, Trash2, 
-  Check, ArrowUpRight, ArrowDownLeft, Coins, Clock, Send,
+  Wallet, 
+  ArrowUpRight, ArrowDownLeft, Coins, Send,
   Flame, Sparkles, Info
 } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCredits, useCreditLedger, usePayoutMethods, usePayouts, useTransactions } from '@/hooks/useCredits';
+import { useCredits, useCreditLedger, usePayouts, useTransactions } from '@/hooks/useCredits';
+import { connectStatusLabel, useCreatorConnect } from '@/hooks/useCreatorConnect';
 import { useMyXp } from '@/hooks/useXp';
 import { TotalBalanceCard, CreditBalanceCard } from '@/components/credits/CreditBalanceCard';
 import { TransferCreditsDialog } from '@/components/credits/TransferCreditsDialog';
@@ -24,15 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-
-const payoutMethodIcons: Record<string, React.ElementType> = {
-  bank_account: Building2,
-  debit_card: CreditCard,
-  apple_pay: Smartphone,
-};
 
 const statusColors: Record<string, string> = {
   pending: 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
@@ -45,45 +38,33 @@ const statusColors: Record<string, string> = {
 const WalletPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const { credits, isLoading: creditsLoading, genesisBalance, earnedBalance, balance } = useCredits();
   const { data: myXp } = useMyXp();
   const { ledger, isLoading: ledgerLoading } = useCreditLedger();
-  const { methods, isLoading: methodsLoading, setupPayoutMethod, setDefaultMethod, deleteMethod, isSettingUp } = usePayoutMethods();
+  const { data: connect, isLoading: connectLoading, refetch: refetchConnect, open: openConnect } = useCreatorConnect();
   const { payouts, isLoading: payoutsLoading, requestPayout, isRequesting } = usePayouts();
   const { transactions, isLoading: transactionsLoading } = useTransactions();
 
   const [payoutAmount, setPayoutAmount] = useState('');
-  const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
   const [payoutDialogOpen, setPayoutDialogOpen] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
 
   // Handle Stripe setup callback
   useEffect(() => {
-    const setupResult = searchParams.get('setup');
-    if (setupResult === 'success') {
-      toast({ title: 'Payment method added successfully!' });
-      // Sync payment methods and wait for completion
-      const syncPaymentMethods = async () => {
-        try {
-          await supabase.functions.invoke('setup-payout-method', {
-            body: { type: 'sync' }
-          });
-          await queryClient.invalidateQueries({ queryKey: ['payout-methods'] });
-        } catch (error) {
-          console.error('Failed to sync payment methods:', error);
-        }
-      };
-      syncPaymentMethods();
-      searchParams.delete('setup');
-      setSearchParams(searchParams, { replace: true });
-    } else if (setupResult === 'cancelled') {
-      toast({ title: 'Setup cancelled', variant: 'destructive' });
-      searchParams.delete('setup');
+    const connectResult = searchParams.get('connect');
+    if (connectResult === 'success' || connectResult === 'refresh') {
+      refetchConnect();
+      toast({
+        title: connectResult === 'success' ? 'Checking payout status' : 'Payout setup needs another step',
+        description: connectResult === 'success'
+          ? 'Stripe sent you back. Status updates when the account is verified.'
+          : 'Open payout setup again to finish.',
+      });
+      searchParams.delete('connect');
       setSearchParams(searchParams, { replace: true });
     }
-  }, [searchParams, setSearchParams, toast, queryClient]);
+  }, [searchParams, setSearchParams, toast, refetchConnect]);
 
   const handleRequestPayout = () => {
     const amount = parseFloat(payoutAmount);
@@ -102,17 +83,17 @@ const WalletPage: React.FC = () => {
       return;
     }
 
-    if (selectedMethod === 'credits') {
-      requestPayout({ amount, use_credits: true });
-    } else if (selectedMethod) {
-      requestPayout({ amount, payout_method_id: selectedMethod });
-    } else {
-      toast({ title: 'Select a payout method', variant: 'destructive' });
+    if (connect?.status !== 'verified') {
+      toast({
+        title: 'Payouts are not verified yet',
+        description: 'Finish Stripe Connect setup before requesting a payout.',
+        variant: 'destructive',
+      });
       return;
     }
+    requestPayout({ amount, use_credits: true });
     setPayoutDialogOpen(false);
     setPayoutAmount('');
-    setSelectedMethod(null);
   };
 
   // Show loading while auth is initializing
@@ -230,54 +211,13 @@ const WalletPage: React.FC = () => {
                   />
                 </div>
 
-                <div>
-                  <Label>Payout Method</Label>
-                  <div className="space-y-2 mt-2">
-                    {/* Payment methods */}
-                    {methods.map((method) => {
-                      const Icon = payoutMethodIcons[method.type];
-                      return (
-                        <div
-                          key={method.id}
-                          onClick={() => setSelectedMethod(method.id)}
-                          className={cn(
-                            "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
-                            selectedMethod === method.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
-                          )}
-                        >
-                          <Icon className="h-5 w-5" />
-                          <div className="flex-1">
-                            <p className="font-medium capitalize">
-                              {method.brand || method.type.replace('_', ' ')} •••• {method.last_four}
-                            </p>
-                            <p className="text-xs text-muted-foreground">1-3 business days</p>
-                          </div>
-                          {selectedMethod === method.id && <Check className="h-5 w-5 text-primary" />}
-                        </div>
-                      );
-                    })}
-
-                    {methods.length === 0 && (
-                      <div className="text-center py-4 text-muted-foreground">
-                        <p className="text-sm">No payout methods added</p>
-                        <Button 
-                          variant="link" 
-                          size="sm" 
-                          onClick={() => {
-                            setPayoutDialogOpen(false);
-                            setupPayoutMethod('checkout_setup');
-                          }}
-                        >
-                          Add a payment method
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  1 LC converts to $1. The 10% community-fund fee was already taken when the sale, gift, invoice, or project payment came in. This payout does not take it again.
+                </p>
 
                 <Button 
                   onClick={handleRequestPayout} 
-                  disabled={!payoutAmount || !selectedMethod || isRequesting || parseFloat(payoutAmount) > earnedBalance}
+                  disabled={!payoutAmount || connect?.status !== 'verified' || isRequesting || parseFloat(payoutAmount) > earnedBalance}
                   className="w-full"
                 >
                   {isRequesting ? 'Processing...' : 'Request Payout'}
@@ -287,61 +227,50 @@ const WalletPage: React.FC = () => {
           </Dialog>
         </div>
 
-        {/* Payout Methods */}
         <Card className="mb-6">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <p className="kicker">// Payout</p>
-              <CardTitle className="ether-title text-[22px]">Methods</CardTitle>
-              <CardDescription>Earned credit converts to USD</CardDescription>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setupPayoutMethod('checkout_setup')}
-              disabled={isSettingUp}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Add
-            </Button>
+          <CardHeader>
+            <p className="kicker">// Payout</p>
+            <CardTitle className="ether-title text-[22px]">Stripe Connect</CardTitle>
+            <CardDescription>One Express account for sales, gifts, invoices, films, and project pay. Test mode only.</CardDescription>
           </CardHeader>
-          <CardContent>
-            {methods.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">
-                <CreditCard className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">No payout methods added yet</p>
-              </div>
+          <CardContent className="space-y-3">
+            {connectLoading ? (
+              <Skeleton className="h-16 w-full" />
             ) : (
-              <div className="space-y-2">
-                {methods.map((method) => {
-                  const Icon = payoutMethodIcons[method.type];
-                  return (
-                    <div key={method.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                      <div className="flex items-center gap-3">
-                        <Icon className="h-5 w-5" />
-                        <div>
-                          <p className="font-medium capitalize">
-                            {method.brand || method.type.replace('_', ' ')} •••• {method.last_four}
-                          </p>
-                        </div>
-                        {method.is_default && (
-                          <Badge variant="secondary" className="text-xs">Default</Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {!method.is_default && (
-                          <Button variant="ghost" size="sm" onClick={() => setDefaultMethod(method.id)}>
-                            Set Default
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="sm" onClick={() => deleteMethod(method.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-foreground">Status</span>
+                  <Badge className={connect?.status === "verified" ? statusColors.completed : connect?.status === "needs_info" ? statusColors.pending : statusColors.processing}>
+                    {connectStatusLabel(connect?.status || "pending")}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {connect?.status === "verified" && "Payouts are verified. Request a payout sends earned LC to this Stripe account."}
+                  {connect?.status === "needs_info" && "Stripe needs more information before payouts can be sent."}
+                  {connect?.status !== "verified" && connect?.status !== "needs_info" && "Payout setup has not been finished. No bank details are stored in Ether."}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={openConnect.isPending}
+                    onClick={() => openConnect.mutate("onboard")}
+                  >
+                    {connect?.status === "pending" ? "Set up payouts" : "Continue setup"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!connect?.accountId || openConnect.isPending}
+                    onClick={() => openConnect.mutate("dashboard")}
+                  >
+                    Manage payouts
+                  </Button>
+                </div>
+                {openConnect.isError && (
+                  <p className="text-sm text-destructive">{openConnect.error instanceof Error ? openConnect.error.message : "Could not open Stripe"}</p>
+                )}
+              </>
             )}
           </CardContent>
         </Card>

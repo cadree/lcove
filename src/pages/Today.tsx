@@ -78,7 +78,7 @@ const Today = () => {
   const [isCreating, setIsCreating] = useState(false);
 
   const isLoading = contactLoading || calendarLoading;
-  const tasks = contactTasks; // For backwards compatibility
+  const tasks = contactTasks;
 
   const now = new Date();
   const todayStart = startOfDay(now);
@@ -214,9 +214,14 @@ const Today = () => {
     }
   };
 
-  const totalTasks = tasks.length;
+  const visibleCalendar = calendarTasks.filter((task) => {
+    const needle = searchQuery.trim().toLowerCase();
+    if (!needle) return true;
+    return task.title.toLowerCase().includes(needle);
+  });
+  const totalTasks = tasks.length + calendarTasks.length;
   const hasNoTasks = totalTasks === 0;
-  const hasNoFilteredTasks = filteredTasks.length === 0 && !hasNoTasks;
+  const hasNoFilteredTasks = filteredTasks.length === 0 && visibleCalendar.length === 0 && !hasNoTasks;
 
   return (
     <PageLayout>
@@ -287,7 +292,7 @@ const Today = () => {
               <Sun className="w-12 h-12 text-amber-500/50 mx-auto mb-4" />
               <h2 className="text-lg font-medium mb-2">All caught up!</h2>
               <p className="text-muted-foreground text-sm mb-4">
-                Add a task to a contact to see it here.
+                Tasks, events, and projects you add to My Day show up here.
               </p>
               <div className="flex justify-center">
                 <Button variant="outline" onClick={() => navigate('/pipeline')}>
@@ -308,6 +313,29 @@ const Today = () => {
             </Card>
           ) : (
             <>
+              {visibleCalendar.length > 0 && (
+                <section className="space-y-2">
+                  <h3 className="flex items-center gap-2 text-sm font-medium">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    On your day
+                  </h3>
+                  {visibleCalendar.map((task) => (
+                    <button
+                      key={task.id}
+                      type="button"
+                      onClick={() => {
+                        if (task.project_id) navigate(`/project/${task.project_id}`);
+                        else if (task.event_id) navigate(`/event/${task.event_id}`);
+                        else navigate("/calendar");
+                      }}
+                      className="flex min-h-11 w-full items-center justify-between rounded-xl border border-border bg-card px-3 text-left"
+                    >
+                      <span className="truncate text-sm font-medium text-foreground">{task.title}</span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    </button>
+                  ))}
+                </section>
+              )}
               {/* Overdue Section */}
               {categorizedTasks.overdue.length > 0 && (
                 <TaskSection

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -106,27 +106,63 @@ export function usePosts() {
         mediaUrl = publicUrl;
       }
 
-      const { error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await supabase
         .from('posts')
         .insert({
           user_id: user.id,
           content: content || null,
           media_url: mediaUrl,
           media_type: mediaType || 'text',
-        });
+        })
+        .select('id, created_at')
+        .single();
 
       if (insertError) throw insertError;
+      return { id: inserted.id, created_at: inserted.created_at, mediaUrl };
+    },
+    onMutate: async ({ content, file, mediaType }) => {
+      if (!user) return;
+      await queryClient.cancelQueries({ queryKey: ['posts'] });
+      const previous = queryClient.getQueryData<Post[]>(['posts']);
+      const preview = file ? URL.createObjectURL(file) : null;
+      const optimistic: Post = {
+        id: `optimistic-${Date.now()}`,
+        user_id: user.id,
+        content: content || null,
+        media_url: preview,
+        media_type: mediaType || 'text',
+        post_type: 'regular',
+        created_at: new Date().toISOString(),
+        reactions: [],
+        user_reaction: null,
+      };
+      queryClient.setQueryData<Post[]>(['posts'], (current) => [optimistic, ...(current ?? [])]);
+      return { previous, preview };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] });
       queryClient.invalidateQueries({ queryKey: ['profile-posts'] });
       toast.success('Post created!');
     },
-    onError: (error) => {
+    onError: (error, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(['posts'], context.previous);
+      if (context?.preview) URL.revokeObjectURL(context.preview);
       toast.error('Failed to create post');
       console.error(error);
     },
   });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('posts-feed')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['posts'] });
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const addReaction = useMutation({
     mutationFn: async ({ postId, emoji }: { postId: string; emoji: string }) => {

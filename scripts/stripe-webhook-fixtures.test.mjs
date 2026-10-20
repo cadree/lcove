@@ -162,6 +162,21 @@ test("store, ticket, network, music, and artist checkouts route apart", async ()
   }
 });
 
+test("invoices, project pay, and stream gifts record the community fund fee", async () => {
+  const cases = [
+    [{ id: "cs_inv", amount_total: 5000, metadata: { type: "contact_invoice", invoice_id: "inv_1" } }, "markContactInvoicePaid"],
+    [{ id: "cs_ms", amount_total: 8000, metadata: { type: "project_payment", milestone_id: "ms_1" } }, "markMilestonePaid"],
+    [{ id: "cs_gift_live", amount_total: 500, metadata: { type: "stream_gift", stream_id: "st", sender_id: "a", host_id: "b", gift: "star" } }, "recordStreamGift"],
+  ];
+  for (const [object, method] of cases) {
+    const { db, calls } = makeDb();
+    const result = await post(event("checkout.session.completed", object), { db });
+    assert.equal(result.status, 200, method);
+    assert.ok(methods(calls).includes(method), method);
+    assert.ok(methods(calls).includes("recordCheckoutCommunityFundFee"), method);
+  }
+});
+
 test("an event ticket is not also confirmed as a store order", async () => {
   const { db, calls } = makeDb();
   await post(event("checkout.session.completed", {

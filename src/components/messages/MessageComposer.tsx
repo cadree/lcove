@@ -10,12 +10,15 @@ interface MessageComposerProps {
   isSending: boolean;
 }
 
+const EMOJIS = ["😀", "😂", "😍", "🔥", "👏", "🎉", "❤️", "💯", "🙌", "✨", "😭", "🤔", "👀", "💪", "🎬", "🎵"];
+
 const MessageComposer = ({ onSend, onTyping, isSending }: MessageComposerProps) => {
   const [content, setContent] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'image' | 'video' | 'audio' | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -72,6 +75,25 @@ const MessageComposer = ({ onSend, onTyping, isSending }: MessageComposerProps) 
     onTyping();
   };
 
+  const insertEmoji = (emoji: string) => {
+    const field = textareaRef.current;
+    const start = field?.selectionStart ?? content.length;
+    const end = field?.selectionEnd ?? content.length;
+    const next = `${content.slice(0, start)}${emoji}${content.slice(end)}`;
+    setContent(next);
+    onTyping();
+    requestAnimationFrame(() => {
+      field?.focus();
+      const caret = start + emoji.length;
+      field?.setSelectionRange(caret, caret);
+    });
+  };
+
+  const pickMedia = (accept: string) => {
+    fileInputRef.current?.setAttribute("accept", accept);
+    fileInputRef.current?.click();
+  };
+
   return (
     <div 
       className="border-t border-border bg-background p-4"
@@ -123,12 +145,31 @@ const MessageComposer = ({ onSend, onTyping, isSending }: MessageComposerProps) 
         {/* Attachment Button */}
         <div className="flex gap-1">
           <Button
+            type="button"
             variant="ghost"
             size="icon"
-            onClick={() => {
-              fileInputRef.current?.setAttribute('accept', 'image/*,video/*');
-              fileInputRef.current?.click();
-            }}
+            aria-label="Send a photo"
+            onClick={() => pickMedia("image/*")}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <Image className="w-5 h-5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Send a video"
+            onClick={() => pickMedia("video/*")}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <Video className="w-5 h-5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Attach a file"
+            onClick={() => pickMedia("image/*,video/*,audio/*")}
             className="text-muted-foreground hover:text-foreground"
           >
             <Paperclip className="w-5 h-5" />
@@ -147,12 +188,30 @@ const MessageComposer = ({ onSend, onTyping, isSending }: MessageComposerProps) 
             rows={1}
           />
           <Button
+            type="button"
             variant="ghost"
             size="icon"
+            aria-label="Insert emoji"
+            aria-expanded={emojiOpen}
+            onClick={() => setEmojiOpen((open) => !open)}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground w-8 h-8"
           >
             <Smile className="w-5 h-5" />
           </Button>
+          {emojiOpen && (
+            <div className="absolute bottom-12 right-0 z-10 grid w-56 grid-cols-8 gap-1 rounded-[14px] border border-border bg-popover p-2 text-popover-foreground shadow-md">
+              {EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-base hover:bg-accent"
+                  onClick={() => insertEmoji(emoji)}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Send Button */}

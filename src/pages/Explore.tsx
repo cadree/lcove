@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { CommunityMall } from "@/components/explore/CommunityMall";
+import { ExploreBrowse } from "@/components/explore/ExploreBrowse";
 import { QuestCard } from "@/components/novi/QuestCard";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +14,7 @@ import { shotPeople, shotSessionEnabled } from "@/lib/shotSession";
 
 const segments = [
   { id: "for-you", label: "For you" },
+  { id: "browse", label: "Browse" },
   { id: "people", label: "People" },
   { id: "portfolios", label: "Portfolios" },
   { id: "events", label: "Events" },
@@ -24,7 +26,7 @@ const segments = [
 
 type SegmentId = (typeof segments)[number]["id"];
 
-const destinations: Record<Exclude<SegmentId, "for-you" | "mall">, { title: string; detail: string; to: string; extra?: { title: string; detail: string; to: string } }> = {
+const destinations: Record<Exclude<SegmentId, "for-you" | "mall" | "browse">, { title: string; detail: string; to: string; extra?: { title: string; detail: string; to: string } }> = {
   people: {
     title: "Directory",
     detail: "Profiles you can open",
@@ -119,6 +121,8 @@ const Explore = () => {
           })}
         </div>
 
+        {segment === "browse" && <ExploreBrowse query={query} />}
+
         {(segment === "for-you" || segment === "people") && (
           <section className="mb-6">
             <div className="mb-2 flex items-center justify-between">
@@ -146,7 +150,7 @@ const Explore = () => {
           </section>
         )}
 
-        {segment !== "for-you" && segment !== "mall" && segment !== "people" && (
+        {segment !== "for-you" && segment !== "mall" && segment !== "people" && segment !== "browse" && (
           <div className="mb-6 space-y-3">
             <Link to={destinations[segment].to} className="file-panel flex min-h-11 flex-col justify-center px-4 py-4">
               <span className="ether-title text-[22px]">{destinations[segment].title}</span>

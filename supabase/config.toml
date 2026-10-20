@@ -221,3 +221,15 @@ verify_jwt = true
 
 [functions.import-shopify-products]
 verify_jwt = true
+
+[functions.manage-creator-connect]
+verify_jwt = true
+
+[functions.create-invoice-checkout]
+verify_jwt = true
+
+[functions.create-project-payment]
+verify_jwt = true
+
+[functions.create-stream-gift]
+verify_jwt = true

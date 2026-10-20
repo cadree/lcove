@@ -92,7 +92,11 @@ export function useUpdateMilestoneStatus() {
     }) => {
       const updates: TablesUpdate<"project_milestones"> = { status };
       
-      if (status === 'submitted') {
+      if (status === 'pending') {
+        updates.submitted_at = null;
+        updates.approved_at = null;
+        updates.paid_at = null;
+      } else if (status === 'submitted') {
         updates.submitted_at = new Date().toISOString();
       } else if (status === 'approved') {
         updates.approved_at = new Date().toISOString();

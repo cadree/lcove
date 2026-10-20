@@ -174,12 +174,42 @@ export function useStories() {
         });
 
       if (insertError) throw insertError;
+      return { mediaUrl: publicUrl };
+    },
+    onMutate: async ({ file, mediaType }) => {
+      if (!user) return;
+      await queryClient.cancelQueries({ queryKey: ['stories'] });
+      const previous = queryClient.getQueryData(['stories']);
+      const preview = URL.createObjectURL(file);
+      const optimistic = {
+        id: `optimistic-${Date.now()}`,
+        user_id: user.id,
+        media_url: preview,
+        media_type: mediaType,
+        is_live: false,
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        profile: { display_name: 'You', avatar_url: null },
+        view_count: 0,
+        has_viewed: true,
+      };
+      queryClient.setQueryData(['stories'], (current: { stories?: StoryWithProfile[]; grouped?: Record<string, StoryWithProfile[]> } | undefined) => {
+        const stories = [optimistic, ...(current?.stories ?? [])];
+        const grouped = {
+          ...(current?.grouped ?? {}),
+          [user.id]: [optimistic, ...(current?.grouped?.[user.id] ?? [])],
+        };
+        return { stories, grouped };
+      });
+      return { previous, preview };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stories'] });
-      toast.success('Story uploaded!');
+      toast.success('Story posted');
     },
-    onError: (error) => {
+    onError: (error, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(['stories'], context.previous);
+      if (context?.preview) URL.revokeObjectURL(context.preview);
       toast.error('Failed to upload story');
       console.error(error);
     },

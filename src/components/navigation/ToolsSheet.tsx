@@ -69,7 +69,7 @@ const groups: { id: string; label: string; items: ToolItem[] }[] = [
     label: "Stage",
     items: [
       { id: "events", label: "My events", path: "/dashboard/events", icon: Calendar, fill: "cyan" },
-      { id: "tickets", label: "My tickets", path: "/profile", icon: Ticket, fill: "rose" },
+      { id: "tickets", label: "My tickets", path: "/tickets", icon: Ticket, fill: "rose" },
       { id: "live", label: "Live", path: "/live", icon: Radio, fill: "red" },
       { id: "cinema", label: "Cinema networks", path: "/cinema", icon: Clapperboard, fill: "ink" },
     ],

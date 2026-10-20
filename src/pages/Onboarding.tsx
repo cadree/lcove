@@ -15,6 +15,7 @@ import OnboardingConnections from '@/components/onboarding/OnboardingConnections
 import OnboardingCompletion from '@/components/onboarding/OnboardingCompletion';
 import { buildUserPassionInserts } from '@/lib/onboardingPassions';
 import { scoreRedFlags, clearQuizSeed, type ChoiceId } from '@/lib/onboardingQuiz';
+import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from '@/lib/onboardingDraft';
 
 export interface OnboardingData {
   displayName: string;
@@ -65,15 +66,26 @@ const Onboarding = () => {
     }
   }, [profile]);
 
-  // Handle redirect for completed onboarding users
+  // Resume a mid-onboarding refresh. Completed profiles still go to the feed.
   useEffect(() => {
-    if (!profileLoading && !initialized && profile) {
-      setInitialized(true);
-      if (profile.onboarding_completed && profile.access_status !== 'banned') {
-        navigate('/feed');
-      }
+    if (authLoading || profileLoading || initialized || !user) return;
+    setInitialized(true);
+    if (profile?.onboarding_completed && profile.access_status !== 'banned') {
+      clearOnboardingDraft(window.localStorage, user.id);
+      navigate('/feed');
+      return;
     }
-  }, [profile, profileLoading, initialized, navigate]);
+    const draft = readOnboardingDraft(window.localStorage, user.id);
+    if (draft) {
+      setCurrentStep(draft.step);
+      setData(draft.data);
+    }
+  }, [authLoading, profile, profileLoading, initialized, navigate, user]);
+
+  useEffect(() => {
+    if (!user || !initialized || profile?.onboarding_completed) return;
+    writeOnboardingDraft(window.localStorage, user.id, { step: currentStep, data });
+  }, [user, initialized, profile?.onboarding_completed, currentStep, data]);
 
   const calculateMindsetLevel = (responses: Record<number, ChoiceId>): {
     level: 1 | 2;
@@ -153,6 +165,7 @@ const Onboarding = () => {
 
       sessionStorage.setItem('onboarding_just_completed', 'true');
       clearQuizSeed(window.sessionStorage);
+      clearOnboardingDraft(window.localStorage, user.id);
 
       // Finishing onboarding always grants access. passed_exam records
       // whether the red-flag count stayed under the threshold.

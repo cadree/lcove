@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Trash2, Play, Flag } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Trash2, Flag } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { usePostInteractions } from '@/hooks/usePostInteractions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,9 +20,11 @@ import {
   CollapsibleContent,
 } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-import { shareLink, buildShareUrl } from '@/lib/shareLink';
+import { buildShareUrl } from '@/lib/shareLink';
+import { ShareSheet } from '@/components/messages/ShareSheet';
 import { fileCode } from '@/lib/noviQuests';
 import { ReportDialog } from '@/components/safety/ReportDialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 interface Post {
   id: string;
@@ -37,7 +39,7 @@ interface Post {
   };
 }
 
-const FeedPost = ({ post, hero = false }: { post: Post; hero?: boolean }) => {
+const FeedPost = ({ post }: { post: Post }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { deletePost } = usePosts();
@@ -55,7 +57,8 @@ const FeedPost = ({ post, hero = false }: { post: Post; hero?: boolean }) => {
   } = usePostInteractions(post.id);
 
   const [showComments, setShowComments] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [lightbox, setLightbox] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const isOwner = user?.id === post.user_id;
 
@@ -66,12 +69,15 @@ const FeedPost = ({ post, hero = false }: { post: Post; hero?: boolean }) => {
     navigate(`/profile/${post.user_id}`);
   };
 
-  const handleShare = async () => {
-    await shareLink({
-      title: post.profile?.display_name || 'Check out this post',
-      text: post.content || undefined,
-      url: buildShareUrl.post(post.user_id, post.id),
-    });
+  const shareCard = {
+    kind: "post" as const,
+    id: post.id,
+    userId: post.user_id,
+    title: authorName,
+    subtitle: post.content?.slice(0, 140) || undefined,
+    mediaUrl: post.media_url,
+    mediaType: post.media_type,
+    href: `/profile/${post.user_id}`,
   };
 
   const handleDelete = () => {
@@ -80,17 +86,19 @@ const FeedPost = ({ post, hero = false }: { post: Post; hero?: boolean }) => {
 
   const toggleVideo = (e: React.MouseEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
-    if (video.paused) {
-      video.play();
-      setIsPlaying(true);
-    } else {
-      video.pause();
-      setIsPlaying(false);
-    }
+    if (video.paused) video.play();
+    else video.pause();
   };
 
   return (
-    <motion.article
+    <>
+      <ShareSheet
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        card={shareCard}
+        linkUrl={buildShareUrl.post(post.user_id, post.id)}
+      />
+      <motion.article
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
@@ -176,42 +184,43 @@ const FeedPost = ({ post, hero = false }: { post: Post; hero?: boolean }) => {
 
       {/* Media */}
       {post.media_url && post.media_type !== 'text' && (
-        <div className={`relative bg-muted/10 ${hero ? "aspect-[3/4]" : "aspect-square"}`}>
-          <span className="mono-label absolute left-3 top-3 z-[1] rounded-full bg-black/55 px-2 py-1 text-[8px] text-white">
-            {fileCode(post.id)}
-          </span>
-          {post.media_type === 'video' ? (
-            <div className="relative h-full">
+        <div className="mx-auto w-full max-w-[470px] bg-muted/15">
+          <button
+            type="button"
+            className="relative block w-full"
+            onClick={() => setLightbox(true)}
+            aria-label="View full size"
+          >
+            <span className="mono-label absolute left-3 top-3 z-[1] rounded-full bg-black/55 px-2 py-1 text-[8px] text-white">
+              {fileCode(post.id)}
+            </span>
+            {post.media_type === 'video' ? (
               <video
                 src={post.media_url}
-                className="w-full h-full object-cover cursor-pointer"
-                onClick={toggleVideo}
+                className="mx-auto aspect-[4/5] max-h-[min(52vh,420px)] w-full bg-black object-contain"
                 playsInline
+                muted
                 loop
               />
-              <AnimatePresence>
-                {!isPlaying && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute inset-0 flex items-center justify-center bg-background/30 pointer-events-none"
-                  >
-                    <div className="w-16 h-16 rounded-full glass-strong flex items-center justify-center">
-                      <Play className="w-7 h-7 text-foreground fill-foreground ml-1" />
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          ) : (
-            <img
-              src={post.media_url}
-              alt=""
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
-          )}
+            ) : (
+              <img
+                src={post.media_url}
+                alt=""
+                className="mx-auto aspect-[4/5] max-h-[min(52vh,420px)] w-full bg-muted object-contain"
+                loading="lazy"
+              />
+            )}
+          </button>
+          <Dialog open={lightbox} onOpenChange={setLightbox}>
+            <DialogContent className="max-w-[min(100vw-1.5rem,720px)] border-border bg-background p-3">
+              <DialogTitle className="sr-only">Full size media</DialogTitle>
+              {post.media_type === 'video' ? (
+                <video src={post.media_url} className="max-h-[80vh] w-full object-contain" controls playsInline onClick={toggleVideo} />
+              ) : (
+                <img src={post.media_url} alt="" className="max-h-[80vh] w-full object-contain" />
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
       )}
 
@@ -243,7 +252,7 @@ const FeedPost = ({ post, hero = false }: { post: Post; hero?: boolean }) => {
 
             <motion.button
               whileTap={{ scale: 0.95 }}
-              onClick={handleShare}
+              onClick={() => setShareOpen(true)}
               aria-label="Share"
               className="mono-label flex min-h-11 flex-col items-center justify-center gap-0.5 text-[8px] text-foreground"
             >
@@ -290,6 +299,7 @@ const FeedPost = ({ post, hero = false }: { post: Post; hero?: boolean }) => {
         </CollapsibleContent>
       </Collapsible>
     </motion.article>
+    </>
   );
 };
 

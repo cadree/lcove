@@ -9,6 +9,8 @@ import { useStream, useStreamReactions, useSendReaction, useTipStream, useJoinSt
 import { StreamChat } from './StreamChat';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WebRTCStreamViewer } from './WebRTCStreamViewer';
 import { WebRTCStreamHost } from './WebRTCStreamHost';
@@ -87,6 +89,24 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   const handleReaction = (emoji: string) => {
     if (!user) return;
     sendReaction.mutate({ streamId, emoji });
+  };
+
+  const sendCardGift = async (gift: "rose" | "star" | "crown") => {
+    try {
+      const { data, error } = await supabase.functions.invoke("create-stream-gift", {
+        body: { streamId, gift },
+      });
+      if (error) throw error;
+      if (data?.needs_connect) {
+        toast.error(data.error || "This host can't receive card gifts yet");
+        return;
+      }
+      if (data?.error) throw new Error(data.error);
+      if (!data?.url) throw new Error("Stripe did not return a checkout link");
+      window.location.assign(data.url);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not start the gift checkout");
+    }
   };
 
   const handleTip = () => {
@@ -324,14 +344,26 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
 
                 {/* Tip Button (viewers only) */}
                 {user && !isHost && streamStatus === 'live' && (
-                  <Button 
-                    variant="outline" 
-                    className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                    onClick={() => setShowTipInput(!showTipInput)}
-                  >
-                    <Coins className="h-4 w-4 mr-2" />
-                    Tip LC
-                  </Button>
+                  <>
+                    <Button 
+                      variant="outline" 
+                      className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                      onClick={() => setShowTipInput(!showTipInput)}
+                    >
+                      <Coins className="h-4 w-4 mr-2" />
+                      Tip LC
+                    </Button>
+                    {(["rose", "star", "crown"] as const).map((gift) => (
+                      <Button
+                        key={gift}
+                        type="button"
+                        variant="outline"
+                        onClick={() => sendCardGift(gift)}
+                      >
+                        {gift === "rose" ? "Rose $1" : gift === "star" ? "Star $5" : "Crown $10"}
+                      </Button>
+                    ))}
+                  </>
                 )}
               </div>
             </div>

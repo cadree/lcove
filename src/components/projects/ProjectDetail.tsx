@@ -7,7 +7,8 @@ import { Project, ProjectRole, useProjectApplications, useProjects } from '@/hoo
 import { formatRoleCompensation } from '@/lib/projectCollaborations';
 import { useProjectAttachments, ProjectAttachment } from '@/hooks/useProjectAttachments';
 import { useProjectUpdates } from '@/hooks/useProjectUpdates';
-import { useProjectMilestones } from '@/hooks/useProjectMilestones';
+import { useProjectMilestones, useUpdateMilestoneStatus } from '@/hooks/useProjectMilestones';
+import { useCalendarTasks } from '@/hooks/useCalendarTasks';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -106,6 +107,8 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
   const { attachments, uploadAttachment, addLinkAttachment, deleteAttachment, isUploading } = useProjectAttachments(project?.id);
   const { updates, addUpdate, isPosting } = useProjectUpdates(project?.id);
   const { data: milestones = [] } = useProjectMilestones(project?.id);
+  const updateMilestoneStatus = useUpdateMilestoneStatus();
+  const { addProjectToMyDay, isAddedToMyDay } = useCalendarTasks();
 
   // Check if user is a client of this project
   const { data: clientStatus } = useQuery({
@@ -480,6 +483,17 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                 {isCreator && (
                   <Button
                     variant="ghost"
+                    size="sm"
+                    className="shrink-0"
+                    disabled={isAddedToMyDay(undefined, project.id) || addProjectToMyDay.isPending}
+                    onClick={() => addProjectToMyDay.mutate({ projectId: project.id, title: project.title, dueAt: project.timeline_start || undefined })}
+                  >
+                    {isAddedToMyDay(undefined, project.id) ? "On My Day" : "Add to My Day"}
+                  </Button>
+                )}
+                {isCreator && (
+                  <Button
+                    variant="ghost"
                     size="icon"
                     className="shrink-0 -mt-1"
                     onClick={() => setEditDialogOpen(true)}
@@ -687,7 +701,19 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                 <div className="relative pl-6 space-y-4">
                   <div className="absolute left-2 top-1 bottom-1 w-0.5 bg-border" />
                   {milestones.map((ms) => (
-                    <div key={ms.id} className="relative">
+                    <div
+                      key={ms.id}
+                      className="relative block w-full text-left"
+                      onClick={() => {
+                        if (!isCreator || !project) return;
+                        const completed = ms.status === "in_progress" || ms.status === "submitted" || ms.status === "approved" || ms.status === "paid";
+                        updateMilestoneStatus.mutate({
+                          milestoneId: ms.id,
+                          status: completed ? "pending" : "approved",
+                          projectId: project.id,
+                        });
+                      }}
+                    >
                       <div className={cn(
                         "absolute -left-4 top-1 w-3 h-3 rounded-full border-2",
                         ms.status === 'approved' || ms.status === 'paid' ? "bg-emerald-500 border-emerald-500" :
@@ -700,6 +726,31 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                           {ms.phase && <Badge variant="outline" className="text-[10px]">{ms.phase.replace('_', '-')}</Badge>}
                           {ms.due_date && <span className="text-xs text-muted-foreground">{format(new Date(ms.due_date), 'MMM d')}</span>}
                           <Badge className={cn('text-[10px]', ms.status === 'paid' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-muted text-muted-foreground')}>{ms.status}</Badge>
+                          {!isCreator && ms.status !== "paid" && Number(ms.amount) > 0 && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
+                              onClick={async (event) => {
+                                event.stopPropagation();
+                                const { data, error } = await supabase.functions.invoke("create-project-payment", {
+                                  body: { milestoneId: ms.id },
+                                });
+                                if (error || data?.error) {
+                                  toast({ title: data?.error || "Could not start payment", variant: "destructive" });
+                                  return;
+                                }
+                                if (data?.needs_connect) {
+                                  toast({ title: data.error, variant: "destructive" });
+                                  return;
+                                }
+                                if (data?.url) window.location.assign(data.url);
+                              }}
+                            >
+                              Pay
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
