@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { shotContentThin, shotPosts, shotSessionEnabled } from '@/lib/shotSession';
+import { mergePostsAndReposts, type RepostRow } from '@/lib/sharing';
 
 interface Post {
   id: string;
@@ -22,6 +23,8 @@ interface Post {
   };
   reactions?: { emoji: string; count: number }[];
   user_reaction?: string | null;
+  feed_key?: string;
+  repost?: RepostRow | null;
 }
 
 export function usePosts() {
@@ -31,8 +34,8 @@ export function usePosts() {
 
   const { data: posts = [], isLoading, refetch } = useQuery({
     queryKey: ['posts'],
-    queryFn: async () => {
-      if (shotSessionEnabled()) return shotContentThin() ? [] : shotPosts();
+    queryFn: async (): Promise<Post[]> => {
+      if (shotSessionEnabled()) return (shotContentThin() ? [] : shotPosts()) as Post[];
       // Get all posts, ordered chronologically (newest first)
       const { data: postsData, error } = await supabase
         .from('posts')
@@ -73,13 +76,34 @@ export function usePosts() {
         }
       });
 
-      return (postsData || []).map(post => ({
+      const mapped = (postsData || []).map(post => ({
         ...post,
         post_type: post.post_type || 'regular',
         profile: profileMap.get(post.user_id),
         reactions: Array.from(reactionsByPost.get(post.id)?.entries() || []).map(([emoji, count]) => ({ emoji, count })),
         user_reaction: userReactions.get(post.id) || null,
+        feed_key: post.id,
+        repost: null,
       })) as Post[];
+
+      const { data: repostData, error: repostError } = await supabase
+        .from('reposts')
+        .select('id, user_id, post_id, created_at')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (repostError || !repostData?.length) return mapped;
+
+      const reposterIds = [...new Set(repostData.map((row) => row.user_id))];
+      const { data: reposterProfiles } = await supabase
+        .from('profiles_public')
+        .select('user_id, display_name, avatar_url')
+        .in('user_id', reposterIds);
+      const reposterMap = new Map((reposterProfiles ?? []).map((profile) => [profile.user_id, profile]));
+      const reposts: RepostRow[] = repostData.map((row) => ({
+        ...row,
+        profile: reposterMap.get(row.user_id) ?? null,
+      }));
+      return mergePostsAndReposts(mapped, reposts);
     },
   });
 
@@ -200,7 +224,7 @@ export function usePosts() {
   });
 
   const visiblePosts = useMemo(
-    () => posts.filter((post) => !blockedIds.includes(post.user_id)),
+    () => posts.filter((post) => !blockedIds.includes(post.user_id) && !blockedIds.includes(post.repost?.user_id ?? '')),
     [posts, blockedIds],
   );
 

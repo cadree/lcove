@@ -1,7 +1,9 @@
 import { motion } from "framer-motion";
-import { Play, ImageIcon } from "lucide-react";
+import { Play, ImageIcon, Repeat2, Eye } from "lucide-react";
 import { ProfilePost } from "@/types/post";
 import { postsForProfileGrid } from "@/lib/profilePosts";
+import { useOwnPostViewCounts } from "@/hooks/usePostViews";
+import { gridViewCount } from "@/lib/sharing";
 
 interface ProfilePostsGridProps {
   posts: ProfilePost[];
@@ -12,6 +14,7 @@ interface ProfilePostsGridProps {
 
 export function ProfilePostsGrid({ posts, onPostClick, isLoading, isOwner = false }: ProfilePostsGridProps) {
   const mediaPosts = postsForProfileGrid(posts);
+  const viewCounts = useOwnPostViewCounts(isOwner);
 
   if (isLoading) {
     return (
@@ -43,9 +46,11 @@ export function ProfilePostsGrid({ posts, onPostClick, isLoading, isOwner = fals
 
   return (
     <div className="grid grid-cols-3 gap-1">
-      {mediaPosts.map((post, index) => (
+      {mediaPosts.map((post, index) => {
+        const views = gridViewCount(isOwner && post.user_id !== undefined && !post.repost, viewCounts, post.id);
+        return (
         <motion.button
-          key={post.id}
+          key={post.grid_key ?? post.id}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: index * 0.05 }}
@@ -76,9 +81,20 @@ export function ProfilePostsGrid({ posts, onPostClick, isLoading, isOwner = fals
               <p className="text-xs text-foreground line-clamp-4">{post.content}</p>
             </div>
           )}
-          
+          {post.repost && (
+            <span className="absolute left-1 top-1 rounded-[2px] bg-background/80 p-1 text-foreground">
+              <Repeat2 className="h-3.5 w-3.5" />
+            </span>
+          )}
+          {views != null && (
+            <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded-[2px] bg-background/80 px-1 py-0.5 text-[10px] text-foreground">
+              <Eye className="h-3 w-3" />
+              {views}
+            </span>
+          )}
         </motion.button>
-      ))}
+      );
+      })}
     </div>
   );
 }

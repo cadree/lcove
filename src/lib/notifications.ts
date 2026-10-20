@@ -118,6 +118,16 @@ export const notifyFollow = (userId: string, followerName: string) => {
   });
 };
 
+export const notifyStoryLike = (userId: string, likerName: string, storyId: string) => {
+  return createNotification({
+    userId,
+    type: 'like',
+    title: 'Story like',
+    body: `${likerName} liked your story`,
+    data: { story_id: storyId },
+  });
+};
+
 export const notifyPostLike = (userId: string, likerName: string, postId: string) => {
   return createNotification({
     userId,

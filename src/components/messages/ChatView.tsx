@@ -25,6 +25,7 @@ import { CreateSubgroupDialog } from './CreateSubgroupDialog';
 import ProjectCommandCenter from './ProjectCommandCenter';
 import { toast } from 'sonner';
 import { ReportDialog } from '@/components/safety/ReportDialog';
+import { SharedContentCard } from '@/components/share/SharedContentCard';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -474,6 +475,12 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                             </div>
                           )}
                           
+                          {msg.share && (
+                            <div className="mb-1">
+                              <SharedContentCard share={msg.share} />
+                            </div>
+                          )}
+
                           {/* Media */}
                           {msg.media_url && (
                             <div className="mb-1 rounded-xl overflow-hidden">

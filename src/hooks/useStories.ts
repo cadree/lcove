@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { shotContentThin, shotSessionEnabled, shotStories } from '@/lib/shotSession';
 
@@ -19,6 +20,12 @@ interface Story {
   };
   view_count?: number;
   has_viewed?: boolean;
+  source_post_id?: string | null;
+  credit_user_id?: string | null;
+  credit_profile?: {
+    display_name: string | null;
+    avatar_url: string | null;
+  } | null;
 }
 
 interface StoryWithProfile extends Story {
@@ -31,6 +38,7 @@ interface StoryWithProfile extends Story {
 export function useStories() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { blockedIds } = useUserBlocks();
 
   const { data, isLoading, refetch, error } = useQuery({
     queryKey: ['stories'],
@@ -57,7 +65,10 @@ export function useStories() {
       }
 
       // Get profiles for story creators
-      const userIds = [...new Set(storiesData.map(s => s.user_id))];
+      const userIds = [...new Set([
+        ...storiesData.map(s => s.user_id),
+        ...storiesData.flatMap(s => s.credit_user_id ? [s.credit_user_id] : []),
+      ])];
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles_public')
         .select('user_id, display_name, avatar_url')
@@ -102,6 +113,7 @@ export function useStories() {
           return {
             ...story,
             profile: profileMap.get(story.user_id) || { display_name: 'Private profile', avatar_url: null },
+            credit_profile: story.credit_user_id ? profileMap.get(story.credit_user_id) || null : null,
             view_count: viewCount,
             has_viewed: hasViewed,
           } as StoryWithProfile;
@@ -232,9 +244,26 @@ export function useStories() {
     },
   });
 
+  const stories = useMemo(() => {
+    const rows = (data?.stories || []) as StoryWithProfile[];
+    return rows.filter((story) => {
+      if (blockedIds.includes(story.user_id)) return false;
+      if (story.credit_user_id && blockedIds.includes(story.credit_user_id)) return false;
+      return true;
+    });
+  }, [data?.stories, blockedIds]);
+
+  const groupedStories = useMemo(() => {
+    return stories.reduce((acc, story) => {
+      if (!acc[story.user_id]) acc[story.user_id] = [];
+      acc[story.user_id].push(story);
+      return acc;
+    }, {} as Record<string, StoryWithProfile[]>);
+  }, [stories]);
+
   return {
-    stories: data?.stories || [],
-    groupedStories: data?.grouped || {},
+    stories,
+    groupedStories,
     isLoading,
     error,
     uploadStory,

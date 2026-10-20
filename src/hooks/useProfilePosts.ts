@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { ProfilePost } from '@/types/post';
+import { profileItemsWithReposts, type RepostRow } from '@/lib/sharing';
 
 export function useProfilePosts(userId?: string) {
   const { user } = useAuth();
@@ -34,7 +35,10 @@ export function useProfilePosts(userId?: string) {
         .limit(1);
       const profile = profileRows?.[0];
 
-      return (postsData || []).map(post => ({
+      const toProfilePost = (
+        post: (typeof postsData)[number],
+        author: { display_name: string | null; avatar_url: string | null },
+      ): ProfilePost => ({
         id: post.id,
         user_id: post.user_id,
         content: post.content,
@@ -46,8 +50,46 @@ export function useProfilePosts(userId?: string) {
         alt_text: post.alt_text ?? null,
         comments_enabled: post.comments_enabled ?? true,
         folder_id: post.folder_id ?? null,
-        profile: profile || { display_name: null, avatar_url: null },
+        profile: author,
+      });
+
+      const own = (postsData || []).map((post) => toProfilePost(post, profile || { display_name: null, avatar_url: null }));
+
+      const { data: repostData, error: repostError } = await supabase
+        .from('reposts')
+        .select('id, user_id, post_id, created_at')
+        .eq('user_id', targetUserId)
+        .order('created_at', { ascending: false });
+      if (repostError || !repostData?.length) {
+        return own.map((post) => ({ ...post, grid_key: post.id, repost: null }));
+      }
+
+      const originalIds = [...new Set(repostData.map((row) => row.post_id))];
+      const { data: originals, error: originalsError } = await supabase
+        .from('posts')
+        .select('*')
+        .in('id', originalIds);
+      if (originalsError || !originals?.length) {
+        return own.map((post) => ({ ...post, grid_key: post.id, repost: null }));
+      }
+
+      const authorIds = [...new Set(originals.map((post) => post.user_id))];
+      const { data: authors } = await supabase
+        .from('profiles_public')
+        .select('user_id, display_name, avatar_url')
+        .in('user_id', authorIds);
+      const authorMap = new Map((authors ?? []).map((author) => [author.user_id, author]));
+      const reposter = profile || { display_name: null, avatar_url: null };
+      const reposts: RepostRow[] = repostData.map((row) => ({
+        ...row,
+        profile: { display_name: reposter.display_name, avatar_url: reposter.avatar_url },
       }));
+
+      return profileItemsWithReposts(
+        own,
+        reposts,
+        originals.map((post) => toProfilePost(post, authorMap.get(post.user_id) || { display_name: null, avatar_url: null })),
+      );
     },
     enabled: !!targetUserId,
     staleTime: 0,

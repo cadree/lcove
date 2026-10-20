@@ -88,6 +88,13 @@ const Profile = () => {
     }
   }, [searchParams, isOwnProfile, setSearchParams]);
 
+  useEffect(() => {
+    const postId = searchParams.get("post");
+    if (!postId || posts.length === 0) return;
+    const match = posts.find((post) => post.id === postId);
+    if (match) setSelectedPost(match);
+  }, [searchParams, posts]);
+
   // Square portfolio grid sits above the rest of the module stack.
   const visibleSections = applyProfileCustomization(layout, customization)
     .filter(s => s.visible)
@@ -589,8 +596,16 @@ const Profile = () => {
         <PostDetailModal
           post={selectedPost}
           open={!!selectedPost}
-          onOpenChange={(open) => !open && setSelectedPost(null)}
-          isOwner={isOwnProfile}
+          onOpenChange={(open) => {
+            if (open) return;
+            setSelectedPost(null);
+            if (searchParams.get("post")) {
+              const next = new URLSearchParams(searchParams);
+              next.delete("post");
+              setSearchParams(next, { replace: true });
+            }
+          }}
+          isOwner={!!selectedPost && selectedPost.user_id === user?.id}
           onDelete={(postId) => {
             deletePost.mutate(postId);
             setSelectedPost(null);

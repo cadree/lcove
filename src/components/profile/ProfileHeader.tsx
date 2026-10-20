@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
   Settings, MapPin, Camera, Loader2, Crown, Heart,
-  MessageCircle, Shield, BadgeCheck, UserPlus, UserMinus, Flag, Ban
+  MessageCircle, Shield, BadgeCheck, UserPlus, UserMinus, Flag, Ban, Share2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -19,6 +19,8 @@ import { xpBar } from '@/lib/noviQuests';
 import { Link } from 'react-router-dom';
 import { ReportDialog } from '@/components/safety/ReportDialog';
 import { FriendsDrawer } from '@/components/friends/FriendsDrawer';
+import { ShareSheet } from '@/components/share/ShareSheet';
+import { YourDashboard } from '@/components/profile/YourDashboard';
 
 // Component to show verification badge inline
 function ProfileVerificationBadge({ userId }: { userId: string }) {
@@ -71,6 +73,7 @@ export function ProfileHeader({
   const { user } = useAuth();
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const { isBlocked, blockUser, unblockUser } = useUserBlocks();
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
@@ -147,11 +150,16 @@ export function ProfileHeader({
     <div className="px-4 pt-3">
       <div className="flex min-h-11 items-center justify-between">
         <p className="kicker">Familcy // Lcove</p>
-        {isOwnProfile && (
-          <Button variant="ghost" size="icon" onClick={onSettingsClick} aria-label="Settings">
-            <Settings className="h-5 w-5" />
+        <div className="flex items-center">
+          <Button variant="ghost" size="icon" onClick={() => setShareOpen(true)} aria-label="Share profile">
+            <Share2 className="h-5 w-5" />
           </Button>
-        )}
+          {isOwnProfile && (
+            <Button variant="ghost" size="icon" onClick={onSettingsClick} aria-label="Settings">
+              <Settings className="h-5 w-5" />
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="holo-card relative mt-2 overflow-hidden">
@@ -278,6 +286,8 @@ export function ProfileHeader({
           )}
         </div>
 
+        {isOwnProfile && <YourDashboard />}
+
         {!isOwnProfile && user && (
           <div className="relative z-[1] mt-2 flex gap-2">
             <Button
@@ -299,6 +309,14 @@ export function ProfileHeader({
         )}
         </div>
       </div>
+      <ShareSheet
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        target={{
+          kind: 'profile',
+          profile: { user_id: userId, display_name: displayName, avatar_url: avatarUrl },
+        }}
+      />
     </div>
   );
 }

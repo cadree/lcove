@@ -3783,6 +3783,9 @@ export type Database = {
           sender_id: string
           shared_from_conversation_id: string | null
           shared_from_message_id: string | null
+          shared_post_id: string | null
+          shared_profile_id: string | null
+          shared_story_id: string | null
           updated_at: string
         }
         Insert: {
@@ -3797,6 +3800,9 @@ export type Database = {
           sender_id: string
           shared_from_conversation_id?: string | null
           shared_from_message_id?: string | null
+          shared_post_id?: string | null
+          shared_profile_id?: string | null
+          shared_story_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -3811,6 +3817,9 @@ export type Database = {
           sender_id?: string
           shared_from_conversation_id?: string | null
           shared_from_message_id?: string | null
+          shared_post_id?: string | null
+          shared_profile_id?: string | null
+          shared_story_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -5211,6 +5220,35 @@ export type Database = {
           },
         ]
       }
+      post_views: {
+        Row: {
+          created_at: string
+          post_id: string
+          viewed_on: string
+          viewer_id: string
+        }
+        Insert: {
+          created_at?: string
+          post_id: string
+          viewed_on: string
+          viewer_id: string
+        }
+        Update: {
+          created_at?: string
+          post_id?: string
+          viewed_on?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_views_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posts: {
         Row: {
           alt_text: string | null
@@ -6135,6 +6173,35 @@ export type Database = {
         }
         Relationships: []
       }
+      reposts: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reposts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_posts: {
         Row: {
           created_at: string
@@ -6447,28 +6514,34 @@ export type Database = {
         Row: {
           created_at: string
           expires_at: string
+          credit_user_id: string | null
           id: string
           is_live: boolean | null
           media_type: string
           media_url: string
+          source_post_id: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
+          credit_user_id?: string | null
           expires_at?: string
           id?: string
           is_live?: boolean | null
           media_type: string
           media_url: string
+          source_post_id?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
+          credit_user_id?: string | null
           expires_at?: string
           id?: string
           is_live?: boolean | null
           media_type?: string
           media_url?: string
+          source_post_id?: string | null
           user_id?: string
         }
         Relationships: []
@@ -7812,6 +7885,21 @@ export type Database = {
         Args: { p_event_id: string }
         Returns: number
       }
+      get_own_post_view_counts: {
+        Args: { p_post_ids?: string[] | null }
+        Returns: {
+          post_id: string
+          view_count: number
+        }[]
+      }
+      get_own_view_dashboard: {
+        Args: never
+        Returns: {
+          photo_views_30d: number
+          video_views_30d: number
+          views_30d: number
+        }[]
+      }
       get_platform_stats: {
         Args: never
         Returns: {
@@ -7891,6 +7979,10 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      record_post_view: {
+        Args: { p_post_id: string }
+        Returns: undefined
       }
       share_messages_to_project_main: {
         Args: { p_message_ids: string[] }

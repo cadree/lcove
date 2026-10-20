@@ -231,7 +231,7 @@ const Feed = () => {
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div> : <div className="space-y-5 pb-32">
             <AnimatePresence mode="popLayout">
-              {lanePosts.map((post, index) => <motion.div key={post.id} initial={{
+              {lanePosts.map((post, index) => <motion.div key={post.feed_key ?? post.id} initial={{
             opacity: 0,
             y: 20
           }} animate={{

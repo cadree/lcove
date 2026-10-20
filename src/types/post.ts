@@ -14,4 +14,14 @@ export interface ProfilePost {
     display_name: string | null;
     avatar_url: string | null;
   };
+  grid_key?: string;
+  repost?: {
+    id: string;
+    user_id: string;
+    created_at: string;
+    profile?: {
+      display_name: string | null;
+      avatar_url: string | null;
+    } | null;
+  } | null;
 }

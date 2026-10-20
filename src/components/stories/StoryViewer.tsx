@@ -1,12 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronLeft, ChevronRight, Eye, Send } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { X, ChevronLeft, ChevronRight, Eye, Heart, Share2, Send } from 'lucide-react';
 import { useStories } from '@/hooks/useStories';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSharingActions } from '@/hooks/useSharing';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { notifyStoryLike } from '@/lib/notifications';
+import { ShareSheet } from '@/components/share/ShareSheet';
+import { toast } from 'sonner';
 
 interface Story {
   id: string;
@@ -22,6 +27,11 @@ interface Story {
   };
   view_count?: number;
   has_viewed?: boolean;
+  credit_user_id?: string | null;
+  credit_profile?: {
+    display_name: string | null;
+    avatar_url: string | null;
+  } | null;
 }
 
 interface StoryViewerProps {
@@ -30,15 +40,18 @@ interface StoryViewerProps {
   onNextUser: () => void;
 }
 
-const EMOJIS = ['❤️', '🔥', '👏', '😍', '🎉', '💯'];
-
 const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const [viewCount, setViewCount] = useState(0);
-  const { recordView, addReaction } = useStories();
+  const [paused, setPaused] = useState(false);
+  const [reply, setReply] = useState('');
+  const [hearted, setHearted] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const { recordView } = useStories();
+  const { sendStoryReply } = useSharingActions();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const recordedViewsRef = useRef<Set<string>>(new Set());
 
   const currentStory = stories[currentIndex];
@@ -113,6 +126,25 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
 
   // Auto-progress timer
   useEffect(() => {
+    if (!storyId || isOwner || !user) return;
+    let cancel = false;
+    supabase
+      .from('story_reactions')
+      .select('emoji')
+      .eq('story_id', storyId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancel) setHearted(data?.emoji === '❤️');
+      });
+    setReply('');
+    return () => {
+      cancel = true;
+    };
+  }, [storyId, isOwner, user]);
+
+  useEffect(() => {
+    if (paused) return;
     const duration = storyMediaType === 'video' ? 15000 : 5000;
     const interval = 50;
     const increment = (interval / duration) * 100;
@@ -128,7 +160,7 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
     }, interval);
 
     return () => clearInterval(timer);
-  }, [storyMediaType, handleNext]);
+  }, [storyMediaType, handleNext, paused]);
 
   const handlePrev = useCallback(() => {
     if (currentIndex > 0) {
@@ -137,8 +169,51 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
     }
   }, [currentIndex]);
 
-  const handleReaction = (emoji: string) => {
-    addReaction.mutate({ storyId: currentStory.id, emoji });
+  const handleHeart = async () => {
+    if (!user || !currentStory) return;
+    const next = !hearted;
+    setHearted(next);
+    if (!next) {
+      const { error } = await supabase
+        .from('story_reactions')
+        .delete()
+        .eq('story_id', currentStory.id)
+        .eq('user_id', user.id);
+      if (error) setHearted(true);
+      return;
+    }
+    const { error } = await supabase.from('story_reactions').upsert({
+      story_id: currentStory.id,
+      user_id: user.id,
+      emoji: '❤️',
+    }, { onConflict: 'story_id,user_id' });
+    if (error) {
+      setHearted(false);
+      toast.error('Could not send');
+      return;
+    }
+    const { data: profile } = await supabase
+      .from('profiles_public')
+      .select('display_name')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    notifyStoryLike(currentStory.user_id, profile?.display_name || 'Someone', currentStory.id).catch(() => undefined);
+  };
+
+  const handleReply = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!currentStory || !reply.trim()) return;
+    try {
+      await sendStoryReply.mutateAsync({
+        storyId: currentStory.id,
+        ownerId: currentStory.user_id,
+        text: reply,
+      });
+      setReply('');
+      toast.success('Sent');
+    } catch {
+      // The send action already reports the error.
+    }
   };
 
   // Keyboard navigation
@@ -298,40 +373,108 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
             </Button>
           )}
 
-          {/* Footer - Reactions or View Count */}
-          <div className="absolute bottom-6 left-4 right-4 z-20">
+          {currentStory.credit_user_id && (
+            <button
+              type="button"
+              className="absolute bottom-28 left-4 z-30 flex min-h-11 items-center gap-2 rounded-full bg-background/80 px-3 text-foreground"
+              onClick={() => {
+                onClose();
+                navigate(`/profile/${currentStory.credit_user_id}`);
+              }}
+            >
+              <span className="mono-label text-[9px] text-muted-foreground">Original</span>
+              <span className="text-sm font-semibold">
+                {currentStory.credit_profile?.display_name || 'Creator'}
+              </span>
+            </button>
+          )}
+
+          {/* Footer */}
+          <div className="absolute bottom-4 left-4 right-4 z-30">
             {isOwner ? (
-              // Owner sees view count (real-time updated)
-              <motion.div 
-                key={viewCount}
-                initial={{ scale: 0.9 }}
-                animate={{ scale: 1 }}
-                className="flex items-center gap-2 text-foreground/80"
-              >
-                <Eye className="w-5 h-5" />
-                <span className="text-sm font-medium">
-                  {viewCount} {viewCount === 1 ? 'view' : 'views'}
-                </span>
-              </motion.div>
-            ) : (
-              // Viewers see reaction buttons
-              <div className="flex items-center justify-center gap-2">
-                {EMOJIS.map((emoji) => (
-                  <motion.button
-                    key={emoji}
-                    whileHover={{ scale: 1.2 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => handleReaction(emoji)}
-                    className="w-12 h-12 rounded-full glass flex items-center justify-center text-xl hover:bg-foreground/10 transition-colors"
-                  >
-                    {emoji}
-                  </motion.button>
-                ))}
+              <div className="flex items-center justify-between gap-2">
+                <motion.div
+                  key={viewCount}
+                  initial={{ scale: 0.9 }}
+                  animate={{ scale: 1 }}
+                  className="flex items-center gap-2 text-foreground/80"
+                >
+                  <Eye className="w-5 h-5" />
+                  <span className="text-sm font-medium">
+                    {viewCount} {viewCount === 1 ? 'view' : 'views'}
+                  </span>
+                </motion.div>
+                <Button
+                  variant="glass"
+                  size="icon"
+                  aria-label="Share"
+                  onClick={() => {
+                    setShareOpen(true);
+                    setPaused(true);
+                  }}
+                >
+                  <Share2 className="h-5 w-5" />
+                </Button>
               </div>
+            ) : (
+              <form onSubmit={handleReply} className="flex items-center gap-2">
+                <Input
+                  value={reply}
+                  onChange={(event) => setReply(event.target.value)}
+                  onFocus={() => setPaused(true)}
+                  onBlur={() => setPaused(false)}
+                  placeholder="Send message"
+                  aria-label="Send message"
+                  className="min-h-11 flex-1 bg-background/80"
+                />
+                {reply.trim() && (
+                  <Button type="submit" variant="glass" size="icon" aria-label="Send" disabled={sendStoryReply.isPending}>
+                    <Send className="h-5 w-5" />
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="glass"
+                  size="icon"
+                  aria-label={hearted ? 'Unlike' : 'Like'}
+                  onClick={handleHeart}
+                >
+                  <Heart className={`h-5 w-5 ${hearted ? 'fill-primary text-primary' : ''}`} />
+                </Button>
+                <Button
+                  type="button"
+                  variant="glass"
+                  size="icon"
+                  aria-label="Share"
+                  onClick={() => {
+                    setShareOpen(true);
+                    setPaused(true);
+                  }}
+                >
+                  <Share2 className="h-5 w-5" />
+                </Button>
+              </form>
             )}
           </div>
         </motion.div>
       </div>
+      <ShareSheet
+        open={shareOpen}
+        onOpenChange={(next) => {
+          setShareOpen(next);
+          if (!next) setPaused(false);
+        }}
+        target={{
+          kind: 'story',
+          story: {
+            id: currentStory.id,
+            user_id: currentStory.user_id,
+            media_url: currentStory.media_url,
+            media_type: currentStory.media_type,
+            profile: currentStory.profile,
+          },
+        }}
+      />
     </motion.div>
   );
 };
