@@ -3,7 +3,6 @@ import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingHero } from "@/components/landing/LandingHero";
 import { PersonaCards } from "@/components/landing/PersonaCards";
 import { BenefitsCarousel } from "@/components/landing/BenefitsCarousel";
-import { TestimonialsSection } from "@/components/landing/TestimonialsSection";
 import { TrustSection } from "@/components/landing/TrustSection";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { GENERATIVE_AI_RULE } from "@/content/copy";
@@ -29,7 +28,6 @@ const Landing = () => {
         </section>
         <PersonaCards joinSearch={location.search} />
         <BenefitsCarousel />
-        <TestimonialsSection />
         <TrustSection />
       </main>
 

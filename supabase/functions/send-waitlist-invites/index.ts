@@ -27,8 +27,8 @@ function escapeHtml(value: string): string {
 }
 
 /**
- * PLACEHOLDER TEMPLATE — Cadre replaces this copy.
  * Nothing in this function calls Resend unless INVITE_EMAILS_ENABLED is exactly "true".
+ * Copy matches src/content/copy.ts. The Slack URL is not repeated here.
  */
 function inviteEmailHtml(inviteUrl: string): string {
   const safeUrl = escapeHtml(inviteUrl);
@@ -36,9 +36,10 @@ function inviteEmailHtml(inviteUrl: string): string {
     <!DOCTYPE html>
     <html>
       <body style="margin:0;padding:24px;background:#1a1a1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-        <p style="color:#ffffff;font-size:16px;line-height:1.5;">
-          PLACEHOLDER for Cadre. This invite email is not final copy.
-        </p>
+        <p style="color:#ffffff;font-size:16px;line-height:1.5;">Real creatives. Real work.</p>
+        <p style="color:#ffffff;font-size:16px;line-height:1.5;">A home for creatives where every face is real and every post is real work.</p>
+        <p style="color:#ffffff;font-size:16px;line-height:1.5;">No fake people. No fake work.</p>
+        <p style="color:#ffffff;font-size:16px;line-height:1.5;">Introduce yourself in #start-here.</p>
         <p style="margin:24px 0;">
           <a href="${safeUrl}" style="display:inline-block;background:#FF9FC8;color:#0A0A0A;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;">
             Open invite
@@ -111,7 +112,7 @@ serve(async (req) => {
         body: JSON.stringify({
           from: EMAIL_FROM,
           to: [row.email],
-          subject: "PLACEHOLDER for Cadre — your Ether invite",
+          subject: "Welcome home, Familcy.",
           html: inviteEmailHtml(inviteUrl),
         }),
       });

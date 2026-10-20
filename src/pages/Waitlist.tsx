@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { WAITLIST_CONFIRMATION } from "@/content/copy";
+import { QUIZ_INTRO_COPY, WAITLIST_CONFIRMATION, WAITLIST_PRIVACY_NOTE } from "@/content/copy";
 import { SITE_ORIGIN } from "@/config/launch";
 import { captureSignupAttribution } from "@/lib/signupAttribution";
 import { waitlistInvitePath } from "@/lib/waitlist";
@@ -107,6 +107,7 @@ export default function Waitlist() {
           ) : (
             <form className="file-panel space-y-4 px-4 py-6 sm:px-6" onSubmit={(event) => void submit(event)}>
               <h1 className="ether-title text-3xl text-foreground">Join the waitlist</h1>
+              <p className="text-sm text-muted-foreground">{QUIZ_INTRO_COPY}</p>
               <div className="space-y-2">
                 <Label htmlFor="waitlist-name">Name</Label>
                 <Input
@@ -131,6 +132,12 @@ export default function Waitlist() {
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                 />
+                <p className="text-sm text-muted-foreground">
+                  {WAITLIST_PRIVACY_NOTE}{" "}
+                  <Link to="/privacy" className="underline">
+                    Privacy
+                  </Link>
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="waitlist-ig">IG handle</Label>

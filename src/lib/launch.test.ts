@@ -1,5 +1,21 @@
 import assert from "node:assert/strict";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it } from "node:test";
+import { APP_STORE_URL, INSTAGRAM_URL, SLACK_URL } from "../config/launch.ts";
+import {
+  APP_STORE_COMING,
+  HERO_TAGLINE,
+  INVITE_EMAIL_LINES,
+  INVITE_EMAIL_SUBJECT,
+  NO_FAKE_LINE,
+  QUIZ_INTRO_COPY,
+  SLACK_INTRO,
+  SUPPORT_LINE,
+  WAITLIST_CONFIRMATION,
+  WAITLIST_PRIVACY_NOTE,
+  WELCOME_HOME,
+} from "../content/copy.ts";
 import { publicJoinPath } from "./publicJoin.ts";
 import { normalizeWaitlistSrc, csvCell, waitlistInvitePath, founderInvitePath, parseWaitlistImportCsv, inviteTokenFromMetadata } from "./waitlist.ts";
 import { attributionFromSearch, captureSignupAttribution } from "./signupAttribution.ts";
@@ -90,5 +106,62 @@ describe("app routes", () => {
     assert.equal(isKnownPath("/waitlist"), true);
     assert.equal(isKnownPath("/feed"), true);
     assert.equal(isKnownPath("/this-page-is-not-real"), false);
+  });
+
+  it("keeps the blog behind sign-in", () => {
+    assert.equal(isKnownPath("/blog"), true);
+    assert.equal(isPublicPath("/blog"), false);
+    assert.equal(isKnownPath("/blog/a-post"), true);
+    assert.equal(isPublicPath("/blog/a-post"), false);
+  });
+});
+
+describe("campaign copy", () => {
+  it("uses the campaign lines as written", () => {
+    assert.equal(HERO_TAGLINE, "Real creatives. Real work.");
+    assert.equal(SUPPORT_LINE, "A home for creatives where every face is real and every post is real work.");
+    assert.equal(WELCOME_HOME, "Welcome home, Familcy.");
+    assert.equal(NO_FAKE_LINE, "No fake people. No fake work.");
+    assert.equal(WAITLIST_CONFIRMATION, "Welcome home, Familcy.");
+    assert.equal(QUIZ_INTRO_COPY, SUPPORT_LINE);
+    assert.equal(WAITLIST_PRIVACY_NOTE, "We use this email only to tell you when Ether opens.");
+    assert.equal(SLACK_INTRO, "Introduce yourself in #start-here.");
+    assert.equal(APP_STORE_COMING, "on the web now, iPhone app coming");
+    assert.equal(INVITE_EMAIL_SUBJECT, "Welcome home, Familcy.");
+    assert.deepEqual(INVITE_EMAIL_LINES, [
+      "Real creatives. Real work.",
+      "A home for creatives where every face is real and every post is real work.",
+      "No fake people. No fake work.",
+      "Introduce yourself in #start-here.",
+    ]);
+  });
+
+  it("keeps the slack invite in one config value and hides a missing app store link", () => {
+    assert.equal(INSTAGRAM_URL, "https://www.instagram.com/_familcy/");
+    assert.equal(APP_STORE_URL, "");
+    assert.equal(SLACK_URL.startsWith("https://join.slack.com/"), true);
+    const hits: string[] = [];
+    const skip = new Set(["node_modules", "dist", ".git", "coverage"]);
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        if (skip.has(name)) continue;
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) {
+          walk(path);
+          continue;
+        }
+        if (!/\.(ts|tsx|html|json|sql|md)$/.test(name)) continue;
+        if (readFileSync(path, "utf8").includes(SLACK_URL)) hits.push(path);
+      }
+    };
+    walk(".");
+    assert.deepEqual(hits, ["src/config/launch.ts"]);
+    const invite = readFileSync("supabase/functions/send-waitlist-invites/index.ts", "utf8");
+    assert.equal(invite.includes(INVITE_EMAIL_SUBJECT), true);
+    for (const line of INVITE_EMAIL_LINES) assert.equal(invite.includes(line), true);
+    assert.equal(invite.includes("PLACEHOLDER"), false);
+    assert.equal(invite.includes(SLACK_URL), false);
+    assert.equal(readFileSync("index.html", "utf8").includes(HERO_TAGLINE), true);
+    assert.equal(readFileSync("public/manifest.json", "utf8").includes(HERO_TAGLINE), true);
   });
 });

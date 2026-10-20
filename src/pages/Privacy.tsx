@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { PRIVACY_EMAIL, SUPPORT_EMAIL } from "@/config/launch";
+import { WAITLIST_PRIVACY_NOTE } from "@/content/copy";
 import { PageMeta } from "@/components/seo/PageMeta";
 
 const Privacy = () => {
@@ -314,7 +315,7 @@ const Privacy = () => {
               </div>
             </AccordionTrigger>
             <AccordionContent className="text-muted-foreground space-y-4">
-              <p className="text-sm font-medium text-foreground">PLACEHOLDER for Cadre to confirm.</p>
+              <p className="text-sm font-medium text-foreground">{WAITLIST_PRIVACY_NOTE}</p>
               <p className="text-sm">
                 People who join the pre-launch waitlist give their name and email. They may also give an Instagram handle and a short note about what they make. If they check the box, Ether emails them when it opens. Ether stores the link source (src), an invite code (ref), whether the row is from the pre-launch list, and the time they joined. The list is not shown on the site.
               </p>

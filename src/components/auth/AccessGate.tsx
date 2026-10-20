@@ -5,6 +5,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { motion } from 'framer-motion';
 import bearLogo from '@/assets/ether-bear-logo.png';
 import { isKnownPath, isPublicPath } from "@/lib/appRoutes";
+import { NO_FAKE_LINE, WELCOME_HOME } from "@/content/copy";
 
 interface AccessGateProps {
   children: React.ReactNode;
@@ -96,8 +97,8 @@ const AccessGate = ({ children }: AccessGateProps) => {
     return <>{children}</>;
   }
 
-  // Show loading state while checking auth/profile
-  if (!isPublicRoute && (authLoading || profileLoading)) {
+  // Private routes, including /blog, stay behind sign-in.
+  if (!isPublicRoute && (authLoading || profileLoading || !user)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <motion.div
@@ -139,11 +140,11 @@ const AccessGate = ({ children }: AccessGateProps) => {
             </motion.div>
             
             <h2 className="ether-title mb-4 text-3xl text-foreground md:text-4xl">
-              Welcome home Familcy
+              {WELCOME_HOME}
             </h2>
             
             <p className="text-muted-foreground mb-8">
-              You've been accepted into the community. This is where you belong.
+              {NO_FAKE_LINE}
             </p>
             
             <motion.button
