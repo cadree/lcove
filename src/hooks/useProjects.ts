@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useEnergy, ENERGY_GAINS } from '@/hooks/useEnergy';
 import { errorMessage } from '@/lib/errorMessage';
+import { refreshXp } from '@/lib/xpRefresh';
 import type { Json, TablesUpdate } from '@/integrations/supabase/types';
 
 export interface ProjectDeliverable {
@@ -404,9 +405,10 @@ export const useProjects = (status?: string) => {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['my-projects'] });
+      if (variables.status === 'completed') refreshXp(queryClient);
     },
   });
 
@@ -754,6 +756,7 @@ export const useProjectApplications = (projectId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['joined-projects'] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       toast({ title: status === 'accepted' ? 'Application accepted!' : 'Application rejected' });
+      if (status === 'accepted') refreshXp(queryClient);
       
       // Award energy points to the applicant when their application is accepted
       if (status === 'accepted') {

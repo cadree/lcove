@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { dailyDecodeCopy, fileCode, nextQuest, questViews, streakFromDays, xpBar, xpLevel } from "./noviQuests.ts";
+import { dailyDecodeCopy, decryptedKey, fileCode, nextQuest, questViews, streakFromDays, suggestedActions, xpBar, xpLevel } from "./noviQuests.ts";
 
 describe("novi quests", () => {
   it("uses the same level bands as the XP ledger", () => {
@@ -35,6 +35,65 @@ describe("novi quests", () => {
 
   it("builds a file code from the real id", () => {
     assert.equal(fileCode("ab12-cd"), "FILE AB12");
+  });
+
+  it("says the first post earns 10 XP", () => {
+    const quests = questViews({
+      profileReady: true,
+      postCount: 0,
+      connectionCount: 0,
+      bookOpened: false,
+      completedProjects: 0,
+    });
+    const post = quests.find((quest) => quest.id === "first_post");
+    assert.equal(post?.detail, "Make your first post to earn 10 XP.");
+    assert.equal(post?.href, "/feed?action=create-post");
+    assert.equal(decryptedKey(quests), "enter_signal");
+  });
+
+  it("suggests the next undone XP actions", () => {
+    const fresh = suggestedActions(
+      {
+        profileReady: false,
+        postCount: 0,
+        connectionCount: 0,
+        bookOpened: false,
+        completedProjects: 0,
+      },
+      { dailyDone: false },
+    );
+    assert.equal(fresh.length, 3);
+    assert.deepEqual(
+      fresh.map((action) => action.id),
+      ["enter_signal", "first_post", "find_people"],
+    );
+    assert.equal(fresh[1]?.xp, 10);
+    assert.equal(fresh[1]?.href, "/feed?action=create-post");
+
+    const partial = suggestedActions({
+      profileReady: true,
+      postCount: 1,
+      connectionCount: 1,
+      bookOpened: true,
+      completedProjects: 0,
+    });
+    assert.equal(partial.length, 2);
+    assert.equal(partial[0]?.id, "find_people");
+    assert.match(partial[0]?.detail ?? "", /1 of 3 so far/);
+    assert.equal(partial[1]?.xp, 25);
+
+    const done = suggestedActions(
+      {
+        profileReady: true,
+        postCount: 1,
+        connectionCount: 3,
+        bookOpened: true,
+        completedProjects: 1,
+      },
+      { dailyDone: false, limit: 3 },
+    );
+    assert.deepEqual(done.map((action) => action.id), ["daily"]);
+    assert.equal(done[0]?.xp, 5);
   });
 
   it("reports the XP the daily cap actually wrote", () => {

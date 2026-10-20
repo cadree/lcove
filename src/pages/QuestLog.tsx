@@ -7,7 +7,9 @@ import { SquircleIcon } from "@/components/world/SquircleIcon";
 import { useNoviQuests } from "@/hooks/useNoviQuests";
 import { useEnergy } from "@/hooks/useEnergy";
 import { useCredits } from "@/hooks/useCredits";
-import { dailyDecodeCopy, type QuestView } from "@/lib/noviQuests";
+import { dailyDecodeCopy, decryptedKey, type QuestView } from "@/lib/noviQuests";
+import { useXpCelebrate } from "@/hooks/useXpCelebrate";
+import { XpMeter } from "@/components/novi/XpMeter";
 
 const tabs = ["Active", "Daily", "Story", "Done"] as const;
 type Tab = (typeof tabs)[number];
@@ -20,7 +22,8 @@ function visible(tab: Tab, quest: QuestView): boolean {
 }
 
 const QuestLog = () => {
-  const { quests, total, bar, streak, dailyDone, dailyXp, complete } = useNoviQuests();
+  const { quests, total, bar, streak, dailyDone, dailyXp, complete, isReady } = useNoviQuests();
+  const burst = useXpCelebrate(total, decryptedKey(quests), isReady);
   const { energy, currentEnergy } = useEnergy();
   const { balance } = useCredits();
   const [tab, setTab] = useState<Tab>("Active");
@@ -38,15 +41,7 @@ const QuestLog = () => {
           <p className="lore text-center text-[18px] text-foreground">Creator</p>
         </div>
         <div className="mt-3">
-          <div className="mb-1 flex items-center justify-between">
-            <span className="mono-label text-[9px] text-muted-foreground">{total} XP</span>
-            <span className="mono-label text-[9px] text-muted-foreground">
-              {bar.into}/{bar.span}
-            </span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-foreground/10">
-            <div className="h-full rounded-full bg-[linear-gradient(90deg,#FFD6E8,#FF9FC8)]" style={{ width: `${Math.round(bar.ratio * 100)}%` }} />
-          </div>
+          <XpMeter total={total} burstToken={burst} />
         </div>
         <div className="mt-4 grid grid-cols-3 gap-2">
           {[

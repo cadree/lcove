@@ -77,9 +77,9 @@ export function questViews(signals: QuestSignals): QuestView[] {
     {
       id: "first_post",
       title: "Send your first signal",
-      detail: "A post already writes 10 XP. This row only tracks it.",
+      detail: "Make your first post to earn 10 XP.",
       lane: "story",
-      href: "/feed",
+      href: "/feed?action=create-post",
       xp: 0,
       progress: Math.min(1, signals.postCount),
       target: 1,
@@ -120,6 +120,86 @@ export function questViews(signals: QuestSignals): QuestView[] {
 
 export function nextQuest(quests: QuestView[]): QuestView | null {
   return quests.find((quest) => quest.state !== "decrypted") ?? null;
+}
+
+export function decryptedKey(quests: QuestView[]): string {
+  return quests
+    .filter((quest) => quest.state === "decrypted")
+    .map((quest) => quest.id)
+    .join(",");
+}
+
+export interface SuggestedAction {
+  id: string;
+  title: string;
+  detail: string;
+  href: string;
+  xp: number;
+}
+
+const SUGGESTED: Record<QuestId, { title: string; detail: string; href: string; xp: number }> = {
+  enter_signal: {
+    title: "Finish your profile",
+    detail: "Add your name and city to earn 10 XP.",
+    href: "/onboarding",
+    xp: 10,
+  },
+  first_post: {
+    title: "Make your first post",
+    detail: "Make your first post to earn 10 XP.",
+    href: "/feed?action=create-post",
+    xp: 10,
+  },
+  find_people: {
+    title: "Add people",
+    detail: "Add 3 people from the directory to earn 10 XP.",
+    href: "/directory",
+    xp: 10,
+  },
+  read_book: {
+    title: "Open the Book",
+    detail: "Open the Book of LCOVE to earn 10 XP.",
+    href: "/book",
+    xp: 10,
+  },
+  finish_project: {
+    title: "Finish a project",
+    detail: "Complete a project to earn 25 XP.",
+    href: "/projects",
+    xp: 25,
+  },
+};
+
+/** Next undone actions that still earn XP. At most `limit` (default 3). */
+export function suggestedActions(
+  signals: QuestSignals,
+  options?: { dailyDone?: boolean; limit?: number },
+): SuggestedAction[] {
+  const limit = options?.limit ?? 3;
+  const rows: SuggestedAction[] = [];
+  for (const quest of questViews(signals)) {
+    if (quest.state === "decrypted") continue;
+    const copy = SUGGESTED[quest.id];
+    const progress =
+      quest.target > 1 && quest.progress > 0 ? ` ${quest.progress} of ${quest.target} so far.` : "";
+    rows.push({
+      id: quest.id,
+      title: copy.title,
+      detail: `${copy.detail}${progress}`,
+      href: copy.href,
+      xp: copy.xp,
+    });
+  }
+  if (options?.dailyDone === false) {
+    rows.push({
+      id: "daily",
+      title: "Decode today",
+      detail: "File today on the quest log. Up to 5 XP.",
+      href: "/quests",
+      xp: 5,
+    });
+  }
+  return rows.slice(0, Math.max(0, limit));
 }
 
 /** Copy for the daily decode tile. granted is the XP row that was written. */

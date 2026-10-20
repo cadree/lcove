@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { callRpc } from "@/lib/rpc";
@@ -19,6 +19,8 @@ export interface NoviBoard {
   completedProjects: number;
   profileReady: boolean;
 }
+
+const filedQuestIds = new Set<string>();
 
 const emptyBoard: NoviBoard = {
   total: 0,
@@ -81,7 +83,6 @@ export function useNoviQuests() {
     completedProjects: board.completedProjects,
   });
   const today = new Date().toISOString().slice(0, 10);
-  const filed = useRef(new Set<string>());
 
   const complete = useMutation({
     mutationFn: async (questId: string) => {
@@ -97,8 +98,9 @@ export function useNoviQuests() {
   useEffect(() => {
     if (!user || shotSessionEnabled() || !boardQuery.isSuccess) return;
     for (const quest of quests) {
-      if (quest.xp > 0 && quest.state === "decrypted" && !filed.current.has(quest.id)) {
-        filed.current.add(quest.id);
+      const key = `${user.id}:${quest.id}`;
+      if (quest.xp > 0 && quest.state === "decrypted" && !filedQuestIds.has(key)) {
+        filedQuestIds.add(key);
         complete.mutate(quest.id);
       }
     }
@@ -111,7 +113,15 @@ export function useNoviQuests() {
     streak: board.streakDays.length > 0 ? streakFromDays(board.streakDays, today) : board.streak,
     dailyXp: board.dailyXp,
     dailyDone: board.dailyDone,
+    signals: {
+      profileReady: board.profileReady,
+      postCount: board.postCount,
+      connectionCount: board.connectionCount,
+      bookOpened: board.bookOpened,
+      completedProjects: board.completedProjects,
+    },
     isLoading: boardQuery.isLoading,
+    isReady: boardQuery.isFetched,
     complete,
   };
 }

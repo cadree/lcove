@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { shotContentThin, shotPosts, shotSessionEnabled } from '@/lib/shotSession';
+import { refreshXp } from '@/lib/xpRefresh';
 
 interface Post {
   id: string;
@@ -120,6 +121,7 @@ export function usePosts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] });
       queryClient.invalidateQueries({ queryKey: ['profile-posts'] });
+      refreshXp(queryClient);
       toast.success('Post created!');
     },
     onError: (error) => {

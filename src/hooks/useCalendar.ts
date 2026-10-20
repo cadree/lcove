@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useEnergy, ENERGY_GAINS } from "@/hooks/useEnergy";
 import { parseCalendarDate } from "@/lib/calendarDate";
+import { refreshXp } from "@/lib/xpRefresh";
 
 export interface CalendarEvent {
   id: string;
@@ -359,6 +360,7 @@ export function useRSVP() {
         toast.success('Marked as interested! Reminder enabled.');
       } else if (status === 'going') {
         toast.success("You're going!");
+        refreshXp(queryClient);
 
         // Fire-and-forget confirmation email
         if (rsvpId) {
