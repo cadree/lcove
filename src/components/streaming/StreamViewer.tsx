@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -72,6 +72,12 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   useStreamPresence(streamId, open && !!user && !isHost && stream?.is_live === true);
   const streamStatus = stream ? getStreamStatus(stream) : 'draft';
   const hasReplay = streamStatus === 'ended' && stream?.replay_available && stream?.replay_url;
+  const hosting = stream?.stream_type === "webrtc" && isHost && streamStatus !== "ended";
+  const openedAt = useRef(Date.now());
+
+  useEffect(() => {
+    if (open) openedAt.current = Date.now();
+  }, [open, streamId]);
 
   // Join stream on mount (for viewers only, when stream is live)
   useEffect(() => {
@@ -259,10 +265,16 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
 
   return (
     <>
-      <Dialog open={open} onOpenChange={() => onClose()}>
+      <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
         <DialogContent
-          className="flex w-full min-w-0 max-w-full flex-col gap-0 overflow-x-hidden overflow-y-auto bg-background p-0"
+          className="flex w-full min-w-0 max-w-full flex-col gap-0 overflow-x-hidden overflow-y-auto bg-background p-0 [&>button]:hidden"
           style={{ maxWidth: "100%", maxHeight: "calc(100dvh - 2rem)" }}
+          onPointerDownOutside={(event) => {
+            if (Date.now() - openedAt.current < 700) event.preventDefault();
+          }}
+          onInteractOutside={(event) => {
+            if (Date.now() - openedAt.current < 700) event.preventDefault();
+          }}
         >
           <DialogTitle className="sr-only">{stream?.title || 'Live Stream'}</DialogTitle>
           <DialogDescription className="sr-only">
@@ -270,7 +282,10 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
           </DialogDescription>
           
           {/* Video Area */}
-          <div className="relative aspect-video max-h-[34vh] w-full min-w-0 shrink-0 overflow-hidden bg-black">
+          <div className={hosting
+            ? "relative w-full min-w-0 shrink-0 bg-black"
+            : "relative aspect-video max-h-[34vh] w-full min-w-0 shrink-0 overflow-hidden bg-black"
+          }>
             {streamLoading ? (
               <div className="w-full h-full flex items-center justify-center">
                 <Radio className="h-16 w-16 text-primary animate-pulse" />
@@ -432,13 +447,12 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
 
             {/* Reactions (only when live) */}
             {streamStatus === 'live' && (
-              <div className="flex gap-2 justify-center">
+              <div className="grid w-full grid-cols-6 gap-1">
                 {REACTIONS.map((emoji) => (
                   <Button
                     key={emoji}
                     variant="outline"
-                    size="lg"
-                    className="text-2xl hover:scale-110 transition-transform"
+                    className="h-11 w-full min-w-0 px-0 text-xl hover:scale-110 transition-transform"
                     onClick={() => handleReaction(emoji)}
                     disabled={!user}
                   >

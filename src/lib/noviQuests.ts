@@ -129,6 +129,12 @@ export function questViews(signals: QuestSignals): QuestView[] {
   return rows.map((row) => ({ ...row, state: stateFor(row.progress, row.target) }));
 }
 
+/** One decrypted quest to file on a page load. The rest wait for a later visit. */
+export function autoFileQuestId(quests: QuestView[], filedIds: ReadonlySet<string> = new Set()): string | null {
+  const next = quests.find((quest) => quest.xp > 0 && quest.state === "decrypted" && !filedIds.has(quest.id));
+  return next?.id ?? null;
+}
+
 export function nextQuest(quests: QuestView[]): QuestView | null {
   return quests.find((quest) => quest.id !== "open_studio" && quest.state !== "decrypted") ?? null;
 }

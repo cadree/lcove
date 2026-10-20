@@ -34,7 +34,7 @@ interface WebRTCStreamHostProps {
   onEnd: () => void;
 }
 
-type CameraState = "checking" | "not-configured" | "requesting" | "ready" | "error" | "denied";
+type CameraState = "checking" | "idle" | "not-configured" | "requesting" | "ready" | "error" | "denied";
 
 async function requestLiveKitSession(streamId: string): Promise<LiveKitSession> {
   const { data, error } = await supabase.functions.invoke("livekit-token", { body: { streamId } });
@@ -120,7 +120,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
           setErrorMessage("Only the host can go live.");
           return;
         }
-        await initCamera();
+        setCameraState("idle");
       } catch (err: unknown) {
         if (cancelled) return;
         setCameraState("error");
@@ -131,7 +131,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
     return () => {
       cancelled = true;
     };
-  }, [initCamera, streamId]);
+  }, [streamId]);
 
   const startRecording = (stream: MediaStream) => {
     recordedChunksRef.current = [];
@@ -182,9 +182,21 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
   };
 
   const startStream = async () => {
-    if (!user || cameraState !== "ready" || !localStreamRef.current) return;
+    if (!user || isGoingLive || isStreaming) return;
+    if (cameraState === "checking") {
+      toast({ title: "Still checking live video", description: "Try Go Live again in a moment." });
+      return;
+    }
+    if (cameraState === "not-configured") {
+      toast({ title: LIVE_VIDEO_NOT_CONFIGURED, variant: "destructive" });
+      return;
+    }
     setIsGoingLive(true);
     try {
+      if (!localStreamRef.current) {
+        await initCamera();
+      }
+      if (!localStreamRef.current) return;
       const session = await requestLiveKitSession(streamId);
       if (!session.configured) {
         setCameraState("not-configured");
@@ -338,6 +350,16 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
   };
 
   const renderCameraContent = () => {
+    if (cameraState === "idle") {
+      return (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
+          <div className="max-w-sm px-4 text-center">
+            <Radio className="mx-auto mb-4 h-12 w-12 text-primary" />
+            <p className="font-medium text-foreground">Tap Go Live to start your camera</p>
+          </div>
+        </div>
+      );
+    }
     if (cameraState === "checking" || cameraState === "requesting") {
       return (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
@@ -382,8 +404,8 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
   };
 
   return (
-    <div className="relative flex h-full min-h-[300px] w-full flex-col overflow-hidden rounded-lg bg-black">
-      <div className="relative min-h-0 flex-1">
+    <div className="relative flex w-full flex-col bg-black">
+      <div className="relative aspect-video w-full">
         <video
           ref={videoRef}
           autoPlay
@@ -424,7 +446,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
         className="flex-shrink-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-4 py-3"
       >
         <div className="mx-auto flex w-full max-w-[280px] flex-col items-center gap-3">
-          {cameraState === "ready" && (
+          {(cameraState === "ready" || cameraState === "idle") && (
             <div className="flex w-full items-center justify-between gap-3">
               <Label htmlFor="save-replay" className="text-sm text-white">Save replay</Label>
               <Switch
@@ -447,7 +469,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
             </div>
           )}
           {!isStreaming ? (
-            <Button onClick={startStream} className="h-11 w-full gap-2 rounded-xl bg-red-500 text-sm font-semibold hover:bg-red-600" disabled={cameraState !== "ready" || isGoingLive}>
+            <Button type="button" onClick={() => void startStream()} className="h-11 w-full gap-2 rounded-xl bg-red-500 text-sm font-semibold hover:bg-red-600" disabled={isGoingLive}>
               {isGoingLive ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radio className="h-4 w-4" />}
               Go Live
             </Button>

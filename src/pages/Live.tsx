@@ -247,6 +247,7 @@ const Live = () => {
   const { streams: allStreams, isLoading: loadingAll } = useLiveStreams(false);
 
   const [showCreate, setShowCreate] = useState(false);
+  const [queuedStreamId, setQueuedStreamId] = useState<string | null>(null);
   const [selectedStreamId, setSelectedStreamId] = useState<string | null>(null);
   const [editingStream, setEditingStream] = useState<LiveStream | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -255,6 +256,19 @@ const Live = () => {
     const streamId = searchParams.get("stream");
     if (streamId) setSelectedStreamId(streamId);
   }, [searchParams]);
+
+  // Open the host room after Setup stream has finished closing. Opening it in
+  // the same turn lets that dialog's dismiss land on the new viewer and drop
+  // the Go Live screen.
+  useEffect(() => {
+    if (showCreate || !queuedStreamId) return;
+    const streamId = queuedStreamId;
+    const timer = window.setTimeout(() => {
+      setSelectedStreamId(streamId);
+      setQueuedStreamId(null);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [showCreate, queuedStreamId]);
 
   // Handle action param from FAB
   useEffect(() => {
@@ -511,7 +525,7 @@ const Live = () => {
         <CreateStreamDialog 
           open={showCreate} 
           onClose={() => setShowCreate(false)} 
-          onStreamCreated={(streamId) => setSelectedStreamId(streamId)}
+          onStreamCreated={(streamId) => setQueuedStreamId(streamId)}
         />
 
         <EditStreamDialog

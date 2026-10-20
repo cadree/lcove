@@ -152,7 +152,7 @@ const Explore = () => {
               <h2 className="ether-title text-[15px]">Find your people</h2>
               <Link to="/directory" className="mono-label text-[9px] text-muted-foreground">Directory</Link>
             </div>
-            <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+            <div data-match-row className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
               {people.map((person) => (
                 <PeopleMatchCard
                   key={person.user_id}

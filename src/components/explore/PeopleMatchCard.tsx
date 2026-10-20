@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type PointerEvent } from "react";
 import { Link } from "react-router-dom";
+import { matchDropTarget, type MatchRect } from "@/lib/matchDrop";
 
 interface MatchPerson {
   user_id: string;
@@ -20,15 +21,32 @@ export function PeopleMatchCard({
   const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const suppressClick = useRef(false);
 
-  const finishDrag = (clientX: number, clientY: number) => {
+  const finishDrag = (event: PointerEvent<HTMLDivElement>) => {
     const moved = drag.current?.moved ?? false;
     drag.current = null;
     setDragging(false);
     if (!moved) return;
     suppressClick.current = true;
-    const hit = document.elementFromPoint(clientX, clientY);
-    const id = hit?.closest("[data-match-id]")?.getAttribute("data-match-id");
-    if (id && id !== person.user_id) onInvite(id);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    const scroller = event.currentTarget.closest("[data-match-row]");
+    const portRect = scroller?.getBoundingClientRect();
+    const port: MatchRect | null = portRect
+      ? { id: "port", left: portRect.left, top: portRect.top, right: portRect.right, bottom: portRect.bottom }
+      : null;
+    const cards: MatchRect[] = Array.from(document.querySelectorAll("[data-match-id]")).map((node) => {
+      const rect = node.getBoundingClientRect();
+      return {
+        id: node.getAttribute("data-match-id") || "",
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+      };
+    });
+    const id = matchDropTarget({ x: event.clientX, y: event.clientY }, cards, person.user_id, port);
+    if (id) onInvite(id);
   };
 
   return (
@@ -48,7 +66,7 @@ export function PeopleMatchCard({
           setDragging(true);
         }
       }}
-      onPointerUp={(event) => finishDrag(event.clientX, event.clientY)}
+      onPointerUp={(event) => finishDrag(event)}
       onPointerCancel={() => {
         drag.current = null;
         setDragging(false);

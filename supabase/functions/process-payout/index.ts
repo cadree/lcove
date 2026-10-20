@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { ledgerBalances } from "../_shared/credit-balances.ts";
 import { loadProfileConnect, syncPayoutEnabled, testStripe, withdrawalBlockedReason } from "../_shared/creator-connect.mjs";
+import { PayoutRefusal, interpretPayoutRequest } from "../_shared/payout-request.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,6 +24,8 @@ serve(async (req) => {
     { auth: { persistSession: false } }
   );
 
+  let legacyPayout = false;
+
   try {
     logStep("Function started");
 
@@ -35,17 +38,19 @@ serve(async (req) => {
     const user = userData.user;
     if (!user?.id) throw new Error("User not authenticated");
 
-    const { amount, project_id, role_id, use_credits } = await req.json();
-    
-    if (!amount || amount <= 0) throw new Error("Invalid amount");
-    if (!use_credits) {
-      throw new Error("Payouts use Stripe Connect. Open Wallet and finish payout setup. Ether does not store bank details.");
+    const decision = interpretPayoutRequest(await req.json());
+    if (!decision.ok) {
+      return new Response(JSON.stringify({ success: false, error: decision.error }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: decision.status,
+      });
     }
+    legacyPayout = decision.legacy;
+    const { amount, project_id, role_id } = decision;
 
     const stripe = testStripe();
 
-    // If using credits, convert from credit balance
-    if (use_credits) {
+    {
       const credits = await ledgerBalances(supabaseClient, user.id);
       const earnedBalance = credits.earned_balance;
 
@@ -76,16 +81,16 @@ serve(async (req) => {
       const withdrawable = Math.min(earnedBalance, Math.max(0, verifiedIn - convertedOut));
 
       if (withdrawable < amount) {
-        throw new Error(`Insufficient verified Earned Credit. Withdrawable ${withdrawable} LC, need ${amount} LC. Only credits from verified sources can be withdrawn.`);
+        throw new PayoutRefusal(`Insufficient verified Earned Credit. Withdrawable ${withdrawable} LC, need ${amount} LC. Only credits from verified sources can be withdrawn.`);
       }
 
       const profile = await loadProfileConnect(supabaseClient, user.id);
       if (!profile?.stripe_connect_account_id) {
-        throw new Error("Set up payouts in Wallet before requesting a payout.");
+        throw new PayoutRefusal("Set up payouts in Wallet before requesting a payout.");
       }
       const state = await syncPayoutEnabled(stripe, supabaseClient, user.id, profile.stripe_connect_account_id);
       const blocked = withdrawalBlockedReason(state);
-      if (blocked) throw new Error(blocked);
+      if (blocked) throw new PayoutRefusal(blocked);
 
       const { data: payout, error: payoutError } = await supabaseClient
         .from("payouts")
@@ -113,7 +118,7 @@ serve(async (req) => {
       } catch (transferError) {
         const message = transferError instanceof Error ? transferError.message : String(transferError);
         await supabaseClient.from("payouts").update({ status: "failed", error_message: message }).eq("id", payout.id);
-        throw new Error(message);
+        throw new PayoutRefusal(message);
       }
 
       const newTotalBalance = credits.balance - amount;
@@ -164,10 +169,11 @@ serve(async (req) => {
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    const soft = legacyPayout || error instanceof PayoutRefusal || (error instanceof Error && error.name === "PayoutRefusal");
+    logStep("ERROR", { message: errorMessage, status: soft ? 200 : 500 });
+    return new Response(JSON.stringify(soft ? { success: false, error: errorMessage } : { error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: soft ? 200 : 500,
     });
   }
 });
