@@ -233,6 +233,3 @@ verify_jwt = true
 
 [functions.create-stream-gift]
 verify_jwt = true
-
-[functions.create-film-checkout]
-verify_jwt = true

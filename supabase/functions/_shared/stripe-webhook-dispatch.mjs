@@ -95,10 +95,6 @@ async function applyCheckoutCompleted(session, db) {
     await db.recordStreamGift(session);
     await db.recordCheckoutCommunityFundFee(session, "stream_gift");
   }
-  if (type === "profile_film") {
-    await db.recordFilmUnlock(session);
-    await db.recordCheckoutCommunityFundFee(session, "profile_film");
-  }
 }
 
 async function applyCheckoutExpired(session, db) {
@@ -493,18 +489,6 @@ export function createSupabaseStripeDb(supabase, stripe) {
         gift: meta.gift || "gift",
         amount_cents: amount,
         platform_fee_cents: fee,
-        stripe_session_id: session.id,
-      });
-      if (isUniqueViolation(error)) return;
-      throwIf(error);
-    },
-
-    async recordFilmUnlock(session) {
-      const meta = session.metadata || {};
-      if (!meta.film_id || !meta.buyer_id) throw new Error("film checkout missing ids");
-      const { error } = await supabase.from("profile_film_unlocks").insert({
-        film_id: meta.film_id,
-        user_id: meta.buyer_id,
         stripe_session_id: session.id,
       });
       if (isUniqueViolation(error)) return;
