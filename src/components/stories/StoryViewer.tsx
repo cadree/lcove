@@ -225,8 +225,13 @@ const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
       .maybeSingle();
     try {
       await notifyStoryLike(currentStory.user_id, profile?.display_name || 'Someone', currentStory.id);
-    } catch {
-      toast.error('Could not notify');
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+          ? error.message
+          : 'Could not notify';
+      toast.error(message);
     }
   };
 

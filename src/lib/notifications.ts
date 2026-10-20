@@ -45,8 +45,11 @@ export const createNotification = async ({
       }
     }
 
-    // Insert notification into database
-    const { data: notification, error } = await supabase
+    // Do not .select() this row. The recipient is the only one who can read it.
+    // INSERT ... RETURNING is what .select() sends, and Postgres then rejects
+    // the whole statement because the sender fails the SELECT policy. The
+    // insert rolls back, so the owner sees no row and the error is easy to miss.
+    const { error } = await supabase
       .from('notifications')
       .insert([{
         user_id: userId,
@@ -54,9 +57,7 @@ export const createNotification = async ({
         title,
         body,
         data: data as Json,
-      }])
-      .select()
-      .single();
+      }]);
 
     if (error) {
       console.error('Error creating notification:', error);
@@ -90,7 +91,7 @@ export const createNotification = async ({
       console.error('Error sending push notification:', err);
     });
 
-    return notification;
+    return null;
   } catch (error) {
     console.error('Error in createNotification:', error);
     throw error;
