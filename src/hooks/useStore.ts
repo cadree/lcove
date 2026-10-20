@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { readFunctionError } from '@/lib/functionError';
 
 function asStoreRecord(store: unknown): (Store & { user_id: string }) | null {
   if (!store || typeof store !== "object" || Array.isArray(store)) return null;
@@ -24,8 +25,82 @@ export interface Store {
   flat_shipping_cents?: number | null;
   tax_line_label?: string | null;
   tax_line_cents?: number | null;
+  website_url?: string | null;
+  import_status?: string | null;
+  import_error?: string | null;
+  import_count?: number | null;
+  imported_at?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface StoreImportResult {
+  ok: boolean;
+  status: 'imported' | 'link' | 'failed';
+  source: 'shopify' | 'link' | null;
+  imported: number;
+  message: string;
+  shop?: string;
+}
+
+const IMPORT_STORAGE = 'ether-store-import';
+
+export function rememberStoreImport(storeId: string, result: StoreImportResult) {
+  sessionStorage.setItem(`${IMPORT_STORAGE}:${storeId}`, JSON.stringify(result));
+}
+
+export function readRememberedStoreImport(storeId: string): StoreImportResult | null {
+  try {
+    const raw = sessionStorage.getItem(`${IMPORT_STORAGE}:${storeId}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as StoreImportResult;
+  } catch {
+    return null;
+  }
+}
+
+export async function importStoreCatalog(storeId: string, shopUrl: string): Promise<StoreImportResult> {
+  const { data, error } = await supabase.functions.invoke('import-shopify-products', {
+    body: { storeId, shopUrl },
+  });
+  if (error || (data && typeof data === 'object' && 'error' in data && data.error)) {
+    const message = await readFunctionError(error, data, 'Could not import this store');
+    const result: StoreImportResult = {
+      ok: false,
+      status: 'failed',
+      source: null,
+      imported: 0,
+      message,
+    };
+    rememberStoreImport(storeId, result);
+    return result;
+  }
+  const payload = (data ?? {}) as { source?: string; imported?: number; message?: string; shop?: string };
+  const source = payload.source === 'link' ? 'link' : 'shopify';
+  const imported = Number(payload.imported ?? 0);
+  const result: StoreImportResult = {
+    ok: true,
+    status: source === 'link' ? 'link' : 'imported',
+    source,
+    imported,
+    message: payload.message
+      || (source === 'link'
+        ? 'This site did not publish a Shopify catalog. A link card was added from the page preview.'
+        : `Imported ${imported} product${imported === 1 ? '' : 's'}.`),
+    shop: payload.shop,
+  };
+  rememberStoreImport(storeId, result);
+  return result;
+}
+
+export async function readStoreImportMeta(storeId: string) {
+  const { data, error } = await supabase
+    .from('stores')
+    .select('website_url, import_status, import_error, import_count, imported_at')
+    .eq('id', storeId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data;
 }
 
 /** Columns safe to read from the client. Payment secrets live in store_secrets. */

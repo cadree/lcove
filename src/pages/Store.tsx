@@ -3,7 +3,8 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMyStore, useStoreItems, useMyStoreItems, useDeleteStoreItem, StoreItem, Store as StoreType, STORE_PUBLIC_COLUMNS } from '@/hooks/useStore';
+import { useMyStore, useStoreItems, useMyStoreItems, useDeleteStoreItem, readRememberedStoreImport, readStoreImportMeta, StoreItem, Store as StoreType, StoreImportResult, STORE_PUBLIC_COLUMNS } from '@/hooks/useStore';
+import { StoreBrandPanel } from '@/components/store/StoreBrandPanel';
 import { supabase } from '@/integrations/supabase/client';
 import PageLayout from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -19,7 +20,6 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,7 +42,6 @@ import {
   Sparkles,
   ArrowLeft,
   Trash2,
-  ExternalLink,
   Receipt,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -75,10 +74,42 @@ const Store = () => {
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [storeSetupOpen, setStoreSetupOpen] = useState(false);
+  const [importResult, setImportResult] = useState<StoreImportResult | null>(null);
+  const [showContinue, setShowContinue] = useState(
+    () => searchParams.get('setup') === '1' || sessionStorage.getItem('ether-continue-feed') === '1',
+  );
   const [editItem, setEditItem] = useState<StoreItem | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<StoreItem | null>(null);
   const handledQuery = useRef('');
+  const [importVersion, setImportVersion] = useState(0);
+
+  useEffect(() => {
+    if (!myStore?.id) return;
+    const remembered = readRememberedStoreImport(myStore.id);
+    if (remembered) setImportResult(remembered);
+    let cancel = false;
+    readStoreImportMeta(myStore.id).then((meta) => {
+      if (cancel || !meta?.import_status) return;
+      if (remembered) return;
+      const status = meta.import_status === 'link' || meta.import_status === 'failed' || meta.import_status === 'imported'
+        ? meta.import_status
+        : 'imported';
+      setImportResult({
+        ok: status !== 'failed',
+        status,
+        source: status === 'link' ? 'link' : 'shopify',
+        imported: meta.import_count ?? 0,
+        message: meta.import_error
+          || (status === 'link'
+            ? 'A link card was added from the page preview.'
+            : `Imported ${meta.import_count ?? 0} products.`),
+      });
+    }).catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
+  }, [myStore?.id, importVersion]);
 
   useEffect(() => {
     const key = searchParams.toString();
@@ -229,58 +260,11 @@ const Store = () => {
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to All Stores
                 </Button>
-                <div className="flex items-center gap-4">
-                  {viewingStore.logo_url ? (
-                    <img src={viewingStore.logo_url} alt="" className="mark-cutout h-16 w-16 object-contain" />
-                  ) : (
-                    <Avatar className="h-16 w-16 border-2 border-border">
-                      <AvatarImage src={viewingStore.profile?.avatar_url || undefined} />
-                      <AvatarFallback className="text-lg">{viewingStore.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                  )}
-                  <div>
-                    <h1 className="ether-title text-2xl text-foreground">{viewingStore.name}</h1>
-                    <p className="text-muted-foreground">
-                      {viewingStore.profile?.display_name}
-                      {viewingStore.profile?.city && ` • ${viewingStore.profile.city}`}
-                    </p>
-                    {viewingStore.description && (
-                      <p className="text-sm text-muted-foreground mt-1">{viewingStore.description}</p>
-                    )}
-                    {(viewingStore.shopify_store_url || viewingStore.peerspace_url) && (
-                      <div className="flex gap-2 mt-3">
-                        {viewingStore.shopify_store_url && (
-                          <Button variant="outline" size="sm" asChild>
-                            <a 
-                              href={viewingStore.shopify_store_url.startsWith('http') 
-                                ? viewingStore.shopify_store_url 
-                                : `https://${viewingStore.shopify_store_url}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <ExternalLink className="w-4 h-4 mr-2" />
-                              Shop on Shopify
-                            </a>
-                          </Button>
-                        )}
-                        {viewingStore.peerspace_url && (
-                          <Button variant="outline" size="sm" asChild>
-                            <a 
-                              href={viewingStore.peerspace_url.startsWith('http') 
-                                ? viewingStore.peerspace_url 
-                                : `https://${viewingStore.peerspace_url}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <ExternalLink className="w-4 h-4 mr-2" />
-                              Book on Peerspace
-                            </a>
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <StoreBrandPanel
+                  store={viewingStore}
+                  importResult={isViewingOwnStore ? importResult : null}
+                  showContinue={!!isViewingOwnStore && showContinue}
+                />
               </div>
             ) : (
               <PageHeader
@@ -381,6 +365,13 @@ const Store = () => {
               {/* Content */}
               {['products', 'services', 'rentals', 'my-store', 'orders'].map((tabId) => (
                 <TabsContent key={tabId} value={tabId}>
+                  {(tabId === 'products' || tabId === 'my-store') && myStore && !storeIdParam && (
+                    <StoreBrandPanel
+                      store={myStore}
+                      importResult={importResult}
+                      showContinue={showContinue}
+                    />
+                  )}
                   {tabId === 'orders' ? (
                     <BuyerOrders />
                   ) : tabId === 'my-store' && myStore ? (
@@ -500,7 +491,13 @@ const Store = () => {
 
       <StoreSetupDialog
         open={storeSetupOpen}
-        onOpenChange={setStoreSetupOpen}
+        onOpenChange={(open) => {
+          setStoreSetupOpen(open);
+          if (!open) {
+            setShowContinue(sessionStorage.getItem('ether-continue-feed') === '1');
+            setImportVersion((version) => version + 1);
+          }
+        }}
         store={myStore}
       />
 

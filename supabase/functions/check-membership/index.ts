@@ -8,6 +8,7 @@ import {
   subscriptionPeriodUnix,
   tierFromStripeSubscription,
 } from "../_shared/membership-products.mjs";
+import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -41,8 +42,7 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
+    const stripeKey = assertStripeTestKey(Deno.env.get("STRIPE_SECRET_KEY"));
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header provided");

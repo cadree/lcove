@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { isGrantEligible } from "@/lib/grantEligibility";
 import { toast } from "sonner";
+import { readFunctionError } from "@/lib/functionError";
 
 export interface MembershipStatus {
   subscribed: boolean;
@@ -70,11 +71,11 @@ export const useMembership = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
-  const checkMembership = useCallback(async () => {
+  const checkMembership = useCallback(async (): Promise<MembershipStatus | null> => {
     if (!user) {
       setMembership(null);
       setIsLoading(false);
-      return;
+      return null;
     }
 
     // The webhook writes memberships. RLS lets the owner read that row.
@@ -92,7 +93,7 @@ export const useMembership = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         if (!row) setMembership(null);
-        return;
+        return row;
       }
 
       const { data, error } = await supabase.functions.invoke("check-membership", {
@@ -104,12 +105,15 @@ export const useMembership = () => {
       if (error || !data || data.error) {
         if (!row) setMembership(null);
         if (error) console.error("Error checking membership:", error);
-        return;
+        return row;
       }
-      setMembership(membershipFromPayload(data));
+      const next = membershipFromPayload(data);
+      setMembership(next);
+      return next;
     } catch (error) {
       console.error("Error checking membership:", error);
       if (!row) setMembership(null);
+      return row;
     } finally {
       setIsLoading(false);
     }
@@ -149,7 +153,9 @@ export const useMembership = () => {
         },
       });
 
-      if (error) throw error;
+      if (error || data?.error) {
+        throw new Error(await readFunctionError(error, data, "Failed to start checkout"));
+      }
       if (data?.url) {
         // Try window.open first, then location.href, then show manual link
         const win = window.open(data.url, "_blank");
@@ -169,7 +175,7 @@ export const useMembership = () => {
       }
     } catch (error) {
       console.error("Error starting checkout:", error);
-      toast.error("Failed to start checkout. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Failed to start checkout. Please try again.");
     } finally {
       setIsCheckingOut(false);
     }
@@ -196,7 +202,9 @@ export const useMembership = () => {
         },
       });
 
-      if (error) throw error;
+      if (error || data?.error) {
+        throw new Error(await readFunctionError(error, data, "Failed to open billing portal"));
+      }
       if (data?.url) {
         const win = window.open(data.url, "_blank");
         if (!win || win.closed) {
@@ -215,7 +223,7 @@ export const useMembership = () => {
       }
     } catch (error) {
       console.error("Error opening portal:", error);
-      toast.error("Failed to open billing portal. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Failed to open billing portal. Please try again.");
     }
   };
 

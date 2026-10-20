@@ -47,43 +47,45 @@ export const PreviewPlayer = ({
     if (!audioRef.current) {
       const audio = new Audio(audioUrl);
       audio.preload = "metadata";
+      audio.addEventListener("loadedmetadata", () => {
+        try {
+          audio.currentTime = locked ? startSeconds : 0;
+        } catch {
+          // ignore seek errors
+        }
+      });
+      audio.addEventListener("timeupdate", () => {
+        if (!locked) {
+          setProgress(audio.duration ? audio.currentTime / audio.duration : 0);
+          return;
+        }
+        const elapsed = audio.currentTime - startSeconds;
+        setProgress(Math.min(1, Math.max(0, elapsed / durationSeconds)));
+        if (elapsed >= durationSeconds) {
+          audio.pause();
+          try {
+            audio.currentTime = startSeconds;
+          } catch {
+            // ignore seek errors
+          }
+          setIsPlaying(false);
+          setProgress(0);
+        }
+      });
+      audio.addEventListener("ended", () => {
+        setIsPlaying(false);
+        setProgress(0);
+      });
       audioRef.current = audio;
     }
     const audio = audioRef.current;
-
-    const onLoaded = () => {
+    if (audio.readyState >= 1) {
       try {
-        audio.currentTime = locked ? startSeconds : 0;
+        audio.currentTime = locked ? startSeconds : audio.currentTime;
       } catch {
         // ignore seek errors
       }
-    };
-
-    const onTime = () => {
-      if (!locked) {
-        setProgress(audio.duration ? audio.currentTime / audio.duration : 0);
-        return;
-      }
-      const elapsed = audio.currentTime - startSeconds;
-      setProgress(Math.min(1, Math.max(0, elapsed / durationSeconds)));
-      if (elapsed >= durationSeconds) {
-        audio.pause();
-        audio.currentTime = startSeconds;
-        setIsPlaying(false);
-        setProgress(0);
-      }
-    };
-
-    const onEnded = () => {
-      setIsPlaying(false);
-      setProgress(0);
-    };
-
-    audio.addEventListener("loadedmetadata", onLoaded, { once: true });
-    audio.addEventListener("timeupdate", onTime);
-    audio.addEventListener("ended", onEnded);
-
-    if (audio.readyState >= 1) onLoaded();
+    }
     audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
   };
 

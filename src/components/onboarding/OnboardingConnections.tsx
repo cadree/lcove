@@ -32,7 +32,7 @@ const options: ConnectionOption[] = [
     title: 'Set Up Your Store',
     description: 'Sell products, offer services, or list studio rentals',
     color: 'from-primary/20 to-primary/10',
-    route: '/store',
+    route: '/store?setup=1',
   },
   {
     id: 'membership',
@@ -120,7 +120,7 @@ const OnboardingConnections = ({ onComplete, onBack }: Props) => {
             Back
           </Button>
           <Button onClick={handleSkip} className="glow-pink">
-            Skip for now
+            Continue to the feed
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </motion.div>

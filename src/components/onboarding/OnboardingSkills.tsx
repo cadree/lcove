@@ -18,6 +18,7 @@ interface Skill {
   category: string | null;
 }
 
+// Signup no longer mounts this step. Skills and tools stay editable on the profile.
 const OnboardingSkills = ({ data, updateData, onNext, onBack }: Props) => {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [loading, setLoading] = useState(true);

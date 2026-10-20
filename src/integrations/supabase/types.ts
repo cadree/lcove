@@ -6396,6 +6396,11 @@ export type Database = {
           tax_line_label: string | null
           updated_at: string
           user_id: string
+          website_url: string | null
+          import_status: string | null
+          import_error: string | null
+          import_count: number | null
+          imported_at: string | null
         }
         Insert: {
           accepts_cash?: boolean | null
@@ -6418,6 +6423,11 @@ export type Database = {
           tax_line_label?: string | null
           updated_at?: string
           user_id: string
+          website_url?: string | null
+          import_status?: string | null
+          import_error?: string | null
+          import_count?: number | null
+          imported_at?: string | null
         }
         Update: {
           accepts_cash?: boolean | null
@@ -6440,6 +6450,11 @@ export type Database = {
           tax_line_label?: string | null
           updated_at?: string
           user_id?: string
+          website_url?: string | null
+          import_status?: string | null
+          import_error?: string | null
+          import_count?: number | null
+          imported_at?: string | null
         }
         Relationships: []
       }
