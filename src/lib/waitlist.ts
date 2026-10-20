@@ -28,6 +28,14 @@ export function founderInvitePath(token: string): string {
   return `/auth?invite=${encodeURIComponent(token)}`;
 }
 
+/** Stored on the auth user at signup so a later browser can claim the invite. */
+export const WAITLIST_INVITE_METADATA_KEY = "waitlist_invite_token";
+
+export function inviteTokenFromMetadata(metadata: { [key: string]: unknown } | null | undefined): string {
+  const value = metadata?.[WAITLIST_INVITE_METADATA_KEY];
+  return typeof value === "string" ? value.trim() : "";
+}
+
 export function csvCell(value: string | null | undefined): string {
   const text = value ?? "";
   if (/[",\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;

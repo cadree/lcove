@@ -6,7 +6,7 @@ import { Capacitor } from '@capacitor/core';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
-import { PENDING_SIGNUP_KEY, applyPendingSignupProfile } from '@/lib/pendingSignup';
+import { PENDING_SIGNUP_KEY, applyPendingSignupProfile, inviteTokenFromMetadata } from '@/lib/pendingSignup';
 import { captureSignupAttribution } from '@/lib/signupAttribution';
 import { WAITLIST_MODE } from '@/config/launch';
 import { PageMeta } from '@/components/seo/PageMeta';
@@ -165,7 +165,11 @@ const Auth = () => {
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email,
-      options: { emailRedirectTo: getAuthRedirectUrl('/auth?confirmed=1') },
+      options: {
+        emailRedirectTo: getAuthRedirectUrl(
+          inviteToken ? `/auth?confirmed=1&invite=${encodeURIComponent(inviteToken)}` : '/auth?confirmed=1',
+        ),
+      },
     });
     setIsResending(false);
     if (error) {
@@ -224,7 +228,7 @@ const Auth = () => {
     if (!user || mode === 'reset' || mode === 'forgot') return;
     if (inviteToken && inviteState === 'checking') return;
     let cancelled = false;
-    applyPendingSignupProfile(user.id).then((result) => {
+    applyPendingSignupProfile(user.id, inviteTokenFromMetadata(user.user_metadata)).then((result) => {
       if (cancelled) return;
       if (result === 'invite-failed') {
         toast({
@@ -334,7 +338,7 @@ const Auth = () => {
           phone: phone.trim(),
           ...(inviteToken ? { inviteToken } : {}),
         }));
-        const { error, session } = await signUp(email, password);
+        const { error, session } = await signUp(email, password, inviteToken || undefined);
         if (error) {
           logAuthError('Signup failed', error);
           const { title, description } = getAuthErrorMessage(error);
@@ -463,6 +467,12 @@ const Auth = () => {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
         >
+          {inviteState === 'inactive' && (
+            <p className="mb-4 text-center text-sm text-destructive" role="status">
+              This invite is not active.
+            </p>
+          )}
+
           {(mode === 'login' || mode === 'signup') && (
             <div className="mb-8 flex rounded-[16px] border border-border p-1">
               <button

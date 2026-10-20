@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { publicJoinPath } from "./publicJoin.ts";
-import { normalizeWaitlistSrc, csvCell, waitlistInvitePath, founderInvitePath, parseWaitlistImportCsv } from "./waitlist.ts";
+import { normalizeWaitlistSrc, csvCell, waitlistInvitePath, founderInvitePath, parseWaitlistImportCsv, inviteTokenFromMetadata } from "./waitlist.ts";
 import { attributionFromSearch, captureSignupAttribution } from "./signupAttribution.ts";
 import { shouldScrollReveal } from "./reveal.ts";
 import { formatAxisDollars } from "./formatAxisDollars.ts";
@@ -32,6 +32,9 @@ describe("waitlist helpers", () => {
   it("builds a private ref link and escapes csv cells", () => {
     assert.equal(waitlistInvitePath("ab23cd45"), "/waitlist?ref=ab23cd45");
     assert.equal(founderInvitePath("tok en"), "/auth?invite=tok%20en");
+    assert.equal(inviteTokenFromMetadata({ waitlist_invite_token: " abc " }), "abc");
+    assert.equal(inviteTokenFromMetadata({}), "");
+    assert.equal(inviteTokenFromMetadata(null), "");
     assert.equal(csvCell('say "hi", pal'), '"say ""hi"", pal"');
   });
 

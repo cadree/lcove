@@ -1,8 +1,10 @@
 -- Pre-launch waitlist. Do not apply this file from the app. Cadre applies it.
+-- Renamed from 20261020160000_waitlist.sql after that version was applied on ether-prod.
+-- Creating the table is skipped when it already exists. Functions are replaced in place.
 -- anon cannot select, update, or delete. Inserts go only through join_waitlist.
 -- The function returns one ref code and no other row data.
 
-CREATE TABLE public.waitlist (
+CREATE TABLE IF NOT EXISTS public.waitlist (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
   email text NOT NULL,
