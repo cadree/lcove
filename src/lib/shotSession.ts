@@ -25,6 +25,7 @@ export const shotProfile = {
   created_at: "2026-10-01T00:00:00.000Z",
   updated_at: "2026-10-01T00:00:00.000Z",
   mindset_level: 1,
+  onboarding_level: null,
   access_status: "active" as const,
   onboarding_score: null,
   passed_exam: false,

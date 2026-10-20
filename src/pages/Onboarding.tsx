@@ -14,7 +14,7 @@ import OnboardingQuestionnaire from '@/components/onboarding/OnboardingQuestionn
 import OnboardingConnections from '@/components/onboarding/OnboardingConnections';
 import OnboardingCompletion from '@/components/onboarding/OnboardingCompletion';
 import { buildUserPassionInserts } from '@/lib/onboardingPassions';
-import { QUIZ_QUESTIONS, scoreMindsetSpread, type ChoiceId } from '@/lib/onboardingQuiz';
+import { scoreRedFlags, clearQuizSeed, type ChoiceId } from '@/lib/onboardingQuiz';
 
 export interface OnboardingData {
   displayName: string;
@@ -80,10 +80,7 @@ const Onboarding = () => {
     score: number;
     passed: boolean;
   } => {
-    const choices = QUIZ_QUESTIONS.map((question) => responses[question.id]).filter(
-      (choice): choice is ChoiceId => choice === 'A' || choice === 'B' || choice === 'C',
-    );
-    const result = scoreMindsetSpread(choices);
+    const result = scoreRedFlags(responses);
     return { level: result.level, score: result.score, passed: result.passed };
   };
 
@@ -155,9 +152,10 @@ const Onboarding = () => {
       }
 
       sessionStorage.setItem('onboarding_just_completed', 'true');
+      clearQuizSeed(window.sessionStorage);
 
-      // Finishing onboarding always grants access. passed_exam records a
-      // spread of mindsets. It does not lock anyone out.
+      // Finishing onboarding always grants access. passed_exam records
+      // whether the red-flag count stayed under the threshold.
       await updateProfile({
         display_name: data.displayName.trim(),
         city: data.city,
@@ -167,6 +165,7 @@ const Onboarding = () => {
         access_level: passedExam ? 'level_2' : 'level_1',
         onboarding_completed: true,
         mindset_level: level,
+        onboarding_level: level,
         access_status: 'active',
         onboarding_score: score,
         passed_exam: passedExam,
