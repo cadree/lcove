@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { notifyStoryLike } from '@/lib/notifications';
+import { storyStartIndex } from '@/lib/likeNotice';
 import { storyAdvanceHeld } from '@/lib/sharing';
 import { ShareSheet } from '@/components/share/ShareSheet';
 import { toast } from 'sonner';
@@ -39,10 +40,11 @@ interface StoryViewerProps {
   stories: Story[];
   onClose: () => void;
   onNextUser: () => void;
+  initialStoryId?: string;
 }
 
-const StoryViewer = ({ stories, onClose, onNextUser }: StoryViewerProps) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryViewerProps) => {
+  const [currentIndex, setCurrentIndex] = useState(() => storyStartIndex(stories, initialStoryId));
   const [progress, setProgress] = useState(0);
   const [viewCount, setViewCount] = useState(0);
   const [paused, setPaused] = useState(false);

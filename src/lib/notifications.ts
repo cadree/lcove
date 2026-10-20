@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
+import { postLikeFields } from './likeNotice';
 
 type NotificationType = 'message' | 'like' | 'comment' | 'follow' | 'project_invite' | 'event_reminder' | 'live_stream';
 
@@ -123,19 +124,24 @@ export const notifyStoryLike = (userId: string, likerName: string, storyId: stri
   return createNotification({
     userId,
     type: 'like',
-    title: 'Story like',
-    body: `${likerName} liked your story`,
+    title: `${likerName} liked your story`,
     data: { story_id: storyId },
   });
 };
 
-export const notifyPostLike = (userId: string, likerName: string, postId: string) => {
+export const notifyPostLike = (
+  userId: string,
+  likerName: string,
+  postId: string,
+  preview?: { caption?: string | null; mediaUrl?: string | null; mediaType?: string | null },
+) => {
+  const fields = postLikeFields(preview);
   return createNotification({
     userId,
     type: 'like',
-    title: 'Someone liked your post',
-    body: `${likerName} liked your post`,
-    data: { post_id: postId },
+    title: `${likerName} liked your post`,
+    body: fields.body,
+    data: { post_id: postId, ...fields.data },
   });
 };
 

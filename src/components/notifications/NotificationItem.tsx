@@ -4,12 +4,15 @@ import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, X, type Lu
 import { cn } from '@/lib/utils';
 import { Notification, NotificationType } from '@/hooks/useNotifications';
 import { SquircleIcon, type IconFill } from '@/components/world/SquircleIcon';
+import { notificationDisplay, type PostLikePreview } from '@/lib/likeNotice';
 
 interface NotificationItemProps {
   notification: Notification;
   onRead: (id: string) => void;
   onDelete: (id: string) => void;
   onProjectInviteTap?: (notification: Notification) => void;
+  onActivate?: (notification: Notification) => void;
+  preview?: PostLikePreview | null;
 }
 
 const notificationMark: Record<NotificationType, { icon: LucideIcon; fill: IconFill }> = {
@@ -27,8 +30,11 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   onRead,
   onDelete,
   onProjectInviteTap,
+  onActivate,
+  preview,
 }) => {
   const isUnread = !notification.read_at;
+  const display = notificationDisplay(notification, preview);
 
   const handleClick = () => {
     if (isUnread) {
@@ -36,7 +42,9 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
     }
     if (notification.type === 'project_invite' && onProjectInviteTap) {
       onProjectInviteTap(notification);
+      return;
     }
+    onActivate?.(notification);
   };
 
   return (
@@ -65,17 +73,36 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
           "font-body text-sm",
           isUnread ? "font-bold text-foreground" : "text-muted-foreground"
         )}>
-          {notification.title}
+          {display.title}
         </p>
-        {notification.body && (
+        {display.detail && (
           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-            {notification.body}
+            {display.detail}
           </p>
         )}
         <p className="mono-label mt-1 text-[9px] text-muted-foreground">
           {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
         </p>
       </div>
+
+      {display.thumbUrl && (
+        display.thumbIsVideo ? (
+          <video
+            src={display.thumbUrl}
+            muted
+            playsInline
+            preload="metadata"
+            aria-hidden
+            className="h-11 w-11 shrink-0 rounded-[2px] object-cover"
+          />
+        ) : (
+          <img
+            src={display.thumbUrl}
+            alt=""
+            className="h-11 w-11 shrink-0 rounded-[2px] object-cover"
+          />
+        )
+      )}
 
       {/* Delete button */}
       <button
