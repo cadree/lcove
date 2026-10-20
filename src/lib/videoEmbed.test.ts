@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import vm from "node:vm";
+import { embedPageResponse, innerPlayerSrc } from "../../functions/embed/player.js";
 import {
+  NATIVE_EMBED_PAGE,
+  VIDEO_EMBED_MIGRATION_FILE,
   canonicalEmbedUrl,
   embedColumnsForInsert,
   embedFromPost,
   embedPlayerSrc,
   fetchEmbedPreview,
+  nativeEmbedFrameSrc,
   parseVideoEmbedUrl,
   sanitizeThumbnailUrl,
   youtubeThumbnailUrl,
@@ -119,6 +125,19 @@ describe("embedPlayerSrc", () => {
     assert.match(vimeo ?? "", /h=a1b2c3d4/);
   });
 
+  it("points the native app at the https wrapper and nowhere else", () => {
+    const youtube = nativeEmbedFrameSrc({ provider: "youtube", id: YOUTUBE_ID });
+    assert.equal(youtube, `${NATIVE_EMBED_PAGE}?provider=youtube&id=${YOUTUBE_ID}`);
+    assert.equal(youtube?.startsWith("https://etherbylcove.com/embed/player?"), true);
+    assert.equal(youtube?.includes("youtube.com"), false);
+
+    const vimeo = nativeEmbedFrameSrc({ provider: "vimeo", id: VIMEO_ID, hash: "a1b2c3d4" });
+    assert.equal(vimeo, `${NATIVE_EMBED_PAGE}?provider=vimeo&id=${VIMEO_ID}&h=a1b2c3d4`);
+    assert.equal(nativeEmbedFrameSrc({ provider: "youtube", id: "javascript" }), null);
+    assert.equal(nativeEmbedFrameSrc({ provider: "youtube", id: YOUTUBE_ID, hash: "abcd" }), null);
+    assert.equal(nativeEmbedFrameSrc({ provider: "vimeo", id: VIMEO_ID, hash: "../evil" }), null);
+  });
+
   it("refuses to turn a poisoned id into an iframe src", () => {
     assert.equal(embedPlayerSrc({ provider: "youtube", id: "javascript" }), null);
     assert.equal(embedPlayerSrc({ provider: "youtube", id: `${YOUTUBE_ID}"onload=` }), null);
@@ -212,5 +231,87 @@ describe("fetchEmbedPreview", () => {
     );
     assert.equal(failed.thumbnailUrl, null);
     assert.equal(failed.title, null);
+  });
+});
+
+function staticPlayerFrame(search, origin) {
+  const html = readFileSync(new URL("../../public/embed/player.html", import.meta.url), "utf8");
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(script);
+  const frames = [];
+  const context = {
+    URLSearchParams,
+    window: {
+      location: {
+        search,
+        protocol: new URL(origin).protocol,
+        origin: new URL(origin).origin,
+      },
+    },
+    document: {
+      createElement() {
+        return {
+          allow: "",
+          allowFullscreen: false,
+          referrerPolicy: "",
+          src: "",
+          title: "",
+          setAttribute() {},
+        };
+      },
+      body: {
+        appendChild(frame) {
+          frames.push(frame);
+        },
+      },
+    },
+  };
+  vm.runInNewContext(script, context);
+  return frames[0] ?? null;
+}
+
+describe("https embed wrapper", () => {
+  it("keeps the migration filename off the timestamp used by content report reasons", () => {
+    assert.equal(VIDEO_EMBED_MIGRATION_FILE, "supabase/migrations/20261020230000_post_video_embeds.sql");
+    assert.equal(existsSync(new URL(`../../${VIDEO_EMBED_MIGRATION_FILE}`, import.meta.url)), true);
+    assert.equal(existsSync(new URL("../../supabase/migrations/20261020120000_post_video_embeds.sql", import.meta.url)), false);
+  });
+
+  it("serves only a youtube-nocookie or Vimeo player from the https page", async () => {
+    const page = new URL(`${NATIVE_EMBED_PAGE}?provider=youtube&id=${YOUTUBE_ID}`);
+    const response = embedPageResponse(page);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
+    const html = await response.text();
+    const src = innerPlayerSrc(page);
+    assert.equal(src, `https://www.youtube-nocookie.com/embed/${YOUTUBE_ID}?rel=0&playsinline=1&origin=https%3A%2F%2Fetherbylcove.com`);
+    assert.match(html, new RegExp(`src="${src?.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
+    assert.equal(html.includes("<script"), false);
+    assert.equal(staticPlayerFrame(`?provider=youtube&id=${YOUTUBE_ID}`, "https://etherbylcove.com").src, src);
+
+    const vimeoPage = new URL(`${NATIVE_EMBED_PAGE}?provider=vimeo&id=${VIMEO_ID}&h=a1b2c3d4`);
+    assert.equal(
+      innerPlayerSrc(vimeoPage),
+      embedPlayerSrc({ provider: "vimeo", id: VIMEO_ID, hash: "a1b2c3d4" }),
+    );
+    assert.equal(staticPlayerFrame(`?provider=vimeo&id=${VIMEO_ID}&h=a1b2c3d4`, "https://etherbylcove.com").src, innerPlayerSrc(vimeoPage));
+  });
+
+  it("rejects hosts and ids that are not YouTube or Vimeo", async () => {
+    const rejected = [
+      `${NATIVE_EMBED_PAGE}?provider=instagram&id=${YOUTUBE_ID}`,
+      `${NATIVE_EMBED_PAGE}?provider=youtube&id=short`,
+      `${NATIVE_EMBED_PAGE}?provider=youtube&id=${YOUTUBE_ID}&h=abcd`,
+      `${NATIVE_EMBED_PAGE}?provider=youtube&id=${YOUTUBE_ID}%22onload=`,
+      `${NATIVE_EMBED_PAGE}?url=https://evil.example/embed`,
+      `${NATIVE_EMBED_PAGE}?provider=vimeo&id=123`,
+      `${NATIVE_EMBED_PAGE}?provider=vimeo&id=${VIMEO_ID}&h=../evil`,
+    ];
+    for (const value of rejected) {
+      const response = embedPageResponse(new URL(value));
+      assert.equal(response.status, 400, value);
+      assert.equal(await response.text(), "Only a YouTube or Vimeo video can be embedded.");
+      assert.equal(staticPlayerFrame(new URL(value).search, "https://etherbylcove.com"), null);
+    }
   });
 });

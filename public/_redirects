@@ -1,1 +1,4 @@
+# /embed/player is functions/embed/player.js. Pages Functions run before this
+# splat, so the catch-all must not be forced with !. /embed/player.html is a
+# real file for hosts that serve public/ as-is.
 /* /index.html 200

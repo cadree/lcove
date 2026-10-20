@@ -13,7 +13,7 @@ import { CreatePostDialog } from "@/components/profile/CreatePostDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { toast } from "sonner";
-import { embedColumnMissing, embedColumnsForInsert, embedFromPost } from "@/lib/videoEmbed";
+import { embedColumnMissing, embedColumnsForInsert, embedFromPost, videoEmbedMigrationMessage } from "@/lib/videoEmbed";
 import { EmbedThumbnail } from "@/components/feed/EmbedPlayer";
 import type { ComposePostInput } from "@/types/post";
 
@@ -190,7 +190,7 @@ const Portfolios = () => {
     },
     onError: (error) => {
       toast.error(embedColumnMissing(error)
-        ? 'Video links need the database update in supabase/migrations/20261020120000_post_video_embeds.sql before they can be published.'
+        ? videoEmbedMigrationMessage()
         : 'Failed to share work');
       console.error(error);
     },

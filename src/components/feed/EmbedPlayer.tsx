@@ -1,5 +1,6 @@
+import { Capacitor } from "@capacitor/core";
 import { cn } from "@/lib/utils";
-import { embedPlayerSrc, sanitizeThumbnailUrl, youtubeThumbnailUrl, type VideoEmbed } from "@/lib/videoEmbed";
+import { embedPlayerSrc, nativeEmbedFrameSrc, sanitizeThumbnailUrl, youtubeThumbnailUrl, type VideoEmbed } from "@/lib/videoEmbed";
 
 interface EmbedPlayerProps {
   embed: VideoEmbed;
@@ -10,9 +11,12 @@ interface EmbedPlayerProps {
 /**
  * The iframe src is built from a checked provider and id.
  * A pasted URL is never assigned to src.
+ * In the Capacitor app the src is the https wrapper on etherbylcove.com.
+ * That page embeds youtube-nocookie or the Vimeo player, so YouTube
+ * receives an https referrer instead of capacitor://localhost (error 153).
  */
 export function EmbedPlayer({ embed, title, className }: EmbedPlayerProps) {
-  const src = embedPlayerSrc(embed);
+  const src = Capacitor.isNativePlatform() ? nativeEmbedFrameSrc(embed) : embedPlayerSrc(embed);
   if (!src) return null;
   const label = title?.trim() || (embed.provider === "youtube" ? "YouTube video" : "Vimeo video");
 

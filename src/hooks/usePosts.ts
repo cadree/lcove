@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { shotContentThin, shotPosts, shotSessionEnabled } from '@/lib/shotSession';
-import { embedColumnMissing, embedColumnsForInsert, type EmbedDraft, type StoredEmbedFields } from '@/lib/videoEmbed';
+import { embedColumnMissing, embedColumnsForInsert, videoEmbedMigrationMessage, type EmbedDraft, type StoredEmbedFields } from '@/lib/videoEmbed';
 
 interface Post extends StoredEmbedFields {
   id: string;
@@ -138,7 +138,7 @@ export function usePosts() {
     },
     onError: (error) => {
       toast.error(embedColumnMissing(error)
-        ? 'Video links need the database update in supabase/migrations/20261020120000_post_video_embeds.sql before they can be published.'
+        ? videoEmbedMigrationMessage()
         : 'Failed to create post');
       console.error(error);
     },

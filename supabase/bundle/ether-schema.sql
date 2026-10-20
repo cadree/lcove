@@ -18233,11 +18233,11 @@ $ether_m149s3$;
 END
 $ether_m149$;
 
--- 20261020120000_post_video_embeds.sql
+-- 20261020230000_post_video_embeds.sql
 DO $ether_m150$
 BEGIN
-  IF EXISTS (SELECT 1 FROM public.ether_schema_migrations WHERE version = '20261020120000_post_video_embeds.sql') THEN
-    RAISE NOTICE 'skip 20261020120000_post_video_embeds.sql';
+  IF EXISTS (SELECT 1 FROM public.ether_schema_migrations WHERE version = '20261020230000_post_video_embeds.sql') THEN
+    RAISE NOTICE 'skip 20261020230000_post_video_embeds.sql';
     RETURN;
   END IF;
   EXECUTE $ether_m150s0$
@@ -18294,7 +18294,7 @@ $ether_m150s6$;
   EXECUTE $ether_m150s7$
 COMMENT ON COLUMN public.posts.embed_title IS 'Title from the free oEmbed response, when one was available.';
 $ether_m150s7$;
-  INSERT INTO public.ether_schema_migrations (version) VALUES ('20261020120000_post_video_embeds.sql');
+  INSERT INTO public.ether_schema_migrations (version) VALUES ('20261020230000_post_video_embeds.sql');
 END
 $ether_m150$;
 

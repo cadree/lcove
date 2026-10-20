@@ -14,11 +14,16 @@ import { NATIVE_APP_ID, NATIVE_APP_NAME } from "./src/config/nativeIds";
  * `ios.scheme` is the Xcode build scheme (default "App"), not a URL scheme.
  * Auth return links use NATIVE_APP_ID in Info.plist and getAuthRedirectUrl.
  *
- * YouTube and Vimeo posts play in an iframe (youtube-nocookie.com or
- * player.vimeo.com) with playsinline=1. Capacitor's WKWebView already sets
+ * YouTube and Vimeo posts play inline. Capacitor's WKWebView already sets
  * allowsInlineMediaPlayback and an empty mediaTypesRequiringUserActionForPlayback
- * list, so those players can run inline. Do not set
- * limitsNavigationsToAppBoundDomains. That setting blocks the player hosts.
+ * list. Do not set limitsNavigationsToAppBoundDomains. That setting blocks
+ * the player hosts, and getUserMedia still needs the capacitor://localhost
+ * origin, so iosScheme stays unset.
+ *
+ * YouTube error 153 is a missing https referrer. The native app does not
+ * iframe youtube-nocookie.com directly. It iframes
+ * https://etherbylcove.com/embed/player, and that page embeds the player.
+ * Changing the WebView scheme would not give YouTube a referrer it accepts.
  */
 const config: CapacitorConfig = {
   appId: NATIVE_APP_ID,

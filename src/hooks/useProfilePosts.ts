@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { ProfilePost } from '@/types/post';
-import { embedColumnMissing, embedColumnsForInsert, type EmbedDraft } from '@/lib/videoEmbed';
+import { embedColumnMissing, embedColumnsForInsert, videoEmbedMigrationMessage, type EmbedDraft } from '@/lib/videoEmbed';
 import { shotEmbedEnabled, shotEmbedPost } from '@/lib/shotSession';
 
 export function useProfilePosts(userId?: string) {
@@ -192,7 +192,7 @@ export function useProfilePosts(userId?: string) {
     },
     onError: (error) => {
       toast.error(embedColumnMissing(error)
-        ? 'Video links need the database update in supabase/migrations/20261020120000_post_video_embeds.sql before they can be published.'
+        ? videoEmbedMigrationMessage()
         : 'Failed to share post');
       console.error(error);
     },

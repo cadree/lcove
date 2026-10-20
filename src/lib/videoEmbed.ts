@@ -103,6 +103,21 @@ export function parseVideoEmbedUrl(input: string): VideoEmbed | null {
   return null;
 }
 
+export const VIDEO_EMBED_MIGRATION_FILE =
+  "supabase/migrations/20261020230000_post_video_embeds.sql";
+
+export function videoEmbedMigrationMessage() {
+  return `Video links need the database update in ${VIDEO_EMBED_MIGRATION_FILE} before they can be published.`;
+}
+
+/**
+ * Page the iOS and Android apps iframe instead of the player host.
+ * WKWebView's origin is capacitor://localhost, and YouTube rejects that
+ * referrer with error 153. This page is https, so the player inside it
+ * sends a normal web referrer. Web keeps the direct player URL.
+ */
+export const NATIVE_EMBED_PAGE = "https://etherbylcove.com/embed/player";
+
 export function embedPlayerSrc(embed: VideoEmbed): string | null {
   if (embed.provider === "youtube") {
     if (!YOUTUBE_ID.test(embed.id)) return null;
@@ -128,6 +143,17 @@ export function embedPlayerSrc(embed: VideoEmbed): string | null {
   }
 
   return null;
+}
+
+export function nativeEmbedFrameSrc(embed: VideoEmbed): string | null {
+  if (!embedPlayerSrc(embed)) return null;
+  if (embed.provider === "youtube" && embed.hash) return null;
+  const params = new URLSearchParams({
+    provider: embed.provider,
+    id: embed.id,
+  });
+  if (embed.provider === "vimeo" && embed.hash) params.set("h", embed.hash);
+  return `${NATIVE_EMBED_PAGE}?${params.toString()}`;
 }
 
 export function youtubeThumbnailUrl(id: string): string | null {
