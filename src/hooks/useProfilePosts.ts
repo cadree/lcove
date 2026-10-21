@@ -4,6 +4,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { ProfilePost } from '@/types/post';
+import { profileItemsWithReposts, type RepostRow } from '@/lib/sharing';
+import {
+  PROFILE_POST_COLUMNS,
+  postsForViewer,
+  profilePostFromRow,
+  type ProfilePostRow,
+} from '@/lib/profilePosts';
+
+const EMPTY_POSTS: ProfilePost[] = [];
 
 export function useProfilePosts(userId?: string) {
   const { user } = useAuth();
@@ -12,46 +21,72 @@ export function useProfilePosts(userId?: string) {
   const targetUserId = userId || user?.id;
   const { isBlocked } = useUserBlocks();
 
-  const { data: posts = [], isLoading, refetch } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['profile-posts', targetUserId],
     queryFn: async (): Promise<ProfilePost[]> => {
-      if (!targetUserId) return [];
+      const profileUserId = targetUserId;
+      if (!profileUserId) return [];
 
-      // Get posts for the user
       const { data: postsData, error } = await supabase
         .from('posts')
-        .select('*')
-        .eq('user_id', targetUserId)
+        .select(PROFILE_POST_COLUMNS)
+        .eq('user_id', profileUserId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Get profile for the user using profiles_public view
       const { data: profileRows } = await supabase
         .from('profiles_public')
         .select('display_name, avatar_url')
-        .eq('user_id', targetUserId)
+        .eq('user_id', profileUserId)
         .limit(1);
-      const profile = profileRows?.[0];
+      const author = profileRows?.[0] || { display_name: null, avatar_url: null };
+      const own = (postsData || []).map((post) => profilePostFromRow(post as ProfilePostRow, author));
 
-      return (postsData || []).map(post => ({
-        id: post.id,
-        user_id: post.user_id,
-        content: post.content,
-        media_url: post.media_url,
-        media_type: post.media_type,
-        created_at: post.created_at,
-        location: post.location ?? null,
-        collaborators: post.collaborators ?? null,
-        alt_text: post.alt_text ?? null,
-        comments_enabled: post.comments_enabled ?? true,
-        folder_id: post.folder_id ?? null,
-        profile: profile || { display_name: null, avatar_url: null },
-      }));
+      try {
+        const { data: repostData, error: repostError } = await supabase
+          .from('reposts')
+          .select('id, user_id, post_id, created_at')
+          .eq('user_id', profileUserId)
+          .order('created_at', { ascending: false });
+        if (repostError || !repostData?.length) return own;
+
+        const originalIds = [...new Set(repostData.map((row) => row.post_id))];
+        const { data: originals, error: originalsError } = await supabase
+          .from('posts')
+          .select(PROFILE_POST_COLUMNS)
+          .in('id', originalIds);
+        if (originalsError || !originals?.length) return own;
+
+        const authorIds = [...new Set(originals.map((post) => post.user_id))];
+        const { data: authors } = await supabase
+          .from('profiles_public')
+          .select('user_id, display_name, avatar_url')
+          .in('user_id', authorIds);
+        const authorMap = new Map((authors ?? []).map((row) => [row.user_id, row]));
+        const reposts: RepostRow[] = repostData.map((row) => ({
+          ...row,
+          profile: { display_name: author.display_name, avatar_url: author.avatar_url },
+        }));
+
+        return profileItemsWithReposts(
+          own,
+          reposts,
+          originals.map((post) => profilePostFromRow(
+            post as ProfilePostRow,
+            authorMap.get(post.user_id) || { display_name: null, avatar_url: null },
+          )),
+        );
+      } catch (repostFailure) {
+        console.error(repostFailure);
+        return own;
+      }
     },
     enabled: !!targetUserId,
     staleTime: 0,
   });
+
+  const posts = data ?? EMPTY_POSTS;
 
   const createPost = useMutation({
     mutationFn: async ({ 
@@ -170,7 +205,12 @@ export function useProfilePosts(userId?: string) {
     },
   });
 
-  const visiblePosts = targetUserId && targetUserId !== user?.id && isBlocked(targetUserId) ? [] : posts;
+  const visiblePosts = postsForViewer(
+    posts,
+    user?.id,
+    targetUserId,
+    Boolean(targetUserId && isBlocked(targetUserId)),
+  );
 
   return {
     posts: visiblePosts,

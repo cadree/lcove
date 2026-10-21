@@ -27,6 +27,7 @@ import { CreateSubgroupDialog } from './CreateSubgroupDialog';
 import ProjectCommandCenter from './ProjectCommandCenter';
 import { toast } from 'sonner';
 import { ReportDialog } from '@/components/safety/ReportDialog';
+import { SharedContentCard } from '@/components/share/SharedContentCard';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -476,6 +477,12 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                             </div>
                           )}
                           
+                          {msg.share && msg.share.kind !== 'story' && (
+                            <div className="mb-1">
+                              <SharedContentCard share={msg.share} />
+                            </div>
+                          )}
+
                           {/* Media */}
                           {msg.media_url && (
                             <div className="mb-1 rounded-xl overflow-hidden">
@@ -500,13 +507,14 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                             </div>
                           )}
 
-                          {/* Shared card or text */}
+                          {/* Encoded share card, note, or plain text */}
                           {(() => {
                             const shared = splitShareMessage(msg.content);
+                            const note = shared.card ? shared.note : msg.content;
                             return (
                               <>
                                 {shared.card && <ShareCardBubble card={shared.card} />}
-                                {shared.note && (
+                                {note && (
                                   <div
                                     className={`px-4 py-2.5 ${
                                       isOwn
@@ -514,12 +522,17 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                                         : 'file-panel rounded-[18px] rounded-bl-[6px] px-4 py-2.5 text-foreground'
                                     }`}
                                   >
-                                    <p className="text-sm whitespace-pre-wrap break-words">{shared.note}</p>
+                                    <p className="text-sm whitespace-pre-wrap break-words">{note}</p>
                                   </div>
                                 )}
                               </>
                             );
                           })()}
+                          {msg.share?.kind === 'story' && (
+                            <div className="mt-1">
+                              <SharedContentCard share={msg.share} compact />
+                            </div>
+                          )}
 
                           {/* Time & Read Receipt */}
                           <div className={`flex items-center gap-1 mt-1 ${isOwn ? 'justify-end' : ''}`}>

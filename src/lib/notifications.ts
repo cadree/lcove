@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
+import { postLikeFields } from './likeNotice';
 
 type NotificationType = 'message' | 'like' | 'comment' | 'follow' | 'project_invite' | 'event_reminder' | 'live_stream';
 
@@ -45,8 +46,11 @@ export const createNotification = async ({
       }
     }
 
-    // Insert notification into database
-    const { data: notification, error } = await supabase
+    // Do not .select() this row. The recipient is the only one who can read it.
+    // INSERT ... RETURNING is what .select() sends, and Postgres then rejects
+    // the whole statement because the sender fails the SELECT policy. The
+    // insert rolls back, so the owner sees no row and the error is easy to miss.
+    const { error } = await supabase
       .from('notifications')
       .insert([{
         user_id: userId,
@@ -54,9 +58,7 @@ export const createNotification = async ({
         title,
         body,
         data: data as Json,
-      }])
-      .select()
-      .single();
+      }]);
 
     if (error) {
       console.error('Error creating notification:', error);
@@ -90,7 +92,7 @@ export const createNotification = async ({
       console.error('Error sending push notification:', err);
     });
 
-    return notification;
+    return null;
   } catch (error) {
     console.error('Error in createNotification:', error);
     throw error;
@@ -118,13 +120,28 @@ export const notifyFollow = (userId: string, followerName: string) => {
   });
 };
 
-export const notifyPostLike = (userId: string, likerName: string, postId: string) => {
+export const notifyStoryLike = (userId: string, likerName: string, storyId: string) => {
   return createNotification({
     userId,
     type: 'like',
-    title: 'Someone liked your post',
-    body: `${likerName} liked your post`,
-    data: { post_id: postId },
+    title: `${likerName} liked your story`,
+    data: { story_id: storyId },
+  });
+};
+
+export const notifyPostLike = (
+  userId: string,
+  likerName: string,
+  postId: string,
+  preview?: { caption?: string | null; mediaUrl?: string | null; mediaType?: string | null },
+) => {
+  const fields = postLikeFields(preview);
+  return createNotification({
+    userId,
+    type: 'like',
+    title: `${likerName} liked your post`,
+    body: fields.body,
+    data: { post_id: postId, ...fields.data },
   });
 };
 

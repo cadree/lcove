@@ -142,7 +142,7 @@ export function usePostInteractions(postId: string) {
 
         const { data: post } = await supabase
           .from('posts')
-          .select('user_id')
+          .select('user_id, content, media_url, media_type')
           .eq('id', postId)
           .maybeSingle();
         if (post && post.user_id !== user.id) {
@@ -151,7 +151,11 @@ export function usePostInteractions(postId: string) {
             .select('display_name')
             .eq('user_id', user.id)
             .maybeSingle();
-          notifyPostLike(post.user_id, profile?.display_name || 'Someone', postId).catch(() => undefined);
+          notifyPostLike(post.user_id, profile?.display_name || 'Someone', postId, {
+            caption: post.content,
+            mediaUrl: post.media_url,
+            mediaType: post.media_type,
+          }).catch(() => undefined);
         }
       }
     },

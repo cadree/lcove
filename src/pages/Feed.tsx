@@ -236,7 +236,7 @@ const Feed = () => {
           </div> : <div className="space-y-5 pb-32">
             <div className="space-y-5">
               {lanePosts.map((post) => (
-                <div key={post.id} className="[content-visibility:auto] [contain-intrinsic-size:auto_480px]">
+                <div key={post.feed_key ?? post.id} className="[content-visibility:auto] [contain-intrinsic-size:auto_480px]">
                   <FeedPost post={post} />
                 </div>
               ))}

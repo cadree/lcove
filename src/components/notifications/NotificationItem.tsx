@@ -8,12 +8,15 @@ import { Notification, NotificationType } from '@/hooks/useNotifications';
 import { SquircleIcon, type IconFill } from '@/components/world/SquircleIcon';
 import { respondCollabInvite } from '@/lib/collabInvite';
 import { useQueryClient } from '@tanstack/react-query';
+import { notificationDisplay, type PostLikePreview } from '@/lib/likeNotice';
 
 interface NotificationItemProps {
   notification: Notification;
   onRead: (id: string) => void;
   onDelete: (id: string) => void;
   onProjectInviteTap?: (notification: Notification) => void;
+  onActivate?: (notification: Notification) => void;
+  preview?: PostLikePreview | null;
 }
 
 const notificationMark: Record<NotificationType, { icon: LucideIcon; fill: IconFill }> = {
@@ -32,6 +35,8 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   onRead,
   onDelete,
   onProjectInviteTap,
+  onActivate,
+  preview,
 }) => {
   const isUnread = !notification.read_at;
   const navigate = useNavigate();
@@ -39,6 +44,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   const inviteId = typeof notification.data?.invite_id === "string" ? notification.data.invite_id : "";
   const answered = notification.data != null && Object.prototype.hasOwnProperty.call(notification.data, "accepted");
   const pendingInvite = notification.type === "collab_invite" && inviteId && !answered && notification.title === "Collab invite";
+  const display = notificationDisplay(notification, preview);
 
   const respond = async (accept: boolean) => {
     try {
@@ -62,7 +68,9 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
     }
     if (notification.type === 'project_invite' && onProjectInviteTap) {
       onProjectInviteTap(notification);
+      return;
     }
+    onActivate?.(notification);
   };
 
   return (
@@ -91,11 +99,11 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
           "font-body text-sm",
           isUnread ? "font-bold text-foreground" : "text-muted-foreground"
         )}>
-          {notification.title}
+          {display.title}
         </p>
-        {notification.body && (
+        {display.detail && (
           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-            {notification.body}
+            {display.detail}
           </p>
         )}
         <p className="mono-label mt-1 text-[9px] text-muted-foreground">
@@ -126,6 +134,25 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
           </div>
         )}
       </div>
+
+      {display.thumbUrl && (
+        display.thumbIsVideo ? (
+          <video
+            src={display.thumbUrl}
+            muted
+            playsInline
+            preload="metadata"
+            aria-hidden
+            className="h-11 w-11 shrink-0 rounded-[2px] object-cover"
+          />
+        ) : (
+          <img
+            src={display.thumbUrl}
+            alt=""
+            className="h-11 w-11 shrink-0 rounded-[2px] object-cover"
+          />
+        )
+      )}
 
       {/* Delete button */}
       <button

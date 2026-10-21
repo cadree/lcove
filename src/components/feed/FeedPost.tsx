@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Trash2, Flag } from 'lucide-react';
+import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Trash2, Flag, Repeat2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { usePostInteractions } from '@/hooks/usePostInteractions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,12 +19,13 @@ import {
   Collapsible,
   CollapsibleContent,
 } from '@/components/ui/collapsible';
-import { toast } from 'sonner';
-import { buildShareUrl } from '@/lib/shareLink';
-import { ShareSheet } from '@/components/messages/ShareSheet';
 import { fileCode } from '@/lib/noviQuests';
 import { ReportDialog } from '@/components/safety/ReportDialog';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { ShareSheet } from '@/components/share/ShareSheet';
+import { useOwnPostViewCounts, useRecordPostView } from '@/hooks/usePostViews';
+import { useMyReposts, useSharingActions } from '@/hooks/useSharing';
+import { canRepostMedia, ownerOnlyInsight, repostedByLabel } from '@/lib/sharing';
 
 interface Post {
   id: string;
@@ -37,6 +38,12 @@ interface Post {
     display_name: string | null;
     avatar_url: string | null;
   };
+  repost?: {
+    id: string;
+    user_id: string;
+    created_at: string;
+    profile?: { display_name: string | null; avatar_url: string | null } | null;
+  } | null;
 }
 
 const FeedPost = ({ post }: { post: Post }) => {
@@ -61,23 +68,18 @@ const FeedPost = ({ post }: { post: Post }) => {
   const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const isOwner = user?.id === post.user_id;
+  const viewRef = useRecordPostView(post.id, post.user_id);
+  const viewCounts = useOwnPostViewCounts(isOwner);
+  const { postIds: myReposts } = useMyReposts();
+  const { repostPost, undoRepost } = useSharingActions();
+  const alreadyReposted = myReposts.has(post.id);
+  const insight = ownerOnlyInsight(isOwner, viewCounts?.[post.id], likesCount);
 
   const authorName = post.profile ? (post.profile.display_name || 'User') : 'Private profile';
 
   const handleProfileClick = () => {
     if (!post.profile) return;
     navigate(`/profile/${post.user_id}`);
-  };
-
-  const shareCard = {
-    kind: "post" as const,
-    id: post.id,
-    userId: post.user_id,
-    title: authorName,
-    subtitle: post.content?.slice(0, 140) || undefined,
-    mediaUrl: post.media_url,
-    mediaType: post.media_type,
-    href: `/profile/${post.user_id}`,
   };
 
   const handleDelete = () => {
@@ -91,14 +93,8 @@ const FeedPost = ({ post }: { post: Post }) => {
   };
 
   return (
-    <>
-      <ShareSheet
-        open={shareOpen}
-        onOpenChange={setShareOpen}
-        card={shareCard}
-        linkUrl={buildShareUrl.post(post.user_id, post.id)}
-      />
-      <motion.article
+    <motion.article
+      ref={viewRef}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
@@ -107,6 +103,16 @@ const FeedPost = ({ post }: { post: Post }) => {
     >
       {!(post.media_url && post.media_type !== "text") && (
         <p className="mono-label px-4 pt-3 text-[8px] text-[hsl(var(--brand))]">{fileCode(post.id)}</p>
+      )}
+      {post.repost && (
+        <button
+          type="button"
+          className="flex min-h-11 items-center gap-2 px-4 pt-3 text-sm text-muted-foreground"
+          onClick={() => navigate(`/profile/${post.repost?.user_id}`)}
+        >
+          <Repeat2 className="h-4 w-4" />
+          {repostedByLabel(post.repost.profile?.display_name)}
+        </button>
       )}
       {/* Header */}
       <header className="flex items-center justify-between p-4 sm:p-5">
@@ -148,6 +154,18 @@ const FeedPost = ({ post }: { post: Post }) => {
                 >
                   <Trash2 className="w-4 h-4" />
                   Delete post
+                </DropdownMenuItem>
+              )}
+              {!isOwner && canRepostMedia(post.media_type, post.user_id, user?.id) && (
+                <DropdownMenuItem
+                  className="gap-2"
+                  onClick={() => {
+                    if (alreadyReposted) undoRepost.mutate(post.id);
+                    else repostPost.mutate(post.id);
+                  }}
+                >
+                  <Repeat2 className="w-4 h-4" />
+                  {alreadyReposted ? 'Undo repost' : 'Repost'}
                 </DropdownMenuItem>
               )}
               {!isOwner && (
@@ -276,10 +294,8 @@ const FeedPost = ({ post }: { post: Post }) => {
           </motion.button>
         </div>
       </div>
-      {isOwner && likesCount > 0 && (
-        <p className="px-4 pb-2 text-xs text-muted-foreground">
-          Only you can see this: {likesCount} {likesCount === 1 ? 'like' : 'likes'}
-        </p>
+      {insight && (
+        <p className="px-4 pb-2 text-xs text-muted-foreground">{insight}</p>
       )}
 
       {/* Comments Section */}
@@ -300,8 +316,22 @@ const FeedPost = ({ post }: { post: Post }) => {
           </motion.div>
         </CollapsibleContent>
       </Collapsible>
+      <ShareSheet
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        target={{
+          kind: 'post',
+          post: {
+            id: post.id,
+            user_id: post.user_id,
+            content: post.content,
+            media_url: post.media_url,
+            media_type: post.media_type,
+            profile: post.profile,
+          },
+        }}
+      />
     </motion.article>
-    </>
   );
 };
 
