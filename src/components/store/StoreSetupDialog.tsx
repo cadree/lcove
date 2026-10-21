@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useCreateStore, useUpdateStore, Store } from '@/hooks/useStore';
+import { useCreateStore, useUpdateStore, importStoreCatalog, Store } from '@/hooks/useStore';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -23,12 +24,14 @@ interface StoreSetupDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   store?: Store | null;
+  onSaved?: (created: boolean) => void;
 }
 
-export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialogProps) => {
+export const StoreSetupDialog = ({ open, onOpenChange, store, onSaved }: StoreSetupDialogProps) => {
   const createStore = useCreateStore();
   const { user } = useAuth();
   const updateStore = useUpdateStore();
+  const queryClient = useQueryClient();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -130,13 +133,26 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
     };
 
     try {
-      if (store) {
-        await updateStore.mutateAsync({ id: store.id, ...storeData });
-      } else {
-        await createStore.mutateAsync(storeData);
+      const saved = store
+        ? await updateStore.mutateAsync({ id: store.id, ...storeData })
+        : await createStore.mutateAsync(storeData);
+      const created = !store;
+      if (created) sessionStorage.setItem('ether-continue-feed', '1');
+      if (shopifyUrl.trim() && saved?.id) {
+        setIsLinking(true);
+        const result = await importStoreCatalog(saved.id, shopifyUrl.trim());
+        await queryClient.invalidateQueries({ queryKey: ['store-items'] });
+        await queryClient.invalidateQueries({ queryKey: ['my-store-items'] });
+        await queryClient.invalidateQueries({ queryKey: ['my-store'] });
+        await queryClient.invalidateQueries({ queryKey: ['explore-mall-stores'] });
+        if (!result.ok) toast.error(result.message);
+        else toast.success(result.message);
+        setIsLinking(false);
       }
+      onSaved?.(created);
       onOpenChange(false);
     } catch (error) {
+      setIsLinking(false);
       // Error handled by mutation
     }
   };
@@ -315,7 +331,7 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
             {/* Shopify */}
             <div className="space-y-2">
               <Label htmlFor="shopify" className="flex items-center gap-2">
-                Shopify Store URL
+                Store website
                 {shopifyUrl && (
                   <a
                     href={shopifyUrl.startsWith('http') ? shopifyUrl : `https://${shopifyUrl}`}
@@ -332,10 +348,10 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
                 id="shopify"
                 value={shopifyUrl}
                 onChange={(e) => setShopifyUrl(e.target.value)}
-                placeholder="mystore.myshopify.com"
+                placeholder="nuancebylcove.com"
               />
               <p className="text-xs text-muted-foreground">
-                Ether reads the public product list at this shop (up to 250 products) and copies title, price, image, and handle. Buy buttons link to https://your-shop/products/handle. No Shopify login. Ether does not take a fee on those sales.
+                Saving imports the public Shopify catalog (up to 250 products) through Ether. Other sites become a link card from the page preview. No store login. Ether does not take a fee on Shopify sales.
               </p>
               {store && (
                 <Button
@@ -349,14 +365,14 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
                         id: store.id,
                         shopify_store_url: shopifyUrl.trim(),
                       });
-                      const { data, error } = await supabase.functions.invoke('import-shopify-products', {
-                        body: { storeId: store.id, shopUrl: shopifyUrl.trim() },
-                      });
-                      if (error) throw error;
-                      if (data?.error) throw new Error(data.error);
-                      toast.success(`Linked ${data?.imported ?? 0} Shopify products. Ether does not take a fee on those sales.`);
+                      const result = await importStoreCatalog(store.id, shopifyUrl.trim());
+                      await queryClient.invalidateQueries({ queryKey: ['store-items'] });
+                      await queryClient.invalidateQueries({ queryKey: ['my-store-items'] });
+                      await queryClient.invalidateQueries({ queryKey: ['explore-mall-stores'] });
+                      if (!result.ok) toast.error(result.message);
+                      else toast.success(result.message);
                     } catch (err) {
-                      const message = err instanceof Error ? err.message : 'Could not link products';
+                      const message = err instanceof Error ? err.message : 'Could not import products';
                       toast.error(message);
                     } finally {
                       setIsLinking(false);
@@ -364,7 +380,7 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
                   }}
                 >
                   {isLinking ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Link className="w-4 h-4 mr-2" />}
-                  Link products
+                  Import again
                 </Button>
               )}
             </div>
@@ -405,9 +421,9 @@ export const StoreSetupDialog = ({ open, onOpenChange, store }: StoreSetupDialog
             <Button 
               type="submit" 
               className="flex-1" 
-              disabled={createStore.isPending || updateStore.isPending || isUploading}
+              disabled={createStore.isPending || updateStore.isPending || isUploading || isLinking}
             >
-              {store ? 'Save Changes' : 'Create Store'}
+              {isLinking ? 'Importing…' : store ? 'Save Changes' : 'Create Store'}
             </Button>
           </div>
         </form>

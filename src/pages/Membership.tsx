@@ -55,12 +55,26 @@ const Membership = () => {
 
   // Handle success/cancel redirects
   useEffect(() => {
-    if (searchParams.get("success") === "true") {
-      toast.success("Welcome to the community! Your membership is now active.");
-      checkMembership();
-    } else if (searchParams.get("cancelled") === "true") {
-      toast.info("Checkout was cancelled");
-    }
+    const success = searchParams.get("success") === "true";
+    const cancelled = searchParams.get("cancelled") === "true";
+    if (!success && !cancelled) return;
+    let ignore = false;
+    (async () => {
+      if (cancelled) {
+        toast.info("Checkout was cancelled");
+        return;
+      }
+      const status = await checkMembership();
+      if (ignore) return;
+      if (status?.subscribed) {
+        toast.success("Welcome to the community! Your membership is now active.");
+      } else {
+        toast.message("Checkout returned. Membership shows here after Stripe confirms the test payment.");
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
   }, [searchParams, checkMembership]);
 
   const handleCommunityJoin = () => {

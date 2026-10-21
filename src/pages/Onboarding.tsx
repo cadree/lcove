@@ -9,12 +9,12 @@ import OnboardingIntro from '@/components/onboarding/OnboardingIntro';
 import OnboardingName from '@/components/onboarding/OnboardingName';
 import OnboardingPassions from '@/components/onboarding/OnboardingPassions';
 import OnboardingCity from '@/components/onboarding/OnboardingCity';
-import OnboardingSkills from '@/components/onboarding/OnboardingSkills';
 import OnboardingRoles from '@/components/onboarding/OnboardingRoles';
 import OnboardingQuestionnaire from '@/components/onboarding/OnboardingQuestionnaire';
 import OnboardingConnections from '@/components/onboarding/OnboardingConnections';
 import OnboardingCompletion from '@/components/onboarding/OnboardingCompletion';
 import { buildUserPassionInserts } from '@/lib/onboardingPassions';
+import { QUIZ_QUESTIONS, scoreMindsetSpread, type ChoiceId } from '@/lib/onboardingQuiz';
 
 export interface OnboardingData {
   displayName: string;
@@ -75,19 +75,16 @@ const Onboarding = () => {
     }
   }, [profile, profileLoading, initialized, navigate]);
 
-  // Scoring: A=1, B=2, C=3 points per question
-  // Threshold: >= 20 points (out of 30 max for 10 questions) = Level 2 (Accepted)
-  const ACCEPTANCE_THRESHOLD = 20;
-
-  const calculateMindsetLevel = (responses: Record<number, 'A' | 'B' | 'C'>): {
+  const calculateMindsetLevel = (responses: Record<number, ChoiceId>): {
     level: 1 | 2;
     score: number;
+    passed: boolean;
   } => {
-    const score = Object.values(responses).reduce((sum, ans) => {
-      return sum + (ans === 'A' ? 1 : ans === 'B' ? 2 : 3);
-    }, 0);
-    const level = score >= ACCEPTANCE_THRESHOLD ? 2 : 1;
-    return { level, score };
+    const choices = QUIZ_QUESTIONS.map((question) => responses[question.id]).filter(
+      (choice): choice is ChoiceId => choice === 'A' || choice === 'B' || choice === 'C',
+    );
+    const result = scoreMindsetSpread(choices);
+    return { level: result.level, score: result.score, passed: result.passed };
   };
 
   const handleComplete = async () => {
@@ -104,8 +101,7 @@ const Onboarding = () => {
       return;
     }
 
-    const { level, score } = calculateMindsetLevel(data.questionnaireResponses);
-    const passedExam = score >= ACCEPTANCE_THRESHOLD;
+    const { level, score, passed: passedExam } = calculateMindsetLevel(data.questionnaireResponses);
     setAccessLevel(passedExam ? 'level_2' : 'level_1');
 
     try {
@@ -160,8 +156,8 @@ const Onboarding = () => {
 
       sessionStorage.setItem('onboarding_just_completed', 'true');
 
-      // Finishing onboarding always grants access. The score is stored
-      // and passed_exam is derived (score >= 20). It does not lock anyone out.
+      // Finishing onboarding always grants access. passed_exam records a
+      // spread of mindsets. It does not lock anyone out.
       await updateProfile({
         display_name: data.displayName.trim(),
         city: data.city,
@@ -176,7 +172,7 @@ const Onboarding = () => {
         passed_exam: passedExam,
       });
 
-      setCurrentStep(7);
+      setCurrentStep(6);
     } catch (error) {
       console.error('Error saving onboarding data:', error);
       toast({
@@ -217,10 +213,9 @@ const Onboarding = () => {
     />,
     <OnboardingPassions key="passions" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingCity key="city" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
-    <OnboardingSkills key="skills" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingRoles key="roles" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingQuestionnaire key="questionnaire" data={data} updateData={updateData} onComplete={handleComplete} onBack={prevStep} />,
-    <OnboardingConnections key="connections" onComplete={() => setCurrentStep(8)} onBack={prevStep} />,
+    <OnboardingConnections key="connections" onComplete={() => setCurrentStep(7)} onBack={prevStep} />,
     <OnboardingCompletion key="completion" accessLevel={accessLevel} />,
   ];
 

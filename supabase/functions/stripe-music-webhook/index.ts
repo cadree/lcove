@@ -5,6 +5,7 @@ import {
   createSupabaseStripeDb,
   handleSignedStripeWebhook,
 } from "../_shared/stripe-webhook-dispatch.mjs";
+import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,7 +17,18 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+  let stripeKey = "";
+  try {
+    stripeKey = assertStripeTestKey(Deno.env.get("STRIPE_SECRET_KEY"));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Stripe test key required";
+    return new Response(JSON.stringify({ error: message }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
+  }
+
+  const stripe = new Stripe(stripeKey, {
     apiVersion: "2025-08-27.basil",
   });
   const supabaseAdmin = createClient(
