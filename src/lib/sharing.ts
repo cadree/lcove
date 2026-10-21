@@ -93,6 +93,20 @@ export function storyAdvanceHeld(input: {
   return input.replyFocused || input.shareOpen || Boolean(input.sending) || Boolean(input.hasDraft);
 }
 
+/** Profile opened from the story header. The poster's own story uses the same path. */
+export function storyAuthorProfilePath(userId: string | null | undefined): string | null {
+  const id = userId?.trim();
+  if (!id) return null;
+  return `/profile/${id}`;
+}
+
+/** Accessible name for the header control. It does not advance the story. */
+export function storyAuthorButtonLabel(displayName: string | null | undefined, isOwner: boolean): string {
+  if (isOwner) return "Your profile";
+  const name = displayName?.trim();
+  return name ? `View ${name}'s profile` : "View profile";
+}
+
 export interface DirectConversationPick {
   id: string;
   type: string;

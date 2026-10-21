@@ -6,6 +6,8 @@ import {
   keepDeliveredMessages,
   pickDirectConversation,
   storyAdvanceHeld,
+  storyAuthorButtonLabel,
+  storyAuthorProfilePath,
   storyReplyInsert,
   gridViewCount,
   mergePostsAndReposts,
@@ -72,6 +74,17 @@ test("story playback waits while a reply or the share sheet is open", () => {
   assert.equal(storyAdvanceHeld({ replyFocused: false, shareOpen: true }), true);
   assert.equal(storyAdvanceHeld({ replyFocused: false, shareOpen: false, sending: true }), true);
   assert.equal(storyAdvanceHeld({ replyFocused: false, shareOpen: false, hasDraft: true }), true);
+});
+
+test("story header opens the poster's profile and does not advance", () => {
+  const founder = "15a45673-0000-4000-8000-000000000001";
+  assert.equal(storyAuthorProfilePath(founder), `/profile/${founder}`);
+  assert.equal(storyAuthorProfilePath("  maya  "), "/profile/maya");
+  assert.equal(storyAuthorProfilePath("  "), null);
+  assert.equal(storyAuthorProfilePath(null), null);
+  assert.equal(storyAuthorButtonLabel("Maya", false), "View Maya's profile");
+  assert.equal(storyAuthorButtonLabel("Maya", true), "Your profile");
+  assert.equal(storyAuthorButtonLabel("  ", false), "View profile");
 });
 
 test("two story replies stay two messages in one chat", () => {

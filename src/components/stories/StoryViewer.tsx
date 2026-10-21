@@ -11,7 +11,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { notifyStoryLike } from '@/lib/notifications';
 import { storyStartIndex } from '@/lib/likeNotice';
-import { storyAdvanceHeld } from '@/lib/sharing';
+import { storyAdvanceHeld, storyAuthorButtonLabel, storyAuthorProfilePath } from '@/lib/sharing';
 import { ShareSheet } from '@/components/share/ShareSheet';
 import { toast } from 'sonner';
 
@@ -315,30 +315,42 @@ const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryView
           </div>
 
           {/* Header */}
-          <div className="absolute top-8 left-4 right-4 z-20 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full overflow-hidden bg-muted border-2 border-foreground/20">
+          <div className="absolute top-8 left-4 right-4 z-30 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              className="flex min-h-11 min-w-0 items-center gap-3 rounded-full border border-foreground/20 bg-background/80 py-1 pl-1 pr-3 text-left text-foreground"
+              aria-label={storyAuthorButtonLabel(currentStory.profile?.display_name, isOwner)}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                const path = storyAuthorProfilePath(currentStory.user_id);
+                if (!path) return;
+                onClose();
+                navigate(path);
+              }}
+            >
+              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border-2 border-foreground/20 bg-muted">
                 {currentStory.profile?.avatar_url ? (
                   <img
                     src={currentStory.profile.avatar_url}
                     alt=""
-                    className="w-full h-full object-cover"
+                    className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                  <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                     {currentStory.profile?.display_name?.charAt(0) || '?'}
                   </div>
                 )}
               </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium text-foreground">
                   {currentStory.profile?.display_name || 'User'}
-                </p>
-                <p className="text-xs text-muted-foreground">
+                </span>
+                <span className="block text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(currentStory.created_at), { addSuffix: true })}
-                </p>
-              </div>
-            </div>
+                </span>
+              </span>
+            </button>
             <Button
               variant="ghost"
               size="icon"
