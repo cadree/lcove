@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { errorMessage } from "@/lib/errorMessage";
 import { LIVE_VIDEO_NOT_CONFIGURED, parseLiveKitTokenResponse, type LiveKitSession } from "@/lib/livekitSession";
+import { shotViewerPreview } from "@/lib/shotSession";
+import { LIVE_REQUEST_TIMEOUT_MS, withDeadline } from "@/lib/withDeadline";
 
 interface WebRTCStreamViewerProps {
   streamId: string;
@@ -17,7 +19,13 @@ interface WebRTCStreamViewerProps {
 }
 
 async function requestLiveKitSession(streamId: string): Promise<LiveKitSession> {
-  const { data, error } = await supabase.functions.invoke("livekit-token", { body: { streamId } });
+  if (shotViewerPreview()) return { configured: false, error: LIVE_VIDEO_NOT_CONFIGURED };
+  const invoke = supabase.functions.invoke("livekit-token", { body: { streamId } });
+  const { data, error } = await withDeadline(
+    invoke,
+    LIVE_REQUEST_TIMEOUT_MS,
+    "Live video did not respond. Try again.",
+  );
   const parsed = parseLiveKitTokenResponse(data ?? { error: error?.message });
   if ("configured" in parsed) return parsed;
   throw new Error(parsed.error);
@@ -87,7 +95,11 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
         if (roomRef.current === room) setWaitingForHost(true);
       });
 
-      await room.connect(session.url, session.token);
+      await withDeadline(
+        room.connect(session.url, session.token),
+        LIVE_REQUEST_TIMEOUT_MS,
+        "Could not join the live room. Try again.",
+      );
       room.remoteParticipants.forEach((participant) => {
         participant.trackPublications.forEach((publication) => {
           if (publication.track) attachHostTrack(publication.track, participant);
@@ -112,6 +124,14 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
     };
   }, [cleanup, connect, isLive, user]);
 
+  if (!user) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/20 to-background px-4">
+        <p className="text-center text-muted-foreground">Sign in to watch this stream.</p>
+      </div>
+    );
+  }
+
   if (!isLive) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/20 to-background">
@@ -135,6 +155,13 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
           <div className="max-w-sm px-4 text-center">
             <Radio className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
             <p className="font-medium text-foreground">Live video not configured</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Camera streaming needs LiveKit credentials before anyone can watch.
+            </p>
+            <Button type="button" onClick={() => void connect()} variant="outline" size="sm" className="mt-4">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Try again
+            </Button>
           </div>
         </div>
       )}

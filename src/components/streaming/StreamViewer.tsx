@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { WebRTCStreamViewer } from './WebRTCStreamViewer';
 import { WebRTCStreamHost } from './WebRTCStreamHost';
 import { ReplayPlayer } from './ReplayPlayer';
+import { liveSheetState, shouldPopLiveSheet } from '@/lib/liveSheetHistory';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -74,10 +75,35 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   const hasReplay = streamStatus === 'ended' && stream?.replay_available && stream?.replay_url;
   const hosting = stream?.stream_type === "webrtc" && isHost && streamStatus !== "ended";
   const openedAt = useRef(Date.now());
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const pushedSheet = useRef(false);
 
   useEffect(() => {
     if (open) openedAt.current = Date.now();
   }, [open, streamId]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!pushedSheet.current) {
+      window.history.pushState(liveSheetState(window.history.state, streamId), "");
+      pushedSheet.current = true;
+    }
+    const onPop = () => {
+      pushedSheet.current = false;
+      onCloseRef.current();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [open, streamId]);
+
+  const requestClose = () => {
+    if (pushedSheet.current && shouldPopLiveSheet(window.history.state, streamId)) {
+      pushedSheet.current = false;
+      window.history.back();
+    }
+    onCloseRef.current();
+  };
 
   // Join stream on mount (for viewers only, when stream is live)
   useEffect(() => {
@@ -133,7 +159,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
     if (deleteConfirmText !== 'DELETE') return;
     await deleteStream.mutateAsync(streamId);
     setShowDeleteDialog(false);
-    onClose();
+    requestClose();
   };
 
   const renderEmbed = () => {
@@ -162,10 +188,11 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
       // HOST VIEW: Show host controls if user is host and stream is draft or live
       if (isHost && streamStatus !== 'ended') {
         return (
-          <WebRTCStreamHost 
-            streamId={streamId} 
+          <WebRTCStreamHost
+            streamId={streamId}
             isLive={streamStatus === 'live'}
-            onEnd={onClose}
+            onEnd={requestClose}
+            onClose={requestClose}
           />
         );
       }
@@ -265,10 +292,13 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
 
   return (
     <>
-      <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <Dialog open={open} onOpenChange={(next) => { if (!next) requestClose(); }}>
         <DialogContent
-          className="flex w-full min-w-0 max-w-full flex-col gap-0 overflow-x-hidden overflow-y-auto bg-background p-0 [&>button]:hidden"
-          style={{ maxWidth: "100%", maxHeight: "calc(100dvh - 2rem)" }}
+          className="mt-[env(safe-area-inset-top)] mb-[env(safe-area-inset-bottom)] flex w-full min-w-0 max-w-full flex-col gap-0 overflow-x-hidden overflow-y-auto bg-background p-0 [&>button]:hidden"
+          style={{
+            maxWidth: "min(32rem, calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 2rem))",
+            maxHeight: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 1rem)",
+          }}
           onPointerDownOutside={(event) => {
             if (Date.now() - openedAt.current < 700) event.preventDefault();
           }}
@@ -334,10 +364,12 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
 
             {/* Close Button */}
             <Button
+              type="button"
               variant="ghost"
               size="icon"
-              className="absolute top-4 right-4 bg-background/50 backdrop-blur-sm z-10"
-              onClick={onClose}
+              className="absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-30 h-11 w-11 bg-background/50 backdrop-blur-sm"
+              onClick={requestClose}
+              aria-label="Close live"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -348,13 +380,13 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
             {/* Host Info */}
             <div className="flex min-w-0 flex-col gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <Avatar>
+                <Avatar className="shrink-0">
                   <AvatarImage src={profile?.avatar_url || undefined} />
                   <AvatarFallback>{profile?.display_name?.charAt(0) || 'D'}</AvatarFallback>
                 </Avatar>
-                <div>
-                  <h3 className="font-semibold">{stream?.title}</h3>
-                  <p className="text-sm text-muted-foreground">{profile?.display_name || 'DJ'}</p>
+                <div className="min-w-0">
+                  <h3 className="truncate font-semibold">{stream?.title}</h3>
+                  <p className="truncate text-sm text-muted-foreground">{profile?.display_name || 'DJ'}</p>
                 </div>
               </div>
 
@@ -424,22 +456,24 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
               <motion.div 
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
-                className="flex gap-2"
+                className="flex w-full min-w-0 gap-2"
               >
                 <Input
                   type="number"
-                  placeholder="Amount"
+                  placeholder="LC"
                   value={tipAmount}
                   onChange={(e) => setTipAmount(e.target.value)}
-                  className="w-24"
+                  className="w-16 shrink-0 px-2"
+                  aria-label="Tip amount"
                 />
                 <Input
-                  placeholder="Message (optional)"
+                  placeholder="Message"
                   value={tipMessage}
                   onChange={(e) => setTipMessage(e.target.value)}
-                  className="flex-1"
+                  className="w-auto min-w-0 flex-1"
+                  aria-label="Tip message"
                 />
-                <Button onClick={handleTip} disabled={tipStream.isPending}>
+                <Button type="button" className="shrink-0 px-3" onClick={handleTip} disabled={tipStream.isPending} aria-label="Send tip">
                   <Send className="h-4 w-4" />
                 </Button>
               </motion.div>

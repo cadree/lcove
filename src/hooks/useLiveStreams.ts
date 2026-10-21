@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useEffect, useRef } from 'react';
 import { callRpc } from '@/lib/rpc';
 import { notifyLiveStream } from '@/lib/notifications';
-import { shotPeople, shotSessionEnabled } from '@/lib/shotSession';
+import { SHOT_USER_ID, shotHostPreview, shotPeople, shotSessionEnabled, shotViewerPreview } from '@/lib/shotSession';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { assertCleanText } from '@/lib/objectionableText';
 
@@ -35,6 +35,33 @@ function shotLiveStream(): LiveStream {
     mux_live_stream_id: null,
     mux_playback_id: null,
   };
+}
+
+function shotStreamFixture(): LiveStream {
+  const base = shotLiveStream();
+  if (shotHostPreview()) {
+    return {
+      ...base,
+      host_id: SHOT_USER_ID,
+      title: "Go Live",
+      description: null,
+      stream_type: "webrtc",
+      external_url: null,
+      is_live: false,
+      started_at: null,
+      viewer_count: 0,
+    };
+  }
+  if (shotViewerPreview()) {
+    return {
+      ...base,
+      title: "Live room",
+      stream_type: "webrtc",
+      external_url: null,
+      is_live: true,
+    };
+  }
+  return base;
 }
 
 export interface LiveStream {
@@ -81,7 +108,7 @@ export const useLiveStreams = (liveOnly = false) => {
   const { data: streams = [], isLoading } = useQuery({
     queryKey: ['live-streams', liveOnly],
     queryFn: async () => {
-      if (shotSessionEnabled()) return liveOnly ? [shotLiveStream()] : [shotLiveStream()];
+      if (shotSessionEnabled()) return [shotStreamFixture()];
       let query = supabase
         .from('live_streams_public')
         .select('*')
@@ -132,7 +159,7 @@ export const useStream = (streamId: string | undefined) => {
     queryKey: ['stream', streamId],
     queryFn: async () => {
       if (!streamId) return null;
-      if (shotSessionEnabled()) return shotLiveStream();
+      if (shotSessionEnabled()) return shotStreamFixture();
       const { data, error } = await supabase
         .from('live_streams_public')
         .select('*')

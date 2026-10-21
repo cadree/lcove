@@ -10,6 +10,16 @@ export function shotContentThin(): boolean {
   return shotSessionEnabled() && localStorage.getItem("ether-shot-thin") === "1";
 }
 
+/** Dev-only Go Live sheet owned by the shot user. Production builds ignore this. */
+export function shotHostPreview(): boolean {
+  return shotSessionEnabled() && localStorage.getItem("ether-shot-host") === "1";
+}
+
+/** Dev-only viewer sheet for a WebRTC room the shot user does not host. */
+export function shotViewerPreview(): boolean {
+  return shotSessionEnabled() && localStorage.getItem("ether-shot-viewer") === "1";
+}
+
 export const shotProfile = {
   id: SHOT_USER_ID,
   user_id: SHOT_USER_ID,

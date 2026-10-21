@@ -86,7 +86,7 @@ export function StreamChat({ streamId }: { streamId: string }) {
   if (!user) return null;
 
   return (
-    <div className="border-t border-border/40 px-4 py-3 space-y-2">
+    <div className="min-w-0 space-y-2 border-t border-border/40 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <div className="max-h-40 overflow-y-auto space-y-1 text-sm">
         {messages.length === 0 && <p className="text-muted-foreground">No chat yet.</p>}
         {messages.filter((message) => !blockedIds.includes(message.user_id)).map((message) => (
@@ -104,14 +104,20 @@ export function StreamChat({ streamId }: { streamId: string }) {
         ))}
       </div>
       <form
-        className="flex gap-2"
+        className="flex w-full min-w-0 gap-2"
         onSubmit={(event) => {
           event.preventDefault();
           void send();
         }}
       >
-        <Input value={body} onChange={(event) => setBody(event.target.value)} placeholder="Say something" maxLength={500} />
-        <Button type="submit" disabled={!body.trim()}>Send</Button>
+        <Input
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
+          placeholder="Say something"
+          maxLength={500}
+          className="w-auto min-w-0 flex-1"
+        />
+        <Button type="submit" className="shrink-0 px-3" disabled={!body.trim()}>Send</Button>
       </form>
       <ReportDialog
         open={!!reportId}

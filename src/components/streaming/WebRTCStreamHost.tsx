@@ -20,6 +20,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { errorMessage as formatError } from "@/lib/errorMessage";
 import {
+  cameraFailureCopy,
+  requestCamera,
+  stopStreamTracks,
+  type CameraFailure,
+} from "@/lib/cameraAccess";
+import {
   LIVE_VIDEO_NOT_CONFIGURED,
   parseLiveKitTokenResponse,
   pickRecorderMimeType,
@@ -27,23 +33,32 @@ import {
   replayFileExtension,
   type LiveKitSession,
 } from "@/lib/livekitSession";
+import { shotHostPreview } from "@/lib/shotSession";
+import { LIVE_REQUEST_TIMEOUT_MS, withDeadline } from "@/lib/withDeadline";
 
 interface WebRTCStreamHostProps {
   streamId: string;
   isLive?: boolean;
   onEnd: () => void;
+  onClose: () => void;
 }
 
 type CameraState = "checking" | "idle" | "not-configured" | "requesting" | "ready" | "error" | "denied";
 
 async function requestLiveKitSession(streamId: string): Promise<LiveKitSession> {
-  const { data, error } = await supabase.functions.invoke("livekit-token", { body: { streamId } });
+  if (shotHostPreview()) return { configured: false, error: LIVE_VIDEO_NOT_CONFIGURED };
+  const invoke = supabase.functions.invoke("livekit-token", { body: { streamId } });
+  const { data, error } = await withDeadline(
+    invoke,
+    LIVE_REQUEST_TIMEOUT_MS,
+    "Live video did not respond. Try again.",
+  );
   const parsed = parseLiveKitTokenResponse(data ?? { error: error?.message });
   if ("configured" in parsed) return parsed;
   throw new Error(parsed.error);
 }
 
-export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, isLive: initialIsLive = false, onEnd }) => {
+export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, isLive: initialIsLive = false, onEnd, onClose }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -53,9 +68,12 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
   const recordedChunksRef = useRef<Blob[]>([]);
   const recorderMimeRef = useRef<string>("video/webm");
   const saveReplayRef = useRef(false);
+  const cameraAttemptRef = useRef(0);
+  const streamingRef = useRef(initialIsLive);
 
   const [isStreaming, setIsStreaming] = useState(initialIsLive);
   const [cameraState, setCameraState] = useState<CameraState>("checking");
+  const [failure, setFailure] = useState<CameraFailure | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
@@ -65,6 +83,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
   const [isSaving, setIsSaving] = useState(false);
   const [saveReplay, setSaveReplay] = useState(false);
   saveReplayRef.current = saveReplay;
+  streamingRef.current = isStreaming;
 
   const attachPreview = useCallback((stream: MediaStream) => {
     const video = videoRef.current;
@@ -75,44 +94,86 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
     video.play().catch(() => undefined);
   }, []);
 
+  const showCameraFailure = useCallback((next: CameraFailure, title: string, message: string) => {
+    setFailure(next);
+    setCameraState(next === "denied" ? "denied" : "error");
+    setErrorMessage(message || title);
+  }, []);
+
   const initCamera = useCallback(async () => {
+    const attempt = ++cameraAttemptRef.current;
     setCameraState("requesting");
+    setFailure(null);
+    setErrorMessage("");
+    const result = await requestCamera({
+      getUserMedia: (constraints) => navigator.mediaDevices.getUserMedia(constraints),
+      secure: window.isSecureContext,
+      supported: typeof navigator.mediaDevices?.getUserMedia === "function",
+      stillWanted: () => attempt === cameraAttemptRef.current,
+    });
+    if (attempt !== cameraAttemptRef.current) {
+      if (result.ok) stopStreamTracks(result.stream);
+      return;
+    }
+    if (result.ok === false) {
+      showCameraFailure(result.failure, result.title, result.message);
+      return;
+    }
+    if (result.stream.getTracks().length === 0) {
+      const copy = cameraFailureCopy("no-device");
+      showCameraFailure("no-device", copy.title, copy.message);
+      return;
+    }
+    localStreamRef.current = result.stream as MediaStream;
+    // The dev host preview feeds a stand-in stream. Headless WebKit crashes if that
+    // stream is assigned to a video element, and this session never publishes it.
+    if (!shotHostPreview()) attachPreview(result.stream as MediaStream);
+    setCameraState("ready");
+  }, [attachPreview, showCameraFailure]);
+
+  const refreshLiveVideo = useCallback(async () => {
+    if (shotHostPreview()) {
+      setFailure(null);
+      setErrorMessage("");
+      setCameraState("idle");
+      return;
+    }
+    setCameraState("checking");
+    setFailure(null);
     setErrorMessage("");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      });
-      localStreamRef.current = stream;
-      attachPreview(stream);
-      setCameraState("ready");
-    } catch (err: unknown) {
-      const name = err instanceof Error ? err.name : "";
-      if (name === "NotAllowedError") {
-        setCameraState("denied");
-        setErrorMessage("Camera access was denied. Allow the camera and microphone, then try again.");
-      } else if (name === "NotFoundError") {
-        setCameraState("error");
-        setErrorMessage("No camera or microphone found.");
-      } else if (name === "NotReadableError") {
-        setCameraState("error");
-        setErrorMessage("Camera is in use by another application.");
-      } else {
-        setCameraState("error");
-        setErrorMessage(formatError(err, "Failed to access camera."));
+      const session = await requestLiveKitSession(streamId);
+      if (!session.configured) {
+        setCameraState("not-configured");
+        setErrorMessage("Camera streaming needs LiveKit credentials before a host can go live.");
+        return;
       }
+      if (!session.canPublish) {
+        setCameraState("error");
+        setErrorMessage("Only the host can go live.");
+        return;
+      }
+      setCameraState("idle");
+    } catch (err: unknown) {
+      setCameraState("error");
+      setErrorMessage(formatError(err, "Could not start live video"));
     }
-  }, [attachPreview]);
+  }, [streamId]);
 
   useEffect(() => {
     let cancelled = false;
-    const check = async () => {
+    const run = async () => {
+      if (shotHostPreview()) {
+        setCameraState("idle");
+        return;
+      }
+      setCameraState("checking");
       try {
         const session = await requestLiveKitSession(streamId);
         if (cancelled) return;
         if (!session.configured) {
           setCameraState("not-configured");
-          setErrorMessage(LIVE_VIDEO_NOT_CONFIGURED);
+          setErrorMessage("Camera streaming needs LiveKit credentials before a host can go live.");
           return;
         }
         if (!session.canPublish) {
@@ -127,7 +188,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
         setErrorMessage(formatError(err, "Could not start live video"));
       }
     };
-    void check();
+    void run();
     return () => {
       cancelled = true;
     };
@@ -199,15 +260,21 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
       if (!localStreamRef.current) return;
       const session = await requestLiveKitSession(streamId);
       if (!session.configured) {
+        stopStreamTracks(localStreamRef.current);
+        localStreamRef.current = null;
         setCameraState("not-configured");
-        setErrorMessage(LIVE_VIDEO_NOT_CONFIGURED);
+        setErrorMessage("Camera streaming needs LiveKit credentials before a host can go live.");
         return;
       }
       if (!session.canPublish) throw new Error("Only the host can go live.");
 
       const room = new Room();
       roomRef.current = room;
-      await room.connect(session.url, session.token);
+      await withDeadline(
+        room.connect(session.url, session.token),
+        LIVE_REQUEST_TIMEOUT_MS,
+        "Could not join the live room. Try again.",
+      );
 
       const media = localStreamRef.current;
       const videoTrack = media.getVideoTracks()[0];
@@ -306,12 +373,20 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
 
   useEffect(() => {
     return () => {
+      cameraAttemptRef.current += 1;
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
         mediaRecorderRef.current.stop();
       }
+      const wasLive = streamingRef.current;
       releaseLocalMedia();
+      if (wasLive && !shotHostPreview()) {
+        void supabase
+          .from("live_streams")
+          .update({ is_live: false, ended_at: new Date().toISOString() })
+          .eq("id", streamId);
+      }
     };
-  }, []);
+  }, [streamId]);
 
   useEffect(() => {
     const channel = supabase
@@ -362,40 +437,65 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
     }
     if (cameraState === "checking" || cameraState === "requesting") {
       return (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
-          <div className="text-center">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-br from-primary/20 to-background px-4">
+          <div className="w-full max-w-sm text-center">
             <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-primary" />
             <p className="font-medium text-foreground">
               {cameraState === "checking" ? "Checking live video..." : "Starting camera..."}
             </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {cameraState === "checking"
+                ? "This stops waiting if live video does not answer."
+                : "This stops waiting if the camera stays busy."}
+            </p>
+            <Button type="button" variant="outline" className="mt-4" onClick={onClose}>
+              Close
+            </Button>
           </div>
         </div>
       );
     }
     if (cameraState === "not-configured") {
       return (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-br from-muted/30 to-background">
-          <div className="max-w-sm px-4 text-center">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-br from-muted/30 to-background px-4">
+          <div className="w-full max-w-sm text-center">
             <Radio className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
             <p className="font-medium text-foreground">Live video not configured</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Camera streaming needs LiveKit credentials before a host can go live.
-            </p>
+            <p className="mt-2 text-sm text-muted-foreground">{errorMessage}</p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <Button type="button" onClick={() => void refreshLiveVideo()} variant="outline">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Try again
+              </Button>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Close
+              </Button>
+            </div>
           </div>
         </div>
       );
     }
     if (cameraState === "denied" || cameraState === "error") {
+      const title = failure ? cameraFailureCopy(failure).title : cameraState === "denied" ? "Camera access denied" : "Camera error";
       return (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-br from-destructive/10 to-background">
-          <div className="max-w-sm px-4 text-center">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-br from-destructive/10 to-background px-4">
+          <div className="w-full max-w-sm text-center">
             <AlertCircle className="mx-auto mb-4 h-12 w-12 text-destructive" />
-            <p className="mb-2 font-medium text-foreground">{cameraState === "denied" ? "Camera access denied" : "Camera error"}</p>
+            <p className="mb-2 font-medium text-foreground">{title}</p>
             <p className="mb-4 text-sm text-muted-foreground">{errorMessage}</p>
-            <Button onClick={initCamera} variant="outline">
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Try again
-            </Button>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button
+                type="button"
+                onClick={() => void (failure ? initCamera() : refreshLiveVideo())}
+                variant="outline"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Try again
+              </Button>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Close
+              </Button>
+            </div>
           </div>
         </div>
       );
@@ -423,7 +523,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
             </div>
           </div>
         )}
-        <div className="absolute left-3 right-3 top-3 z-20 flex gap-2">
+        <div className="absolute left-3 right-14 top-3 z-20 flex gap-2">
           {cameraState === "ready" && !isStreaming && (
             <Badge variant="secondary" className="bg-background/80 text-xs backdrop-blur-sm">Preview</Badge>
           )}
@@ -445,7 +545,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({ streamId, is
         animate={{ opacity: 1, y: 0 }}
         className="flex-shrink-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-4 py-3"
       >
-        <div className="mx-auto flex w-full max-w-[280px] flex-col items-center gap-3">
+        <div className="mx-auto flex w-full min-w-0 max-w-full flex-col items-center gap-3">
           {(cameraState === "ready" || cameraState === "idle") && (
             <div className="flex w-full items-center justify-between gap-3">
               <Label htmlFor="save-replay" className="text-sm text-white">Save replay</Label>
