@@ -228,17 +228,17 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
             <RadioGroup
               value={streamType}
               onValueChange={(v) => setStreamType(v as StreamType)}
-              className="grid grid-cols-2 gap-2"
+              className="grid grid-cols-1 gap-2 sm:grid-cols-2"
             >
               <Label
                 htmlFor="webrtc"
-                className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                className={`flex min-w-0 items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
                   streamType === 'webrtc' ? 'border-primary bg-primary/10' : 'border-border'
                 }`}
               >
-                <RadioGroupItem value="webrtc" id="webrtc" />
-                <Radio className="h-4 w-4" />
-                <div className="text-sm">
+                <RadioGroupItem value="webrtc" id="webrtc" className="shrink-0" />
+                <Radio className="h-4 w-4 shrink-0" />
+                <div className="min-w-0 text-sm">
                   <span className="font-medium">Camera/Mic</span>
                   <p className="text-xs text-muted-foreground">Live video</p>
                 </div>
@@ -246,22 +246,22 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
               
               <Label
                 htmlFor="youtube"
-                className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                className={`flex min-w-0 items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
                   streamType === 'youtube' ? 'border-primary bg-primary/10' : 'border-border'
                 }`}
               >
-                <RadioGroupItem value="youtube" id="youtube" />
-                <Youtube className="h-4 w-4" />
+                <RadioGroupItem value="youtube" id="youtube" className="shrink-0" />
+                <Youtube className="h-4 w-4 shrink-0" />
                 <span className="text-sm">YouTube</span>
               </Label>
               
               <Label
                 htmlFor="twitch"
-                className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                className={`flex min-w-0 items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
                   streamType === 'twitch' ? 'border-primary bg-primary/10' : 'border-border'
                 }`}
               >
-                <RadioGroupItem value="twitch" id="twitch" />
+                <RadioGroupItem value="twitch" id="twitch" className="shrink-0" />
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/>
                 </svg>
@@ -270,12 +270,12 @@ export const CreateStreamDialog: React.FC<CreateStreamDialogProps> = ({ open, on
               
               <Label
                 htmlFor="soundcloud"
-                className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                className={`flex min-w-0 items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
                   streamType === 'soundcloud' ? 'border-primary bg-primary/10' : 'border-border'
                 }`}
               >
-                <RadioGroupItem value="soundcloud" id="soundcloud" />
-                <Music2 className="h-4 w-4" />
+                <RadioGroupItem value="soundcloud" id="soundcloud" className="shrink-0" />
+                <Music2 className="h-4 w-4 shrink-0" />
                 <span className="text-sm">SoundCloud</span>
               </Label>
 

@@ -12,6 +12,9 @@ const SheetOverlay = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Ove
   ...props
 }, ref) => <SheetPrimitive.Overlay className={cn("fixed inset-0 z-50 bg-background/80 backdrop-blur-md", "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out", className)} {...props} ref={ref} />);
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
+const sheetContain =
+  "box-border min-w-0 overflow-x-hidden break-words [&>*]:min-w-0 [&_input]:min-w-0 [&_input]:max-w-full [&_textarea]:min-w-0 [&_textarea]:max-w-full [&_select]:min-w-0 [&_select]:max-w-full [&_img]:min-w-0 [&_img]:max-w-full [&_button]:min-w-0 [&_button]:max-w-full [&_button]:whitespace-normal [&_label]:min-w-0 [&_label]:max-w-full";
+
 const sheetVariants = cva("fixed z-50 gap-4 bg-card border-border/50 p-6 shadow-elevated transition-all ease-smooth data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-400", {
   variants: {
     side: {
@@ -35,12 +38,17 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
   children,
   overlayClassName,
   overlayStyle,
+  style,
   ...props
 }, ref) => <SheetPortal>
       <SheetOverlay className={overlayClassName} style={overlayStyle} />
       <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({
     side
-  }), "scrollbar-thin overflow-y-auto", className)} {...props}>
+  }), "scrollbar-thin overflow-y-auto", sheetContain, className)} style={{
+    ...style,
+    boxSizing: "border-box",
+    minWidth: 0,
+  }} {...props}>
         {children}
         
       </SheetPrimitive.Content>

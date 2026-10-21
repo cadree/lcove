@@ -298,9 +298,9 @@ export function CreatePostDialog({
                     <Image className="w-4 h-4 mr-2" />
                     Select Photo
                   </Button>
-                  <Button variant="outline" onClick={() => multiImageInputRef.current?.click()} className="w-full">
-                    <LayoutGrid className="w-4 h-4 mr-2" />
-                    Create Collage (Multiple Photos)
+                  <Button variant="outline" onClick={() => multiImageInputRef.current?.click()} className="h-auto w-full whitespace-normal py-3 text-center">
+                    <LayoutGrid className="h-4 w-4 shrink-0" />
+                    <span className="min-w-0 whitespace-normal">Create Collage (Multiple Photos)</span>
                   </Button>
                   <Button variant="outline" onClick={() => videoInputRef.current?.click()} className="w-full">
                     <Video className="w-4 h-4 mr-2" />

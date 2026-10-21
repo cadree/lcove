@@ -627,7 +627,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
           {/* Timeline */}
           <div className="space-y-4">
             <Label className="flex items-center gap-2"><Calendar className="h-4 w-4" /> Project Timeline</Label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label className="text-sm text-muted-foreground">Start Date</Label>
                 <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
@@ -637,7 +637,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
                 <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label className="text-sm text-muted-foreground">End Date</Label>
                 <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
@@ -659,20 +659,20 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
             </div>
             <div className="space-y-2">
               {milestones.map((ms, i) => (
-                <div key={i} className="flex items-center gap-2 bg-muted/20 rounded-lg p-3">
-                  <div className="flex-1">
+                <div key={i} className="flex min-w-0 flex-col gap-2 bg-muted/20 rounded-lg p-3 sm:flex-row sm:items-center">
+                  <div className="min-w-0 flex-1">
                     <Input
                       value={ms.title}
                       onChange={(e) => updateMilestone(i, 'title', e.target.value)}
                       placeholder="Milestone name"
-                      className="mb-1"
+                      className="mb-1 w-full"
                     />
                   </div>
                   <Input
                     type="date"
                     value={ms.due_date}
                     onChange={(e) => updateMilestone(i, 'due_date', e.target.value)}
-                    className="w-40"
+                    className="w-full min-w-0 sm:w-40"
                   />
                   {ms.phase === 'custom' && (
                     <Button type="button" variant="ghost" size="sm" onClick={() => removeMilestone(i)} className="text-muted-foreground hover:text-destructive">

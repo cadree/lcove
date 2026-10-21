@@ -220,11 +220,11 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
                     key={opt.value}
                     type="button"
                     variant={type === opt.value ? 'default' : 'outline'}
-                    className="flex flex-col h-auto py-3"
+                    className="flex h-auto min-w-0 flex-col whitespace-normal py-3 text-center leading-tight"
                     onClick={() => setType(opt.value as typeof type)}
                   >
                     <Icon className="w-5 h-5 mb-1" />
-                    <span className="text-xs">{opt.label}</span>
+                    <span className="whitespace-normal text-xs">{opt.label}</span>
                   </Button>
                 );
               })}
