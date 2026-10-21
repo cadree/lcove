@@ -142,7 +142,16 @@ export function useNoviQuests() {
     streak: board.streakDays.length > 0 ? streakFromDays(board.streakDays, today) : board.streak,
     dailyXp: board.dailyXp,
     dailyDone: board.dailyDone,
+    signals: {
+      profileReady: board.profileReady,
+      postCount: board.postCount,
+      connectionCount: board.connectionCount,
+      bookOpened: board.bookOpened,
+      completedProjects: board.completedProjects,
+      studioOpened: board.studioOpened,
+    },
     isLoading: boardQuery.isLoading,
+    isReady: boardQuery.isFetched,
     complete,
   };
 }

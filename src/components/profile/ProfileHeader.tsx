@@ -15,7 +15,8 @@ import { useFavorites } from '@/hooks/useFavorites';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyXp } from '@/hooks/useXp';
-import { xpBar } from '@/lib/noviQuests';
+import { useXpCelebrate } from '@/hooks/useXpCelebrate';
+import { XpMeter } from '@/components/novi/XpMeter';
 import { Link } from 'react-router-dom';
 import { ReportDialog } from '@/components/safety/ReportDialog';
 import { FriendsDrawer } from '@/components/friends/FriendsDrawer';
@@ -79,7 +80,8 @@ export function ProfileHeader({
   const { isBlocked, blockUser, unblockUser } = useUserBlocks();
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
-  const { data: myXp } = useMyXp();
+  const { data: myXp, isSuccess: xpReady } = useMyXp();
+  const burst = useXpCelebrate(myXp?.total ?? 0, "", xpReady);
 
   const isUserFavorite = isFavorite(userId);
   const ownFriends = favorites?.length || 0;
@@ -231,18 +233,7 @@ export function ProfileHeader({
 
         {isOwnProfile && (
           <Link to="/quests" className="mt-3 block">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="mono-label text-[9px] text-[hsl(var(--brand))]">
-                {roleLabel} // Lv {xpBar(myXp?.total ?? 0).level}
-              </span>
-              <span className="mono-label text-[9px] text-muted-foreground">{myXp?.total ?? 0} XP</span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-foreground/10">
-              <div
-                className="h-full rounded-full bg-[linear-gradient(90deg,#FFD6E8,#FF9FC8)]"
-                style={{ width: `${Math.round(xpBar(myXp?.total ?? 0).ratio * 100)}%` }}
-              />
-            </div>
+            <XpMeter total={myXp?.total ?? 0} burstToken={burst} caption={roleLabel} dense />
           </Link>
         )}
 

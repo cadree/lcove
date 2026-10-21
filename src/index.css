@@ -729,6 +729,163 @@
   transform: translateX(-50%);
 }
 
+button.novi-peek {
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+  font: inherit;
+}
+
+button.novi-peek:focus-visible {
+  outline: 2px solid hsl(var(--bubble));
+  outline-offset: 2px;
+}
+
+.novi-bob,
+.novi-glance {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.novi-bob {
+  transform-origin: 50% 80%;
+  animation: novi-breathe 3.4s ease-in-out infinite;
+}
+
+.novi-glance {
+  animation: novi-glance 9s ease-in-out infinite;
+}
+
+.novi-lid {
+  position: absolute;
+  top: 1.68rem;
+  width: 0.78rem;
+  height: 0.62rem;
+  border-radius: 45%;
+  background: #8d6244;
+  transform: scaleY(0);
+  transform-origin: center top;
+  animation: novi-blink 6.4s linear infinite;
+}
+
+.novi-lid-left {
+  left: calc(37.7% - 0.39rem);
+}
+
+.novi-lid-right {
+  left: calc(62.5% - 0.39rem);
+  animation-delay: 0.05s;
+}
+
+.novi-press:hover .novi-bob,
+.novi-press:focus-visible .novi-bob,
+.novi-press:active .novi-bob {
+  animation: novi-hop 0.42s ease-out, novi-breathe 3.4s ease-in-out 0.42s infinite;
+}
+
+.quest-fill {
+  transform-origin: left center;
+  animation: quest-fill 680ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.xp-burst {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.xp-burst i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  opacity: 0;
+  animation: xp-pop 680ms ease-out forwards;
+}
+
+@keyframes novi-breathe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-3px) scale(1.015);
+  }
+}
+
+@keyframes novi-glance {
+  0%,
+  62%,
+  100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  72% {
+    transform: translateX(-4px) rotate(-3deg);
+  }
+  82% {
+    transform: translateX(3px) rotate(2.5deg);
+  }
+  90% {
+    transform: translateX(0) rotate(0deg);
+  }
+}
+
+@keyframes novi-blink {
+  0%,
+  42%,
+  50%,
+  100% {
+    transform: scaleY(0);
+  }
+  46% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes novi-hop {
+  0% {
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+  40% {
+    transform: translateY(-7px) scale(1.04) rotate(-4deg);
+  }
+  100% {
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+
+@keyframes quest-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes xp-pop {
+  0% {
+    transform: translate(0, 0) scale(0.3);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(1);
+    opacity: 0;
+  }
+}
+
 .ether-splash {
   position: fixed;
   inset: 0;
@@ -772,8 +929,21 @@
 @media (prefers-reduced-motion: reduce) {
   .world-grain,
   .world-sweep,
-  .world-glow {
+  .world-glow,
+  .novi-bob,
+  .novi-glance,
+  .novi-lid,
+  .quest-fill,
+  .xp-burst i {
     animation: none !important;
+  }
+
+  .novi-lid {
+    transform: scaleY(0);
+  }
+
+  .quest-fill {
+    transform: none;
   }
 
   .world-sweep {

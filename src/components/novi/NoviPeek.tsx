@@ -1,26 +1,48 @@
-import { useState } from "react";
 import cutout from "@/assets/novi-cutout.png";
-import { NoviGuide } from "@/components/novi/NoviGuide";
 import { cn } from "@/lib/utils";
+
+function NoviBody() {
+  return (
+    <span className="novi-bob">
+      <span className="novi-glance">
+        <img src={cutout} alt="" />
+        <span className="novi-lid novi-lid-left" />
+        <span className="novi-lid novi-lid-right" />
+      </span>
+    </span>
+  );
+}
 
 /**
  * Novi hiding behind an edge. The window shows his head and shoulders from the
- * full cutout; the card clips the rest of his body. A tap opens the quest guide.
+ * full cutout; the card clips the rest of his body.
  */
-export function NoviPeek({ className }: { className?: string }) {
-  const [open, setOpen] = useState(false);
+export function NoviPeek({
+  className,
+  onPress,
+  label = "Ask Novi",
+}: {
+  className?: string;
+  onPress?: () => void;
+  label?: string;
+}) {
+  if (!onPress) {
+    return (
+      <span className={cn("novi-peek novi-alive", className)} aria-hidden="true">
+        <NoviBody />
+      </span>
+    );
+  }
+
   return (
-    <>
-      <button
-        type="button"
-        className={cn("novi-peek", className)}
-        aria-label="Open Novi's guide"
-        onClick={() => setOpen(true)}
-      >
-        <img src={cutout} alt="" />
-      </button>
-      <NoviGuide open={open} onOpenChange={setOpen} />
-    </>
+    <button
+      type="button"
+      className={cn("novi-peek novi-alive novi-press", className)}
+      onClick={onPress}
+      aria-label={label}
+    >
+      <NoviBody />
+    </button>
   );
 }
 

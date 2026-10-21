@@ -8,6 +8,7 @@ import { shotContentThin, shotPosts, shotSessionEnabled } from '@/lib/shotSessio
 import { isQueryablePostId } from '@/lib/postId';
 import { assertCleanText, OBJECTIONABLE_MESSAGE } from '@/lib/objectionableText';
 import { mergePostsAndReposts, type RepostRow } from '@/lib/sharing';
+import { refreshXp } from '@/lib/xpRefresh';
 
 interface Post {
   id: string;
@@ -177,6 +178,7 @@ export function usePosts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] });
       queryClient.invalidateQueries({ queryKey: ['profile-posts'] });
+      refreshXp(queryClient);
       toast.success('Post created!');
     },
     onError: (error, _vars, context) => {
