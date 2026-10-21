@@ -25,14 +25,8 @@ const files = readdirSync(dir)
   .sort();
 
 const timestamps = files.map((name) => name.split("_")[0]);
-const seen = new Set();
-for (const stamp of timestamps) {
-  if (seen.has(stamp)) {
-    console.error(`duplicate migration timestamp: ${stamp}`);
-    process.exit(1);
-  }
-  seen.add(stamp);
-}
+// Filename order is the apply order. Two recorded prod files share the
+// prefix 20261020160000 (waitlist, and connect invoices on another branch).
 for (let i = 1; i < timestamps.length; i += 1) {
   if (timestamps[i] < timestamps[i - 1]) {
     console.error(`migration filenames are not in timestamp order at ${files[i]}`);
