@@ -26,8 +26,10 @@ import { ShareSheet } from '@/components/share/ShareSheet';
 import { useOwnPostViewCounts, useRecordPostView } from '@/hooks/usePostViews';
 import { useMyReposts, useSharingActions } from '@/hooks/useSharing';
 import { canRepostMedia, ownerOnlyInsight, repostedByLabel } from '@/lib/sharing';
+import { EmbedPlayer } from '@/components/feed/EmbedPlayer';
+import { embedFromPost, type StoredEmbedFields } from '@/lib/videoEmbed';
 
-interface Post {
+interface Post extends StoredEmbedFields {
   id: string;
   user_id: string;
   content: string | null;
@@ -74,6 +76,7 @@ const FeedPost = ({ post }: { post: Post }) => {
   const { repostPost, undoRepost } = useSharingActions();
   const alreadyReposted = myReposts.has(post.id);
   const insight = ownerOnlyInsight(isOwner, viewCounts?.[post.id], likesCount);
+  const embed = embedFromPost(post);
 
   const authorName = post.profile ? (post.profile.display_name || 'User') : 'Private profile';
 
@@ -201,7 +204,14 @@ const FeedPost = ({ post }: { post: Post }) => {
       )}
 
       {/* Media */}
-      {post.media_url && post.media_type !== 'text' && (
+      {embed ? (
+        <div className="relative mx-auto w-full max-w-[470px] bg-black">
+          <span className="mono-label absolute left-3 top-3 z-[1] rounded-full bg-black/55 px-2 py-1 text-[8px] text-white">
+            {fileCode(post.id)}
+          </span>
+          <EmbedPlayer embed={embed} title={post.embed_title} />
+        </div>
+      ) : post.media_url && post.media_type !== 'text' && (
         <div className="mx-auto w-full max-w-[470px] bg-muted/15">
           <button
             type="button"

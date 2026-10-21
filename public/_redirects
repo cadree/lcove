@@ -1,4 +1,7 @@
 # 200 is a proxy, not an HTTP redirect. It must stay above the SPA fallback
 # so Pages does not rewrite this URL to index.html.
 /.well-known/apple-app-site-association /.well-known/apple-app-site-association.json 200
+# /embed/player is functions/embed/player.js. Pages Functions run before this
+# splat, so the catch-all must not be forced with !. /embed/player.html is a
+# real file for hosts that serve public/ as-is.
 /* /index.html 200

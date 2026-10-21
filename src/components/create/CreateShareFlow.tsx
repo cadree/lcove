@@ -5,6 +5,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { usePosts } from "@/hooks/usePosts";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
+import { VideoLinkField } from "@/components/feed/VideoLinkField";
+import { EmbedPlayer, EmbedThumbnail } from "@/components/feed/EmbedPlayer";
+import type { EmbedDraft } from "@/lib/videoEmbed";
 
 type Step = "pick" | "crop" | "caption" | "share";
 
@@ -61,6 +64,8 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [kind, setKind] = useState<"photo" | "video" | "text">("text");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [embed, setEmbed] = useState<EmbedDraft | null>(null);
 
   const reset = () => {
     setStep("pick");
@@ -73,6 +78,8 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
     setNatural(null);
     setError(null);
     setKind("text");
+    setLinkUrl("");
+    setEmbed(null);
   };
 
   const chooseFile = (accept: string) => {
@@ -88,6 +95,8 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
   const onPick = (file: File | undefined) => {
     if (!file) return;
     setError(null);
+    setLinkUrl("");
+    setEmbed(null);
     if (file.type.startsWith("video/")) {
       if (file.size > 80 * 1024 * 1024) {
         setError("Videos need to be under 80 MB.");
@@ -138,13 +147,14 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
   };
 
   const share = async () => {
-    if (!caption.trim() && !croppedFile) return;
+    if (!caption.trim() && !croppedFile && !embed) return;
     try {
       setError(null);
       await createPost.mutateAsync({
         content: caption.trim() || undefined,
-        file: croppedFile || undefined,
-        mediaType: kind === "video" ? "video" : croppedFile ? "photo" : "text",
+        file: embed ? undefined : croppedFile || undefined,
+        mediaType: embed ? "video" : kind === "video" ? "video" : croppedFile ? "photo" : "text",
+        embed: embed ?? undefined,
       });
       handleOpenChange(false);
     } catch (err) {
@@ -173,9 +183,19 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
               <Button variant="outline" className="w-full min-h-11" onClick={() => chooseFile("video/*")}>
                 Choose a video
               </Button>
-              <Button variant="outline" className="w-full min-h-11" onClick={() => { setKind("text"); setStep("caption"); }}>
+              <Button variant="outline" className="w-full min-h-11" onClick={() => { setKind("text"); setEmbed(null); setStep("caption"); }}>
                 Caption only
               </Button>
+              <VideoLinkField
+                url={linkUrl}
+                onUrlChange={setLinkUrl}
+                onDraft={setEmbed}
+              />
+              {embed && (
+                <Button className="w-full min-h-11" onClick={() => setStep("caption")}>
+                  Next
+                </Button>
+              )}
               {error && <p className="text-sm text-destructive">{error}</p>}
               <input
                 ref={fileInputRef}
@@ -252,7 +272,9 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
 
           {user && step === "caption" && (
             <div className="space-y-4">
-              {kind === "video" && croppedUrl ? (
+              {embed ? (
+                <EmbedPlayer embed={embed} title={embed.title} />
+              ) : kind === "video" && croppedUrl ? (
                 <video src={croppedUrl} className="max-h-[min(52vh,420px)] w-full rounded-[14px] bg-black object-contain" controls playsInline />
               ) : croppedUrl ? (
                 <img src={croppedUrl} alt="" className="aspect-[4/5] max-h-[min(52vh,420px)] w-full rounded-[14px] bg-muted object-contain" />
@@ -268,13 +290,13 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
                 <Button
                   variant="outline"
                   className="min-h-11 flex-1"
-                  onClick={() => setStep(kind === "video" ? "pick" : preview ? "crop" : "pick")}
+                  onClick={() => setStep(embed || kind === "video" ? "pick" : preview ? "crop" : "pick")}
                 >
                   Back
                 </Button>
                 <Button
                   className="min-h-11 flex-1"
-                  disabled={!caption.trim() && !croppedFile}
+                  disabled={!caption.trim() && !croppedFile && !embed}
                   onClick={() => setStep("share")}
                 >
                   Next
@@ -285,7 +307,12 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
 
           {user && step === "share" && (
             <div className="space-y-4">
-              {kind === "video" && croppedUrl ? (
+              {embed ? (
+                <div className="space-y-2">
+                  <EmbedThumbnail embed={embed} thumbnailUrl={embed.thumbnailUrl} title={embed.title} className="aspect-video" />
+                  {embed.title && <p className="text-sm text-foreground">{embed.title}</p>}
+                </div>
+              ) : kind === "video" && croppedUrl ? (
                 <video src={croppedUrl} className="max-h-[min(52vh,420px)] w-full rounded-[14px] bg-black object-contain" controls playsInline />
               ) : croppedUrl ? (
                 <img src={croppedUrl} alt="" className="aspect-[4/5] max-h-[min(52vh,420px)] w-full rounded-[14px] bg-muted object-contain" />

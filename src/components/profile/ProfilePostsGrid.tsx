@@ -4,6 +4,8 @@ import { ProfilePost } from "@/types/post";
 import { postsForProfileGrid } from "@/lib/profilePosts";
 import { useOwnPostViewCounts } from "@/hooks/usePostViews";
 import { gridViewCount } from "@/lib/sharing";
+import { EmbedThumbnail } from "@/components/feed/EmbedPlayer";
+import { embedFromPost } from "@/lib/videoEmbed";
 
 interface ProfilePostsGridProps {
   posts: ProfilePost[];
@@ -57,7 +59,18 @@ export function ProfilePostsGrid({ posts, onPostClick, isLoading, isOwner = fals
           className="aspect-square relative group overflow-hidden bg-muted"
           onClick={() => onPostClick(post)}
         >
-          {post.media_url && post.media_type === 'video' ? (
+          {embedFromPost(post) ? (
+            <>
+              <EmbedThumbnail
+                embed={embedFromPost(post)!}
+                thumbnailUrl={post.embed_thumbnail_url}
+                title={post.embed_title || post.content}
+              />
+              <div className="absolute top-2 right-2">
+                <Play className="w-4 h-4 text-white drop-shadow-lg" fill="white" />
+              </div>
+            </>
+          ) : post.media_url && post.media_type === 'video' ? (
             <>
               <video
                 src={post.media_url}

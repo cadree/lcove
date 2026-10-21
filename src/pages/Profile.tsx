@@ -49,10 +49,10 @@ import { ProfileEffects } from "@/components/profile/ProfileEffects";
 import { supabase } from "@/integrations/supabase/client";
 import { postPreviewPath } from "@/lib/sharing";
 import {
-  PROFILE_POST_COLUMNS,
   mergeLinkedPost,
   profilePostFromRow,
   sameUserId,
+  withProfilePostColumns,
   type ProfilePostRow,
 } from "@/lib/profilePosts";
 
@@ -120,11 +120,9 @@ const Profile = () => {
 
     let cancel = false;
     void (async () => {
-      const { data, error } = await supabase
-        .from("posts")
-        .select(PROFILE_POST_COLUMNS)
-        .eq("id", postId)
-        .maybeSingle();
+      const { data, error } = await withProfilePostColumns((columns) =>
+        supabase.from("posts").select(columns).eq("id", postId).maybeSingle(),
+      );
       if (cancel || error || !data) return;
       const row = data as ProfilePostRow;
       if (targetUserId && row.user_id && !sameUserId(row.user_id, targetUserId)) {

@@ -5256,6 +5256,11 @@ export type Database = {
           comments_enabled: boolean | null
           content: string | null
           created_at: string
+          embed_hash: string | null
+          embed_provider: string | null
+          embed_thumbnail_url: string | null
+          embed_title: string | null
+          embed_video_id: string | null
           folder_id: string | null
           id: string
           location: string | null
@@ -5270,6 +5275,11 @@ export type Database = {
           comments_enabled?: boolean | null
           content?: string | null
           created_at?: string
+          embed_hash?: string | null
+          embed_provider?: string | null
+          embed_thumbnail_url?: string | null
+          embed_title?: string | null
+          embed_video_id?: string | null
           folder_id?: string | null
           id?: string
           location?: string | null
@@ -5284,6 +5294,11 @@ export type Database = {
           comments_enabled?: boolean | null
           content?: string | null
           created_at?: string
+          embed_hash?: string | null
+          embed_provider?: string | null
+          embed_thumbnail_url?: string | null
+          embed_title?: string | null
+          embed_video_id?: string | null
           folder_id?: string | null
           id?: string
           location?: string | null

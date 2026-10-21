@@ -15,6 +15,18 @@ describe("postsForProfileGrid", () => {
       ["text", "photo"],
     );
   });
+
+  it("keeps a video-link post that has no uploaded file", () => {
+    const posts = [
+      { id: "youtube", media_url: null, content: null, embed_provider: "youtube", embed_video_id: "aqz-KE-bpKQ" },
+      { id: "poison", media_url: null, content: null, embed_provider: "instagram", embed_video_id: "aqz-KE-bpKQ" },
+    ];
+
+    assert.deepEqual(
+      postsForProfileGrid(posts).map((post) => post.id),
+      ["youtube"],
+    );
+  });
 });
 
 const founder = "15a45673-0000-4000-8000-000000000001";

@@ -207,6 +207,11 @@ export interface PortfolioItem {
   external_url?: string | null;
   thumbnail_url?: string | null;
   title?: string;
+  embed_provider?: string | null;
+  embed_video_id?: string | null;
+  embed_hash?: string | null;
+  embed_thumbnail_url?: string | null;
+  embed_title?: string | null;
   source: 'post' | 'portfolio_item';
 }
 

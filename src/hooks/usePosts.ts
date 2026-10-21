@@ -10,8 +10,9 @@ import { isQueryablePostId } from '@/lib/postId';
 import { assertCleanText } from '@/lib/objectionableText';
 import { mergePostsAndReposts, type RepostRow } from '@/lib/sharing';
 import { refreshXp } from '@/lib/xpRefresh';
+import { embedColumnMissing, embedColumnsForInsert, videoEmbedMigrationMessage, type EmbedDraft, type StoredEmbedFields } from '@/lib/videoEmbed';
 
-interface Post {
+interface Post extends StoredEmbedFields {
   id: string;
   user_id: string;
   content: string | null;
@@ -120,9 +121,22 @@ export function usePosts() {
   });
 
   const createPost = useMutation({
-    mutationFn: async ({ content, file, mediaType }: { content?: string; file?: File; mediaType?: 'photo' | 'video' | 'text' }) => {
+    mutationFn: async ({ content, file, mediaType, embed }: { content?: string; file?: File; mediaType?: 'photo' | 'video' | 'text'; embed?: EmbedDraft }) => {
       if (!user) throw new Error('Must be logged in');
       assertCleanText(content);
+
+      if (embed) {
+        const columns = embedColumnsForInsert(embed);
+        const { error: insertError } = await supabase
+          .from('posts')
+          .insert({
+            user_id: user.id,
+            content: content || null,
+            ...columns,
+          });
+        if (insertError) throw insertError;
+        return;
+      }
 
       let mediaUrl: string | null = null;
 
@@ -185,7 +199,9 @@ export function usePosts() {
     onError: (error, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(['posts'], context.previous);
       if (context?.preview) URL.revokeObjectURL(context.preview);
-      toast.error(errorMessage(error, 'Failed to create post'));
+      toast.error(embedColumnMissing(error)
+        ? videoEmbedMigrationMessage()
+        : errorMessage(error, 'Failed to create post'));
       console.error(error);
     },
   });

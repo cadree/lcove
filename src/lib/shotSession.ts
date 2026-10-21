@@ -61,14 +61,55 @@ export const shotPeople = [
 
 export const shotFavoriteIds = shotPeople.slice(0, 2).map((person) => person.user_id);
 
+export function shotEmbedEnabled() {
+  return shotSessionEnabled() && localStorage.getItem("ether-shot-embed") === "1";
+}
+
+/** Real YouTube id used by dev screenshots. The player URL is built in the app. */
+export function shotEmbedPost() {
+  return {
+    id: "0412bbbb-0000-4000-8000-000000000042",
+    user_id: SHOT_USER_ID,
+    content: "A longer cut than the upload limit allows. Big Buck Bunny, posted from YouTube.",
+    media_url: null,
+    media_type: "video" as const,
+    post_type: "regular" as const,
+    created_at: "2026-10-20T18:00:00.000Z",
+    embed_provider: "youtube",
+    embed_video_id: "aqz-KE-bpKQ",
+    embed_hash: null,
+    embed_thumbnail_url: "https://i.ytimg.com/vi/aqz-KE-bpKQ/hqdefault.jpg",
+    embed_title: "Big Buck Bunny",
+    location: null,
+    collaborators: null,
+    alt_text: null,
+    comments_enabled: true,
+    folder_id: null,
+    profile: {
+      user_id: SHOT_USER_ID,
+      display_name: shotProfile.display_name,
+      avatar_url: null as string | null,
+      city: shotProfile.city,
+      city_display: shotProfile.city_display,
+    },
+    reactions: [],
+    user_reaction: null,
+  };
+}
+
 export function shotPosts() {
-  return [
+  const posts = [
     {
       id: "0412aaaa-0000-4000-8000-000000000041",
       user_id: shotPeople[0].user_id,
       content: "Golden hour on Trade St. Looking to the west.",
-      media_url: "/nuance/dynasty-denim.png",
-      media_type: "photo" as const,
+      media_url: "/nuance/dynasty-denim.png" as string | null,
+      media_type: "photo" as "photo" | "video",
+      embed_provider: null as string | null,
+      embed_video_id: null as string | null,
+      embed_hash: null as string | null,
+      embed_thumbnail_url: null as string | null,
+      embed_title: null as string | null,
       post_type: "regular" as const,
       created_at: "2026-10-19T15:00:00.000Z",
       profile: shotPeople[0],
@@ -76,6 +117,10 @@ export function shotPosts() {
       user_reaction: null,
     },
   ];
+  if (typeof localStorage !== "undefined" && localStorage.getItem("ether-shot-embed") === "1") {
+    posts.unshift(shotEmbedPost());
+  }
+  return posts;
 }
 
 export function shotStories() {

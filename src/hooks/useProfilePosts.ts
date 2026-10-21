@@ -7,11 +7,13 @@ import { errorMessage } from '@/lib/errorMessage';
 import { ProfilePost } from '@/types/post';
 import { profileItemsWithReposts, type RepostRow } from '@/lib/sharing';
 import {
-  PROFILE_POST_COLUMNS,
   postsForViewer,
   profilePostFromRow,
+  withProfilePostColumns,
   type ProfilePostRow,
 } from '@/lib/profilePosts';
+import { embedColumnMissing, embedColumnsForInsert, videoEmbedMigrationMessage, type EmbedDraft } from '@/lib/videoEmbed';
+import { shotEmbedEnabled, shotEmbedPost } from '@/lib/shotSession';
 
 const EMPTY_POSTS: ProfilePost[] = [];
 
@@ -28,11 +30,38 @@ export function useProfilePosts(userId?: string) {
       const profileUserId = targetUserId;
       if (!profileUserId) return [];
 
-      const { data: postsData, error } = await supabase
-        .from('posts')
-        .select(PROFILE_POST_COLUMNS)
-        .eq('user_id', profileUserId)
-        .order('created_at', { ascending: false });
+      if (shotEmbedEnabled() && targetUserId === shotEmbedPost().user_id) {
+        const post = shotEmbedPost();
+        return [{
+          id: post.id,
+          user_id: post.user_id,
+          content: post.content,
+          media_url: post.media_url,
+          media_type: post.media_type,
+          created_at: post.created_at,
+          location: post.location,
+          collaborators: post.collaborators,
+          alt_text: post.alt_text,
+          comments_enabled: post.comments_enabled,
+          folder_id: post.folder_id,
+          embed_provider: post.embed_provider,
+          embed_video_id: post.embed_video_id,
+          embed_hash: post.embed_hash,
+          embed_thumbnail_url: post.embed_thumbnail_url,
+          embed_title: post.embed_title,
+          profile: { display_name: post.profile.display_name, avatar_url: null },
+          grid_key: post.id,
+          repost: null,
+        }];
+      }
+
+      const { data: postsData, error } = await withProfilePostColumns((columns) =>
+        supabase
+          .from('posts')
+          .select(columns)
+          .eq('user_id', profileUserId)
+          .order('created_at', { ascending: false }),
+      );
 
       if (error) throw error;
 
@@ -53,10 +82,9 @@ export function useProfilePosts(userId?: string) {
         if (repostError || !repostData?.length) return own;
 
         const originalIds = [...new Set(repostData.map((row) => row.post_id))];
-        const { data: originals, error: originalsError } = await supabase
-          .from('posts')
-          .select(PROFILE_POST_COLUMNS)
-          .in('id', originalIds);
+        const { data: originals, error: originalsError } = await withProfilePostColumns((columns) =>
+          supabase.from('posts').select(columns).in('id', originalIds),
+        );
         if (originalsError || !originals?.length) return own;
 
         const authorIds = [...new Set(originals.map((post) => post.user_id))];
@@ -98,6 +126,7 @@ export function useProfilePosts(userId?: string) {
       location,
       altText,
       commentsEnabled = true,
+      embed,
     }: { 
       content?: string; 
       file?: File;
@@ -106,8 +135,25 @@ export function useProfilePosts(userId?: string) {
       location?: string;
       altText?: string;
       commentsEnabled?: boolean;
+      embed?: EmbedDraft;
     }) => {
       if (!user) throw new Error('Must be logged in');
+
+      if (embed) {
+        const columns = embedColumnsForInsert(embed);
+        const { error: insertError } = await supabase
+          .from('posts')
+          .insert({
+            user_id: user.id,
+            content: content || null,
+            location: location || null,
+            alt_text: altText || null,
+            comments_enabled: commentsEnabled,
+            ...columns,
+          });
+        if (insertError) throw insertError;
+        return;
+      }
 
       let mediaUrl: string | null = null;
       let additionalMediaUrls: string[] = [];
@@ -179,7 +225,9 @@ export function useProfilePosts(userId?: string) {
       toast.success('Post shared!');
     },
     onError: (error) => {
-      toast.error(errorMessage(error, 'Failed to share post'));
+      toast.error(embedColumnMissing(error)
+        ? videoEmbedMigrationMessage()
+        : errorMessage(error, 'Failed to share post'));
       console.error(error);
     },
   });

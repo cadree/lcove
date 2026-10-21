@@ -103,7 +103,8 @@ const Feed = () => {
     // Media type filter
     let matchesCategory = activeCategory === "All";
     if (!matchesCategory) {
-      if (activeCategory === "Photo") matchesCategory = post.media_type === 'photo';else if (activeCategory === "Video") matchesCategory = post.media_type === 'video';else if (activeCategory === "Text") matchesCategory = post.media_type === 'text' || !post.media_url && !!post.content;
+      const linkedVideo = post.embed_provider === 'youtube' || post.embed_provider === 'vimeo';
+      if (activeCategory === "Photo") matchesCategory = post.media_type === 'photo';else if (activeCategory === "Video") matchesCategory = post.media_type === 'video' || linkedVideo;else if (activeCategory === "Text") matchesCategory = !linkedVideo && (post.media_type === 'text' || !post.media_url && !!post.content);
     }
 
     // Post type filter

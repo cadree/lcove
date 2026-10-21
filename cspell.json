@@ -34,6 +34,13 @@
     "etherbylcove",
     "mediabunny",
     "quantizer",
-    "quicktime"
+    "quicktime",
+    "oembed",
+    "nocookie",
+    "playsinline",
+    "youtu",
+    "ytimg",
+    "vimeocdn",
+    "hqdefault"
   ]
 }

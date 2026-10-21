@@ -42,7 +42,9 @@ Ether is a client-side React Router app. A refresh on `/auth` or `/nuance` must 
 /* /index.html 200
 ```
 
-Cloudflare Pages and Netlify both honor that file from the output directory. Do not add a second redirect that sends those paths to a server function.
+Cloudflare Pages and Netlify both honor that file from the output directory. Do not add a second redirect that sends those paths to a server function. Do not add `!` to the splat. A forced rewrite would serve the app shell instead of `public/embed/player.html`.
+
+`/embed/player` is a Cloudflare Pages Function (`functions/embed/player.js`). The iOS app iframes that https URL so YouTube receives a web referrer. Pages Functions run before the splat, so `/embed/player` must not be pointed at `index.html`. `public/embed/player.html` is the same player for a host that serves files from `public/` directly.
 
 ### Environment variables
 
