@@ -5384,7 +5384,10 @@ export type Database = {
           city_key: string | null
           created_at: string | null
           display_name: string | null
+          founding: boolean
           gender: string | null
+          signup_src: string | null
+          signup_ref: string | null
           id: string
           interests: string[] | null
           is_suspended: boolean | null
@@ -5401,6 +5404,7 @@ export type Database = {
           social_links: Json | null
           stripe_connect_account_id: string | null
           suspended_at: string | null
+          signup_attribution: Json | null
           suspension_reason: string | null
           updated_at: string | null
           user_id: string
@@ -5416,6 +5420,7 @@ export type Database = {
           city_key?: string | null
           created_at?: string | null
           display_name?: string | null
+          founding?: boolean
           gender?: string | null
           id?: string
           interests?: string[] | null
@@ -5430,6 +5435,9 @@ export type Database = {
           phone?: string | null
           region_country?: string | null
           region_state?: string | null
+          signup_attribution?: Json | null
+          signup_ref?: string | null
+          signup_src?: string | null
           social_links?: Json | null
           stripe_connect_account_id?: string | null
           suspended_at?: string | null
@@ -5462,12 +5470,16 @@ export type Database = {
           phone?: string | null
           region_country?: string | null
           region_state?: string | null
+          signup_attribution?: Json | null
+          signup_ref?: string | null
+          signup_src?: string | null
           social_links?: Json | null
           stripe_connect_account_id?: string | null
           suspended_at?: string | null
           suspension_reason?: string | null
           updated_at?: string | null
           user_id?: string
+          founding?: boolean
         }
         Relationships: []
       }
@@ -7670,6 +7682,7 @@ export type Database = {
           city_key: string | null
           created_at: string | null
           display_name: string | null
+          founding: boolean | null
           id: string | null
           is_suspended: boolean | null
           mindset_level: number | null
@@ -7826,6 +7839,73 @@ export type Database = {
       public_event_attendance_count: {
         Args: { p_event_id: string }
         Returns: number
+      }
+      claim_waitlist_invite: {
+        Args: { p_token: string }
+        Returns: undefined
+      }
+      export_waitlist: {
+        Args: { p_src?: string; p_week?: string }
+        Returns: {
+          created_at: string
+          email: string
+          email_me: boolean
+          founding: boolean
+          ig_handle: string
+          name: string
+          ref_code: string
+          referred_by: string
+          src: string
+          what_do_you_make: string
+        }[]
+      }
+      invite_waitlist: {
+        Args: { p_ids: string[] }
+        Returns: {
+          email: string
+          id: string
+          invite_token: string
+        }[]
+      }
+      join_waitlist: {
+        Args: {
+          p_company?: string
+          p_email: string
+          p_email_me: boolean
+          p_ig_handle?: string
+          p_name: string
+          p_ref?: string
+          p_src?: string
+          p_what_do_you_make?: string
+        }
+        Returns: string
+      }
+      list_waitlist_admin: {
+        Args: { p_src?: string }
+        Returns: {
+          converted_at: string
+          created_at: string
+          email: string
+          founding: boolean
+          id: string
+          invite_token: string
+          invited_at: string
+          name: string
+          ref_code: string
+          referred_by: string
+          src: string
+        }[]
+      }
+      import_waitlist: {
+        Args: { p_rows: Json; p_src: string }
+        Returns: {
+          email: string
+          outcome: string
+        }[]
+      }
+      preview_waitlist_invite: {
+        Args: { p_token: string }
+        Returns: string
       }
       get_platform_stats: {
         Args: never

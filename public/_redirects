@@ -1,1 +1,4 @@
+# 200 is a proxy, not an HTTP redirect. It must stay above the SPA fallback
+# so Pages does not rewrite this URL to index.html.
+/.well-known/apple-app-site-association /.well-known/apple-app-site-association.json 200
 /* /index.html 200

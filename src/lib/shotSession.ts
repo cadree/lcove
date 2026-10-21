@@ -42,6 +42,7 @@ export const shotProfile = {
   show_only_to_passed_exam: false,
   phone: null,
   social_links: null,
+  founding: false,
 };
 
 const friend = (id: string, name: string) => ({

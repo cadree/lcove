@@ -39,6 +39,9 @@ verify_jwt = true
 [functions.send-notification-email]
 verify_jwt = true
 
+[functions.send-waitlist-invites]
+verify_jwt = true
+
 [functions.create-network-subscription]
 verify_jwt = true
 

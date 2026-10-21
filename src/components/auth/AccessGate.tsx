@@ -4,44 +4,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { motion } from 'framer-motion';
 import bearLogo from '@/assets/ether-bear-logo.png';
+import { isKnownPath, isPublicPath } from "@/lib/appRoutes";
+import { NO_FAKE_LINE, WELCOME_HOME } from "@/content/copy";
 
 interface AccessGateProps {
   children: React.ReactNode;
 }
 
-// Exact paths a logged-out visitor can open.
-const PUBLIC_EXACT = new Set([
-  '/',
-  '/landing',
-  '/auth',
-  '/onboarding',
-  '/locked',
-  '/admin/onboarding',
-  '/denied',
-  '/admin',
-  '/fund',
-  '/unsubscribe',
-  '/privacy',
-  '/terms',
-  '/guidelines',
-  '/community',
-  '/nuance',
-]);
-
 // Signed-in people leave the public landing for the feed.
 const LANDING_ROUTES = ['/', '/landing'];
-
-function isPublicPath(pathname: string) {
-  if (PUBLIC_EXACT.has(pathname)) return true;
-  return (
-    pathname.startsWith('/admin/onboarding') ||
-    pathname.startsWith('/event/') ||
-    pathname.startsWith('/project/') ||
-    pathname.startsWith('/book/') ||
-    pathname.startsWith('/sign-contract') ||
-    pathname.startsWith('/client/')
-  );
-}
 
 const AccessGate = ({ children }: AccessGateProps) => {
   const { user, loading: authLoading } = useAuth();
@@ -51,10 +22,12 @@ const AccessGate = ({ children }: AccessGateProps) => {
   const [showWelcome, setShowWelcome] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
 
+  const knownRoute = isKnownPath(location.pathname);
   const isPublicRoute = isPublicPath(location.pathname);
   const isLandingRoute = LANDING_ROUTES.includes(location.pathname);
 
   useEffect(() => {
+    if (!knownRoute) return;
     // Wait for auth to load first
     if (authLoading) return;
 
@@ -118,10 +91,14 @@ const AccessGate = ({ children }: AccessGateProps) => {
         }
       }
     }
-  }, [user, profile, authLoading, profileLoading, isPublicRoute, isLandingRoute, navigate, location.pathname, hasSeenWelcome]);
+  }, [user, profile, authLoading, profileLoading, isPublicRoute, isLandingRoute, knownRoute, navigate, location.pathname, hasSeenWelcome]);
 
-  // Show loading state while checking auth/profile
-  if (!isPublicRoute && (authLoading || profileLoading)) {
+  if (!knownRoute) {
+    return <>{children}</>;
+  }
+
+  // Private routes, including /blog, stay behind sign-in.
+  if (!isPublicRoute && (authLoading || profileLoading || !user)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <motion.div
@@ -163,11 +140,11 @@ const AccessGate = ({ children }: AccessGateProps) => {
             </motion.div>
             
             <h2 className="ether-title mb-4 text-3xl text-foreground md:text-4xl">
-              Welcome home Familcy
+              {WELCOME_HOME}
             </h2>
             
             <p className="text-muted-foreground mb-8">
-              You've been accepted into the community. This is where you belong.
+              {NO_FAKE_LINE}
             </p>
             
             <motion.button

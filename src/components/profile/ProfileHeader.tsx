@@ -49,6 +49,7 @@ interface ProfileHeaderProps {
   memberTier: "community" | "elite" | null;
   roleLabel?: string;
   postCount?: number;
+  founding?: boolean;
 }
 
 export function ProfileHeader({
@@ -67,6 +68,7 @@ export function ProfileHeader({
   memberTier,
   roleLabel = "Creator",
   postCount = 0,
+  founding = false,
 }: ProfileHeaderProps) {
   const { user } = useAuth();
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -204,6 +206,11 @@ export function ProfileHeader({
               {isProfileAdmin && (
                 <Badge className="gap-1 border-primary/30 bg-primary/20 text-[10px] text-primary">
                   <Shield className="h-3 w-3" /> Admin
+                </Badge>
+              )}
+              {founding && (
+                <Badge className="gap-1 border-primary/30 bg-primary/20 text-[10px] text-primary">
+                  Founding
                 </Badge>
               )}
             </div>

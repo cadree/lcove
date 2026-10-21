@@ -20,6 +20,8 @@ import { IosDigitalGoodsNotice } from "@/components/ios/IosDigitalGoodsNotice";
 import { IOS_DONATIONS_ENABLED, digitalPurchasesEnabled, isIosApp } from "@/lib/platform";
 import { toast } from "sonner";
 import { SquircleIcon, iconFills } from "@/components/world/SquircleIcon";
+import { formatAxisDollars } from "@/lib/formatAxisDollars";
+import { PageMeta } from "@/components/seo/PageMeta";
 
 const ALLOCATION_DATA = [
   { name: "Community Grants", key: "communityGrants", color: "hsl(330, 100%, 71%)", icon: Users, description: "Direct support for creative projects and artist grants" },
@@ -170,6 +172,7 @@ export default function FundDashboard() {
 
   return (
     <PageLayout>
+      <PageMeta title="Fund · Ether" description="Community fund activity, updated in real time." />
       <div className="min-h-screen bg-background">
         <div className="max-w-6xl mx-auto px-4 py-8 pb-24">
           {/* Hero Section */}
@@ -334,7 +337,7 @@ export default function FundDashboard() {
                             axisLine={false} 
                             tickLine={false}
                             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                            tickFormatter={(value) => `$${value / 1000}k`}
+                            tickFormatter={(value) => formatAxisDollars(Number(value))}
                           />
                           <Tooltip content={<CustomTooltip />} />
                           <Legend 
@@ -482,15 +485,13 @@ export default function FundDashboard() {
                   </div>
 
                   <div className="flex flex-wrap items-center justify-between gap-4">
+                    {membership?.grant_eligible && (
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <Heart className="w-4 h-4 text-primary fill-primary" />
-                      You're part of {stats?.memberCount || 0}+ members building this community
-                      {membership?.grant_eligible && (
-                        <Badge variant="secondary" className="bg-primary/10 text-primary border-0 ml-2">
-                          Grant Eligible
-                        </Badge>
-                      )}
+                      <Badge variant="secondary" className="bg-primary/10 text-primary border-0">
+                        Grant Eligible
+                      </Badge>
                     </div>
+                    )}
                     <div className="flex flex-wrap gap-2">
                       {showDonations ? (
                       <DonateDialog>
@@ -524,7 +525,6 @@ export default function FundDashboard() {
                           Support the Community
                         </h3>
                         <p className="text-muted-foreground max-w-md">
-                          Join {fundStats?.lifetime.memberCount || 0}+ members funding grants, events, and creative opportunities.{" "}
                           {linkOut
                             ? "Donate once or subscribe monthly. Checkout opens in Safari."
                             : hideDigitalPurchases
@@ -594,7 +594,7 @@ export default function FundDashboard() {
                   Unlike traditional platforms that extract value, every dollar contributed here 
                   goes directly back into supporting creators.
                 </p>
-                <div className="grid md:grid-cols-3 gap-4 pt-2">
+                <div className="grid md:grid-cols-2 gap-4 pt-2">
                   <div className="p-4 rounded-xl bg-background/50">
                     <span className="squircle-icon mb-3 font-body text-sm font-extrabold" style={{ width: 32, height: 32, backgroundImage: iconFills.gold, color: "#0A0A0A" }}>1</span>
                     <h4 className="font-medium text-foreground mb-1">Members Contribute</h4>
@@ -604,13 +604,6 @@ export default function FundDashboard() {
                   </div>
                   <div className="p-4 rounded-xl bg-background/50">
                     <span className="squircle-icon mb-3 font-body text-sm font-extrabold" style={{ width: 32, height: 32, backgroundImage: iconFills.gold, color: "#0A0A0A" }}>2</span>
-                    <h4 className="font-medium text-foreground mb-1">Community Decides</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Allocation priorities set by member voting
-                    </p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-background/50">
-                    <span className="squircle-icon mb-3 font-body text-sm font-extrabold" style={{ width: 32, height: 32, backgroundImage: iconFills.gold, color: "#0A0A0A" }}>3</span>
                     <h4 className="font-medium text-foreground mb-1">Creators Benefit</h4>
                     <p className="text-sm text-muted-foreground">
                       Funds distributed to grants, events, and programs
@@ -630,7 +623,7 @@ export default function FundDashboard() {
           >
             <p className="text-muted-foreground text-sm flex items-center justify-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500" />
-              Updated in real-time • Audited quarterly • Community-governed decisions
+              Updated in real-time
             </p>
           </motion.div>
         </div>

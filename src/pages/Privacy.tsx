@@ -2,6 +2,9 @@ import { ArrowLeft, Shield, Database, Users, Lock, Eye, Trash2, Globe, Bell, Cre
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { PRIVACY_EMAIL, SUPPORT_EMAIL } from "@/config/launch";
+import { WAITLIST_PRIVACY_NOTE } from "@/content/copy";
+import { PageMeta } from "@/components/seo/PageMeta";
 
 const Privacy = () => {
   const navigate = useNavigate();
@@ -9,6 +12,7 @@ const Privacy = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <PageMeta title="Privacy · Ether" description="Privacy Policy for Ether." />
       <div className="container max-w-3xl mx-auto px-4 py-8 safe-area-top safe-area-bottom">
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
@@ -188,7 +192,7 @@ const Privacy = () => {
                 <li><strong>Opt-Out:</strong> Unsubscribe from marketing communications</li>
                 <li><strong>Restrict Processing:</strong> Request limitations on how we use your data</li>
               </ul>
-              <p className="text-sm">To ask for a copy of your data or another request, email privacy@ethercreative.co. Account deletion is in Settings.</p>
+              <p className="text-sm">To ask for a copy of your data or another request, email privacy@etherbylcove.com. Account deletion is in Settings.</p>
               <div>
                 <h4 className="font-medium text-foreground mb-2">Account Deletion</h4>
                 <p className="text-sm">Settings has Delete my account. Confirming it deletes your login and the personal data tied to it, including your profile, posts, comments, and messages. If a payout or other payment is still pending, deletion is refused until that money is settled. Records required for payments or the law can stay, without your profile attached.</p>
@@ -214,7 +218,7 @@ const Privacy = () => {
                 we will take steps to delete that information as quickly as possible.
               </p>
               <p className="text-sm">
-                If you believe a child has provided us with personal information, please contact us at privacy@ethercreative.co.
+                If you believe a child has provided us with personal information, please contact us at privacy@etherbylcove.com.
               </p>
             </AccordionContent>
           </AccordionItem>
@@ -303,6 +307,21 @@ const Privacy = () => {
             </AccordionContent>
           </AccordionItem>
 
+          <AccordionItem value="waitlist" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-3">
+                <Mail className="h-5 w-5 text-primary" />
+                <span className="font-medium">Waitlist</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="text-muted-foreground space-y-4">
+              <p className="text-sm font-medium text-foreground">{WAITLIST_PRIVACY_NOTE}</p>
+              <p className="text-sm">
+                People who join the pre-launch waitlist give their name and email. They may also give an Instagram handle and a short note about what they make. If they check the box, Ether emails them when it opens. Ether stores the link source (src), an invite code (ref), whether the row is from the pre-launch list, and the time they joined. The list is not shown on the site.
+              </p>
+            </AccordionContent>
+          </AccordionItem>
+
           {/* Contact */}
           <AccordionItem value="contact" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline">
@@ -314,8 +333,8 @@ const Privacy = () => {
             <AccordionContent className="text-muted-foreground space-y-4">
               <p className="text-sm">If you have questions about this Privacy Policy or our practices, please contact us:</p>
               <div className="space-y-2 text-sm">
-                <p><strong>Email:</strong> privacy@ethercreative.co</p>
-                <p><strong>Support:</strong> Available through the app's Settings page</p>
+                <p><strong>Email:</strong> {PRIVACY_EMAIL}</p>
+                <p><strong>Support:</strong> {SUPPORT_EMAIL}</p>
               </div>
               <p className="text-sm">
                 We will respond to your inquiry within 30 days.

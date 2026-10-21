@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Palette, Building2, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { publicJoinPath } from "@/lib/publicJoin";
 
 const personas = [
   {
@@ -8,29 +10,26 @@ const personas = [
     eyebrow: "Creators",
     title: "A profile and a feed",
     details: ["Profile", "Feed", "Messages"],
-    cta: "Join",
-    ctaAction: "/auth",
   },
   {
     icon: Building2,
     eyebrow: "Brands",
     title: "Creator profiles and project pages",
     details: ["Directory of creators", "Project pages"],
-    cta: "Sign in",
-    ctaAction: "/auth",
   },
   {
     icon: Users,
     eyebrow: "Collectives",
     title: "Shared work",
     details: ["Group messaging", "Shared projects"],
-    cta: "Sign in",
-    ctaAction: "/auth",
   },
 ];
 
-export function PersonaCards() {
+export function PersonaCards({ joinSearch = "" }: { joinSearch?: string }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const label = user ? "Home" : "JOIN";
+  const destination = user ? "/feed" : publicJoinPath(joinSearch);
 
   return (
     <section className="py-16 md:py-24">
@@ -51,8 +50,8 @@ export function PersonaCards() {
                   <li key={detail} className="text-sm text-muted-foreground">{detail}</li>
                 ))}
               </ul>
-              <Button variant="outline" className="min-h-11" onClick={() => navigate(persona.ctaAction)}>
-                {persona.cta}
+              <Button variant="outline" className="min-h-11" onClick={() => navigate(destination)}>
+                {persona.eyebrow === "Creators" && !user ? "Join" : label}
               </Button>
             </article>
           ))}

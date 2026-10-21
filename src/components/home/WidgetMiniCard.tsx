@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { revealMotion } from "@/lib/reveal";
 import { LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -14,10 +15,7 @@ interface WidgetMiniCardProps {
 const WidgetMiniCard = ({ title, subtitle, tag, icon: Icon, link, index = 0 }: WidgetMiniCardProps) => {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.4, delay: index * 0.05 }}
+      {...revealMotion({ y: 12, duration: 0.4, delay: index * 0.05 })}
     >
       <Link to={link}>
         <motion.div 
