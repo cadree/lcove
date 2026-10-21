@@ -2,8 +2,8 @@ import type { CapacitorConfig } from "@capacitor/cli";
 import { NATIVE_APP_ID, NATIVE_APP_NAME } from "./src/config/nativeIds";
 
 /**
- * CONFIRM WITH CADRE: appId is a placeholder (reverse-domain of
- * etherbylcove.com). It is not registered in Apple Developer or Google Play.
+ * appId is the existing App Store Connect bundle id for ETHER by LCOVE.
+ * Do not replace it. Apple ID 6758372010, team 926NTNU4M7.
  *
  * Do not set `server.url`. That key loads a dev server instead of the
  * bundled web assets and must stay unset for TestFlight and App Store builds.

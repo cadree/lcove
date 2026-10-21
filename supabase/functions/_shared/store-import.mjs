@@ -71,24 +71,78 @@ function metaContent(html, key) {
   return "";
 }
 
+function absoluteUrl(value, fallbackUrl) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    return new URL(raw, fallbackUrl || undefined).toString();
+  } catch {
+    return "";
+  }
+}
+
+function logoFromJsonLd(node) {
+  if (typeof node === "string") return node;
+  if (!node || typeof node !== "object") return "";
+  if (typeof node.url === "string") return node.url;
+  if (typeof node.contentUrl === "string") return node.contentUrl;
+  return "";
+}
+
+/** Organization logo and description from Shopify's JSON-LD block. */
+export function parseJsonLdBrand(html) {
+  const source = String(html || "");
+  const pattern = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let logo = "";
+  let description = "";
+  let match;
+  while ((match = pattern.exec(source))) {
+    let data;
+    try {
+      data = JSON.parse(match[1]);
+    } catch {
+      continue;
+    }
+    const nodes = Array.isArray(data) ? data : [data, ...(Array.isArray(data?.["@graph"]) ? data["@graph"] : [])];
+    for (const node of nodes) {
+      if (!node || typeof node !== "object") continue;
+      const type = node["@type"];
+      const types = Array.isArray(type) ? type.map(String) : [String(type || "")];
+      const isOrg = types.some((item) => item === "Organization" || item === "Brand" || item === "OnlineStore");
+      if (!isOrg) continue;
+      if (!logo) logo = logoFromJsonLd(node.logo);
+      if (!description && typeof node.description === "string") description = node.description;
+    }
+  }
+  return {
+    logo: decodeHtml(logo).trim(),
+    description: decodeHtml(description).trim(),
+  };
+}
+
 export function parseOpenGraph(html, fallbackUrl) {
   const source = String(html || "");
   const titleTag = source.match(/<title[^>]*>([^<]*)<\/title>/i);
   const title = metaContent(source, "og:title") || (titleTag ? decodeHtml(titleTag[1]).trim() : "");
-  const description = metaContent(source, "og:description") || metaContent(source, "description");
-  let image = metaContent(source, "og:image");
-  if (image && fallbackUrl) {
-    try {
-      image = new URL(image, fallbackUrl).toString();
-    } catch {
-      image = "";
-    }
-  }
+  const jsonLd = parseJsonLdBrand(source);
+  const description = metaContent(source, "og:description") || metaContent(source, "description") || jsonLd.description;
+  const image = absoluteUrl(metaContent(source, "og:image"), fallbackUrl);
+  const logo = absoluteUrl(jsonLd.logo, fallbackUrl);
   return {
     title: title.slice(0, 180),
     description: description.slice(0, 500),
     image,
+    logo,
     url: fallbackUrl,
+  };
+}
+
+/** Cloudflare returns 403 for an empty user agent. Shopify's public pages need a browser one. */
+export function storeFetchHeaders(accept) {
+  return {
+    accept,
+    "accept-language": "en-US,en;q=0.9",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
   };
 }
 
@@ -122,6 +176,27 @@ export function mapShopifyProducts(body, host) {
     });
   }
   return rows;
+}
+
+export function parseShopifyMeta(body) {
+  const shop = body && typeof body === "object" ? (body.shop || body) : {};
+  return {
+    name: String(shop.name || "").trim().slice(0, 180),
+    description: String(shop.description || "").trim().slice(0, 500),
+  };
+}
+
+/** Fill logo, description, and cover only where the store row is still empty. */
+export function emptyBrandPatch(existing, og, meta) {
+  const patch = {};
+  const mark = String(og?.logo || "").trim();
+  const cover = String(og?.image || "").trim();
+  const logo = mark || cover;
+  const description = String(og?.description || meta?.description || "").trim().slice(0, 500);
+  if (!existing?.logo_url && logo) patch.logo_url = logo;
+  if (!existing?.description && description) patch.description = description;
+  if (!existing?.cover_image_url && (cover || mark)) patch.cover_image_url = cover || mark;
+  return patch;
 }
 
 export function linkCardFromOpenGraph(og) {

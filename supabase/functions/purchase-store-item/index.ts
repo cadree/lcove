@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { STORE_PLATFORM_FEE_PERCENT } from "../_shared/fees.mjs";
+import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
+import { verifiedDestination } from "../_shared/creator-connect.mjs";
 import { ledgerBalances } from "../_shared/credit-balances.ts";
 
 const corsHeaders = {
@@ -105,7 +107,9 @@ serve(async (req) => {
       .select("stripe_connect_account_id")
       .eq("store_id", store.id)
       .maybeSingle();
-    const connectAccountId = storeSecrets?.stripe_connect_account_id ?? null;
+    const profileDestination = await verifiedDestination(supabaseAdmin, store.user_id);
+    const connectAccountId = profileDestination
+      || (store.payout_enabled ? storeSecrets?.stripe_connect_account_id ?? null : null);
 
     logStep(`Processing ${paymentType} purchase for item ${itemId}`, { 
       itemTitle: item.title,
@@ -182,7 +186,7 @@ serve(async (req) => {
       });
 
       // Initialize Stripe
-      const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+      const stripe = new Stripe(assertStripeTestKey(Deno.env.get("STRIPE_SECRET_KEY")), {
         apiVersion: "2025-08-27.basil",
       });
 
@@ -207,7 +211,7 @@ serve(async (req) => {
           status: "pending",
           seller_amount: sellerAmount / 100,
           platform_fee: platformFeeAmount / 100,
-          seller_payout_status: store.payout_enabled ? "processing" : "pending_setup",
+          seller_payout_status: connectAccountId ? "processing" : "pending_setup",
         })
         .select()
         .single();
@@ -276,7 +280,7 @@ serve(async (req) => {
       // Ether does not collect a shipping address or limit countries.
       // Connect fee is STORE_PLATFORM_FEE_PERCENT of the item price. Shipping and tax are not in the fee.
       // Linked Shopify items are rejected above and never reach this split.
-      if (connectAccountId && store.payout_enabled) {
+      if (connectAccountId) {
         sessionConfig.payment_intent_data = {
           ...sessionConfig.payment_intent_data,
           ...(platformFeeAmount > 0 ? { application_fee_amount: platformFeeAmount } : {}),

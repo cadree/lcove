@@ -10,6 +10,16 @@ export function shotContentThin(): boolean {
   return shotSessionEnabled() && localStorage.getItem("ether-shot-thin") === "1";
 }
 
+/** Dev-only Go Live sheet owned by the shot user. Production builds ignore this. */
+export function shotHostPreview(): boolean {
+  return shotSessionEnabled() && localStorage.getItem("ether-shot-host") === "1";
+}
+
+/** Dev-only viewer sheet for a WebRTC room the shot user does not host. */
+export function shotViewerPreview(): boolean {
+  return shotSessionEnabled() && localStorage.getItem("ether-shot-viewer") === "1";
+}
+
 export const shotProfile = {
   id: SHOT_USER_ID,
   user_id: SHOT_USER_ID,
@@ -25,6 +35,7 @@ export const shotProfile = {
   created_at: "2026-10-01T00:00:00.000Z",
   updated_at: "2026-10-01T00:00:00.000Z",
   mindset_level: 1,
+  onboarding_level: null,
   access_status: "active" as const,
   onboarding_score: null,
   passed_exam: false,
@@ -131,7 +142,11 @@ export function shotConversations(userId: string) {
         timeline_end: null,
       },
     },
-    direct("conv-kofi", shotPeople[2], "The book chapter landed."),
+    direct(
+      "conv-kofi",
+      shotPeople[2],
+      'ether-card:{"kind":"reel","id":"0412aaaa-0000-4000-8000-000000000041","userId":"0412bbbb-0000-4000-8000-0000000000b1","title":"Kofi","href":"/profile/0412bbbb-0000-4000-8000-0000000000b1"}',
+    ),
   ];
 }
 

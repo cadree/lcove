@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
+import { assertCleanText } from '@/lib/objectionableText';
 import { toast } from 'sonner';
 
 interface Message {
@@ -111,6 +112,8 @@ export function useMessages(conversationId: string | null) {
 
         mediaUrl = publicUrl;
       }
+
+      assertCleanText(content);
 
       const { data: messageData, error } = await supabase
         .from('messages')

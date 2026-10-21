@@ -29,6 +29,7 @@ export interface Profile {
   updated_at: string;
   // Mindset gate fields
   mindset_level: number | null;
+  onboarding_level: number | null;
   access_status: 'pending' | 'active' | 'denied' | 'banned' | null;
   onboarding_score: number | null;
   // Own profile only. Never copied from another member's row.
@@ -97,6 +98,7 @@ export const useProfile = (userId?: string) => {
         created_at: data.created_at as string,
         updated_at: data.updated_at as string,
         mindset_level: (data.mindset_level as number | null) ?? null,
+        onboarding_level: isOwnProfile ? ((data.onboarding_level as number | null) ?? null) : null,
         access_status: (data.access_status as Profile['access_status']) ?? 'pending',
         onboarding_score: isOwnProfile ? ((data.onboarding_score as number | null) ?? null) : null,
         passed_exam: isOwnProfile ? Boolean(data.passed_exam) : false,

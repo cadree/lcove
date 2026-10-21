@@ -1,13 +1,16 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { format } from 'date-fns';
 import { parseCalendarDate } from '@/lib/calendarDate';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, ExternalLink, Upload, X, Eye, Image as ImageIcon, Camera, Share2, Copy, Pencil, Mail, MessageCircle, UserPlus, Lock } from 'lucide-react';
 import { Project, ProjectRole, useProjectApplications, useProjects } from '@/hooks/useProjects';
 import { formatRoleCompensation } from '@/lib/projectCollaborations';
+import { parseItemList } from '@/lib/itemList';
 import { useProjectAttachments, ProjectAttachment } from '@/hooks/useProjectAttachments';
 import { useProjectUpdates } from '@/hooks/useProjectUpdates';
-import { useProjectMilestones } from '@/hooks/useProjectMilestones';
+import { useProjectMilestones, useUpdateMilestoneStatus } from '@/hooks/useProjectMilestones';
+import { useCalendarTasks } from '@/hooks/useCalendarTasks';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -106,6 +109,8 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
   const { attachments, uploadAttachment, addLinkAttachment, deleteAttachment, isUploading } = useProjectAttachments(project?.id);
   const { updates, addUpdate, isPosting } = useProjectUpdates(project?.id);
   const { data: milestones = [] } = useProjectMilestones(project?.id);
+  const updateMilestoneStatus = useUpdateMilestoneStatus();
+  const { addProjectToMyDay, isAddedToMyDay } = useCalendarTasks();
 
   // Check if user is a client of this project
   const { data: clientStatus } = useQuery({
@@ -480,6 +485,17 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                 {isCreator && (
                   <Button
                     variant="ghost"
+                    size="sm"
+                    className="shrink-0"
+                    disabled={isAddedToMyDay(undefined, project.id) || addProjectToMyDay.isPending}
+                    onClick={() => addProjectToMyDay.mutate({ projectId: project.id, title: project.title, dueAt: project.timeline_start || undefined })}
+                  >
+                    {isAddedToMyDay(undefined, project.id) ? "On My Day" : "Add to My Day"}
+                  </Button>
+                )}
+                {isCreator && (
+                  <Button
+                    variant="ghost"
                     size="icon"
                     className="shrink-0 -mt-1"
                     onClick={() => setEditDialogOpen(true)}
@@ -653,13 +669,23 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
               <div className="bg-muted/30 rounded-xl p-4 space-y-3">
                 <h4 className="font-medium flex items-center gap-2"><Wrench className="h-4 w-4" /> Resources</h4>
                 {project.equipment_needed && (
-                  <div className="text-sm"><span className="text-muted-foreground">Equipment:</span> {project.equipment_needed}</div>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Equipment</span>
+                    <ul className="mt-1 list-disc pl-4">
+                      {parseItemList(project.equipment_needed).map((item) => <li key={item}>{item}</li>)}
+                    </ul>
+                  </div>
                 )}
                 {project.venue && (
                   <div className="text-sm flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-muted-foreground" /> {project.venue} {project.location_secured && <Badge className="text-[10px] bg-emerald-500/20 text-emerald-400">Secured</Badge>}</div>
                 )}
                 {project.props_needed && (
-                  <div className="text-sm"><span className="text-muted-foreground">Props:</span> {project.props_needed}</div>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Props</span>
+                    <ul className="mt-1 list-disc pl-4">
+                      {parseItemList(project.props_needed).map((item) => <li key={item}>{item}</li>)}
+                    </ul>
+                  </div>
                 )}
                 <div className="flex gap-2 flex-wrap">
                   {project.sponsorship_needed && <Badge variant="outline">Sponsorship Needed</Badge>}
@@ -687,7 +713,19 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                 <div className="relative pl-6 space-y-4">
                   <div className="absolute left-2 top-1 bottom-1 w-0.5 bg-border" />
                   {milestones.map((ms) => (
-                    <div key={ms.id} className="relative">
+                    <div
+                      key={ms.id}
+                      className="relative block w-full text-left"
+                      onClick={() => {
+                        if (!isCreator || !project) return;
+                        const completed = ms.status === "in_progress" || ms.status === "submitted" || ms.status === "approved" || ms.status === "paid";
+                        updateMilestoneStatus.mutate({
+                          milestoneId: ms.id,
+                          status: completed ? "pending" : "approved",
+                          projectId: project.id,
+                        });
+                      }}
+                    >
                       <div className={cn(
                         "absolute -left-4 top-1 w-3 h-3 rounded-full border-2",
                         ms.status === 'approved' || ms.status === 'paid' ? "bg-emerald-500 border-emerald-500" :
@@ -700,6 +738,31 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                           {ms.phase && <Badge variant="outline" className="text-[10px]">{ms.phase.replace('_', '-')}</Badge>}
                           {ms.due_date && <span className="text-xs text-muted-foreground">{format(new Date(ms.due_date), 'MMM d')}</span>}
                           <Badge className={cn('text-[10px]', ms.status === 'paid' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-muted text-muted-foreground')}>{ms.status}</Badge>
+                          {!isCreator && ms.status !== "paid" && Number(ms.amount) > 0 && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
+                              onClick={async (event) => {
+                                event.stopPropagation();
+                                const { data, error } = await supabase.functions.invoke("create-project-payment", {
+                                  body: { milestoneId: ms.id },
+                                });
+                                if (error || data?.error) {
+                                  toast({ title: data?.error || "Could not start payment", variant: "destructive" });
+                                  return;
+                                }
+                                if (data?.needs_connect) {
+                                  toast({ title: data.error, variant: "destructive" });
+                                  return;
+                                }
+                                if (data?.url) window.location.assign(data.url);
+                              }}
+                            >
+                              Pay
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -915,7 +978,9 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                               <AvatarFallback>{app.applicant?.display_name?.[0] || '?'}</AvatarFallback>
                             </Avatar>
                             <div>
-                              <p className="font-medium">{app.applicant?.display_name || 'Anonymous'}</p>
+                              <RouterLink to={`/profile/${app.applicant_id}`} className="font-medium underline">
+                                {app.applicant?.display_name || 'Anonymous'}
+                              </RouterLink>
                               <p className="text-xs text-muted-foreground">
                                 {app.message?.startsWith('[Custom Role Proposal:') ? 'Proposed custom role' : `Applied for ${app.role?.role_name}`} • {format(new Date(app.created_at), 'MMM d')}
                               </p>

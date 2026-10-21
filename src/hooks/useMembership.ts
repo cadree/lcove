@@ -3,6 +3,10 @@ import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { isGrantEligible } from "@/lib/grantEligibility";
+import { openExternalCheckout, readStorefrontCountry } from "@/lib/externalCheckout";
+import { isUsStorefront } from "@/lib/iosStorefront";
+import { MEMBERSHIP_REFRESH_EVENT } from "@/lib/membershipRefresh";
+import { ETHER_WEB_ORIGIN } from "@/lib/platform";
 import { toast } from "sonner";
 import { readFunctionError } from "@/lib/functionError";
 
@@ -123,6 +127,14 @@ export const useMembership = () => {
     checkMembership();
   }, [checkMembership]);
 
+  useEffect(() => {
+    const onRefresh = () => {
+      void checkMembership();
+    };
+    window.addEventListener(MEMBERSHIP_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(MEMBERSHIP_REFRESH_EVENT, onRefresh);
+  }, [checkMembership]);
+
   // Auto-refresh every minute
   useEffect(() => {
     if (!user) return;
@@ -131,9 +143,13 @@ export const useMembership = () => {
   }, [user, checkMembership]);
 
   const startCheckout = async (tier: "community" | "elite", customAmount?: number) => {
-    if (Capacitor.getPlatform() === "ios") {
-      toast.error("Membership checkout isn't available in the iOS app.");
-      return;
+    const ios = Capacitor.getPlatform() === "ios";
+    if (ios) {
+      const country = await readStorefrontCountry();
+      if (!isUsStorefront(country)) {
+        toast.error("Membership checkout isn't available in the iOS app.");
+        return;
+      }
     }
 
     if (!user) {
@@ -147,7 +163,7 @@ export const useMembership = () => {
       if (!session) throw new Error("No session");
 
       const { data, error } = await supabase.functions.invoke("create-membership-checkout", {
-        body: { tier, customAmount },
+        body: { tier, customAmount, ...(ios ? { return_origin: ETHER_WEB_ORIGIN } : {}) },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -157,6 +173,10 @@ export const useMembership = () => {
         throw new Error(await readFunctionError(error, data, "Failed to start checkout"));
       }
       if (data?.url) {
+        if (ios) {
+          await openExternalCheckout(data.url);
+          return;
+        }
         // Try window.open first, then location.href, then show manual link
         const win = window.open(data.url, "_blank");
         if (!win || win.closed) {
@@ -182,9 +202,13 @@ export const useMembership = () => {
   };
 
   const openCustomerPortal = async () => {
-    if (Capacitor.getPlatform() === "ios") {
-      toast.error("Subscription billing isn't available in the iOS app.");
-      return;
+    const ios = Capacitor.getPlatform() === "ios";
+    if (ios) {
+      const country = await readStorefrontCountry();
+      if (!isUsStorefront(country)) {
+        toast.error("Subscription billing isn't available in the iOS app.");
+        return;
+      }
     }
 
     if (!user) {
@@ -197,6 +221,7 @@ export const useMembership = () => {
       if (!session) throw new Error("No session");
 
       const { data, error } = await supabase.functions.invoke("customer-portal", {
+        body: ios ? { return_origin: ETHER_WEB_ORIGIN } : {},
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -206,6 +231,10 @@ export const useMembership = () => {
         throw new Error(await readFunctionError(error, data, "Failed to open billing portal"));
       }
       if (data?.url) {
+        if (ios) {
+          await openExternalCheckout(data.url);
+          return;
+        }
         const win = window.open(data.url, "_blank");
         if (!win || win.closed) {
           try {

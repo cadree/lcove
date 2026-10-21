@@ -129,13 +129,13 @@ export function CreateSheet({ open, onOpenChange }: CreateSheetProps) {
           </div>
 
           <p className="mono-label mb-2 mt-6 text-[10px] text-muted-foreground">More</p>
-          <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+          <div className="grid grid-cols-4 gap-2">
             {more.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 onClick={item.run}
-                className="flex w-[72px] shrink-0 flex-col items-center gap-2 py-1"
+                className="flex min-h-11 min-w-0 flex-col items-center gap-2 px-1 py-1"
               >
                 <SquircleIcon icon={item.icon} fill={item.fill} size={54} glyph={24} />
                 <span className="mono-label text-center text-[9px] leading-tight text-foreground">{item.label}</span>

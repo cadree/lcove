@@ -83,6 +83,18 @@ async function applyCheckoutCompleted(session, db) {
   if (type === "store_order" || (meta.order_id && meta.item_id && type !== "event_ticket")) {
     await db.confirmStoreOrder(session);
   }
+  if (type === "contact_invoice") {
+    await db.markContactInvoicePaid(session);
+    await db.recordCheckoutCommunityFundFee(session, "contact_invoice");
+  }
+  if (type === "project_payment") {
+    await db.markMilestonePaid(session);
+    await db.recordCheckoutCommunityFundFee(session, "project_payment");
+  }
+  if (type === "stream_gift") {
+    await db.recordStreamGift(session);
+    await db.recordCheckoutCommunityFundFee(session, "stream_gift");
+  }
 }
 
 async function applyCheckoutExpired(session, db) {
@@ -432,6 +444,54 @@ export function createSupabaseStripeDb(supabase, stripe) {
         current_period_start: periodStart,
         current_period_end: periodEnd,
       }, { onConflict: "network_id,user_id" });
+      throwIf(error);
+    },
+
+    async markContactInvoicePaid(session) {
+      const invoiceId = session.metadata?.invoice_id;
+      if (!invoiceId) throw new Error("invoice checkout missing id");
+      const { error } = await supabase
+        .from("contact_invoices")
+        .update({
+          status: "paid",
+          paid_at: new Date().toISOString(),
+          stripe_session_id: session.id,
+        })
+        .eq("id", invoiceId)
+        .neq("status", "paid");
+      throwIf(error);
+    },
+
+    async markMilestonePaid(session) {
+      const milestoneId = session.metadata?.milestone_id;
+      if (!milestoneId) throw new Error("project payment missing milestone");
+      const { error } = await supabase
+        .from("project_milestones")
+        .update({
+          status: "paid",
+          paid_at: new Date().toISOString(),
+          stripe_payment_intent_id: idOf(session.payment_intent),
+        })
+        .eq("id", milestoneId)
+        .neq("status", "paid");
+      throwIf(error);
+    },
+
+    async recordStreamGift(session) {
+      const meta = session.metadata || {};
+      if (!meta.stream_id || !meta.sender_id || !meta.host_id) throw new Error("stream gift missing ids");
+      const amount = session.amount_total ?? 0;
+      const fee = communityFundFeeCents(amount);
+      const { error } = await supabase.from("stream_gifts").insert({
+        stream_id: meta.stream_id,
+        sender_id: meta.sender_id,
+        host_id: meta.host_id,
+        gift: meta.gift || "gift",
+        amount_cents: amount,
+        platform_fee_cents: fee,
+        stripe_session_id: session.id,
+      });
+      if (isUniqueViolation(error)) return;
       throwIf(error);
     },
 

@@ -2,11 +2,14 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import {
   importStatusMessage,
+  emptyBrandPatch,
   linkCardFromOpenGraph,
   mapShopifyProducts,
   pageUrl,
   parseOpenGraph,
+  parseShopifyMeta,
   shopHost,
+  storeFetchHeaders,
 } from "../_shared/store-import.mjs";
 
 const corsHeaders = {
@@ -16,7 +19,7 @@ const corsHeaders = {
 
 async function readHtml(url: string): Promise<string> {
   const response = await fetch(url, {
-    headers: { accept: "text/html,application/xhtml+xml" },
+    headers: storeFetchHeaders("text/html,application/xhtml+xml"),
     redirect: "follow",
   });
   if (!response.ok) throw new Error("That website did not respond");
@@ -48,7 +51,7 @@ serve(async (req) => {
 
     const { data: store, error: storeError } = await supabaseAdmin
       .from("stores")
-      .select("id, user_id, shopify_store_url")
+      .select("id, user_id, shopify_store_url, logo_url, description, cover_image_url")
       .eq("id", storeId)
       .single();
     if (storeError || !store || store.user_id !== user.id) {
@@ -60,7 +63,7 @@ serve(async (req) => {
     const site = pageUrl(shopUrl || store.shopify_store_url || host);
     const productsUrl = `https://${host}/products.json?limit=250`;
     const response = await fetch(productsUrl, {
-      headers: { accept: "application/json" },
+      headers: storeFetchHeaders("application/json"),
       redirect: "follow",
     });
 
@@ -78,9 +81,27 @@ serve(async (req) => {
       }
     }
 
+    let html = "";
+    try {
+      html = await readHtml(site);
+    } catch {
+      html = "";
+    }
+    const og = html ? parseOpenGraph(html, site) : { title: "", description: "", image: "", url: site };
+    let meta = { name: "", description: "" };
+    try {
+      const metaResponse = await fetch(`https://${host}/meta.json`, {
+        headers: storeFetchHeaders("application/json"),
+        redirect: "follow",
+      });
+      if (metaResponse.ok) meta = parseShopifyMeta(await metaResponse.json());
+    } catch {
+      meta = { name: "", description: "" };
+    }
+    const brand = emptyBrandPatch(store, og, meta);
+
     if (!rows) {
-      const html = await readHtml(site);
-      const card = linkCardFromOpenGraph(parseOpenGraph(html, site));
+      const card = linkCardFromOpenGraph(og);
       if (!card) {
         throw new Error("That website did not publish a Shopify catalog or a page preview");
       }
@@ -111,6 +132,11 @@ serve(async (req) => {
     const message = importStatusMessage(source, imported);
     const status = source === "shopify" ? "imported" : "link";
     const visibleUrl = source === "shopify" ? host : site;
+    let brandSaved = true;
+    if (Object.keys(brand).length > 0) {
+      const { error: brandError } = await supabaseAdmin.from("stores").update(brand).eq("id", storeId);
+      brandSaved = !brandError;
+    }
     const statusUpdate = {
       shopify_store_url: visibleUrl,
       website_url: site,
@@ -131,6 +157,8 @@ serve(async (req) => {
       status,
       message,
       website: site,
+      brand,
+      brandSaved,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

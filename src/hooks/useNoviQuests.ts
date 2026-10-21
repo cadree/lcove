@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { callRpc } from "@/lib/rpc";
-import { questViews, streakFromDays, xpBar, type QuestView } from "@/lib/noviQuests";
+import { autoFileQuestId, questViews, streakFromDays, xpBar, type QuestView } from "@/lib/noviQuests";
 import { shotSessionEnabled } from "@/lib/shotSession";
 
 export interface NoviBoard {
@@ -18,7 +19,11 @@ export interface NoviBoard {
   connectionCount: number;
   completedProjects: number;
   profileReady: boolean;
+  studioOpened: boolean;
 }
+
+const filedQuestKeys = new Set<string>();
+const filedQuestPages = new Set<string>();
 
 const emptyBoard: NoviBoard = {
   total: 0,
@@ -32,6 +37,7 @@ const emptyBoard: NoviBoard = {
   connectionCount: 0,
   completedProjects: 0,
   profileReady: false,
+  studioOpened: false,
 };
 
 function normalizeBoard(data: Partial<NoviBoard> | null | undefined): NoviBoard {
@@ -79,9 +85,9 @@ export function useNoviQuests() {
     connectionCount: board.connectionCount,
     bookOpened: board.bookOpened,
     completedProjects: board.completedProjects,
+    studioOpened: board.studioOpened,
   });
   const today = new Date().toISOString().slice(0, 10);
-  const filed = useRef(new Set<string>());
 
   const complete = useMutation({
     mutationFn: async (questId: string) => {
@@ -89,20 +95,45 @@ export function useNoviQuests() {
       return callRpc<NoviBoard>("complete_novi_quest", { p_quest: questId });
     },
     onSuccess: (data) => {
-      if (data) queryClient.setQueryData(["novi-board", user?.id], normalizeBoard(data));
+      const previous = queryClient.getQueryData<NoviBoard>(["novi-board", user?.id]);
+      const next = data ? normalizeBoard(data) : null;
+      if (next) queryClient.setQueryData(["novi-board", user?.id], next);
       queryClient.invalidateQueries({ queryKey: ["my-xp", user?.id] });
+      const gained = next && previous ? next.total - previous.total : 0;
+      if (gained > 0) {
+        toast.success(`+${gained} XP`);
+        window.dispatchEvent(new CustomEvent("ether-novi-xp", { detail: { gained, total: next?.total ?? 0 } }));
+      }
     },
   });
 
+  const completeQuest = useRef(complete.mutate);
+  completeQuest.current = complete.mutate;
+
   useEffect(() => {
-    if (!user || shotSessionEnabled() || !boardQuery.isSuccess) return;
-    for (const quest of quests) {
-      if (quest.xp > 0 && quest.state === "decrypted" && !filed.current.has(quest.id)) {
-        filed.current.add(quest.id);
-        complete.mutate(quest.id);
-      }
-    }
-  }, [boardQuery.dataUpdatedAt, complete, quests, user]);
+    if (!user || shotSessionEnabled() || !boardQuery.isSuccess || !boardQuery.data) return;
+    const pageKey = `${user.id}:${window.location.pathname}`;
+    if (filedQuestPages.has(pageKey)) return;
+    const board = boardQuery.data;
+    const views = questViews({
+      profileReady: board.profileReady,
+      postCount: board.postCount,
+      connectionCount: board.connectionCount,
+      bookOpened: board.bookOpened,
+      completedProjects: board.completedProjects,
+      studioOpened: board.studioOpened,
+    });
+    const filedIds = new Set(
+      [...filedQuestKeys]
+        .filter((key) => key.startsWith(`${user.id}:`))
+        .map((key) => key.slice(user.id.length + 1)),
+    );
+    const questId = autoFileQuestId(views, filedIds);
+    if (!questId) return;
+    filedQuestPages.add(pageKey);
+    filedQuestKeys.add(`${user.id}:${questId}`);
+    completeQuest.current(questId);
+  }, [boardQuery.data, boardQuery.dataUpdatedAt, boardQuery.isSuccess, user]);
 
   return {
     quests,

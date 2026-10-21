@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMyStore, useStoreItems, useMyStoreItems, useDeleteStoreItem, readRememberedStoreImport, readStoreImportMeta, StoreItem, Store as StoreType, StoreImportResult, STORE_PUBLIC_COLUMNS } from '@/hooks/useStore';
+import { useMyStore, useStoreItems, useMyStoreItems, useDeleteStoreItem, importStoreCatalog, readRememberedStoreImport, readStoreImportMeta, StoreItem, Store as StoreType, StoreImportResult, STORE_PUBLIC_COLUMNS } from '@/hooks/useStore';
 import { StoreBrandPanel } from '@/components/store/StoreBrandPanel';
 import { supabase } from '@/integrations/supabase/client';
 import PageLayout from '@/components/layout/PageLayout';
@@ -40,15 +40,15 @@ import {
   Settings,
   ShoppingBag,
   Sparkles,
-  ArrowLeft,
   Trash2,
   Receipt,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { BackButton } from '@/components/navigation/BackButton';
 
 const Store = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const storeIdParam = searchParams.get('store');
   
@@ -75,6 +75,7 @@ const Store = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [storeSetupOpen, setStoreSetupOpen] = useState(false);
   const [importResult, setImportResult] = useState<StoreImportResult | null>(null);
+  const [importing, setImporting] = useState(false);
   const [showContinue, setShowContinue] = useState(
     () => searchParams.get('setup') === '1' || sessionStorage.getItem('ether-continue-feed') === '1',
   );
@@ -233,6 +234,23 @@ const Store = () => {
     }
   };
 
+  const reimportStore = async (store: StoreType) => {
+    const url = store.website_url || store.shopify_store_url;
+    if (!url) {
+      toast.error('Add a website before importing');
+      return;
+    }
+    setImporting(true);
+    const result = await importStoreCatalog(store.id, url);
+    setImportResult(result);
+    if (result.ok) toast.success(result.message);
+    else toast.error(result.message);
+    await queryClient.invalidateQueries({ queryKey: ['my-store'] });
+    await queryClient.invalidateQueries({ queryKey: ['store'] });
+    await queryClient.invalidateQueries({ queryKey: ['store-items'] });
+    setImporting(false);
+  };
+
   const tabConfig = [
     { id: 'products' as const, label: 'Products', icon: Package },
     { id: 'services' as const, label: 'Services', icon: Wrench },
@@ -241,29 +259,20 @@ const Store = () => {
 
   return (
     <PageLayout>
-      <div className="min-h-screen">
+      <div className="min-h-screen overflow-x-hidden">
         {/* Header */}
         <div className="sticky top-0 z-10 glass-strong border-b border-border/30">
           <div className="container mx-auto px-4 py-5">
             {/* Show store header when viewing a specific store */}
             {storeIdParam && viewingStore ? (
               <div className="mb-5">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    searchParams.delete('store');
-                    setSearchParams(searchParams);
-                  }}
-                  className="mb-3"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to All Stores
-                </Button>
+                <BackButton showLabel label="Back" className="mb-3" />
                 <StoreBrandPanel
                   store={viewingStore}
                   importResult={isViewingOwnStore ? importResult : null}
+                  importing={!!isViewingOwnStore && importing}
                   showContinue={!!isViewingOwnStore && showContinue}
+                  onReimport={isViewingOwnStore ? () => reimportStore(viewingStore) : undefined}
                 />
               </div>
             ) : (
@@ -324,7 +333,8 @@ const Store = () => {
             transition={{ delay: 0.15 }}
           >
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-              <TabsList className="mb-6">
+              <div className="mb-6 w-full min-w-0 max-w-full">
+              <TabsList className="flex h-auto w-full max-w-full flex-wrap justify-start gap-1">
                 {tabConfig.map((tab) => {
                   const Icon = tab.icon;
                   // Count items per tab when viewing a specific store
@@ -332,7 +342,7 @@ const Store = () => {
                     ? items.filter(item => item.type === typeMap[tab.id as keyof typeof typeMap]).length
                     : undefined;
                   return (
-                    <TabsTrigger key={tab.id} value={tab.id} className="flex items-center gap-2">
+                    <TabsTrigger key={tab.id} value={tab.id} className="flex shrink-0 items-center gap-2">
                       <Icon className="w-4 h-4" />
                       {tab.label}
                       {storeIdParam && tabItemCount !== undefined && tabItemCount > 0 && (
@@ -344,7 +354,7 @@ const Store = () => {
                   );
                 })}
                 {user && myStore && !storeIdParam && (
-                  <TabsTrigger value="my-store" className="flex items-center gap-2">
+                  <TabsTrigger value="my-store" className="flex shrink-0 items-center gap-2">
                     <StoreIcon className="w-4 h-4" />
                     My Store
                     {myItems && myItems.length > 0 && (
@@ -355,12 +365,13 @@ const Store = () => {
                   </TabsTrigger>
                 )}
                 {user && !storeIdParam && (
-                  <TabsTrigger value="orders" className="flex items-center gap-2">
+                  <TabsTrigger value="orders" className="flex shrink-0 items-center gap-2">
                     <Receipt className="w-4 h-4" />
                     Orders
                   </TabsTrigger>
                 )}
               </TabsList>
+              </div>
 
               {/* Content */}
               {['products', 'services', 'rentals', 'my-store', 'orders'].map((tabId) => (
@@ -369,7 +380,9 @@ const Store = () => {
                     <StoreBrandPanel
                       store={myStore}
                       importResult={importResult}
+                      importing={importing}
                       showContinue={showContinue}
+                      onReimport={() => reimportStore(myStore)}
                     />
                   )}
                   {tabId === 'orders' ? (

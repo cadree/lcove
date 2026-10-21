@@ -1,15 +1,26 @@
+import { useState } from "react";
 import cutout from "@/assets/novi-cutout.png";
+import { NoviGuide } from "@/components/novi/NoviGuide";
 import { cn } from "@/lib/utils";
 
 /**
  * Novi hiding behind an edge. The window shows his head and shoulders from the
- * full cutout; the card clips the rest of his body.
+ * full cutout; the card clips the rest of his body. A tap opens the quest guide.
  */
 export function NoviPeek({ className }: { className?: string }) {
+  const [open, setOpen] = useState(false);
   return (
-    <span className={cn("novi-peek", className)} aria-hidden="true">
-      <img src={cutout} alt="" />
-    </span>
+    <>
+      <button
+        type="button"
+        className={cn("novi-peek", className)}
+        aria-label="Open Novi's guide"
+        onClick={() => setOpen(true)}
+      >
+        <img src={cutout} alt="" />
+      </button>
+      <NoviGuide open={open} onOpenChange={setOpen} />
+    </>
   );
 }
 

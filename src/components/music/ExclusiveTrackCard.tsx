@@ -13,7 +13,7 @@ import {
 } from "@/hooks/useMusicLibrary";
 import { PreviewPlayer } from "./PreviewPlayer";
 import { IosDigitalGoodsNotice } from "@/components/ios/IosDigitalGoodsNotice";
-import { isIosApp } from "@/lib/platform";
+import { digitalPurchasesEnabled } from "@/lib/platform";
 import { toast } from "sonner";
 
 interface ExclusiveTrackCardProps {
@@ -59,7 +59,7 @@ export const ExclusiveTrackCard = ({
   const fullUrl = track.audio_file_url || "";
 
   const isPaid = price > 0;
-  const iosApp = isIosApp();
+  const iosApp = !digitalPurchasesEnabled();
   const showPaidUnlock = !fullAccess && !isOwner && ((!!purchaseRule && isPaid) || !!subscriptionRule);
   const statusBadge = (() => {
     if (isOwner) return { label: track.is_published ? "Published" : "Draft", variant: "outline" as const };

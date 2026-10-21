@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Calendar,
@@ -23,6 +23,8 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { SquircleIcon, type IconFill } from "@/components/world/SquircleIcon";
 import { useHomeUsage } from "@/hooks/useHomeUsage";
+import { useNoviQuests } from "@/hooks/useNoviQuests";
+import { useIosExternalCheckout } from "@/hooks/useIosExternalCheckout";
 import { isIosApp } from "@/lib/platform";
 import type { LucideIcon } from "lucide-react";
 
@@ -69,7 +71,7 @@ const groups: { id: string; label: string; items: ToolItem[] }[] = [
     label: "Stage",
     items: [
       { id: "events", label: "My events", path: "/dashboard/events", icon: Calendar, fill: "cyan" },
-      { id: "tickets", label: "My tickets", path: "/profile", icon: Ticket, fill: "rose" },
+      { id: "tickets", label: "My tickets", path: "/tickets", icon: Ticket, fill: "rose" },
       { id: "live", label: "Live", path: "/live", icon: Radio, fill: "red" },
       { id: "cinema", label: "Cinema networks", path: "/cinema", icon: Clapperboard, fill: "ink" },
     ],
@@ -89,7 +91,16 @@ export function ToolsSheet({ open, onOpenChange }: ToolsSheetProps) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const { pinnedItems, recentItems, trackClick } = useHomeUsage();
+  const { complete } = useNoviQuests();
+  const filedStudio = useRef(false);
   const hideIos = isIosApp();
+  const { linkOut } = useIosExternalCheckout();
+
+  useEffect(() => {
+    if (!open || filedStudio.current) return;
+    filedStudio.current = true;
+    complete.mutate("open_studio");
+  }, [complete, open]);
 
   const visibleGroups = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -97,13 +108,17 @@ export function ToolsSheet({ open, onOpenChange }: ToolsSheetProps) {
       .map((group) => ({
         ...group,
         items: group.items.filter((item) => {
-          if (item.iosHidden && hideIos) return false;
+          if (item.id === "membership" || item.id === "fund") {
+            if (hideIos && !linkOut) return false;
+          } else if (item.iosHidden && hideIos) {
+            return false;
+          }
           if (!needle) return true;
           return item.label.toLowerCase().includes(needle) || group.label.toLowerCase().includes(needle);
         }),
       }))
       .filter((group) => group.items.length > 0);
-  }, [hideIos, query]);
+  }, [hideIos, linkOut, query]);
 
   const openPath = (path: string, id: string) => {
     trackClick(id);

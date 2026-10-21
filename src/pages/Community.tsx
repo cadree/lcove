@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Megaphone, Star, FileText, BarChart3, Plus, Pin, ArrowLeft } from 'lucide-react';
+import { Megaphone, Star, FileText, BarChart3, Plus, Pin } from 'lucide-react';
+import { BackButton } from '@/components/navigation/BackButton';
 import PageLayout from '@/components/layout/PageLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,9 +60,7 @@ const Community: React.FC = () => {
         <div className="bg-gradient-to-b from-primary/10 to-background px-4 pt-6 pb-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
+              <BackButton />
               <div>
                 <h1 className="text-2xl font-bold">Community</h1>
                 <p className="text-muted-foreground">

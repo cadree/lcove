@@ -5,6 +5,65 @@ import { useToast } from '@/hooks/use-toast';
 import { useEffect, useRef } from 'react';
 import { callRpc } from '@/lib/rpc';
 import { notifyLiveStream } from '@/lib/notifications';
+import { SHOT_USER_ID, shotHostPreview, shotPeople, shotSessionEnabled, shotViewerPreview } from '@/lib/shotSession';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
+import { assertCleanText } from '@/lib/objectionableText';
+
+export const SHOT_STREAM_ID = "0412aaaa-0000-4000-8000-0000000000c1";
+
+function shotLiveStream(): LiveStream {
+  return {
+    id: SHOT_STREAM_ID,
+    host_id: shotPeople[1].user_id,
+    title: "Open Studio",
+    description: "Live from the floor",
+    stream_type: "youtube",
+    external_url: "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    thumbnail_url: null,
+    thumbnail_focal_point: null,
+    is_live: true,
+    started_at: "2026-10-19T15:00:00.000Z",
+    ended_at: null,
+    viewer_count: 12,
+    total_tips: 0,
+    created_at: "2026-10-19T15:00:00.000Z",
+    replay_available: false,
+    replay_url: null,
+    rtmp_stream_key: null,
+    rtmp_ingest_url: null,
+    playback_url: null,
+    mux_live_stream_id: null,
+    mux_playback_id: null,
+  };
+}
+
+function shotStreamFixture(): LiveStream {
+  const base = shotLiveStream();
+  if (shotHostPreview()) {
+    return {
+      ...base,
+      host_id: SHOT_USER_ID,
+      title: "Go Live",
+      description: "A long description that should stay inside the dialog on a phone.",
+      thumbnail_url: "/nuance/dynasty-denim.png",
+      stream_type: "webrtc",
+      external_url: null,
+      is_live: false,
+      started_at: null,
+      viewer_count: 0,
+    };
+  }
+  if (shotViewerPreview()) {
+    return {
+      ...base,
+      title: "Live room",
+      stream_type: "webrtc",
+      external_url: null,
+      is_live: true,
+    };
+  }
+  return base;
+}
 
 export interface LiveStream {
   id: string;
@@ -45,10 +104,12 @@ export interface StreamReaction {
 
 export const useLiveStreams = (liveOnly = false) => {
   const queryClient = useQueryClient();
+  const { blockedIds } = useUserBlocks();
 
   const { data: streams = [], isLoading } = useQuery({
     queryKey: ['live-streams', liveOnly],
     queryFn: async () => {
+      if (shotSessionEnabled()) return [shotStreamFixture()];
       let query = supabase
         .from('live_streams_public')
         .select('*')
@@ -86,16 +147,20 @@ export const useLiveStreams = (liveOnly = false) => {
     };
   }, [queryClient]);
 
-  return { streams, isLoading };
+  const visibleStreams = streams.filter((stream) => !blockedIds.includes(stream.host_id));
+
+  return { streams: visibleStreams, isLoading };
 };
 
 export const useStream = (streamId: string | undefined) => {
   const queryClient = useQueryClient();
+  const { blockedIds } = useUserBlocks();
 
   const { data: stream, isLoading } = useQuery({
     queryKey: ['stream', streamId],
     queryFn: async () => {
       if (!streamId) return null;
+      if (shotSessionEnabled()) return shotStreamFixture();
       const { data, error } = await supabase
         .from('live_streams_public')
         .select('*')
@@ -131,7 +196,9 @@ export const useStream = (streamId: string | undefined) => {
     };
   }, [streamId, queryClient]);
 
-  return { stream, isLoading };
+  const visibleStream = stream && blockedIds.includes(stream.host_id) ? null : stream;
+
+  return { stream: visibleStream, isLoading };
 };
 
 export const useStreamReactions = (streamId: string | undefined) => {
@@ -185,17 +252,13 @@ export const useCreateStream = () => {
     mutationFn: async (data: {
       title: string;
       description?: string;
-      stream_type: 'webrtc' | 'youtube' | 'twitch' | 'soundcloud' | 'obs_rtmp';
+      stream_type: 'webrtc' | 'youtube' | 'twitch' | 'soundcloud';
       external_url?: string;
       thumbnail_url?: string;
-      // OBS/RTMP fields
-      mux_live_stream_id?: string;
-      mux_playback_id?: string;
-      rtmp_ingest_url?: string;
-      rtmp_stream_key?: string;
-      playback_url?: string;
     }) => {
       if (!user) throw new Error('Not authenticated');
+      assertCleanText(data.title);
+      assertCleanText(data.description);
 
       const { data: stream, error } = await supabase
         .from('live_streams')
@@ -206,12 +269,6 @@ export const useCreateStream = () => {
           stream_type: data.stream_type,
           external_url: data.external_url,
           thumbnail_url: data.thumbnail_url,
-          // OBS/RTMP fields
-          mux_live_stream_id: data.mux_live_stream_id,
-          mux_playback_id: data.mux_playback_id,
-          rtmp_ingest_url: data.rtmp_ingest_url,
-          rtmp_stream_key: data.rtmp_stream_key,
-          playback_url: data.playback_url,
         })
         .select()
         .single();
@@ -345,13 +402,6 @@ export const useEndStream = () => {
     mutationFn: async (stream: { id: string; stream_type: string }) => {
       await callRpc('end_live_stream', { p_stream_id: stream.id });
 
-      if (stream.stream_type === 'obs_rtmp') {
-        const { error } = await supabase.functions.invoke('mux-stream', {
-          body: { action: 'disable', streamId: stream.id },
-        });
-        if (error) throw error;
-      }
-
       const channel = supabase.channel(`stream-end-${stream.id}`);
       await Promise.race([
         new Promise<void>((resolve) => {
@@ -474,41 +524,6 @@ export const useDeleteStream = () => {
     },
     onError: (error) => {
       toast({ title: 'Failed to delete stream', description: error.message, variant: 'destructive' });
-    },
-  });
-};
-
-export const useEndOBSStream = () => {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (streamId: string) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
-
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mux-stream`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ action: 'disable', streamId }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to end stream');
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['live-streams'] });
-      toast({ title: 'Stream ended' });
-    },
-    onError: (error) => {
-      toast({ title: 'Failed to end stream', description: error.message, variant: 'destructive' });
     },
   });
 };

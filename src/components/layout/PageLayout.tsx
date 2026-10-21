@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import BottomNav from "@/components/navigation/BottomNav";
+import { NoviCelebration } from "@/components/novi/NoviCelebration";
 import { useAuth } from "@/contexts/AuthContext";
 
 const MAIN_TABS = ["/feed", "/explore", "/messages", "/profile"];
@@ -24,6 +25,7 @@ const PageLayout = ({
   
   return (
     <div className="min-h-screen overflow-x-hidden bg-background">
+      <NoviCelebration />
       <main className={`relative safe-area-top ${hideNav ? "safe-area-bottom" : "pb-28"} ${className}`}>
         {children}
       </main>

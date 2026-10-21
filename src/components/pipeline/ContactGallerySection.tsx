@@ -222,7 +222,7 @@ export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionP
                     <img
                       src={item.media_url}
                       alt="Contact media"
-                      className="w-full h-full object-cover"
+                      className="h-full w-full bg-muted object-contain"
                     />
                   )}
                 </div>
@@ -292,7 +292,7 @@ export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionP
                   className="min-h-[100px]"
                 />
                 <div className="flex gap-2">
-                  <Button onClick={handleSaveNotes} className="flex-1" role="button">
+                  <Button type="button" onClick={handleSaveNotes} className="flex-1">
                     Save Notes
                   </Button>
                   <Button 

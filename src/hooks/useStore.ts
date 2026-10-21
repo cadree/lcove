@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { readFunctionError } from '@/lib/functionError';
+import { shotSessionEnabled } from '@/lib/shotSession';
 
 function asStoreRecord(store: unknown): (Store & { user_id: string }) | null {
   if (!store || typeof store !== "object" || Array.isArray(store)) return null;
@@ -75,7 +76,17 @@ export async function importStoreCatalog(storeId: string, shopUrl: string): Prom
     rememberStoreImport(storeId, result);
     return result;
   }
-  const payload = (data ?? {}) as { source?: string; imported?: number; message?: string; shop?: string };
+  const payload = (data ?? {}) as {
+    source?: string;
+    imported?: number;
+    message?: string;
+    shop?: string;
+    brand?: { logo_url?: string; description?: string; cover_image_url?: string };
+    brandSaved?: boolean;
+  };
+  if (payload.brand && payload.brandSaved === false) {
+    await supabase.from('stores').update(payload.brand).eq('id', storeId);
+  }
   const source = payload.source === 'link' ? 'link' : 'shopify';
   const imported = Number(payload.imported ?? 0);
   const result: StoreImportResult = {
@@ -105,7 +116,7 @@ export async function readStoreImportMeta(storeId: string) {
 
 /** Columns safe to read from the client. Payment secrets live in store_secrets. */
 export const STORE_PUBLIC_COLUMNS =
-  'id, user_id, name, description, cover_image_url, logo_url, is_active, accepts_credits, accepts_cash, shopify_store_url, peerspace_url, flat_shipping_cents, tax_line_label, tax_line_cents, created_at, updated_at';
+  'id, user_id, name, description, cover_image_url, logo_url, is_active, accepts_credits, accepts_cash, shopify_store_url, website_url, import_status, import_error, import_count, imported_at, peerspace_url, flat_shipping_cents, tax_line_label, tax_line_cents, created_at, updated_at';
 
 export interface StoreItemCategory {
   id: string;
@@ -175,6 +186,28 @@ export const useMyStore = () => {
     queryKey: ['my-store', user?.id],
     queryFn: async () => {
       if (!user) return null;
+      if (shotSessionEnabled()) {
+        return {
+          id: "0412aaaa-0000-4000-8000-000000000042",
+          user_id: user.id,
+          name: "Shot Store",
+          description: null,
+          cover_image_url: null,
+          logo_url: null,
+          is_active: true,
+          accepts_credits: true,
+          accepts_cash: true,
+          shopify_store_url: "nuancebylcove.com",
+          website_url: "https://nuancebylcove.com/",
+          import_status: null,
+          import_error: null,
+          import_count: null,
+          imported_at: null,
+          peerspace_url: null,
+          created_at: "2026-10-19T15:00:00.000Z",
+          updated_at: "2026-10-19T15:00:00.000Z",
+        } satisfies Store;
+      }
       const { data, error } = await supabase
         .from('stores')
         .select(STORE_PUBLIC_COLUMNS)

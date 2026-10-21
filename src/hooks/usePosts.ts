@@ -1,10 +1,12 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { shotContentThin, shotPosts, shotSessionEnabled } from '@/lib/shotSession';
+import { isQueryablePostId } from '@/lib/postId';
+import { assertCleanText, OBJECTIONABLE_MESSAGE } from '@/lib/objectionableText';
 
 interface Post {
   id: string;
@@ -42,20 +44,28 @@ export function usePosts() {
       if (error) throw error;
 
       // Get profiles for post creators
-      const userIds = [...new Set(postsData?.map(p => p.user_id) || [])];
-      const { data: profiles } = await supabase
-        .from('profiles_public')
-        .select('user_id, display_name, avatar_url, city, city_display')
-        .in('user_id', userIds);
+      const userIds = [...new Set(postsData?.map(p => p.user_id) || [])].filter(isQueryablePostId);
+      let profiles: { user_id: string; display_name: string | null; avatar_url: string | null; city: string | null; city_display: string | null }[] = [];
+      if (userIds.length) {
+        const { data } = await supabase
+          .from('profiles_public')
+          .select('user_id, display_name, avatar_url, city, city_display')
+          .in('user_id', userIds);
+        profiles = data ?? [];
+      }
 
-      const profileMap = new Map(profiles?.map(p => [p.user_id, p]));
+      const profileMap = new Map(profiles.map(p => [p.user_id, p]));
 
-      // Get reactions for each post
-      const postIds = postsData?.map(p => p.id) || [];
-      const { data: reactions } = await supabase
-        .from('post_reactions')
-        .select('post_id, emoji, user_id')
-        .in('post_id', postIds);
+      // Get reactions for each post. A non-uuid id makes the whole filter 400.
+      const postIds = (postsData?.map(p => p.id) || []).filter(isQueryablePostId);
+      let reactions: { post_id: string; emoji: string; user_id: string }[] = [];
+      if (postIds.length) {
+        const { data } = await supabase
+          .from('post_reactions')
+          .select('post_id, emoji, user_id')
+          .in('post_id', postIds);
+        reactions = data ?? [];
+      }
 
       // Group reactions by post and emoji
       const reactionsByPost = new Map<string, Map<string, number>>();
@@ -86,6 +96,7 @@ export function usePosts() {
   const createPost = useMutation({
     mutationFn: async ({ content, file, mediaType }: { content?: string; file?: File; mediaType?: 'photo' | 'video' | 'text' }) => {
       if (!user) throw new Error('Must be logged in');
+      assertCleanText(content);
 
       let mediaUrl: string | null = null;
 
@@ -106,27 +117,63 @@ export function usePosts() {
         mediaUrl = publicUrl;
       }
 
-      const { error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await supabase
         .from('posts')
         .insert({
           user_id: user.id,
           content: content || null,
           media_url: mediaUrl,
           media_type: mediaType || 'text',
-        });
+        })
+        .select('id, created_at')
+        .single();
 
       if (insertError) throw insertError;
+      return { id: inserted.id, created_at: inserted.created_at, mediaUrl };
+    },
+    onMutate: async ({ content, file, mediaType }) => {
+      if (!user) return;
+      await queryClient.cancelQueries({ queryKey: ['posts'] });
+      const previous = queryClient.getQueryData<Post[]>(['posts']);
+      const preview = file ? URL.createObjectURL(file) : null;
+      const optimistic: Post = {
+        id: `optimistic-${Date.now()}`,
+        user_id: user.id,
+        content: content || null,
+        media_url: preview,
+        media_type: mediaType || 'text',
+        post_type: 'regular',
+        created_at: new Date().toISOString(),
+        reactions: [],
+        user_reaction: null,
+      };
+      queryClient.setQueryData<Post[]>(['posts'], (current) => [optimistic, ...(current ?? [])]);
+      return { previous, preview };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] });
       queryClient.invalidateQueries({ queryKey: ['profile-posts'] });
       toast.success('Post created!');
     },
-    onError: (error) => {
-      toast.error('Failed to create post');
+    onError: (error, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(['posts'], context.previous);
+      if (context?.preview) URL.revokeObjectURL(context.preview);
+      toast.error(error instanceof Error && error.message === OBJECTIONABLE_MESSAGE ? error.message : 'Failed to create post');
       console.error(error);
     },
   });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('posts-feed')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['posts'] });
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const addReaction = useMutation({
     mutationFn: async ({ postId, emoji }: { postId: string; emoji: string }) => {

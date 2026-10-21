@@ -5,6 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { notifyPostComment, notifyPostLike } from '@/lib/notifications';
+import { isQueryablePostId } from '@/lib/postId';
+import { assertCleanText, OBJECTIONABLE_MESSAGE } from '@/lib/objectionableText';
 
 interface Comment {
   id: string;
@@ -24,7 +26,7 @@ export function usePostInteractions(postId: string) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { blockedIds } = useUserBlocks();
-  const canQuery = postId.trim().length > 0;
+  const canQuery = isQueryablePostId(postId);
 
   // Fetch likes count and user's like status
   const { data: likesData, refetch: refetchLikes } = useQuery({
@@ -37,14 +39,14 @@ export function usePostInteractions(postId: string) {
         .eq('post_id', postId);
 
       let hasLiked = false;
-      if (user) {
+      if (user && isQueryablePostId(user.id)) {
         const { data } = await supabase
           .from('post_likes')
           .select('id')
           .eq('post_id', postId)
           .eq('user_id', user.id)
-          .maybeSingle();
-        hasLiked = !!data;
+          .limit(1);
+        hasLiked = !!data?.length;
       }
 
       return { count: count || 0, hasLiked };
@@ -65,13 +67,17 @@ export function usePostInteractions(postId: string) {
       if (error) throw error;
 
       // Get profiles for commenters
-      const userIds = [...new Set(commentsData?.map(c => c.user_id) || [])];
-      const { data: profiles } = await supabase
-        .from('profiles_public')
-        .select('user_id, display_name, avatar_url')
-        .in('user_id', userIds);
+      const userIds = [...new Set(commentsData?.map(c => c.user_id) || [])].filter(isQueryablePostId);
+      let profiles: { user_id: string; display_name: string | null; avatar_url: string | null }[] = [];
+      if (userIds.length) {
+        const { data } = await supabase
+          .from('profiles_public')
+          .select('user_id, display_name, avatar_url')
+          .in('user_id', userIds);
+        profiles = data ?? [];
+      }
 
-      const profileMap = new Map(profiles?.map(p => [p.user_id, p]));
+      const profileMap = new Map(profiles.map(p => [p.user_id, p]));
 
       // Add profiles to comments. A missing row is a private profile.
       const commentsWithProfiles = (commentsData || []).map(c => ({
@@ -104,14 +110,14 @@ export function usePostInteractions(postId: string) {
   const { data: isSaved = false, refetch: refetchSaved } = useQuery({
     queryKey: ['post-saved', postId, user?.id],
     queryFn: async () => {
-      if (!user) return false;
+      if (!user || !isQueryablePostId(user.id)) return false;
       const { data } = await supabase
         .from('saved_posts')
         .select('id')
         .eq('post_id', postId)
         .eq('user_id', user.id)
-        .maybeSingle();
-      return !!data;
+        .limit(1);
+      return !!data?.length;
     },
     enabled: canQuery && !!user,
   });
@@ -158,6 +164,7 @@ export function usePostInteractions(postId: string) {
   const commentMutation = useMutation({
     mutationFn: async ({ content, parentId }: { content: string; parentId?: string }) => {
       if (!user) throw new Error('Must be logged in');
+      assertCleanText(content);
 
       const { error } = await supabase
         .from('post_comments')
@@ -188,8 +195,8 @@ export function usePostInteractions(postId: string) {
       queryClient.invalidateQueries({ queryKey: ['post-comments', postId] });
       toast.success('Comment added');
     },
-    onError: () => {
-      toast.error('Failed to add comment');
+    onError: (error) => {
+      toast.error(error instanceof Error && error.message === OBJECTIONABLE_MESSAGE ? error.message : 'Failed to add comment');
     },
   });
 

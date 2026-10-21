@@ -22,6 +22,7 @@ import { ProfileStats } from "@/components/profile/ProfileStats";
 import { ProfileAboutSection } from "@/components/profile/ProfileAboutSection";
 import { ProfileFolders } from "@/components/profile/ProfileFolders";
 import { ProfileBookEntry, ProfileQuickLinks, ToolsEntry } from "@/components/profile/ProfileQuickLinks";
+import { ProfileFilms } from "@/components/profile/ProfileFilms";
 import { ProfileNovi } from "@/components/profile/ProfileNovi";
 import { FolderDetailView } from "@/components/profile/FolderDetailView";
 import { ProfileLayoutEditor } from "@/components/profile/ProfileLayoutEditor";
@@ -540,6 +541,7 @@ const Profile = () => {
         {isOwnProfile && <div className="px-4 pt-4"><ProfileNovi /></div>}
         <ProfileBookEntry />
         {isOwnProfile && <ToolsEntry />}
+        {targetUserId && <ProfileFilms ownerId={targetUserId} isOwner={!!isOwnProfile} />}
 
         {postsSection && renderSection(postsSection)}
 

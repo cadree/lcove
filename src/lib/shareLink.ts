@@ -267,4 +267,5 @@ export const buildShareUrl = {
   post: (userId: string, postId: string) => `${SHARE_BASE_URL}/profile/${userId}?post=${postId}`,
   client: (token: string) => `${SHARE_BASE_URL}/client/${token}`,
   cinema: (id: string) => `${SHARE_BASE_URL}/cinema?content=${id}`,
+  live: (id: string) => `${SHARE_BASE_URL}/live?stream=${id}`,
 };

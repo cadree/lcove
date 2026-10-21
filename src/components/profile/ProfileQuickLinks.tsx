@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { BookOpen, ChevronRight, Wrench } from 'lucide-react';
 import { ToolsSheet } from '@/components/navigation/ToolsSheet';
+import { studioShortcuts } from '@/components/navigation/studioTools';
 import { SquircleIcon } from '@/components/world/SquircleIcon';
 
 export function ProfileBookEntry() {
@@ -26,20 +27,43 @@ export function ProfileBookEntry() {
 
 export function ToolsEntry() {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const shortcuts = studioShortcuts;
   return (
     <div className="px-4 pt-3">
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="file-panel flex min-h-11 w-full items-center gap-3 px-3 py-3 text-left"
-      >
-        <SquircleIcon icon={Wrench} fill="denim" size={34} glyph={17} />
-        <span className="min-w-0 flex-1">
-          <span className="mono-label block text-[8px] text-muted-foreground">Work · Money · Stage · Partners</span>
-          <span className="font-body text-[15px] font-extrabold">Tools</span>
-        </span>
-        <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
-      </button>
+      <div className="file-panel px-3 py-3">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex min-h-11 w-full items-center gap-3 text-left"
+        >
+          <SquircleIcon icon={Wrench} fill="denim" size={34} glyph={17} />
+          <span className="min-w-0 flex-1">
+            <span className="mono-label block text-[8px] text-muted-foreground">Work · Money · Stage · Partners</span>
+            <span className="font-body text-[15px] font-extrabold">Studio</span>
+          </span>
+          <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+        </button>
+        <div className="mt-2 flex gap-2 overflow-x-auto scrollbar-hide">
+          {shortcuts.map((tool) => (
+            <button
+              key={tool.id}
+              type="button"
+              onClick={() => navigate(tool.path)}
+              className="inline-flex h-11 shrink-0 items-center rounded-full border border-border px-3 font-body text-sm font-semibold"
+            >
+              {tool.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="mono-label inline-flex h-11 shrink-0 items-center px-2 text-[10px] text-muted-foreground"
+          >
+            See all
+          </button>
+        </div>
+      </div>
       <ToolsSheet open={open} onOpenChange={setOpen} />
     </div>
   );

@@ -3,11 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
 import { OnboardingData } from '@/pages/Onboarding';
-import { useAuth } from '@/contexts/AuthContext';
 import {
   QUIZ_INTRO_COPY,
   QUIZ_QUESTIONS,
-  optionsForUser,
+  optionsForSeed,
+  quizSeedForSession,
   type ChoiceId,
 } from '@/lib/onboardingQuiz';
 
@@ -19,16 +19,19 @@ interface Props {
 }
 
 const OnboardingQuestionnaire = ({ data, updateData, onComplete, onBack }: Props) => {
-  const { user } = useAuth();
   const [showIntro, setShowIntro] = useState(true);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const quizSeed = useMemo(
+    () => quizSeedForSession(window.sessionStorage),
+    [],
+  );
 
   const question = QUIZ_QUESTIONS[currentQuestion];
   const selectedAnswer = data.questionnaireResponses[question.id];
   const options = useMemo(
-    () => optionsForUser(question, user?.id || 'guest'),
-    [question, user?.id],
+    () => optionsForSeed(question, quizSeed),
+    [question, quizSeed],
   );
 
   const selectAnswer = (answer: ChoiceId) => {

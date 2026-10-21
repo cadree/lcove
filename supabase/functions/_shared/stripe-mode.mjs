@@ -1,13 +1,13 @@
-// Membership and music checkout stay on Stripe test keys.
+// Membership and music checkout accept a Stripe test or live secret.
+// The same check is used by the other payment functions, which read one STRIPE_SECRET_KEY.
+
+const STRIPE_SECRET_KEY = /^(?:sk|rk)_(?:test|live)_\S+$/;
 
 export function assertStripeTestKey(key) {
   const value = typeof key === "string" ? key.trim() : "";
   if (!value) throw new Error("STRIPE_SECRET_KEY is not set");
-  if (value.startsWith("sk_live_") || value.startsWith("rk_live_")) {
-    throw new Error("Stripe live mode is refused. Membership and music stay on a test key.");
-  }
-  if (!value.startsWith("sk_test_") && !value.startsWith("rk_test_")) {
-    throw new Error("Stripe key must be a test key (sk_test_).");
+  if (!STRIPE_SECRET_KEY.test(value)) {
+    throw new Error("Stripe key must be a secret or restricted key (sk_test_, sk_live_, rk_test_, or rk_live_).");
   }
   return value;
 }

@@ -1,4 +1,4 @@
-export const QUEST_IDS = ["enter_signal", "first_post", "find_people", "read_book", "finish_project"] as const;
+export const QUEST_IDS = ["enter_signal", "first_post", "find_people", "read_book", "finish_project", "open_studio"] as const;
 export type QuestId = (typeof QUEST_IDS)[number];
 export type QuestState = "sealed" | "progress" | "decrypted";
 export type QuestLane = "story" | "work";
@@ -9,6 +9,7 @@ export interface QuestSignals {
   connectionCount: number;
   bookOpened: boolean;
   completedProjects: number;
+  studioOpened?: boolean;
 }
 
 export interface QuestView {
@@ -91,8 +92,8 @@ export function questViews(signals: QuestSignals): QuestView[] {
       lane: "story",
       href: "/directory",
       xp: 10,
-      progress: Math.min(3, signals.connectionCount),
-      target: 3,
+      progress: Math.min(1, signals.connectionCount),
+      target: 1,
     },
     {
       id: "read_book",
@@ -114,12 +115,35 @@ export function questViews(signals: QuestSignals): QuestView[] {
       progress: Math.min(1, signals.completedProjects),
       target: 1,
     },
+    {
+      id: "open_studio",
+      title: "Open Studio",
+      detail: "Open the Studio sheet from your profile or the feed.",
+      lane: "work",
+      href: "/feed?studio=1",
+      xp: 10,
+      progress: signals.studioOpened ? 1 : 0,
+      target: 1,
+    },
   ];
   return rows.map((row) => ({ ...row, state: stateFor(row.progress, row.target) }));
 }
 
+/** One decrypted quest to file on a page load. The rest wait for a later visit. */
+export function autoFileQuestId(quests: QuestView[], filedIds: ReadonlySet<string> = new Set()): string | null {
+  const next = quests.find((quest) => quest.xp > 0 && quest.state === "decrypted" && !filedIds.has(quest.id));
+  return next?.id ?? null;
+}
+
 export function nextQuest(quests: QuestView[]): QuestView | null {
-  return quests.find((quest) => quest.state !== "decrypted") ?? null;
+  return quests.find((quest) => quest.id !== "open_studio" && quest.state !== "decrypted") ?? null;
+}
+
+/** Studio stays visible beside the current quest until it is filed. */
+export function studioQuest(quests: QuestView[]): QuestView | null {
+  const quest = quests.find((row) => row.id === "open_studio");
+  if (!quest || quest.state === "decrypted") return null;
+  return quest;
 }
 
 /** Copy for the daily decode tile. granted is the XP row that was written. */

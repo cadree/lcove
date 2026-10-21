@@ -48,6 +48,7 @@ export function useFavorites() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['favorite-friends', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['novi-board', user?.id] });
       toast.success('Added to favorites');
     },
     onError: (error) => {

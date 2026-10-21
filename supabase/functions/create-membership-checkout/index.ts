@@ -3,6 +3,7 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { requireMembershipConfig } from "../_shared/membership-products.mjs";
 import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
+import { checkoutOrigin } from "../_shared/checkout-origin.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,7 +38,7 @@ serve(async (req) => {
     }
     logStep("User authenticated", { userId: user.id, email: user.email });
 
-    const { tier, customAmount } = await req.json();
+    const { tier, customAmount, return_origin } = await req.json();
     logStep("Request params", { tier, customAmount });
 
     if (tier !== "community" && tier !== "elite") {
@@ -57,7 +58,7 @@ serve(async (req) => {
       logStep("Found existing customer", { customerId });
     }
 
-    const origin = req.headers.get("origin") || "http://localhost:3000";
+    const origin = checkoutOrigin(return_origin, req.headers.get("origin"), "http://localhost:3000");
     let sessionConfig: Stripe.Checkout.SessionCreateParams;
 
     if (tier === "community") {

@@ -28,6 +28,7 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
   const [sendVia, setSendVia] = useState<'email' | 'sms'>('email');
   const [sendRecipient, setSendRecipient] = useState('');
   const [senderName, setSenderName] = useState('');
+  const [payLinkId, setPayLinkId] = useState<string | null>(null);
   const [senderEmail, setSenderEmail] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -167,6 +168,28 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
       toast.success(`Invoice sent via ${sendVia}`);
     } catch (error) {
       toast.error("Failed to send invoice");
+    }
+  };
+
+  const createPayLink = async (invoice: ContactInvoice) => {
+    setPayLinkId(invoice.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-invoice-checkout", {
+        body: { invoiceId: invoice.id },
+      });
+      if (error) throw error;
+      if (data?.needs_connect) {
+        toast.error(data.error || "Set up payouts in Wallet before sending a pay link");
+        return;
+      }
+      if (data?.error) throw new Error(data.error);
+      if (!data?.url) throw new Error("Stripe did not return a pay link");
+      await navigator.clipboard.writeText(data.url);
+      toast.success("Pay link copied. 10% of the payment goes to the community fund.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create a pay link");
+    } finally {
+      setPayLinkId(null);
     }
   };
 
@@ -462,15 +485,28 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
                     </Button>
                   )}
                   {invoice.status === 'sent' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => handleMarkPaid(invoice)}
-                      role="button"
-                    >
-                      <Check className="w-3 h-3 mr-1" /> Mark Paid
-                    </Button>
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        disabled={payLinkId === invoice.id}
+                        onClick={() => createPayLink(invoice)}
+                      >
+                        {payLinkId === invoice.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                        Pay link
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => handleMarkPaid(invoice)}
+                        role="button"
+                      >
+                        <Check className="w-3 h-3 mr-1" /> Mark Paid
+                      </Button>
+                    </>
                   )}
                   <Button
                     variant="ghost"

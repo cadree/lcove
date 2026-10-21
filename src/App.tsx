@@ -14,6 +14,7 @@ import { CreateFlowProvider } from "@/components/create/CreateFlowContext";
 import AccessGate from "@/components/auth/AccessGate";
 import { EtherSplash } from "@/components/brand/EtherSplash";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
+import { IosCheckoutReturn } from "@/components/ios/IosCheckoutReturn";
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Feed = lazy(() => import("./pages/Feed"));
@@ -22,6 +23,7 @@ const Directory = lazy(() => import("./pages/Directory"));
 const Projects = lazy(() => import("./pages/Projects"));
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
 const Profile = lazy(() => import("./pages/Profile"));
+const Tickets = lazy(() => import("./pages/Tickets"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Locked = lazy(() => import("./pages/Locked"));
@@ -103,6 +105,7 @@ const App = () => (
         <WorldLayer />
         <MotionConfig reducedMotion="user">
         <AuthProvider>
+          <IosCheckoutReturn />
           <PresenceProvider>
             <CreateFlowProvider>
               <AccessGate>
@@ -124,6 +127,7 @@ const App = () => (
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/events" element={<Navigate to="/calendar" replace />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/tickets" element={<Tickets />} />
                 <Route path="/profile/:userId" element={<Profile />} />
                 <Route path="/blog" element={<BlogIndex />} />
                 <Route path="/blog/:blogId" element={<BlogPostPage />} />

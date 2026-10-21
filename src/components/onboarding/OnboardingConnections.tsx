@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Music, Store, Crown, ChevronLeft } from 'lucide-react';
-import { isIosApp } from '@/lib/platform';
+import { useIosExternalCheckout } from '@/hooks/useIosExternalCheckout';
+import { digitalPurchasesEnabled } from '@/lib/platform';
 
 interface Props {
   onComplete: () => void;
@@ -45,6 +46,7 @@ const options: ConnectionOption[] = [
 ];
 
 const OnboardingConnections = ({ onComplete, onBack }: Props) => {
+  const { linkOut } = useIosExternalCheckout();
   const handleOptionClick = (route: string) => {
     // Use window.location for a full page reload to ensure fresh profile data
     window.location.href = route;
@@ -79,7 +81,7 @@ const OnboardingConnections = ({ onComplete, onBack }: Props) => {
 
         {/* Options */}
         <div className="space-y-4 mb-8">
-          {options.filter((option) => option.id !== 'membership' || !isIosApp()).map((option, index) => (
+          {options.filter((option) => option.id !== 'membership' || digitalPurchasesEnabled() || linkOut).map((option, index) => (
             <motion.button
               key={option.id}
               onClick={() => handleOptionClick(option.route)}
