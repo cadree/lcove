@@ -87,10 +87,15 @@ export function profilePostFromRow(
   };
 }
 
+type ProfileColumnResult<T> = {
+  data: T;
+  error: { message: string } | null;
+};
+
 /** Prefer embed columns, and fall back when that migration is not applied yet. */
 export async function withProfilePostColumns<T>(
-  run: (columns: string) => Promise<{ data: T; error: { message: string } | null }>,
-): Promise<{ data: T; error: { message: string } | null }> {
+  run: (columns: string) => PromiseLike<ProfileColumnResult<T>>,
+): Promise<ProfileColumnResult<T>> {
   const full = await run(PROFILE_POST_COLUMNS);
   if (!full.error || !embedColumnMissing(full.error)) return full;
   return run(PROFILE_POST_COLUMNS_BASE);

@@ -2,7 +2,7 @@
  * Campaign lines. Use these sentences as written.
  * HERO_TAGLINE is also the meta description in index.html and public/manifest.json.
  */
-import { AI_CONTENT_RULE_ALLOWED, AI_CONTENT_RULE_FORBIDDEN } from "@/lib/aiContentRule";
+import { AI_CONTENT_RULE_ALLOWED, AI_CONTENT_RULE_FORBIDDEN } from "../lib/aiContentRule.ts";
 export const HERO_TAGLINE = "Real creatives. Real work.";
 
 export const SUPPORT_LINE =

@@ -124,7 +124,7 @@ const Profile = () => {
         supabase.from("posts").select(columns).eq("id", postId).maybeSingle(),
       );
       if (cancel || error || !data) return;
-      const row = data as ProfilePostRow;
+      const row = data as unknown as ProfilePostRow;
       if (targetUserId && row.user_id && !sameUserId(row.user_id, targetUserId)) {
         navigate(postPreviewPath(row.user_id, row.id), { replace: true });
         return;

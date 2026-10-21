@@ -6,7 +6,6 @@ import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { errorMessage } from '@/lib/errorMessage';
 import { shotContentThin, shotSessionEnabled, shotStories } from '@/lib/shotSession';
-import { useUserBlocks } from '@/hooks/useUserBlocks';
 
 interface Story {
   id: string;

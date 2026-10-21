@@ -93,12 +93,11 @@ describe("novi quests", () => {
       bookOpened: true,
       completedProjects: 0,
     });
-    assert.equal(partial.length, 3);
-    assert.equal(partial[0]?.id, "find_people");
-    assert.match(partial[0]?.detail ?? "", /1 of 3 so far/);
-    assert.equal(partial[1]?.id, "finish_project");
-    assert.equal(partial[1]?.xp, 25);
-    assert.equal(partial[2]?.id, "open_studio");
+    assert.equal(partial.length, 2);
+    assert.equal(partial[0]?.id, "finish_project");
+    assert.equal(partial[0]?.xp, 25);
+    assert.equal(partial[1]?.id, "open_studio");
+    assert.match(partial[1]?.detail ?? "", /Open the Studio sheet/);
 
     const done = suggestedActions(
       {

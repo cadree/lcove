@@ -176,7 +176,7 @@ const SUGGESTED: Record<QuestId, { title: string; detail: string; href: string; 
   },
   find_people: {
     title: "Add people",
-    detail: "Add 3 people from the directory to earn 10 XP.",
+    detail: "Add someone from the directory to earn 10 XP.",
     href: "/directory",
     xp: 10,
   },

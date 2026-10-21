@@ -32,7 +32,7 @@ export const NOVI_GUIDE: readonly GuideEntry[] = [
     id: "xp",
     question: "How do I earn XP?",
     answer:
-      "XP is a private level. A post with text or media is 10 XP. An editor seat on someone else's board, or an accepted project application, is 15 XP. RSVP going to someone else's event is 10 XP. Completing a project is 25 XP for the creator and each accepted collaborator. Finishing your profile, adding 3 people, and opening the Book are 10 XP each. Decode today on the quest log for up to 5 XP. A UTC day caps at 40 XP. Likes, comments, and follows do not write XP. XP is not credits and cannot be paid out.",
+      "XP is a private level. A post with text or media is 10 XP. An editor seat on someone else's board, or an accepted project application, is 15 XP. RSVP going to someone else's event is 10 XP. Completing a project is 25 XP for the creator and each accepted collaborator. Finishing your profile, adding someone from the directory, opening the Book, and opening Studio are 10 XP each. Decode today on the quest log for up to 5 XP. A UTC day caps at 40 XP. Likes, comments, and follows do not write XP. XP is not credits and cannot be paid out.",
     href: "/quests",
     hrefLabel: "Open quests",
     keywords: ["xp", "level", "quest", "earn", "points"],
@@ -41,7 +41,7 @@ export const NOVI_GUIDE: readonly GuideEntry[] = [
     id: "share",
     question: "How do I share or repost?",
     answer:
-      "Tap Share on a feed item to send its link or copy it. There is no repost button. Sharing a link does not write XP.",
+      "Tap Share on a feed item to copy its link, send it, add it to your story, or repost a photo or video. Sharing a link does not write XP.",
     href: "/feed",
     hrefLabel: "Open the feed",
     keywords: ["share", "repost", "link", "copy"],

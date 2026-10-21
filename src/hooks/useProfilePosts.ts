@@ -71,7 +71,8 @@ export function useProfilePosts(userId?: string) {
         .eq('user_id', profileUserId)
         .limit(1);
       const author = profileRows?.[0] || { display_name: null, avatar_url: null };
-      const own = (postsData || []).map((post) => profilePostFromRow(post as ProfilePostRow, author));
+      const ownRows = (postsData || []) as unknown as ProfilePostRow[];
+      const own = ownRows.map((post) => profilePostFromRow(post, author));
 
       try {
         const { data: repostData, error: repostError } = await supabase
@@ -87,7 +88,8 @@ export function useProfilePosts(userId?: string) {
         );
         if (originalsError || !originals?.length) return own;
 
-        const authorIds = [...new Set(originals.map((post) => post.user_id))];
+        const originalRows = originals as unknown as ProfilePostRow[];
+        const authorIds = [...new Set(originalRows.map((post) => post.user_id))];
         const { data: authors } = await supabase
           .from('profiles_public')
           .select('user_id, display_name, avatar_url')
@@ -101,8 +103,8 @@ export function useProfilePosts(userId?: string) {
         return profileItemsWithReposts(
           own,
           reposts,
-          originals.map((post) => profilePostFromRow(
-            post as ProfilePostRow,
+          originalRows.map((post) => profilePostFromRow(
+            post,
             authorMap.get(post.user_id) || { display_name: null, avatar_url: null },
           )),
         );
