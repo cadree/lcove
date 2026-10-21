@@ -8,7 +8,10 @@ export const REPORT_REASONS = [
   "Hate or violence",
   "Sexual content",
   "Scam or fraud",
-  "AI-generated or fake content",
+  "Fake or AI-generated person",
+  "Fully AI-generated scene passed off as real work",
+  "AI slop / spam promotion",
+  "Plagiarized or stolen work",
   "Other",
 ] as const;
 

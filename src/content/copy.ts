@@ -2,6 +2,7 @@
  * Campaign lines. Use these sentences as written.
  * HERO_TAGLINE is also the meta description in index.html and public/manifest.json.
  */
+import { AI_CONTENT_RULE_ALLOWED, AI_CONTENT_RULE_FORBIDDEN } from "@/lib/aiContentRule";
 export const HERO_TAGLINE = "Real creatives. Real work.";
 
 export const SUPPORT_LINE =
@@ -36,6 +37,5 @@ export const INVITE_EMAIL_LINES = [
   SLACK_INTRO,
 ] as const;
 
-/** Wording already published on /guidelines. Do not paraphrase. */
-export const GENERATIVE_AI_RULE =
-  "Generative AI is not allowed on Ether except for tools that improve a creator's workflow. AI-generated people, fake profiles, and AI-made work presented as human-made can be reported and removed.";
+/** Landing summary of Cadre's guidelines rule. The two sentences stay in aiContentRule. */
+export const GENERATIVE_AI_RULE = `${AI_CONTENT_RULE_ALLOWED} ${AI_CONTENT_RULE_FORBIDDEN}`;
