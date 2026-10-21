@@ -71,15 +71,12 @@ const OnboardingQuestionnaire = ({ data, updateData, onComplete, onBack }: Props
           <h1 className="font-display text-4xl md:text-5xl text-foreground mb-4">
             Mindset Alignment
           </h1>
-          <div className="rounded-2xl border border-dashed border-primary/50 bg-primary/5 p-5 space-y-3">
+          <div className="rounded-2xl border border-border bg-muted/30 p-5 space-y-3">
             <p className="text-xs font-medium uppercase tracking-wide text-primary">
               {QUIZ_INTRO_COPY.kicker}
             </p>
             <h2 className="font-display text-2xl text-foreground">{QUIZ_INTRO_COPY.title}</h2>
             <p className="text-base leading-relaxed text-foreground">{QUIZ_INTRO_COPY.body}</p>
-            <p className="text-xs text-muted-foreground">
-              Placeholder copy lives in src/lib/onboardingQuiz.ts as QUIZ_INTRO_COPY.
-            </p>
           </div>
         </div>
         <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background to-transparent">

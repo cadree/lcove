@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   QUIZ_INTRO_COPY,
@@ -118,11 +119,20 @@ describe("red flag scoring", () => {
   });
 });
 
-describe("quiz intro placeholder", () => {
-  it("marks the owner copy as a placeholder", () => {
-    assert.match(QUIZ_INTRO_COPY.kicker, /PLACEHOLDER/);
-    assert.match(QUIZ_INTRO_COPY.title, /PLACEHOLDER/);
-    assert.match(QUIZ_INTRO_COPY.body, /PLACEHOLDER/);
+describe("quiz intro", () => {
+  it("describes scoring and has no placeholder text", () => {
+    const text = `${QUIZ_INTRO_COPY.kicker}\n${QUIZ_INTRO_COPY.title}\n${QUIZ_INTRO_COPY.body}`;
+    assert.equal(/placeholder/i.test(text), false);
+    assert.match(QUIZ_INTRO_COPY.kicker, /10 questions/);
+    assert.match(QUIZ_INTRO_COPY.body, /letter only labels a sentence/i);
+    assert.match(QUIZ_INTRO_COPY.body, /two or more/i);
+    assert.match(QUIZ_INTRO_COPY.body, /one does not/i);
+    const screen = readFileSync(
+      new URL("../components/onboarding/OnboardingQuestionnaire.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.equal(screen.includes("PLACEHOLDER"), false);
+    assert.equal(/placeholder copy lives/i.test(screen), false);
     assert.equal(QUIZ_QUESTIONS.length, 10);
     assert.match(QUIZ_QUESTIONS[0].question, /challenges your beliefs/);
     for (const question of QUIZ_QUESTIONS) {
@@ -131,5 +141,16 @@ describe("quiz intro placeholder", () => {
         assert.equal(typeof option.redFlag, "boolean");
       }
     }
+  });
+});
+
+describe("wallet pass button", () => {
+  it("stays off the page unless wallet passes are enabled", () => {
+    const source = readFileSync(new URL("../pages/PublicEventPage.tsx", import.meta.url), "utf8");
+    assert.equal(/coming soon/i.test(source), false);
+    assert.equal(/check back soon/i.test(source), false);
+    assert.match(source, /VITE_WALLET_PASSES_ENABLED === "true"/);
+    assert.equal((source.match(/walletPassesEnabled &&/g) ?? []).length, 2);
+    assert.equal((source.match(/Add to Wallet/g) ?? []).length, 2);
   });
 });

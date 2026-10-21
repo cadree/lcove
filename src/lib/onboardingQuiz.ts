@@ -1,8 +1,7 @@
 // Onboarding quiz. Letters identify a sentence, not a rank and not a screen position.
 // A red flag is an option that conflicts with a collaborative creative community.
 // Every other option is equally valid. There is no best answer.
-// Placeholder intro copy lives in QUIZ_INTRO_COPY. The owner replaces that text.
-// File: src/lib/onboardingQuiz.ts
+// QUIZ_INTRO_COPY is the text shown before the questions.
 
 export type ChoiceId = "A" | "B" | "C";
 
@@ -21,9 +20,9 @@ export interface QuizQuestion {
 }
 
 export const QUIZ_INTRO_COPY = {
-  kicker: "PLACEHOLDER — owner writes the final text",
-  title: "PLACEHOLDER: Why these questions",
-  body: "PLACEHOLDER: New members answer these so Ether can see a spread of how you think. There is no single correct letter. Replace this paragraph with the final welcome before launch.",
+  kicker: "10 questions",
+  title: "How answers are scored",
+  body: "Each question has three sentences. A letter only labels a sentence, and the order changes between visits. One sentence is marked as a conflict with working in a group. Two or more of those answers fails this step. One does not. Every other sentence counts the same.",
 } as const;
 
 /** Two or more red-flag answers fails. One red flag still passes. */
