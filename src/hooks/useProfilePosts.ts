@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import { ProfilePost } from '@/types/post';
 import { profileItemsWithReposts, type RepostRow } from '@/lib/sharing';
 import {
@@ -178,7 +179,7 @@ export function useProfilePosts(userId?: string) {
       toast.success('Post shared!');
     },
     onError: (error) => {
-      toast.error('Failed to share post');
+      toast.error(errorMessage(error, 'Failed to share post'));
       console.error(error);
     },
   });

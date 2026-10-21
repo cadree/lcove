@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import { shotContentThin, shotSessionEnabled, shotStories } from '@/lib/shotSession';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 
@@ -223,7 +224,7 @@ export function useStories() {
     onError: (error, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(['stories'], context.previous);
       if (context?.preview) URL.revokeObjectURL(context.preview);
-      toast.error('Failed to upload story');
+      toast.error(errorMessage(error, 'Failed to upload story'));
       console.error(error);
     },
   });

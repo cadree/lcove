@@ -16,6 +16,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 import { cn } from "@/lib/utils";
 
 // Icons for music services - wrapped with forwardRef to prevent ref warnings
@@ -218,7 +219,7 @@ export const ProfileMusicSourceSelector = ({
       toast.success("Music uploaded successfully!");
     } catch (err) {
       console.error('Upload error:', err);
-      setError("Failed to upload audio file.");
+      setError(errorMessage(err, "Failed to upload audio file."));
     } finally {
       setIsProcessing(false);
     }
@@ -253,7 +254,7 @@ export const ProfileMusicSourceSelector = ({
       onMusicChange(updatedData);
       toast.success("Album art uploaded!");
     } catch (err) {
-      toast.error("Failed to upload artwork.");
+      toast.error(errorMessage(err, "Failed to upload artwork."));
     } finally {
       setIsProcessing(false);
     }

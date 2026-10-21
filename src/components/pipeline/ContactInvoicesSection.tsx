@@ -12,6 +12,7 @@ import { useContactInvoices, ContactInvoice, InvoiceLineItem } from "@/hooks/use
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 
 interface ContactInvoicesSectionProps {
   pipelineItemId: string;
@@ -93,7 +94,7 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
       });
       toast.success("Image attached");
     } catch (error) {
-      toast.error("Failed to upload image");
+      toast.error(errorMessage(error, "Failed to upload image"));
     }
 
     if (fileInputRef.current) {

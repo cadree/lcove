@@ -24,6 +24,7 @@ import { ProfilePost } from '@/types/post';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface FolderDetailViewProps {
@@ -123,7 +124,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
       refetchAllPosts();
     } catch (error) {
       console.error('Error uploading media:', error);
-      toast.error('Failed to upload media');
+      toast.error(errorMessage(error, 'Failed to upload media'));
     } finally {
       setIsUploadingMedia(false);
       if (mediaInputRef.current) {

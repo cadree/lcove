@@ -4,9 +4,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import { shotContentThin, shotPosts, shotSessionEnabled } from '@/lib/shotSession';
 import { isQueryablePostId } from '@/lib/postId';
-import { assertCleanText, OBJECTIONABLE_MESSAGE } from '@/lib/objectionableText';
+import { assertCleanText } from '@/lib/objectionableText';
 import { mergePostsAndReposts, type RepostRow } from '@/lib/sharing';
 import { refreshXp } from '@/lib/xpRefresh';
 
@@ -184,7 +185,7 @@ export function usePosts() {
     onError: (error, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(['posts'], context.previous);
       if (context?.preview) URL.revokeObjectURL(context.preview);
-      toast.error(error instanceof Error && error.message === OBJECTIONABLE_MESSAGE ? error.message : 'Failed to create post');
+      toast.error(errorMessage(error, 'Failed to create post'));
       console.error(error);
     },
   });

@@ -13,6 +13,7 @@ import { CreatePostDialog } from "@/components/profile/CreatePostDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 
 interface PortfolioPost {
   id: string;
@@ -159,7 +160,7 @@ const Portfolios = () => {
       setShowCreateDialog(false);
     },
     onError: (error) => {
-      toast.error('Failed to share work');
+      toast.error(errorMessage(error, 'Failed to share work'));
       console.error(error);
     },
   });

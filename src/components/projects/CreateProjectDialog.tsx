@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import { cn } from '@/lib/utils';
 
 type ProjectType = 'paid' | 'volunteer' | 'hybrid';
@@ -244,7 +245,11 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
               .from('media')
               .upload(filePath, att.file);
 
-            if (uploadError) { console.error('Upload error:', uploadError); continue; }
+            if (uploadError) {
+              console.error('Upload error:', uploadError);
+              toast.error(errorMessage(uploadError, `Couldn't upload ${att.file.name}`));
+              continue;
+            }
 
             const { data: { publicUrl } } = supabase.storage
               .from('media')

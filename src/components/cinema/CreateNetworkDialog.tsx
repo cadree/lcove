@@ -23,6 +23,7 @@ import { Film, Upload, DollarSign } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 
 interface CreateNetworkDialogProps {
   open: boolean;
@@ -52,10 +53,7 @@ export const CreateNetworkDialog = ({ open, onOpenChange }: CreateNetworkDialogP
       .from('media')
       .upload(fileName, file);
 
-    if (error) {
-      console.error('Upload error:', error);
-      return null;
-    }
+    if (error) throw error;
 
     const { data } = supabase.storage.from('media').getPublicUrl(fileName);
     return data.publicUrl;
@@ -104,6 +102,7 @@ export const CreateNetworkDialog = ({ open, onOpenChange }: CreateNetworkDialogP
       onOpenChange(false);
     } catch (error) {
       console.error('Failed to create network:', error);
+      toast.error(errorMessage(error, "Couldn't create the network"));
     } finally {
       setUploading(false);
     }
