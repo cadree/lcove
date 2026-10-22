@@ -549,8 +549,8 @@ const Profile = () => {
   return (
     <PageLayout showNotificationBell={false}>
       <div
-        className={`relative min-h-screen pb-20 ${profileFont ? "profile-theme" : ""}`}
-        style={themeStyle}
+        className={`relative -mt-[env(safe-area-inset-top,0px)] min-h-screen pb-20 pt-[env(safe-area-inset-top,0px)] ${profileFont ? "profile-theme" : ""}`}
+        style={{ ...themeStyle, backgroundColor: "hsl(var(--background))" }}
       >
         {showEffects && (
           <ProfileEffects

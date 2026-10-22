@@ -314,24 +314,24 @@ const Live = () => {
         {/* Hero Section */}
         <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-background to-background">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                 <BackButton className="shrink-0" />
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2.5 bg-primary/20 rounded-xl">
+                <div className="min-w-0">
+                  <div className="mb-2 flex items-center gap-3">
+                    <div className="shrink-0 rounded-xl bg-primary/20 p-2.5">
                       <Radio className="h-6 w-6 text-primary" />
                     </div>
-                    <h1 className="text-2xl sm:text-3xl font-bold">Live Streams</h1>
+                    <h1 className="min-w-0 text-2xl font-bold sm:text-3xl">Live Streams</h1>
                   </div>
-                  <p className="text-muted-foreground text-sm sm:text-base">
+                  <p className="text-sm text-muted-foreground sm:text-base">
                     Stream live DJ sets or watch the community
                   </p>
                 </div>
               </div>
               
               {user && (
-                <Button onClick={() => setShowCreate(true)} className="shrink-0">
+                <Button onClick={() => setShowCreate(true)} className="w-full shrink-0 sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   <span className="hidden sm:inline">Start Streaming</span>
                   <span className="sm:hidden">Stream</span>

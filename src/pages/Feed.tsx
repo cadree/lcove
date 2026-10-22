@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Bell, Filter, Loader2, Shuffle, Sparkles, Users } from "lucide-react";
 import { ToolsSheet } from "@/components/navigation/ToolsSheet";
 import { usePosts } from "@/hooks/usePosts";
+import { FeedEngagementProvider } from "@/hooks/useFeedEngagement";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
@@ -235,6 +236,7 @@ const Feed = () => {
         {isLoading ? <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div> : <div className="space-y-5 pb-32">
+            <FeedEngagementProvider postIds={lanePosts.map((post) => post.id)}>
             <div className="space-y-5">
               {lanePosts.map((post) => (
                 <div key={post.feed_key ?? post.id} className="[content-visibility:auto] [contain-intrinsic-size:auto_480px]">
@@ -242,6 +244,7 @@ const Feed = () => {
                 </div>
               ))}
             </div>
+            </FeedEngagementProvider>
 
             {lanePosts.length === 0 && posts.length === 0 && user && lane !== "live" && <FirstRunEmpty title="Your feed is empty" description="Start with a post, look through the directory, or read community updates." actions={[{
           label: "Share something",

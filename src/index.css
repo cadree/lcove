@@ -428,6 +428,7 @@
     content: "";
     position: absolute;
     inset: 0;
+    border-radius: inherit;
     background: linear-gradient(115deg, transparent 32%, rgba(255, 255, 255, 0.2) 48%, transparent 64%);
     pointer-events: none;
   }

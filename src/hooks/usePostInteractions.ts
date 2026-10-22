@@ -22,7 +22,9 @@ interface Comment {
   replies?: Comment[];
 }
 
-export function usePostInteractions(postId: string) {
+export function usePostInteractions(postId: string, options?: { loadComments?: boolean; threadOnly?: boolean }) {
+  const loadComments = options?.threadOnly ? options.loadComments === true : options?.loadComments !== false;
+  const loadCard = !options?.threadOnly;
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { blockedIds } = useUserBlocks();
@@ -31,32 +33,27 @@ export function usePostInteractions(postId: string) {
   // Fetch likes count and user's like status
   const { data: likesData, refetch: refetchLikes } = useQuery({
     queryKey: ['post-likes', postId],
-    enabled: canQuery,
+    enabled: canQuery && loadCard,
     queryFn: async () => {
-      const { count } = await supabase
+      // A HEAD count with select=* returns 416 when a post has no likes.
+      // One column list covers the count and this viewer's heart.
+      const { data, error } = await supabase
         .from('post_likes')
-        .select('*', { count: 'exact', head: true })
+        .select('user_id')
         .eq('post_id', postId);
-
-      let hasLiked = false;
-      if (user && isQueryablePostId(user.id)) {
-        const { data } = await supabase
-          .from('post_likes')
-          .select('id')
-          .eq('post_id', postId)
-          .eq('user_id', user.id)
-          .limit(1);
-        hasLiked = !!data?.length;
-      }
-
-      return { count: count || 0, hasLiked };
+      if (error) throw error;
+      const rows = data ?? [];
+      return {
+        count: rows.length,
+        hasLiked: !!user && rows.some((row) => row.user_id === user.id),
+      };
     },
   });
 
   // Fetch comments with profiles
   const { data: comments = [], refetch: refetchComments } = useQuery({
     queryKey: ['post-comments', postId],
-    enabled: canQuery,
+    enabled: canQuery && loadComments,
     queryFn: async () => {
       const { data: commentsData, error } = await supabase
         .from('post_comments')
@@ -119,7 +116,7 @@ export function usePostInteractions(postId: string) {
         .limit(1);
       return !!data?.length;
     },
-    enabled: canQuery && !!user,
+    enabled: canQuery && loadCard && !!user,
   });
 
   // Like mutation
@@ -246,33 +243,37 @@ export function usePostInteractions(postId: string) {
     },
   });
 
-  // Real-time subscriptions
+  // Real-time subscriptions. The feed does not use this path.
   useEffect(() => {
-    if (!canQuery) return;
+    if (!canQuery || (!loadCard && !loadComments)) return;
 
-    const likesChannel = supabase
-      .channel(`post-likes-${postId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'post_likes', filter: `post_id=eq.${postId}` },
-        () => refetchLikes()
-      )
-      .subscribe();
+    const likesChannel = loadCard
+      ? supabase
+          .channel(`post-likes-${postId}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'post_likes', filter: `post_id=eq.${postId}` },
+            () => refetchLikes()
+          )
+          .subscribe()
+      : null;
 
-    const commentsChannel = supabase
-      .channel(`post-comments-${postId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'post_comments', filter: `post_id=eq.${postId}` },
-        () => refetchComments()
-      )
-      .subscribe();
+    const commentsChannel = loadComments
+      ? supabase
+          .channel(`post-comments-${postId}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'post_comments', filter: `post_id=eq.${postId}` },
+            () => refetchComments()
+          )
+          .subscribe()
+      : null;
 
     return () => {
-      supabase.removeChannel(likesChannel);
-      supabase.removeChannel(commentsChannel);
+      if (likesChannel) supabase.removeChannel(likesChannel);
+      if (commentsChannel) supabase.removeChannel(commentsChannel);
     };
-  }, [canQuery, postId, refetchLikes, refetchComments]);
+  }, [canQuery, loadCard, loadComments, postId, refetchLikes, refetchComments]);
 
   const visibleComments = useMemo(
     () => hideBlockedComments(comments, new Set(blockedIds)),

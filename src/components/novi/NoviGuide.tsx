@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { X } from "lucide-react";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { useNoviQuests } from "@/hooks/useNoviQuests";
 import { nextQuest, suggestedActions } from "@/lib/noviQuests";
@@ -47,15 +47,15 @@ export function NoviGuide({
         side={wide ? "right" : "bottom"}
         className={wide ? "border-border bg-card px-4 pb-8" : "max-h-[85vh] border-border bg-card px-4 pb-8"}
         style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
-        aria-labelledby="novi-guide-title"
       >
         <div className="mx-auto mb-3 mt-1 h-1 w-10 rounded-full bg-foreground/20 md:hidden" aria-hidden="true" />
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <p className="mono-label text-[8px] text-[hsl(var(--brand))]">Novi // Guide</p>
-            <SheetTitle id="novi-guide-title" className="ether-title text-left text-[28px]">
+            <SheetTitle className="ether-title text-left text-[28px]">
               Novi
             </SheetTitle>
+            <SheetDescription className="sr-only">Quests, suggested actions, and answers from Novi</SheetDescription>
           </div>
           <button
             type="button"
