@@ -20633,53 +20633,64 @@ CREATE POLICY "Anyone can view comments"
   USING (NOT public.either_blocked(auth.uid(), user_id));
 $ether_m167s11$;
   EXECUTE $ether_m167s12$
+-- Prod's message policy is "Users can view messages in chats they can read"
+-- (can_read_conversation plus deleted_at). Drop the retired name as well so a
+-- second apply cannot leave both policies in place. Permissive policies are OR'd.
 DROP POLICY IF EXISTS "Users can view messages in their conversations" ON public.messages;
 $ether_m167s12$;
   EXECUTE $ether_m167s13$
-CREATE POLICY "Users can view messages in their conversations"
+DROP POLICY IF EXISTS "Users can view messages in chats they can read" ON public.messages;
+$ether_m167s13$;
+  EXECUTE $ether_m167s14$
+CREATE POLICY "Users can view messages in chats they can read"
   ON public.messages
   FOR SELECT
   USING (
-    public.is_conversation_participant(conversation_id, auth.uid())
+    public.can_read_conversation(conversation_id, auth.uid())
     AND deleted_at IS NULL
     AND NOT public.either_blocked(auth.uid(), sender_id)
   );
-$ether_m167s13$;
-  EXECUTE $ether_m167s14$
-DROP POLICY IF EXISTS "Anyone can view non-expired stories" ON public.stories;
 $ether_m167s14$;
   EXECUTE $ether_m167s15$
+-- Keep prod's credit_user_id block. either_blocked is both directions.
+DROP POLICY IF EXISTS "Anyone can view non-expired stories" ON public.stories;
+$ether_m167s15$;
+  EXECUTE $ether_m167s16$
 CREATE POLICY "Anyone can view non-expired stories"
   ON public.stories
   FOR SELECT
   USING (
     expires_at > now()
     AND NOT public.either_blocked(auth.uid(), user_id)
+    AND (
+      credit_user_id IS NULL
+      OR NOT public.either_blocked(auth.uid(), credit_user_id)
+    )
   );
-$ether_m167s15$;
-  EXECUTE $ether_m167s16$
-DROP POLICY IF EXISTS "Anyone can view live streams" ON public.live_streams;
 $ether_m167s16$;
   EXECUTE $ether_m167s17$
+DROP POLICY IF EXISTS "Anyone can view live streams" ON public.live_streams;
+$ether_m167s17$;
+  EXECUTE $ether_m167s18$
 CREATE POLICY "Anyone can view live streams"
   ON public.live_streams
   FOR SELECT
   USING (NOT public.either_blocked(auth.uid(), host_id));
-$ether_m167s17$;
-  EXECUTE $ether_m167s18$
-DROP POLICY IF EXISTS "Stream chat visible unless blocked" ON public.stream_chat;
 $ether_m167s18$;
   EXECUTE $ether_m167s19$
+DROP POLICY IF EXISTS "Stream chat visible unless blocked" ON public.stream_chat;
+$ether_m167s19$;
+  EXECUTE $ether_m167s20$
 CREATE POLICY "Stream chat visible unless blocked"
   ON public.stream_chat
   FOR SELECT
   TO authenticated
   USING (NOT public.either_blocked(auth.uid(), user_id));
-$ether_m167s19$;
-  EXECUTE $ether_m167s20$
-DROP POLICY IF EXISTS "Users send own stream chat" ON public.stream_chat;
 $ether_m167s20$;
   EXECUTE $ether_m167s21$
+DROP POLICY IF EXISTS "Users send own stream chat" ON public.stream_chat;
+$ether_m167s21$;
+  EXECUTE $ether_m167s22$
 CREATE POLICY "Users send own stream chat"
   ON public.stream_chat
   FOR INSERT
@@ -20693,8 +20704,8 @@ CREATE POLICY "Users send own stream chat"
         AND public.either_blocked(s.host_id, auth.uid())
     )
   );
-$ether_m167s21$;
-  EXECUTE $ether_m167s22$
+$ether_m167s22$;
+  EXECUTE $ether_m167s23$
 DO $$
 BEGIN
   IF to_regclass('public.content_reports') IS NOT NULL THEN
@@ -20703,8 +20714,8 @@ BEGIN
       CHECK (target_type IN ('post', 'profile', 'message', 'comment', 'project', 'stream_message', 'stream'));
   END IF;
 END $$;
-$ether_m167s22$;
-  EXECUTE $ether_m167s23$
+$ether_m167s23$;
+  EXECUTE $ether_m167s24$
 CREATE OR REPLACE FUNCTION public.objectionable_text(input text)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -20747,8 +20758,8 @@ BEGIN
   RETURN false;
 END;
 $$;
-$ether_m167s23$;
-  EXECUTE $ether_m167s24$
+$ether_m167s24$;
+  EXECUTE $ether_m167s25$
 CREATE OR REPLACE FUNCTION public.reject_objectionable_text()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -20773,8 +20784,8 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-$ether_m167s24$;
-  EXECUTE $ether_m167s25$
+$ether_m167s25$;
+  EXECUTE $ether_m167s26$
 DO $$
 BEGIN
   IF to_regclass('public.posts') IS NOT NULL THEN
@@ -20814,8 +20825,8 @@ BEGIN
       FOR EACH ROW EXECUTE FUNCTION public.reject_objectionable_text();
   END IF;
 END $$;
-$ether_m167s25$;
-  EXECUTE $ether_m167s26$
+$ether_m167s26$;
+  EXECUTE $ether_m167s27$
 CREATE OR REPLACE FUNCTION public.moderate_report(p_report_id uuid, p_action text)
 RETURNS void
 LANGUAGE plpgsql
@@ -20875,13 +20886,13 @@ BEGIN
     WHERE id = p_report_id;
 END;
 $$;
-$ether_m167s26$;
-  EXECUTE $ether_m167s27$
-REVOKE ALL ON FUNCTION public.moderate_report(uuid, text) FROM PUBLIC;
 $ether_m167s27$;
   EXECUTE $ether_m167s28$
-GRANT EXECUTE ON FUNCTION public.moderate_report(uuid, text) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.moderate_report(uuid, text) FROM PUBLIC;
 $ether_m167s28$;
+  EXECUTE $ether_m167s29$
+GRANT EXECUTE ON FUNCTION public.moderate_report(uuid, text) TO authenticated, service_role;
+$ether_m167s29$;
   INSERT INTO public.ether_schema_migrations (version) VALUES ('20261020181000_app_store_readiness.sql');
 END
 $ether_m167$;

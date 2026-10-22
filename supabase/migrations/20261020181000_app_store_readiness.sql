@@ -91,16 +91,21 @@ CREATE POLICY "Anyone can view comments"
   FOR SELECT
   USING (NOT public.either_blocked(auth.uid(), user_id));
 
+-- Prod's message policy is "Users can view messages in chats they can read"
+-- (can_read_conversation plus deleted_at). Drop the retired name as well so a
+-- second apply cannot leave both policies in place. Permissive policies are OR'd.
 DROP POLICY IF EXISTS "Users can view messages in their conversations" ON public.messages;
-CREATE POLICY "Users can view messages in their conversations"
+DROP POLICY IF EXISTS "Users can view messages in chats they can read" ON public.messages;
+CREATE POLICY "Users can view messages in chats they can read"
   ON public.messages
   FOR SELECT
   USING (
-    public.is_conversation_participant(conversation_id, auth.uid())
+    public.can_read_conversation(conversation_id, auth.uid())
     AND deleted_at IS NULL
     AND NOT public.either_blocked(auth.uid(), sender_id)
   );
 
+-- Keep prod's credit_user_id block. either_blocked is both directions.
 DROP POLICY IF EXISTS "Anyone can view non-expired stories" ON public.stories;
 CREATE POLICY "Anyone can view non-expired stories"
   ON public.stories
@@ -108,6 +113,10 @@ CREATE POLICY "Anyone can view non-expired stories"
   USING (
     expires_at > now()
     AND NOT public.either_blocked(auth.uid(), user_id)
+    AND (
+      credit_user_id IS NULL
+      OR NOT public.either_blocked(auth.uid(), credit_user_id)
+    )
   );
 
 DROP POLICY IF EXISTS "Anyone can view live streams" ON public.live_streams;
