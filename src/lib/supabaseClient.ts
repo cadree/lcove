@@ -5,19 +5,29 @@ import { toast } from "sonner";
 import { capacitorStorage } from "@/lib/capacitorStorage";
 import { prepareStorageBody, StorageLimitError } from "@/lib/prepareStorageUpload";
 import { fileKind, isStorageSizeRejection, storageLimitMessage } from "@/lib/storageLimit";
+import { supabaseProjectRef } from "@/lib/supabaseTarget.mjs";
 import type { Database } from "@/integrations/supabase/types";
 
 // Vite inlines VITE_* from the process environment and from a local .env file.
 // Hosted builds must set these in the host's environment settings.
-// See .env.example and docs/hosting-without-lovable.md.
+// Production (etherbylcove.com) keeps ether-prod. Cloudflare preview builds
+// are refused if they embed that project. See docs/preview-staging.md.
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const supabaseTarget = supabaseProjectRef(SUPABASE_URL, import.meta.env.VITE_SUPABASE_PROJECT_ID);
 
 // Detect if running on native platform (iOS/Android)
 const isNative = Capacitor.isNativePlatform();
 
 // Log platform detection for debugging
-console.log("[Supabase Client] Platform:", Capacitor.getPlatform(), "isNative:", isNative);
+console.log(
+  "[Supabase Client] Platform:",
+  Capacitor.getPlatform(),
+  "isNative:",
+  isNative,
+  "project:",
+  supabaseTarget.ref ?? "(unset)",
+);
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

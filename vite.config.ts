@@ -1,6 +1,19 @@
+import { spawnSync } from "node:child_process";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+
+function previewSupabaseGuard() {
+  const result = spawnSync(
+    process.execPath,
+    [path.resolve(__dirname, "scripts/check-supabase-target.mjs")],
+    { stdio: "inherit", env: process.env },
+  );
+  if (result.status !== 0) {
+    throw new Error("Supabase preview target check failed");
+  }
+  return { name: "preview-supabase-guard" };
+}
 
 function isCharts(id: string): boolean {
   return id.includes("/recharts/") || id.includes("/d3-") || id.includes("/victory-vendor/");
@@ -53,7 +66,7 @@ export default defineConfig(() => ({
     host: "::",
     port: 8080,
   },
-  plugins: [react()],
+  plugins: [previewSupabaseGuard(), react()],
   resolve: {
     alias: [
       // Exact match so a regenerated src/integrations/supabase/client.ts

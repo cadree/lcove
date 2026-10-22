@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
+import { authStorageKeys } from '@/lib/supabaseTarget.mjs';
 import { NATIVE_APP_ID } from '@/config/nativeIds';
 import { logStorageOperation } from './authDebug';
 
@@ -82,13 +83,10 @@ export const capacitorStorage = {
  * Supabase stores session data in keys prefixed with 'sb-'
  */
 export const clearAllAuthStorage = async (): Promise<void> => {
-  const authKeys = [
-    'sb-aykopqinnnssxdhxqruo-auth-token',
-    'sb-aykopqinnnssxdhxqruo-auth-token-code-verifier',
-    'sb-wjbyvlgsxscwukkolehg-auth-token',
-    'sb-wjbyvlgsxscwukkolehg-auth-token-code-verifier',
-    'supabase.auth.token',
-  ];
+  const authKeys = authStorageKeys(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_PROJECT_ID,
+  );
 
   if (import.meta.env.DEV) {
     console.log('[CapacitorStorage] Clearing auth storage keys');
