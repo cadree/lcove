@@ -50,5 +50,6 @@ These are the migration files that are not on `cursor/ether-combined`. Order is 
 | `20261020193000_community_fund_fees_source_types.sql` | #26 | not recorded |
 | `20261020220000_story_like_notices_and_direct_chats.sql` | #28 | not recorded |
 | `20261020230000_post_video_embeds.sql` | #33 | not applied |
+| `20261022120000_objectionable_text_record_fields.sql` | #35 | recorded |
 
-`20261020193000_community_fund_fees_source_types.sql` repeats the source-type check from `20261020035500_community_fund_fee_sources.sql` and is safe to apply after it. The AI-reasons file and the video-embed file have not been applied. The story-like file was not listed as recorded when #29 was written.
+`20261020193000_community_fund_fees_source_types.sql` repeats the source-type check from `20261020035500_community_fund_fee_sources.sql` and is safe to apply after it. The AI-reasons file and the video-embed file have not been applied. The story-like file was not listed as recorded when #29 was written. `20261022120000_objectionable_text_record_fields.sql` is already applied and recorded on ether-prod. It replaces `reject_objectionable_text` so the trigger reads `to_jsonb(NEW)` and a profile insert no longer crashes on a missing `content` field. The allowed text is unchanged.
