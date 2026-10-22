@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { SplashScreen } from "@capacitor/splash-screen";
-import wordmark from "@/assets/ether-wordmark-splash.png";
-import { POWER_MS, REDUCED_MS, splashFrame, type SplashFrame } from "@/lib/etherSplash";
+import wordmark from "@/assets/ether-wordmark-splash.webp";
+import { POWER_MS, REDUCED_MS } from "@/lib/etherSplash";
 import { shotSessionEnabled } from "@/lib/shotSession";
 
 async function hideNativeSplash() {
@@ -15,9 +15,11 @@ async function hideNativeSplash() {
 }
 
 export function EtherSplash() {
-  const [frame, setFrame] = useState<SplashFrame>({ logo: 1, brightness: 1, veil: 1 });
   const [gone, setGone] = useState(false);
   const skip = shotSessionEnabled();
+  const reduced =
+    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const total = reduced ? REDUCED_MS : POWER_MS;
 
   useEffect(() => {
     void hideNativeSplash();
@@ -25,46 +27,23 @@ export function EtherSplash() {
       setGone(true);
       return;
     }
-
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const total = reduced ? REDUCED_MS : POWER_MS;
-    let start = 0;
-    let raf = 0;
-    let alive = true;
-
-    const tick = (now: number) => {
-      if (!alive) return;
-      if (!start) start = now;
-      const t = now - start;
-      setFrame(splashFrame(Math.min(t, total), reduced));
-      if (t >= total) {
-        setGone(true);
-        return;
-      }
-      raf = requestAnimationFrame(tick);
-    };
-
-    raf = requestAnimationFrame(tick);
-    return () => {
-      alive = false;
-      cancelAnimationFrame(raf);
-    };
-  }, [skip]);
+    const timer = window.setTimeout(() => setGone(true), total);
+    return () => window.clearTimeout(timer);
+  }, [skip, total]);
 
   if (gone || skip) return null;
 
   return (
     <div
-      className="ether-splash"
-      style={{ opacity: frame.veil }}
-      role="img"
-      aria-label="Ether"
+      className={reduced ? "ether-splash is-reduced" : "ether-splash"}
+      style={{ animationDuration: `${total}ms` }}
+      aria-hidden="true"
     >
       <img
         src={wordmark}
         alt=""
-        className="block h-auto w-auto max-w-full object-contain w-[min(86vw,26rem)]"
-        style={{ opacity: frame.logo, filter: `brightness(${frame.brightness})` }}
+        className="ether-splash-mark block h-auto w-[min(86vw,26rem)] max-w-full object-contain"
+        style={{ animationDuration: `${total}ms` }}
       />
     </div>
   );

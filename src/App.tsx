@@ -1,5 +1,6 @@
 // Application entry point - Ether App
 import { lazy, Suspense, useEffect } from "react";
+import { loadExplore, loadFeed, loadMessages, loadProfile, prefetchMainTabs } from "@/lib/tabRoutes";
 import { MotionConfig } from "framer-motion";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { WorldLayer } from "@/components/world/WorldLayer";
@@ -19,17 +20,17 @@ import { APP_STORE_APPLE_ID, APP_STORE_URL } from "@/config/launch";
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Waitlist = lazy(() => import("./pages/Waitlist"));
-const Feed = lazy(() => import("./pages/Feed"));
-const Explore = lazy(() => import("./pages/Explore"));
+const Feed = lazy(loadFeed);
+const Explore = lazy(loadExplore);
 const Directory = lazy(() => import("./pages/Directory"));
 const Projects = lazy(() => import("./pages/Projects"));
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
-const Profile = lazy(() => import("./pages/Profile"));
+const Profile = lazy(loadProfile);
 const Tickets = lazy(() => import("./pages/Tickets"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Locked = lazy(() => import("./pages/Locked"));
-const Messages = lazy(() => import("./pages/Messages"));
+const Messages = lazy(loadMessages);
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Wallet = lazy(() => import("./pages/Wallet"));
 const Store = lazy(() => import("./pages/Store"));
@@ -79,6 +80,13 @@ const ActivityTracker = () => {
   return null;
 };
 
+function WarmTabs() {
+  useEffect(() => {
+    prefetchMainTabs();
+  }, []);
+  return null;
+}
+
 function StoreListingMeta() {
   useEffect(() => {
     if (!APP_STORE_URL || !APP_STORE_APPLE_ID) return;
@@ -126,6 +134,7 @@ const App = () => (
             <CreateFlowProvider>
               <AccessGate>
                 <ActivityTracker />
+                <WarmTabs />
                 <StoreListingMeta />
                 <Toaster />
               <Sonner />

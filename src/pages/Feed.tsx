@@ -23,7 +23,7 @@ import { useFavorites } from "@/hooks/useFavorites";
 import { QuestCard } from "@/components/novi/QuestCard";
 import { useNoviQuests } from "@/hooks/useNoviQuests";
 import { nextQuest, studioQuest } from "@/lib/noviQuests";
-import bearLogo from "@/assets/ether-bear-logo.png";
+import bearLogo from "@/assets/ether-bear-logo.webp";
 const Feed = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeCategory, setActiveCategory] = useState("All");
