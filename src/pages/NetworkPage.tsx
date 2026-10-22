@@ -449,7 +449,7 @@ const NetworkPage = () => {
             <p className="text-muted-foreground">
               {isOwner
                 ? 'Start adding content to your network!'
-                : 'This network is just getting started. Check back soon!'}
+                : 'Nothing is posted on this network yet.'}
             </p>
             {isOwner && (
               <Link to={`/cinema/manage/${networkId}`}>
