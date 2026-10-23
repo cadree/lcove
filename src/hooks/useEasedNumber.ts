@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { easeOutCubic, XP_COUNT_MS } from "@/lib/xpMotion";
+import { easeOutCubic, readoutAt, XP_COUNT_MS, type XpReadout } from "@/lib/xpMotion";
 
 export function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(() =>
@@ -50,4 +50,9 @@ export function useEasedNumber(target: number, duration = XP_COUNT_MS): number {
   }, [target, reduced, duration]);
 
   return reduced ? target : value;
+}
+
+/** Level and bar for the XP on screen. Reduced motion snaps with the number. */
+export function useXpReadout(target: number): XpReadout {
+  return readoutAt(useEasedNumber(target));
 }
