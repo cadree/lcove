@@ -1612,3 +1612,46 @@ END $$;
 
 RESET ROLE;
 
+-- reject_objectionable_text calls objectionable_text, which is not granted to
+-- authenticated. A signed-in insert has to succeed. Service role is not this check.
+SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","email":"a.passed@example.com"}', false);
+SET ROLE authenticated;
+
+INSERT INTO public.posts (id, user_id, content)
+VALUES (
+  'a9a9a9a9-a9a9-49a9-89a9-a9a9a9a9a9a9',
+  '11111111-1111-4111-8111-111111111111',
+  'signed-in post'
+);
+
+UPDATE public.posts
+SET content = 'signed-in edit'
+WHERE id = 'a9a9a9a9-a9a9-49a9-89a9-a9a9a9a9a9a9';
+
+UPDATE public.profiles
+SET bio = 'signed-in bio'
+WHERE user_id = '11111111-1111-4111-8111-111111111111';
+
+RESET ROLE;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.posts
+    WHERE id = 'a9a9a9a9-a9a9-49a9-89a9-a9a9a9a9a9a9'
+      AND content = 'signed-in edit'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: authenticated post write did not land';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE user_id = '11111111-1111-4111-8111-111111111111'
+      AND bio = 'signed-in bio'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: authenticated profile write did not land';
+  END IF;
+  RAISE NOTICE 'PASS: authenticated post and profile writes run reject_objectionable_text';
+END $$;
+
