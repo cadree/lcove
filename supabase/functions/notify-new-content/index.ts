@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { jwtRole, jwtSubject, requireUserOrService } from "../_shared/require-caller.ts";
+import { getBearerUser, jwtRole, requireUserOrService } from "../_shared/require-caller.ts";
+import { authorizeNewContent, escapeHtml } from "../_shared/notification-auth.mjs";
 import { shouldNotifyCommunity } from "../_shared/project-collaborations.mjs";
 import { httpStatusForError } from "../_shared/http-error.mjs";
 
@@ -56,9 +57,9 @@ const getEmailTemplate = (
                       New ${label} Posted
                     </h1>
                     <p style="color: #ffffff; font-size: 20px; font-weight: 600; margin: 0 0 10px;">
-                      ${title}
+                      ${escapeHtml(title)}
                     </p>
-                    ${creatorName ? `<p style="color: #a0a0a0; font-size: 14px; margin: 0 0 30px;">by ${creatorName}</p>` : ""}
+                    ${creatorName ? `<p style="color: #a0a0a0; font-size: 14px; margin: 0 0 30px;">by ${escapeHtml(creatorName)}</p>` : ""}
                     <a href="${url}" 
                        style="display: inline-block; background: ${color}; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                       View ${label}
@@ -98,46 +99,75 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { content_type, content_id, title, description, creator_name }: NotifyNewContentRequest = await req.json();
+    const body = await req.json() as Partial<NotifyNewContentRequest>;
+    const content_type = body.content_type;
+    const content_id = typeof body.content_id === "string" ? body.content_id : "";
+    const role = jwtRole(req.headers.get("Authorization"));
+    const callerId = role === "service_role" ? null : await getBearerUser(req.headers.get("Authorization"), supabase);
 
-    console.log(`Notifying users of new ${content_type}:`, title);
-
-    let listingType: "project" | "gig" | "event" = content_type === "project" ? "project" : "event";
-    let creatorId: string | null = null;
-
-    if (content_type === "project") {
-      const { data: project, error: projectError } = await supabase
+    let record: {
+      id: string;
+      creator_id: string;
+      title: string | null;
+      description?: string | null;
+      is_private?: boolean | null;
+      listing_type?: string | null;
+    } | null = null;
+    if (content_type === "project" && content_id) {
+      const { data, error } = await supabase
         .from("projects")
-        .select("id, creator_id, is_private, listing_type, title")
+        .select("id, creator_id, is_private, listing_type, title, description")
         .eq("id", content_id)
         .maybeSingle();
-
-      if (projectError) throw projectError;
-      if (!project) {
-        return new Response(JSON.stringify({ error: "Project not found" }), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const role = jwtRole(req.headers.get("Authorization"));
-      const callerId = jwtSubject(req.headers.get("Authorization"));
-      if (role !== "service_role" && project.creator_id !== callerId) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      creatorId = project.creator_id;
-      listingType = project.listing_type === "gig" ? "gig" : "project";
-      if (project.is_private) {
-        return new Response(
-          JSON.stringify({ message: "Private projects are not announced", sent: 0 }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
+      if (error) throw error;
+      record = data;
+    } else if (content_type === "event" && content_id) {
+      const { data, error } = await supabase
+        .from("events")
+        .select("id, creator_id, title, description")
+        .eq("id", content_id)
+        .maybeSingle();
+      if (error) throw error;
+      record = data;
     }
+
+    let profileName: string | null = null;
+    if (record?.creator_id) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("user_id", record.creator_id)
+        .maybeSingle();
+      profileName = profile?.display_name ?? null;
+    }
+
+    const decision = authorizeNewContent({
+      callerId,
+      role,
+      contentType: content_type,
+      record,
+      creatorName: profileName,
+    });
+    if (!decision.ok) {
+      return new Response(JSON.stringify({ error: decision.error }), {
+        status: decision.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (decision.skip) {
+      return new Response(
+        JSON.stringify({ message: "Private projects are not announced", sent: 0 }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const title = decision.title;
+    const description = decision.description;
+    const creator_name = decision.creatorName;
+    const listingType = decision.listingType;
+    const creatorId = decision.creatorId;
+
+    console.log(`Notifying users of new ${content_type}:`, title);
 
     const prefColumn = listingType === "gig"
       ? "new_gigs_enabled"

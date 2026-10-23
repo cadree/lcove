@@ -65,8 +65,8 @@ export const createNotification = async ({
       throw error;
     }
 
-    // Trigger email notification via edge function
-    // This runs in the background and won't block the main flow
+    // Email and push rebuild the title and body from the stored follow, like,
+    // comment, or stream. These strings are what the in-app row shows.
     supabase.functions.invoke('send-notification-email', {
       body: {
         user_id: userId,

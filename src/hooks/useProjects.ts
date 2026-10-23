@@ -352,22 +352,12 @@ export const useProjects = (status?: string) => {
         console.error('Failed to create project groupchat:', chatErr);
       }
 
-      // Get creator name for notification
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('display_name')
-        .eq('user_id', user.id)
-        .single();
-
       // Notify opted-in users about the new project
       if (!data.is_private) {
         supabase.functions.invoke('notify-new-content', {
           body: {
             content_type: 'project',
             content_id: project.id,
-            title: data.title,
-            description: data.description,
-            creator_name: profile?.display_name || 'A creator'
           }
         }).catch(err => console.error('Failed to send new project notifications:', err));
       }
@@ -576,39 +566,11 @@ export const useProjectApplications = (projectId?: string) => {
 
       if (error) throw error;
 
-      // Notify project owner of new application
+      // The function loads the application, role, and creator. Names in the body are ignored.
       try {
-        // Get project and role details
-        const { data: project } = await supabase
-          .from('projects')
-          .select('title, creator_id')
-          .eq('id', projectId)
-          .single();
-        
-        const { data: role } = await supabase
-          .from('project_roles')
-          .select('role_name')
-          .eq('id', roleId)
-          .single();
-
-        // Get applicant name
-        const { data: applicantProfile } = await supabase
-          .from('profiles')
-          .select('display_name')
-          .eq('user_id', user.id)
-          .single();
-
-        if (project && role) {
-          await supabase.functions.invoke('notify-new-application', {
-            body: {
-              project_id: projectId,
-              project_creator_id: project.creator_id,
-              project_title: project.title,
-              role_title: role.role_name,
-              applicant_name: applicantProfile?.display_name || 'Someone'
-            }
-          });
-        }
+        await supabase.functions.invoke('notify-new-application', {
+          body: { project_id: projectId },
+        });
       } catch (notifyError) {
         console.error('Error sending application notification:', notifyError);
         // Don't throw - application was submitted successfully
@@ -774,8 +736,6 @@ export const useProjectApplications = (projectId?: string) => {
           body: {
             applicant_id: application.applicant_id,
             project_id: application.project_id,
-            project_title: finalProjectTitle,
-            role_title: finalRoleTitle
           }
         }).catch(err => console.error('Failed to send acceptance notification:', err));
       }

@@ -133,32 +133,9 @@ export default function PublicProjectPage() {
       if (error) throw error;
 
       try {
-        const { data: proj } = await supabase
-          .from("projects")
-          .select("title, creator_id")
-          .eq("id", projectId!)
-          .single();
-        const { data: role } = await supabase
-          .from("project_roles")
-          .select("role_name")
-          .eq("id", roleId)
-          .single();
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("display_name")
-          .eq("user_id", user.id)
-          .single();
-        if (proj && role) {
-          await supabase.functions.invoke("notify-new-application", {
-            body: {
-              project_id: projectId,
-              project_creator_id: proj.creator_id,
-              project_title: proj.title,
-              role_title: role.role_name,
-              applicant_name: profile?.display_name || "Someone",
-            },
-          });
-        }
+        await supabase.functions.invoke("notify-new-application", {
+          body: { project_id: projectId },
+        });
       } catch {
         // Application already succeeded; notification failure is non-fatal.
       }
@@ -188,18 +165,10 @@ export default function PublicProjectPage() {
       const { error } = await supabase.from("guest_role_applications").insert(application);
       if (error) throw error;
 
-      // Notify via edge function (fire-and-forget, don't block success)
-      const roleName = project?.roles?.find((r) => r.id === roleId)?.role_name || "Unknown Role";
       supabase.functions.invoke("notify-guest-application", {
         body: {
           project_id: projectId,
-          project_title: project?.title,
-          role_name: roleName,
-          applicant_name: guestName.trim(),
           applicant_email: guestEmail.trim(),
-          project_creator_id: project?.creator_id,
-          portfolio_link: guestPortfolio.trim() || null,
-          message: guestMessage.trim() || null,
         },
       }).catch(() => {
         // Guest notification is best-effort.

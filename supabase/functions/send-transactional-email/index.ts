@@ -2,6 +2,8 @@ import * as React from 'npm:react@18.3.1'
 import { renderAsync } from 'npm:@react-email/components@0.0.22'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { TEMPLATES } from '../_shared/transactional-email-templates/registry.ts'
+import { jwtRole } from '../_shared/require-caller.ts'
+import { authorizeTransactionalEmail } from '../_shared/notification-auth.mjs'
 
 // Recorded on the queue payload. process-email-queue sends with Resend and
 // uses EMAIL_FROM (default notifications@notifications.etherbylcove.com).
@@ -24,14 +26,21 @@ function generateToken(): string {
     .join('')
 }
 
-// Auth note: this function uses verify_jwt = true in config.toml, so Supabase's
-// gateway validates the caller's JWT (anon or service_role) before the request
-// reaches this code. No in-function auth check is needed.
+// Only another edge function, using the service role key, may enqueue mail.
+// The anon key is a project JWT, so verify_jwt alone is not a caller check.
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
+  }
+
+  const caller = authorizeTransactionalEmail({ role: jwtRole(req.headers.get('Authorization')) })
+  if (!caller.ok) {
+    return new Response(JSON.stringify({ error: caller.error }), {
+      status: caller.status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
