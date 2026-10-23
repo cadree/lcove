@@ -73,24 +73,6 @@ serve(async (req) => {
   if (denied) return denied;
 
   try {
-    const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY");
-    const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY");
-    const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:push@ether.local";
-
-    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-      logStep("ERROR: VAPID keys not configured");
-      return new Response(
-        JSON.stringify({ error: "Push notifications not configured - VAPID keys missing" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    const vapidKeys = await loadVapidKeys(VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-    const appServer = await ApplicationServer.new({
-      contactInformation: VAPID_SUBJECT,
-      vapidKeys,
-    });
-
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -129,6 +111,24 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY");
+    const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY");
+    const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:push@ether.local";
+
+    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+      logStep("ERROR: VAPID keys not configured");
+      return new Response(
+        JSON.stringify({ error: "Push notifications not configured - VAPID keys missing" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const vapidKeys = await loadVapidKeys(VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+    const appServer = await ApplicationServer.new({
+      contactInformation: VAPID_SUBJECT,
+      vapidKeys,
+    });
 
     logStep("Processing push notification", { user_id, title, notification_type });
 
