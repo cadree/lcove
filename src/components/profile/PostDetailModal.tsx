@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +49,8 @@ import { ownerOnlyInsight, repostedByLabel, shouldRecordPostView } from "@/lib/s
 import { supabase } from "@/integrations/supabase/client";
 import { EmbedPlayer } from "@/components/feed/EmbedPlayer";
 import { embedFromPost } from "@/lib/videoEmbed";
+import { InlineError } from "@/components/ui/inline-error";
+import { writeError } from "@/lib/writeError";
 
 interface PostDetailModalProps {
   post: ProfilePost | null;
@@ -69,6 +71,8 @@ export function PostDetailModal({
   const navigate = useNavigate();
   const { user } = useAuth();
   const [comment, setComment] = useState("");
+  const [commentError, setCommentError] = useState<string | null>(null);
+  const commentErrorId = useId();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const ownsPost = !!user && user.id === post?.user_id;
@@ -137,14 +141,22 @@ export function PostDetailModal({
     toggleSave();
   };
 
-  const handlePostComment = () => {
+  const handlePostComment = async () => {
     if (!user) {
       toast.error("Please sign in to comment");
       return;
     }
-    if (!comment.trim()) return;
-    addComment(comment.trim());
+    const text = comment.trim();
+    if (!text || isCommenting) return;
+    setCommentError(null);
+    try {
+      await addComment(text);
+    } catch (err) {
+      setCommentError(writeError(err, "Failed to add comment"));
+      return;
+    }
     setComment("");
+    setCommentError(null);
   };
 
   const handleShare = () => {
@@ -399,30 +411,38 @@ export function PostDetailModal({
                 <p className="mono-label mb-3 text-[9px] text-muted-foreground">{timeAgo}</p>
 
                 {/* Comment input */}
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder="Add a comment..."
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handlePostComment();
-                      }
-                    }}
-                    className="flex-1 border-0 focus-visible:ring-0 px-0"
-                    aria-label="Add a comment"
-                  />
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={handlePostComment}
-                    disabled={!comment.trim() || isCommenting}
-                    className="min-h-11 font-semibold text-primary"
-                    role="button"
-                  >
-                    {isCommenting ? 'Posting...' : 'Post'}
-                  </Button>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Add a comment..."
+                      value={comment}
+                      onChange={(e) => {
+                        setComment(e.target.value);
+                        setCommentError(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handlePostComment();
+                        }
+                      }}
+                      className="flex-1 border-0 focus-visible:ring-0 px-0"
+                      aria-label="Add a comment"
+                      aria-invalid={commentError ? true : undefined}
+                      aria-describedby={commentError ? commentErrorId : undefined}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handlePostComment}
+                      disabled={!comment.trim() || isCommenting}
+                      className="min-h-11 font-semibold text-primary"
+                      role="button"
+                    >
+                      {isCommenting ? 'Posting...' : 'Post'}
+                    </Button>
+                  </div>
+                  <InlineError id={commentErrorId} message={commentError} />
                 </div>
               </div>
             </div>

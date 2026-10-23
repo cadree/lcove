@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
+import { assertCleanText } from "@/lib/objectionableText";
 import { embedColumnMissing, embedColumnsForInsert, embedFromPost, videoEmbedMigrationMessage } from "@/lib/videoEmbed";
 import { EmbedThumbnail } from "@/components/feed/EmbedPlayer";
 import type { ComposePostInput } from "@/types/post";
@@ -111,8 +112,9 @@ const Portfolios = () => {
       altText,
       commentsEnabled = true,
       embed,
-    }: ComposePostInput) => {
+    }: ComposePostInput & { inlineError?: boolean }) => {
       if (!user) throw new Error('Must be logged in');
+      assertCleanText(content);
 
       if (embed) {
         const columns = embedColumnsForInsert(embed);
@@ -189,7 +191,8 @@ const Portfolios = () => {
       toast.success('Portfolio work shared!');
       setShowCreateDialog(false);
     },
-    onError: (error) => {
+    onError: (error, variables) => {
+      if (variables.inlineError) return;
       toast.error(embedColumnMissing(error)
         ? videoEmbedMigrationMessage()
         : errorMessage(error, 'Failed to share work'));
@@ -198,7 +201,7 @@ const Portfolios = () => {
   });
 
   const handleCreatePost = async (data: ComposePostInput) => {
-    await createPortfolioPost.mutateAsync(data);
+    await createPortfolioPost.mutateAsync({ ...data, inlineError: true });
   };
 
   const visiblePosts = (posts ?? []).filter((post) => !blockedIds.includes(post.user_id));

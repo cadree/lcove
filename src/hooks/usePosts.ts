@@ -136,7 +136,7 @@ export function usePosts() {
   });
 
   const createPost = useMutation({
-    mutationFn: async ({ content, file, mediaType, embed }: { content?: string; file?: File; mediaType?: 'photo' | 'video' | 'text'; embed?: EmbedDraft }) => {
+    mutationFn: async ({ content, file, mediaType, embed }: { content?: string; file?: File; mediaType?: 'photo' | 'video' | 'text'; embed?: EmbedDraft; inlineError?: boolean }) => {
       if (!user) throw new Error('Must be logged in');
       assertCleanText(content);
 
@@ -211,9 +211,10 @@ export function usePosts() {
       refreshXp(queryClient);
       toast.success('Post created!');
     },
-    onError: (error, _vars, context) => {
+    onError: (error, vars, context) => {
       if (context?.previous) queryClient.setQueryData(['posts'], context.previous);
       if (context?.preview) URL.revokeObjectURL(context.preview);
+      if (vars.inlineError) return;
       toast.error(embedColumnMissing(error)
         ? videoEmbedMigrationMessage()
         : errorMessage(error, 'Failed to create post'));
