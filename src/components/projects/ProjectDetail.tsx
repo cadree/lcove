@@ -160,17 +160,10 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
       });
       if (error) throw error;
 
-      const roleName = project.roles?.find((r) => r.id === roleId)?.role_name || "Unknown Role";
       supabase.functions.invoke("notify-guest-application", {
         body: {
           project_id: project.id,
-          project_title: project.title,
-          role_name: roleName,
-          applicant_name: guestName.trim(),
           applicant_email: guestEmail.trim(),
-          project_creator_id: project.creator_id,
-          portfolio_link: guestPortfolio.trim() || null,
-          message: guestMessage.trim() || null,
         },
       }).catch(() => {});
     },
@@ -750,7 +743,10 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                                   body: { milestoneId: ms.id },
                                 });
                                 if (error || data?.error) {
-                                  toast({ title: data?.error || "Could not start payment", variant: "destructive" });
+                                  const serverMessage = typeof data?.error === "string" && data.error
+                                    ? data.error
+                                    : error instanceof Error ? error.message : "";
+                                  toast({ title: serverMessage || "Could not start payment", variant: "destructive" });
                                   return;
                                 }
                                 if (data?.needs_connect) {

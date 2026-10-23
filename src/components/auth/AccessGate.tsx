@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { motion } from 'framer-motion';
-import bearLogo from '@/assets/ether-bear-logo.png';
+import bearLogo from '@/assets/ether-bear-logo.webp';
 import { isKnownPath, isPublicPath } from "@/lib/appRoutes";
 import { NO_FAKE_LINE, WELCOME_HOME } from "@/content/copy";
 
@@ -97,8 +97,9 @@ const AccessGate = ({ children }: AccessGateProps) => {
     return <>{children}</>;
   }
 
-  // Private routes, including /blog, stay behind sign-in.
-  if (!isPublicRoute && (authLoading || profileLoading || !user)) {
+  // Private routes stay behind sign-in. The profile request must not hold the
+  // route: onboarding and banned redirects run once that row arrives.
+  if (!isPublicRoute && (authLoading || !user)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <motion.div
@@ -120,7 +121,8 @@ const AccessGate = ({ children }: AccessGateProps) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+          className="fixed inset-x-0 top-0 z-40 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+          style={{ bottom: "calc(84px + env(safe-area-inset-bottom, 0px))" }}
           onClick={() => setShowWelcome(false)}
         >
           <motion.div

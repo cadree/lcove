@@ -1,7 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { ApplicationServer, importVapidKeys, Urgency, type ExportedVapidKeys } from "jsr:@negrel/webpush";
-import { requireUserOrService } from "../_shared/require-caller.ts";
+import { getBearerUser, jwtRole, requireUserOrService } from "../_shared/require-caller.ts";
+import { noticeForUser } from "../_shared/notification-auth.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -71,6 +73,45 @@ serve(async (req) => {
   if (denied) return denied;
 
   try {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
+
+    const requestBody: PushNotificationRequest = await req.json();
+    const { user_id, notification_type } = requestBody;
+    let { title, body, url, data, icon, badge } = requestBody;
+
+    const role = jwtRole(req.headers.get("Authorization"));
+    if (role !== "service_role") {
+      const callerId = await getBearerUser(req.headers.get("Authorization"), supabase);
+      const notice = await noticeForUser(supabase, {
+        callerId,
+        recipientId: user_id,
+        notificationType: notification_type,
+        data,
+      });
+      if (!notice.ok) {
+        return new Response(JSON.stringify({ error: notice.error }), {
+          status: notice.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      title = notice.title;
+      body = notice.body;
+      data = notice.data;
+      url = undefined;
+      icon = undefined;
+      badge = undefined;
+    }
+
+    if (!user_id || !title) {
+      return new Response(JSON.stringify({ error: "user_id and title are required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY");
     const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY");
     const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:push@ether.local";
@@ -88,14 +129,6 @@ serve(async (req) => {
       contactInformation: VAPID_SUBJECT,
       vapidKeys,
     });
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
-
-    const requestBody: PushNotificationRequest = await req.json();
-    const { user_id, title, body, url, data, icon, badge, notification_type } = requestBody;
 
     logStep("Processing push notification", { user_id, title, notification_type });
 
@@ -215,7 +248,7 @@ serve(async (req) => {
     logStep("ERROR in send-push-notification", { error: errorMessage });
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: httpStatusForError(error), headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });

@@ -5,6 +5,7 @@ import { STORE_PLATFORM_FEE_PERCENT } from "../_shared/fees.mjs";
 import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
 import { verifiedDestination } from "../_shared/creator-connect.mjs";
 import { ledgerBalances } from "../_shared/credit-balances.ts";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -333,7 +334,7 @@ serve(async (req) => {
     logStep("ERROR", { message });
     return new Response(
       JSON.stringify({ error: message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: httpStatusForError(error) }
     );
   }
 });

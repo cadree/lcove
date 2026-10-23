@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   LIVE_VIDEO_NOT_CONFIGURED,
   isStreamRoomName,
+  liveKitEventTime,
   liveKitRoomUpdate,
   liveKitVideoGrant,
   readLiveKitConfig,
@@ -93,13 +94,24 @@ describe("livekit access", () => {
       patch: { viewer_count: 3 },
     });
     assert.equal(viewerCount(1), 0);
-    assert.deepEqual(liveKitRoomUpdate({ event: "room_started", room: { name: STREAM_ID, numParticipants: 1 }, createdAt: "2026-10-20T00:00:00.000Z" }), {
+    const startedSeconds = 1_760_928_000;
+    const startedIso = new Date(startedSeconds * 1000).toISOString();
+    const endedSeconds = 1_760_931_600;
+    const endedIso = new Date(endedSeconds * 1000).toISOString();
+    assert.equal(liveKitEventTime(startedSeconds), startedIso);
+    assert.equal(liveKitEventTime(String(endedSeconds)), endedIso);
+    assert.equal(liveKitEventTime(undefined, 1_760_928_000_000), startedIso);
+    assert.equal(liveKitEventTime(null, 1_760_928_000_000), startedIso);
+    assert.equal(liveKitEventTime("", 1_760_928_000_000), startedIso);
+    assert.equal(liveKitEventTime("   ", 1_760_928_000_000), startedIso);
+    assert.equal(liveKitEventTime("not-a-time", 1_760_928_000_000), startedIso);
+    assert.deepEqual(liveKitRoomUpdate({ event: "room_started", room: { name: STREAM_ID, numParticipants: 1 }, createdAt: startedSeconds }), {
       streamId: STREAM_ID,
-      patch: { is_live: true, started_at: "2026-10-20T00:00:00.000Z", viewer_count: 0 },
+      patch: { is_live: true, started_at: startedIso, viewer_count: 0 },
     });
-    assert.deepEqual(liveKitRoomUpdate({ event: "room_finished", room: { name: STREAM_ID, numParticipants: 0 }, createdAt: "2026-10-20T01:00:00.000Z" }), {
+    assert.deepEqual(liveKitRoomUpdate({ event: "room_finished", room: { name: STREAM_ID, numParticipants: 0 }, createdAt: String(endedSeconds) }), {
       streamId: STREAM_ID,
-      patch: { is_live: false, ended_at: "2026-10-20T01:00:00.000Z", viewer_count: 0 },
+      patch: { is_live: false, ended_at: endedIso, viewer_count: 0 },
     });
     assert.equal(liveKitRoomUpdate({ event: "room_started", room: { name: "not-a-stream" } }), null);
     assert.equal(isStreamRoomName(STREAM_ID), true);

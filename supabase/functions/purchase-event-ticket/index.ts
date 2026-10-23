@@ -3,6 +3,7 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { EVENT_PLATFORM_FEE_PERCENT } from "../_shared/fees.mjs";
 import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -340,7 +341,7 @@ serve(async (req) => {
     log("ERROR", { msg });
     return new Response(JSON.stringify({ error: msg }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 400,
+      status: httpStatusForError(error),
     });
   }
 });

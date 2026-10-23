@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { usePosts } from "@/hooks/usePosts";
@@ -170,6 +170,7 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
         <div className="px-5 pt-5 pb-4 border-b border-border">
           <p className="eyebrow">{stepLabel}</p>
           <DialogTitle className="ether-title text-3xl font-medium text-left">Create</DialogTitle>
+          <DialogDescription className="sr-only">Choose a photo, video, or caption, then share it</DialogDescription>
         </div>
 
         <div className="px-5 py-5">

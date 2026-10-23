@@ -179,7 +179,7 @@ export function ProfileHeader({
         <div className="relative z-[1] -mt-10 px-4 pb-4">
         <div className="flex items-end gap-3">
           <div className="group relative shrink-0">
-            <Avatar className="h-24 w-24 rounded-full border-[3px] border-transparent bg-[conic-gradient(from_140deg,#FF9FC8,#C4142D,#79C3CF,#FF9FC8)] p-[3px] shadow-[0_0_24px_rgba(255,159,200,0.45)]">
+            <Avatar className="h-24 w-24 rounded-full border-[3px] border-transparent bg-[conic-gradient(from_140deg,#FF9FC8,#C4142D,#79C3CF,#FF9FC8)] p-[3px] shadow-[0_0_24px_rgba(255,159,200,0.45)] ring-0 ring-offset-0">
               <AvatarImage src={avatarUrl || undefined} />
               <AvatarFallback className="rounded-full bg-muted font-body text-xl font-bold text-foreground">
                 {displayName.charAt(0).toUpperCase()}
@@ -200,9 +200,9 @@ export function ProfileHeader({
               </>
             )}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="ether-title truncate text-[24px]">{displayName}</h1>
+              <h1 className="ether-title min-w-0 max-w-full whitespace-normal break-words text-[24px] leading-tight">{displayName}</h1>
               <ProfileVerificationBadge userId={userId} />
               {memberTier === "elite" && (
                 <Badge className="gap-1 border-0 bg-gradient-to-r from-amber-400 to-orange-500 text-[10px] text-white">

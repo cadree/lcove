@@ -6,6 +6,7 @@ import {
   syncPayoutEnabled,
   testStripe,
 } from "../_shared/creator-connect.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,6 +78,6 @@ serve(async (req) => {
     return json(state);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return json({ error: message }, 500);
+    return json({ error: message }, httpStatusForError(error));
   }
 });

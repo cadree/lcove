@@ -11,6 +11,10 @@ import { assertCleanText } from '@/lib/objectionableText';
 import { mergePostsAndReposts, type RepostRow } from '@/lib/sharing';
 import { refreshXp } from '@/lib/xpRefresh';
 import { embedColumnMissing, embedColumnsForInsert, videoEmbedMigrationMessage, type EmbedDraft, type StoredEmbedFields } from '@/lib/videoEmbed';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+
+let postsFeedListeners = 0;
+let postsFeedChannel: RealtimeChannel | null = null;
 
 interface Post extends StoredEmbedFields {
   id: string;
@@ -207,14 +211,21 @@ export function usePosts() {
   });
 
   useEffect(() => {
-    const channel = supabase
-      .channel('posts-feed')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['posts'] });
-      })
-      .subscribe();
+    postsFeedListeners += 1;
+    if (postsFeedListeners === 1) {
+      postsFeedChannel = supabase
+        .channel('posts-feed')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+          queryClient.invalidateQueries({ queryKey: ['posts'] });
+        })
+        .subscribe();
+    }
     return () => {
-      supabase.removeChannel(channel);
+      postsFeedListeners -= 1;
+      if (postsFeedListeners === 0 && postsFeedChannel) {
+        supabase.removeChannel(postsFeedChannel);
+        postsFeedChannel = null;
+      }
     };
   }, [queryClient]);
 

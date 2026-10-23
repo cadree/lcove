@@ -40,6 +40,23 @@ function unauthorized(corsHeaders: Record<string, string>): Response {
   });
 }
 
+/** Confirms the bearer token is a real user. The anon key and service role fail here. */
+export async function getBearerUser(
+  authorization: string | null,
+  supabase: {
+    auth: {
+      getUser: (jwt: string) => Promise<{ data: { user: { id: string } | null }; error: unknown }>;
+    };
+  },
+): Promise<string | null> {
+  if (!authorization) return null;
+  const token = authorization.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return null;
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user?.id) return null;
+  return data.user.id;
+}
+
 /** Logged-in user or another edge function using the service role key. */
 export function requireUserOrService(
   req: Request,

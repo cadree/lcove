@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Trash2, Flag, Repeat2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { usePostInteractions } from '@/hooks/usePostInteractions';
+import { useFeedCardState } from '@/hooks/feedCardState';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePosts } from '@/hooks/usePosts';
 import { Button } from '@/components/ui/button';
@@ -21,7 +22,7 @@ import {
 } from '@/components/ui/collapsible';
 import { fileCode } from '@/lib/noviQuests';
 import { ReportDialog } from '@/components/safety/ReportDialog';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { ShareSheet } from '@/components/share/ShareSheet';
 import { useOwnPostViewCounts, useRecordPostView } from '@/hooks/usePostViews';
 import { useMyReposts, useSharingActions } from '@/hooks/useSharing';
@@ -52,20 +53,21 @@ const FeedPost = ({ post }: { post: Post }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { deletePost } = usePosts();
+  const [showComments, setShowComments] = useState(false);
   const {
     likesCount,
     hasLiked,
-    comments,
     isSaved,
     toggleLike,
-    addComment,
-    deleteComment,
     toggleSave,
     isLiking,
+  } = useFeedCardState(post.id);
+  const {
+    comments,
+    addComment,
+    deleteComment,
     isCommenting,
-  } = usePostInteractions(post.id);
-
-  const [showComments, setShowComments] = useState(false);
+  } = usePostInteractions(post.id, { threadOnly: true, loadComments: showComments });
   const [lightbox, setLightbox] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -244,6 +246,7 @@ const FeedPost = ({ post }: { post: Post }) => {
           <Dialog open={lightbox} onOpenChange={setLightbox}>
             <DialogContent className="max-w-[min(100vw-1.5rem,720px)] border-border bg-background p-3">
               <DialogTitle className="sr-only">Full size media</DialogTitle>
+              <DialogDescription className="sr-only">The post photo or video at full size</DialogDescription>
               {post.media_type === 'video' ? (
                 <video src={post.media_url} className="max-h-[80vh] w-full object-contain" controls playsInline onClick={toggleVideo} />
               ) : (
@@ -259,7 +262,13 @@ const FeedPost = ({ post }: { post: Post }) => {
         <div className="contents">
             <motion.button
               whileTap={{ scale: 0.9 }}
-              onClick={toggleLike}
+              onClick={() => toggleLike({
+                id: post.id,
+                user_id: post.user_id,
+                content: post.content,
+                media_url: post.media_url,
+                media_type: post.media_type,
+              })}
               disabled={!user || isLiking}
               aria-label={hasLiked ? "Unlike" : "Like"}
               className={`mono-label flex min-h-11 flex-col items-center justify-center gap-0.5 text-[8px] ${
@@ -292,7 +301,7 @@ const FeedPost = ({ post }: { post: Post }) => {
 
           <motion.button
             whileTap={{ scale: 0.9 }}
-            onClick={toggleSave}
+            onClick={() => toggleSave(post.id)}
             disabled={!user}
             aria-label={isSaved ? "Unsave" : "Save"}
             className={`mono-label flex min-h-11 flex-col items-center justify-center gap-0.5 text-[8px] ${

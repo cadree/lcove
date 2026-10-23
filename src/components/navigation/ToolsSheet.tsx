@@ -19,7 +19,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { SquircleIcon, type IconFill } from "@/components/world/SquircleIcon";
 import { useHomeUsage } from "@/hooks/useHomeUsage";
@@ -137,15 +137,15 @@ export function ToolsSheet({ open, onOpenChange }: ToolsSheetProps) {
         side="bottom"
         className="max-h-[88dvh] rounded-t-[28px] border-border bg-card/95 px-4 pb-8 backdrop-blur-xl"
         style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
-        aria-labelledby="tools-sheet-title"
       >
         <div className="mx-auto mb-4 mt-1 h-1 w-10 rounded-full bg-foreground/20" aria-hidden="true" />
         <div className="mb-4 flex items-center justify-between">
           <div>
             <p className="kicker">Profile</p>
-            <SheetTitle id="tools-sheet-title" className="ether-title text-[26px] text-left">
+            <SheetTitle className="ether-title text-[26px] text-left">
               Tools
             </SheetTitle>
+            <SheetDescription className="sr-only">Studio tools and shortcuts</SheetDescription>
           </div>
           <button
             type="button"

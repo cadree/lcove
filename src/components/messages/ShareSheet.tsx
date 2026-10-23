@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
@@ -60,7 +60,7 @@ export function ShareSheet({ open, onOpenChange, card, linkUrl }: ShareSheetProp
       <DialogContent className="max-w-md gap-0 border-border bg-background p-0">
         <div className="border-b border-border px-5 pb-4 pt-5">
           <DialogTitle className="ether-title text-left text-3xl">Send</DialogTitle>
-          <p className="mt-1 text-sm text-muted-foreground">A private message to a friend or a group chat.</p>
+          <DialogDescription className="mt-1 text-sm text-muted-foreground">A private message to a friend or a group chat.</DialogDescription>
         </div>
         <div className="space-y-3 px-5 py-4">
           <Input

@@ -124,8 +124,25 @@ export const useMembership = () => {
   }, [user]);
 
   useEffect(() => {
-    checkMembership();
-  }, [checkMembership]);
+    if (!user) {
+      setMembership(null);
+      setIsLoading(false);
+      return;
+    }
+    let cancel = false;
+    void readOwnMembership(user.id).then((row) => {
+      if (cancel) return;
+      if (row) setMembership(membershipFromPayload(row));
+      setIsLoading(false);
+    });
+    const timer = window.setTimeout(() => {
+      if (!cancel) void checkMembership();
+    }, 1200);
+    return () => {
+      cancel = true;
+      window.clearTimeout(timer);
+    };
+  }, [user, checkMembership]);
 
   useEffect(() => {
     const onRefresh = () => {

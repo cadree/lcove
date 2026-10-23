@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { jwtRole } from "../_shared/require-caller.ts";
+import { authorizeGuestApplication, escapeHtml } from "../_shared/notification-auth.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const EMAIL_FROM = "ETHER <notifications@etherbylcove.com>";
@@ -33,9 +35,9 @@ const getGuestConfirmationEmail = (projectTitle: string, roleName: string) => `
             </div>
             <h1 style="color:#ffffff;font-size:24px;margin:0 0 16px;font-weight:600;">Application Received</h1>
             <p style="color:#a0a0a0;font-size:16px;line-height:1.6;margin:0 0 20px;">
-              We received your application for the role of <strong style="color:#ffffff;">${roleName}</strong> on the project:
+              We received your application for the role of <strong style="color:#ffffff;">${escapeHtml(roleName)}</strong> on the project:
             </p>
-            <p style="color:#ffffff;font-size:20px;font-weight:600;margin:0 0 20px;">${projectTitle}</p>
+            <p style="color:#ffffff;font-size:20px;font-weight:600;margin:0 0 20px;">${escapeHtml(projectTitle)}</p>
             <p style="color:#a0a0a0;font-size:14px;line-height:1.6;margin:0 0 30px;">
               The project creator will review it soon. You'll receive an email when there's an update.
             </p>
@@ -66,13 +68,13 @@ const getOwnerNotificationEmail = (projectTitle: string, roleName: string, appli
             </div>
             <h1 style="color:#ffffff;font-size:24px;margin:0 0 16px;font-weight:600;">New Guest Application</h1>
             <p style="color:#a0a0a0;font-size:16px;line-height:1.6;margin:0 0 10px;">
-              <strong style="color:#E91E63;">${applicantName}</strong> has applied for the role of <strong style="color:#ffffff;">${roleName}</strong> on:
+              <strong style="color:#E91E63;">${escapeHtml(applicantName)}</strong> has applied for the role of <strong style="color:#ffffff;">${escapeHtml(roleName)}</strong> on:
             </p>
-            <p style="color:#ffffff;font-size:20px;font-weight:600;margin:0 0 20px;">${projectTitle}</p>
+            <p style="color:#ffffff;font-size:20px;font-weight:600;margin:0 0 20px;">${escapeHtml(projectTitle)}</p>
             <table width="100%" style="text-align:left;margin:0 0 20px;">
-              <tr><td style="color:#666;font-size:13px;padding:6px 0;">Email</td><td style="color:#fff;font-size:13px;padding:6px 0;">${applicantEmail}</td></tr>
-              ${portfolioLink ? `<tr><td style="color:#666;font-size:13px;padding:6px 0;">Portfolio</td><td style="padding:6px 0;"><a href="${portfolioLink}" style="color:#E91E63;font-size:13px;">${portfolioLink}</a></td></tr>` : ''}
-              ${message ? `<tr><td style="color:#666;font-size:13px;padding:6px 0;vertical-align:top;">Message</td><td style="color:#ccc;font-size:13px;padding:6px 0;">${message}</td></tr>` : ''}
+              <tr><td style="color:#666;font-size:13px;padding:6px 0;">Email</td><td style="color:#fff;font-size:13px;padding:6px 0;">${escapeHtml(applicantEmail)}</td></tr>
+              ${portfolioLink ? `<tr><td style="color:#666;font-size:13px;padding:6px 0;">Portfolio</td><td style="padding:6px 0;"><a href="${escapeHtml(portfolioLink)}" style="color:#E91E63;font-size:13px;">${escapeHtml(portfolioLink)}</a></td></tr>` : ''}
+              ${message ? `<tr><td style="color:#666;font-size:13px;padding:6px 0;vertical-align:top;">Message</td><td style="color:#ccc;font-size:13px;padding:6px 0;">${escapeHtml(message)}</td></tr>` : ''}
             </table>
             <a href="https://etherbylcove.com/projects" style="display:inline-block;background:#E91E63;color:white;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600;font-size:14px;">
               Review Application
@@ -93,38 +95,57 @@ serve(async (req) => {
   }
 
   const role = jwtRole(req.headers.get("Authorization"));
-  if (role !== "authenticated" && role !== "service_role" && role !== "anon") {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
 
   try {
-    const { project_id, project_title, role_name, applicant_name, applicant_email, project_creator_id, portfolio_link, message } = await req.json();
+    const body = await req.json();
+    const project_id = typeof body.project_id === "string" ? body.project_id : "";
+    const applicant_email_lookup = typeof body.applicant_email === "string" ? body.applicant_email.trim() : "";
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Guests call this with the anon key. Require a real application row so the
-    // function cannot email an arbitrary address.
-    const { data: application } = await supabase
-      .from("guest_role_applications")
-      .select("id")
-      .eq("project_id", project_id)
-      .eq("email", applicant_email)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const { data: project } = project_id
+      ? await supabase.from("projects").select("id, creator_id, title").eq("id", project_id).maybeSingle()
+      : { data: null };
 
-    if (!application) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
-        status: 403,
+    const { data: stored } = project && applicant_email_lookup
+      ? await supabase
+        .from("guest_role_applications")
+        .select("project_id, email, name, portfolio_link, message, role_id")
+        .eq("project_id", project.id)
+        .eq("email", applicant_email_lookup)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      : { data: null };
+
+    let roleName: string | null = null;
+    if (stored?.role_id) {
+      const { data: roleRow } = await supabase.from("project_roles").select("role_name").eq("id", stored.role_id).maybeSingle();
+      roleName = roleRow?.role_name ?? null;
+    }
+
+    const decision = authorizeGuestApplication({
+      role,
+      project,
+      application: stored ? { ...stored, role_name: roleName } : null,
+    });
+    if (!decision.ok) {
+      return new Response(JSON.stringify({ error: decision.error }), {
+        status: decision.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const project_title = decision.projectTitle;
+    const role_name = decision.roleName;
+    const applicant_name = decision.applicantName;
+    const applicant_email = decision.applicantEmail;
+    const project_creator_id = decision.creatorId;
+    const portfolio_link = decision.portfolioLink;
+    const message = decision.message;
 
     const results: { channel: string; status: string; error?: string }[] = [];
 
@@ -186,7 +207,7 @@ serve(async (req) => {
     const msg = error instanceof Error ? error.message : "Unknown error";
     console.error("Error in notify-guest-application:", msg);
     return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
+      status: httpStatusForError(error),
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

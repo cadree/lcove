@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -372,7 +373,7 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     console.error("Error sending contract:", error);
     return new Response(JSON.stringify({ error: errorMessage }), {
-      status: 500,
+      status: httpStatusForError(error),
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -156,10 +157,10 @@ serve(async (req) => {
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error";
     log("ERROR", { msg });
-    // Return 200 with structured error so the client can read the body cleanly
+    // Body keeps the error string. Status is 401, 400, or 500.
     return new Response(JSON.stringify({ ok: false, error: msg }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
+      status: httpStatusForError(error),
     });
   }
 });

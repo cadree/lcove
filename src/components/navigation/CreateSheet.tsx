@@ -14,7 +14,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { CreateShareFlow } from "@/components/create/CreateShareFlow";
 import StoryUpload from "@/components/stories/StoryUpload";
@@ -91,13 +91,15 @@ export function CreateSheet({ open, onOpenChange }: CreateSheetProps) {
           overlayStyle={{ backgroundColor: "transparent", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}
           className="rounded-t-[28px] border-border bg-card/95 px-4 pb-8 backdrop-blur-xl"
           style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
-          aria-labelledby="create-sheet-title"
         >
           <div className="mx-auto mb-4 mt-1 h-1 w-10 rounded-full bg-foreground/20" aria-hidden="true" />
           <div className="mb-5 flex items-center justify-between">
-            <SheetTitle id="create-sheet-title" className="ether-title text-[26px] text-left">
-              Create
-            </SheetTitle>
+            <div>
+              <SheetTitle className="ether-title text-[26px] text-left">
+                Create
+              </SheetTitle>
+              <SheetDescription className="sr-only">Post, story, live, and other ways to add something</SheetDescription>
+            </div>
             <button
               type="button"
               onClick={() => onOpenChange(false)}

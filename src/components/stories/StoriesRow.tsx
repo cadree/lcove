@@ -10,17 +10,6 @@ import StoryUpload from './StoryUpload';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-function EmptyStoryRing({ label }: { label: string }) {
-  return (
-    <div className="shrink-0" aria-hidden="true">
-      <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-dashed border-foreground/30 bg-card/50">
-        <span className="mono-label text-[8px] text-muted-foreground">{label}</span>
-      </div>
-      <span className="mt-1.5 block w-20 text-center font-body text-[10px] text-muted-foreground">Story</span>
-    </div>
-  );
-}
-
 const StoriesRow = () => {
   const {
     user
@@ -67,8 +56,6 @@ const StoriesRow = () => {
   if (storiesError) {
     console.error('[StoriesRow] Error loading stories:', storiesError);
   }
-
-  const ghostRings = otherUsersWithStories.length === 0 && !showFavoritesOnly;
 
   return <>
       <div className="flex items-center justify-between gap-2 px-1 pt-2">
@@ -155,10 +142,6 @@ const StoriesRow = () => {
 
         {isLoading && [0, 1, 2, 3].map((slot) => (
           <div key={slot} className="h-20 w-20 shrink-0 animate-pulse rounded-full bg-muted" />
-        ))}
-
-        {ghostRings && !isLoading && ["Open", "Soon", "Yours", "Next"].map((label) => (
-          <EmptyStoryRing key={label} label={label} />
         ))}
 
         {/* Other Users' Stories */}

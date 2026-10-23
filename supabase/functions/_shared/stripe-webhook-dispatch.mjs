@@ -1,3 +1,4 @@
+import { httpStatusForError } from "./http-error.mjs";
 import {
   COMMUNITY_FUND_FEE_PERCENT,
   communityFundFeeCents,
@@ -138,7 +139,7 @@ export async function handleSignedStripeWebhook({
   try {
     claimed = await db.claimEvent(event.id, event.type);
   } catch (err) {
-    return { status: 500, body: { error: err instanceof Error ? err.message : String(err) } };
+    return { status: httpStatusForError(err), body: { error: err instanceof Error ? err.message : String(err) } };
   }
   if (!claimed) {
     return { status: 200, body: { received: true, duplicate: true } };
@@ -153,7 +154,7 @@ export async function handleSignedStripeWebhook({
     } catch {
       // The request still fails so Stripe retries the event.
     }
-    return { status: 500, body: { error: err instanceof Error ? err.message : String(err) } };
+    return { status: httpStatusForError(err), body: { error: err instanceof Error ? err.message : String(err) } };
   }
 }
 

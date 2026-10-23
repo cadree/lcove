@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireUserOrService } from "../_shared/require-caller.ts";
+import { getBearerUser, jwtRole, requireUserOrService } from "../_shared/require-caller.ts";
+import { authorizeNewApplication, escapeHtml } from "../_shared/notification-auth.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const EMAIL_FROM = "ETHER <notifications@etherbylcove.com>";
@@ -43,10 +45,10 @@ const getEmailTemplate = (projectTitle: string, roleTitle: string, applicantName
                       New Application Received!
                     </h1>
                     <p style="color: #a0a0a0; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
-                      <strong style="color: #E91E63;">${applicantName}</strong> has applied for the role of <strong style="color: #ffffff;">${roleTitle}</strong> on your project:
+                      <strong style="color: #E91E63;">${escapeHtml(applicantName)}</strong> has applied for the role of <strong style="color: #ffffff;">${escapeHtml(roleTitle)}</strong> on your project:
                     </p>
                     <p style="color: #ffffff; font-size: 20px; font-weight: 600; margin: 0 0 30px;">
-                      ${projectTitle}
+                      ${escapeHtml(projectTitle)}
                     </p>
                     <a href="https://etherbylcove.com/projects" 
                        style="display: inline-block; background: #E91E63; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
@@ -87,7 +89,45 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { project_id, project_creator_id, project_title, role_title, applicant_name }: NotifyNewApplicationRequest = await req.json();
+    const body = await req.json() as Partial<NotifyNewApplicationRequest>;
+    const requestedProjectId = typeof body.project_id === "string" ? body.project_id : "";
+    const role = jwtRole(req.headers.get("Authorization"));
+    const callerId = role === "service_role" ? null : await getBearerUser(req.headers.get("Authorization"), supabase);
+
+    const { data: project } = requestedProjectId
+      ? await supabase.from("projects").select("id, creator_id, title").eq("id", requestedProjectId).maybeSingle()
+      : { data: null };
+
+    let application: { applicant_id: string; project_id: string; role_id: string; role_name?: string | null; applicant_name?: string | null } | null = null;
+    if (project && (callerId || role === "service_role")) {
+      let query = supabase
+        .from("project_applications")
+        .select("applicant_id, project_id, role_id")
+        .eq("project_id", project.id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (role !== "service_role" && callerId) query = query.eq("applicant_id", callerId);
+      const { data } = await query.maybeSingle();
+      if (data) {
+        const { data: roleRow } = await supabase.from("project_roles").select("role_name").eq("id", data.role_id).maybeSingle();
+        const { data: profile } = await supabase.from("profiles").select("display_name").eq("user_id", data.applicant_id).maybeSingle();
+        application = { ...data, role_name: roleRow?.role_name, applicant_name: profile?.display_name };
+      }
+    }
+
+    const decision = authorizeNewApplication({ callerId, role, project, application });
+    if (!decision.ok) {
+      return new Response(JSON.stringify({ error: decision.error }), {
+        status: decision.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const project_id = decision.projectId;
+    const project_creator_id = decision.recipientId;
+    const project_title = decision.projectTitle;
+    const role_title = decision.roleTitle;
+    const applicant_name = decision.applicantName;
 
     console.log("Notifying project owner of new application:", project_creator_id, "for project:", project_title);
 
@@ -250,7 +290,7 @@ serve(async (req) => {
     console.error("Error in notify-new-application:", errorMessage);
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: httpStatusForError(error), headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

@@ -1,4 +1,4 @@
-import cutout from "@/assets/novi-cutout.png";
+import cutout from "@/assets/novi-cutout.webp";
 import { cn } from "@/lib/utils";
 
 function NoviBody() {

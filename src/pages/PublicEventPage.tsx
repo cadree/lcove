@@ -33,9 +33,11 @@ import { errorMessage } from "@/lib/errorMessage";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { shareLink, buildShareUrl } from "@/lib/shareLink";
+import { resolveVapidPublicKey } from "@/lib/vapidPublicKey";
 import { EventMoodboardView } from "@/components/calendar/EventMoodboardView";
 import { AddToCalendarButtons } from "@/components/calendar/AddToCalendarButtons";
 
+const VAPID_PUBLIC_KEY = resolveVapidPublicKey(import.meta.env.VITE_VAPID_PUBLIC_KEY);
 const walletPassesEnabled = import.meta.env.VITE_WALLET_PASSES_ENABLED === "true";
 
 export default function PublicEventPage() {
@@ -58,8 +60,6 @@ export default function PublicEventPage() {
   const [ticketGuestPhone, setTicketGuestPhone] = useState("");
   const [pushStatus, setPushStatus] = useState<'idle' | 'subscribing' | 'subscribed' | 'error'>('idle');
 
-  const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
-
   const urlBase64ToArrayBuffer = useCallback((base64String: string): ArrayBuffer => {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
     const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -73,7 +73,7 @@ export default function PublicEventPage() {
   }, []);
 
   const handleSubscribePush = useCallback(async (email: string) => {
-    if (!VAPID_PUBLIC_KEY || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       toast.info("Push notifications aren't supported in this browser");
       return;
     }
@@ -115,7 +115,7 @@ export default function PublicEventPage() {
       setPushStatus('error');
       toast.error('Failed to enable notifications');
     }
-  }, [VAPID_PUBLIC_KEY, eventId, urlBase64ToArrayBuffer]);
+  }, [eventId, urlBase64ToArrayBuffer]);
 
   // Fetch event (public – anon can read)
   const { data: event, isLoading } = useQuery({
