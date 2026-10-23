@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  HOST_DISPLAY_NAME_MAX,
   HOST_EVENT_FROM_ADDRESS,
   PLATFORM_FALLBACK_REPLY_TO,
   PLATFORM_QUEUE_FROM,
+  eventReplyTo,
   hostFromHeader,
   isVerifiedSender,
+  sanitizeDisplayName,
 } from "../../supabase/functions/_shared/host-email-address.mjs";
 import { DEFAULT_EMAIL_FROM, resolveQueueFrom } from "../../supabase/functions/_shared/email-queue-dispatch.mjs";
 
@@ -18,13 +21,24 @@ describe("host email sender", () => {
       hostFromHeader('Ada "Lane"\r\nvia Ether'),
       "Ada Lane via Ether <events@etherbylcove.com>",
     );
+    assert.equal(
+      sanitizeDisplayName('Ada <guest@example.com>, "Name";\r\n'),
+      "Ada guest example.com Name",
+    );
+    assert.equal(sanitizeDisplayName("A".repeat(200)).length, HOST_DISPLAY_NAME_MAX);
+    const spoofed = hostFromHeader('Ada <guest@example.com>, "Name";');
+    assert.equal(spoofed, "Ada guest example.com Name <events@etherbylcove.com>");
+    assert.equal((spoofed.match(/@/g) || []).length, 1);
     assert.equal(isVerifiedSender(hostFromHeader("Ada via Ether")), true);
     assert.equal(HOST_EVENT_FROM_ADDRESS.endsWith("@etherbylcove.com"), true);
     assert.equal(HOST_EVENT_FROM_ADDRESS.includes("notifications.etherbylcove.com"), false);
   });
 
-  it("keeps the reply-to fallback and rewrites a queued notifications-subdomain sender", () => {
-    assert.equal(PLATFORM_FALLBACK_REPLY_TO, "support@notify.etherbylcove.com");
+  it("sends no reply-to until a host address is verified", () => {
+    assert.equal(PLATFORM_FALLBACK_REPLY_TO, null);
+    assert.equal(eventReplyTo(null), null);
+    assert.equal(eventReplyTo(""), null);
+    assert.equal(eventReplyTo("  host@example.com  "), "host@example.com");
     assert.equal(
       resolveQueueFrom(
         "notifications@notifications.etherbylcove.com",
