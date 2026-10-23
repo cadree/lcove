@@ -202,6 +202,8 @@ $$;
 CREATE OR REPLACE FUNCTION public.reject_objectionable_text()
 RETURNS trigger
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   sample text;

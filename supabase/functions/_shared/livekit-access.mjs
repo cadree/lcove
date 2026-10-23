@@ -33,6 +33,18 @@ export function viewerCount(numParticipants) {
   return Math.max(0, Math.floor(count) - 1);
 }
 
+/** LiveKit createdAt is unix seconds and may arrive as a string. timestamptz needs ISO. */
+export function liveKitEventTime(value, now = Date.now()) {
+  if (value !== null && value !== undefined && String(value).trim() !== "") {
+    const seconds = Number(value);
+    if (Number.isFinite(seconds)) {
+      const date = new Date(seconds * 1000);
+      if (!Number.isNaN(date.getTime())) return date.toISOString();
+    }
+  }
+  return new Date(now).toISOString();
+}
+
 /**
  * Room lifecycle for live_streams. Participant events only change the viewer count.
  * Returns null when the event should not write.
@@ -41,9 +53,7 @@ export function liveKitRoomUpdate(event) {
   const roomName = event?.room?.name;
   if (!isStreamRoomName(roomName)) return null;
   const kind = event?.event;
-  const now = typeof event?.createdAt === "string" && event.createdAt
-    ? event.createdAt
-    : new Date().toISOString();
+  const now = liveKitEventTime(event?.createdAt);
   const count = viewerCount(event?.room?.numParticipants);
 
   if (kind === "room_started") {
