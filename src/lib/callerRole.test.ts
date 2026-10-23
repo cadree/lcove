@@ -17,8 +17,9 @@ const keys = {
 };
 
 function jwt(payload: Record<string, unknown>): string {
+  const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  return `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${body}.sig`;
+  return `${header}.${body}.sig`;
 }
 
 describe("caller role", () => {
