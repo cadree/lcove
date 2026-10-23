@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { COMMUNITY_FUND_FEE_PERCENT } from "../_shared/fees.mjs";
 import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
 import { verifiedDestination } from "../_shared/creator-connect.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -177,7 +178,7 @@ serve(async (req) => {
     logStep("ERROR", { message: errorMessage });
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: httpStatusForError(error),
     });
   }
 });

@@ -11,6 +11,7 @@ import {
   shopHost,
   storeFetchHeaders,
 } from "../_shared/store-import.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -176,7 +177,7 @@ serve(async (req) => {
     }
     return new Response(JSON.stringify({ error: message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 400,
+      status: httpStatusForError(error),
     });
   }
 });

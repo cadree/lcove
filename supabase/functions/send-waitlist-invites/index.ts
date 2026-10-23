@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { jwtRole, jwtSubject, requireUserOrService } from "../_shared/require-caller.ts";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const EMAIL_FROM = "ETHER <notifications@etherbylcove.com>";
@@ -123,6 +124,6 @@ serve(async (req) => {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("send-waitlist-invites failed:", message);
-    return json({ sent: false, error: message }, 500);
+    return json({ sent: false, error: message }, httpStatusForError(error));
   }
 });

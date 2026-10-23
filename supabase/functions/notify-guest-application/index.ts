@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { jwtRole } from "../_shared/require-caller.ts";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const EMAIL_FROM = "ETHER <notifications@etherbylcove.com>";
@@ -186,7 +187,7 @@ serve(async (req) => {
     const msg = error instanceof Error ? error.message : "Unknown error";
     console.error("Error in notify-guest-application:", msg);
     return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
+      status: httpStatusForError(error),
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

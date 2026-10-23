@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { jwtRole, jwtSubject, requireUserOrService } from "../_shared/require-caller.ts";
 import { shouldNotifyCommunity } from "../_shared/project-collaborations.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const EMAIL_FROM = "ETHER <notifications@etherbylcove.com>";
@@ -259,7 +260,7 @@ serve(async (req) => {
     console.error("Error in notify-new-content:", errorMessage);
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: httpStatusForError(error), headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

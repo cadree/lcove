@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -335,7 +336,7 @@ Thank you for your business!`;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: httpStatusForError(error), headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

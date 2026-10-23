@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { ledgerBalances } from "../_shared/credit-balances.ts";
 import { loadProfileConnect, syncPayoutEnabled, testStripe, withdrawalBlockedReason } from "../_shared/creator-connect.mjs";
 import { PayoutRefusal, interpretPayoutRequest } from "../_shared/payout-request.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -170,10 +171,10 @@ serve(async (req) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const soft = legacyPayout || error instanceof PayoutRefusal || (error instanceof Error && error.name === "PayoutRefusal");
-    logStep("ERROR", { message: errorMessage, status: soft ? 200 : 500 });
+    logStep("ERROR", { message: errorMessage, status: soft ? 200 : httpStatusForError(error) });
     return new Response(JSON.stringify(soft ? { success: false, error: errorMessage } : { error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: soft ? 200 : 500,
+      status: soft ? 200 : httpStatusForError(error),
     });
   }
 });

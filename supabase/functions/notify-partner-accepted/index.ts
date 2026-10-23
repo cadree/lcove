@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 import { requireUserOrService } from "../_shared/require-caller.ts";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -143,7 +144,7 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(
       JSON.stringify({ error: errorMessage(error) }),
       {
-        status: 500,
+        status: httpStatusForError(error),
         headers: { "Content-Type": "application/json", ...corsHeaders },
       }
     );

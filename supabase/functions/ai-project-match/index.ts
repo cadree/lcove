@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.88.0";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -321,7 +322,7 @@ Return the best matching projects for this user.`;
   } catch (error) {
     console.error("Error in ai-project-match:", error);
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
-      status: 500,
+      status: httpStatusForError(error),
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

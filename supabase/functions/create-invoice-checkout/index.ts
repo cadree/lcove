@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { COMMUNITY_FUND_FEE_PERCENT } from "../_shared/fees.mjs";
 import { destinationCharge, testStripe, verifiedDestination } from "../_shared/creator-connect.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -79,6 +80,6 @@ serve(async (req) => {
 
     return json({ url: session.url, fee_percent: COMMUNITY_FUND_FEE_PERCENT });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+    return json({ error: error instanceof Error ? error.message : String(error) }, httpStatusForError(error));
   }
 });
