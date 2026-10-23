@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { jwtRole, jwtSubject, requireUserOrService } from "../_shared/require-caller.ts";
+import { jwtSubject, requestRole, requireUserOrService } from "../_shared/require-caller.ts";
 import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
@@ -71,7 +71,7 @@ serve(async (req) => {
     );
 
     const authorization = req.headers.get("Authorization");
-    const role = jwtRole(authorization);
+    const role = requestRole(req);
     if (role !== "service_role") {
       const userId = jwtSubject(authorization);
       if (!userId) return json({ error: "Unauthorized" }, 401);

@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { eventDateLabel, eventTimeLabel } from "../_shared/event-time.mjs";
-import { getBearerUser, jwtRole } from "../_shared/require-caller.ts";
+import { getBearerUser, requestRole } from "../_shared/require-caller.ts";
 import { authorizeRsvpConfirmation, escapeHtml } from "../_shared/notification-auth.mjs";
 import { httpStatusForError } from "../_shared/http-error.mjs";
 
@@ -26,7 +26,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const role = jwtRole(req.headers.get("Authorization"));
+    const role = requestRole(req);
     const callerId = role === "service_role" ? null : await getBearerUser(req.headers.get("Authorization"), admin);
 
     const { data: rsvp } = rsvp_id

@@ -1,0 +1,73 @@
+# Deploys the event email functions to ether-staging and proves the caller check.
+# Does not deploy to ether-prod and does not change production secrets.
+# Push to cursor/ether-combined is what deploys functions to production.
+
+name: Prove staging event email auth
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cursor/ether-email-auth-413d
+    paths:
+      - supabase/functions/**
+      - scripts/prove-event-email-auth.mjs
+      - .github/workflows/prove-staging-email-auth.yml
+
+permissions:
+  contents: read
+
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      STAGING_PROJECT_REF: vjdrihmriufkameqngfg
+      STAGING_URL: https://vjdrihmriufkameqngfg.supabase.co
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Refuse production
+        run: |
+          set -euo pipefail
+          if [ "$STAGING_PROJECT_REF" = "aykopqinnnssxdhxqruo" ]; then
+            echo "refusing ether-prod"
+            exit 1
+          fi
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "SUPABASE_ACCESS_TOKEN is empty. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.121.0
+
+      - name: Deploy event email functions to staging
+        run: |
+          set -euo pipefail
+          supabase functions deploy \
+            send-rsvp-confirmation \
+            send-transactional-email \
+            send-event-reminder \
+            send-event-invite \
+            send-bulk-attendee-reminder \
+            --project-ref "$STAGING_PROJECT_REF" \
+            --use-api
+
+      - name: Prove guest, host, and rejected anonymous sends
+        run: |
+          set -euo pipefail
+          keys="$(mktemp)"
+          err="$(mktemp)"
+          chmod 600 "$keys" "$err"
+          cleanup() { rm -f "$keys" "$err"; }
+          trap cleanup EXIT
+          if ! supabase projects api-keys --project-ref "$STAGING_PROJECT_REF" -o json > "$keys" 2>"$err"; then
+            python3 -c 'import re,sys; text=open(sys.argv[1],encoding="utf-8",errors="replace").read(); text=re.sub(r"sb_(?:secret|publishable)_[A-Za-z0-9_-]+","sb_[redacted]",text); text=re.sub(r"eyJ[A-Za-z0-9_-]{10,}","eyJ[redacted]",text); print(text)' "$err"
+            exit 1
+          fi
+          PROOF_API_KEYS_FILE="$keys" node scripts/prove-event-email-auth.mjs

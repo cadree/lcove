@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getBearerUser, jwtRole, requireUserOrService } from "../_shared/require-caller.ts";
+import { getBearerUser, requestRole, requireUserOrService } from "../_shared/require-caller.ts";
 import { authorizeNewContent, escapeHtml } from "../_shared/notification-auth.mjs";
 import { shouldNotifyCommunity } from "../_shared/project-collaborations.mjs";
 import { httpStatusForError } from "../_shared/http-error.mjs";
@@ -102,7 +102,7 @@ serve(async (req) => {
     const body = await req.json() as Partial<NotifyNewContentRequest>;
     const content_type = body.content_type;
     const content_id = typeof body.content_id === "string" ? body.content_id : "";
-    const role = jwtRole(req.headers.get("Authorization"));
+    const role = requestRole(req);
     const callerId = role === "service_role" ? null : await getBearerUser(req.headers.get("Authorization"), supabase);
 
     let record: {
