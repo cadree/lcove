@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,6 +7,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 import { VideoLinkField } from "@/components/feed/VideoLinkField";
 import { EmbedPlayer, EmbedThumbnail } from "@/components/feed/EmbedPlayer";
+import { InlineError } from "@/components/ui/inline-error";
+import { writeError } from "@/lib/writeError";
+import { assertCleanText, OBJECTIONABLE_MESSAGE } from "@/lib/objectionableText";
 import type { EmbedDraft } from "@/lib/videoEmbed";
 
 type Step = "pick" | "crop" | "caption" | "share";
@@ -63,6 +66,7 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const captionErrorId = useId();
   const [kind, setKind] = useState<"photo" | "video" | "text">("text");
   const [linkUrl, setLinkUrl] = useState("");
   const [embed, setEmbed] = useState<EmbedDraft | null>(null);
@@ -150,15 +154,19 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
     if (!caption.trim() && !croppedFile && !embed) return;
     try {
       setError(null);
+      assertCleanText(caption);
       await createPost.mutateAsync({
         content: caption.trim() || undefined,
         file: embed ? undefined : croppedFile || undefined,
         mediaType: embed ? "video" : kind === "video" ? "video" : croppedFile ? "photo" : "text",
         embed: embed ?? undefined,
+        inlineError: true,
       });
       handleOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not share that post");
+      const message = writeError(err, "Could not share that post");
+      setError(message);
+      if (message === OBJECTIONABLE_MESSAGE) setStep("caption");
     }
   };
 
@@ -282,11 +290,18 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
               ) : null}
               <Textarea
                 value={caption}
-                onChange={(event) => setCaption(event.target.value)}
+                onChange={(event) => {
+                  setCaption(event.target.value);
+                  setError(null);
+                }}
                 placeholder="Write a caption"
+                aria-label="Post caption"
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? captionErrorId : undefined}
                 className="min-h-28 rounded-[14px]"
                 maxLength={2200}
               />
+              <InlineError id={captionErrorId} message={error} />
               <div className="flex gap-2">
                 <Button
                   variant="outline"
@@ -319,7 +334,7 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
                 <img src={croppedUrl} alt="" className="aspect-[4/5] max-h-[min(52vh,420px)] w-full rounded-[14px] bg-muted object-contain" />
               ) : null}
               {caption.trim() && <p className="text-sm text-foreground whitespace-pre-wrap">{caption}</p>}
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              <InlineError message={error} />
               <div className="flex gap-2">
                 <Button variant="outline" className="min-h-11 flex-1" onClick={() => setStep("caption")}>
                   Back

@@ -5,7 +5,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
-import { errorMessage } from '@/lib/errorMessage';
 import { assertCleanText } from '@/lib/objectionableText';
 import {
   excludeBlocked,
@@ -303,7 +302,6 @@ export function useSharingActions() {
       toast.success('Reposted');
       refresh();
     },
-    onError: (err) => toast.error(errorMessage(err, 'Could not repost')),
   });
 
   const undoRepost = useMutation({

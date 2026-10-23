@@ -6,7 +6,7 @@ import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { notifyPostComment, notifyPostLike } from '@/lib/notifications';
 import { isQueryablePostId } from '@/lib/postId';
-import { assertCleanText, OBJECTIONABLE_MESSAGE } from '@/lib/objectionableText';
+import { assertCleanText } from '@/lib/objectionableText';
 
 interface Comment {
   id: string;
@@ -196,9 +196,6 @@ export function usePostInteractions(postId: string, options?: { loadComments?: b
       queryClient.invalidateQueries({ queryKey: ['post-comments', postId] });
       toast.success('Comment added');
     },
-    onError: (error) => {
-      toast.error(error instanceof Error && error.message === OBJECTIONABLE_MESSAGE ? error.message : 'Failed to add comment');
-    },
   });
 
   // Delete comment mutation
@@ -287,7 +284,7 @@ export function usePostInteractions(postId: string, options?: { loadComments?: b
     commentsCount: countComments(visibleComments),
     isSaved,
     toggleLike: () => likeMutation.mutate(),
-    addComment: (content: string, parentId?: string) => commentMutation.mutate({ content, parentId }),
+    addComment: (content: string, parentId?: string) => commentMutation.mutateAsync({ content, parentId }),
     deleteComment: (commentId: string) => deleteCommentMutation.mutate(commentId),
     toggleSave: () => saveMutation.mutate(),
     isLiking: likeMutation.isPending,

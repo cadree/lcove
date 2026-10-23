@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getBearerUser, jwtRole, requireUserOrService } from "../_shared/require-caller.ts";
+import { getBearerUser, requestRole, requireUserOrService } from "../_shared/require-caller.ts";
 import { authorizeContentSubmission, escapeHtml } from "../_shared/notification-auth.mjs";
 import { httpStatusForError } from "../_shared/http-error.mjs";
 
@@ -138,7 +138,7 @@ serve(async (req) => {
 
     const body = await req.json() as Partial<NotifySubmissionRequest>;
     const requestedNetworkId = typeof body.network_id === "string" ? body.network_id : "";
-    const role = jwtRole(req.headers.get("Authorization"));
+    const role = requestRole(req);
     const callerId = role === "service_role" ? null : await getBearerUser(req.headers.get("Authorization"), supabase);
 
     const { data: network } = requestedNetworkId

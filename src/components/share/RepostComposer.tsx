@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { InlineError } from "@/components/ui/inline-error";
+import { writeError } from "@/lib/writeError";
 
 export function RepostComposer({
   open,
@@ -22,11 +24,21 @@ export function RepostComposer({
   pending: boolean;
   onSubmit: (caption: string) => Promise<void>;
 }) {
+  const errorId = useId();
   const [caption, setCaption] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setCaption("");
+      setError(null);
+    }
+  }, [open]);
 
   const close = () => {
     if (pending) return;
     setCaption("");
+    setError(null);
     onOpenChange(false);
   };
 
@@ -39,24 +51,32 @@ export function RepostComposer({
         </DialogHeader>
         <Textarea
           value={caption}
-          onChange={(event) => setCaption(event.target.value.slice(0, 500))}
+          onChange={(event) => {
+            setCaption(event.target.value.slice(0, 500));
+            setError(null);
+          }}
           placeholder="Write a caption (optional)"
           aria-label="Repost caption"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
           rows={4}
           maxLength={500}
         />
+        <InlineError id={errorId} message={error} />
         <p className="text-right text-xs text-muted-foreground">{caption.trim().length}/500</p>
         <DialogFooter>
           <Button variant="outline" onClick={close} disabled={pending}>Cancel</Button>
           <Button
             disabled={pending}
             onClick={async () => {
+              setError(null);
               try {
                 await onSubmit(caption);
                 setCaption("");
+                setError(null);
                 onOpenChange(false);
-              } catch {
-                // The repost action already reports the error.
+              } catch (err) {
+                setError(writeError(err, "Could not repost"));
               }
             }}
           >

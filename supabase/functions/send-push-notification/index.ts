@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { ApplicationServer, importVapidKeys, Urgency, type ExportedVapidKeys } from "jsr:@negrel/webpush";
-import { getBearerUser, jwtRole, requireUserOrService } from "../_shared/require-caller.ts";
+import { getBearerUser, requestRole, requireUserOrService } from "../_shared/require-caller.ts";
 import { noticeForUser } from "../_shared/notification-auth.mjs";
 import { httpStatusForError } from "../_shared/http-error.mjs";
 
@@ -82,7 +82,7 @@ serve(async (req) => {
     const { user_id, notification_type } = requestBody;
     let { title, body, url, data, icon, badge } = requestBody;
 
-    const role = jwtRole(req.headers.get("Authorization"));
+    const role = requestRole(req);
     if (role !== "service_role") {
       const callerId = await getBearerUser(req.headers.get("Authorization"), supabase);
       const notice = await noticeForUser(supabase, {
