@@ -1,6 +1,64 @@
 // Pure decisions shared by the event page and the database trigger.
 // The trigger in supabase/migrations/20261023150000_event_guest_list.sql is the lock.
 
+export interface PaidSeat {
+  id: string;
+  orderId: string | null;
+  userId: string | null;
+  email: string | null;
+  status: string;
+  rsvpId: string | null;
+}
+
+// Mirrors sync_rsvp_attendee when ticket_purchased is set. The order row keeps
+// the seat. RSVP-only rows for the same person are cancelled.
+export function paidConfirmSeats(input: {
+  rsvpId: string;
+  userId: string | null;
+  email: string | null;
+  seats: PaidSeat[];
+}): { linkedId: string | null; cancelledIds: string[]; registeredIds: string[] } {
+  const email = input.email?.trim().toLowerCase() || null;
+  const samePerson = (seat: PaidSeat) =>
+    (input.userId != null && seat.userId === input.userId)
+    || (email != null && seat.email?.trim().toLowerCase() === email);
+  const orderCandidates = input.seats.filter((seat) => seat.orderId != null && samePerson(seat));
+  const orderRow = orderCandidates.find((seat) => seat.status === "registered" || seat.status === "approved")
+    ?? orderCandidates[0];
+  if (!orderRow) {
+    return {
+      linkedId: null,
+      cancelledIds: [],
+      registeredIds: input.seats
+        .filter((seat) => seat.status === "registered" || seat.status === "approved")
+        .map((seat) => seat.id),
+    };
+  }
+  const cancelledIds = input.seats
+    .filter((seat) =>
+      seat.id !== orderRow.id
+      && seat.orderId == null
+      && seat.status !== "cancelled"
+      && (seat.rsvpId === input.rsvpId || samePerson(seat))
+    )
+    .map((seat) => seat.id);
+  const registeredIds = input.seats
+    .filter((seat) =>
+      !cancelledIds.includes(seat.id)
+      && (seat.status === "registered" || seat.status === "approved" || seat.id === orderRow.id)
+    )
+    .map((seat) => seat.id);
+  return { linkedId: orderRow.id, cancelledIds, registeredIds };
+}
+
+// Stripe Checkout sessions last at most 24 hours. Older pending orders are
+// abandoned even if the expired webhook never arrived.
+export function isAbandonedPendingOrder(createdAt: string, now: Date, hours = 24): boolean {
+  const created = new Date(createdAt).getTime();
+  if (Number.isNaN(created)) return false;
+  return created < now.getTime() - hours * 60 * 60 * 1000;
+}
+
 export function decideRsvpStatus(input: {
   requested: string;
   capacity: number | null;

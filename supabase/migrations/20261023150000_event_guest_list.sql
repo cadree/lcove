@@ -10,6 +10,8 @@
 --      not delete or demote them.
 --
 -- Apply this file yourself. It does not run against a database from the app.
+-- Re-running it is safe: columns, indexes, and policies use IF NOT EXISTS
+-- or DROP IF EXISTS, and the functions are replaced in place.
 
 ALTER TABLE public.event_attendees
   ADD COLUMN IF NOT EXISTS rsvp_id uuid REFERENCES public.event_rsvps(id) ON DELETE SET NULL;
@@ -221,6 +223,7 @@ DECLARE
   v_notify_email text;
   v_title text;
   v_safe_title text;
+  v_order_row uuid;
 BEGIN
   v_status := CASE NEW.status
     WHEN 'going' THEN 'registered'
@@ -238,6 +241,61 @@ BEGIN
   v_name := COALESCE(v_name, 'Guest');
   v_email := NULLIF(lower(btrim(COALESCE(NEW.guest_email, ''))), '');
 
+  -- A paid confirm already inserted a registered row for the order. Link the
+  -- RSVP to that row and cancel the older RSVP-only row. Registering both
+  -- is a second seat, and on a full event it raises after the card is charged.
+  IF COALESCE(NEW.ticket_purchased, false) THEN
+    SELECT a.id INTO v_order_row
+    FROM public.event_attendees a
+    WHERE a.event_id = NEW.event_id
+      AND a.order_id IS NOT NULL
+      AND (
+        (NEW.user_id IS NOT NULL AND a.attendee_user_id = NEW.user_id)
+        OR (
+          v_email IS NOT NULL
+          AND a.attendee_email IS NOT NULL
+          AND lower(a.attendee_email) = v_email
+        )
+      )
+    ORDER BY (a.status IN ('registered', 'approved')) DESC, a.created_at
+    LIMIT 1;
+  END IF;
+
+  IF v_order_row IS NOT NULL THEN
+    UPDATE public.event_attendees
+    SET status = 'cancelled',
+        rsvp_id = NULL,
+        updated_at = now()
+    WHERE event_id = NEW.event_id
+      AND id IS DISTINCT FROM v_order_row
+      AND order_id IS NULL
+      AND status IS DISTINCT FROM 'cancelled'
+      AND (
+        rsvp_id = NEW.id
+        OR (NEW.user_id IS NOT NULL AND attendee_user_id = NEW.user_id)
+        OR (
+          v_email IS NOT NULL
+          AND attendee_email IS NOT NULL
+          AND lower(attendee_email) = v_email
+        )
+      );
+
+    UPDATE public.event_attendees
+    SET rsvp_id = NEW.id,
+        attendee_user_id = COALESCE(attendee_user_id, NEW.user_id),
+        attendee_name = CASE
+          WHEN attendee_name IS NULL OR btrim(attendee_name) = '' OR attendee_name = 'Guest' THEN v_name
+          ELSE attendee_name
+        END,
+        attendee_email = COALESCE(attendee_email, v_email),
+        attendee_phone = COALESCE(attendee_phone, NULLIF(btrim(COALESCE(NEW.guest_phone, '')), '')),
+        status = CASE
+          WHEN status IN ('registered', 'approved') AND v_status <> 'cancelled' THEN status
+          ELSE v_status
+        END,
+        updated_at = now()
+    WHERE id = v_order_row;
+  ELSE
   SELECT a.id INTO v_existing
   FROM public.event_attendees a
   WHERE a.rsvp_id = NEW.id
@@ -291,6 +349,7 @@ BEGIN
       now()
     );
   END IF;
+  END IF;
 
   IF NEW.campaign_id IS NOT NULL
      AND NEW.status = 'going'
@@ -302,7 +361,8 @@ BEGIN
 
   IF TG_OP = 'UPDATE'
      AND OLD.status = 'waitlist'
-     AND NEW.status = 'going' THEN
+     AND NEW.status = 'going'
+     AND NOT COALESCE(NEW.ticket_purchased, false) THEN
     IF NEW.user_id IS NOT NULL THEN
       BEGIN
         INSERT INTO public.notifications (user_id, type, title, body, data)
@@ -712,3 +772,255 @@ BEGIN
   );
 END;
 $$;
+
+-- A charged order that cannot finish seat linking stays in the table and is
+-- marked for a refund. Nothing in this path deletes a ticket_orders row.
+
+ALTER TABLE public.ticket_orders
+  ADD COLUMN IF NOT EXISTS needs_refund boolean NOT NULL DEFAULT false;
+
+CREATE OR REPLACE FUNCTION public.confirm_event_ticket_order(
+  p_order_id uuid,
+  p_payment_intent text
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_order public.ticket_orders%ROWTYPE;
+  v_tier_id uuid;
+  v_err text;
+BEGIN
+  SELECT * INTO v_order
+  FROM public.ticket_orders
+  WHERE id = p_order_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'order not found';
+  END IF;
+  IF v_order.payment_status = 'paid' THEN
+    RETURN false;
+  END IF;
+
+  -- Stripe has already taken the money. Record that before any seat work.
+  -- A cancelled or otherwise finished order is kept and flagged for a refund
+  -- instead of raising, which would hide the charge.
+  IF v_order.payment_status <> 'pending' THEN
+    UPDATE public.ticket_orders
+    SET needs_refund = true,
+        stripe_payment_intent_id = COALESCE(p_payment_intent, stripe_payment_intent_id),
+        notes = left(
+          btrim(COALESCE(notes, '') || E'\nrefund required: payment arrived for ' || payment_status || ' order'),
+          2000
+        )
+    WHERE id = p_order_id;
+    RETURN true;
+  END IF;
+
+  UPDATE public.ticket_orders
+  SET payment_status = 'paid',
+      needs_refund = false,
+      stripe_payment_intent_id = COALESCE(p_payment_intent, stripe_payment_intent_id)
+  WHERE id = p_order_id;
+
+  -- The pending attendee row already holds the seat. Capacity must not
+  -- fail this function after the charge.
+  PERFORM set_config('ether.skip_capacity', 'on', true);
+
+  BEGIN
+    SELECT tier_id INTO v_tier_id
+    FROM public.event_attendees
+    WHERE order_id = p_order_id
+      AND tier_id IS NOT NULL
+    LIMIT 1;
+
+    IF v_tier_id IS NOT NULL THEN
+      UPDATE public.ticket_tiers
+      SET quantity_sold = COALESCE(quantity_sold, 0) + v_order.quantity
+      WHERE id = v_tier_id;
+    END IF;
+
+    IF v_order.purchaser_user_id IS NOT NULL THEN
+      INSERT INTO public.event_rsvps (
+        event_id, user_id, status, ticket_purchased, stripe_payment_id
+      ) VALUES (
+        v_order.event_id, v_order.purchaser_user_id, 'going', true, p_payment_intent
+      )
+      ON CONFLICT (event_id, user_id) WHERE user_id IS NOT NULL DO UPDATE
+        SET status = 'going',
+            ticket_purchased = true,
+            stripe_payment_id = COALESCE(EXCLUDED.stripe_payment_id, public.event_rsvps.stripe_payment_id),
+            updated_at = now();
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_err = MESSAGE_TEXT;
+    UPDATE public.ticket_orders
+    SET needs_refund = true,
+        notes = left(btrim(COALESCE(notes, '') || E'\nrefund required: ' || COALESCE(v_err, 'confirm failed')), 2000)
+    WHERE id = p_order_id;
+  END;
+
+  PERFORM set_config('ether.skip_capacity', 'off', true);
+  RETURN true;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.confirm_event_ticket_order(uuid, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.confirm_event_ticket_order(uuid, text) TO service_role;
+
+-- Dropping a pending checkout frees the seat it held. The order row stays,
+-- marked cancelled. The oldest waitlist RSVP is promoted when a seat is free.
+
+CREATE OR REPLACE FUNCTION public.cancel_pending_ticket_order(p_order_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_order public.ticket_orders%ROWTYPE;
+  v_capacity integer;
+  v_taken integer;
+  v_promote uuid;
+BEGIN
+  SELECT * INTO v_order
+  FROM public.ticket_orders
+  WHERE id = p_order_id
+  FOR UPDATE;
+  IF NOT FOUND OR v_order.payment_status <> 'pending' THEN
+    RETURN false;
+  END IF;
+
+  UPDATE public.ticket_orders
+  SET payment_status = 'cancelled'
+  WHERE id = p_order_id;
+
+  UPDATE public.event_attendees
+  SET status = 'cancelled',
+      updated_at = now()
+  WHERE order_id = p_order_id
+    AND status IN ('registered', 'approved');
+
+  SELECT e.capacity INTO v_capacity
+  FROM public.events e
+  WHERE e.id = v_order.event_id;
+  IF v_capacity IS NOT NULL THEN
+    v_taken := public.event_seat_count(v_order.event_id);
+    IF v_taken < v_capacity THEN
+      SELECT r.id INTO v_promote
+      FROM public.event_rsvps r
+      WHERE r.event_id = v_order.event_id
+        AND r.status = 'waitlist'
+      ORDER BY r.created_at
+      LIMIT 1;
+      IF v_promote IS NOT NULL THEN
+        PERFORM set_config('ether.promoting_waitlist', 'on', true);
+        UPDATE public.event_rsvps
+        SET status = 'going', updated_at = now()
+        WHERE id = v_promote;
+        PERFORM set_config('ether.promoting_waitlist', 'off', true);
+      END IF;
+    END IF;
+  END IF;
+
+  RETURN true;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.cancel_pending_ticket_order(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.cancel_pending_ticket_order(uuid) TO service_role;
+
+-- Stripe Checkout sessions last at most 24 hours. This does not call Stripe.
+-- checkout.session.expired cancels that order immediately; this catches the
+-- ones whose webhook never arrived.
+
+CREATE OR REPLACE FUNCTION public.release_abandoned_ticket_orders(
+  p_older_than interval DEFAULT interval '24 hours'
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_id uuid;
+  v_count integer := 0;
+BEGIN
+  FOR v_id IN
+    SELECT o.id
+    FROM public.ticket_orders o
+    WHERE o.payment_status = 'pending'
+      AND o.payment_method = 'stripe'
+      AND o.created_at < now() - COALESCE(p_older_than, interval '24 hours')
+    ORDER BY o.created_at
+    FOR UPDATE SKIP LOCKED
+  LOOP
+    IF public.cancel_pending_ticket_order(v_id) THEN
+      v_count := v_count + 1;
+    END IF;
+  END LOOP;
+  RETURN v_count;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.release_abandoned_ticket_orders(interval) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.release_abandoned_ticket_orders(interval) TO service_role;
+
+-- A direct delete of an RSVP used to drop the row and leave its seat behind,
+-- so nobody on the waitlist moved up. Cancel the RSVP-only seat first, then
+-- promote. An order-backed seat stays; that person paid.
+
+CREATE OR REPLACE FUNCTION public.cancel_rsvp_on_delete()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_capacity integer;
+  v_taken integer;
+  v_promote uuid;
+BEGIN
+  UPDATE public.event_attendees
+  SET status = 'cancelled',
+      rsvp_id = NULL,
+      updated_at = now()
+  WHERE rsvp_id = OLD.id
+    AND order_id IS NULL
+    AND status IN ('registered', 'approved');
+
+  IF OLD.status = 'going'
+     AND NOT COALESCE(OLD.ticket_purchased, false)
+     AND current_setting('ether.promoting_waitlist', true) IS DISTINCT FROM 'on'
+     AND current_setting('ether.skip_capacity', true) IS DISTINCT FROM 'on' THEN
+    SELECT e.capacity INTO v_capacity FROM public.events e WHERE e.id = OLD.event_id;
+    IF v_capacity IS NOT NULL THEN
+      v_taken := public.event_seat_count(OLD.event_id);
+      IF v_taken < v_capacity THEN
+        SELECT r.id INTO v_promote
+        FROM public.event_rsvps r
+        WHERE r.event_id = OLD.event_id
+          AND r.status = 'waitlist'
+          AND r.id IS DISTINCT FROM OLD.id
+        ORDER BY r.created_at
+        LIMIT 1;
+        IF v_promote IS NOT NULL THEN
+          PERFORM set_config('ether.promoting_waitlist', 'on', true);
+          UPDATE public.event_rsvps
+          SET status = 'going', updated_at = now()
+          WHERE id = v_promote;
+          PERFORM set_config('ether.promoting_waitlist', 'off', true);
+        END IF;
+      END IF;
+    END IF;
+  END IF;
+  RETURN OLD;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS event_rsvps_cancel_delete ON public.event_rsvps;
+CREATE TRIGGER event_rsvps_cancel_delete
+  BEFORE DELETE ON public.event_rsvps
+  FOR EACH ROW EXECUTE FUNCTION public.cancel_rsvp_on_delete();

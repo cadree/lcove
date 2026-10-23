@@ -161,6 +161,111 @@ BEGIN
     RAISE EXCEPTION 'ticket confirm did not mark the rsvp';
   END IF;
 
+  -- Buyer already interested on a full event. The pending order holds the
+  -- only seat. Confirm must record payment, leave one registered seat, and
+  -- cancel the RSVP-only row instead of registering it.
+  INSERT INTO public.events (id, creator_id, title, city, start_date, capacity, is_public, ticket_type)
+  VALUES ('00000000-0000-4000-8000-0000000000a1', v_seller, 'Paid full', 'Atlanta', '2026-11-21T00:00:00Z', 1, true, 'paid');
+  INSERT INTO public.event_rsvps (event_id, user_id, status)
+  VALUES ('00000000-0000-4000-8000-0000000000a1', v_buyer, 'interested');
+  INSERT INTO public.ticket_orders (
+    id, event_id, purchaser_user_id, quantity, subtotal_cents, total_cents,
+    currency, payment_method, payment_status
+  ) VALUES (
+    '00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000a1',
+    v_buyer, 1, 1000, 1000, 'usd', 'stripe', 'pending'
+  );
+  INSERT INTO public.event_attendees (event_id, order_id, attendee_user_id, attendee_name, status)
+  VALUES (
+    '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000b1',
+    v_buyer, 'Nico', 'registered'
+  );
+  IF public.confirm_event_ticket_order('00000000-0000-4000-8000-0000000000b1', 'pi_full') IS NOT TRUE THEN
+    RAISE EXCEPTION 'full-event confirm did not record payment';
+  END IF;
+  IF (
+    SELECT count(*) FROM public.event_attendees
+    WHERE event_id = '00000000-0000-4000-8000-0000000000a1' AND status = 'registered'
+  ) <> 1 THEN
+    RAISE EXCEPTION 'full event did not keep a single registered seat';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.event_attendees
+    WHERE event_id = '00000000-0000-4000-8000-0000000000a1'
+      AND order_id IS NULL AND status = 'registered'
+  ) THEN
+    RAISE EXCEPTION 'full event registered the RSVP-only row';
+  END IF;
+  IF (
+    SELECT status FROM public.event_rsvps
+    WHERE event_id = '00000000-0000-4000-8000-0000000000a1' AND user_id = v_buyer
+  ) <> 'going' THEN
+    RAISE EXCEPTION 'full event RSVP was not marked going';
+  END IF;
+  IF (
+    SELECT needs_refund FROM public.ticket_orders WHERE id = '00000000-0000-4000-8000-0000000000b1'
+  ) THEN
+    RAISE EXCEPTION 'full event confirm asked for a refund';
+  END IF;
+
+  -- Same buyer, prior interested RSVP, room for two. Still one seat for them.
+  INSERT INTO public.events (id, creator_id, title, city, start_date, capacity, is_public, ticket_type)
+  VALUES ('00000000-0000-4000-8000-0000000000a2', v_seller, 'Paid open', 'Atlanta', '2026-11-21T00:00:00Z', 2, true, 'paid');
+  INSERT INTO public.event_rsvps (event_id, user_id, status)
+  VALUES ('00000000-0000-4000-8000-0000000000a2', v_buyer, 'interested');
+  INSERT INTO public.ticket_orders (
+    id, event_id, purchaser_user_id, quantity, subtotal_cents, total_cents,
+    currency, payment_method, payment_status
+  ) VALUES (
+    '00000000-0000-4000-8000-0000000000b2', '00000000-0000-4000-8000-0000000000a2',
+    v_buyer, 1, 1000, 1000, 'usd', 'stripe', 'pending'
+  );
+  INSERT INTO public.event_attendees (event_id, order_id, attendee_user_id, attendee_name, status)
+  VALUES (
+    '00000000-0000-4000-8000-0000000000a2', '00000000-0000-4000-8000-0000000000b2',
+    v_buyer, 'Nico', 'registered'
+  );
+  IF public.confirm_event_ticket_order('00000000-0000-4000-8000-0000000000b2', 'pi_open') IS NOT TRUE THEN
+    RAISE EXCEPTION 'open-event confirm did not record payment';
+  END IF;
+  IF (
+    SELECT count(*) FROM public.event_attendees
+    WHERE event_id = '00000000-0000-4000-8000-0000000000a2'
+      AND attendee_user_id = v_buyer AND status = 'registered'
+  ) <> 1 THEN
+    RAISE EXCEPTION 'open event gave the buyer more than one seat';
+  END IF;
+
+  -- A day-old pending checkout releases its seat and keeps the order row.
+  INSERT INTO public.events (id, creator_id, title, city, start_date, capacity, is_public, ticket_type)
+  VALUES ('00000000-0000-4000-8000-0000000000a3', v_seller, 'Paid abandoned', 'Atlanta', '2026-11-21T00:00:00Z', 1, true, 'paid');
+  INSERT INTO public.ticket_orders (
+    id, event_id, purchaser_user_id, quantity, subtotal_cents, total_cents,
+    currency, payment_method, payment_status, created_at
+  ) VALUES (
+    '00000000-0000-4000-8000-0000000000b3', '00000000-0000-4000-8000-0000000000a3',
+    v_buyer, 1, 1000, 1000, 'usd', 'stripe', 'pending', now() - interval '25 hours'
+  );
+  INSERT INTO public.event_attendees (event_id, order_id, attendee_user_id, attendee_name, status)
+  VALUES (
+    '00000000-0000-4000-8000-0000000000a3', '00000000-0000-4000-8000-0000000000b3',
+    v_buyer, 'Nico', 'registered'
+  );
+  IF public.release_abandoned_ticket_orders(interval '24 hours') < 1 THEN
+    RAISE EXCEPTION 'abandoned checkout was not released';
+  END IF;
+  IF (
+    SELECT payment_status FROM public.ticket_orders WHERE id = '00000000-0000-4000-8000-0000000000b3'
+  ) <> 'cancelled' THEN
+    RAISE EXCEPTION 'abandoned order was deleted or left pending';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.event_attendees
+    WHERE order_id = '00000000-0000-4000-8000-0000000000b3' AND status = 'registered'
+  ) THEN
+    RAISE EXCEPTION 'abandoned checkout kept its seat';
+  END IF;
+
   INSERT INTO public.processed_stripe_events (event_id, event_type)
   VALUES ('evt_scratch', 'checkout.session.completed');
   BEGIN

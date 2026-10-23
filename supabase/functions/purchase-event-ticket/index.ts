@@ -140,6 +140,13 @@ serve(async (req) => {
     }
     if (!tier) throw new Error("No active ticket tier available for this event");
 
+    // Checkout sessions expire within 24 hours. Release those seats before
+    // counting, without calling Stripe.
+    const { error: releaseError } = await supabase.rpc("release_abandoned_ticket_orders", {
+      p_older_than: "24 hours",
+    });
+    if (releaseError) log("Abandoned release skipped", { message: releaseError.message });
+
     // Capacity check. Tier inventory and the event seat count both have to fit.
     if (tier.capacity != null) {
       const remaining = tier.capacity - (tier.quantity_sold || 0);

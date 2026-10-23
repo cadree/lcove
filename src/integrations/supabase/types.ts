@@ -7034,6 +7034,7 @@ export type Database = {
           currency: string
           event_id: string
           id: string
+          needs_refund: boolean
           notes: string | null
           payment_method: string
           payment_status: string
@@ -7058,6 +7059,7 @@ export type Database = {
           currency?: string
           event_id: string
           id?: string
+          needs_refund?: boolean
           notes?: string | null
           payment_method?: string
           payment_status?: string
@@ -7082,6 +7084,7 @@ export type Database = {
           currency?: string
           event_id?: string
           id?: string
+          needs_refund?: boolean
           notes?: string | null
           payment_method?: string
           payment_status?: string
@@ -7932,6 +7935,10 @@ export type Database = {
       get_client_project_by_token: { Args: { p_token: string }; Returns: Json }
       public_event_attendance_count: {
         Args: { p_event_id: string }
+        Returns: number
+      }
+      release_abandoned_ticket_orders: {
+        Args: { p_older_than?: string }
         Returns: number
       }
       host_event_attendance_counts: {
