@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { callRpc } from "@/lib/rpc";
-import { autoFileQuestId, questViews, streakFromDays, xpBar, type QuestView } from "@/lib/noviQuests";
+import { autoFileQuestId, questViews, streakFromDays, type QuestView } from "@/lib/noviQuests";
 import { shotSessionEnabled } from "@/lib/shotSession";
 
 export interface NoviBoard {
@@ -138,7 +138,6 @@ export function useNoviQuests() {
   return {
     quests,
     total: board.total,
-    bar: xpBar(board.total),
     streak: board.streakDays.length > 0 ? streakFromDays(board.streakDays, today) : board.streak,
     dailyXp: board.dailyXp,
     dailyDone: board.dailyDone,
