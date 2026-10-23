@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { ApplicationServer, importVapidKeys, Urgency, type ExportedVapidKeys } from "jsr:@negrel/webpush";
-import { requireUserOrService } from "../_shared/require-caller.ts";
+import { getBearerUser, jwtRole, requireUserOrService } from "../_shared/require-caller.ts";
+import { noticeForUser } from "../_shared/notification-auth.mjs";
 import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
@@ -96,7 +97,38 @@ serve(async (req) => {
     );
 
     const requestBody: PushNotificationRequest = await req.json();
-    const { user_id, title, body, url, data, icon, badge, notification_type } = requestBody;
+    const { user_id, notification_type } = requestBody;
+    let { title, body, url, data, icon, badge } = requestBody;
+
+    const role = jwtRole(req.headers.get("Authorization"));
+    if (role !== "service_role") {
+      const callerId = await getBearerUser(req.headers.get("Authorization"), supabase);
+      const notice = await noticeForUser(supabase, {
+        callerId,
+        recipientId: user_id,
+        notificationType: notification_type,
+        data,
+      });
+      if (!notice.ok) {
+        return new Response(JSON.stringify({ error: notice.error }), {
+          status: notice.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      title = notice.title;
+      body = notice.body;
+      data = notice.data;
+      url = undefined;
+      icon = undefined;
+      badge = undefined;
+    }
+
+    if (!user_id || !title) {
+      return new Response(JSON.stringify({ error: "user_id and title are required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     logStep("Processing push notification", { user_id, title, notification_type });
 

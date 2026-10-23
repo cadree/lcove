@@ -28,9 +28,7 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
   const [selectedInvoice, setSelectedInvoice] = useState<ContactInvoice | null>(null);
   const [sendVia, setSendVia] = useState<'email' | 'sms'>('email');
   const [sendRecipient, setSendRecipient] = useState('');
-  const [senderName, setSenderName] = useState('');
   const [payLinkId, setPayLinkId] = useState<string | null>(null);
-  const [senderEmail, setSenderEmail] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [newInvoice, setNewInvoice] = useState({
@@ -159,13 +157,9 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
         invoiceId: selectedInvoice.id,
         via: sendVia,
         recipient: sendRecipient.trim(),
-        senderName: senderName.trim() || undefined,
-        senderEmail: senderEmail.trim() || undefined,
       });
       setSendDialogOpen(false);
       setSelectedInvoice(null);
-      setSenderName('');
-      setSenderEmail('');
       toast.success(`Invoice sent via ${sendVia}`);
     } catch (error) {
       toast.error("Failed to send invoice");
@@ -533,30 +527,9 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
             <DialogTitle>Send Invoice</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Sender Info */}
-            <div className="p-3 bg-muted/30 rounded-lg space-y-3">
-              <p className="text-xs text-muted-foreground font-medium">Your Information (appears on invoice)</p>
-              <div className="space-y-2">
-                <Label htmlFor="sender-name">Your Name / Business Name</Label>
-                <Input
-                  id="sender-name"
-                  value={senderName}
-                  onChange={(e) => setSenderName(e.target.value)}
-                  placeholder="e.g., John's Photography"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="sender-email">Your Email (for replies)</Label>
-                <Input
-                  id="sender-email"
-                  type="email"
-                  value={senderEmail}
-                  onChange={(e) => setSenderEmail(e.target.value)}
-                  placeholder="your@email.com"
-                />
-                <p className="text-xs text-muted-foreground">Clients will reply to this email address</p>
-              </div>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              The invoice is sent from your profile name. Replies go to the email on your account.
+            </p>
 
             <div className="space-y-2">
               <Label>Send via</Label>

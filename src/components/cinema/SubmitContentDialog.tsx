@@ -169,15 +169,6 @@ export const SubmitContentDialog = ({
     setSubmitting(true);
 
     try {
-      // Get user's profile for the submitter name - user's own profile so we can use profiles table
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('display_name')
-        .eq('user_id', user.id)
-        .single();
-
-      const submitterName = profile?.display_name || 'A creator';
-
       const { error } = await supabase
         .from('content_submissions')
         .insert({
@@ -202,13 +193,7 @@ export const SubmitContentDialog = ({
 
       // Notify the network owner via edge function
       supabase.functions.invoke('notify-content-submission', {
-        body: {
-          network_id: networkId,
-          network_name: networkName,
-          submission_title: title.trim(),
-          submitter_name: submitterName,
-          content_type: contentType,
-        },
+        body: { network_id: networkId },
       }).catch((err) => {
         console.error('Error sending submission notification:', err);
       });

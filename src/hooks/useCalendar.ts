@@ -489,21 +489,11 @@ export function useCreateEvent() {
       
       if (error) throw error;
 
-      // Get creator name for notification
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('display_name')
-        .eq('user_id', user.id)
-        .single();
-
       // Notify opted-in users about the new event
       supabase.functions.invoke('notify-new-content', {
         body: {
           content_type: 'event',
           content_id: createdEvent.id,
-          title: event.title,
-          description: event.description,
-          creator_name: profile?.display_name || 'A creator'
         }
       }).catch(err => console.error('Failed to send new event notifications:', err));
 

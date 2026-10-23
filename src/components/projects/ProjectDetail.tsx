@@ -160,17 +160,10 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
       });
       if (error) throw error;
 
-      const roleName = project.roles?.find((r) => r.id === roleId)?.role_name || "Unknown Role";
       supabase.functions.invoke("notify-guest-application", {
         body: {
           project_id: project.id,
-          project_title: project.title,
-          role_name: roleName,
-          applicant_name: guestName.trim(),
           applicant_email: guestEmail.trim(),
-          project_creator_id: project.creator_id,
-          portfolio_link: guestPortfolio.trim() || null,
-          message: guestMessage.trim() || null,
         },
       }).catch(() => {});
     },
