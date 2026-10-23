@@ -40,7 +40,7 @@ CREATE OR REPLACE FUNCTION public.delete_own_live_stream(p_stream_id uuid)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, pg_temp
 AS $$
 BEGIN
   IF auth.uid() IS NULL THEN

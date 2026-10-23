@@ -21189,11 +21189,11 @@ $ether_m172s0$;
 END
 $ether_m172$;
 
--- 20261023150000_delete_own_live_stream.sql
+-- 20261023160000_delete_own_live_stream.sql
 DO $ether_m173$
 BEGIN
-  IF EXISTS (SELECT 1 FROM public.ether_schema_migrations WHERE version = '20261023150000_delete_own_live_stream.sql') THEN
-    RAISE NOTICE 'skip 20261023150000_delete_own_live_stream.sql';
+  IF EXISTS (SELECT 1 FROM public.ether_schema_migrations WHERE version = '20261023160000_delete_own_live_stream.sql') THEN
+    RAISE NOTICE 'skip 20261023160000_delete_own_live_stream.sql';
     RETURN;
   END IF;
   EXECUTE $ether_m173s0$
@@ -21240,7 +21240,7 @@ CREATE OR REPLACE FUNCTION public.delete_own_live_stream(p_stream_id uuid)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, pg_temp
 AS $$
 BEGIN
   IF auth.uid() IS NULL THEN
@@ -21293,7 +21293,7 @@ EXCEPTION
     RAISE NOTICE 'skipped adding stream_gifts to supabase_realtime: %', SQLERRM;
 END $$;
 $ether_m173s5$;
-  INSERT INTO public.ether_schema_migrations (version) VALUES ('20261023150000_delete_own_live_stream.sql');
+  INSERT INTO public.ether_schema_migrations (version) VALUES ('20261023160000_delete_own_live_stream.sql');
 END
 $ether_m173$;
 
