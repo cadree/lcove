@@ -96,9 +96,6 @@ serve(async (req) => {
   if (denied) return denied;
 
   try {
-    // Validate sender email before processing
-    validateSenderEmail(EMAIL_FROM);
-    
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -134,6 +131,8 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    validateSenderEmail(EMAIL_FROM);
 
     console.log("Sending notification email for user:", user_id, "type:", notification_type);
 

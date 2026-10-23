@@ -4,13 +4,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isIosApp } from '@/lib/platform';
 import { registerIosPush } from '@/lib/nativePush';
+import { resolveVapidPublicKey } from '@/lib/vapidPublicKey';
 
-// VAPID public key - this is safe to expose in client code
-// Must be set via VITE_VAPID_PUBLIC_KEY environment variable
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
-
-// Log VAPID key status on load for debugging
-console.log('VAPID public key configured:', !!VAPID_PUBLIC_KEY);
+// Env overrides the committed ether-prod public key. Never log the key.
+const VAPID_PUBLIC_KEY = resolveVapidPublicKey(import.meta.env.VITE_VAPID_PUBLIC_KEY);
 
 // Convert base64url string to ArrayBuffer for push subscription
 function urlBase64ToArrayBuffer(base64String: string): ArrayBuffer {
@@ -172,10 +169,6 @@ export const usePushNotifications = () => {
   }, []);
 
   const subscribeToPush = useCallback(async (registration: ServiceWorkerRegistration): Promise<PushSubscription> => {
-    if (!VAPID_PUBLIC_KEY) {
-      throw new Error('VAPID public key not configured. Push notifications are not available.');
-    }
-
     try {
       // Check for existing subscription first
       let subscription = await registration.pushManager.getSubscription();
@@ -211,12 +204,6 @@ export const usePushNotifications = () => {
 
     if (!user?.id) {
       toast.error('Please sign in to enable push notifications');
-      return false;
-    }
-
-    if (!VAPID_PUBLIC_KEY) {
-      toast.error('Push notifications are not configured for this app');
-      setState(prev => ({ ...prev, error: 'VAPID key not configured' }));
       return false;
     }
 
