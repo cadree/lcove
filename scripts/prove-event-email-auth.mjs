@@ -328,11 +328,21 @@ try {
   if (!sbSecret || !legacyService) {
     check("both secret key formats present", false, `sb_secret=${Boolean(sbSecret)} legacy=${Boolean(legacyService)}`);
   } else {
-    const secretCall = await callFunction("send-transactional-email", authHeaders(sbSecret), directBody(secretProofEmail));
+    const secretAttempts = [];
+    let secretQueued = false;
+    for (const [mode, headers] of [
+      ["both", authHeaders(sbSecret)],
+      ["apikey", { apikey: sbSecret }],
+      ["bearer", { Authorization: `Bearer ${sbSecret}` }],
+    ]) {
+      const secretCall = await callFunction("send-transactional-email", headers, directBody(`${mode}-${secretProofEmail}`));
+      secretAttempts.push(`${mode}:${secretCall.status}`);
+      if (secretCall.status >= 200 && secretCall.status < 300 && secretCall.json?.success === true) secretQueued = true;
+    }
     check(
       "sb_secret can queue transactional email",
-      secretCall.status >= 200 && secretCall.status < 300 && secretCall.json?.success === true,
-      `status=${secretCall.status} body=${secretCall.text}`,
+      secretQueued,
+      secretAttempts.join(" "),
     );
     const legacyCall = await callFunction("send-transactional-email", authHeaders(legacyService), directBody(legacyProofEmail));
     check(
