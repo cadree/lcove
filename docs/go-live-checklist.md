@@ -39,7 +39,7 @@ In the dashboard SQL editor, or with `psql` against this project's connection st
 
 If a notice says this role could not change publication `supabase_realtime` (that publication is owned by `supabase_admin`), add these tables under Database, Publications, `supabase_realtime`:
 
-`post_likes`, `post_comments`, `messages`, `typing_indicators`, `message_read_receipts`, `notifications`, `live_streams`, `stream_reactions`, `story_views`, `fund_distributions`, `conversation_participants`, `project_checklist_items`, `project_item_suggestions`, `events`, `projects`, `ticket_tiers`, `ticket_orders`, `event_attendees`, `event_check_ins`, `donations`, `stream_chat`, `board_items`.
+`post_likes`, `post_comments`, `messages`, `typing_indicators`, `message_read_receipts`, `notifications`, `live_streams`, `stream_reactions`, `stream_tips`, `stream_gifts`, `story_views`, `fund_distributions`, `conversation_participants`, `project_checklist_items`, `project_item_suggestions`, `events`, `projects`, `ticket_tiers`, `ticket_orders`, `event_attendees`, `event_check_ins`, `donations`, `stream_chat`, `board_items`.
 
 `profiles` is not in that list. Realtime would send every column of a row the subscriber can select, including phone and exam fields that `profiles_public` omits. The landing stats query does not subscribe to `profiles`. If a notice says `profiles` could not be removed from the publication, remove it on that same screen.
 
