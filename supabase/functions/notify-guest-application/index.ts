@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { jwtRole } from "../_shared/require-caller.ts";
+import { requestRole } from "../_shared/require-caller.ts";
 import { authorizeGuestApplication, escapeHtml } from "../_shared/notification-auth.mjs";
 import { httpStatusForError } from "../_shared/http-error.mjs";
 
@@ -94,7 +94,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const role = jwtRole(req.headers.get("Authorization"));
+  const role = requestRole(req);
 
   try {
     const body = await req.json();

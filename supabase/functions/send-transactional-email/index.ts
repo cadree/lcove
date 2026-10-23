@@ -2,7 +2,7 @@ import * as React from 'npm:react@18.3.1'
 import { renderAsync } from 'npm:@react-email/components@0.0.22'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { TEMPLATES } from '../_shared/transactional-email-templates/registry.ts'
-import { jwtRole } from '../_shared/require-caller.ts'
+import { requestRole } from '../_shared/require-caller.ts'
 import { authorizeTransactionalEmail } from '../_shared/notification-auth.mjs'
 
 // Recorded on the queue payload. process-email-queue sends with Resend and
@@ -26,8 +26,9 @@ function generateToken(): string {
     .join('')
 }
 
-// Only another edge function, using the service role key, may enqueue mail.
-// The anon key is a project JWT, so verify_jwt alone is not a caller check.
+// Only another edge function, using this project's secret key, may enqueue mail.
+// Legacy service_role JWTs and sb_secret_ keys both count. The publishable key
+// does not. verify_jwt alone is not a caller check.
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -35,7 +36,7 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
-  const caller = authorizeTransactionalEmail({ role: jwtRole(req.headers.get('Authorization')) })
+  const caller = authorizeTransactionalEmail({ role: requestRole(req) })
   if (!caller.ok) {
     return new Response(JSON.stringify({ error: caller.error }), {
       status: caller.status,

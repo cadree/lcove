@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { jwtRole, jwtSubject, requireUserOrService } from "../_shared/require-caller.ts";
+import { jwtSubject, requestRole, requireUserOrService } from "../_shared/require-caller.ts";
 import { chatAlertChannels } from "../_shared/project-collaborations.mjs";
 
 const corsHeaders = {
@@ -75,7 +75,7 @@ serve(async (req) => {
       });
     }
 
-    const role = jwtRole(req.headers.get("Authorization"));
+    const role = requestRole(req);
     const callerId = jwtSubject(req.headers.get("Authorization"));
     if (role !== "service_role" && message.sender_id !== callerId) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
