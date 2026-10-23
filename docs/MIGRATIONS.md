@@ -10,6 +10,8 @@ bash scripts/build-supabase-bundle.sh
 
 Do not use `supabase db push` for this project. Do not run the old `migration/` folder at the repo root. Do not apply these files from the integration branch.
 
+A free staging project for Cloudflare preview builds is separate from ether-prod. `bash scripts/apply-staging-project.sh` applies this bundle and `supabase/seed/staging.sql` there. It refuses ref `aykopqinnnssxdhxqruo`. The steps are in `docs/preview-staging.md`.
+
 ## Timestamp rule
 
 Every timestamp prefix must be unique and non-decreasing. The bundle script exits if a later file sorts before an earlier one, or if two files share a prefix.
@@ -51,5 +53,6 @@ These are the migration files that are not on `cursor/ether-combined`. Order is 
 | `20261020220000_story_like_notices_and_direct_chats.sql` | #28 | not recorded |
 | `20261020230000_post_video_embeds.sql` | #33 | not applied |
 | `20261022120000_objectionable_text_record_fields.sql` | #35 | recorded |
+| `20261023040000_reject_objectionable_text_security_definer.sql` | #39 | hot-fixed; file not recorded |
 
-`20261020193000_community_fund_fees_source_types.sql` repeats the source-type check from `20261020035500_community_fund_fee_sources.sql` and is safe to apply after it. The AI-reasons file and the video-embed file have not been applied. The story-like file was not listed as recorded when #29 was written. `20261022120000_objectionable_text_record_fields.sql` is already applied and recorded on ether-prod. It replaces `reject_objectionable_text` so the trigger reads `to_jsonb(NEW)` and a profile insert no longer crashes on a missing `content` field. The allowed text is unchanged.
+`20261020193000_community_fund_fees_source_types.sql` repeats the source-type check from `20261020035500_community_fund_fee_sources.sql` and is safe to apply after it. The AI-reasons file and the video-embed file have not been applied. The story-like file was not listed as recorded when #29 was written. `20261022120000_objectionable_text_record_fields.sql` is already applied and recorded on ether-prod. It replaces `reject_objectionable_text` so the trigger reads `to_jsonb(NEW)` and a profile insert no longer crashes on a missing `content` field. The allowed text is unchanged. `20261023040000_reject_objectionable_text_security_definer.sql` puts `SECURITY DEFINER` and `search_path = public, pg_temp` back on that function. ether-prod already has the same `ALTER`. The filename is not recorded there until this file is applied. Staging gets it with the rest of the bundle.

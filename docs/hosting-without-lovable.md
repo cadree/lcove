@@ -48,7 +48,7 @@ Cloudflare Pages and Netlify both honor that file from the output directory. Do 
 
 ### Environment variables
 
-Set these in the host's environment settings for Production (and Preview, if you want preview URLs to talk to this project). They are public client values. Vite inlines them at build time. Changing them requires a new build.
+Set these in the host's **Production** environment. Do not copy them into **Preview**. A preview build that contains this project writes posts, likes, and accounts into ether-prod. Preview uses a separate free Supabase project. See `docs/preview-staging.md`. These are public client values. Vite inlines them at build time. Changing them requires a new build.
 
 | Name | What to paste |
 | --- | --- |
@@ -73,7 +73,7 @@ Do this in the Cloudflare Pages project after a production deployment has succee
 5. Open `https://etherbylcove.com` and `https://etherbylcove.com/auth`. Both should render the app, not a host 404.
 6. In project `aykopqinnnssxdhxqruo`, set the site URL and redirect URLs to `https://etherbylcove.com` before sending people to the new host. The list is in `docs/supabase-migration.md`.
 
-If the name still points at Lovable, finish the Supabase and env steps on a `pages.dev` URL first. Switch DNS only when that URL signs in against `aykopqinnnssxdhxqruo`.
+If the name still points at Lovable, finish the Supabase and env steps on the production `pages.dev` URL first (`https://ether-staging.pages.dev`, the name with no branch in front). That deployment is built from the production branch and uses the Production variables above. A branch preview URL (`https://<branch>.ether-staging.pages.dev`) must not use this project. Switch DNS only when the production URL signs in against `aykopqinnnssxdhxqruo`.
 
 ## Netlify (free tier)
 

@@ -183,7 +183,7 @@ Leave `VITE_VAPID_PUBLIC_KEY` and `VITE_WALLET_PASSES_ENABLED` unset until push 
 3. Framework preset: **None**, or **Vite** if the form offers it.
 4. Build command: `npm run build`
 5. Build output directory: `dist`
-6. Add the three environment variables above for **Production**. Add them for **Preview** too if preview URLs should talk to ether-prod.
+6. Add the three environment variables above for **Production** only. Do not add them under **Preview**. Preview deployments must use a second Supabase project. The steps are in `docs/preview-staging.md`.
 7. Save and deploy. Open the `pages.dev` address Cloudflare gives you.
 
 ### SPA redirect

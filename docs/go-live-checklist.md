@@ -132,7 +132,7 @@ Commit that file. `src/integrations/supabase/client.ts` only re-exports `src/lib
 
 ## 10. Host the client
 
-Follow `docs/hosting-without-lovable.md`. Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_SUPABASE_PROJECT_ID` (`aykopqinnnssxdhxqruo`) on the host and rebuild. Point `etherbylcove.com` only after a `pages.dev` URL signs in.
+Follow `docs/hosting-without-lovable.md`. Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_SUPABASE_PROJECT_ID` (`aykopqinnnssxdhxqruo`) on the host's **Production** environment and rebuild. Do not put those values on **Preview**. Preview uses a second project, in `docs/preview-staging.md`. Point `etherbylcove.com` only after the production `pages.dev` URL signs in.
 
 ## 11. Merge
 
