@@ -155,7 +155,7 @@ export function EventEmailIdentitySettings({ eventId, hostDisplayName }: Props) 
           From: <span className="text-primary">{effectiveFromName}</span> &lt;events@etherbylcove.com&gt;
         </div>
         <div className="text-sm">
-          Reply-To: {replyTo || "support@notify.etherbylcove.com"}
+          Reply-To: {isVerified && replyTo ? replyTo : "No reply-to until this address is verified"}
           {isVerified && <Badge variant="secondary" className="ml-2 gap-1"><CheckCircle2 className="h-3 w-3" /> Verified</Badge>}
         </div>
       </Card>

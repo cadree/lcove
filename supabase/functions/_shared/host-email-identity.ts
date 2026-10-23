@@ -5,6 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import {
   HOST_EVENT_FROM_ADDRESS,
   PLATFORM_FALLBACK_REPLY_TO,
+  eventReplyTo,
   hostFromHeader,
   sanitizeDisplayName,
 } from "./host-email-address.mjs";
@@ -15,7 +16,7 @@ export interface HostIdentity {
   fromName: string;
   fromHeader: string; // RFC 5322 ready: "Name via Ether" <events@...>
   fromAddress: string;
-  replyTo: string;
+  replyTo: string | null;
   replyToVerified: boolean;
   organizerName: string;
   hostDisplayName: string;
@@ -91,9 +92,7 @@ export async function resolveHostIdentity(
   const replyToVerified = Boolean(
     branding?.reply_to_email && branding?.reply_to_verified_at
   );
-  const replyTo = replyToVerified
-    ? branding.reply_to_email
-    : PLATFORM_FALLBACK_REPLY_TO;
+  const replyTo = eventReplyTo(replyToVerified ? branding.reply_to_email : null);
 
   return {
     fromName,
