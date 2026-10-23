@@ -108,10 +108,16 @@ BEGIN
         RAISE EXCEPTION 'FAIL % % was allowed', role_name, verb;
       EXCEPTION
         WHEN insufficient_privilege THEN
-          RAISE NOTICE 'PASS % % denied', role_name, verb;
+          RAISE NOTICE 'PASS % % denied (%)', role_name, verb, SQLERRM;
         WHEN OTHERS THEN
-          IF SQLSTATE = '42501' THEN
-            RAISE NOTICE 'PASS % % denied', role_name, verb;
+          -- A joined security_barrier view is rejected before the ACL check.
+          -- The privilege row above already requires that INSERT/UPDATE/DELETE
+          -- are not granted. This statement must still not write.
+          IF SQLERRM ILIKE 'cannot insert into view%'
+            OR SQLERRM ILIKE 'cannot update view%'
+            OR SQLERRM ILIKE 'cannot delete from view%'
+            OR SQLSTATE = '42501' THEN
+            RAISE NOTICE 'PASS % % denied (%)', role_name, verb, SQLERRM;
           ELSE
             RAISE;
           END IF;
