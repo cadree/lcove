@@ -49,12 +49,41 @@ jobs:
       - name: Deploy event email functions to staging
         run: |
           set -euo pipefail
+          mkdir -p supabase/functions/caller-key-shape
+          python3 -c 'open("supabase/functions/caller-key-shape/index.ts","w").write("""Deno.serve(() => {
+            const shape = (value: string) => {
+              if (!value) return \"missing\";
+              if (value.startsWith(\"sb_publishable_\")) return `sb_publishable:${value.length}`;
+              if (value.startsWith(\"sb_secret_\")) return `sb_secret:${value.length}`;
+              if (value.startsWith(\"eyJ\")) return `eyJ:${value.length}`;
+              if (value.trim().startsWith(\"{\")) return `json:${value.length}`;
+              return `other:${value.length}`;
+            };
+            const secretJson = Deno.env.get(\"SUPABASE_SECRET_KEYS\") ?? \"\";
+            const publishableJson = Deno.env.get(\"SUPABASE_PUBLISHABLE_KEYS\") ?? \"\";
+            let secretNames: string[] = [];
+            let publishableNames: string[] = [];
+            try { secretNames = Object.keys(JSON.parse(secretJson)); } catch { /* unset */ }
+            try { publishableNames = Object.keys(JSON.parse(publishableJson)); } catch { /* unset */ }
+            return Response.json({
+              service: shape(Deno.env.get(\"SUPABASE_SERVICE_ROLE_KEY\") ?? \"\"),
+              anon: shape(Deno.env.get(\"SUPABASE_ANON_KEY\") ?? \"\"),
+              secretSingle: shape(Deno.env.get(\"SUPABASE_SECRET_KEY\") ?? \"\"),
+              publishableSingle: shape(Deno.env.get(\"SUPABASE_PUBLISHABLE_KEY\") ?? \"\"),
+              secretJson: shape(secretJson),
+              publishableJson: shape(publishableJson),
+              secretNames,
+              publishableNames,
+            });
+          });
+          """)'
           supabase functions deploy \
             send-rsvp-confirmation \
             send-transactional-email \
             send-event-reminder \
             send-event-invite \
             send-bulk-attendee-reminder \
+            caller-key-shape \
             --project-ref "$STAGING_PROJECT_REF" \
             --use-api
 
@@ -71,3 +100,9 @@ jobs:
             exit 1
           fi
           PROOF_API_KEYS_FILE="$keys" node scripts/prove-event-email-auth.mjs
+
+      - name: Remove runtime key shape probe
+        if: always()
+        run: |
+          supabase functions delete caller-key-shape --project-ref "$STAGING_PROJECT_REF" --yes || true
+          rm -rf supabase/functions/caller-key-shape

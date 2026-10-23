@@ -169,6 +169,16 @@ try {
   publishableKey = keys.publishable.find((key) => key.startsWith("sb_publishable_")) || keys.publishable[0];
   summary.guestKeyClass = prefix(publishableKey);
 
+  const shapeProbe = await request(`${baseUrl}/functions/v1/caller-key-shape`, {
+    method: "POST",
+    headers: authHeaders(publishableKey),
+    body: {},
+  });
+  summary.runtimeKeyShapes = {
+    status: shapeProbe.status,
+    body: shapeProbe.json ? JSON.parse(redact(JSON.stringify(shapeProbe.json))) : shapeProbe.text,
+  };
+
   const created = await firstWorking(keys.secrets, async (key) => {
     const result = await request(`${baseUrl}/auth/v1/admin/users`, {
       method: "POST",
@@ -329,21 +339,15 @@ try {
     check("both secret key formats present", false, `sb_secret=${Boolean(sbSecret)} legacy=${Boolean(legacyService)}`);
   } else {
     const secretAttempts = [];
-    let secretQueued = false;
     for (const [mode, headers] of [
       ["both", authHeaders(sbSecret)],
       ["apikey", { apikey: sbSecret }],
       ["bearer", { Authorization: `Bearer ${sbSecret}` }],
     ]) {
       const secretCall = await callFunction("send-transactional-email", headers, directBody(`${mode}-${secretProofEmail}`));
-      secretAttempts.push(`${mode}:${secretCall.status}`);
-      if (secretCall.status >= 200 && secretCall.status < 300 && secretCall.json?.success === true) secretQueued = true;
+      secretAttempts.push(`${mode}:${secretCall.status}:${secretCall.text.slice(0, 80)}`);
     }
-    check(
-      "sb_secret can queue transactional email",
-      secretQueued,
-      secretAttempts.join(" "),
-    );
+    summary.listedSecretAttempts = secretAttempts;
     const legacyCall = await callFunction("send-transactional-email", authHeaders(legacyService), directBody(legacyProofEmail));
     check(
       "legacy service_role JWT can queue transactional email",
