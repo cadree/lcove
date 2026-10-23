@@ -327,6 +327,19 @@ async function handleApi(route, state, log) {
     return;
   }
 
+  if (url.pathname === "/storage/v1/object/media" && request.method() === "DELETE") {
+    const body = request.postDataJSON?.() || {};
+    const prefixes = Array.isArray(body.prefixes) ? body.prefixes.map((prefix) => String(prefix)) : [];
+    for (const prefix of prefixes) {
+      for (const key of [...state.files.keys()]) {
+        if (key === prefix || key.startsWith(`${prefix}/`)) state.files.delete(key);
+      }
+    }
+    log(`removed media ${prefixes.join(",") || "(none)"}`);
+    await json(prefixes.map((name) => ({ name })));
+    return;
+  }
+
   if (url.pathname.startsWith("/storage/v1/object/media/")) {
     const filePath = decodeURIComponent(url.pathname.replace("/storage/v1/object/media/", ""));
     const raw = request.postDataBuffer?.() || Buffer.alloc(0);
@@ -348,6 +361,10 @@ async function handleApi(route, state, log) {
       const row = owned.find((item) => item.id === target);
       if (!id || !row || row.host_id !== id) {
         await json({ message: "You can only delete your own streams", code: "42501" }, 403);
+        return;
+      }
+      if (row.is_live === true) {
+        await json({ message: "End the live stream before deleting it", code: "42501" }, 403);
         return;
       }
       if (state.child && state.child.parent_event_id === target) state.child.parent_event_id = null;
@@ -509,10 +526,10 @@ async function prove(browserType, label) {
 
     await viewer.getByTestId("chat-input").fill("hello from the phone");
     await viewer.getByTestId("chat-send").click();
-    await host.getByText("hello from the phone").waitFor({ timeout: 12_000 });
+    await host.getByText("hello from the phone").waitFor({ timeout: 4_000 });
     await host.getByTestId("chat-input").fill("host hears you");
     await host.getByTestId("chat-send").click();
-    await viewer.getByText("host hears you").waitFor({ timeout: 12_000 });
+    await viewer.getByText("host hears you").waitFor({ timeout: 4_000 });
 
     await viewer.locator('[data-testid="reaction-❤️"]').click();
     await host.getByTestId("cheer-log").getByText("❤️").waitFor({ timeout: 12_000 });
@@ -528,6 +545,16 @@ async function prove(browserType, label) {
     if (!state.stream.replay_url || !state.stream.replay_available) {
       throw new Error(`replay was not stored: ${state.stream.replay_url || "none"}`);
     }
+    const storedReplay = [...state.files.values()].find((file) => file.type.includes("webm"));
+    if (storedReplay) {
+      const { readWebmDurationMs } = await import("../src/lib/webmDuration.ts");
+      const duration = readWebmDurationMs(storedReplay.bytes);
+      result.replayDuration = duration;
+      log(`replay duration ${duration}`);
+      if (!(duration > 0) || !Number.isFinite(duration)) {
+        throw new Error(`replay duration was ${duration}`);
+      }
+    }
     await viewer.getByTestId("replay-video").waitFor({ timeout: 15_000 });
     await viewer.getByTestId("replay-video").click();
     result.replay = await waitForFrames(viewer, "replay-video");
@@ -542,10 +569,24 @@ async function prove(browserType, label) {
     const childCard = host.getByTestId(`stream-card-${CHILD_ID}`);
     await parentCard.waitFor();
     await childCard.waitFor();
+    const statusText = (await parentCard.getByTestId("stream-status").innerText()).replace(/\s+/g, " ").trim();
+    if (statusText !== "Replay") throw new Error(`browse status badge was ${JSON.stringify(statusText)}`);
+    const childStatus = (await childCard.getByTestId("stream-status").innerText()).replace(/\s+/g, " ").trim();
+    if (childStatus !== "Ended") throw new Error(`child status badge was ${JSON.stringify(childStatus)}`);
+    await shot(host, `${label}-browse-badge.png`);
+    const replayUrl = state.stream.replay_url;
     await parentCard.getByTestId("delete-stream").click();
     await host.getByTestId("confirm-delete-stream").click();
     await parentCard.waitFor({ state: "hidden", timeout: 10_000 });
     await childCard.waitFor();
+    const removedStatus = await host.evaluate(async (url) => {
+      const response = await fetch(url);
+      return response.status;
+    }, replayUrl);
+    if (removedStatus !== 404 && removedStatus !== 400) {
+      throw new Error(`replay stayed public at ${removedStatus} for ${replayUrl}`);
+    }
+    result.replayRemoved = removedStatus;
     result.deleted = state.deleted === true && state.child?.parent_event_id === null;
     await shot(host, `${label}-deleted.png`);
     if (!result.deleted) {

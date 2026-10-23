@@ -33,7 +33,7 @@ interface UntypedTable {
 }
 
 export function fromUntyped(
-  table: "content_reports" | "stream_chat" | "content_likes" | "profile_films" | "stream_gifts",
+  table: "content_reports" | "stream_chat" | "content_likes" | "profile_films" | "stream_gifts" | "stream_gift_notices",
 ): UntypedTable {
   const client = supabase as unknown as {
     from: (name: typeof table) => UntypedTable;

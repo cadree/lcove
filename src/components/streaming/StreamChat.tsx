@@ -59,6 +59,8 @@ export function StreamChat({ streamId, className = "" }: { streamId: string; cla
       `stream_id=eq.${streamId}`,
       queryClient,
       ["stream-chat", streamId],
+      "INSERT",
+      { intervalMs: 1000, keepPolling: true },
     );
   }, [streamId, queryClient]);
 
@@ -78,13 +80,31 @@ export function StreamChat({ streamId, className = "" }: { streamId: string; cla
       return;
     }
     setBody("");
+    const sent = text.slice(0, 500);
+    const meta = user.user_metadata as { display_name?: unknown } | undefined;
+    const displayName = typeof meta?.display_name === "string" ? meta.display_name : null;
+    const optimistic: ChatRow = {
+      id: `local-${crypto.randomUUID()}`,
+      stream_id: streamId,
+      user_id: user.id,
+      body: sent,
+      created_at: new Date().toISOString(),
+      display_name: displayName,
+    };
+    queryClient.setQueryData<ChatRow[]>(["stream-chat", streamId], (current = []) => [...current, optimistic]);
     const { error } = await fromUntyped("stream_chat").insert({
       stream_id: streamId,
       user_id: user.id,
-      body: text.slice(0, 500),
+      body: sent,
     });
-    if (error) setBody(text);
-    else queryClient.invalidateQueries({ queryKey: ["stream-chat", streamId] });
+    if (error) {
+      setBody(text);
+      queryClient.setQueryData<ChatRow[]>(["stream-chat", streamId], (current = []) => (
+        current.filter((row) => row.id !== optimistic.id)
+      ));
+      return;
+    }
+    void queryClient.invalidateQueries({ queryKey: ["stream-chat", streamId] });
   };
 
   if (!user) return null;

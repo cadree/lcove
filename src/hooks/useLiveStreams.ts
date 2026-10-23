@@ -10,6 +10,8 @@ import { notifyLiveStream } from '@/lib/notifications';
 import { SHOT_USER_ID, shotHostPreview, shotPeople, shotSessionEnabled, shotViewerPreview } from '@/lib/shotSession';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { assertCleanText } from '@/lib/objectionableText';
+import { giftNoticeLabel } from '@/lib/giftNotice';
+import { mediaObjectPath } from '@/lib/replayStorage';
 
 export const SHOT_STREAM_ID = "0412aaaa-0000-4000-8000-0000000000c1";
 
@@ -252,13 +254,13 @@ export const useStreamCheers = (streamId: string | undefined) => {
     queryKey: ["stream-gifts", streamId],
     enabled: !!streamId,
     queryFn: async () => {
-      const { data, error } = await fromUntyped("stream_gifts")
-        .select("id, gift, created_at")
+      const { data, error } = await fromUntyped("stream_gift_notices")
+        .select("id, gift, created_at, sender_name")
         .eq("stream_id", streamId!)
         .order("created_at", { ascending: false })
         .limit(20);
       if (error) return [];
-      return (data || []) as { id: string; gift: string; created_at: string }[];
+      return (data || []) as { id: string; gift: string; created_at: string; sender_name: string | null }[];
     },
   });
 
@@ -271,16 +273,14 @@ export const useStreamCheers = (streamId: string | undefined) => {
       queryClient,
       ["stream-tips", streamId],
     );
-    const stopGifts = watchRows(
-      `stream-gifts-${streamId}`,
-      "stream_gifts",
-      `stream_id=eq.${streamId}`,
-      queryClient,
-      ["stream-gifts", streamId],
-    );
+    // The notice view is not a realtime table. stream_gifts changes are
+    // filtered by sender-or-host RLS, so other viewers never get that event.
+    const refreshGifts = window.setInterval(() => {
+      void queryClient.invalidateQueries({ queryKey: ["stream-gifts", streamId] });
+    }, 1000);
     return () => {
       stopTips();
-      stopGifts();
+      window.clearInterval(refreshGifts);
     };
   }, [streamId, queryClient]);
 
@@ -297,7 +297,7 @@ export const useStreamCheers = (streamId: string | undefined) => {
     })),
     ...gifts.map((gift) => ({
       id: gift.id,
-      label: gift.gift === "rose" ? "Rose" : gift.gift === "star" ? "Star" : gift.gift === "crown" ? "Crown" : gift.gift,
+      label: giftNoticeLabel(gift.sender_name, gift.gift),
       created_at: gift.created_at,
     })),
   ].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 8);
@@ -559,7 +559,7 @@ export const useDeleteStream = () => {
       // First verify user owns this stream
       const { data: stream, error: fetchError } = await supabase
         .from('live_streams')
-        .select('host_id')
+        .select('host_id, replay_url')
         .eq('id', streamId)
         .single();
 
@@ -578,6 +578,13 @@ export const useDeleteStream = () => {
           .eq('id', streamId)
           .eq('host_id', user.id);
         if (deleteError) throw deleteError;
+      }
+
+      if (stream.replay_url) {
+        const path = mediaObjectPath(stream.replay_url);
+        if (!path) throw new Error('Could not remove the replay file');
+        const { error: storageError } = await supabase.storage.from('media').remove([path]);
+        if (storageError) throw storageError;
       }
     },
     onSuccess: () => {

@@ -44,6 +44,7 @@ import {
   replayFileExtension,
   type LiveKitSession,
 } from "@/lib/livekitSession";
+import { fixWebmDuration } from "@/lib/webmDuration";
 import {
   cameraConstraintAttempts,
   captureDevice,
@@ -146,13 +147,14 @@ async function publishLocal(room: Room, media: MediaStream) {
   }
 }
 
-async function storeReplay(userId: string, streamId: string, blob: Blob, mime: string) {
+async function storeReplay(userId: string, streamId: string, blob: Blob, mime: string, durationMs: number) {
   const plan = replayUploadPlan(blob.size);
   if (plan.action === "keep-local") return { replayUrl: null as string | null, note: plan.message };
   const extension = replayFileExtension(mime);
   const contentType = replayContentType(mime);
+  const uploadBlob = contentType === "video/webm" ? await fixWebmDuration(blob, durationMs) : blob;
   const fileName = `${userId}/replays/${streamId}-${Date.now()}.${extension}`;
-  const file = new File([blob], `replay.${extension}`, { type: contentType });
+  const file = new File([uploadBlob], `replay.${extension}`, { type: contentType });
   const { error } = await supabase.storage.from("media").upload(fileName, file, { contentType, upsert: false });
   if (error) throw error;
   return {
@@ -178,6 +180,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const recorderMimeRef = useRef<string>("video/webm");
+  const recordingStartedAtRef = useRef(0);
   const saveReplayRef = useRef(false);
   const cameraAttemptRef = useRef(0);
   const streamingRef = useRef(initialIsLive);
@@ -334,6 +337,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
       const timeslice = recorderTimeslice(mimeType);
       if (timeslice) mediaRecorder.start(timeslice);
       else mediaRecorder.start();
+      recordingStartedAtRef.current = Date.now();
       mediaRecorderRef.current = mediaRecorder;
       return true;
     } catch (err) {
@@ -507,7 +511,8 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
       let note = save ? "Stream ended." : "Stream ended. The recording was not saved.";
       if (save && blob && blob.size > 0 && user) {
         try {
-          const stored = await storeReplay(user.id, streamId, blob, recorderMimeRef.current);
+          const durationMs = recordingStartedAtRef.current ? Date.now() - recordingStartedAtRef.current : 0;
+          const stored = await storeReplay(user.id, streamId, blob, recorderMimeRef.current, durationMs);
           replayUrl = stored.replayUrl;
           note = stored.note || note;
         } catch (err: unknown) {
@@ -605,7 +610,8 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
             ? new Blob(recordedChunksRef.current, { type: replayContentType(mime) })
             : null;
           if (!blob) return;
-          void storeReplay(userId, streamId, blob, mime).then((stored) => supabase
+          const durationMs = recordingStartedAtRef.current ? Date.now() - recordingStartedAtRef.current : 0;
+          void storeReplay(userId, streamId, blob, mime, durationMs).then((stored) => supabase
             .from("live_streams")
             .update({
               is_live: false,
