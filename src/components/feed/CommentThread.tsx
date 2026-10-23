@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
 import { Trash2, Reply, ChevronDown, ChevronUp, Flag } from 'lucide-react';
@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { ReportDialog } from '@/components/safety/ReportDialog';
+import { InlineError } from '@/components/ui/inline-error';
+import { writeError } from '@/lib/writeError';
 
 interface Comment {
   id: string;
@@ -24,7 +26,7 @@ interface Comment {
 
 interface CommentThreadProps {
   comments: Comment[];
-  onAddComment: (content: string, parentId?: string) => void;
+  onAddComment: (content: string, parentId?: string) => Promise<void>;
   onDeleteComment: (commentId: string) => void;
   isCommenting: boolean;
 }
@@ -201,12 +203,22 @@ const CommentThread = ({
   const { user } = useAuth();
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const errorId = useId();
 
-  const handleSubmit = () => {
-    if (!newComment.trim()) return;
-    onAddComment(newComment.trim(), replyingTo || undefined);
+  const handleSubmit = async () => {
+    const text = newComment.trim();
+    if (!text || isCommenting) return;
+    setError(null);
+    try {
+      await onAddComment(text, replyingTo || undefined);
+    } catch (err) {
+      setError(writeError(err, 'Failed to add comment'));
+      return;
+    }
     setNewComment('');
     setReplyingTo(null);
+    setError(null);
   };
 
   const handleReply = (parentId: string) => {
@@ -244,7 +256,12 @@ const CommentThread = ({
             <Textarea
               placeholder={replyingTo ? 'Write a reply...' : 'Add a comment...'}
               value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
+              onChange={(e) => {
+                setNewComment(e.target.value);
+                setError(null);
+              }}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? errorId : undefined}
               className="min-h-[60px] resize-none bg-muted/30 border-border/50 text-sm"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -253,6 +270,7 @@ const CommentThread = ({
               }}
             />
           </div>
+          <InlineError id={errorId} message={error} />
           
           <div className="flex justify-end">
             <Button

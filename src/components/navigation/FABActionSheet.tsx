@@ -49,6 +49,7 @@ export function FABActionSheet({ open, onOpenChange }: FABActionSheetProps) {
         content: data.content,
         mediaType: 'video',
         embed: data.embed,
+        inlineError: true,
       });
       setShowPostDialog(false);
       return;
@@ -64,6 +65,7 @@ export function FABActionSheet({ open, onOpenChange }: FABActionSheetProps) {
       content: data.content,
       file: fileToUpload,
       mediaType: dbMediaType as 'photo' | 'video' | 'text',
+      inlineError: true,
     });
     setShowPostDialog(false);
   };

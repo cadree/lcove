@@ -41,21 +41,29 @@ function dialogMaxWidth(caller: React.CSSProperties["maxWidth"] | undefined) {
   return DIALOG_MAX_WIDTH;
 }
 
+type DialogContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+  fullscreen?: boolean;
+};
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, style, ...props }, ref) => (
+  DialogContentProps
+>(({ className, children, style, fullscreen = false, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden p-4">
+    <div className={cn(
+      "fixed inset-0 z-50 flex overflow-hidden",
+      fullscreen ? "items-stretch justify-stretch p-0" : "items-center justify-center p-4",
+    )}>
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
-          "relative z-50 grid w-full min-w-0 max-w-lg",
-          dialogContain,
-          "gap-4 rounded-[16px] border border-border bg-card p-6 shadow-elevated",
+          "relative z-50 w-full min-w-0",
+          fullscreen
+            ? "flex h-[100dvh] max-h-[100dvh] max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 bg-background p-0 shadow-none"
+            : "grid max-w-lg gap-4 rounded-[16px] border border-border bg-card p-6 shadow-elevated max-h-[85vh] overflow-x-hidden overflow-y-auto scrollbar-thin",
+          !fullscreen && dialogContain,
           "data-[state=open]:animate-scale-in data-[state=closed]:animate-scale-out",
-          "max-h-[85vh] overflow-x-hidden overflow-y-auto scrollbar-thin",
           className
         )}
         style={{
@@ -63,7 +71,7 @@ const DialogContent = React.forwardRef<
           boxSizing: "border-box",
           width: "100%",
           minWidth: 0,
-          maxWidth: dialogMaxWidth(style?.maxWidth),
+          maxWidth: fullscreen ? "100%" : dialogMaxWidth(style?.maxWidth),
         }}
         {...props}
       >
