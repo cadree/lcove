@@ -6202,18 +6202,21 @@ export type Database = {
       }
       reposts: {
         Row: {
+          caption: string | null
           created_at: string
           id: string
           post_id: string
           user_id: string
         }
         Insert: {
+          caption?: string | null
           created_at?: string
           id?: string
           post_id: string
           user_id: string
         }
         Update: {
+          caption?: string | null
           created_at?: string
           id?: string
           post_id?: string

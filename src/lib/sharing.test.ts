@@ -16,7 +16,10 @@ import {
   postPreviewPath,
   profileItemsWithReposts,
   rankSharePeople,
+  repostCaption,
+  repostQueryMissingCaption,
   repostedByLabel,
+  storyMediaFit,
   shareMessageInsert,
   shareUrlFor,
   shouldRecordPostView,
@@ -146,4 +149,21 @@ test("a sent post becomes a message that opens the original", () => {
     kind: "profile",
     profile: { user_id: "maya", display_name: "Maya", avatar_url: null },
   }), "https://etherbylcove.com/profile/maya");
+});
+
+test("a repost caption is optional and stays short", () => {
+  assert.equal(repostCaption("  "), null);
+  assert.equal(repostCaption("  night shoot  "), "night shoot");
+  assert.equal(repostCaption("a".repeat(600))?.length, 500);
+});
+
+test("a missing caption column can fall back", () => {
+  assert.equal(repostQueryMissingCaption("column reposts.caption does not exist"), true);
+  assert.equal(repostQueryMissingCaption("permission denied"), false);
+});
+
+test("a story made from a post shows the whole image", () => {
+  assert.equal(storyMediaFit("post-1"), "contain");
+  assert.equal(storyMediaFit(null), "cover");
+  assert.equal(storyMediaFit(undefined), "cover");
 });

@@ -1,5 +1,6 @@
 import React from 'react';
-import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Bell, Mail, Smartphone, FolderKanban, CalendarPlus, CheckCircle, Briefcase } from 'lucide-react';
+import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Bell, Mail, FolderKanban, CalendarPlus, CheckCircle, Briefcase } from 'lucide-react';
+import { IosPushInstallSteps } from '@/components/settings/IosPushInstallSteps';
 import { useNotificationPreferences } from '@/hooks/useNotifications';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { Switch } from '@/components/ui/switch';
@@ -44,7 +45,7 @@ const PreferenceItem: React.FC<PreferenceItemProps> = ({
 
 export const NotificationPreferences: React.FC = () => {
   const { preferences, isLoading, updatePreferences } = useNotificationPreferences();
-  const { isSupported, permission, requestPermission } = usePushNotifications();
+  const { isSupported, permission, requestPermission, status } = usePushNotifications();
 
   const handlePushToggle = async (checked: boolean) => {
     if (checked && permission !== 'granted') {
@@ -76,7 +77,10 @@ export const NotificationPreferences: React.FC = () => {
     );
   }
 
-  const pushDescription = !isSupported 
+  const needsHomeScreen = status === 'needs_home_screen';
+  const pushDescription = needsHomeScreen
+    ? 'Add Ether to your Home Screen, then turn push on'
+    : !isSupported
     ? 'Not supported in this browser'
     : permission === 'denied'
     ? 'Permission denied - enable in browser settings'
@@ -197,8 +201,9 @@ export const NotificationPreferences: React.FC = () => {
           description={pushDescription}
           checked={(preferences.push_enabled ?? false) && permission === 'granted'}
           onCheckedChange={handlePushToggle}
-          disabled={!isSupported || permission === 'denied'}
+          disabled={!isSupported || permission === 'denied' || needsHomeScreen}
         />
+        {needsHomeScreen && <IosPushInstallSteps />}
 
         <PreferenceItem
           icon={<Mail className="h-4 w-4" />}
@@ -208,13 +213,6 @@ export const NotificationPreferences: React.FC = () => {
           onCheckedChange={(checked) => updatePreferences({ email_enabled: checked })}
         />
 
-        <PreferenceItem
-          icon={<Smartphone className="h-4 w-4" />}
-          label="SMS Notifications"
-          description="Get text messages for new DMs"
-          checked={preferences.sms_enabled ?? false}
-          onCheckedChange={(checked) => updatePreferences({ sms_enabled: checked })}
-        />
       </div>
     </div>
   );

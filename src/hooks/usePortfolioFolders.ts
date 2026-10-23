@@ -314,3 +314,30 @@ export function useAddPortfolioItem(userId?: string) {
     },
   });
 }
+
+export function useDeletePortfolioItem(userId?: string) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const targetUserId = userId || user?.id;
+
+  return useMutation({
+    mutationFn: async ({ id, folderId }: { id: string; folderId: string }) => {
+      if (!user) throw new Error('Not authenticated');
+      const { error } = await supabase
+        .from('portfolio_items')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+      if (error) throw error;
+      return folderId;
+    },
+    onSuccess: (folderId) => {
+      queryClient.invalidateQueries({ queryKey: ['folder-posts', folderId, targetUserId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolio-folders', targetUserId] });
+      toast.success('Item deleted');
+    },
+    onError: () => {
+      toast.error('Could not delete that item');
+    },
+  });
+}

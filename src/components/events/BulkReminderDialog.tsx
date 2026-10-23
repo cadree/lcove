@@ -25,7 +25,6 @@ export function BulkReminderDialog({ open, onOpenChange, eventId, tiers }: Props
   const [statuses, setStatuses] = useState<string[]>(["confirmed"]);
   const [push, setPush] = useState(true);
   const [email, setEmail] = useState(true);
-  const [sms, setSms] = useState(false);
   const [sending, setSending] = useState(false);
 
   const toggle = (arr: string[], setArr: (a: string[]) => void, v: string) =>
@@ -36,7 +35,7 @@ export function BulkReminderDialog({ open, onOpenChange, eventId, tiers }: Props
     try {
       const res = await sendBulkReminder({
         eventId, title, body,
-        channels: { push, email, sms },
+        channels: { push, email, sms: false },
         filter: { tierIds: tierIds.length ? tierIds : undefined, status: statuses },
       });
       toast.success(`Reminder queued for ${res.recipientCount} attendees`);
@@ -102,16 +101,12 @@ export function BulkReminderDialog({ open, onOpenChange, eventId, tiers }: Props
               <span className="text-sm">Email</span>
               <Switch checked={email} onCheckedChange={setEmail} />
             </div>
-            <div className="flex items-center justify-between rounded-lg border border-border/40 p-2.5">
-              <span className="text-sm">SMS</span>
-              <Switch checked={sms} onCheckedChange={setSms} />
-            </div>
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSend} disabled={sending || (!push && !email && !sms)}>
+          <Button onClick={handleSend} disabled={sending || (!push && !email)}>
             {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
             Send
           </Button>

@@ -5,9 +5,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
+import { assertCleanText } from '@/lib/objectionableText';
 import {
   excludeBlocked,
   pickDirectConversation,
+  repostCaption,
   shareMessageInsert,
   storyReplyInsert,
   type SharePerson,
@@ -284,16 +287,23 @@ export function useSharingActions() {
   });
 
   const repostPost = useMutation({
-    mutationFn: async (postId: string) => {
+    mutationFn: async ({ postId, caption }: { postId: string; caption?: string }) => {
       if (!user) throw new Error('Sign in to repost');
-      const { error } = await supabase.from('reposts').insert({ user_id: user.id, post_id: postId });
+      const text = repostCaption(caption);
+      assertCleanText(text);
+      const row: { user_id: string; post_id: string; caption?: string } = {
+        user_id: user.id,
+        post_id: postId,
+      };
+      if (text) row.caption = text;
+      const { error } = await supabase.from('reposts').insert(row);
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Reposted');
       refresh();
     },
-    onError: (err) => toast.error(errorText(err, 'Could not repost')),
+    onError: (err) => toast.error(errorMessage(err, 'Could not repost')),
   });
 
   const undoRepost = useMutation({

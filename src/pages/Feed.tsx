@@ -22,7 +22,7 @@ import { cityFilterOptions, cityMatchesFilter } from "@/lib/cityNormalization";
 import { useFavorites } from "@/hooks/useFavorites";
 import { QuestCard } from "@/components/novi/QuestCard";
 import { useNoviQuests } from "@/hooks/useNoviQuests";
-import { nextQuest, studioQuest } from "@/lib/noviQuests";
+import { homeQuestCard } from "@/lib/noviQuests";
 import bearLogo from "@/assets/ether-bear-logo.webp";
 const Feed = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -36,8 +36,7 @@ const Feed = () => {
   const [studioOpen, setStudioOpen] = useState(false);
   const { favorites } = useFavorites();
   const { quests } = useNoviQuests();
-  const openQuest = nextQuest(quests);
-  const studio = studioQuest(quests);
+  const openQuest = homeQuestCard(quests);
   const {
     user
   } = useAuth();
@@ -178,7 +177,6 @@ const Feed = () => {
         </div>
 
         {openQuest && <div className="mb-4"><QuestCard quest={openQuest} /></div>}
-        {studio && <div className="mb-4"><QuestCard quest={studio} /></div>}
 
         <div className="mb-4 mt-2 flex items-center justify-end gap-2">
           <div className="flex gap-2">

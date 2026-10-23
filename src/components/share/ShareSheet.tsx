@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { RepostComposer } from '@/components/share/RepostComposer';
 import { Check, Link2, Repeat2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -108,6 +109,7 @@ export function ShareSheet({
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [note, setNote] = useState('');
+  const [repostOpen, setRepostOpen] = useState(false);
   const { recent, suggested, results, searching, isLoading } = useShareRecipients(open, search);
   const { postIds } = useMyReposts();
   const { sendShare, addPostToStory, repostPost, undoRepost } = useSharingActions();
@@ -219,14 +221,13 @@ export function ShareSheet({
               variant="outline"
               className="min-h-11"
               disabled={repostPost.isPending || undoRepost.isPending}
-              onClick={async () => {
-                try {
-                  if (alreadyReposted) await undoRepost.mutateAsync(post.id);
-                  else await repostPost.mutateAsync(post.id);
-                  close();
-                } catch {
-                  // The repost action already reports the error.
+              onClick={() => {
+                if (alreadyReposted) {
+                  undoRepost.mutate(post.id, { onSuccess: close });
+                  return;
                 }
+                setRepostOpen(true);
+                close();
               }}
             >
               <Repeat2 className="h-4 w-4" />
@@ -235,6 +236,16 @@ export function ShareSheet({
           )}
         </div>
       </SheetContent>
+      <RepostComposer
+        open={repostOpen}
+        onOpenChange={setRepostOpen}
+        pending={repostPost.isPending}
+        onSubmit={async (caption) => {
+          if (!post) return;
+          await repostPost.mutateAsync({ postId: post.id, caption });
+          close();
+        }}
+      />
     </Sheet>
   );
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { autoFileQuestId, dailyDecodeCopy, decryptedKey, fileCode, nextQuest, questViews, streakFromDays, studioQuest, suggestedActions, xpBar, xpLevel } from "./noviQuests.ts";
+import { autoFileQuestId, dailyDecodeCopy, decryptedKey, fileCode, homeQuestCard, nextQuest, questViews, streakFromDays, studioQuest, suggestedActions, xpBar, xpLevel } from "./noviQuests.ts";
 
 describe("novi quests", () => {
   it("uses the same level bands as the XP ledger", () => {
@@ -27,6 +27,17 @@ describe("novi quests", () => {
     assert.equal(quests.find((quest) => quest.id === "open_studio")?.state, "sealed");
     assert.equal(nextQuest(quests)?.id, "first_post");
     assert.equal(studioQuest(quests)?.id, "open_studio");
+    assert.equal(homeQuestCard(quests)?.id, "first_post");
+    assert.notEqual(homeQuestCard(quests)?.id, studioQuest(quests)?.id);
+    const studioOnly = questViews({
+      profileReady: true,
+      postCount: 1,
+      connectionCount: 1,
+      bookOpened: true,
+      completedProjects: 1,
+      studioOpened: false,
+    });
+    assert.equal(homeQuestCard(studioOnly)?.id, "open_studio");
   });
 
   it("files one decrypted quest per page load", () => {

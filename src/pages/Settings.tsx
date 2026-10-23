@@ -44,6 +44,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "@/hooks/useAdmin";
 import { useNotificationPreferences } from "@/hooks/useNotifications";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { IosPushInstallSteps } from "@/components/settings/IosPushInstallSteps";
 import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { assertCleanText, OBJECTIONABLE_MESSAGE } from "@/lib/objectionableText";
 import { toast } from "sonner";
@@ -454,7 +455,7 @@ const Settings = () => {
                 onChange={(e) => setPhone(e.target.value)}
                 className="bg-background/50"
               />
-              <p className="text-xs text-muted-foreground">For SMS notifications from the community</p>
+              <p className="text-xs text-muted-foreground">Optional contact number</p>
             </div>
 
             <Separator className="bg-border/50" />
@@ -789,20 +790,24 @@ const Settings = () => {
             <div className="flex items-center justify-between py-2">
               <div className="flex-1">
                 <Label className="text-foreground">Push Notifications</Label>
-                <p className="text-sm text-muted-foreground">
-                  {pushStatus === 'checking'
-                    ? "Checking status..."
-                    : pushStatus === 'not_supported' 
-                      ? "Not supported in this browser" 
-                      : pushStatus === 'permission_denied' 
-                        ? "Blocked in browser settings" 
-                        : pushStatus === 'subscribed' 
-                          ? "Enabled - receiving notifications" 
-                          : pushStatus === 'error'
-                            ? pushError || "Configuration error"
-                            : "Click to enable push notifications"}
-                </p>
-                {pushError && pushStatus !== 'permission_denied' && pushStatus !== 'error' && (
+                {pushStatus === 'needs_home_screen' ? (
+                  <IosPushInstallSteps />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {pushStatus === 'checking'
+                      ? "Checking status..."
+                      : pushStatus === 'not_supported'
+                        ? "Not supported in this browser"
+                        : pushStatus === 'permission_denied'
+                          ? "Blocked in browser settings"
+                          : pushStatus === 'subscribed'
+                            ? "Enabled - receiving notifications"
+                            : pushStatus === 'error'
+                              ? pushError || "Configuration error"
+                              : "Click to enable push notifications"}
+                  </p>
+                )}
+                {pushError && pushStatus !== 'permission_denied' && pushStatus !== 'error' && pushStatus !== 'needs_home_screen' && pushStatus !== 'not_supported' && (
                   <p className="text-xs text-destructive mt-1">{pushError}</p>
                 )}
               </div>
@@ -821,23 +826,10 @@ const Settings = () => {
                     }
                   }
                 }}
-                disabled={!pushSupported || pushStatus === 'not_supported' || pushLoading || pushStatus === 'checking'}
+                disabled={!pushSupported || pushStatus === 'not_supported' || pushStatus === 'needs_home_screen' || pushLoading || pushStatus === 'checking'}
               />
             </div>
 
-            <Separator className="bg-border/50" />
-
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <Label className="text-foreground">SMS Notifications</Label>
-                <p className="text-sm text-muted-foreground">Receive text messages (requires phone number)</p>
-              </div>
-              <Switch
-                checked={preferences?.sms_enabled ?? false}
-                onCheckedChange={(checked) => handleNotificationToggle('sms_enabled', checked)}
-                disabled={!phone}
-              />
-            </div>
           </div>
         </motion.section>
 
