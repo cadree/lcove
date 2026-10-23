@@ -451,7 +451,7 @@ const Store = () => {
                             showSeller={tabId !== 'my-store' && !storeIdParam}
                           />
                           {tabId === 'my-store' && (
-                            <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="absolute top-3 right-3 flex gap-1">
                               <Button
                                 variant="secondary"
                                 size="sm"

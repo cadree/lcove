@@ -44,7 +44,6 @@ import {
   Send,
   Image,
   Facebook,
-  Phone
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -605,7 +604,7 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
               <InviteGuestsDialog eventId={event.id} eventTitle={event.title}>
                 <Button variant="outline" size="sm" className="w-full gap-2">
                   <UserPlus className="h-4 w-4" />
-                  Invite Guests via Email / SMS
+                  Invite guests by email
                 </Button>
               </InviteGuestsDialog>
             )}
@@ -634,20 +633,6 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
                       <Bell className="w-3 h-3 mr-1" />
                     )}
                     Email All
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleSendReminder(true)}
-                    disabled={isSendingReminder}
-                    className="flex-1"
-                  >
-                    {isSendingReminder ? (
-                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                    ) : (
-                      <Phone className="w-3 h-3 mr-1" />
-                    )}
-                    Email + Text
                   </Button>
                 </div>
               </div>

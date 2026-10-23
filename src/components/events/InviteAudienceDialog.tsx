@@ -179,7 +179,7 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
   };
 
   // Effective reach per mode
-  const validExternals = externalGuests.filter(g => g.email.trim() || g.phone.trim());
+  const validExternals = externalGuests.filter(g => g.email.trim());
   const effectiveReach =
     mode === "filter" ? (estimate ?? 0)
     : mode === "specific" ? selectedUsers.length
@@ -215,7 +215,7 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
         toast.success(`Invite sent to ${res.recipientCount} users`);
       } else {
         if (!eventId) throw new Error("External invites require an event");
-        if (validExternals.length === 0) throw new Error("Add at least one guest with email or phone");
+        if (validExternals.length === 0) throw new Error("Add at least one guest with an email");
         const { data, error } = await supabase.functions.invoke("send-event-invite", {
           body: {
             eventId,
@@ -285,7 +285,7 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
               {mode === "filter" && estimating ? "…" : effectiveReach.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {mode === "external" ? "people will receive this invite via email/SMS" : "people will see this invite"}
+              {mode === "external" ? "people will receive this invite by email" : "people will see this invite"}
             </p>
           </div>
 
@@ -343,7 +343,7 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
           {mode === "external" && (
             <section className="space-y-2">
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">Guest details</Label>
-              <p className="text-xs text-muted-foreground -mt-1">Provide email or phone (or both) for each guest.</p>
+              <p className="text-xs text-muted-foreground -mt-1">Add an email for each guest.</p>
               <div className="space-y-2">
                 {externalGuests.map((g, idx) => (
                   <div key={g.id} className="grid grid-cols-12 gap-1.5 items-center">
@@ -354,18 +354,11 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
                       onChange={e => setExternalGuests(gs => gs.map(x => x.id === g.id ? { ...x, name: e.target.value } : x))}
                     />
                     <Input
-                      className="col-span-4"
+                      className="col-span-8"
                       placeholder="Email"
                       type="email"
                       value={g.email}
                       onChange={e => setExternalGuests(gs => gs.map(x => x.id === g.id ? { ...x, email: e.target.value } : x))}
-                    />
-                    <Input
-                      className="col-span-4"
-                      placeholder="Phone"
-                      type="tel"
-                      value={g.phone}
-                      onChange={e => setExternalGuests(gs => gs.map(x => x.id === g.id ? { ...x, phone: e.target.value } : x))}
                     />
                     <Button
                       size="icon"

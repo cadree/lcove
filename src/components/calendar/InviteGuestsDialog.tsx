@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Plus, X, Loader2, Mail, Phone, UserPlus } from "lucide-react";
+import { Send, Plus, X, Loader2, Mail, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
@@ -47,9 +47,9 @@ export function InviteGuestsDialog({ eventId, eventTitle, children }: InviteGues
   };
 
   const handleSend = async () => {
-    const validInvitees = invitees.filter((i) => i.email.trim() || i.phone.trim());
+    const validInvitees = invitees.filter((i) => i.email.trim());
     if (validInvitees.length === 0) {
-      toast.error("Add at least one email or phone number");
+      toast.error("Add at least one email");
       return;
     }
 
@@ -96,7 +96,7 @@ export function InviteGuestsDialog({ eventId, eventTitle, children }: InviteGues
 
         <div className="space-y-4 pt-2">
           <p className="text-sm text-muted-foreground">
-            Send email or SMS invitations to people — they don't need an account to RSVP or buy tickets.
+            Send email invitations to people — they don't need an account to RSVP or buy tickets.
           </p>
 
           {invitees.map((invitee, index) => (
@@ -117,29 +117,16 @@ export function InviteGuestsDialog({ eventId, eventTitle, children }: InviteGues
                 onChange={(e) => updateInvitee(invitee.id, "name", e.target.value)}
                 maxLength={100}
               />
-              <div className="grid grid-cols-2 gap-2">
-                <div className="relative">
-                  <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input
-                    type="email"
-                    placeholder="Email"
-                    className="pl-8"
-                    value={invitee.email}
-                    onChange={(e) => updateInvitee(invitee.id, "email", e.target.value)}
-                    maxLength={255}
-                  />
-                </div>
-                <div className="relative">
-                  <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input
-                    type="tel"
-                    placeholder="Phone"
-                    className="pl-8"
-                    value={invitee.phone}
-                    onChange={(e) => updateInvitee(invitee.id, "phone", e.target.value)}
-                    maxLength={20}
-                  />
-                </div>
+              <div className="relative">
+                <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  className="pl-8"
+                  value={invitee.email}
+                  onChange={(e) => updateInvitee(invitee.id, "email", e.target.value)}
+                  maxLength={255}
+                />
               </div>
             </div>
           ))}
@@ -155,7 +142,7 @@ export function InviteGuestsDialog({ eventId, eventTitle, children }: InviteGues
 
           <Button className="w-full gap-2" onClick={handleSend} disabled={sending}>
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {sending ? "Sending..." : `Send ${invitees.filter((i) => i.email || i.phone).length} Invitation${invitees.filter((i) => i.email || i.phone).length !== 1 ? "s" : ""}`}
+            {sending ? "Sending..." : `Send ${invitees.filter((i) => i.email.trim()).length} Invitation${invitees.filter((i) => i.email.trim()).length !== 1 ? "s" : ""}`}
           </Button>
         </div>
       </DialogContent>

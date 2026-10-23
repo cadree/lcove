@@ -8,9 +8,7 @@ import {
   Palette, 
   Music, 
   Sparkles,
-  Upload,
   Loader2,
-  X
 } from "lucide-react";
 import { useProfileCustomization } from "@/hooks/useProfileCustomization";
 import { useProfileLayout } from "@/hooks/useProfileLayout";
@@ -35,7 +33,7 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
   const { layout, isLoading: layoutLoading } = useProfileLayout();
   const [activeTab, setActiveTab] = useState("customize");
   const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [localPreview, setLocalPreview] = useState<string | null>(null);
   const initializedRef = useRef(false);
   const [ready, setReady] = useState(false);
 
@@ -151,9 +149,11 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
     toast.info("Preview mode - changes shown but not saved yet");
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleImageUpload = async (file: File) => {
     if (!file || !user) return;
+    const previewUrl = URL.createObjectURL(file);
+    setLocalPreview(previewUrl);
+    setCustomizationState(prev => ({ ...prev, backgroundType: 'image' }));
 
     setUploading(true);
     try {
@@ -180,6 +180,8 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
       console.error('Upload error:', error);
       toast.error(errorMessage(error, 'Failed to upload image'));
     } finally {
+      URL.revokeObjectURL(previewUrl);
+      setLocalPreview(null);
       setUploading(false);
     }
   };
@@ -257,54 +259,10 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
                 onChange={handleCustomizationChange}
                 onReset={handleReset}
                 onPreview={handlePreview}
+                onBackgroundFile={handleImageUpload}
+                backgroundUploading={uploading}
+                backgroundPreviewUrl={localPreview}
               />
-              
-              {/* Image upload for background */}
-              {customizationState.backgroundType === 'image' && (
-                <div className="mt-4 space-y-3">
-                  <Label className="text-sm font-medium">Background Image</Label>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                      className="flex-1"
-                    >
-                      {uploading ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Upload className="w-4 h-4 mr-2" />
-                      )}
-                      Upload Image
-                    </Button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                    />
-                  </div>
-                  {customizationState.backgroundValue?.startsWith('http') && (
-                    <div className="relative h-20 rounded-lg overflow-hidden">
-                      <img 
-                        src={customizationState.backgroundValue} 
-                        alt="Background preview" 
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        onClick={() => handleCustomizationChange({
-                          backgroundType: 'gradient',
-                          backgroundValue: 'from-primary/30 via-background to-accent/20',
-                        })}
-                        className="absolute top-2 right-2 p-1 bg-background/80 rounded-full"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
             </TabsContent>
 
             <TabsContent value="music" className="space-y-6 mt-0">

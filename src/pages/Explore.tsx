@@ -1,19 +1,18 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { CommunityMall } from "@/components/explore/CommunityMall";
 import { ExploreBrowse } from "@/components/explore/ExploreBrowse";
-import { toast } from "sonner";
 import { PeopleMatchCard } from "@/components/explore/PeopleMatchCard";
 import { useAuth } from "@/contexts/AuthContext";
-import { sendCollabInvite } from "@/lib/collabInvite";
+import { listSentCollabInvites, sendCollabInvite } from "@/lib/collabInvite";
 import { QuestCard } from "@/components/novi/QuestCard";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useNoviQuests } from "@/hooks/useNoviQuests";
-import { nextQuest, studioQuest } from "@/lib/noviQuests";
+import { homeQuestCard } from "@/lib/noviQuests";
 import { shotPeople, shotSessionEnabled } from "@/lib/shotSession";
 
 const segments = [
@@ -66,22 +65,22 @@ const destinations: Record<Exclude<SegmentId, "for-you" | "mall" | "browse">, { 
 
 const Explore = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [segment, setSegment] = useState<SegmentId>("for-you");
   const [query, setQuery] = useState("");
   const { quests } = useNoviQuests();
-  const openQuest = nextQuest(quests);
-  const studio = studioQuest(quests);
+  const openQuest = homeQuestCard(quests);
+  const { data: sentMatches = [] } = useQuery({
+    queryKey: ["sent-matches", user?.id],
+    enabled: !!user && !shotSessionEnabled(),
+    queryFn: () => listSentCollabInvites(user!.id),
+  });
+  const sentByPerson = new Map(sentMatches.map((row) => [row.recipient_id, row.status]));
   const sendMatch = async (recipientId: string) => {
-    if (!user) {
-      toast.error("Sign in to send a match");
-      return;
-    }
+    if (!user) throw new Error("Sign in to send a match");
     if (recipientId === user.id) return;
-    try {
-      await sendCollabInvite(recipientId);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not send that invite");
-    }
+    await sendCollabInvite(recipientId);
+    await queryClient.invalidateQueries({ queryKey: ["sent-matches", user.id] });
   };
   const { data: people = [] } = useQuery({
     queryKey: ["explore-people", query, user?.id],
@@ -152,18 +151,21 @@ const Explore = () => {
               <h2 className="ether-title text-[15px]">Find your people</h2>
               <Link to="/directory" className="mono-label text-[9px] text-muted-foreground">Directory</Link>
             </div>
-            <div data-match-row className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+            <div
+              data-match-row
+              className="flex w-full min-w-0 touch-pan-x snap-x gap-3 overflow-x-auto overscroll-x-contain pb-1 scrollbar-hide"
+            >
               {people.map((person) => (
                 <PeopleMatchCard
                   key={person.user_id}
                   person={person}
                   isSelf={person.user_id === user?.id}
+                  inviteStatus={sentByPerson.get(person.user_id) ?? null}
                   onInvite={sendMatch}
                 />
               ))}
             </div>
             {openQuest && segment === "for-you" && <div className="mt-4"><QuestCard quest={openQuest} /></div>}
-            {studio && segment === "for-you" && <div className="mt-4"><QuestCard quest={studio} /></div>}
           </section>
         )}
 

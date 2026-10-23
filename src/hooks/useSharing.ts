@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import {
   excludeBlocked,
   pickDirectConversation,
+  repostCaption,
   shareMessageInsert,
   storyReplyInsert,
   type SharePerson,
@@ -284,9 +285,15 @@ export function useSharingActions() {
   });
 
   const repostPost = useMutation({
-    mutationFn: async (postId: string) => {
+    mutationFn: async ({ postId, caption }: { postId: string; caption?: string }) => {
       if (!user) throw new Error('Sign in to repost');
-      const { error } = await supabase.from('reposts').insert({ user_id: user.id, post_id: postId });
+      const text = repostCaption(caption);
+      const row: { user_id: string; post_id: string; caption?: string } = {
+        user_id: user.id,
+        post_id: postId,
+      };
+      if (text) row.caption = text;
+      const { error } = await supabase.from('reposts').insert(row);
       if (error) throw error;
     },
     onSuccess: () => {
