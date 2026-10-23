@@ -5,10 +5,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Radio, Users, Coins, PlayCircle, Clock } from 'lucide-react';
 import { LiveStream } from '@/hooks/useLiveStreams';
 import { useProfile } from '@/hooks/useProfile';
+import { DeleteStreamButton } from './DeleteStreamButton';
 
 interface LiveStreamCardProps {
   stream: LiveStream;
   onClick?: () => void;
+  canDelete?: boolean;
 }
 
 // Stream status helper
@@ -19,7 +21,7 @@ const getStreamStatus = (stream: { is_live: boolean | null; started_at: string |
   return 'draft';
 };
 
-export const LiveStreamCard: React.FC<LiveStreamCardProps> = ({ stream, onClick }) => {
+export const LiveStreamCard: React.FC<LiveStreamCardProps> = ({ stream, onClick, canDelete = false }) => {
   const { profile } = useProfile(stream.host_id);
   const status = getStreamStatus(stream);
   const hasReplay = status === 'ended' && stream.replay_available && stream.replay_url;
@@ -27,6 +29,7 @@ export const LiveStreamCard: React.FC<LiveStreamCardProps> = ({ stream, onClick 
   return (
     <Card 
       className="overflow-hidden cursor-pointer hover:border-primary/50 transition-colors bg-card/50 backdrop-blur-sm"
+      data-testid={`stream-card-${stream.id}`}
       onClick={onClick}
     >
       <div className="relative aspect-video bg-muted">
@@ -48,23 +51,23 @@ export const LiveStreamCard: React.FC<LiveStreamCardProps> = ({ stream, onClick 
         )}
         
         {status === 'live' ? (
-          <Badge className="absolute top-2 left-2 bg-red-500 animate-pulse">
+          <Badge data-testid="stream-status" className="absolute top-2 left-2 !border-transparent !bg-red-500 !text-white hover:!bg-red-500 animate-pulse">
             <Radio className="h-3 w-3 mr-1" />
-            LIVE
+            Live
           </Badge>
         ) : status === 'draft' ? (
-          <Badge variant="secondary" className="absolute top-2 left-2 bg-background/80">
+          <Badge variant="secondary" className="absolute top-2 left-2 !bg-neutral-950/80 !text-white">
             <Clock className="h-3 w-3 mr-1" />
-            PREVIEW
+            Preview
           </Badge>
         ) : hasReplay ? (
-          <Badge className="absolute top-2 left-2 bg-primary">
+          <Badge data-testid="stream-status" className="absolute top-2 left-2 !border-transparent !bg-primary !text-primary-foreground hover:!bg-primary">
             <PlayCircle className="h-3 w-3 mr-1" />
-            REPLAY
+            Replay
           </Badge>
         ) : (
-          <Badge variant="secondary" className="absolute top-2 left-2 bg-background/80">
-            ENDED
+          <Badge data-testid="stream-status" className="absolute top-2 left-2 !border-transparent !bg-neutral-950/80 !text-white">
+            Ended
           </Badge>
         )}
 
@@ -97,7 +100,8 @@ export const LiveStreamCard: React.FC<LiveStreamCardProps> = ({ stream, onClick 
           </span>
         </div>
 
-        <div className="flex gap-2 mt-2 flex-wrap">
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {canDelete && <DeleteStreamButton streamId={stream.id} />}
           <Badge variant="outline" className="text-xs">
             {stream.stream_type === 'webrtc' ? '📹 Camera/Mic' : 
              stream.stream_type === 'obs_rtmp' ? 'Unavailable' :
