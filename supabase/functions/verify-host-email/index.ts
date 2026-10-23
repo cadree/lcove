@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { httpStatusForError } from "../_shared/http-error.mjs";
+import { PLATFORM_QUEUE_FROM } from "../_shared/host-email-address.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -62,7 +63,7 @@ serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "ETHER <notifications@notifications.etherbylcove.com>",
+            from: `ETHER <${PLATFORM_QUEUE_FROM}>`,
             to: [email],
             subject: "Verify your host reply-to address",
             html: `<div style="font-family:Arial,sans-serif;padding:24px;max-width:480px;margin:0 auto;">
