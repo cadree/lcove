@@ -515,7 +515,12 @@ async function prove(browserType, label) {
     const saveSwitch = host.getByRole("switch", { name: "Save replay" });
     await saveSwitch.waitFor({ timeout: 20_000 });
     const saveOn = await saveSwitch.getAttribute("aria-checked");
-    if (saveOn !== "true") throw new Error(`Save replay started ${saveOn}`);
+    if (saveOn !== "false") throw new Error(`Save replay started ${saveOn}`);
+    await host.getByText("Uploads when you end (under 50 MB). Anyone can watch it in Replays.").waitFor();
+    await saveSwitch.click();
+    if ((await saveSwitch.getAttribute("aria-checked")) !== "true") {
+      throw new Error("Save replay did not turn on");
+    }
     const deleteHits = await host.evaluate(() => {
       return [...document.querySelectorAll("[data-testid='delete-stream']")].map((button) => {
         const rect = button.getBoundingClientRect();

@@ -181,7 +181,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
   const recordedChunksRef = useRef<Blob[]>([]);
   const recorderMimeRef = useRef<string>("video/webm");
   const recordingStartedAtRef = useRef(0);
-  const saveReplayRef = useRef(true);
+  const saveReplayRef = useRef(false);
   const cameraAttemptRef = useRef(0);
   const streamingRef = useRef(initialIsLive);
   const endingRef = useRef(false);
@@ -199,7 +199,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [isGoingLive, setIsGoingLive] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveReplay, setSaveReplay] = useState(true);
+  const [saveReplay, setSaveReplay] = useState(false);
   const [link, setLink] = useState<LiveLink>("live");
   const [finished, setFinished] = useState(false);
   const [replayNote, setReplayNote] = useState("");
@@ -855,9 +855,9 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
       >
         <div className="mx-auto flex w-full min-w-0 max-w-full flex-col items-center gap-3">
           <div className="flex w-full items-center justify-between gap-3">
-            <Label htmlFor="save-replay" className="text-sm text-white">
+            <Label htmlFor="save-replay" className="min-w-0 flex-1 text-sm text-white">
               Save replay
-              <span className="mt-0.5 block text-xs font-normal text-white/70">Stays on this phone and costs nothing.</span>
+              <span className="mt-0.5 block text-xs font-normal text-white/70">Uploads when you end (under 50 MB). Anyone can watch it in Replays.</span>
             </Label>
             <Switch
               id="save-replay"
