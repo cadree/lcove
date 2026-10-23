@@ -61,7 +61,7 @@ export default function EventsDashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { events, rsvps, isLoading } = useEventDashboard();
+  const { events, rsvps, seatCounts, isLoading } = useEventDashboard();
   const [view, setView] = useState<"calendar" | "list" | "settings">("calendar");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -72,11 +72,12 @@ export default function EventsDashboard() {
       const eventRsvps = rsvps?.filter(r => r.event_id === event.id) || [];
       return {
         ...event,
-        rsvpCount: eventRsvps.filter(r => r.status === 'going' || r.status === 'interested').length,
+        rsvpCount: seatCounts?.find((seat) => seat.event_id === event.id)?.going
+          ?? eventRsvps.filter(r => r.status === 'going').length,
         ticketCount: eventRsvps.filter(r => r.ticket_purchased).length,
       };
     });
-  }, [events, rsvps]);
+  }, [events, rsvps, seatCounts]);
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -381,7 +382,7 @@ interface EventBlockProps {
 
 function EventBlock({ event, onClick, onEdit, onShare, onDuplicate }: EventBlockProps) {
   const status = getEventDisplayStatus(event);
-  const totalCount = (event.rsvpCount || 0) + (event.ticketCount || 0);
+  const totalCount = event.rsvpCount || 0;
 
   return (
     <Popover>
@@ -426,7 +427,7 @@ function EventBlock({ event, onClick, onEdit, onShare, onDuplicate }: EventBlock
             {totalCount > 0 && (
               <span className="flex items-center gap-1">
                 <Users className="h-3 w-3" />
-                {event.ticketCount || 0} tickets · {event.rsvpCount || 0} RSVPs
+                {event.rsvpCount || 0} going
               </span>
             )}
           </div>
@@ -480,7 +481,7 @@ function ListView({ events, onEventClick, onEdit, onShare, onDuplicate }: ListVi
 
   const EventCard = ({ event }: { event: EventWithStats }) => {
     const status = getEventDisplayStatus(event);
-    const totalCount = (event.rsvpCount || 0) + (event.ticketCount || 0);
+    const totalCount = event.rsvpCount || 0;
 
     return (
       <div className="relative p-3 rounded-xl border border-border/40 bg-card/60 backdrop-blur-sm">
@@ -516,7 +517,7 @@ function ListView({ events, onEventClick, onEdit, onShare, onDuplicate }: ListVi
                 {totalCount > 0 && (
                   <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                     <Users className="h-3 w-3" />
-                    {event.ticketCount || 0} tickets · {event.rsvpCount || 0} RSVPs
+                    {event.rsvpCount || 0} going
                   </span>
                 )}
               </div>

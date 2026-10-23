@@ -453,6 +453,7 @@ export default function EventDetail() {
                   attendeeProfiles={v2AttendeeProfiles || {}}
                   isLoading={v2Loading}
                   eventTitle={event?.title || "Event"}
+                  capacity={event?.capacity ?? null}
                   onSelectAttendee={(key, name) => setSelectedAttendee({ key, name })}
                 />
               </TabsContent>
@@ -777,7 +778,7 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading, eventTitle }: At
     }
   };
 
-  // Bulk: send email blast (and SMS where possible) to selected attendees
+  // Bulk: email the selected attendees. Text is not sent.
   const handleBulkEmail = async () => {
     if (selectedIds.size === 0 || !eventId) return;
     setSending(true);
@@ -1401,7 +1402,7 @@ function OrdersTabV2({
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState icon={Ticket} title="No orders yet" description="Orders will appear when people purchase tickets." />
+        <EmptyState icon={Ticket} title="No orders yet" description="Ticket purchases show up here. Free RSVPs are on the Attendees tab." />
       ) : (
         <div className="space-y-2">
           {filtered.map(order => {
@@ -1470,6 +1471,7 @@ function AttendeesTabV2({
   attendeeProfiles,
   isLoading,
   eventTitle,
+  capacity,
   onSelectAttendee,
 }: {
   attendees: EventAttendee[];
@@ -1478,10 +1480,11 @@ function AttendeesTabV2({
   attendeeProfiles: ProfileMap;
   isLoading: boolean;
   eventTitle: string;
+  capacity?: number | null;
   onSelectAttendee?: (key: AttendeeKey, name: string | null) => void;
 }) {
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "checked_in" | "not_checked_in" | "guests">("all");
+  const [filter, setFilter] = useState<"all" | "going" | "waitlist" | "checked_in" | "guests">("all");
 
   const tierMap = Object.fromEntries(tiers.map(t => [t.id, t]));
   const checkedInIds = new Set(checkIns.map((c) => c.attendee_id));
@@ -1498,17 +1501,22 @@ function AttendeesTabV2({
       (a.attendee_email || "").toLowerCase().includes(search.toLowerCase()) ||
       a.ticket_number.toLowerCase().includes(search.toLowerCase());
     if (!matchesSearch) return false;
+    if (a.status === "cancelled" || a.status === "refunded") return false;
+    if (filter === "going") return a.status === "registered" || a.status === "approved";
+    if (filter === "waitlist") return a.status === "waitlisted";
     if (filter === "checked_in") return checkedInIds.has(a.id);
-    if (filter === "not_checked_in") return !checkedInIds.has(a.id);
     if (filter === "guests") return !a.attendee_user_id;
     return true;
   });
 
+  const activeAttendees = attendees.filter(a => a.status !== "cancelled" && a.status !== "refunded");
+  const goingCount = activeAttendees.filter(a => a.status === "registered" || a.status === "approved").length;
   const stats = {
-    total: attendees.length,
+    total: activeAttendees.length,
+    going: goingCount,
+    waitlist: activeAttendees.filter(a => a.status === "waitlisted").length,
     checkedIn: attendees.filter(a => checkedInIds.has(a.id)).length,
-    notCheckedIn: attendees.filter(a => !checkedInIds.has(a.id)).length,
-    guests: attendees.filter(a => !a.attendee_user_id).length,
+    guests: activeAttendees.filter(a => !a.attendee_user_id).length,
   };
 
   const handleDownloadCSV = () => {
@@ -1542,14 +1550,20 @@ function AttendeesTabV2({
 
   const filterChips: Array<{ key: typeof filter; label: string; count: number }> = [
     { key: "all", label: "All", count: stats.total },
-    { key: "checked_in", label: "Checked In", count: stats.checkedIn },
-    { key: "not_checked_in", label: "Not Yet", count: stats.notCheckedIn },
+    { key: "going", label: "Going", count: stats.going },
+    { key: "waitlist", label: "Waitlist", count: stats.waitlist },
+    { key: "checked_in", label: "Checked", count: stats.checkedIn },
     { key: "guests", label: "Guests", count: stats.guests },
   ];
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-2">
+      {capacity != null && goingCount > capacity && (
+        <p className="text-xs text-amber-600">
+          {goingCount} people are going and the capacity is {capacity}. They keep their seats. New RSVPs join the waitlist.
+        </p>
+      )}
+      <div className="grid grid-cols-5 gap-2">
         {filterChips.map(chip => (
           <button
             key={chip.key}
@@ -1576,7 +1590,7 @@ function AttendeesTabV2({
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState icon={Users} title="No attendees" description="Attendees appear here once tickets are issued." />
+        <EmptyState icon={Users} title="No attendees" description="People who RSVP or buy a ticket show up here." />
       ) : (
         <div className="space-y-2">
           {filtered.map(a => {

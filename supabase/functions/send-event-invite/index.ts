@@ -122,41 +122,8 @@ serve(async (req) => {
         }
       }
 
-      if (invitee.phone) {
-        const twilioSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-        const twilioAuth = Deno.env.get("TWILIO_AUTH_TOKEN");
-        const twilioPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
-
-        if (twilioSid && twilioAuth && twilioPhone) {
-          try {
-            const smsBody = `${identity.organizerName} invited you to "${event.title}" on ${eventDate} at ${eventTime}. ${location}. ${isFree ? "RSVP" : "Get tickets"}: ${eventUrl}`;
-            const smsRes = await fetch(
-              `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
-              {
-                method: "POST",
-                headers: {
-                  Authorization: `Basic ${btoa(`${twilioSid}:${twilioAuth}`)}`,
-                  "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: new URLSearchParams({
-                  To: invitee.phone,
-                  From: twilioPhone,
-                  Body: smsBody,
-                }).toString(),
-              }
-            );
-            if (smsRes.ok) {
-              results.push({ phone: invitee.phone, status: "sent" });
-            } else {
-              const errText = await smsRes.text();
-              results.push({ phone: invitee.phone, status: "failed", error: errText });
-            }
-          } catch (err) {
-            results.push({ phone: invitee.phone, status: "failed", error: String(err) });
-          }
-        } else {
-          results.push({ phone: invitee.phone, status: "skipped", error: "SMS not configured" });
-        }
+      if (invitee.phone && !invitee.email) {
+        results.push({ phone: invitee.phone, status: "skipped", error: "Email is required. Text invites are not sent." });
       }
     }
 

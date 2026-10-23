@@ -63,7 +63,10 @@ serve(async (req) => {
       .select("id, attendee_user_id, attendee_email, attendee_name, attendee_phone, tier_id, status, created_at")
       .eq("event_id", body.eventId);
 
-    const statuses = body.filter?.status?.length ? body.filter.status : ["confirmed", "checked_in"];
+    const requested = body.filter?.status?.length ? body.filter.status : ["registered", "approved"];
+    const statuses = [...new Set(requested.flatMap((status) =>
+      status === "confirmed" || status === "checked_in" ? ["registered", "approved"] : [status]
+    ))];
     q = q.in("status", statuses);
     if (body.filter?.tierIds?.length) q = q.in("tier_id", body.filter.tierIds);
     if (body.filter?.purchasedAfter) q = q.gte("created_at", body.filter.purchasedAfter);
@@ -196,24 +199,6 @@ serve(async (req) => {
             await logRow("email", "failed", String(invokeErr?.message || invokeData?.reason || "failed"));
           }
         } catch (e) { await logRow("email", "failed", String(e)); }
-      }
-
-      // SMS
-      if (channels.sms && phone) {
-        const sid = Deno.env.get("TWILIO_ACCOUNT_SID");
-        const auth = Deno.env.get("TWILIO_AUTH_TOKEN");
-        const from = Deno.env.get("TWILIO_PHONE_NUMBER");
-        if (sid && auth && from) {
-          try {
-            const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
-              method: "POST",
-              headers: { Authorization: `Basic ${btoa(`${sid}:${auth}`)}`, "Content-Type": "application/x-www-form-urlencoded" },
-              body: new URLSearchParams({ To: phone, From: from, Body: `${finalTitle}\n\n${finalBody}\n\n${eventUrl}` }),
-            });
-            if (r.ok) { await logRow("sms", "sent"); sentCount++; }
-            else await logRow("sms", "failed", `${r.status}`);
-          } catch (e) { await logRow("sms", "failed", String(e)); }
-        }
       }
 
       // Throttle

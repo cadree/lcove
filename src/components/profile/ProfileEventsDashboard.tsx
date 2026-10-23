@@ -55,7 +55,7 @@ export function ProfileEventsDashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { events, rsvps, isLoading } = useEventDashboard();
+  const { events, rsvps, seatCounts, isLoading } = useEventDashboard();
   const [view, setView] = useState<"calendar" | "list" | "settings">("list");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -66,11 +66,12 @@ export function ProfileEventsDashboard() {
       const eventRsvps = rsvps?.filter(r => r.event_id === event.id) || [];
       return {
         ...event,
-        rsvpCount: eventRsvps.filter(r => r.status === 'going' || r.status === 'interested').length,
+        rsvpCount: seatCounts?.find((seat) => seat.event_id === event.id)?.going
+          ?? eventRsvps.filter(r => r.status === 'going').length,
         ticketCount: eventRsvps.filter(r => r.ticket_purchased).length,
       };
     });
-  }, [events, rsvps]);
+  }, [events, rsvps, seatCounts]);
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -385,7 +386,7 @@ function CompactListView({ events, onEventClick, onEdit, onShare, onDuplicate, o
     <div className="space-y-2">
       {displayEvents.map((event) => {
         const status = getEventDisplayStatus(event);
-        const totalCount = (event.rsvpCount || 0) + (event.ticketCount || 0);
+        const totalCount = event.rsvpCount || 0;
 
         return (
           <div

@@ -236,3 +236,9 @@ verify_jwt = true
 
 [functions.create-stream-gift]
 verify_jwt = true
+
+[functions.campaign-track]
+verify_jwt = false
+
+[functions.resend-webhook]
+verify_jwt = false

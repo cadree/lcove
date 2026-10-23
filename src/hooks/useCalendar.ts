@@ -309,7 +309,7 @@ export function useRSVP() {
   const { earnEnergy } = useEnergy();
 
   const rsvpMutation = useMutation({
-    mutationFn: async ({ eventId, status }: { eventId: string; status: string }) => {
+    mutationFn: async ({ eventId, status, campaignId }: { eventId: string; status: string; campaignId?: string | null }) => {
       if (!user) throw new Error('Must be logged in to RSVP');
 
       const { data: existing } = await supabase
@@ -321,17 +321,22 @@ export function useRSVP() {
 
       const reminderEnabled = status === 'interested' ? true : undefined;
       let rsvpId = existing?.id;
+      let settled = status;
 
       if (existing) {
         const updateData: Record<string, unknown> = { status };
         if (reminderEnabled !== undefined) {
           updateData.reminder_enabled = reminderEnabled;
         }
-        const { error } = await supabase
+        if (campaignId) updateData.campaign_id = campaignId;
+        const { data: updated, error } = await supabase
           .from('event_rsvps')
           .update(updateData)
-          .eq('id', existing.id);
+          .eq('id', existing.id)
+          .select('id, status')
+          .single();
         if (error) throw error;
+        settled = updated.status;
       } else {
         const { data: inserted, error } = await supabase
           .from('event_rsvps')
@@ -339,25 +344,36 @@ export function useRSVP() {
             event_id: eventId,
             user_id: user.id,
             status,
-            reminder_enabled: status === 'interested' ? true : true,
+            reminder_enabled: true,
+            ...(campaignId ? { campaign_id: campaignId } : {}),
           })
-          .select('id')
+          .select('id, status')
           .single();
         if (error) throw error;
         rsvpId = inserted.id;
+        settled = inserted.status;
       }
 
-      return { rsvpId, status };
+      return { rsvpId, status: settled };
     },
-    onSuccess: async ({ rsvpId }, { eventId, status }) => {
+    onSuccess: async ({ rsvpId, status }, { eventId }) => {
       queryClient.invalidateQueries({ queryKey: ['event', eventId] });
       queryClient.invalidateQueries({ queryKey: ['events'] });
       queryClient.invalidateQueries({ queryKey: ['my-rsvps'] });
       queryClient.invalidateQueries({ queryKey: ['my-event-rsvp', eventId] });
       queryClient.invalidateQueries({ queryKey: ['public-event-attendee-count', eventId] });
+      queryClient.invalidateQueries({ queryKey: ['event-attendees-v2', eventId] });
+      queryClient.invalidateQueries({ queryKey: ['event-seat-counts'] });
 
       if (status === 'interested') {
         toast.success('Marked as interested! Reminder enabled.');
+      } else if (status === 'waitlist') {
+        toast.success("You're on the waitlist. We'll email you if a seat opens.");
+        if (rsvpId) {
+          supabase.functions.invoke('send-rsvp-confirmation', {
+            body: { event_id: eventId, rsvp_id: rsvpId },
+          }).catch((err) => console.error('Failed to send waitlist email:', err));
+        }
       } else if (status === 'going') {
         toast.success("You're going!");
         refreshXp(queryClient);

@@ -140,11 +140,30 @@ serve(async (req) => {
     }
     if (!tier) throw new Error("No active ticket tier available for this event");
 
-    // Capacity check
+    // Checkout sessions expire within 24 hours. Release those seats before
+    // counting, without calling Stripe.
+    const { error: releaseError } = await supabase.rpc("release_abandoned_ticket_orders", {
+      p_older_than: "24 hours",
+    });
+    if (releaseError) log("Abandoned release skipped", { message: releaseError.message });
+
+    // Capacity check. Tier inventory and the event seat count both have to fit.
     if (tier.capacity != null) {
       const remaining = tier.capacity - (tier.quantity_sold || 0);
       if (remaining < attendeeList.length) {
         throw new Error(`Only ${Math.max(0, remaining)} ticket(s) remaining for this tier`);
+      }
+    }
+    if (event.capacity != null) {
+      const { count, error: seatError } = await supabase
+        .from("event_attendees")
+        .select("id", { count: "exact", head: true })
+        .eq("event_id", eventId)
+        .in("status", ["registered", "approved"]);
+      if (seatError) throw seatError;
+      const taken = count || 0;
+      if (taken + attendeeList.length > event.capacity) {
+        throw new Error("This event is sold out");
       }
     }
 
@@ -195,7 +214,11 @@ serve(async (req) => {
         .from("event_attendees")
         .insert(attendeeRows)
         .select("id, qr_code, ticket_number, attendee_name");
-      if (attErr) throw attErr;
+      if (attErr) {
+        await supabase.from("ticket_orders").delete().eq("id", order.id);
+        if (attErr.message.toLowerCase().includes("sold out")) throw new Error("This event is sold out");
+        throw attErr;
+      }
 
       // Update tier sold count
       await supabase.from("ticket_tiers").update({
@@ -259,7 +282,14 @@ serve(async (req) => {
       attendee_social: a.social,
       status: "registered",
     }));
-    await supabase.from("event_attendees").insert(attendeeRows);
+    const { error: pendingAttendeeError } = await supabase.from("event_attendees").insert(attendeeRows);
+    if (pendingAttendeeError) {
+      await supabase.from("ticket_orders").delete().eq("id", order.id);
+      if (pendingAttendeeError.message.toLowerCase().includes("sold out")) {
+        throw new Error("This event is sold out");
+      }
+      throw pendingAttendeeError;
+    }
 
     // Creator connect info
     let creatorConnectId: string | null = null;

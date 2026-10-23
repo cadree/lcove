@@ -68,6 +68,7 @@ export function useEventTicketingData(eventId?: string, enabled = true) {
       return (data as EventAttendee[]) || [];
     },
     enabled: !!eventId && enabled,
+    refetchInterval: enabled ? 15000 : false,
   });
 
   const tiersQ = useQuery({

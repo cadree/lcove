@@ -2642,6 +2642,7 @@ export type Database = {
       }
       event_rsvps: {
         Row: {
+          campaign_id: string | null
           confirmation_sent_at: string | null
           created_at: string
           credits_spent: number | null
@@ -2658,6 +2659,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          campaign_id?: string | null
           confirmation_sent_at?: string | null
           created_at?: string
           credits_spent?: number | null
@@ -2674,6 +2676,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          campaign_id?: string | null
           confirmation_sent_at?: string | null
           created_at?: string
           credits_spent?: number | null
@@ -4217,12 +4220,14 @@ export type Database = {
           recipient_phone: string | null
           sent_at: string | null
           status: string
+          track_token: string | null
           type: string
           user_id: string | null
         }
         Insert: {
           campaign_id?: string | null
           channel: string
+          track_token?: string | null
           clicked_at?: string | null
           created_at?: string
           error_message?: string | null
@@ -7032,6 +7037,7 @@ export type Database = {
           currency: string
           event_id: string
           id: string
+          needs_refund: boolean
           notes: string | null
           payment_method: string
           payment_status: string
@@ -7056,6 +7062,7 @@ export type Database = {
           currency?: string
           event_id: string
           id?: string
+          needs_refund?: boolean
           notes?: string | null
           payment_method?: string
           payment_status?: string
@@ -7080,6 +7087,7 @@ export type Database = {
           currency?: string
           event_id?: string
           id?: string
+          needs_refund?: boolean
           notes?: string | null
           payment_method?: string
           payment_status?: string
@@ -7859,12 +7867,13 @@ export type Database = {
       }
       create_guest_event_rsvp: {
         Args: {
+          p_campaign_id?: string
           p_event_id: string
           p_guest_email: string
           p_guest_name: string
           p_guest_phone?: string
         }
-        Returns: string
+        Returns: Json
       }
       check_in_attendee: {
         Args: {
@@ -7930,6 +7939,18 @@ export type Database = {
       public_event_attendance_count: {
         Args: { p_event_id: string }
         Returns: number
+      }
+      release_abandoned_ticket_orders: {
+        Args: { p_older_than?: string }
+        Returns: number
+      }
+      host_event_attendance_counts: {
+        Args: { p_event_ids: string[] }
+        Returns: {
+          event_id: string
+          going: number
+          waitlist: number
+        }[]
       }
       claim_waitlist_invite: {
         Args: { p_token: string }

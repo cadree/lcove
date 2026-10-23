@@ -109,6 +109,20 @@ export function useEventDashboard() {
     enabled: !!user && userOrgs !== undefined,
   });
 
+  const eventIds = events?.map((event) => event.id) ?? [];
+  const { data: seatCounts } = useQuery({
+    queryKey: ["event-seat-counts", eventIds],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("host_event_attendance_counts", {
+        p_event_ids: eventIds,
+      });
+      if (error) return null;
+      return data ?? [];
+    },
+    enabled: eventIds.length > 0,
+    refetchInterval: 20000,
+  });
+
   // Fetch RSVPs for all user's events
   const { data: rsvps, isLoading: rsvpsLoading } = useQuery({
     queryKey: ['dashboard-rsvps', events?.map(e => e.id)],
@@ -127,12 +141,19 @@ export function useEventDashboard() {
     enabled: !!events && events.length > 0,
   });
 
+  const goingFor = (eventId: string) => {
+    const seat = seatCounts?.find((row) => row.event_id === eventId);
+    if (seat) return seat.going;
+    return rsvps?.filter((rsvp) => rsvp.event_id === eventId && (rsvp.status === "going" || rsvp.ticket_purchased)).length ?? 0;
+  };
+  const goingTotal = events?.reduce((sum, event) => sum + goingFor(event.id), 0) ?? 0;
+
   // Calculate metrics
   const metrics: DashboardMetrics = {
     totalEvents: events?.length || 0,
     upcomingEvents: events?.filter(e => new Date(e.start_date) > new Date()).length || 0,
     pastEvents: events?.filter(e => new Date(e.start_date) <= new Date()).length || 0,
-    totalAttendees: rsvps?.filter(r => r.status === 'going' || r.ticket_purchased).length || 0,
+    totalAttendees: goingTotal,
     totalRevenue: rsvps?.reduce((sum, r) => {
       if (r.ticket_purchased && r.stripe_payment_id) {
         const event = events?.find(e => e.id === r.event_id);
@@ -142,8 +163,8 @@ export function useEventDashboard() {
     }, 0) || 0,
     totalCreditsEarned: rsvps?.reduce((sum, r) => sum + (r.credits_spent || 0), 0) || 0,
     ticketsSold: rsvps?.filter(r => r.ticket_purchased).length || 0,
-    averageAttendance: events?.length 
-      ? Math.round((rsvps?.filter(r => r.status === 'going' || r.ticket_purchased).length || 0) / events.length)
+    averageAttendance: events?.length
+      ? Math.round(goingTotal / events.length)
       : 0,
   };
 
@@ -207,7 +228,7 @@ export function useEventDashboard() {
       const eventRsvps = rsvps?.filter(r => r.event_id === e.id) || [];
       return {
         ...e,
-        attendeeCount: eventRsvps.filter(r => r.status === 'going' || r.ticket_purchased).length,
+        attendeeCount: goingFor(e.id),
         interestedCount: eventRsvps.filter(r => r.status === 'interested').length,
         ticketsSold: eventRsvps.filter(r => r.ticket_purchased).length,
       };
@@ -219,7 +240,7 @@ export function useEventDashboard() {
     return {
       eventId: e.id,
       eventTitle: e.title,
-      going: eventRsvps.filter(r => r.status === 'going').length,
+      going: goingFor(e.id),
       interested: eventRsvps.filter(r => r.status === 'interested').length,
       ticketed: eventRsvps.filter(r => r.ticket_purchased).length,
       total: eventRsvps.length,
@@ -234,6 +255,7 @@ export function useEventDashboard() {
     salesData,
     upcomingCampaigns,
     eventAttendees,
+    seatCounts: seatCounts ?? null,
     isLoading: eventsLoading || rsvpsLoading,
   };
 }

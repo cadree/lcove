@@ -71,8 +71,8 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
   const { data: searchResults = [], isFetching: searching } = useUserSearch(searchQuery, mode === "specific" && open);
 
   // External Guests
-  type ExternalGuest = { id: string; name: string; email: string; phone: string };
-  const [externalGuests, setExternalGuests] = useState<ExternalGuest[]>([{ id: "g1", name: "", email: "", phone: "" }]);
+  type ExternalGuest = { id: string; name: string; email: string };
+  const [externalGuests, setExternalGuests] = useState<ExternalGuest[]>([{ id: "g1", name: "", email: "" }]);
 
   // Audience config
   const [audienceType, setAudienceType] = useState<AudienceType>("everyone");
@@ -221,8 +221,7 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
             eventId,
             invitees: validExternals.map(g => ({
               name: g.name.trim() || undefined,
-              email: g.email.trim() || undefined,
-              phone: g.phone.trim() || undefined,
+              email: g.email.trim(),
             })),
           },
         });
@@ -343,18 +342,18 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
           {mode === "external" && (
             <section className="space-y-2">
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">Guest details</Label>
-              <p className="text-xs text-muted-foreground -mt-1">Add an email for each guest.</p>
+              <p className="text-xs text-muted-foreground -mt-1">Email is required. Text invites are not sent.</p>
               <div className="space-y-2">
-                {externalGuests.map((g, idx) => (
+                {externalGuests.map((g) => (
                   <div key={g.id} className="grid grid-cols-12 gap-1.5 items-center">
                     <Input
-                      className="col-span-3"
+                      className="col-span-4"
                       placeholder="Name"
                       value={g.name}
                       onChange={e => setExternalGuests(gs => gs.map(x => x.id === g.id ? { ...x, name: e.target.value } : x))}
                     />
                     <Input
-                      className="col-span-8"
+                      className="col-span-7"
                       placeholder="Email"
                       type="email"
                       value={g.email}
@@ -376,7 +375,7 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setExternalGuests(gs => [...gs, { id: `g${Date.now()}`, name: "", email: "", phone: "" }])}
+                onClick={() => setExternalGuests(gs => [...gs, { id: `g${Date.now()}`, name: "", email: "" }])}
               >
                 <Plus className="h-3.5 w-3.5 mr-1" /> Add guest
               </Button>
