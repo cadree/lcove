@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,31 +16,52 @@ export function DeleteStreamButton({
   streamId,
   onDeleted,
   label = "Delete",
+  suppressed = false,
 }: {
   streamId: string;
   onDeleted?: () => void;
   label?: string;
+  /** Another copy is visible. This one must not take taps or focus. */
+  suppressed?: boolean;
 }) {
   const deleteStream = useDeleteStream();
   const [open, setOpen] = useState(false);
+  const frame = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const node = frame.current;
+    if (!node) return;
+    if (suppressed) node.setAttribute("inert", "");
+    else node.removeAttribute("inert");
+  }, [suppressed]);
 
   return (
     <>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        data-testid="delete-stream"
-        className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
-        onClick={(event) => {
-          event.stopPropagation();
-          setOpen(true);
-        }}
+      <span
+        ref={frame}
+        className={suppressed ? "pointer-events-none" : undefined}
+        aria-hidden={suppressed ? true : undefined}
+        data-suppressed={suppressed ? "true" : "false"}
       >
-        <Trash2 className="mr-1 h-4 w-4" />
-        {label}
-      </Button>
-      <AlertDialog open={open} onOpenChange={setOpen}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          data-testid="delete-stream"
+          disabled={suppressed}
+          tabIndex={suppressed ? -1 : undefined}
+          className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+          onClick={(event) => {
+            event.stopPropagation();
+            if (suppressed) return;
+            setOpen(true);
+          }}
+        >
+          <Trash2 className="mr-1 h-4 w-4" />
+          {label}
+        </Button>
+      </span>
+      <AlertDialog open={open && !suppressed} onOpenChange={setOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this stream?</AlertDialogTitle>

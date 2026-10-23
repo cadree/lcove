@@ -512,7 +512,35 @@ async function prove(browserType, label) {
   try {
     await host.goto(`${APP}/live?stream=${STREAM_ID}`, { waitUntil: "domcontentloaded" });
     await host.getByTestId("go-live").waitFor({ timeout: 20_000 });
-    await host.getByRole("switch", { name: "Save replay" }).click();
+    const saveSwitch = host.getByRole("switch", { name: "Save replay" });
+    await saveSwitch.waitFor({ timeout: 20_000 });
+    const saveOn = await saveSwitch.getAttribute("aria-checked");
+    if (saveOn !== "true") throw new Error(`Save replay started ${saveOn}`);
+    const deleteHits = await host.evaluate(() => {
+      return [...document.querySelectorAll("[data-testid='delete-stream']")].map((button) => {
+        const rect = button.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        const onScreen = x >= 0 && y >= 0 && x < window.innerWidth && y < window.innerHeight;
+        const hit = onScreen ? document.elementFromPoint(x, y) : null;
+        return {
+          suppressed: button.closest("[data-suppressed='true']") !== null,
+          onScreen,
+          hitIsSelf: !!hit && (hit === button || button.contains(hit)),
+        };
+      });
+    });
+    const clickable = deleteHits.filter((row) => row.hitIsSelf);
+    if (clickable.length !== 1 || clickable[0].suppressed) {
+      throw new Error(`expected one visible delete, saw ${JSON.stringify(deleteHits)}`);
+    }
+    if (deleteHits.some((row) => row.suppressed && row.hitIsSelf)) {
+      throw new Error(`hidden delete caught a tap ${JSON.stringify(deleteHits)}`);
+    }
+    await host.locator("[data-suppressed='false'] [data-testid='delete-stream']").click();
+    await host.getByTestId("confirm-delete-stream").waitFor();
+    await host.getByRole("button", { name: "Cancel" }).click();
+    await host.getByTestId("confirm-delete-stream").waitFor({ state: "hidden" });
     await shot(host, `${label}-host-before.png`);
     await host.getByTestId("go-live").click();
     await host.getByTestId("live-badge").waitFor({ timeout: 30_000 });

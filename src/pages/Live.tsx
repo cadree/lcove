@@ -30,7 +30,8 @@ const MyStreamCard: React.FC<{
   onWatch: () => void;
   onEdit: () => void;
   onGoLive: () => void;
-}> = ({ stream, onWatch, onEdit, onGoLive }) => {
+  deleteSuppressed?: boolean;
+}> = ({ stream, onWatch, onEdit, onGoLive, deleteSuppressed = false }) => {
   const { profile } = useProfile(stream.host_id);
   const endStream = useEndStream();
   
@@ -124,7 +125,7 @@ const MyStreamCard: React.FC<{
             </Button>
             
             {status === 'ended' && (
-              <DeleteStreamButton streamId={stream.id} />
+              <DeleteStreamButton streamId={stream.id} suppressed={deleteSuppressed} />
             )}
             {status === 'live' ? (
               <Button 
@@ -258,6 +259,15 @@ const Live = () => {
   // history.back() from the sheet returns to the same ?stream= URL. Remember
   // the id we just closed so that entry cannot open the room again.
   const dismissedStream = useRef<string | null>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const sheetOpen = Boolean(selectedStreamId);
+
+  useEffect(() => {
+    const node = pageRef.current;
+    if (!node) return;
+    if (sheetOpen) node.setAttribute("inert", "");
+    else node.removeAttribute("inert");
+  }, [sheetOpen]);
 
   const openStream = (streamId: string) => {
     if (dismissedStream.current === streamId) dismissedStream.current = null;
@@ -324,7 +334,7 @@ const Live = () => {
 
   return (
     <PageLayout>
-      <div className="min-h-screen">
+      <div ref={pageRef} className={cn("min-h-screen", sheetOpen && "pointer-events-none")}>
         {/* Hero Section */}
         <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-background to-background">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -431,6 +441,7 @@ const Live = () => {
                         onWatch={() => openStream(stream.id)}
                         onEdit={() => setEditingStream(stream)}
                         onGoLive={() => openStream(stream.id)}
+                        deleteSuppressed={sheetOpen}
                       />
                     ))}
                   </div>
@@ -474,6 +485,7 @@ const Live = () => {
                       key={stream.id} 
                       stream={stream}
                       canDelete={!!user && stream.host_id === user.id && !stream.is_live}
+                      deleteSuppressed={sheetOpen}
                       onClick={() => openStream(stream.id)}
                     />
                   ))}
@@ -516,6 +528,7 @@ const Live = () => {
                       key={stream.id} 
                       stream={stream}
                       canDelete={!!user && stream.host_id === user.id && !stream.is_live}
+                      deleteSuppressed={sheetOpen}
                       onClick={() => openStream(stream.id)}
                     />
                   ))}
@@ -536,36 +549,35 @@ const Live = () => {
             </TabsContent>
           </Tabs>
         </div>
-
-        {/* Dialogs */}
-        <CreateStreamDialog 
-          open={showCreate} 
-          onClose={() => setShowCreate(false)} 
-          onStreamCreated={(streamId) => setQueuedStreamId(streamId)}
-        />
-
-        <EditStreamDialog
-          stream={editingStream}
-          open={!!editingStream}
-          onClose={() => setEditingStream(null)}
-        />
-
-        {selectedStreamId && (
-          <StreamViewer
-            streamId={selectedStreamId}
-            open={!!selectedStreamId}
-            onClose={() => {
-              dismissedStream.current = selectedStreamId;
-              setSelectedStreamId(null);
-              if (searchParams.get("stream")) {
-                const next = new URLSearchParams(searchParams);
-                next.delete("stream");
-                setSearchParams(next, { replace: true });
-              }
-            }}
-          />
-        )}
       </div>
+
+      <CreateStreamDialog 
+        open={showCreate} 
+        onClose={() => setShowCreate(false)} 
+        onStreamCreated={(streamId) => setQueuedStreamId(streamId)}
+      />
+
+      <EditStreamDialog
+        stream={editingStream}
+        open={!!editingStream}
+        onClose={() => setEditingStream(null)}
+      />
+
+      {selectedStreamId && (
+        <StreamViewer
+          streamId={selectedStreamId}
+          open={!!selectedStreamId}
+          onClose={() => {
+            dismissedStream.current = selectedStreamId;
+            setSelectedStreamId(null);
+            if (searchParams.get("stream")) {
+              const next = new URLSearchParams(searchParams);
+              next.delete("stream");
+              setSearchParams(next, { replace: true });
+            }
+          }}
+        />
+      )}
     </PageLayout>
   );
 };

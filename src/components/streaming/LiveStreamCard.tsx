@@ -11,6 +11,7 @@ interface LiveStreamCardProps {
   stream: LiveStream;
   onClick?: () => void;
   canDelete?: boolean;
+  deleteSuppressed?: boolean;
 }
 
 // Stream status helper
@@ -21,7 +22,7 @@ const getStreamStatus = (stream: { is_live: boolean | null; started_at: string |
   return 'draft';
 };
 
-export const LiveStreamCard: React.FC<LiveStreamCardProps> = ({ stream, onClick, canDelete = false }) => {
+export const LiveStreamCard: React.FC<LiveStreamCardProps> = ({ stream, onClick, canDelete = false, deleteSuppressed = false }) => {
   const { profile } = useProfile(stream.host_id);
   const status = getStreamStatus(stream);
   const hasReplay = status === 'ended' && stream.replay_available && stream.replay_url;
@@ -101,7 +102,7 @@ export const LiveStreamCard: React.FC<LiveStreamCardProps> = ({ stream, onClick,
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          {canDelete && <DeleteStreamButton streamId={stream.id} />}
+          {canDelete && <DeleteStreamButton streamId={stream.id} suppressed={deleteSuppressed} />}
           <Badge variant="outline" className="text-xs">
             {stream.stream_type === 'webrtc' ? '📹 Camera/Mic' : 
              stream.stream_type === 'obs_rtmp' ? 'Unavailable' :
