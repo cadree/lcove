@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fromUntyped } from "@/lib/safetyTables";
+import { watchRows } from "@/lib/liveRoomWatch";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,12 +21,13 @@ interface ChatRow {
   display_name?: string | null;
 }
 
-export function StreamChat({ streamId }: { streamId: string }) {
+export function StreamChat({ streamId, className = "" }: { streamId: string; className?: string }) {
   const { user } = useAuth();
   const { blockedIds } = useUserBlocks();
   const queryClient = useQueryClient();
   const [body, setBody] = useState("");
   const [reportId, setReportId] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const { data: messages = [] } = useQuery({
     queryKey: ["stream-chat", streamId],
@@ -51,18 +53,20 @@ export function StreamChat({ streamId }: { streamId: string }) {
 
   useEffect(() => {
     if (!streamId) return;
-    const channel = supabase
-      .channel(`stream-chat-${streamId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "stream_chat", filter: `stream_id=eq.${streamId}` },
-        () => queryClient.invalidateQueries({ queryKey: ["stream-chat", streamId] }),
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return watchRows(
+      `stream-chat-${streamId}`,
+      "stream_chat",
+      `stream_id=eq.${streamId}`,
+      queryClient,
+      ["stream-chat", streamId],
+    );
   }, [streamId, queryClient]);
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    list.scrollTop = list.scrollHeight;
+  }, [messages]);
 
   const send = async () => {
     const text = body.trim();
@@ -86,8 +90,8 @@ export function StreamChat({ streamId }: { streamId: string }) {
   if (!user) return null;
 
   return (
-    <div className="min-w-0 space-y-2 border-t border-border/40 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-      <div className="max-h-40 overflow-y-auto space-y-1 text-sm">
+    <div data-testid="live-chat" className={`flex min-h-0 min-w-0 flex-col gap-2 border-t border-border/40 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${className}`}>
+      <div ref={listRef} className="min-h-0 flex-1 space-y-1 overflow-y-auto text-sm">
         {messages.length === 0 && <p className="text-muted-foreground">No chat yet.</p>}
         {messages.filter((message) => !blockedIds.includes(message.user_id)).map((message) => (
           <div key={message.id} className="flex items-start justify-between gap-2">
@@ -116,8 +120,9 @@ export function StreamChat({ streamId }: { streamId: string }) {
           placeholder="Say something"
           maxLength={500}
           className="w-auto min-w-0 flex-1"
+          data-testid="chat-input"
         />
-        <Button type="submit" className="shrink-0 px-3" disabled={!body.trim()}>Send</Button>
+        <Button type="submit" data-testid="chat-send" className="shrink-0 px-3" disabled={!body.trim()}>Send</Button>
       </form>
       <ReportDialog
         open={!!reportId}

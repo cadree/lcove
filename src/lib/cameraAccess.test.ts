@@ -121,6 +121,40 @@ describe("camera access", () => {
     assert.deepEqual(stopped, ["video", "audio"]);
   });
 
+  it("retries when the facing mode is rejected and stops after a denial", async () => {
+    const seen: MediaStreamConstraints[] = [];
+    const recovered = await requestCamera({
+      constraints: [
+        { video: { facingMode: "user" }, audio: true },
+        { video: true, audio: true },
+      ],
+      getUserMedia: async (constraints) => {
+        seen.push(constraints);
+        const video = constraints.video;
+        if (video && typeof video === "object" && "facingMode" in video) throw named("OverconstrainedError");
+        return fakeStream([]);
+      },
+      secure: true,
+      supported: true,
+    });
+    assert.equal(recovered.ok, true);
+    assert.equal(seen.length, 2);
+
+    let calls = 0;
+    const denied = await requestCamera({
+      constraints: [{ video: true }, { video: true, audio: true }],
+      getUserMedia: async () => {
+        calls += 1;
+        throw named("NotAllowedError");
+      },
+      secure: true,
+      supported: true,
+    });
+    assert.equal(denied.ok, false);
+    if (!denied.ok) assert.equal(denied.failure, "denied");
+    assert.equal(calls, 1);
+  });
+
   it("stops every track on an open stream", () => {
     const stopped: string[] = [];
     stopStreamTracks(fakeStream(stopped));

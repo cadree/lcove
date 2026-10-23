@@ -5,10 +5,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Radio, Users, Coins, PlayCircle, Clock } from 'lucide-react';
 import { LiveStream } from '@/hooks/useLiveStreams';
 import { useProfile } from '@/hooks/useProfile';
+import { DeleteStreamButton } from './DeleteStreamButton';
 
 interface LiveStreamCardProps {
   stream: LiveStream;
   onClick?: () => void;
+  canDelete?: boolean;
 }
 
 // Stream status helper
@@ -19,7 +21,7 @@ const getStreamStatus = (stream: { is_live: boolean | null; started_at: string |
   return 'draft';
 };
 
-export const LiveStreamCard: React.FC<LiveStreamCardProps> = ({ stream, onClick }) => {
+export const LiveStreamCard: React.FC<LiveStreamCardProps> = ({ stream, onClick, canDelete = false }) => {
   const { profile } = useProfile(stream.host_id);
   const status = getStreamStatus(stream);
   const hasReplay = status === 'ended' && stream.replay_available && stream.replay_url;
@@ -27,6 +29,7 @@ export const LiveStreamCard: React.FC<LiveStreamCardProps> = ({ stream, onClick 
   return (
     <Card 
       className="overflow-hidden cursor-pointer hover:border-primary/50 transition-colors bg-card/50 backdrop-blur-sm"
+      data-testid={`stream-card-${stream.id}`}
       onClick={onClick}
     >
       <div className="relative aspect-video bg-muted">
@@ -97,7 +100,8 @@ export const LiveStreamCard: React.FC<LiveStreamCardProps> = ({ stream, onClick 
           </span>
         </div>
 
-        <div className="flex gap-2 mt-2 flex-wrap">
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {canDelete && <DeleteStreamButton streamId={stream.id} />}
           <Badge variant="outline" className="text-xs">
             {stream.stream_type === 'webrtc' ? '📹 Camera/Mic' : 
              stream.stream_type === 'obs_rtmp' ? 'Unavailable' :

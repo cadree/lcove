@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { BackButton } from '@/components/navigation/BackButton';
 import PageLayout from '@/components/layout/PageLayout';
@@ -16,6 +16,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useLiveStreams, useEndStream, LiveStream } from '@/hooks/useLiveStreams';
 import { LiveStreamCard } from '@/components/streaming/LiveStreamCard';
+import { DeleteStreamButton } from '@/components/streaming/DeleteStreamButton';
 import { StreamViewer } from '@/components/streaming/StreamViewer';
 import { CreateStreamDialog } from '@/components/streaming/CreateStreamDialog';
 import { EditStreamDialog } from '@/components/streaming/EditStreamDialog';
@@ -122,6 +123,9 @@ const MyStreamCard: React.FC<{
               Edit
             </Button>
             
+            {status === 'ended' && (
+              <DeleteStreamButton streamId={stream.id} />
+            )}
             {status === 'live' ? (
               <Button 
                 size="sm" 
@@ -251,10 +255,19 @@ const Live = () => {
   const [selectedStreamId, setSelectedStreamId] = useState<string | null>(null);
   const [editingStream, setEditingStream] = useState<LiveStream | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  // history.back() from the sheet returns to the same ?stream= URL. Remember
+  // the id we just closed so that entry cannot open the room again.
+  const dismissedStream = useRef<string | null>(null);
+
+  const openStream = (streamId: string) => {
+    if (dismissedStream.current === streamId) dismissedStream.current = null;
+    setSelectedStreamId(streamId);
+  };
 
   useEffect(() => {
     const streamId = searchParams.get("stream");
-    if (streamId) setSelectedStreamId(streamId);
+    if (!streamId || dismissedStream.current === streamId) return;
+    setSelectedStreamId(streamId);
   }, [searchParams]);
 
   // Open the host room after Setup stream has finished closing. Opening it in
@@ -279,11 +292,12 @@ const Live = () => {
   }, [searchParams, user, setSearchParams]);
 
   const myStreams = allStreams.filter(s => s.host_id === user?.id);
-  const otherStreams = allStreams.filter(s => s.host_id !== user?.id);
-  
+
   // Filter streams by search query
   const filteredBrowseStreams = useMemo(() => {
-    const streams = user ? otherStreams : allStreams;
+    const streams = user
+      ? allStreams.filter((stream) => stream.host_id !== user.id || (!stream.is_live && stream.started_at && stream.ended_at))
+      : allStreams;
     if (!searchQuery.trim()) return streams;
     
     const query = searchQuery.toLowerCase();
@@ -291,7 +305,7 @@ const Live = () => {
       s.title.toLowerCase().includes(query) || 
       (s.description && s.description.toLowerCase().includes(query))
     );
-  }, [searchQuery, otherStreams, allStreams, user]);
+  }, [searchQuery, allStreams, user]);
 
   const filteredReplays = useMemo(() => {
     const replays = allStreams.filter(s => s.replay_available && s.replay_url);
@@ -380,7 +394,7 @@ const Live = () => {
                 <div className="max-w-xl">
                   <FeaturedLiveCard 
                     stream={liveStreams[0]}
-                    onClick={() => setSelectedStreamId(liveStreams[0].id)}
+                    onClick={() => openStream(liveStreams[0].id)}
                   />
                 </div>
               ) : (
@@ -389,7 +403,7 @@ const Live = () => {
                     <LiveStreamCard 
                       key={stream.id} 
                       stream={stream}
-                      onClick={() => setSelectedStreamId(stream.id)}
+                      onClick={() => openStream(stream.id)}
                     />
                   ))}
                 </div>
@@ -414,9 +428,9 @@ const Live = () => {
                       <MyStreamCard
                         key={stream.id}
                         stream={stream}
-                        onWatch={() => setSelectedStreamId(stream.id)}
+                        onWatch={() => openStream(stream.id)}
                         onEdit={() => setEditingStream(stream)}
-                        onGoLive={() => setSelectedStreamId(stream.id)}
+                        onGoLive={() => openStream(stream.id)}
                       />
                     ))}
                   </div>
@@ -459,7 +473,8 @@ const Live = () => {
                     <LiveStreamCard 
                       key={stream.id} 
                       stream={stream}
-                      onClick={() => setSelectedStreamId(stream.id)}
+                      canDelete={!!user && stream.host_id === user.id && !stream.is_live}
+                      onClick={() => openStream(stream.id)}
                     />
                   ))}
                 </div>
@@ -500,7 +515,8 @@ const Live = () => {
                     <LiveStreamCard 
                       key={stream.id} 
                       stream={stream}
-                      onClick={() => setSelectedStreamId(stream.id)}
+                      canDelete={!!user && stream.host_id === user.id && !stream.is_live}
+                      onClick={() => openStream(stream.id)}
                     />
                   ))}
                 </div>
@@ -538,7 +554,15 @@ const Live = () => {
           <StreamViewer
             streamId={selectedStreamId}
             open={!!selectedStreamId}
-            onClose={() => setSelectedStreamId(null)}
+            onClose={() => {
+              dismissedStream.current = selectedStreamId;
+              setSelectedStreamId(null);
+              if (searchParams.get("stream")) {
+                const next = new URLSearchParams(searchParams);
+                next.delete("stream");
+                setSearchParams(next, { replace: true });
+              }
+            }}
           />
         )}
       </div>

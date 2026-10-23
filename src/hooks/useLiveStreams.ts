@@ -4,6 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect, useRef } from 'react';
 import { callRpc } from '@/lib/rpc';
+import { watchRows } from '@/lib/liveRoomWatch';
+import { fromUntyped } from '@/lib/safetyTables';
 import { notifyLiveStream } from '@/lib/notifications';
 import { SHOT_USER_ID, shotHostPreview, shotPeople, shotSessionEnabled, shotViewerPreview } from '@/lib/shotSession';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
@@ -129,23 +131,18 @@ export const useLiveStreams = (liveOnly = false) => {
     },
   });
 
-  // Subscribe to realtime updates for live streams
+  // Refresh the list when a row changes. Poll until the socket is joined so a
+  // dropped connection still updates the Live and Replays counts.
   useEffect(() => {
-    const channel = supabase
-      .channel('live-streams-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'live_streams' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['live-streams'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
+    return watchRows(
+      `live-streams-${liveOnly ? "live" : "all"}`,
+      "live_streams",
+      "",
+      queryClient,
+      ["live-streams"],
+      "*",
+    );
+  }, [liveOnly, queryClient]);
 
   const visibleStreams = streams.filter((stream) => !blockedIds.includes(stream.host_id));
 
@@ -176,24 +173,16 @@ export const useStream = (streamId: string | undefined) => {
     enabled: !!streamId,
   });
 
-  // Realtime subscription
   useEffect(() => {
     if (!streamId) return;
-
-    const channel = supabase
-      .channel(`stream-${streamId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'live_streams', filter: `id=eq.${streamId}` },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['stream', streamId] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return watchRows(
+      `stream-${streamId}`,
+      "live_streams",
+      `id=eq.${streamId}`,
+      queryClient,
+      ["stream", streamId],
+      "*",
+    );
   }, [streamId, queryClient]);
 
   const visibleStream = stream && blockedIds.includes(stream.host_id) ? null : stream;
@@ -220,27 +209,100 @@ export const useStreamReactions = (streamId: string | undefined) => {
     enabled: !!streamId,
   });
 
-  // Realtime reactions
   useEffect(() => {
     if (!streamId) return;
-
-    const channel = supabase
-      .channel(`stream-reactions-${streamId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'stream_reactions', filter: `stream_id=eq.${streamId}` },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['stream-reactions', streamId] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return watchRows(
+      `stream-reactions-${streamId}`,
+      "stream_reactions",
+      `stream_id=eq.${streamId}`,
+      queryClient,
+      ["stream-reactions", streamId],
+    );
   }, [streamId, queryClient]);
 
   return { reactions };
+};
+
+export interface StreamCheer {
+  id: string;
+  label: string;
+  created_at: string;
+}
+
+export const useStreamCheers = (streamId: string | undefined) => {
+  const queryClient = useQueryClient();
+  const { reactions } = useStreamReactions(streamId);
+
+  const { data: tips = [] } = useQuery({
+    queryKey: ["stream-tips", streamId],
+    enabled: !!streamId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("stream_tips")
+        .select("id, amount, message, created_at")
+        .eq("stream_id", streamId!)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) return [];
+      return data;
+    },
+  });
+
+  const { data: gifts = [] } = useQuery({
+    queryKey: ["stream-gifts", streamId],
+    enabled: !!streamId,
+    queryFn: async () => {
+      const { data, error } = await fromUntyped("stream_gifts")
+        .select("id, gift, created_at")
+        .eq("stream_id", streamId!)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) return [];
+      return (data || []) as { id: string; gift: string; created_at: string }[];
+    },
+  });
+
+  useEffect(() => {
+    if (!streamId) return;
+    const stopTips = watchRows(
+      `stream-tips-${streamId}`,
+      "stream_tips",
+      `stream_id=eq.${streamId}`,
+      queryClient,
+      ["stream-tips", streamId],
+    );
+    const stopGifts = watchRows(
+      `stream-gifts-${streamId}`,
+      "stream_gifts",
+      `stream_id=eq.${streamId}`,
+      queryClient,
+      ["stream-gifts", streamId],
+    );
+    return () => {
+      stopTips();
+      stopGifts();
+    };
+  }, [streamId, queryClient]);
+
+  const cheers: StreamCheer[] = [
+    ...reactions.map((reaction) => ({
+      id: reaction.id,
+      label: reaction.emoji,
+      created_at: reaction.created_at,
+    })),
+    ...tips.map((tip) => ({
+      id: tip.id,
+      label: tip.message ? `${tip.amount} LC · ${tip.message}` : `${tip.amount} LC`,
+      created_at: tip.created_at,
+    })),
+    ...gifts.map((gift) => ({
+      id: gift.id,
+      label: gift.gift === "rose" ? "Rose" : gift.gift === "star" ? "Star" : gift.gift === "crown" ? "Crown" : gift.gift,
+      created_at: gift.created_at,
+    })),
+  ].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 8);
+
+  return { reactions, cheers };
 };
 
 export const useCreateStream = () => {
@@ -334,6 +396,7 @@ export const useGoLive = () => {
 
 export const useSendReaction = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ streamId, emoji }: { streamId: string; emoji: string }) => {
@@ -349,11 +412,15 @@ export const useSendReaction = () => {
 
       if (error) throw error;
     },
+    onSuccess: (_, { streamId }) => {
+      queryClient.invalidateQueries({ queryKey: ["stream-reactions", streamId] });
+    },
   });
 };
 
 export const useTipStream = () => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const idempotencyKey = useRef<string | null>(null);
 
   return useMutation({
@@ -384,8 +451,9 @@ export const useTipStream = () => {
       if (data.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: (_, { amount }) => {
+    onSuccess: (_, { streamId, amount }) => {
       idempotencyKey.current = null;
+      queryClient.invalidateQueries({ queryKey: ["stream-tips", streamId] });
       toast({ title: `Tipped ${amount} LC!` });
     },
     onError: (error) => {
@@ -498,25 +566,19 @@ export const useDeleteStream = () => {
       if (fetchError) throw fetchError;
       if (stream.host_id !== user.id) throw new Error('You can only delete your own streams');
 
-      // Delete stream reactions first
-      await supabase
-        .from('stream_reactions')
-        .delete()
-        .eq('stream_id', streamId);
-
-      // Delete stream viewers
-      await supabase
-        .from('stream_viewers')
-        .delete()
-        .eq('stream_id', streamId);
-
-      // Delete the stream
-      const { error } = await supabase
-        .from('live_streams')
-        .delete()
-        .eq('id', streamId);
-
-      if (error) throw error;
+      try {
+        await callRpc('delete_own_live_stream', { p_stream_id: streamId });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        const missing = /delete_own_live_stream|schema cache|does not exist|PGRST202/i.test(message);
+        if (!missing) throw error;
+        const { error: deleteError } = await supabase
+          .from('live_streams')
+          .delete()
+          .eq('id', streamId)
+          .eq('host_id', user.id);
+        if (deleteError) throw deleteError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['live-streams'] });

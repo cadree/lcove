@@ -3,7 +3,12 @@ import { LIVE_REQUEST_TIMEOUT_MS } from "./withDeadline.ts";
 export const CAMERA_TIMEOUT_MS = LIVE_REQUEST_TIMEOUT_MS;
 
 export const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
-  video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+  video: {
+    facingMode: "user",
+    width: { ideal: 1280, max: 1280 },
+    height: { ideal: 720, max: 720 },
+    frameRate: { ideal: 30, max: 30 },
+  },
   audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
 };
 
@@ -90,19 +95,14 @@ function fail(failure: CameraFailure): CameraResult<never> {
   return { ok: false, failure, title: copy.title, message: copy.message };
 }
 
-export async function requestCamera<T extends CameraStream>(options: {
+async function requestCameraOnce<T extends CameraStream>(options: {
   getUserMedia: (constraints: MediaStreamConstraints) => Promise<T>;
-  secure: boolean;
-  supported: boolean;
-  timeoutMs?: number;
+  constraints: MediaStreamConstraints;
+  timeoutMs: number;
   stillWanted?: () => boolean;
 }): Promise<CameraResult<T>> {
-  if (!options.secure) return fail("insecure");
-  if (!options.supported) return fail("unsupported");
-
-  const timeoutMs = options.timeoutMs ?? CAMERA_TIMEOUT_MS;
   let settled = false;
-  const pending = options.getUserMedia(CAMERA_CONSTRAINTS).then(
+  const pending = options.getUserMedia(options.constraints).then(
     (stream) => {
       if (settled || options.stillWanted?.() === false) {
         stopStreamTracks(stream);
@@ -121,7 +121,7 @@ export async function requestCamera<T extends CameraStream>(options: {
       const error = new Error("Camera request timed out");
       error.name = "TimeoutError";
       reject(error);
-    }, timeoutMs);
+    }, options.timeoutMs);
   });
 
   try {
@@ -139,4 +139,37 @@ export async function requestCamera<T extends CameraStream>(options: {
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+function canTryNextConstraint(failure: CameraFailure): boolean {
+  return failure === "no-device" || failure === "failed";
+}
+
+export async function requestCamera<T extends CameraStream>(options: {
+  getUserMedia: (constraints: MediaStreamConstraints) => Promise<T>;
+  secure: boolean;
+  supported: boolean;
+  timeoutMs?: number;
+  stillWanted?: () => boolean;
+  constraints?: MediaStreamConstraints[];
+}): Promise<CameraResult<T>> {
+  if (!options.secure) return fail("insecure");
+  if (!options.supported) return fail("unsupported");
+
+  const timeoutMs = options.timeoutMs ?? CAMERA_TIMEOUT_MS;
+  const attempts = options.constraints?.length ? options.constraints : [CAMERA_CONSTRAINTS];
+  let last: CameraResult<T> = fail("failed");
+  for (let index = 0; index < attempts.length; index += 1) {
+    if (options.stillWanted?.() === false) return fail("timeout");
+    const result = await requestCameraOnce({
+      getUserMedia: options.getUserMedia,
+      constraints: attempts[index],
+      timeoutMs,
+      stillWanted: options.stillWanted,
+    });
+    if (result.ok === true) return result;
+    last = result;
+    if (!canTryNextConstraint(result.failure) || index === attempts.length - 1) return result;
+  }
+  return last;
 }
