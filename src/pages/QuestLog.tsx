@@ -9,8 +9,8 @@ import { useEnergy } from "@/hooks/useEnergy";
 import { useCredits } from "@/hooks/useCredits";
 import { dailyDecodeCopy, decryptedKey, type QuestView } from "@/lib/noviQuests";
 import { useXpCelebrate } from "@/hooks/useXpCelebrate";
-import { useXpReadout } from "@/hooks/useEasedNumber";
-import { XpMeter } from "@/components/novi/XpMeter";
+import { useEasedNumber } from "@/hooks/useEasedNumber";
+import { QuestHero } from "@/components/novi/QuestHero";
 
 const tabs = ["Active", "Daily", "Story", "Done"] as const;
 type Tab = (typeof tabs)[number];
@@ -24,7 +24,7 @@ function visible(tab: Tab, quest: QuestView): boolean {
 
 const QuestLog = () => {
   const { quests, total, streak, dailyDone, dailyXp, complete, isReady } = useNoviQuests();
-  const readout = useXpReadout(total);
+  const shown = useEasedNumber(total);
   const burst = useXpCelebrate(total, decryptedKey(quests), isReady);
   const { energy, currentEnergy } = useEnergy();
   const { balance } = useCredits();
@@ -36,15 +36,11 @@ const QuestLog = () => {
     <PageLayout>
       <div className="mx-auto max-w-md px-4 pb-28 pt-4">
         <p className="kicker">// Neo gold</p>
-        <div className="relative mt-3 overflow-hidden rounded-[18px] border border-[color-mix(in_srgb,#FF9FC8_55%,transparent)] bg-[radial-gradient(circle_at_70%_18%,rgba(255,159,200,0.34),transparent_58%)] px-4 pb-4 pt-3">
-          <p className="mono-label text-[8px] text-[hsl(var(--brand))]">Novi // Hero</p>
-          <NoviCutout className="mx-auto h-64 w-52" />
-          <h1 className="ether-title text-center text-[40px]">Level {readout.level}</h1>
-          <p className="lore text-center text-[18px] text-foreground">Creator</p>
-        </div>
-        <div className="mt-3">
-          <XpMeter total={total} burstToken={burst} readout={readout} />
-        </div>
+        <QuestHero
+          displayedXp={shown}
+          burstToken={burst}
+          cutout={<NoviCutout className="mx-auto h-64 w-52" />}
+        />
         <div className="mt-4 grid grid-cols-3 gap-2">
           {[
             ["Streak", String(streak)],
