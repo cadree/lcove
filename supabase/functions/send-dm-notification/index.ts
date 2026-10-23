@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const EMAIL_FROM = "ETHER <notifications@etherbylcove.com>";
 
@@ -386,7 +387,7 @@ serve(async (req) => {
   } catch (error: unknown) {
     console.error("Error in send-dm-notification function:", error);
     return new Response(JSON.stringify({ error: errorMessage(error) }), {
-      status: 500,
+      status: httpStatusForError(error),
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }

@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useIosExternalCheckout } from "@/hooks/useIosExternalCheckout";
 import { openExternalCheckout, readStorefrontCountry } from "@/lib/externalCheckout";
 import { isUsStorefront } from "@/lib/iosStorefront";
+import { errorMessage } from "@/lib/errorMessage";
 import { ETHER_WEB_ORIGIN, isIosApp } from "@/lib/platform";
 
 const PRESET_AMOUNTS = [5, 10, 25, 50];
@@ -79,7 +80,7 @@ export function DonateDialog({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error("Donation error:", err);
-      toast.error("Failed to start checkout. Please try again.");
+      toast.error(errorMessage(err, "Failed to start checkout. Please try again."));
     } finally {
       setLoading(false);
     }

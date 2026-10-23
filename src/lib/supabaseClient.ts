@@ -4,6 +4,7 @@ import { Capacitor } from "@capacitor/core";
 import { toast } from "sonner";
 import { capacitorStorage } from "@/lib/capacitorStorage";
 import { prepareStorageBody, StorageLimitError } from "@/lib/prepareStorageUpload";
+import { withServerFunctionMessage } from "@/lib/functionError";
 import { fileKind, isStorageSizeRejection, storageLimitMessage } from "@/lib/storageLimit";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -34,6 +35,14 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     flowType: "pkce",
   },
 });
+
+// Non-2xx function responses keep their JSON error string on error.message.
+// Status 401 and 400 would otherwise surface as a generic Edge Function error.
+const originalInvoke = supabase.functions.invoke.bind(supabase.functions);
+supabase.functions.invoke = (async (functionName, options) => {
+  const result = await originalInvoke(functionName, options);
+  return withServerFunctionMessage(result);
+}) as typeof supabase.functions.invoke;
 
 // Every storage upload goes through this guard. Files at or under the 50 MB
 // cap are sent unchanged. Larger videos are compressed in the browser first,

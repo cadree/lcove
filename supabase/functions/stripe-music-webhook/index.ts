@@ -6,6 +6,7 @@ import {
   handleSignedStripeWebhook,
 } from "../_shared/stripe-webhook-dispatch.mjs";
 import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,7 +25,7 @@ serve(async (req) => {
     const message = error instanceof Error ? error.message : "Stripe test key required";
     return new Response(JSON.stringify({ error: message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: httpStatusForError(error),
     });
   }
 

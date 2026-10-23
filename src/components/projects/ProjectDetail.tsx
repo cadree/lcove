@@ -750,7 +750,10 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                                   body: { milestoneId: ms.id },
                                 });
                                 if (error || data?.error) {
-                                  toast({ title: data?.error || "Could not start payment", variant: "destructive" });
+                                  const serverMessage = typeof data?.error === "string" && data.error
+                                    ? data.error
+                                    : error instanceof Error ? error.message : "";
+                                  toast({ title: serverMessage || "Could not start payment", variant: "destructive" });
                                   return;
                                 }
                                 if (data?.needs_connect) {

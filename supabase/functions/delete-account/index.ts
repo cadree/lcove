@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -266,7 +267,7 @@ serve(async (req) => {
       || message === STRIPE_SUBSCRIPTION
       || message === MONEY_CHECK_FAILED
       ? 409
-      : 500;
+      : httpStatusForError(error);
     return json(status, { error: message });
   }
 });

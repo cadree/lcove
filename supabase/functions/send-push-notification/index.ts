@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { ApplicationServer, importVapidKeys, Urgency, type ExportedVapidKeys } from "jsr:@negrel/webpush";
 import { requireUserOrService } from "../_shared/require-caller.ts";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -215,7 +216,7 @@ serve(async (req) => {
     logStep("ERROR in send-push-notification", { error: errorMessage });
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: httpStatusForError(error), headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });

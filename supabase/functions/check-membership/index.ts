@@ -9,6 +9,7 @@ import {
   tierFromStripeSubscription,
 } from "../_shared/membership-products.mjs";
 import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -244,7 +245,7 @@ serve(async (req) => {
     logStep("ERROR", { message: errorMessage });
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: httpStatusForError(error),
     });
   }
 });

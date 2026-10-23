@@ -3,6 +3,7 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
 import { checkoutOrigin } from "../_shared/checkout-origin.mjs";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -154,7 +155,7 @@ serve(async (req) => {
     logStep("ERROR", { message: errorMessage });
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: httpStatusForError(error),
     });
   }
 });
