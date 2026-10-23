@@ -4,12 +4,14 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import { TEMPLATES } from '../_shared/transactional-email-templates/registry.ts'
 import { requestRole } from '../_shared/require-caller.ts'
 import { authorizeTransactionalEmail } from '../_shared/notification-auth.mjs'
+import { PLATFORM_QUEUE_FROM, VERIFIED_SENDER_DOMAIN } from '../_shared/host-email-address.mjs'
 
-// Recorded on the queue payload. process-email-queue sends with Resend and
-// uses EMAIL_FROM (default notifications@notifications.etherbylcove.com).
-// It does not read `from` or `sender_domain`, and it does not call Lovable.
-const QUEUED_FROM = "Ether <notifications@notifications.etherbylcove.com>"
-const SENDER_DOMAIN = "notifications.etherbylcove.com"
+// Recorded on the queue payload. process-email-queue sends with Resend.
+// A from address on etherbylcove.com is kept, including the display name.
+// The notifications subdomain is rewritten onto that domain. It does not call Lovable.
+
+const QUEUED_FROM = `Ether <${PLATFORM_QUEUE_FROM}>`
+const SENDER_DOMAIN = VERIFIED_SENDER_DOMAIN
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

@@ -1,18 +1,15 @@
 // Queue dispatcher for auth_emails and transactional_emails.
 // Sends with Resend. Callers pass sendEmail so tests can mock the HTTP call.
 
-export const DEFAULT_EMAIL_FROM = "notifications@notifications.etherbylcove.com";
+import { PLATFORM_QUEUE_FROM, isVerifiedSender, rewriteSenderAddress } from "./host-email-address.mjs";
 
-const VERIFIED_FROM_DOMAINS = ["etherbylcove.com", "notifications.etherbylcove.com"];
+export const DEFAULT_EMAIL_FROM = PLATFORM_QUEUE_FROM;
 
 export function resolveQueueFrom(fallback, payloadFrom) {
-  const candidate = typeof payloadFrom === "string" ? payloadFrom.trim() : "";
-  const address = (candidate.match(/<([^>]+)>/)?.[1] || candidate).trim().toLowerCase();
-  const domain = address.split("@")[1] || "";
-  if (address.includes("@") && VERIFIED_FROM_DOMAINS.includes(domain) && !address.includes(" ")) {
-    return candidate;
-  }
-  return (typeof fallback === "string" && fallback.trim()) || DEFAULT_EMAIL_FROM;
+  const candidate = rewriteSenderAddress(typeof payloadFrom === "string" ? payloadFrom.trim() : "");
+  if (isVerifiedSender(candidate)) return candidate;
+  const fallbackValue = rewriteSenderAddress(typeof fallback === "string" ? fallback.trim() : "");
+  return fallbackValue || DEFAULT_EMAIL_FROM;
 }
 
 const MAX_RETRIES = 5;
@@ -284,7 +281,7 @@ export async function runEmailQueue(deps) {
 
         if (isForbidden(error)) {
           await moveToDlq(supabase, queue, msg, "Emails disabled for this project");
-          return json({ processed: totalProcessed, stopped: "emails_disabled" });
+          continue;
         }
 
         await supabase.from("email_send_log").insert({

@@ -85,7 +85,7 @@ Profile photos are public URLs in `media`. `avatars` is private and exists so `d
 Supabase injects `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Set the rest as GitHub Actions secrets. The deploy workflow copies each name that is set and skips the rest. Do not put the values in the repo. The click path is in `docs/deploy-ether-prod.md`.
 
 - `INTERNAL_FUNCTION_SECRET` (the existing Vault secret `internal_function_secret`, not a new value)
-- `EMAIL_FROM` (optional; default `notifications@notifications.etherbylcove.com`)
+- `EMAIL_FROM` (optional; default `notifications@etherbylcove.com`)
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET` (from `docs/stripe-setup.md`, for this project's endpoint)
 - `STRIPE_PRODUCT_COMMUNITY`, `STRIPE_PRICE_COMMUNITY`, `STRIPE_PRODUCT_ELITE`, `STRIPE_PRICE_ELITE` (this Stripe account; `docs/stripe-setup.md`)

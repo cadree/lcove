@@ -2,9 +2,14 @@
 // Always sends through the verified platform domain — never spoofs host mailboxes.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import {
+  HOST_EVENT_FROM_ADDRESS,
+  PLATFORM_FALLBACK_REPLY_TO,
+  hostFromHeader,
+  sanitizeDisplayName,
+} from "./host-email-address.mjs";
 
-export const HOST_EVENT_FROM_ADDRESS = "events@notifications.etherbylcove.com";
-export const PLATFORM_FALLBACK_REPLY_TO = "support@notify.etherbylcove.com";
+export { HOST_EVENT_FROM_ADDRESS, PLATFORM_FALLBACK_REPLY_TO };
 
 export interface HostIdentity {
   fromName: string;
@@ -19,15 +24,6 @@ export interface HostIdentity {
   brandColor: string;
   signature: string | null;
   personalNote: string | null;
-}
-
-// Strip CR/LF and quotes — prevents header injection in display name.
-function sanitizeDisplayName(name: string): string {
-  return (name || "")
-    .replace(/[\r\n"]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 80);
 }
 
 interface EventIdentityRow {
@@ -101,7 +97,7 @@ export async function resolveHostIdentity(
 
   return {
     fromName,
-    fromHeader: `${fromName} <${HOST_EVENT_FROM_ADDRESS}>`,
+    fromHeader: hostFromHeader(fromName),
     fromAddress: HOST_EVENT_FROM_ADDRESS,
     replyTo,
     replyToVerified,
