@@ -205,6 +205,7 @@ test("an expired ticket is not also cancelled as a store order", async () => {
   }), { db });
   assert.equal(result.status, 200);
   assert.ok(methods(calls).includes("cancelPendingTicketOrder"));
+  assert.ok(methods(calls).includes("releaseAbandonedTicketOrders"));
   assert.equal(methods(calls).includes("cancelPendingStoreOrder"), false);
 });
 

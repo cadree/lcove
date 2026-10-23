@@ -66,7 +66,6 @@ serve(async (req) => {
     let displayName = body.attendeeName || "there";
     let pushEnabled = false;
     let emailEnabled = true;
-    const smsEnabled = true;
 
     if (body.attendeeUserId) {
       if (!email) {
@@ -201,30 +200,6 @@ serve(async (req) => {
           if (r.ok) { results.email = true; await logRow("email", "sent"); }
           else await logRow("email", "failed", await r.text());
         } catch (e) { await logRow("email", "failed", String(e)); }
-      }
-    }
-
-    // SMS
-    if (channels.sms && phone && smsEnabled) {
-      const sid = Deno.env.get("TWILIO_ACCOUNT_SID");
-      const auth = Deno.env.get("TWILIO_AUTH_TOKEN");
-      const from = Deno.env.get("TWILIO_PHONE_NUMBER");
-      if (sid && auth && from) {
-        try {
-          const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
-            method: "POST",
-            headers: {
-              Authorization: `Basic ${btoa(`${sid}:${auth}`)}`,
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-              To: phone, From: from,
-              Body: `${finalTitle}\n\n${finalBody}\n\n${eventUrl}`,
-            }),
-          });
-          if (r.ok) { results.sms = true; await logRow("sms", "sent"); }
-          else await logRow("sms", "failed", `${r.status}`);
-        } catch (e) { await logRow("sms", "failed", String(e)); }
       }
     }
 

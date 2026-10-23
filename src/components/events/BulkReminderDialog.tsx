@@ -22,7 +22,7 @@ export function BulkReminderDialog({ open, onOpenChange, eventId, tiers }: Props
   const [title, setTitle] = useState("Reminder: {event_name}");
   const [body, setBody] = useState("Hey {first_name}, just a reminder — {event_name} is coming up on {event_time}.");
   const [tierIds, setTierIds] = useState<string[]>([]);
-  const [statuses, setStatuses] = useState<string[]>(["confirmed"]);
+  const [statuses, setStatuses] = useState<string[]>(["registered", "approved"]);
   const [push, setPush] = useState(true);
   const [email, setEmail] = useState(true);
   const [sending, setSending] = useState(false);
@@ -80,12 +80,16 @@ export function BulkReminderDialog({ open, onOpenChange, eventId, tiers }: Props
           <div>
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Status</Label>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {["confirmed", "checked_in"].map(s => (
-                <Badge key={s}
-                  variant={statuses.includes(s) ? "default" : "outline"}
+              {[
+                { value: "registered", label: "Going" },
+                { value: "approved", label: "Approved" },
+                { value: "waitlisted", label: "Waitlist" },
+              ].map(s => (
+                <Badge key={s.value}
+                  variant={statuses.includes(s.value) ? "default" : "outline"}
                   className="cursor-pointer"
-                  onClick={() => toggle(statuses, setStatuses, s)}>
-                  {s.replace("_", " ")}
+                  onClick={() => toggle(statuses, setStatuses, s.value)}>
+                  {s.label}
                 </Badge>
               ))}
             </div>

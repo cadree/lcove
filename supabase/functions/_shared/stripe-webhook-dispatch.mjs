@@ -100,13 +100,17 @@ async function applyCheckoutCompleted(session, db) {
 
 async function applyCheckoutExpired(session, db) {
   const { meta, type } = checkoutMeta(session);
-  if (!meta.order_id) return;
-  if (type === "event_ticket") {
+  if (meta.order_id && type === "event_ticket") {
     await db.cancelPendingTicketOrder(meta.order_id);
-    return;
-  }
-  if (type === "store_order" || meta.item_id) {
+  } else if (meta.order_id && (type === "store_order" || meta.item_id)) {
     await db.cancelPendingStoreOrder(meta.order_id);
+  }
+  // Sessions last at most 24 hours. The timestamp sweep frees holds whose
+  // expired webhook never arrived. It does not call Stripe.
+  try {
+    await db.releaseAbandonedTicketOrders();
+  } catch (err) {
+    console.error("abandoned ticket sweep failed", err);
   }
 }
 
@@ -523,6 +527,13 @@ export function createSupabaseStripeDb(supabase, stripe) {
 
     async cancelPendingTicketOrder(orderId) {
       const { error } = await supabase.rpc("cancel_pending_ticket_order", { p_order_id: orderId });
+      throwIf(error);
+    },
+
+    async releaseAbandonedTicketOrders() {
+      const { error } = await supabase.rpc("release_abandoned_ticket_orders", {
+        p_older_than: "24 hours",
+      });
       throwIf(error);
     },
 

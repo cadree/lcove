@@ -14,6 +14,7 @@ import { useCredits } from "@/hooks/useCredits";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { supabase } from "@/integrations/supabase/client";
 import { shareLink, shareToChannel, buildShareUrl } from "@/lib/shareLink";
+import { attendanceLabel, attendanceSummary } from "@/lib/eventGuests";
 import { format, formatDistanceToNow } from "date-fns";
 import { formatEventDate, formatEventTime } from "@/lib/eventTime";
 import { 
@@ -39,7 +40,6 @@ import {
   Sun,
   CalendarCheck,
   UserPlus,
-  MessageSquare,
   Download,
   Send,
   Image,
@@ -83,6 +83,7 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
   const [isGeneratingFlyer, setIsGeneratingFlyer] = useState(false);
   const [isSendingReminder, setIsSendingReminder] = useState(false);
   const [reminderMessage, setReminderMessage] = useState("");
+  const [reminderNotice, setReminderNotice] = useState<string | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [tierManagerOpen, setTierManagerOpen] = useState(false);
 
@@ -100,8 +101,9 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
     );
   }
 
-  const spotsLeft = event.capacity ? event.capacity - (event.rsvp_count || 0) : null;
-  const isSoldOut = spotsLeft !== null && spotsLeft <= 0;
+  const attendance = attendanceSummary(event.capacity, event.rsvp_count || 0);
+  const spotsLeft = attendance.spotsLeft;
+  const isSoldOut = attendance.soldOut;
   const eventDate = new Date(event.start_date);
   const isUpcoming = eventDate > new Date();
   const timeUntilEvent = isUpcoming ? formatDistanceToNow(eventDate, { addSuffix: true }) : null;
@@ -279,22 +281,31 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
     }
   };
 
-  const handleSendReminder = async (includeSms = false) => {
+  const handleSendReminder = async () => {
     setIsSendingReminder(true);
+    setReminderNotice(null);
     try {
       const { data, error } = await supabase.functions.invoke('send-event-reminder', {
-        body: { eventId: event.id, message: reminderMessage || undefined, sendSms: includeSms },
+        body: { eventId: event.id, message: reminderMessage || undefined },
       });
       if (error) throw error;
-      const parts = [];
-      if (data?.sentCount > 0) parts.push(`${data.sentCount} emails`);
-      if (data?.smsSentCount > 0) parts.push(`${data.smsSentCount} texts`);
-      if (data?.pushSentCount > 0) parts.push(`${data.pushSentCount} push notifications`);
-      toast.success(parts.length > 0 ? `Sent: ${parts.join(', ')}` : 'No attendees to notify');
-      setReminderMessage("");
+      const notice = typeof data?.message === "string"
+        ? data.message
+        : data?.sentCount > 0
+          ? `Queued email for ${data.sentCount} guest${data.sentCount === 1 ? "" : "s"}.`
+          : "No guests to email.";
+      setReminderNotice(notice);
+      if (data?.sentCount > 0) {
+        toast.success(notice);
+        setReminderMessage("");
+      } else {
+        toast.error(notice);
+      }
     } catch (error) {
       console.error('Reminder error:', error);
-      toast.error('Failed to send reminder');
+      const notice = "Could not queue the reminder email.";
+      setReminderNotice(notice);
+      toast.error(notice);
     } finally {
       setIsSendingReminder(false);
     }
@@ -460,10 +471,6 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
                       <Copy className="w-4 h-4 mr-2" />
                       Copy Link
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleShare('sms')}>
-                      <MessageSquare className="w-4 h-4 mr-2" />
-                      iMessage / SMS
-                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleShare('whatsapp')}>
                       <Send className="w-4 h-4 mr-2" />
                       WhatsApp
@@ -574,7 +581,7 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
               </div>
               <div className="flex-1">
                 <p className="text-foreground font-medium">
-                  {event.rsvp_count} attending
+                  {attendanceLabel(event.capacity, event.rsvp_count || 0)}
                 </p>
                 {spotsLeft !== null && (
                   <p className={cn(
@@ -619,22 +626,23 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
                   onChange={(e) => setReminderMessage(e.target.value)}
                   className="text-sm"
                 />
-                <div className="flex gap-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => handleSendReminder(false)}
-                    disabled={isSendingReminder}
-                    className="flex-1"
-                  >
-                    {isSendingReminder ? (
-                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                    ) : (
-                      <Bell className="w-3 h-3 mr-1" />
-                    )}
-                    Email All
-                  </Button>
-                </div>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => handleSendReminder()}
+                  disabled={isSendingReminder}
+                  className="w-full"
+                >
+                  {isSendingReminder ? (
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  ) : (
+                    <Bell className="w-3 h-3 mr-1" />
+                  )}
+                  Email guests
+                </Button>
+                {reminderNotice && (
+                  <p className="text-xs text-foreground" role="status">{reminderNotice}</p>
+                )}
               </div>
             )}
 
@@ -690,8 +698,12 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
               <Button
                 variant={event.user_rsvp?.status === 'going' ? 'glass' : 'default'}
                 size="lg"
-                onClick={() => handleRSVP(event.user_rsvp?.status === 'going' ? 'cancelled' : 'going')}
-                disabled={isRsvping || isSoldOut}
+                onClick={() => handleRSVP(
+                  event.user_rsvp?.status === 'going' || event.user_rsvp?.status === 'waitlist'
+                    ? 'cancelled'
+                    : 'going'
+                )}
+                disabled={isRsvping}
                 className="w-full"
               >
                 {isRsvping ? (
@@ -700,6 +712,16 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
                   <>
                     <X className="w-4 h-4 mr-2" />
                     Cancel RSVP
+                  </>
+                ) : event.user_rsvp?.status === 'waitlist' ? (
+                  <>
+                    <X className="w-4 h-4 mr-2" />
+                    Leave waitlist
+                  </>
+                ) : isSoldOut ? (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Join waitlist
                   </>
                 ) : (
                   <>

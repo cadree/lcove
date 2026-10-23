@@ -13,7 +13,6 @@ interface Invitee {
   id: string;
   name: string;
   email: string;
-  phone: string;
 }
 
 interface InviteGuestsDialogProps {
@@ -25,7 +24,7 @@ interface InviteGuestsDialogProps {
 export function InviteGuestsDialog({ eventId, eventTitle, children }: InviteGuestsDialogProps) {
   const [open, setOpen] = useState(false);
   const [invitees, setInvitees] = useState<Invitee[]>([
-    { id: crypto.randomUUID(), name: "", email: "", phone: "" },
+    { id: crypto.randomUUID(), name: "", email: "" },
   ]);
   const [sending, setSending] = useState(false);
 
@@ -34,7 +33,7 @@ export function InviteGuestsDialog({ eventId, eventTitle, children }: InviteGues
       toast.error("Maximum 50 invitations at a time");
       return;
     }
-    setInvitees([...invitees, { id: crypto.randomUUID(), name: "", email: "", phone: "" }]);
+    setInvitees([...invitees, { id: crypto.randomUUID(), name: "", email: "" }]);
   };
 
   const removeInvitee = (id: string) => {
@@ -49,7 +48,7 @@ export function InviteGuestsDialog({ eventId, eventTitle, children }: InviteGues
   const handleSend = async () => {
     const validInvitees = invitees.filter((i) => i.email.trim());
     if (validInvitees.length === 0) {
-      toast.error("Add at least one email");
+      toast.error("Add at least one email address");
       return;
     }
 
@@ -63,8 +62,7 @@ export function InviteGuestsDialog({ eventId, eventTitle, children }: InviteGues
           eventId,
           invitees: validInvitees.map((i) => ({
             name: i.name.trim() || undefined,
-            email: i.email.trim() || undefined,
-            phone: i.phone.trim() || undefined,
+            email: i.email.trim(),
           })),
         },
         headers: { Authorization: `Bearer ${session.access_token}` },
@@ -75,7 +73,7 @@ export function InviteGuestsDialog({ eventId, eventTitle, children }: InviteGues
       const sentCount = data?.sentCount || 0;
       toast.success(`${sentCount} invitation${sentCount !== 1 ? "s" : ""} sent!`);
       setOpen(false);
-      setInvitees([{ id: crypto.randomUUID(), name: "", email: "", phone: "" }]);
+      setInvitees([{ id: crypto.randomUUID(), name: "", email: "" }]);
     } catch (err: unknown) {
       toast.error(errorMessage(err, "Failed to send invitations"));
     } finally {
@@ -96,7 +94,7 @@ export function InviteGuestsDialog({ eventId, eventTitle, children }: InviteGues
 
         <div className="space-y-4 pt-2">
           <p className="text-sm text-muted-foreground">
-            Send email invitations to people — they don't need an account to RSVP or buy tickets.
+            Send an email invitation. They don't need an account to RSVP or buy a ticket. Text invites aren't available.
           </p>
 
           {invitees.map((invitee, index) => (
