@@ -53,7 +53,7 @@ const DialogContent = React.forwardRef<
     <DialogOverlay />
     <div className={cn(
       "fixed inset-0 z-50 flex overflow-hidden",
-      fullscreen ? "items-stretch justify-stretch p-0" : "items-center justify-center p-4",
+      fullscreen ? "items-stretch justify-stretch p-0 pointer-events-auto" : "items-center justify-center p-4",
     )}>
       <DialogPrimitive.Content
         ref={ref}

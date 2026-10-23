@@ -854,21 +854,19 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
         className="flex-shrink-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-4 py-3"
       >
         <div className="mx-auto flex w-full min-w-0 max-w-full flex-col items-center gap-3">
-          {(cameraState === "ready" || cameraState === "idle") && (
-            <div className="flex w-full items-center justify-between gap-3">
-              <Label htmlFor="save-replay" className="text-sm text-white">
-                Save replay
-                <span className="mt-0.5 block text-xs font-normal text-white/70">Uploads from this phone when it is under 50 MB.</span>
-              </Label>
-              <Switch
-                id="save-replay"
-                checked={saveReplay}
-                onCheckedChange={setSaveReplay}
-                disabled={isStreaming || isGoingLive}
-                aria-label="Save replay"
-              />
-            </div>
-          )}
+          <div className="flex w-full items-center justify-between gap-3">
+            <Label htmlFor="save-replay" className="min-w-0 flex-1 text-sm text-white">
+              Save replay
+              <span className="mt-0.5 block text-xs font-normal text-white/70">Uploads when you end (under 50 MB). Anyone can watch it in Replays.</span>
+            </Label>
+            <Switch
+              id="save-replay"
+              checked={saveReplay}
+              onCheckedChange={setSaveReplay}
+              disabled={isStreaming || isGoingLive}
+              aria-label="Save replay"
+            />
+          </div>
           {cameraState === "ready" && (
             <div className="flex items-center justify-center gap-6">
               <Button variant={videoEnabled ? "secondary" : "destructive"} size="icon" onClick={toggleVideo} className="h-11 w-11 rounded-full" aria-label={videoEnabled ? "Turn camera off" : "Turn camera on"}>
