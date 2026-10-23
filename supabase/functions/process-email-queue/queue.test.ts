@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { DEFAULT_EMAIL_FROM, sendWithResend } from "../_shared/email-queue-dispatch.mjs";
+import { DEFAULT_EMAIL_FROM, resolveQueueFrom, sendWithResend } from "../_shared/email-queue-dispatch.mjs";
 import { handleEmailQueueRequest } from "./handler.ts";
 
 Deno.env.set("INTERNAL_FUNCTION_SECRET", "queue-test-secret");
@@ -185,6 +185,14 @@ Deno.test("mocked Resend send deletes, and failures move to the DLQ", async () =
   assert.equal(fetches[0].url, "https://api.resend.com/emails");
   assert.equal(fetches[0].authorization, "Bearer resend-test-key");
   assert.equal(fetches[0].from, DEFAULT_EMAIL_FROM);
+  assert.equal(
+    resolveQueueFrom(DEFAULT_EMAIL_FROM, "Ether <notifications@etherbylcove.com>"),
+    "Ether <notifications@etherbylcove.com>",
+  );
+  assert.equal(
+    resolveQueueFrom(DEFAULT_EMAIL_FROM, "Evil <notifications@evil.example>"),
+    DEFAULT_EMAIL_FROM,
+  );
   assert.equal(fetches[1].idempotency, "idem-denied");
   assert.equal(body.processed, 1);
   assert.equal(body.stopped, "emails_disabled");

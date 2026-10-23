@@ -61,6 +61,12 @@ serve(async (req) => {
       return new Response(JSON.stringify({ skipped: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (rsvp.status !== "going" && rsvp.status !== "waitlist") {
+      return new Response(JSON.stringify({ skipped: true, reason: rsvp.status }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { data: event } = await admin
       .from("events")
       .select("id, title, start_date, end_date, venue, address, city, state, image_url, description, timezone")
@@ -101,10 +107,13 @@ serve(async (req) => {
     const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
     const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${fmt(start)}/${fmt(end)}&details=${encodeURIComponent(event.description || '')}&location=${encodeURIComponent(location)}`;
 
+    const waitlisted = rsvp.status === "waitlist";
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #ffffff;">
-        <h1 style="color: #1a1a2e; margin: 0 0 8px;">You're going! 🎉</h1>
-        <p style="color: #555; margin: 0 0 20px;">Hey ${escapeHtml(name)}, your RSVP for <strong>${escapeHtml(event.title)}</strong> is confirmed${rsvp.ticket_purchased ? " — ticket purchased ✓" : ""}.</p>
+        <h1 style="color: #1a1a2e; margin: 0 0 8px;">${waitlisted ? "You're on the waitlist" : "You're going!"}</h1>
+        <p style="color: #555; margin: 0 0 20px;">Hey ${escapeHtml(name)}, ${waitlisted
+          ? `the event is full. You're on the waitlist for <strong>${escapeHtml(event.title)}</strong>. We'll email you if a seat opens.`
+          : `your RSVP for <strong>${escapeHtml(event.title)}</strong> is confirmed${rsvp.ticket_purchased ? " — ticket purchased." : "."}`}</p>
         ${event.image_url ? `<img src="${event.image_url}" style="width:100%;max-height:280px;object-fit:cover;border-radius:12px;margin-bottom:16px" />` : ''}
         <div style="background: #f8f8f8; border-radius: 12px; padding: 20px; margin: 16px 0;">
           <h2 style="margin: 0 0 12px; color: #1a1a2e; font-size: 20px;">${escapeHtml(event.title)}</h2>
@@ -122,7 +131,7 @@ serve(async (req) => {
             </td>
           </tr>
         </table>
-        <p style="color:#888;font-size:12px;margin-top:24px;">We'll send reminders 1 week, 1 day, 5 hours, and 30 minutes before the event. — ETHER by lcove</p>
+        <p style="color:#888;font-size:12px;margin-top:24px;">The host can email you about this event. — ETHER by lcove</p>
       </div>`;
 
     const res = await fetch("https://api.resend.com/emails", {
@@ -131,7 +140,7 @@ serve(async (req) => {
       body: JSON.stringify({
         from: "notifications@etherbylcove.com",
         to: [email],
-        subject: `You're confirmed for ${event.title}`,
+        subject: waitlisted ? `You're on the waitlist for ${event.title}` : `You're confirmed for ${event.title}`,
         html,
       }),
     });

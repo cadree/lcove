@@ -36,6 +36,8 @@ import { shareLink, buildShareUrl } from "@/lib/shareLink";
 import { resolveVapidPublicKey } from "@/lib/vapidPublicKey";
 import { EventMoodboardView } from "@/components/calendar/EventMoodboardView";
 import { AddToCalendarButtons } from "@/components/calendar/AddToCalendarButtons";
+import { PageMeta } from "@/components/seo/PageMeta";
+import { attendanceLabel, attendanceSummary, parseGuestRsvp } from "@/lib/eventGuests";
 
 const VAPID_PUBLIC_KEY = resolveVapidPublicKey(import.meta.env.VITE_VAPID_PUBLIC_KEY);
 const walletPassesEnabled = import.meta.env.VITE_WALLET_PASSES_ENABLED === "true";
@@ -51,6 +53,8 @@ export default function PublicEventPage() {
   const [guestEmail, setGuestEmail] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
   const [rsvpSuccess, setRsvpSuccess] = useState(false);
+  const [waitlisted, setWaitlisted] = useState(false);
+  const inviteCampaignId = searchParams.get("invite");
   const [ticketPurchaseSuccess, setTicketPurchaseSuccess] = useState(
     searchParams.get("ticket_success") === "true"
   );
@@ -159,6 +163,7 @@ export default function PublicEventPage() {
       return data ?? 0;
     },
     enabled: !!eventId,
+    refetchInterval: 15000,
   });
 
   const { data: myRsvp } = useQuery({
@@ -194,28 +199,37 @@ export default function PublicEventPage() {
   const guestRsvpMutation = useMutation({
     mutationFn: async () => {
       if (!eventId) throw new Error("No event");
-      const { data: rsvpId, error } = await supabase.rpc("create_guest_event_rsvp", {
+      const { data, error } = await supabase.rpc("create_guest_event_rsvp", {
         p_event_id: eventId,
         p_guest_name: guestName.trim(),
         p_guest_email: guestEmail.trim().toLowerCase(),
         p_guest_phone: guestPhone.trim() || undefined,
+        p_campaign_id: inviteCampaignId || undefined,
       });
       if (error) {
         if (error.message.toLowerCase().includes("already")) {
           throw new Error("You've already RSVP'd with this email!");
         }
+        if (error.message.toLowerCase().includes("sold out")) {
+          throw new Error("This event is sold out.");
+        }
         throw error;
       }
-      return rsvpId;
+      return parseGuestRsvp(data);
     },
-    onSuccess: async (rsvpId) => {
-      if (rsvpId) {
+    onSuccess: async (result) => {
+      if (result.id) {
         supabase.functions.invoke('send-rsvp-confirmation', {
-          body: { event_id: eventId, rsvp_id: rsvpId },
+          body: { event_id: eventId, rsvp_id: result.id },
         }).catch((err) => console.error('Confirmation email failed:', err));
       }
-      setRsvpSuccess(true);
       queryClient.invalidateQueries({ queryKey: ["public-event-attendee-count", eventId] });
+      if (result.status === "waitlist") {
+        setWaitlisted(true);
+        toast.success("You're on the waitlist.");
+        return;
+      }
+      setRsvpSuccess(true);
       toast.success("You're on the list!");
       navigate(`/event/${eventId}/confirmation?free=1`);
     },
@@ -248,6 +262,8 @@ export default function PublicEventPage() {
   };
 
   const isPast = event ? new Date(event.end_date || event.start_date) < new Date() : false;
+  const attendance = attendanceSummary(event?.capacity, rsvpCount || 0);
+  const isSoldOut = attendance.soldOut;
   const hasPaidTier = (tiers || []).some((t) => (t.price_cents || 0) > 0);
   const hasFreeTier = (tiers || []).some((t) => (t.price_cents || 0) === 0 && (t.credits_price || 0) === 0);
   const isFree = !hasPaidTier && (!event?.ticket_price || event.ticket_price <= 0);
@@ -285,8 +301,17 @@ export default function PublicEventPage() {
     );
   }
 
+  const shareImage = event.image_url?.startsWith("https://") ? event.image_url : undefined;
+  const onTheList = rsvpSuccess || myRsvp?.status === "going";
+  const onTheWaitlist = waitlisted || myRsvp?.status === "waitlist";
+
   return (
     <div className="min-h-screen bg-background">
+      <PageMeta
+        title={`${event.title} · Ether`}
+        description={`${attendanceLabel(event.capacity, rsvpCount || 0)}. ${formatEventDate(event.start_date, event.timezone)}.`}
+        image={shareImage}
+      />
       {/* Hero */}
       <div className="relative">
         {event.image_url ? (
@@ -309,7 +334,7 @@ export default function PublicEventPage() {
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 -mt-12 relative z-10 pb-12">
+      <div className="max-w-lg mx-auto px-4 -mt-12 relative z-10 pb-28">
         {/* Event info card */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="border-border/50 shadow-xl bg-card/95 backdrop-blur-md">
@@ -377,10 +402,7 @@ export default function PublicEventPage() {
 
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Users className="h-4 w-4 text-primary shrink-0" />
-                <span>
-                  {rsvpCount} attending
-                  {event.capacity && ` · ${event.capacity - (rsvpCount || 0)} spots left`}
-                </span>
+                <span>{attendanceLabel(event.capacity, rsvpCount || 0)}</span>
               </div>
 
               <div className="flex items-center gap-2 text-sm">
@@ -427,7 +449,25 @@ export default function PublicEventPage() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
             <Card className="mt-4 border-border/50 shadow-lg bg-card/95 backdrop-blur-md">
               <CardContent className="p-5">
-                {rsvpSuccess || myRsvp?.status === "going" ? (
+                {waitlisted || myRsvp?.status === "waitlist" ? (
+                  <div className="text-center py-4 space-y-3">
+                    <Users className="h-12 w-12 text-primary mx-auto" />
+                    <h3 className="text-lg font-display font-semibold">You're on the waitlist</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {event.title} is full. We'll email you if a seat opens.
+                    </p>
+                    {user && (
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        disabled={isRsvping}
+                        onClick={() => rsvp({ eventId: event.id, status: "cancelled" })}
+                      >
+                        {isRsvping ? "Updating…" : "Leave waitlist"}
+                      </Button>
+                    )}
+                  </div>
+                ) : rsvpSuccess || myRsvp?.status === "going" ? (
                   <div className="text-center py-4 space-y-3">
                     <CheckCircle2 className="h-12 w-12 text-primary mx-auto" />
                     <h3 className="text-lg font-display font-semibold">You're on the list!</h3>
@@ -543,9 +583,9 @@ export default function PublicEventPage() {
                     <Button
                       className="w-full"
                       disabled={isRsvping}
-                      onClick={() => rsvp({ eventId: event.id, status: "going" })}
+                      onClick={() => rsvp({ eventId: event.id, status: "going", campaignId: inviteCampaignId })}
                     >
-                      {isRsvping ? "Saving…" : "I'm going"}
+                      {isRsvping ? "Saving…" : isSoldOut ? "Join waitlist" : "I'm going"}
                     </Button>
                   </div>
                 ) : (
@@ -596,7 +636,7 @@ export default function PublicEventPage() {
                         className="w-full"
                         disabled={guestRsvpMutation.isPending}
                       >
-                        {guestRsvpMutation.isPending ? "Submitting…" : "RSVP – I'm Going!"}
+                        {guestRsvpMutation.isPending ? "Submitting…" : isSoldOut ? "Join the waitlist" : "RSVP – I'm Going!"}
                       </Button>
                     </form>
 
@@ -843,6 +883,31 @@ export default function PublicEventPage() {
           </Card>
         )}
       </div>
+      {!isPast && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border/40 bg-background/95 backdrop-blur-md px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden">
+          <div className="mx-auto flex max-w-lg items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">{attendanceLabel(event.capacity, rsvpCount || 0)}</p>
+              <p className="truncate text-xs text-muted-foreground">{event.title}</p>
+            </div>
+            {isFree && !onTheList && !onTheWaitlist && (
+              <Button
+                className="shrink-0"
+                disabled={isRsvping || guestRsvpMutation.isPending}
+                onClick={() => {
+                  if (user) rsvp({ eventId: event.id, status: "going", campaignId: inviteCampaignId });
+                  else document.getElementById("guest-name")?.focus();
+                }}
+              >
+                {isSoldOut ? "Join waitlist" : "RSVP"}
+              </Button>
+            )}
+            {(onTheList || onTheWaitlist) && (
+              <p className="shrink-0 text-sm font-medium text-primary">{onTheWaitlist ? "Waitlisted" : "You're going"}</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -33,7 +33,7 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !user) throw new Error("Not authenticated");
 
-    const { eventId, message, sendSms = false, recipientUserIds, recipientRsvpIds } = await req.json();
+    const { eventId, message, recipientUserIds, recipientRsvpIds } = await req.json();
     if (!eventId) throw new Error("Missing eventId");
     const userIdFilter: string[] | null = Array.isArray(recipientUserIds) && recipientUserIds.length > 0 ? recipientUserIds : null;
     const rsvpIdFilter: string[] | null = Array.isArray(recipientRsvpIds) && recipientRsvpIds.length > 0 ? recipientRsvpIds : null;
@@ -45,7 +45,11 @@ serve(async (req) => {
       .single();
 
     if (eventError || !event) throw new Error("Event not found");
-    if (event.creator_id !== user.id) throw new Error("Only the host can send reminders");
+    const { data: canManage } = await supabaseAdmin.rpc("can_manage_event", {
+      p_event_id: eventId,
+      p_user_id: user.id,
+    });
+    if (!canManage && event.creator_id !== user.id) throw new Error("Only the host can send reminders");
 
     let rsvpQuery = supabaseAdmin
       .from("event_rsvps")
@@ -63,15 +67,59 @@ serve(async (req) => {
     const { data: rsvps, error: rsvpError } = await rsvpQuery;
 
     if (rsvpError) throw new Error("Failed to fetch attendees");
-    if (!rsvps || rsvps.length === 0) {
-      return new Response(JSON.stringify({ success: true, sentCount: 0, smsSentCount: 0, message: "No attendees to notify" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+
+    const { data: attendeeRows } = (!userIdFilter && !rsvpIdFilter)
+      ? await supabaseAdmin
+        .from("event_attendees")
+        .select("id, attendee_user_id, attendee_email, attendee_name, attendee_phone")
+        .eq("event_id", eventId)
+        .in("status", ["registered", "approved"])
+      : { data: [] as Array<{ id: string; attendee_user_id: string | null; attendee_email: string | null; attendee_name: string | null; attendee_phone: string | null }> };
+
+    type Recipient = {
+      key: string;
+      userId: string | null;
+      email: string | null;
+      name: string;
+      phone: string | null;
+    };
+    const recipients: Recipient[] = [];
+    const seen = new Set<string>();
+    const addRecipient = (row: Recipient) => {
+      const dedupe = (row.userId || row.email || row.key).toLowerCase();
+      if (seen.has(dedupe)) return;
+      seen.add(dedupe);
+      recipients.push(row);
+    };
+    for (const rsvp of rsvps || []) {
+      addRecipient({
+        key: rsvp.id,
+        userId: rsvp.user_id,
+        email: rsvp.guest_email,
+        name: rsvp.guest_name || "there",
+        phone: rsvp.guest_phone,
+      });
+    }
+    for (const attendee of attendeeRows || []) {
+      addRecipient({
+        key: attendee.id,
+        userId: attendee.attendee_user_id,
+        email: attendee.attendee_email,
+        name: attendee.attendee_name || "there",
+        phone: attendee.attendee_phone,
       });
     }
 
-    const twilioSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-    const twilioAuth = Deno.env.get("TWILIO_AUTH_TOKEN");
-    const twilioPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
+    if (recipients.length === 0) {
+      return new Response(JSON.stringify({
+        success: true,
+        sentCount: 0,
+        failedCount: 0,
+        message: "No guests to email.",
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const eventDate = eventDateLabel(event.start_date, event.timezone);
     const eventTime = eventTimeLabel(event.start_date, event.timezone);
@@ -81,27 +129,25 @@ serve(async (req) => {
     const identity = await resolveHostIdentity(supabaseAdmin, eventId);
 
     let sentCount = 0;
-    let smsSentCount = 0;
+    let failedCount = 0;
+    let skippedNoEmail = 0;
 
-    for (const rsvp of rsvps) {
-      let email: string | null = null;
-      let phone: string | null = rsvp.guest_phone || null;
-      let name = "there";
+    for (const recipient of recipients) {
+      let email: string | null = recipient.email || null;
+      let name = recipient.name || "there";
 
-      if (rsvp.user_id) {
+      if (recipient.userId) {
         const { data: profile } = await supabaseAdmin
           .from("profiles")
-          .select("display_name, phone")
-          .eq("user_id", rsvp.user_id)
-          .single();
-        name = profile?.display_name || "there";
-        if (!phone && profile?.phone) phone = profile.phone;
+          .select("display_name")
+          .eq("user_id", recipient.userId)
+          .maybeSingle();
+        name = profile?.display_name || name;
 
-        const { data: userData } = await supabaseAdmin.auth.admin.getUserById(rsvp.user_id);
-        email = userData?.user?.email || null;
-      } else if (rsvp.guest_email) {
-        email = rsvp.guest_email;
-        name = rsvp.guest_name || "there";
+        if (!email) {
+          const { data: userData } = await supabaseAdmin.auth.admin.getUserById(recipient.userId);
+          email = userData?.user?.email || null;
+        }
       }
 
       if (email) {
@@ -110,8 +156,8 @@ serve(async (req) => {
             body: {
               templateName: "event-reminder",
               recipientEmail: email,
-              idempotencyKey: `reminder-${eventId}-${rsvp.id}`,
-              from: identity.fromHeader,
+              idempotencyKey: `reminder-${eventId}-${recipient.key}-${crypto.randomUUID()}`,
+              from: "Ether <notifications@etherbylcove.com>",
               replyTo: identity.replyTo,
               templateData: {
                 organizerName: identity.organizerName,
@@ -133,42 +179,15 @@ serve(async (req) => {
             sentCount++;
             logStep("Email queued", { email });
           } else {
+            failedCount++;
             logStep("Email failed", { email, error: error?.message || data?.reason });
           }
         } catch (err) {
+          failedCount++;
           logStep("Email error", { email, error: String(err) });
         }
-      }
-
-      if (sendSms && phone && twilioSid && twilioAuth && twilioPhone) {
-        try {
-          const smsBody = message
-            ? `${message}\n\n${event.title}\n📅 ${eventDate} at ${eventTime}\n📍 ${location}\n\nRSVP: ${eventUrl}`
-            : `Reminder: ${event.title} is coming up!\n📅 ${eventDate} at ${eventTime}\n📍 ${location}\n\nRSVP: ${eventUrl}`;
-
-          const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
-          const smsRes = await fetch(twilioUrl, {
-            method: "POST",
-            headers: {
-              Authorization: `Basic ${btoa(`${twilioSid}:${twilioAuth}`)}`,
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-              To: phone,
-              From: twilioPhone,
-              Body: smsBody,
-            }),
-          });
-
-          if (smsRes.ok) {
-            smsSentCount++;
-            logStep("SMS sent", { phone });
-          } else {
-            logStep("SMS failed", { phone, status: smsRes.status });
-          }
-        } catch (err) {
-          logStep("SMS error", { phone, error: String(err) });
-        }
+      } else {
+        skippedNoEmail++;
       }
     }
 
@@ -227,15 +246,31 @@ serve(async (req) => {
     await supabaseAdmin.from("event_reminder_log").insert({
       event_id: eventId,
       reminder_type: "custom",
-      recipient_count: sentCount + smsSentCount,
+      recipient_count: sentCount,
       message: message || null,
       sent_by: user.id,
     });
 
-    logStep("Complete", { emailsSent: sentCount, smsSent: smsSentCount, pushSent: pushSentCount });
+    const resultMessage = sentCount > 0
+      ? `Queued email for ${sentCount} guest${sentCount === 1 ? "" : "s"}.`
+      : skippedNoEmail > 0 && failedCount === 0
+        ? "No guests have an email address."
+        : failedCount > 0
+          ? `Could not queue email for ${failedCount} guest${failedCount === 1 ? "" : "s"}.`
+          : "No guests to email.";
+
+    logStep("Complete", { emailsQueued: sentCount, failedCount, skippedNoEmail, pushSent: pushSentCount });
 
     return new Response(
-      JSON.stringify({ success: true, sentCount, smsSentCount, pushSentCount, totalAttendees: rsvps.length }),
+      JSON.stringify({
+        success: sentCount > 0 || failedCount === 0,
+        sentCount,
+        failedCount,
+        skippedNoEmail,
+        pushSentCount,
+        message: resultMessage,
+        totalAttendees: recipients.length,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

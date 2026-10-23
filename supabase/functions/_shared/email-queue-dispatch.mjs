@@ -3,6 +3,18 @@
 
 export const DEFAULT_EMAIL_FROM = "notifications@notifications.etherbylcove.com";
 
+const VERIFIED_FROM_DOMAINS = ["etherbylcove.com", "notifications.etherbylcove.com"];
+
+export function resolveQueueFrom(fallback, payloadFrom) {
+  const candidate = typeof payloadFrom === "string" ? payloadFrom.trim() : "";
+  const address = (candidate.match(/<([^>]+)>/)?.[1] || candidate).trim().toLowerCase();
+  const domain = address.split("@")[1] || "";
+  if (address.includes("@") && VERIFIED_FROM_DOMAINS.includes(domain) && !address.includes(" ")) {
+    return candidate;
+  }
+  return (typeof fallback === "string" && fallback.trim()) || DEFAULT_EMAIL_FROM;
+}
+
 const MAX_RETRIES = 5;
 const DEFAULT_BATCH_SIZE = 10;
 const DEFAULT_SEND_DELAY_MS = 200;
@@ -297,7 +309,7 @@ export async function runEmailQueue(deps) {
 }
 
 export async function sendWithResend(apiKey, emailFrom, payload, fetchImpl = fetch) {
-  const from = emailFrom || DEFAULT_EMAIL_FROM;
+  const from = resolveQueueFrom(emailFrom, payload?.from);
   const headers = {
     Authorization: `Bearer ${apiKey}`,
     "Content-Type": "application/json",

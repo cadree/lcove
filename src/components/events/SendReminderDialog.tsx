@@ -37,7 +37,6 @@ export function SendReminderDialog({ open, onOpenChange, eventId, attendee }: Pr
   const [body, setBody] = useState(TEMPLATES[0].body);
   const [push, setPush] = useState(true);
   const [email, setEmail] = useState(true);
-  const [sms, setSms] = useState(false);
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
@@ -46,7 +45,6 @@ export function SendReminderDialog({ open, onOpenChange, eventId, attendee }: Pr
       setBody(TEMPLATES[0].body);
       setPush(!!attendee.user_id);
       setEmail(!!attendee.email);
-      setSms(false);
     }
   }, [open, attendee.user_id, attendee.email]);
 
@@ -62,7 +60,7 @@ export function SendReminderDialog({ open, onOpenChange, eventId, attendee }: Pr
         attendeeName: attendee.name,
         attendeePhone: attendee.phone,
         tierName: attendee.tier_name,
-        channels: { push, email, sms },
+        channels: { push, email, sms: false },
         title, body,
       });
       const sent = Object.values(res?.results || {}).filter(Boolean).length;
@@ -125,19 +123,12 @@ export function SendReminderDialog({ open, onOpenChange, eventId, attendee }: Pr
               </div>
               <Switch checked={email} onCheckedChange={setEmail} disabled={!attendee.email} />
             </div>
-            <div className="flex items-center justify-between rounded-lg border border-border/40 p-2.5">
-              <div>
-                <p className="text-sm font-medium">SMS</p>
-                <p className="text-xs text-muted-foreground">{attendee.phone || "No phone on file"}</p>
-              </div>
-              <Switch checked={sms} onCheckedChange={setSms} disabled={!attendee.phone} />
-            </div>
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSend} disabled={sending || (!push && !email && !sms)}>
+          <Button onClick={handleSend} disabled={sending || (!push && !email)}>
             {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
             Send
           </Button>
