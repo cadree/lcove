@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Dialog,
@@ -31,6 +31,9 @@ import {
 import { cn } from "@/lib/utils";
 import { VideoLinkField } from "@/components/feed/VideoLinkField";
 import { EmbedThumbnail } from "@/components/feed/EmbedPlayer";
+import { InlineError } from "@/components/ui/inline-error";
+import { writeError } from "@/lib/writeError";
+import { assertCleanText, OBJECTIONABLE_MESSAGE } from "@/lib/objectionableText";
 import type { ComposePostInput } from "@/types/post";
 import type { EmbedDraft } from "@/lib/videoEmbed";
 
@@ -67,6 +70,8 @@ export function CreatePostDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [embed, setEmbed] = useState<EmbedDraft | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const captionErrorId = useId();
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -85,6 +90,7 @@ export function CreatePostDialog({
     setIsSubmitting(false);
     setLinkUrl("");
     setEmbed(null);
+    setSubmitError(null);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'photo' | 'video') => {
@@ -190,7 +196,9 @@ export function CreatePostDialog({
 
   const handlePublish = async () => {
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
+      assertCleanText(caption);
       await onCreatePost({
         content: caption || undefined,
         file: embed ? undefined : selectedFiles[0] || undefined,
@@ -203,7 +211,9 @@ export function CreatePostDialog({
       });
       handleClose();
     } catch (error) {
-      console.error('Failed to create post:', error);
+      const message = writeError(error, 'Failed to create post');
+      setSubmitError(message);
+      if (message === OBJECTIONABLE_MESSAGE) setCurrentStep('caption');
     } finally {
       setIsSubmitting(false);
     }
@@ -520,9 +530,16 @@ export function CreatePostDialog({
                   <Textarea
                     placeholder="Write a caption..."
                     value={caption}
-                    onChange={(e) => setCaption(e.target.value.slice(0, MAX_CAPTION_LENGTH))}
+                    onChange={(e) => {
+                      setCaption(e.target.value.slice(0, MAX_CAPTION_LENGTH));
+                      setSubmitError(null);
+                    }}
+                    aria-label="Post caption"
+                    aria-invalid={submitError ? true : undefined}
+                    aria-describedby={submitError ? captionErrorId : undefined}
                     className="min-h-[150px] resize-none border-0 focus-visible:ring-0 p-0 text-base"
                   />
+                  <InlineError id={captionErrorId} message={submitError} />
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <Button variant="ghost" size="sm" className="h-8 px-2">
                       <Smile className="w-4 h-4" />
@@ -693,6 +710,7 @@ export function CreatePostDialog({
                   )}
                 </div>
 
+                <InlineError message={submitError} />
                 <p className="text-sm text-muted-foreground text-center">
                   Your post will be shared with the community
                 </p>
