@@ -25,19 +25,22 @@ const files = readdirSync(dir)
   .sort();
 
 const timestamps = files.map((name) => name.split("_")[0]);
-const seen = new Set();
-for (const stamp of timestamps) {
-  if (seen.has(stamp)) {
-    console.error(`duplicate migration timestamp: ${stamp}`);
-    process.exit(1);
-  }
-  seen.add(stamp);
-}
-for (let i = 1; i < timestamps.length; i += 1) {
-  if (timestamps[i] < timestamps[i - 1]) {
+// Filename order is the apply order. ether-prod already recorded both
+// 20261020160000_waitlist.sql and 20261020160000_connect_invoice_and_gifts.sql,
+// so that one prefix stays shared. Every other timestamp must be unique.
+const recordedSharedPrefix = new Set(["20261020160000"]);
+const seen = new Map();
+for (let i = 0; i < timestamps.length; i += 1) {
+  if (i > 0 && timestamps[i] < timestamps[i - 1]) {
     console.error(`migration filenames are not in timestamp order at ${files[i]}`);
     process.exit(1);
   }
+  const previous = seen.get(timestamps[i]);
+  if (previous && !recordedSharedPrefix.has(timestamps[i])) {
+    console.error(`duplicate migration timestamp ${timestamps[i]} on ${previous} and ${files[i]}`);
+    process.exit(1);
+  }
+  seen.set(timestamps[i], files[i]);
 }
 
 function splitSql(sql) {

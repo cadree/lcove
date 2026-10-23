@@ -1,5 +1,6 @@
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { publicJoinPath } from "@/lib/publicJoin";
 
 const publicLinks = [
   { label: "Community", to: "/community" },
@@ -9,6 +10,7 @@ const publicLinks = [
 
 export function LandingNav() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
 
   return (
@@ -35,15 +37,26 @@ export function LandingNav() {
             ))}
           </div>
 
-          {user ? (
-            <button type="button" className="mono-label min-h-11 text-[12px]" onClick={() => navigate("/feed")}>
-              Home
-            </button>
-          ) : (
-            <button type="button" className="mono-label min-h-11 text-[12px]" onClick={() => navigate("/auth")}>
-              Sign in
-            </button>
-          )}
+          <div className="flex items-center gap-1">
+            {user ? (
+              <button type="button" className="mono-label min-h-11 px-2 text-[12px]" onClick={() => navigate("/feed")}>
+                Home
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="mono-label min-h-11 px-2 text-[12px]"
+                  onClick={() => navigate(publicJoinPath(location.search))}
+                >
+                  Join
+                </button>
+                <button type="button" className="mono-label min-h-11 px-2 text-[12px]" onClick={() => navigate("/auth")}>
+                  Sign in
+                </button>
+              </>
+            )}
+          </div>
         </nav>
       </div>
     </header>

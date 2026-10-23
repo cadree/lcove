@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import wordmark from "@/assets/ether-wordmark.png";
+import wordmark from "@/assets/ether-wordmark.webp";
 import { cn } from "@/lib/utils";
 
 type EtherWordmarkProps = {

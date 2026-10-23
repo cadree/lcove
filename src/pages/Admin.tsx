@@ -1,13 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { 
   Shield, Users, AlertTriangle, CheckCircle, Clock, History, Search, 
-  ArrowLeft, Ban, UserCheck, ClipboardList, Trash2, Eye, Phone, Mail, MapPin, 
+  Ban, UserCheck, ClipboardList, Trash2, Eye, Phone, Mail, MapPin, 
   Briefcase, Heart, Star, Send, Coins, Download, MessageSquare, ShieldCheck, ShieldOff,
   MessageCircle, Building2, Flag, Shirt, Film
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { WaitlistAdminDialog } from '@/components/admin/WaitlistAdminDialog';
+import { WaitlistExportButton } from '@/components/admin/WaitlistExportButton';
 import { cityMatchesQuery, citiesShareGroup } from '@/lib/cityNormalization';
 import PageLayout from '@/components/layout/PageLayout';
+import { BackButton } from '@/components/navigation/BackButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -330,9 +333,7 @@ const Admin: React.FC = () => {
         {/* Header */}
         <div className="bg-gradient-to-b from-primary/10 to-background px-4 pt-6 pb-8">
           <div className="flex items-center gap-3 mb-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <BackButton />
             <Shield className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>
           </div>
@@ -408,6 +409,8 @@ const Admin: React.FC = () => {
             <Download className="h-4 w-4" />
             Export CSV
           </Button>
+          <WaitlistExportButton />
+          <WaitlistAdminDialog />
         </div>
 
         {/* Tabs */}

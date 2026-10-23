@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { BackButton } from '@/components/navigation/BackButton';
 import { motion } from 'framer-motion';
 import { 
   Film, 
@@ -13,7 +14,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Users,
-  ArrowLeft,
   Info
 } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
@@ -24,13 +24,12 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useNetworks, useMyNetworks, useContentGenres, Network } from '@/hooks/useCinema';
 import { useAuth } from '@/contexts/AuthContext';
 import { CreateNetworkDialog } from '@/components/cinema/CreateNetworkDialog';
-import { isIosApp } from '@/lib/platform';
+import { digitalPurchasesEnabled } from '@/lib/platform';
 import { cn } from '@/lib/utils';
 import { SquircleIcon } from '@/components/world/SquircleIcon';
 
 const Cinema = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState<string | undefined>();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -92,9 +91,7 @@ const Cinema = () => {
             <div className="absolute top-0 left-0 right-0 z-20">
               <div className="flex items-center justify-between px-4 md:px-12 py-4">
                 <div className="flex items-center gap-4">
-                  <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="text-foreground hover:bg-background/20">
-                    <ArrowLeft className="w-5 h-5" />
-                  </Button>
+                  <BackButton className="text-foreground hover:bg-background/20" />
                   <div className="flex items-center gap-2">
                     <SquircleIcon icon={Film} fill="ink" size={40} />
                     <span className="ether-title text-2xl text-foreground">LC Cinema</span>
@@ -159,7 +156,7 @@ const Cinema = () => {
                     <Users className="w-4 h-4" />
                     {currentFeatured.subscriber_count} subscribers
                   </span>
-                  {currentFeatured.is_paid && !isIosApp() && (
+                  {currentFeatured.is_paid && digitalPurchasesEnabled() && (
                     <Badge className="bg-primary/20 text-primary border-primary/30">
                       ${currentFeatured.subscription_price}/mo
                     </Badge>
@@ -397,7 +394,7 @@ const NetworkCard = ({ network, showManage = false, isRow = false }: { network: 
       </div>
 
       {/* Price Badge */}
-      {network.is_paid && !isIosApp() && (
+      {network.is_paid && digitalPurchasesEnabled() && (
         <Badge className="absolute top-2 right-2 text-[10px] px-1.5 py-0.5 bg-primary/90 text-primary-foreground">
           ${network.subscription_price}/mo
         </Badge>

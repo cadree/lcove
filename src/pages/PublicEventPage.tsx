@@ -497,10 +497,10 @@ export default function PublicEventPage() {
                           if (data?.passUrl) {
                             window.open(data.passUrl, '_blank');
                           } else {
-                            toast.info("Wallet pass generation is being set up. Check back soon!");
+                            toast.error("Could not add a wallet pass.");
                           }
                         } catch {
-                          toast.info("Wallet pass feature coming soon!");
+                          toast.error("Could not add a wallet pass.");
                         }
                       }}
                     >
@@ -696,10 +696,10 @@ export default function PublicEventPage() {
                           if (data?.passUrl) {
                             window.open(data.passUrl, '_blank');
                           } else {
-                            toast.info("Wallet pass generation is being set up. Check back soon!");
+                            toast.error("Could not add a wallet pass.");
                           }
                         } catch {
-                          toast.info("Wallet pass feature coming soon!");
+                          toast.error("Could not add a wallet pass.");
                         }
                       }}
                     >

@@ -111,7 +111,7 @@ export default function BrandPartners() {
               description={
                 filter === "all"
                   ? "Be the first brand to partner with us using the form above!"
-                  : `No ${filter}s yet. Check back soon!`
+                  : `No ${filter}s yet.`
               }
             />
           )}

@@ -73,6 +73,8 @@ export default defineConfig(() => ({
           if (id.includes("/hls.js/")) return "video";
           if (isEditors(id)) return "editors";
           if (id.includes("/html5-qrcode/")) return "scanner";
+          // The encoder loads only when a video is over the storage cap.
+          if (id.includes("/mediabunny/")) return "video-compress";
           // Shared runtime stays in its own chunk. Rollup otherwise folds
           // React and the Vite preload helper into the first heavy chunk.
           if (reachableFromEntry(id, getModuleInfo) && (id.includes("node_modules") || id.startsWith("\0"))) {

@@ -1,7 +1,5 @@
 import { ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/navigation/BackButton";
 import { MoreMenuButton } from "@/components/navigation/MoreMenu";
 import { glyphColor, iconFills, type IconFill } from "@/components/world/SquircleIcon";
 import { cn } from "@/lib/utils";
@@ -15,7 +13,6 @@ interface PageHeaderProps {
   actions?: ReactNode;
   showBack?: boolean;
   showMore?: boolean;
-  backPath?: string;
   className?: string;
 }
 
@@ -28,32 +25,15 @@ export const PageHeader = ({
   actions,
   showBack = true,
   showMore = true,
-  backPath,
   className = "",
 }: PageHeaderProps) => {
-  const navigate = useNavigate();
-
-  const handleBack = () => {
-    if (backPath) {
-      navigate(backPath);
-    } else if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate("/feed");
-    }
-  };
-
   return (
     <header
       className={cn("pb-4 mb-6 border-b border-border", className)}
       role="banner"
     >
       <div className="flex items-start gap-2">
-        {showBack && (
-          <Button variant="ghost" size="icon" onClick={handleBack} className="shrink-0" aria-label="Go back">
-            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
-          </Button>
-        )}
+        {showBack && <BackButton label="Go back" className="shrink-0" />}
         <div className="min-w-0 flex-1">
           <p className="kicker">// {eyebrow || "Archive"}</p>
           <div className="mt-1 flex items-center gap-2 min-w-0">

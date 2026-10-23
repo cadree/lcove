@@ -31,6 +31,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
+import { readFunctionError } from "@/lib/functionError";
 
 interface VerifyResultRow {
   status?: string;
@@ -46,20 +47,6 @@ interface InvokePayload {
 function asInvokePayload(value: unknown): InvokePayload | null {
   if (typeof value !== "object" || value === null) return null;
   return value as InvokePayload;
-}
-
-function invokeErrorText(error: unknown, data: unknown, fallback: string): string {
-  const payload = asInvokePayload(data);
-  let bodyError: string | undefined;
-  if (typeof error === "object" && error !== null && "context" in error) {
-    const context = error.context;
-    if (typeof context === "object" && context !== null && "body" in context) {
-      const body = asInvokePayload(context.body);
-      if (typeof body?.error === "string" && body.error.length > 0) bodyError = body.error;
-    }
-  }
-  const dataError = typeof payload?.error === "string" && payload.error.length > 0 ? payload.error : undefined;
-  return bodyError || dataError || errorMessage(error, fallback);
 }
 
 interface ExclusiveMusicSectionProps {
@@ -241,7 +228,7 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
       setShowUpload(false);
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error("Failed to upload track");
+      toast.error(errorMessage(error, "Failed to upload track"));
     } finally {
       setIsUploading(false);
     }
@@ -269,10 +256,9 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
       const { data, error } = await supabase.functions.invoke(fnName, { body });
       const payload = asInvokePayload(data);
       if (error) {
-        // Edge function returns error body even on non-2xx
-        const serverMsg = invokeErrorText(error, data, "");
+        const serverMsg = await readFunctionError(error, data, "Failed to start checkout");
         console.error("[MusicPurchase] error", serverMsg);
-        toast.error(serverMsg || "Failed to start checkout", { duration: 6000 });
+        toast.error(serverMsg, { duration: 6000 });
         return;
       }
       if (payload?.error) {

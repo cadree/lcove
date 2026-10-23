@@ -3,7 +3,12 @@ import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { isGrantEligible } from "@/lib/grantEligibility";
+import { openExternalCheckout, readStorefrontCountry } from "@/lib/externalCheckout";
+import { isUsStorefront } from "@/lib/iosStorefront";
+import { MEMBERSHIP_REFRESH_EVENT } from "@/lib/membershipRefresh";
+import { ETHER_WEB_ORIGIN } from "@/lib/platform";
 import { toast } from "sonner";
+import { readFunctionError } from "@/lib/functionError";
 
 export interface MembershipStatus {
   subscribed: boolean;
@@ -70,11 +75,11 @@ export const useMembership = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
-  const checkMembership = useCallback(async () => {
+  const checkMembership = useCallback(async (): Promise<MembershipStatus | null> => {
     if (!user) {
       setMembership(null);
       setIsLoading(false);
-      return;
+      return null;
     }
 
     // The webhook writes memberships. RLS lets the owner read that row.
@@ -92,7 +97,7 @@ export const useMembership = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         if (!row) setMembership(null);
-        return;
+        return row;
       }
 
       const { data, error } = await supabase.functions.invoke("check-membership", {
@@ -104,19 +109,47 @@ export const useMembership = () => {
       if (error || !data || data.error) {
         if (!row) setMembership(null);
         if (error) console.error("Error checking membership:", error);
-        return;
+        return row;
       }
-      setMembership(membershipFromPayload(data));
+      const next = membershipFromPayload(data);
+      setMembership(next);
+      return next;
     } catch (error) {
       console.error("Error checking membership:", error);
       if (!row) setMembership(null);
+      return row;
     } finally {
       setIsLoading(false);
     }
   }, [user]);
 
   useEffect(() => {
-    checkMembership();
+    if (!user) {
+      setMembership(null);
+      setIsLoading(false);
+      return;
+    }
+    let cancel = false;
+    void readOwnMembership(user.id).then((row) => {
+      if (cancel) return;
+      if (row) setMembership(membershipFromPayload(row));
+      setIsLoading(false);
+    });
+    const timer = window.setTimeout(() => {
+      if (!cancel) void checkMembership();
+    }, 1200);
+    return () => {
+      cancel = true;
+      window.clearTimeout(timer);
+    };
+  }, [user, checkMembership]);
+
+  useEffect(() => {
+    const onRefresh = () => {
+      void checkMembership();
+    };
+    window.addEventListener(MEMBERSHIP_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(MEMBERSHIP_REFRESH_EVENT, onRefresh);
   }, [checkMembership]);
 
   // Auto-refresh every minute
@@ -127,9 +160,13 @@ export const useMembership = () => {
   }, [user, checkMembership]);
 
   const startCheckout = async (tier: "community" | "elite", customAmount?: number) => {
-    if (Capacitor.getPlatform() === "ios") {
-      toast.error("Membership checkout isn't available in the iOS app.");
-      return;
+    const ios = Capacitor.getPlatform() === "ios";
+    if (ios) {
+      const country = await readStorefrontCountry();
+      if (!isUsStorefront(country)) {
+        toast.error("Membership checkout isn't available in the iOS app.");
+        return;
+      }
     }
 
     if (!user) {
@@ -143,14 +180,20 @@ export const useMembership = () => {
       if (!session) throw new Error("No session");
 
       const { data, error } = await supabase.functions.invoke("create-membership-checkout", {
-        body: { tier, customAmount },
+        body: { tier, customAmount, ...(ios ? { return_origin: ETHER_WEB_ORIGIN } : {}) },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
       });
 
-      if (error) throw error;
+      if (error || data?.error) {
+        throw new Error(await readFunctionError(error, data, "Failed to start checkout"));
+      }
       if (data?.url) {
+        if (ios) {
+          await openExternalCheckout(data.url);
+          return;
+        }
         // Try window.open first, then location.href, then show manual link
         const win = window.open(data.url, "_blank");
         if (!win || win.closed) {
@@ -169,16 +212,20 @@ export const useMembership = () => {
       }
     } catch (error) {
       console.error("Error starting checkout:", error);
-      toast.error("Failed to start checkout. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Failed to start checkout. Please try again.");
     } finally {
       setIsCheckingOut(false);
     }
   };
 
   const openCustomerPortal = async () => {
-    if (Capacitor.getPlatform() === "ios") {
-      toast.error("Subscription billing isn't available in the iOS app.");
-      return;
+    const ios = Capacitor.getPlatform() === "ios";
+    if (ios) {
+      const country = await readStorefrontCountry();
+      if (!isUsStorefront(country)) {
+        toast.error("Subscription billing isn't available in the iOS app.");
+        return;
+      }
     }
 
     if (!user) {
@@ -191,13 +238,20 @@ export const useMembership = () => {
       if (!session) throw new Error("No session");
 
       const { data, error } = await supabase.functions.invoke("customer-portal", {
+        body: ios ? { return_origin: ETHER_WEB_ORIGIN } : {},
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
       });
 
-      if (error) throw error;
+      if (error || data?.error) {
+        throw new Error(await readFunctionError(error, data, "Failed to open billing portal"));
+      }
       if (data?.url) {
+        if (ios) {
+          await openExternalCheckout(data.url);
+          return;
+        }
         const win = window.open(data.url, "_blank");
         if (!win || win.closed) {
           try {
@@ -215,7 +269,7 @@ export const useMembership = () => {
       }
     } catch (error) {
       console.error("Error opening portal:", error);
-      toast.error("Failed to open billing portal. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Failed to open billing portal. Please try again.");
     }
   };
 

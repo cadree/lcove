@@ -673,7 +673,7 @@ const TIMEZONES = [
             type="button"
             variant="outline"
             onClick={addToGoogleCalendar}
-            className="w-full flex items-center justify-center gap-2"
+            className="flex h-auto w-full items-center justify-center gap-2 whitespace-normal text-center"
           >
             <Calendar className="h-4 w-4" />
             Also Add to Google Calendar

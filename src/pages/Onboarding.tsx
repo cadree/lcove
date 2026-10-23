@@ -9,12 +9,13 @@ import OnboardingIntro from '@/components/onboarding/OnboardingIntro';
 import OnboardingName from '@/components/onboarding/OnboardingName';
 import OnboardingPassions from '@/components/onboarding/OnboardingPassions';
 import OnboardingCity from '@/components/onboarding/OnboardingCity';
-import OnboardingSkills from '@/components/onboarding/OnboardingSkills';
 import OnboardingRoles from '@/components/onboarding/OnboardingRoles';
 import OnboardingQuestionnaire from '@/components/onboarding/OnboardingQuestionnaire';
 import OnboardingConnections from '@/components/onboarding/OnboardingConnections';
 import OnboardingCompletion from '@/components/onboarding/OnboardingCompletion';
 import { buildUserPassionInserts } from '@/lib/onboardingPassions';
+import { scoreRedFlags, clearQuizSeed, type ChoiceId } from '@/lib/onboardingQuiz';
+import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from '@/lib/onboardingDraft';
 
 export interface OnboardingData {
   displayName: string;
@@ -65,29 +66,34 @@ const Onboarding = () => {
     }
   }, [profile]);
 
-  // Handle redirect for completed onboarding users
+  // Resume a mid-onboarding refresh. Completed profiles still go to the feed.
   useEffect(() => {
-    if (!profileLoading && !initialized && profile) {
-      setInitialized(true);
-      if (profile.onboarding_completed && profile.access_status !== 'banned') {
-        navigate('/feed');
-      }
+    if (authLoading || profileLoading || initialized || !user) return;
+    setInitialized(true);
+    if (profile?.onboarding_completed && profile.access_status !== 'banned') {
+      clearOnboardingDraft(window.localStorage, user.id);
+      navigate('/feed');
+      return;
     }
-  }, [profile, profileLoading, initialized, navigate]);
+    const draft = readOnboardingDraft(window.localStorage, user.id);
+    if (draft) {
+      setCurrentStep(draft.step);
+      setData(draft.data);
+    }
+  }, [authLoading, profile, profileLoading, initialized, navigate, user]);
 
-  // Scoring: A=1, B=2, C=3 points per question
-  // Threshold: >= 20 points (out of 30 max for 10 questions) = Level 2 (Accepted)
-  const ACCEPTANCE_THRESHOLD = 20;
+  useEffect(() => {
+    if (!user || !initialized || profile?.onboarding_completed) return;
+    writeOnboardingDraft(window.localStorage, user.id, { step: currentStep, data });
+  }, [user, initialized, profile?.onboarding_completed, currentStep, data]);
 
-  const calculateMindsetLevel = (responses: Record<number, 'A' | 'B' | 'C'>): {
+  const calculateMindsetLevel = (responses: Record<number, ChoiceId>): {
     level: 1 | 2;
     score: number;
+    passed: boolean;
   } => {
-    const score = Object.values(responses).reduce((sum, ans) => {
-      return sum + (ans === 'A' ? 1 : ans === 'B' ? 2 : 3);
-    }, 0);
-    const level = score >= ACCEPTANCE_THRESHOLD ? 2 : 1;
-    return { level, score };
+    const result = scoreRedFlags(responses);
+    return { level: result.level, score: result.score, passed: result.passed };
   };
 
   const handleComplete = async () => {
@@ -104,8 +110,7 @@ const Onboarding = () => {
       return;
     }
 
-    const { level, score } = calculateMindsetLevel(data.questionnaireResponses);
-    const passedExam = score >= ACCEPTANCE_THRESHOLD;
+    const { level, score, passed: passedExam } = calculateMindsetLevel(data.questionnaireResponses);
     setAccessLevel(passedExam ? 'level_2' : 'level_1');
 
     try {
@@ -159,9 +164,11 @@ const Onboarding = () => {
       }
 
       sessionStorage.setItem('onboarding_just_completed', 'true');
+      clearQuizSeed(window.sessionStorage);
+      clearOnboardingDraft(window.localStorage, user.id);
 
-      // Finishing onboarding always grants access. The score is stored
-      // and passed_exam is derived (score >= 20). It does not lock anyone out.
+      // Finishing onboarding always grants access. passed_exam records
+      // whether the red-flag count stayed under the threshold.
       await updateProfile({
         display_name: data.displayName.trim(),
         city: data.city,
@@ -171,12 +178,13 @@ const Onboarding = () => {
         access_level: passedExam ? 'level_2' : 'level_1',
         onboarding_completed: true,
         mindset_level: level,
+        onboarding_level: level,
         access_status: 'active',
         onboarding_score: score,
         passed_exam: passedExam,
       });
 
-      setCurrentStep(7);
+      setCurrentStep(6);
     } catch (error) {
       console.error('Error saving onboarding data:', error);
       toast({
@@ -217,10 +225,9 @@ const Onboarding = () => {
     />,
     <OnboardingPassions key="passions" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingCity key="city" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
-    <OnboardingSkills key="skills" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingRoles key="roles" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingQuestionnaire key="questionnaire" data={data} updateData={updateData} onComplete={handleComplete} onBack={prevStep} />,
-    <OnboardingConnections key="connections" onComplete={() => setCurrentStep(8)} onBack={prevStep} />,
+    <OnboardingConnections key="connections" onComplete={() => setCurrentStep(7)} onBack={prevStep} />,
     <OnboardingCompletion key="completion" accessLevel={accessLevel} />,
   ];
 

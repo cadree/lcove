@@ -10,17 +10,6 @@ import StoryUpload from './StoryUpload';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-function EmptyStoryRing({ label }: { label: string }) {
-  return (
-    <div className="shrink-0" aria-hidden="true">
-      <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-dashed border-foreground/30 bg-card/50">
-        <span className="mono-label text-[8px] text-muted-foreground">{label}</span>
-      </div>
-      <span className="mt-1.5 block w-20 text-center font-body text-[10px] text-muted-foreground">Story</span>
-    </div>
-  );
-}
-
 const StoriesRow = () => {
   const {
     user
@@ -68,8 +57,6 @@ const StoriesRow = () => {
     console.error('[StoriesRow] Error loading stories:', storiesError);
   }
 
-  const ghostRings = otherUsersWithStories.length === 0 && !showFavoritesOnly;
-
   return <>
       <div className="flex items-center justify-between gap-2 px-1 pt-2">
         <p className="kicker">Stories</p>
@@ -111,30 +98,50 @@ const StoriesRow = () => {
       y: 0
     }} className="flex gap-3 overflow-x-auto py-4 px-1 scrollbar-hide">
         {/* Add Story Button / Your Story */}
-        {user && <motion.button whileTap={{
+        {user && <motion.div role="button" tabIndex={0} whileTap={{
         scale: 0.95
-      }} onClick={() => userStories.length > 0 ? handleOpenStory(user.id) : setShowUpload(true)} className="relative shrink-0 group">
+      }} onClick={() => userStories.length > 0 ? handleOpenStory(user.id) : setShowUpload(true)} onKeyDown={(event) => {
+        if (event.key !== "Enter") return;
+        if (userStories.length > 0) handleOpenStory(user.id);
+        else setShowUpload(true);
+      }} className="relative shrink-0 group">
             <div className="w-20 h-20 rounded-full relative">
               {/* Glass ring */}
               <div className="absolute inset-0 rounded-full bg-[conic-gradient(from_120deg,#C4142D,#FF9FC8,#C4142D)] p-[2px]">
                 <div className="w-full h-full rounded-full bg-card p-[2px]">
                   <div className="w-full h-full rounded-full overflow-hidden bg-muted flex items-center justify-center">
-                    {userStories.length > 0 && userStories[0].profile?.avatar_url ? <img src={userStories[0].profile.avatar_url} alt="Your story" className="w-full h-full object-cover" /> : <Plus className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />}
+                    {userStories.length > 0 && userStories[0].media_url ? <img src={userStories[0].media_url} alt="Your story" className="w-full h-full object-cover" /> : <Plus className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />}
                   </div>
                 </div>
               </div>
+              {userStories.length > 0 && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Add another story"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setShowUpload(true);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.stopPropagation();
+                      setShowUpload(true);
+                    }
+                  }}
+                  className="absolute bottom-0 right-0 z-[1] flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-foreground"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </span>
+              )}
             </div>
             <span className="text-[10px] text-foreground mt-1.5 block text-center truncate w-20 font-body">
               Your story
             </span>
-          </motion.button>}
+          </motion.div>}
 
         {isLoading && [0, 1, 2, 3].map((slot) => (
           <div key={slot} className="h-20 w-20 shrink-0 animate-pulse rounded-full bg-muted" />
-        ))}
-
-        {ghostRings && !isLoading && ["Open", "Soon", "Yours", "Next"].map((label) => (
-          <EmptyStoryRing key={label} label={label} />
         ))}
 
         {/* Other Users' Stories */}
@@ -156,7 +163,7 @@ const StoriesRow = () => {
 
       {/* Story Viewer Modal */}
       <AnimatePresence>
-        {selectedUserId && groupedStories[selectedUserId] && <StoryViewer stories={groupedStories[selectedUserId]} onClose={handleCloseStory} onNextUser={handleNextUser} />}
+        {selectedUserId && groupedStories[selectedUserId] && <StoryViewer key={selectedUserId} stories={groupedStories[selectedUserId]} onClose={handleCloseStory} onNextUser={handleNextUser} />}
       </AnimatePresence>
 
       {/* Upload Dialog */}

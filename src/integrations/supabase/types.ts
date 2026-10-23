@@ -3783,6 +3783,9 @@ export type Database = {
           sender_id: string
           shared_from_conversation_id: string | null
           shared_from_message_id: string | null
+          shared_post_id: string | null
+          shared_profile_id: string | null
+          shared_story_id: string | null
           updated_at: string
         }
         Insert: {
@@ -3797,6 +3800,9 @@ export type Database = {
           sender_id: string
           shared_from_conversation_id?: string | null
           shared_from_message_id?: string | null
+          shared_post_id?: string | null
+          shared_profile_id?: string | null
+          shared_story_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -3811,6 +3817,9 @@ export type Database = {
           sender_id?: string
           shared_from_conversation_id?: string | null
           shared_from_message_id?: string | null
+          shared_post_id?: string | null
+          shared_profile_id?: string | null
+          shared_story_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -5211,6 +5220,35 @@ export type Database = {
           },
         ]
       }
+      post_views: {
+        Row: {
+          created_at: string
+          post_id: string
+          viewed_on: string
+          viewer_id: string
+        }
+        Insert: {
+          created_at?: string
+          post_id: string
+          viewed_on: string
+          viewer_id: string
+        }
+        Update: {
+          created_at?: string
+          post_id?: string
+          viewed_on?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_views_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posts: {
         Row: {
           alt_text: string | null
@@ -5218,6 +5256,11 @@ export type Database = {
           comments_enabled: boolean | null
           content: string | null
           created_at: string
+          embed_hash: string | null
+          embed_provider: string | null
+          embed_thumbnail_url: string | null
+          embed_title: string | null
+          embed_video_id: string | null
           folder_id: string | null
           id: string
           location: string | null
@@ -5232,6 +5275,11 @@ export type Database = {
           comments_enabled?: boolean | null
           content?: string | null
           created_at?: string
+          embed_hash?: string | null
+          embed_provider?: string | null
+          embed_thumbnail_url?: string | null
+          embed_title?: string | null
+          embed_video_id?: string | null
           folder_id?: string | null
           id?: string
           location?: string | null
@@ -5246,6 +5294,11 @@ export type Database = {
           comments_enabled?: boolean | null
           content?: string | null
           created_at?: string
+          embed_hash?: string | null
+          embed_provider?: string | null
+          embed_thumbnail_url?: string | null
+          embed_title?: string | null
+          embed_video_id?: string | null
           folder_id?: string | null
           id?: string
           location?: string | null
@@ -5384,7 +5437,10 @@ export type Database = {
           city_key: string | null
           created_at: string | null
           display_name: string | null
+          founding: boolean
           gender: string | null
+          signup_src: string | null
+          signup_ref: string | null
           id: string
           interests: string[] | null
           is_suspended: boolean | null
@@ -5401,6 +5457,7 @@ export type Database = {
           social_links: Json | null
           stripe_connect_account_id: string | null
           suspended_at: string | null
+          signup_attribution: Json | null
           suspension_reason: string | null
           updated_at: string | null
           user_id: string
@@ -5416,6 +5473,7 @@ export type Database = {
           city_key?: string | null
           created_at?: string | null
           display_name?: string | null
+          founding?: boolean
           gender?: string | null
           id?: string
           interests?: string[] | null
@@ -5430,6 +5488,9 @@ export type Database = {
           phone?: string | null
           region_country?: string | null
           region_state?: string | null
+          signup_attribution?: Json | null
+          signup_ref?: string | null
+          signup_src?: string | null
           social_links?: Json | null
           stripe_connect_account_id?: string | null
           suspended_at?: string | null
@@ -5462,12 +5523,16 @@ export type Database = {
           phone?: string | null
           region_country?: string | null
           region_state?: string | null
+          signup_attribution?: Json | null
+          signup_ref?: string | null
+          signup_src?: string | null
           social_links?: Json | null
           stripe_connect_account_id?: string | null
           suspended_at?: string | null
           suspension_reason?: string | null
           updated_at?: string | null
           user_id?: string
+          founding?: boolean
         }
         Relationships: []
       }
@@ -6135,6 +6200,35 @@ export type Database = {
         }
         Relationships: []
       }
+      reposts: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reposts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_posts: {
         Row: {
           created_at: string
@@ -6396,6 +6490,11 @@ export type Database = {
           tax_line_label: string | null
           updated_at: string
           user_id: string
+          website_url: string | null
+          import_status: string | null
+          import_error: string | null
+          import_count: number | null
+          imported_at: string | null
         }
         Insert: {
           accepts_cash?: boolean | null
@@ -6418,6 +6517,11 @@ export type Database = {
           tax_line_label?: string | null
           updated_at?: string
           user_id: string
+          website_url?: string | null
+          import_status?: string | null
+          import_error?: string | null
+          import_count?: number | null
+          imported_at?: string | null
         }
         Update: {
           accepts_cash?: boolean | null
@@ -6440,6 +6544,11 @@ export type Database = {
           tax_line_label?: string | null
           updated_at?: string
           user_id?: string
+          website_url?: string | null
+          import_status?: string | null
+          import_error?: string | null
+          import_count?: number | null
+          imported_at?: string | null
         }
         Relationships: []
       }
@@ -6447,28 +6556,34 @@ export type Database = {
         Row: {
           created_at: string
           expires_at: string
+          credit_user_id: string | null
           id: string
           is_live: boolean | null
           media_type: string
           media_url: string
+          source_post_id: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
+          credit_user_id?: string | null
           expires_at?: string
           id?: string
           is_live?: boolean | null
           media_type: string
           media_url: string
+          source_post_id?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
+          credit_user_id?: string | null
           expires_at?: string
           id?: string
           is_live?: boolean | null
           media_type?: string
           media_url?: string
+          source_post_id?: string | null
           user_id?: string
         }
         Relationships: []
@@ -7655,6 +7770,7 @@ export type Database = {
           city_key: string | null
           created_at: string | null
           display_name: string | null
+          founding: boolean | null
           id: string | null
           is_suspended: boolean | null
           mindset_level: number | null
@@ -7812,6 +7928,92 @@ export type Database = {
         Args: { p_event_id: string }
         Returns: number
       }
+      claim_waitlist_invite: {
+        Args: { p_token: string }
+        Returns: undefined
+      }
+      export_waitlist: {
+        Args: { p_src?: string; p_week?: string }
+        Returns: {
+          created_at: string
+          email: string
+          email_me: boolean
+          founding: boolean
+          ig_handle: string
+          name: string
+          ref_code: string
+          referred_by: string
+          src: string
+          what_do_you_make: string
+        }[]
+      }
+      get_or_create_direct_conversation: {
+        Args: { p_other: string }
+        Returns: string
+      }
+      get_own_post_view_counts: {
+        Args: { p_post_ids?: string[] | null }
+        Returns: {
+          post_id: string
+          view_count: number
+        }[]
+      }
+      get_own_view_dashboard: {
+        Args: never
+        Returns: {
+          photo_views_30d: number
+          video_views_30d: number
+          views_30d: number
+        }[]
+      }
+      import_waitlist: {
+        Args: { p_rows: Json; p_src: string }
+        Returns: {
+          email: string
+          outcome: string
+        }[]
+      }
+      invite_waitlist: {
+        Args: { p_ids: string[] }
+        Returns: {
+          email: string
+          id: string
+          invite_token: string
+        }[]
+      }
+      join_waitlist: {
+        Args: {
+          p_company?: string
+          p_email: string
+          p_email_me: boolean
+          p_ig_handle?: string
+          p_name: string
+          p_ref?: string
+          p_src?: string
+          p_what_do_you_make?: string
+        }
+        Returns: string
+      }
+      list_waitlist_admin: {
+        Args: { p_src?: string }
+        Returns: {
+          converted_at: string
+          created_at: string
+          email: string
+          founding: boolean
+          id: string
+          invite_token: string
+          invited_at: string
+          name: string
+          ref_code: string
+          referred_by: string
+          src: string
+        }[]
+      }
+      preview_waitlist_invite: {
+        Args: { p_token: string }
+        Returns: string
+      }
       get_platform_stats: {
         Args: never
         Returns: {
@@ -7892,11 +8094,19 @@ export type Database = {
           read_ct: number
         }[]
       }
+      record_post_view: {
+        Args: { p_post_id: string }
+        Returns: undefined
+      }
       share_messages_to_project_main: {
         Args: { p_message_ids: string[] }
         Returns: number
       }
       touch_last_active: { Args: never; Returns: undefined }
+      viewer_liked_story: {
+        Args: { p_story_id: string; p_owner: string }
+        Returns: boolean
+      }
       upsert_attendee_note: {
         Args: { p_email: string; p_note: string; p_user_id: string }
         Returns: string

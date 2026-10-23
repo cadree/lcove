@@ -4,15 +4,21 @@ import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { CommunityMall } from "@/components/explore/CommunityMall";
+import { ExploreBrowse } from "@/components/explore/ExploreBrowse";
+import { toast } from "sonner";
+import { PeopleMatchCard } from "@/components/explore/PeopleMatchCard";
+import { useAuth } from "@/contexts/AuthContext";
+import { sendCollabInvite } from "@/lib/collabInvite";
 import { QuestCard } from "@/components/novi/QuestCard";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useNoviQuests } from "@/hooks/useNoviQuests";
-import { nextQuest } from "@/lib/noviQuests";
+import { nextQuest, studioQuest } from "@/lib/noviQuests";
 import { shotPeople, shotSessionEnabled } from "@/lib/shotSession";
 
 const segments = [
   { id: "for-you", label: "For you" },
+  { id: "browse", label: "Browse" },
   { id: "people", label: "People" },
   { id: "portfolios", label: "Portfolios" },
   { id: "events", label: "Events" },
@@ -24,7 +30,7 @@ const segments = [
 
 type SegmentId = (typeof segments)[number]["id"];
 
-const destinations: Record<Exclude<SegmentId, "for-you" | "mall">, { title: string; detail: string; to: string; extra?: { title: string; detail: string; to: string } }> = {
+const destinations: Record<Exclude<SegmentId, "for-you" | "mall" | "browse">, { title: string; detail: string; to: string; extra?: { title: string; detail: string; to: string } }> = {
   people: {
     title: "Directory",
     detail: "Profiles you can open",
@@ -59,14 +65,33 @@ const destinations: Record<Exclude<SegmentId, "for-you" | "mall">, { title: stri
 };
 
 const Explore = () => {
+  const { user } = useAuth();
   const [segment, setSegment] = useState<SegmentId>("for-you");
   const [query, setQuery] = useState("");
   const { quests } = useNoviQuests();
   const openQuest = nextQuest(quests);
+  const studio = studioQuest(quests);
+  const sendMatch = async (recipientId: string) => {
+    if (!user) {
+      toast.error("Sign in to send a match");
+      return;
+    }
+    if (recipientId === user.id) return;
+    try {
+      await sendCollabInvite(recipientId);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not send that invite");
+    }
+  };
   const { data: people = [] } = useQuery({
-    queryKey: ["explore-people", query],
+    queryKey: ["explore-people", query, user?.id],
     queryFn: async () => {
-      if (shotSessionEnabled()) return shotPeople;
+      if (shotSessionEnabled()) {
+        const self = user
+          ? [{ user_id: user.id, display_name: "Shot Member", city_display: "Charlotte, NC", avatar_url: null }]
+          : [];
+        return [...self, ...shotPeople];
+      }
       const request = supabase
         .from("profiles_public")
         .select("user_id, display_name, city_display, avatar_url")
@@ -119,34 +144,30 @@ const Explore = () => {
           })}
         </div>
 
+        {segment === "browse" && <ExploreBrowse query={query} />}
+
         {(segment === "for-you" || segment === "people") && (
           <section className="mb-6">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="ether-title text-[15px]">Find your people</h2>
               <Link to="/directory" className="mono-label text-[9px] text-muted-foreground">Directory</Link>
             </div>
-            <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+            <div data-match-row className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
               {people.map((person) => (
-                <Link
+                <PeopleMatchCard
                   key={person.user_id}
-                  to={`/profile/${person.user_id}`}
-                  className="file-panel flex w-[132px] shrink-0 flex-col items-center px-3 py-4 text-center"
-                >
-                  <span className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-[conic-gradient(from_120deg,#FF9FC8,#C4142D,#FF9FC8)] p-[2px]">
-                    <span className="flex h-full w-full items-center justify-center rounded-full bg-card font-body text-sm font-extrabold">
-                      {(person.display_name || "?").charAt(0)}
-                    </span>
-                  </span>
-                  <span className="line-clamp-2 font-body text-[13px] font-extrabold">{person.display_name || "Member"}</span>
-                  <span className="mono-label mt-1 text-[8px] text-muted-foreground">{person.city_display || "City open"}</span>
-                </Link>
+                  person={person}
+                  isSelf={person.user_id === user?.id}
+                  onInvite={sendMatch}
+                />
               ))}
             </div>
             {openQuest && segment === "for-you" && <div className="mt-4"><QuestCard quest={openQuest} /></div>}
+            {studio && segment === "for-you" && <div className="mt-4"><QuestCard quest={studio} /></div>}
           </section>
         )}
 
-        {segment !== "for-you" && segment !== "mall" && segment !== "people" && (
+        {segment !== "for-you" && segment !== "mall" && segment !== "people" && segment !== "browse" && (
           <div className="mb-6 space-y-3">
             <Link to={destinations[segment].to} className="file-panel flex min-h-11 flex-col justify-center px-4 py-4">
               <span className="ether-title text-[22px]">{destinations[segment].title}</span>

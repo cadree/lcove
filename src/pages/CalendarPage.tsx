@@ -178,7 +178,6 @@ const CalendarPage = () => {
           description="Community events, projects, and personal schedule"
           icon={<CalendarIcon className="w-5 h-5" />}
           tile="cyan"
-          backPath="/"
           actions={
             user && (
               <DropdownMenu>

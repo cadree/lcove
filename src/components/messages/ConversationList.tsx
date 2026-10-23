@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useConversations } from '@/hooks/useConversations';
 import { usePresence } from '@/hooks/usePresence';
 import { shotOnline, shotSessionEnabled } from '@/lib/shotSession';
+import { messagePreview } from '@/lib/shareCard';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,13 +58,18 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
     if (conv.last_message.media_type === 'image') return '📷 Photo';
     if (conv.last_message.media_type === 'video') return '🎥 Video';
     if (conv.last_message.media_type === 'audio') return '🎵 Audio';
-    return conv.last_message.content || 'Message';
+    return messagePreview(conv.last_message.content) || conv.last_message.content || 'Message';
   };
 
   const filteredConversations = conversations.filter(conv => {
     const name = getConversationName(conv).toLowerCase();
     return name.includes(search.toLowerCase());
   });
+
+  const onlineNow = conversations.filter((conv) => {
+    const otherId = getOtherUserId(conv);
+    return otherId ? isOnline(otherId) : false;
+  }).slice(0, 8);
 
   if (!user) {
     return (
@@ -100,23 +106,11 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
 
         <div>
             <p className="kicker mb-2">// Active now</p>
+          {onlineNow.length === 0 ? (
+            <p className="pb-1 text-sm text-muted-foreground">Nobody is online</p>
+          ) : (
           <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
-          {conversations.filter((conv) => {
-            const otherId = getOtherUserId(conv);
-            return otherId ? isOnline(otherId) : false;
-          }).length === 0 ? (
-            ["Open", "Soon", "Quiet", "Next"].map((label) => (
-              <div key={label} className="flex w-16 shrink-0 flex-col items-center gap-1" aria-hidden="true">
-                <span className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-foreground/30 bg-card/50">
-                  <span className="h-2 w-2 rounded-full bg-foreground/25" />
-                </span>
-                <span className="mono-label text-[8px] text-muted-foreground">{label}</span>
-              </div>
-            ))
-          ) : conversations.filter((conv) => {
-            const otherId = getOtherUserId(conv);
-            return otherId ? isOnline(otherId) : false;
-          }).slice(0, 8).map((conv) => (
+          {onlineNow.map((conv) => (
             <button
               key={conv.id}
               type="button"
@@ -134,6 +128,7 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
             </button>
           ))}
           </div>
+          )}
         </div>
       </div>
 

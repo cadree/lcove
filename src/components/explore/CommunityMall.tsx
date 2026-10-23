@@ -26,11 +26,16 @@ const FILTERS: { id: "all" | MallKind; label: string }[] = [
   { id: "studios", label: "Studios" },
 ];
 
-function kindForStore(name: string, description: string | null): MallKind {
-  const text = `${name} ${description ?? ""}`.toLowerCase();
+function kindForStore(name: string, description: string | null, website: string | null): MallKind {
+  const text = `${name} ${description ?? ""} ${website ?? ""}`.toLowerCase();
   if (text.includes("studio")) return "studios";
-  if (text.includes("cloth") || text.includes("denim") || text.includes("wear")) return "clothing";
+  if (text.includes("cloth") || text.includes("denim") || text.includes("wear") || text.includes("nuance")) return "clothing";
   return "creators";
+}
+
+function isNuanceStore(name: string, website: string | null): boolean {
+  const text = `${name} ${website ?? ""}`.toLowerCase();
+  return text.includes("nuancebylcove.com") || text.includes("nuance");
 }
 
 const EXAMPLES: MallCard[] = [
@@ -63,24 +68,39 @@ export function CommunityMall({ query = "" }: { query?: string }) {
         .eq("is_active", true)
         .order("name", { ascending: true });
       if (error) throw error;
-      return data ?? [];
+      const ids = (data ?? []).map((store) => store.id);
+      const counts = new Map<string, number>();
+      if (ids.length > 0) {
+        const { data: items } = await supabase
+          .from("store_items")
+          .select("store_id")
+          .in("store_id", ids)
+          .eq("is_active", true);
+        for (const item of items ?? []) {
+          counts.set(item.store_id, (counts.get(item.store_id) ?? 0) + 1);
+        }
+      }
+      return (data ?? []).map((store) => ({ ...store, item_count: counts.get(store.id) ?? 0 }));
     },
   });
 
   const cards = useMemo(() => {
     const live: MallCard[] = stores.map((store) => {
-      const kind = kindForStore(store.name, store.description);
+      const website = store.shopify_store_url;
+      const kind = kindForStore(store.name, store.description, website);
+      const count = store.item_count ?? 0;
       return {
         id: store.id,
         name: store.name,
         kind,
         kindLabel: kind === "studios" ? "Studio" : kind === "clothing" ? "Clothing" : "Creator",
-        countLabel: "Open",
-        to: "/mall",
+        countLabel: count > 0 ? `${count} item${count === 1 ? "" : "s"}` : "Open",
+        to: `/store?store=${store.id}`,
         image: store.cover_image_url,
         mark: store.logo_url,
       };
     });
+    const hasNuance = stores.some((store) => isNuanceStore(store.name, store.shopify_store_url));
     const nuance: MallCard = {
       id: "nuance",
       name: "Nuance by LCOVE",
@@ -90,7 +110,7 @@ export function CommunityMall({ query = "" }: { query?: string }) {
       to: "/nuance",
       mark: lcoveMark,
     };
-    const merged = [...live, nuance].sort((a, b) => a.name.localeCompare(b.name));
+    const merged = [...live, ...(hasNuance ? [] : [nuance])].sort((a, b) => a.name.localeCompare(b.name));
     return live.length < 2 ? [...merged, ...EXAMPLES] : merged;
   }, [stores]);
 

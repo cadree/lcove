@@ -177,6 +177,7 @@ export default function PartnerPortal() {
       
       if (uploadError) {
         console.error('Failed to upload gallery image:', uploadError);
+        toast.error(errorMessage(uploadError, "Couldn't upload that image"));
         continue;
       }
       

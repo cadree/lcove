@@ -1,4 +1,4 @@
-export const QUEST_IDS = ["enter_signal", "first_post", "find_people", "read_book", "finish_project"] as const;
+export const QUEST_IDS = ["enter_signal", "first_post", "find_people", "read_book", "finish_project", "open_studio"] as const;
 export type QuestId = (typeof QUEST_IDS)[number];
 export type QuestState = "sealed" | "progress" | "decrypted";
 export type QuestLane = "story" | "work";
@@ -9,6 +9,7 @@ export interface QuestSignals {
   connectionCount: number;
   bookOpened: boolean;
   completedProjects: number;
+  studioOpened?: boolean;
 }
 
 export interface QuestView {
@@ -77,9 +78,9 @@ export function questViews(signals: QuestSignals): QuestView[] {
     {
       id: "first_post",
       title: "Send your first signal",
-      detail: "A post already writes 10 XP. This row only tracks it.",
+      detail: "Make your first post to earn 10 XP.",
       lane: "story",
-      href: "/feed",
+      href: "/feed?action=create-post",
       xp: 0,
       progress: Math.min(1, signals.postCount),
       target: 1,
@@ -91,8 +92,8 @@ export function questViews(signals: QuestSignals): QuestView[] {
       lane: "story",
       href: "/directory",
       xp: 10,
-      progress: Math.min(3, signals.connectionCount),
-      target: 3,
+      progress: Math.min(1, signals.connectionCount),
+      target: 1,
     },
     {
       id: "read_book",
@@ -114,12 +115,121 @@ export function questViews(signals: QuestSignals): QuestView[] {
       progress: Math.min(1, signals.completedProjects),
       target: 1,
     },
+    {
+      id: "open_studio",
+      title: "Open Studio",
+      detail: "Open the Studio sheet from your profile or the feed.",
+      lane: "work",
+      href: "/feed?studio=1",
+      xp: 10,
+      progress: signals.studioOpened ? 1 : 0,
+      target: 1,
+    },
   ];
   return rows.map((row) => ({ ...row, state: stateFor(row.progress, row.target) }));
 }
 
+/** One decrypted quest to file on a page load. The rest wait for a later visit. */
+export function autoFileQuestId(quests: QuestView[], filedIds: ReadonlySet<string> = new Set()): string | null {
+  const next = quests.find((quest) => quest.xp > 0 && quest.state === "decrypted" && !filedIds.has(quest.id));
+  return next?.id ?? null;
+}
+
 export function nextQuest(quests: QuestView[]): QuestView | null {
-  return quests.find((quest) => quest.state !== "decrypted") ?? null;
+  return quests.find((quest) => quest.id !== "open_studio" && quest.state !== "decrypted") ?? null;
+}
+
+/** Studio stays visible beside the current quest until it is filed. */
+export function studioQuest(quests: QuestView[]): QuestView | null {
+  const quest = quests.find((row) => row.id === "open_studio");
+  if (!quest || quest.state === "decrypted") return null;
+  return quest;
+}
+
+export function decryptedKey(quests: QuestView[]): string {
+  return quests
+    .filter((quest) => quest.state === "decrypted")
+    .map((quest) => quest.id)
+    .join(",");
+}
+
+export interface SuggestedAction {
+  id: string;
+  title: string;
+  detail: string;
+  href: string;
+  xp: number;
+}
+
+const SUGGESTED: Record<QuestId, { title: string; detail: string; href: string; xp: number }> = {
+  enter_signal: {
+    title: "Finish your profile",
+    detail: "Add your name and city to earn 10 XP.",
+    href: "/onboarding",
+    xp: 10,
+  },
+  first_post: {
+    title: "Make your first post",
+    detail: "Make your first post to earn 10 XP.",
+    href: "/feed?action=create-post",
+    xp: 10,
+  },
+  find_people: {
+    title: "Add people",
+    detail: "Add someone from the directory to earn 10 XP.",
+    href: "/directory",
+    xp: 10,
+  },
+  read_book: {
+    title: "Open the Book",
+    detail: "Open the Book of LCOVE to earn 10 XP.",
+    href: "/book",
+    xp: 10,
+  },
+  finish_project: {
+    title: "Finish a project",
+    detail: "Complete a project to earn 25 XP.",
+    href: "/projects",
+    xp: 25,
+  },
+  open_studio: {
+    title: "Open Studio",
+    detail: "Open the Studio sheet from your profile or the feed to earn 10 XP.",
+    href: "/feed?studio=1",
+    xp: 10,
+  },
+};
+
+/** Next undone actions that still earn XP. At most `limit` (default 3). */
+export function suggestedActions(
+  signals: QuestSignals,
+  options?: { dailyDone?: boolean; limit?: number },
+): SuggestedAction[] {
+  const limit = options?.limit ?? 3;
+  const rows: SuggestedAction[] = [];
+  for (const quest of questViews(signals)) {
+    if (quest.state === "decrypted") continue;
+    const copy = SUGGESTED[quest.id];
+    const progress =
+      quest.target > 1 && quest.progress > 0 ? ` ${quest.progress} of ${quest.target} so far.` : "";
+    rows.push({
+      id: quest.id,
+      title: copy.title,
+      detail: `${copy.detail}${progress}`,
+      href: copy.href,
+      xp: copy.xp,
+    });
+  }
+  if (options?.dailyDone === false) {
+    rows.push({
+      id: "daily",
+      title: "Decode today",
+      detail: "File today on the quest log. Up to 5 XP.",
+      href: "/quests",
+      xp: 5,
+    });
+  }
+  return rows.slice(0, Math.max(0, limit));
 }
 
 /** Copy for the daily decode tile. granted is the XP row that was written. */

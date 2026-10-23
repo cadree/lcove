@@ -12,7 +12,9 @@ import { EmptyState } from "@/components/ui/empty-state";
 import FirstRunEmpty from "@/components/onboarding/FirstRunEmpty";
 import { Button } from "@/components/ui/button";
 import { Bell, Filter, Loader2, Shuffle, Sparkles, Users } from "lucide-react";
+import { ToolsSheet } from "@/components/navigation/ToolsSheet";
 import { usePosts } from "@/hooks/usePosts";
+import { FeedEngagementProvider } from "@/hooks/useFeedEngagement";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,8 +22,8 @@ import { cityFilterOptions, cityMatchesFilter } from "@/lib/cityNormalization";
 import { useFavorites } from "@/hooks/useFavorites";
 import { QuestCard } from "@/components/novi/QuestCard";
 import { useNoviQuests } from "@/hooks/useNoviQuests";
-import { nextQuest } from "@/lib/noviQuests";
-import bearLogo from "@/assets/ether-bear-logo.png";
+import { nextQuest, studioQuest } from "@/lib/noviQuests";
+import bearLogo from "@/assets/ether-bear-logo.webp";
 const Feed = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeCategory, setActiveCategory] = useState("All");
@@ -31,9 +33,11 @@ const Feed = () => {
   const [isShuffled, setIsShuffled] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [lane, setLane] = useState<"for-you" | "friends" | "city" | "live">("for-you");
+  const [studioOpen, setStudioOpen] = useState(false);
   const { favorites } = useFavorites();
   const { quests } = useNoviQuests();
   const openQuest = nextQuest(quests);
+  const studio = studioQuest(quests);
   const {
     user
   } = useAuth();
@@ -47,6 +51,14 @@ const Feed = () => {
   const postCreatorRef = useRef<HTMLTextAreaElement>(null);
 
   // Handle action params from FAB
+  useEffect(() => {
+    if (searchParams.get("studio") !== "1") return;
+    setStudioOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("studio");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   useEffect(() => {
     if (searchParams.get('action') === 'create-post' && user) {
       // Focus the post creator after a brief delay
@@ -92,7 +104,8 @@ const Feed = () => {
     // Media type filter
     let matchesCategory = activeCategory === "All";
     if (!matchesCategory) {
-      if (activeCategory === "Photo") matchesCategory = post.media_type === 'photo';else if (activeCategory === "Video") matchesCategory = post.media_type === 'video';else if (activeCategory === "Text") matchesCategory = post.media_type === 'text' || !post.media_url && !!post.content;
+      const linkedVideo = post.embed_provider === 'youtube' || post.embed_provider === 'vimeo';
+      if (activeCategory === "Photo") matchesCategory = post.media_type === 'photo';else if (activeCategory === "Video") matchesCategory = post.media_type === 'video' || linkedVideo;else if (activeCategory === "Text") matchesCategory = !linkedVideo && (post.media_type === 'text' || !post.media_url && !!post.content);
     }
 
     // Post type filter
@@ -123,6 +136,9 @@ const Feed = () => {
             <img src={bearLogo} alt="" className="h-14 w-auto" />
           </Link>
           <div className="flex items-center">
+            <Button variant="ghost" className="font-body font-extrabold" onClick={() => setStudioOpen(true)} aria-label="Studio">
+              Studio
+            </Button>
             <FriendsDrawer>
               <Button variant="ghost" size="icon" aria-label="Friends">
                 <Users className="h-5 w-5" />
@@ -135,6 +151,7 @@ const Feed = () => {
             </Link>
           </div>
         </header>
+        <ToolsSheet open={studioOpen} onOpenChange={setStudioOpen} />
 
         <StoriesRow />
 
@@ -161,6 +178,7 @@ const Feed = () => {
         </div>
 
         {openQuest && <div className="mb-4"><QuestCard quest={openQuest} /></div>}
+        {studio && <div className="mb-4"><QuestCard quest={studio} /></div>}
 
         <div className="mb-4 mt-2 flex items-center justify-end gap-2">
           <div className="flex gap-2">
@@ -215,34 +233,18 @@ const Feed = () => {
             <span className="mono-label rounded-full bg-[hsl(var(--brand))] px-2 py-1 text-[8px] text-[#0A0A0A]">Live</span>
           </Link>
         )}
-        {!isLoading && lane !== "live" && !lanePosts.some((post) => post.media_url && post.media_type !== "text") && (
-          <article className="file-panel mb-5 overflow-hidden">
-            <p className="mono-label px-4 pt-3 text-[8px] text-[hsl(var(--brand))]">File // open</p>
-            <div className="relative mx-4 mb-4 mt-3 aspect-[3/4] overflow-hidden rounded-[14px] border border-border bg-[radial-gradient(circle_at_28%_18%,rgba(255,159,200,0.42),transparent_52%),linear-gradient(180deg,hsl(var(--panel-2)),hsl(var(--panel)))]">
-              <div className="absolute inset-x-0 bottom-0 p-4">
-                <p className="kicker">// Feed</p>
-                <p className="ether-title mt-1 text-[28px]">The file is open</p>
-                <p className="lore mt-1 text-[16px] text-foreground/85">A hero lands here when a post carries a picture.</p>
-              </div>
-            </div>
-          </article>
-        )}
         {isLoading ? <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div> : <div className="space-y-5 pb-32">
-            <AnimatePresence mode="popLayout">
-              {lanePosts.map((post, index) => <motion.div key={post.id} initial={{
-            opacity: 0,
-            y: 20
-          }} animate={{
-            opacity: 1,
-            y: 0
-          }} transition={{
-            delay: index * 0.05
-          }}>
-                  <FeedPost post={post} hero={index === 0 && lane === "for-you"} />
-                </motion.div>)}
-            </AnimatePresence>
+            <FeedEngagementProvider postIds={lanePosts.map((post) => post.id)}>
+            <div className="space-y-5">
+              {lanePosts.map((post) => (
+                <div key={post.feed_key ?? post.id} className="[content-visibility:auto] [contain-intrinsic-size:auto_480px]">
+                  <FeedPost post={post} />
+                </div>
+              ))}
+            </div>
+            </FeedEngagementProvider>
 
             {lanePosts.length === 0 && posts.length === 0 && user && lane !== "live" && <FirstRunEmpty title="Your feed is empty" description="Start with a post, look through the directory, or read community updates." actions={[{
           label: "Share something",

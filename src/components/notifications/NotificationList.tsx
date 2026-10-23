@@ -1,14 +1,22 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Bell, Check, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { SquircleIcon } from '@/components/world/SquircleIcon';
-import { useNotifications, Notification, NotificationType } from '@/hooks/useNotifications';
+import { useNotifications, Notification } from '@/hooks/useNotifications';
 import { NotificationItem } from './NotificationItem';
 import { ProjectAcceptedDialog } from '@/components/projects/ProjectAcceptedDialog';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { dayDividerLabel } from '@/lib/calendarDay';
+import { supabase } from '@/integrations/supabase/client';
+import { likeTarget, notificationsForTab, postIdsForLikes, storyOpenPlan, type PostLikePreview } from '@/lib/likeNotice';
+import { postPreviewPath } from '@/lib/sharing';
+import { loadLiveStories, type OpenStory } from '@/lib/openStoryNotice';
+import StoryViewer from '@/components/stories/StoryViewer';
 
 const NOTIFICATION_TYPES: { value: string; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -31,11 +39,33 @@ export const NotificationList: React.FC = () => {
     clearAll,
   } = useNotifications();
 
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = React.useState('all');
+  const [viewer, setViewer] = React.useState<{ stories: OpenStory[]; initialStoryId: string } | null>(null);
+  const openingStory = React.useRef(false);
   const [acceptedDialog, setAcceptedDialog] = React.useState<{ open: boolean; projectId: string | null; roleTitle: string | null }>({
     open: false,
     projectId: null,
     roleTitle: null,
+  });
+
+  const postIds = React.useMemo(() => postIdsForLikes(notifications), [notifications]);
+  const { data: postPreviews = {} } = useQuery({
+    queryKey: ['notification-post-previews', postIds],
+    enabled: postIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('posts')
+        .select('id, content, media_url, media_type')
+        .in('id', postIds);
+      if (error || !data) return {} as Record<string, PostLikePreview>;
+      return Object.fromEntries(
+        data.map((post) => [
+          post.id,
+          { content: post.content, media_url: post.media_url, media_type: post.media_type },
+        ]),
+      );
+    },
   });
 
   const handleProjectInviteTap = (notification: Notification) => {
@@ -47,9 +77,41 @@ export const NotificationList: React.FC = () => {
     });
   };
 
-  const filteredNotifications = activeTab === 'all'
-    ? notifications
-    : notifications.filter(n => n.type === activeTab);
+  const previewFor = (notification: Notification): PostLikePreview | null => {
+    const target = likeTarget(notification);
+    if (target?.kind !== 'post') return null;
+    return postPreviews[target.postId] ?? null;
+  };
+
+  const openLike = async (notification: Notification) => {
+    const target = likeTarget(notification);
+    if (!target) return;
+    if (target.kind === 'post') {
+      navigate(postPreviewPath(target.ownerId, target.postId));
+      return;
+    }
+    if (openingStory.current) return;
+    openingStory.current = true;
+    try {
+      const stories = await loadLiveStories(target.storyId);
+      const plan = storyOpenPlan(stories?.map((story) => story.id) ?? [], target.storyId, target.ownerId);
+      if (plan.kind === 'profile' || !stories) {
+        navigate(`/profile/${target.ownerId}`);
+        return;
+      }
+      setViewer({ stories, initialStoryId: plan.initialStoryId });
+    } catch {
+      toast.error('Could not open that story');
+      navigate(`/profile/${target.ownerId}`);
+    } finally {
+      openingStory.current = false;
+    }
+  };
+
+  const filteredNotifications = React.useMemo(
+    () => notificationsForTab(notifications, activeTab),
+    [notifications, activeTab],
+  );
 
   // Group notifications by the viewer's local calendar day.
   const groupedNotifications = React.useMemo(() => {
@@ -174,6 +236,8 @@ export const NotificationList: React.FC = () => {
                         onRead={markAsRead}
                         onDelete={deleteNotification}
                         onProjectInviteTap={handleProjectInviteTap}
+                        onActivate={openLike}
+                        preview={previewFor(notification)}
                       />
                     ))}
                   </div>
@@ -183,6 +247,18 @@ export const NotificationList: React.FC = () => {
           )}
         </TabsContent>
       </Tabs>
+
+      <AnimatePresence>
+        {viewer && (
+          <StoryViewer
+            key={viewer.initialStoryId}
+            stories={viewer.stories}
+            initialStoryId={viewer.initialStoryId}
+            onClose={() => setViewer(null)}
+            onNextUser={() => setViewer(null)}
+          />
+        )}
+      </AnimatePresence>
 
       <ProjectAcceptedDialog
         projectId={acceptedDialog.projectId}

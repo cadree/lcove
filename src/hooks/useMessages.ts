@@ -3,7 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
+import { assertCleanText } from '@/lib/objectionableText';
 import { toast } from 'sonner';
+import { keepDeliveredMessages, messageSharePreview, type MessageSharePreview } from '@/lib/sharing';
 
 interface Message {
   id: string;
@@ -20,6 +22,10 @@ interface Message {
     avatar_url: string | null;
   };
   read_by?: string[];
+  shared_post_id?: string | null;
+  shared_story_id?: string | null;
+  shared_profile_id?: string | null;
+  share?: MessageSharePreview | null;
 }
 
 interface TypingUser {
@@ -75,10 +81,63 @@ export function useMessages(conversationId: string | null) {
         receiptMap.get(r.message_id)!.push(r.user_id);
       });
 
-      return (messagesData || []).map(m => ({
+      const base = (messagesData || []).map(m => ({
         ...m,
         profile: profileMap.get(m.sender_id),
         read_by: receiptMap.get(m.id) || [],
+      }));
+
+      const postIds = [...new Set(base.map((m) => m.shared_post_id).filter((id): id is string => !!id))];
+      const storyIds = [...new Set(base.map((m) => m.shared_story_id).filter((id): id is string => !!id))];
+      const profileIds = [...new Set(base.map((m) => m.shared_profile_id).filter((id): id is string => !!id))];
+
+      const postLookup = new Map<string, { id: string; user_id: string; content: string | null; media_url: string | null; media_type: string | null; author: string | null }>();
+      const storyLookup = new Map<string, { id: string; user_id: string; media_url: string; media_type: string; author: string | null }>();
+      const profileLookup = new Map<string, { user_id: string; display_name: string | null; avatar_url: string | null }>();
+
+      if (postIds.length) {
+        const { data: postRows } = await supabase
+          .from('posts')
+          .select('id, user_id, content, media_url, media_type')
+          .in('id', postIds);
+        const authorIds = [...new Set((postRows ?? []).map((post) => post.user_id))];
+        const authorMap = new Map<string, string | null>();
+        if (authorIds.length) {
+          const { data: authors } = await supabase.from('profiles_public').select('user_id, display_name').in('user_id', authorIds);
+          authors?.forEach((author) => authorMap.set(author.user_id, author.display_name));
+        }
+        postRows?.forEach((post) => {
+          postLookup.set(post.id, { ...post, author: authorMap.get(post.user_id) ?? null });
+        });
+      }
+
+      if (storyIds.length) {
+        const { data: storyRows } = await supabase
+          .from('stories')
+          .select('id, user_id, media_url, media_type')
+          .in('id', storyIds);
+        const authorIds = [...new Set((storyRows ?? []).map((story) => story.user_id))];
+        const authorMap = new Map<string, string | null>();
+        if (authorIds.length) {
+          const { data: authors } = await supabase.from('profiles_public').select('user_id, display_name').in('user_id', authorIds);
+          authors?.forEach((author) => authorMap.set(author.user_id, author.display_name));
+        }
+        storyRows?.forEach((story) => {
+          storyLookup.set(story.id, { ...story, author: authorMap.get(story.user_id) ?? null });
+        });
+      }
+
+      if (profileIds.length) {
+        const { data: profileRows } = await supabase
+          .from('profiles_public')
+          .select('user_id, display_name, avatar_url')
+          .in('user_id', profileIds);
+        profileRows?.forEach((profile) => profileLookup.set(profile.user_id, profile));
+      }
+
+      return keepDeliveredMessages(base).map((message) => ({
+        ...message,
+        share: messageSharePreview(message, { posts: postLookup, stories: storyLookup, profiles: profileLookup }),
       })) as Message[];
     },
     enabled: !!conversationId && !!user,
@@ -111,6 +170,8 @@ export function useMessages(conversationId: string | null) {
 
         mediaUrl = publicUrl;
       }
+
+      assertCleanText(content);
 
       const { data: messageData, error } = await supabase
         .from('messages')

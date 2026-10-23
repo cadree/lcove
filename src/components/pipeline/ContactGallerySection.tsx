@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Progress } from "@/components/ui/progress";
 import { useContactMedia, ContactMedia } from "@/hooks/useContactMedia";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 
 interface ContactGallerySectionProps {
   pipelineItemId: string;
@@ -71,7 +72,7 @@ export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionP
         setUploadQueue(prev => prev.map((p, idx) => 
           idx === index ? { ...p, progress: -1 } : p
         ));
-        return { success: false, index };
+        return { success: false, index, message: errorMessage(error, `${file.name} failed to upload`) };
       }
     });
 
@@ -80,12 +81,14 @@ export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionP
     
     let successCount = 0;
     let failCount = 0;
+    let failureMessage = "";
     
     results.forEach(result => {
       if (result.status === 'fulfilled' && result.value.success) {
         successCount++;
       } else {
         failCount++;
+        if (result.status === 'fulfilled' && result.value.message) failureMessage = result.value.message;
       }
     });
     
@@ -99,7 +102,7 @@ export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionP
       toast.success(`${successCount} file(s) uploaded`);
     }
     if (failCount > 0) {
-      toast.error(`${failCount} file(s) failed`);
+      toast.error(failureMessage || `${failCount} file(s) failed`);
     }
   };
 
@@ -222,7 +225,7 @@ export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionP
                     <img
                       src={item.media_url}
                       alt="Contact media"
-                      className="w-full h-full object-cover"
+                      className="h-full w-full bg-muted object-contain"
                     />
                   )}
                 </div>
@@ -292,7 +295,7 @@ export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionP
                   className="min-h-[100px]"
                 />
                 <div className="flex gap-2">
-                  <Button onClick={handleSaveNotes} className="flex-1" role="button">
+                  <Button type="button" onClick={handleSaveNotes} className="flex-1">
                     Save Notes
                   </Button>
                   <Button 

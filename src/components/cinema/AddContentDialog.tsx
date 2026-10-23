@@ -24,6 +24,7 @@ import { Film, Upload, Link as LinkIcon, X, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 
 interface AddContentDialogProps {
   open: boolean;
@@ -62,10 +63,7 @@ export const AddContentDialog = ({ open, onOpenChange, networkId }: AddContentDi
       .from('media')
       .upload(fileName, file);
 
-    if (error) {
-      console.error('Upload error:', error);
-      return null;
-    }
+    if (error) throw error;
 
     const { data } = supabase.storage.from('media').getPublicUrl(fileName);
     return data.publicUrl;
@@ -147,6 +145,7 @@ export const AddContentDialog = ({ open, onOpenChange, networkId }: AddContentDi
       onOpenChange(false);
     } catch (error) {
       console.error('Failed to add content:', error);
+      toast.error(errorMessage(error, "Couldn't add that content"));
     } finally {
       setUploading(false);
     }

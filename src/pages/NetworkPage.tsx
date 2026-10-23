@@ -57,7 +57,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ContentDetailDialog } from '@/components/cinema/ContentDetailDialog';
 import { VideoPlayer } from '@/components/cinema/VideoPlayer';
 import { IosDigitalGoodsNotice } from '@/components/ios/IosDigitalGoodsNotice';
-import { isIosApp } from '@/lib/platform';
+import { digitalPurchasesEnabled } from '@/lib/platform';
 import { SubmitContentDialog } from '@/components/cinema/SubmitContentDialog';
 import { cn } from '@/lib/utils';
 
@@ -402,7 +402,7 @@ const NetworkPage = () => {
               </Button>
 
               {network.is_paid && !isSubscribed && !isOwner && (
-                isIosApp() ? (
+                !digitalPurchasesEnabled() ? (
                   <IosDigitalGoodsNotice className="max-w-xs" />
                 ) : (
                 <Button
@@ -449,7 +449,7 @@ const NetworkPage = () => {
             <p className="text-muted-foreground">
               {isOwner
                 ? 'Start adding content to your network!'
-                : 'This network is just getting started. Check back soon!'}
+                : 'Nothing is posted on this network yet.'}
             </p>
             {isOwner && (
               <Link to={`/cinema/manage/${networkId}`}>

@@ -1,11 +1,13 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Image, Video, X, Loader2, Send } from 'lucide-react';
+import { Image, Link2, Video, X, Loader2, Send } from 'lucide-react';
 import { usePosts } from '@/hooks/usePosts';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { VideoLinkField } from '@/components/feed/VideoLinkField';
+import type { EmbedDraft } from '@/lib/videoEmbed';
 interface PostCreatorProps {
   avatarUrl?: string | null;
   displayName?: string | null;
@@ -25,6 +27,8 @@ const PostCreator = ({
   const [preview, setPreview] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'photo' | 'video' | 'text'>('text');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [embed, setEmbed] = useState<EmbedDraft | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   if (!user) return null;
@@ -33,6 +37,8 @@ const PostCreator = ({
     if (!file) return;
     setMediaType(type);
     setSelectedFile(file);
+    setLinkUrl('');
+    setEmbed(null);
     setIsExpanded(true);
     const reader = new FileReader();
     reader.onload = () => setPreview(reader.result as string);
@@ -42,11 +48,12 @@ const PostCreator = ({
     e.target.value = '';
   };
   const handleSubmit = async () => {
-    if (!content.trim() && !selectedFile) return;
+    if (!content.trim() && !selectedFile && !embed) return;
     await createPost.mutateAsync({
       content: content.trim() || undefined,
-      file: selectedFile || undefined,
-      mediaType
+      file: embed ? undefined : selectedFile || undefined,
+      mediaType: embed ? 'video' : mediaType,
+      embed: embed ?? undefined,
     });
 
     // Reset form
@@ -54,6 +61,8 @@ const PostCreator = ({
     setSelectedFile(null);
     setPreview(null);
     setMediaType('text');
+    setLinkUrl('');
+    setEmbed(null);
     setIsExpanded(false);
   };
   const clearMedia = () => {
@@ -98,6 +107,24 @@ const PostCreator = ({
           </motion.div>}
       </AnimatePresence>
 
+      {(isExpanded || linkUrl || embed) && (
+        <div className="mt-4">
+          <VideoLinkField
+            url={linkUrl}
+            onUrlChange={(value) => {
+              setLinkUrl(value);
+              if (value.trim()) {
+                setSelectedFile(null);
+                setPreview(null);
+                setMediaType('video');
+                setIsExpanded(true);
+              }
+            }}
+            onDraft={setEmbed}
+          />
+        </div>
+      )}
+
       {/* Actions - Always visible */}
       <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
         <div className="flex gap-2">
@@ -109,10 +136,14 @@ const PostCreator = ({
             <Video className="w-4 h-4" />
             Video
           </Button>
+          <Button variant="ghost" size="sm" onClick={() => setIsExpanded(true)} className="text-muted-foreground hover:text-foreground gap-2 min-h-11">
+            <Link2 className="w-4 h-4" />
+            Link
+          </Button>
         </div>
 
         <AnimatePresence>
-          {(isExpanded || content.trim() || selectedFile) && <motion.div initial={{
+          {(isExpanded || content.trim() || selectedFile || linkUrl || embed) && <motion.div initial={{
           opacity: 0,
           scale: 0.9
         }} animate={{
@@ -122,7 +153,7 @@ const PostCreator = ({
           opacity: 0,
           scale: 0.9
         }}>
-              <Button onClick={handleSubmit} disabled={!content.trim() && !selectedFile || createPost.isPending} size="sm" className="gap-2">
+              <Button onClick={handleSubmit} disabled={(!content.trim() && !selectedFile && !embed) || createPost.isPending} size="sm" className="gap-2">
                 {createPost.isPending ? <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Posting...

@@ -93,8 +93,8 @@ export const SubmitContentDialog = ({
         .getPublicUrl(fileName);
 
       setCoverArtUrl(urlData.publicUrl);
-    } catch {
-      toast.error('Failed to upload image');
+    } catch (error) {
+      toast.error(errorMessage(error, 'Failed to upload image'));
     } finally {
       setUploadingCover(false);
     }
@@ -134,8 +134,8 @@ export const SubmitContentDialog = ({
       }
 
       setMoodboardImages([...moodboardImages, ...newImages]);
-    } catch {
-      toast.error('Failed to upload moodboard images');
+    } catch (error) {
+      toast.error(errorMessage(error, 'Failed to upload moodboard images'));
     } finally {
       setUploadingMoodboard(false);
     }

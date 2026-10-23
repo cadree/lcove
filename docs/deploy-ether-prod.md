@@ -53,7 +53,7 @@ Optional names, same **New repository secret** button. Add them when you have th
 | `INTERNAL_FUNCTION_SECRET` | The same value as the ether-prod Vault secret `internal_function_secret` (already created). Database, Vault. The email-queue cron and the reminder cron send it as `x-internal-secret`. |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | Twilio, only if texts are turned on. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | `docs/push-setup.md`. Optional `VAPID_SUBJECT` (`mailto:you@domain`). |
-| `MUX_TOKEN_ID`, `MUX_TOKEN_SECRET` | Mux, only if livestreams are turned on. |
+| `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` | LiveKit Cloud. Camera streams use these. Do not set Mux tokens. Point the LiveKit webhook at `livekit-webhook`. |
 | `SITE_URL`, `APP_URL` | The site people should land on from email links. See the hosting step. |
 | `EMAIL_FROM` | Optional. The queue From address. If you leave it unset, mail is sent as `notifications@notifications.etherbylcove.com`. |
 | `APPLE_PASS_TYPE_ID`, `APPLE_TEAM_ID`, `GOOGLE_WALLET_ISSUER_ID`, `GOOGLE_WALLET_SERVICE_ACCOUNT_KEY` | Wallet passes, later. Store the Google key as one line. |

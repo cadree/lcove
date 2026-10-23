@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Calendar,
@@ -19,10 +19,12 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { SquircleIcon, type IconFill } from "@/components/world/SquircleIcon";
 import { useHomeUsage } from "@/hooks/useHomeUsage";
+import { useNoviQuests } from "@/hooks/useNoviQuests";
+import { useIosExternalCheckout } from "@/hooks/useIosExternalCheckout";
 import { isIosApp } from "@/lib/platform";
 import type { LucideIcon } from "lucide-react";
 
@@ -69,7 +71,7 @@ const groups: { id: string; label: string; items: ToolItem[] }[] = [
     label: "Stage",
     items: [
       { id: "events", label: "My events", path: "/dashboard/events", icon: Calendar, fill: "cyan" },
-      { id: "tickets", label: "My tickets", path: "/profile", icon: Ticket, fill: "rose" },
+      { id: "tickets", label: "My tickets", path: "/tickets", icon: Ticket, fill: "rose" },
       { id: "live", label: "Live", path: "/live", icon: Radio, fill: "red" },
       { id: "cinema", label: "Cinema networks", path: "/cinema", icon: Clapperboard, fill: "ink" },
     ],
@@ -89,7 +91,16 @@ export function ToolsSheet({ open, onOpenChange }: ToolsSheetProps) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const { pinnedItems, recentItems, trackClick } = useHomeUsage();
+  const { complete } = useNoviQuests();
+  const filedStudio = useRef(false);
   const hideIos = isIosApp();
+  const { linkOut } = useIosExternalCheckout();
+
+  useEffect(() => {
+    if (!open || filedStudio.current) return;
+    filedStudio.current = true;
+    complete.mutate("open_studio");
+  }, [complete, open]);
 
   const visibleGroups = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -97,13 +108,17 @@ export function ToolsSheet({ open, onOpenChange }: ToolsSheetProps) {
       .map((group) => ({
         ...group,
         items: group.items.filter((item) => {
-          if (item.iosHidden && hideIos) return false;
+          if (item.id === "membership" || item.id === "fund") {
+            if (hideIos && !linkOut) return false;
+          } else if (item.iosHidden && hideIos) {
+            return false;
+          }
           if (!needle) return true;
           return item.label.toLowerCase().includes(needle) || group.label.toLowerCase().includes(needle);
         }),
       }))
       .filter((group) => group.items.length > 0);
-  }, [hideIos, query]);
+  }, [hideIos, linkOut, query]);
 
   const openPath = (path: string, id: string) => {
     trackClick(id);
@@ -122,15 +137,15 @@ export function ToolsSheet({ open, onOpenChange }: ToolsSheetProps) {
         side="bottom"
         className="max-h-[88dvh] rounded-t-[28px] border-border bg-card/95 px-4 pb-8 backdrop-blur-xl"
         style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
-        aria-labelledby="tools-sheet-title"
       >
         <div className="mx-auto mb-4 mt-1 h-1 w-10 rounded-full bg-foreground/20" aria-hidden="true" />
         <div className="mb-4 flex items-center justify-between">
           <div>
             <p className="kicker">Profile</p>
-            <SheetTitle id="tools-sheet-title" className="ether-title text-[26px] text-left">
+            <SheetTitle className="ether-title text-[26px] text-left">
               Tools
             </SheetTitle>
+            <SheetDescription className="sr-only">Studio tools and shortcuts</SheetDescription>
           </div>
           <button
             type="button"

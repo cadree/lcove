@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { requireMembershipConfig } from "../_shared/membership-products.mjs";
+import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
+import { checkoutOrigin } from "../_shared/checkout-origin.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,8 +23,7 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
+    const stripeKey = assertStripeTestKey(Deno.env.get("STRIPE_SECRET_KEY"));
     requireMembershipConfig();
     logStep("Stripe key verified");
 
@@ -51,7 +52,14 @@ serve(async (req) => {
     const customerId = customers.data[0].id;
     logStep("Found Stripe customer", { customerId });
 
-    const origin = req.headers.get("origin") || "http://localhost:3000";
+    let returnOrigin: unknown;
+    try {
+      const body = await req.json();
+      returnOrigin = body?.return_origin;
+    } catch {
+      returnOrigin = undefined;
+    }
+    const origin = checkoutOrigin(returnOrigin, req.headers.get("origin"), "http://localhost:3000");
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: `${origin}/membership`,

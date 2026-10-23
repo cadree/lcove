@@ -25,15 +25,17 @@ DrawerOverlay.displayName = DrawerPrimitive.Overlay.displayName;
 const DrawerContent = React.forwardRef<
   React.ElementRef<typeof DrawerPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, style, ...props }, ref) => (
   <DrawerPortal>
     <DrawerOverlay />
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background",
+        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto min-w-0 max-w-full flex-col overflow-x-hidden rounded-t-[10px] border bg-background box-border break-words",
+        "[&>*]:min-w-0 [&_input]:min-w-0 [&_input]:max-w-full [&_textarea]:min-w-0 [&_textarea]:max-w-full [&_select]:min-w-0 [&_select]:max-w-full [&_img]:min-w-0 [&_img]:max-w-full [&_button]:min-w-0 [&_button]:max-w-full [&_button]:whitespace-normal [&_label]:min-w-0 [&_label]:max-w-full",
         className,
       )}
+      style={{ ...style, boxSizing: "border-box", minWidth: 0, maxWidth: "100%" }}
       {...props}
     >
       <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />

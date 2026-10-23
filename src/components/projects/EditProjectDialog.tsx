@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { ItemListField, XpExplainer } from '@/components/projects/ItemListField';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -374,10 +375,7 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
           {/* Resources */}
           <div className="space-y-4">
             <Label className="flex items-center gap-2"><Wrench className="h-4 w-4" /> Resources</Label>
-            <div>
-              <Label className="text-xs text-muted-foreground">Equipment Needed</Label>
-              <Input value={equipmentNeeded} onChange={e => setEquipmentNeeded(e.target.value)} />
-            </div>
+            <ItemListField label="Equipment needed" value={equipmentNeeded} onChange={setEquipmentNeeded} placeholder="Add a piece of equipment" />
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" /> Venue</Label>
@@ -388,10 +386,7 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
                 <Label className="text-xs">Location Secured</Label>
               </div>
             </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Props Needed</Label>
-              <Input value={propsNeeded} onChange={e => setPropsNeeded(e.target.value)} />
-            </div>
+            <ItemListField label="Props needed" value={propsNeeded} onChange={setPropsNeeded} placeholder="Add a prop" />
             <div className="flex gap-6">
               <div className="flex items-center gap-2">
                 <Switch checked={sponsorshipNeeded} onCheckedChange={setSponsorshipNeeded} />
@@ -406,6 +401,7 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
 
           {/* Roles */}
           <div className="space-y-3">
+            <XpExplainer />
             <div className="flex items-center justify-between">
               <Label>Roles</Label>
               <Button type="button" variant="outline" size="sm" onClick={addRole}>

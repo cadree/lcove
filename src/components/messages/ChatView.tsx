@@ -17,6 +17,8 @@ import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { usePresence } from '@/hooks/usePresence';
 import { useProjectChatData } from '@/hooks/useProjectChatData';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { ShareCardBubble } from '@/components/messages/ShareCardBubble';
+import { splitShareMessage } from '@/lib/shareCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { OnlineIndicator } from '@/components/ui/online-indicator';
@@ -25,6 +27,7 @@ import { CreateSubgroupDialog } from './CreateSubgroupDialog';
 import ProjectCommandCenter from './ProjectCommandCenter';
 import { toast } from 'sonner';
 import { ReportDialog } from '@/components/safety/ReportDialog';
+import { SharedContentCard } from '@/components/share/SharedContentCard';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -474,6 +477,12 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                             </div>
                           )}
                           
+                          {msg.share && msg.share.kind !== 'story' && (
+                            <div className="mb-1">
+                              <SharedContentCard share={msg.share} />
+                            </div>
+                          )}
+
                           {/* Media */}
                           {msg.media_url && (
                             <div className="mb-1 rounded-xl overflow-hidden">
@@ -481,14 +490,15 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                                 <img
                                   src={msg.media_url}
                                   alt=""
-                                  className="max-w-[250px] max-h-[300px] object-cover rounded-xl"
+                                  className="max-h-[300px] w-[min(70vw,260px)] rounded-xl bg-muted object-contain"
                                 />
                               )}
                               {msg.media_type === 'video' && (
                                 <video
                                   src={msg.media_url}
                                   controls
-                                  className="max-w-[250px] max-h-[300px] rounded-xl"
+                                  playsInline
+                                  className="max-h-[300px] w-[min(70vw,260px)] rounded-xl bg-black object-contain"
                                 />
                               )}
                               {msg.media_type === 'audio' && (
@@ -497,16 +507,30 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                             </div>
                           )}
 
-                          {/* Text Content */}
-                          {msg.content && (
-                            <div
-                              className={`px-4 py-2.5 ${
-                                isOwn
-                                  ? 'rounded-[18px] rounded-br-[6px] bg-gradient-to-br from-[#FFD6E8] to-[#FF9FC8] text-[#0A0A0A]'
-                                  : 'file-panel rounded-[18px] rounded-bl-[6px] px-4 py-2.5 text-foreground'
-                              }`}
-                            >
-                              <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                          {/* Encoded share card, note, or plain text */}
+                          {(() => {
+                            const shared = splitShareMessage(msg.content);
+                            const note = shared.card ? shared.note : msg.content;
+                            return (
+                              <>
+                                {shared.card && <ShareCardBubble card={shared.card} />}
+                                {note && (
+                                  <div
+                                    className={`px-4 py-2.5 ${
+                                      isOwn
+                                        ? 'rounded-[18px] rounded-br-[6px] bg-gradient-to-br from-[#FFD6E8] to-[#FF9FC8] text-[#0A0A0A]'
+                                        : 'file-panel rounded-[18px] rounded-bl-[6px] px-4 py-2.5 text-foreground'
+                                    }`}
+                                  >
+                                    <p className="text-sm whitespace-pre-wrap break-words">{note}</p>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                          {msg.share?.kind === 'story' && (
+                            <div className="mt-1">
+                              <SharedContentCard share={msg.share} compact />
                             </div>
                           )}
 

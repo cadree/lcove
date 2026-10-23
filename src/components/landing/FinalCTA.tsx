@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowRight, Loader2, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { revealMotion } from "@/lib/reveal";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -69,10 +70,7 @@ export function FinalCTA({ onOpenCreatorApplication }: FinalCTAProps) {
       
       <div className="container relative px-4 sm:px-6 lg:px-8">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+          {...revealMotion({ y: 20, duration: 0.6 })}
           className="max-w-3xl mx-auto"
         >
           {/* Main CTA Card */}

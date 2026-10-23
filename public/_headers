@@ -1,0 +1,11 @@
+# Apple requires this URL as application/json, with no redirect.
+/.well-known/apple-app-site-association
+  Content-Type: application/json
+
+/.well-known/apple-app-site-association.json
+  Content-Type: application/json
+
+/embed/player.html
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Content-Type-Options: nosniff
+  Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-src https://www.youtube-nocookie.com https://player.vimeo.com; base-uri 'none'; form-action 'none'

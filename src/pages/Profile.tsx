@@ -22,6 +22,7 @@ import { ProfileStats } from "@/components/profile/ProfileStats";
 import { ProfileAboutSection } from "@/components/profile/ProfileAboutSection";
 import { ProfileFolders } from "@/components/profile/ProfileFolders";
 import { ProfileBookEntry, ProfileQuickLinks, ToolsEntry } from "@/components/profile/ProfileQuickLinks";
+import { ProfileFilms } from "@/components/profile/ProfileFilms";
 import { ProfileNovi } from "@/components/profile/ProfileNovi";
 import { FolderDetailView } from "@/components/profile/FolderDetailView";
 import { ProfileLayoutEditor } from "@/components/profile/ProfileLayoutEditor";
@@ -45,6 +46,15 @@ import { toast } from "sonner";
 import { ProfilePost } from "@/types/post";
 import { applyProfileCustomization, hexToHslChannels } from "@/lib/profileSections";
 import { ProfileEffects } from "@/components/profile/ProfileEffects";
+import { supabase } from "@/integrations/supabase/client";
+import { postPreviewPath } from "@/lib/sharing";
+import {
+  mergeLinkedPost,
+  profilePostFromRow,
+  sameUserId,
+  withProfilePostColumns,
+  type ProfilePostRow,
+} from "@/lib/profilePosts";
 
 const Profile = () => {
   const { userId: urlUserId } = useParams<{ userId?: string }>();
@@ -60,6 +70,13 @@ const Profile = () => {
   const { credits } = useCredits();
   const { customization, isOwner, saveCustomization } = useProfileCustomization(targetUserId);
   const { posts, isLoading: postsLoading, deletePost } = useProfilePosts(targetUserId);
+  const [linkedPost, setLinkedPost] = useState<ProfilePost | null>(null);
+  const requestedPostId = searchParams.get("post");
+  const displayPosts = mergeLinkedPost(
+    posts,
+    linkedPost?.id === requestedPostId ? linkedPost : null,
+    targetUserId,
+  );
   const { blogs, isLoading: blogsLoading, createBlog, deleteBlog } = useProfileBlogs(targetUserId);
   const { data: creatorRoles = [] } = useCreatorRoles(targetUserId);
   const { data: userSkills = [] } = useUserSkills(targetUserId);
@@ -87,6 +104,51 @@ const Profile = () => {
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, isOwnProfile, setSearchParams]);
+
+  useEffect(() => {
+    const postId = searchParams.get("post");
+    if (!postId) {
+      setLinkedPost(null);
+      return;
+    }
+    const match = posts.find((post) => post.id === postId);
+    if (match) {
+      setLinkedPost(null);
+      setSelectedPost(match);
+      return;
+    }
+
+    let cancel = false;
+    void (async () => {
+      const { data, error } = await withProfilePostColumns((columns) =>
+        supabase.from("posts").select(columns).eq("id", postId).maybeSingle(),
+      );
+      if (cancel || error || !data) return;
+      const row = data as unknown as ProfilePostRow;
+      if (targetUserId && row.user_id && !sameUserId(row.user_id, targetUserId)) {
+        navigate(postPreviewPath(row.user_id, row.id), { replace: true });
+        return;
+      }
+      const author = sameUserId(profile?.user_id, row.user_id)
+        ? { display_name: profile?.display_name ?? null, avatar_url: profile?.avatar_url ?? null }
+        : { display_name: null, avatar_url: null };
+      const linked = profilePostFromRow(row, author);
+      setLinkedPost(linked);
+      setSelectedPost(linked);
+    })();
+
+    return () => {
+      cancel = true;
+    };
+  }, [
+    searchParams,
+    posts,
+    targetUserId,
+    navigate,
+    profile?.user_id,
+    profile?.display_name,
+    profile?.avatar_url,
+  ]);
 
   // Square portfolio grid sits above the rest of the module stack.
   const visibleSections = applyProfileCustomization(layout, customization)
@@ -295,9 +357,9 @@ const Profile = () => {
               </TabsList>
               <TabsContent value="posts" className="mt-4">
                 <ProfilePostsGrid 
-                  posts={posts}
+                  posts={displayPosts}
                   onPostClick={(post) => setSelectedPost(post)}
-                  isLoading={postsLoading}
+                  isLoading={postsLoading && displayPosts.length === 0}
                   isOwner={isOwnProfile}
                 />
               </TabsContent>
@@ -487,8 +549,8 @@ const Profile = () => {
   return (
     <PageLayout showNotificationBell={false}>
       <div
-        className={`relative min-h-screen pb-20 ${profileFont ? "profile-theme" : ""}`}
-        style={themeStyle}
+        className={`relative -mt-[env(safe-area-inset-top,0px)] min-h-screen pb-20 pt-[env(safe-area-inset-top,0px)] ${profileFont ? "profile-theme" : ""}`}
+        style={{ ...themeStyle, backgroundColor: "hsl(var(--background))" }}
       >
         {showEffects && (
           <ProfileEffects
@@ -534,12 +596,14 @@ const Profile = () => {
           userId={targetUserId || ''}
           memberTier={isOwnProfile && membership?.subscribed ? membership.tier : null}
           roleLabel={userCreativeRoles[0]?.name || "Creator"}
-          postCount={posts.length}
+          postCount={displayPosts.length}
+          founding={profile?.founding}
         />
 
         {isOwnProfile && <div className="px-4 pt-4"><ProfileNovi /></div>}
         <ProfileBookEntry />
         {isOwnProfile && <ToolsEntry />}
+        {targetUserId && <ProfileFilms ownerId={targetUserId} isOwner={!!isOwnProfile} />}
 
         {postsSection && renderSection(postsSection)}
 
@@ -589,8 +653,16 @@ const Profile = () => {
         <PostDetailModal
           post={selectedPost}
           open={!!selectedPost}
-          onOpenChange={(open) => !open && setSelectedPost(null)}
-          isOwner={isOwnProfile}
+          onOpenChange={(open) => {
+            if (open) return;
+            setSelectedPost(null);
+            if (searchParams.get("post")) {
+              const next = new URLSearchParams(searchParams);
+              next.delete("post");
+              setSearchParams(next, { replace: true });
+            }
+          }}
+          isOwner={!!selectedPost && selectedPost.user_id === user?.id}
           onDelete={(postId) => {
             deletePost.mutate(postId);
             setSelectedPost(null);

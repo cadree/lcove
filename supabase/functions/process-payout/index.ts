@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { ledgerBalances } from "../_shared/credit-balances.ts";
+import { loadProfileConnect, syncPayoutEnabled, testStripe, withdrawalBlockedReason } from "../_shared/creator-connect.mjs";
+import { PayoutRefusal, interpretPayoutRequest } from "../_shared/payout-request.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,11 +24,10 @@ serve(async (req) => {
     { auth: { persistSession: false } }
   );
 
+  let legacyPayout = false;
+
   try {
     logStep("Function started");
-
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header provided");
@@ -38,14 +38,19 @@ serve(async (req) => {
     const user = userData.user;
     if (!user?.id) throw new Error("User not authenticated");
 
-    const { amount, payout_method_id, project_id, role_id, use_credits } = await req.json();
-    
-    if (!amount || amount <= 0) throw new Error("Invalid amount");
+    const decision = interpretPayoutRequest(await req.json());
+    if (!decision.ok) {
+      return new Response(JSON.stringify({ success: false, error: decision.error }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: decision.status,
+      });
+    }
+    legacyPayout = decision.legacy;
+    const { amount, project_id, role_id } = decision;
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
+    const stripe = testStripe();
 
-    // If using credits, convert from credit balance
-    if (use_credits) {
+    {
       const credits = await ledgerBalances(supabaseClient, user.id);
       const earnedBalance = credits.earned_balance;
 
@@ -76,124 +81,99 @@ serve(async (req) => {
       const withdrawable = Math.min(earnedBalance, Math.max(0, verifiedIn - convertedOut));
 
       if (withdrawable < amount) {
-        throw new Error(`Insufficient verified Earned Credit. Withdrawable ${withdrawable} LC, need ${amount} LC. Only credits from verified sources can be withdrawn.`);
+        throw new PayoutRefusal(`Insufficient verified Earned Credit. Withdrawable ${withdrawable} LC, need ${amount} LC. Only credits from verified sources can be withdrawn.`);
       }
 
-      // Deduct from earned credits only
-      const newTotalBalance = credits.balance - amount;
-      
-      await supabaseClient.from('credit_ledger').insert({
-        user_id: user.id,
-        amount: -amount,
-        balance_after: newTotalBalance,
-        type: 'payout_conversion',
-        description: `Converted ${amount} Earned LC to payout`,
-        reference_type: project_id ? 'project' : null,
-        reference_id: project_id || null,
-        credit_type: 'earned',
-        genesis_amount: 0,
-        earned_amount: -amount,
-      });
+      const profile = await loadProfileConnect(supabaseClient, user.id);
+      if (!profile?.stripe_connect_account_id) {
+        throw new PayoutRefusal("Set up payouts in Wallet before requesting a payout.");
+      }
+      const state = await syncPayoutEnabled(stripe, supabaseClient, user.id, profile.stripe_connect_account_id);
+      const blocked = withdrawalBlockedReason(state);
+      if (blocked) throw new PayoutRefusal(blocked);
 
-      // Create payout record
       const { data: payout, error: payoutError } = await supabaseClient
-        .from('payouts')
+        .from("payouts")
         .insert({
           user_id: user.id,
           amount,
-          currency: 'USD',
-          status: 'completed',
+          currency: "USD",
+          status: "processing",
           project_id,
           role_id,
-          completed_at: new Date().toISOString(),
         })
         .select()
         .single();
-
       if (payoutError) throw payoutError;
 
-      logStep("Credit payout completed", { payoutId: payout.id });
+      // 1 LC = $1. The 10% community-fund fee was already taken when the money was earned.
+      let transfer;
+      try {
+        transfer = await stripe.transfers.create({
+          amount: Math.round(Number(amount) * 100),
+          currency: "usd",
+          destination: profile.stripe_connect_account_id,
+          metadata: { payout_id: payout.id, user_id: user.id, lc_per_usd: "1" },
+        });
+      } catch (transferError) {
+        const message = transferError instanceof Error ? transferError.message : String(transferError);
+        await supabaseClient.from("payouts").update({ status: "failed", error_message: message }).eq("id", payout.id);
+        throw new PayoutRefusal(message);
+      }
 
-      return new Response(JSON.stringify({ 
-        success: true, 
+      const newTotalBalance = credits.balance - amount;
+      const { error: ledgerError } = await supabaseClient.from("credit_ledger").insert({
+        user_id: user.id,
+        amount: -amount,
+        balance_after: newTotalBalance,
+        type: "payout_conversion",
+        description: `Converted ${amount} Earned LC to a Stripe payout`,
+        reference_type: project_id ? "project" : null,
+        reference_id: project_id || null,
+        credit_type: "earned",
+        genesis_amount: 0,
+        earned_amount: -amount,
+      });
+      if (ledgerError) {
+        try {
+          await stripe.transfers.createReversal(transfer.id);
+        } catch (reversalError) {
+          console.error("[PROCESS-PAYOUT] reversal failed", reversalError);
+        }
+        await supabaseClient.from("payouts").update({
+          status: "failed",
+          error_message: ledgerError.message,
+          stripe_transfer_id: transfer.id,
+        }).eq("id", payout.id);
+        throw new Error(ledgerError.message);
+      }
+
+      await supabaseClient.from("payouts").update({
+        status: "completed",
+        stripe_transfer_id: transfer.id,
+        completed_at: new Date().toISOString(),
+      }).eq("id", payout.id);
+
+      logStep("Credit payout completed", { payoutId: payout.id, transferId: transfer.id });
+
+      return new Response(JSON.stringify({
+        success: true,
         payout_id: payout.id,
-        type: 'credit_conversion'
+        stripe_transfer_id: transfer.id,
+        type: "credit_conversion",
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
     }
 
-    // Get payout method
-    if (!payout_method_id) throw new Error("Payout method required");
-
-    const { data: payoutMethod, error: methodError } = await supabaseClient
-      .from('payout_methods')
-      .select('*')
-      .eq('id', payout_method_id)
-      .eq('user_id', user.id)
-      .single();
-
-    if (methodError || !payoutMethod) throw new Error("Payout method not found");
-
-    // Create Stripe transfer/payout
-    const stripeTransferId = null;
-    const stripePayoutId = null;
-
-    // For bank accounts, create a payout
-    if (payoutMethod.type === 'bank_account' && payoutMethod.stripe_bank_account_id) {
-      // First need a connected account - this is simplified
-      // In production, you'd use Stripe Connect
-      logStep("Bank transfer requested", { amount });
-    }
-
-    // Create payout record
-    const { data: payout, error: payoutError } = await supabaseClient
-      .from('payouts')
-      .insert({
-        user_id: user.id,
-        amount,
-        currency: 'USD',
-        status: 'processing',
-        payout_method_id,
-        stripe_transfer_id: stripeTransferId,
-        stripe_payout_id: stripePayoutId,
-        project_id,
-        role_id,
-      })
-      .select()
-      .single();
-
-    if (payoutError) throw payoutError;
-
-    // Create transaction record
-    await supabaseClient.from('transactions').insert({
-      user_id: user.id,
-      type: 'payout',
-      amount,
-      currency: 'USD',
-      status: 'processing',
-      description: `Payout via ${payoutMethod.type}`,
-      metadata: { payout_id: payout.id, project_id, role_id }
-    });
-
-    logStep("Payout created", { payoutId: payout.id });
-
-    return new Response(JSON.stringify({ 
-      success: true, 
-      payout_id: payout.id,
-      status: 'processing'
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
-
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    const soft = legacyPayout || error instanceof PayoutRefusal || (error instanceof Error && error.name === "PayoutRefusal");
+    logStep("ERROR", { message: errorMessage, status: soft ? 200 : 500 });
+    return new Response(JSON.stringify(soft ? { success: false, error: errorMessage } : { error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: soft ? 200 : 500,
     });
   }
 });

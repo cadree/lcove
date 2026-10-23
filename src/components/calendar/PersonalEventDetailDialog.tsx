@@ -123,7 +123,7 @@ export function PersonalEventDetailDialog({
         ? (allDay ? `${endDateValue}T23:59:59` : `${endDateValue}T${endTimeValue || '23:59'}:00`)
         : null;
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('personal_calendar_items')
         .update({
           title: title.trim(),
@@ -134,9 +134,11 @@ export function PersonalEventDetailDialog({
           all_day: allDay,
         })
         .eq('id', item.id)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .select('id');
 
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error('That event did not save');
 
       queryClient.invalidateQueries({ queryKey: ['personal-calendar-items'] });
       toast.success('Event updated');

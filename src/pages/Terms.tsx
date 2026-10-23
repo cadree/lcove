@@ -2,13 +2,17 @@ import { ArrowLeft, FileText, Users, Shield, AlertTriangle, Scale, Ban, Globe, M
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { LEGAL_EMAIL, SUPPORT_EMAIL } from "@/config/launch";
+import { PageMeta } from "@/components/seo/PageMeta";
+import { AI_CONTENT_RULE_ALLOWED, AI_CONTENT_RULE_FORBIDDEN } from "@/lib/aiContentRule";
 
 const Terms = () => {
   const navigate = useNavigate();
-  const lastUpdated = "October 18, 2026";
+  const lastUpdated = "October 20, 2026";
 
   return (
     <div className="min-h-screen bg-background">
+      <PageMeta title="Terms · Ether" description="Terms of Service for Ether." />
       <div className="container max-w-3xl mx-auto px-4 py-8 safe-area-top safe-area-bottom">
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
@@ -107,11 +111,9 @@ const Terms = () => {
                 We reserve the right to remove content and suspend or terminate accounts that violate these guidelines.
               </p>
               <div>
-                <h4 className="font-medium text-foreground mb-2">Generative AI</h4>
-                <p className="text-sm">
-                  Generative AI is not allowed on Ether except for tools that improve a creator's workflow.
-                  AI-generated people, fake profiles, and AI-made work presented as human-made can be reported and removed.
-                </p>
+                <h4 className="font-medium text-foreground mb-2">AI</h4>
+                <p className="text-sm">{AI_CONTENT_RULE_ALLOWED}</p>
+                <p className="text-sm">{AI_CONTENT_RULE_FORBIDDEN}</p>
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -284,7 +286,7 @@ const Terms = () => {
               <div>
                 <h4 className="font-medium text-foreground mb-2">Informal Resolution</h4>
                 <p className="text-sm">
-                  Before filing any formal dispute, you agree to contact us at legal@ethercreative.co to 
+                  Before filing any formal dispute, you agree to contact us at {LEGAL_EMAIL} to 
                   attempt to resolve the matter informally within 60 days.
                 </p>
               </div>
@@ -379,8 +381,8 @@ const Terms = () => {
             <AccordionContent className="text-muted-foreground space-y-4">
               <p className="text-sm">For questions about these Terms, please contact us:</p>
               <div className="space-y-2 text-sm">
-                <p><strong>Email:</strong> legal@ethercreative.co</p>
-                <p><strong>Support:</strong> Available through the app's Settings page</p>
+                <p><strong>Email:</strong> {LEGAL_EMAIL}</p>
+                <p><strong>Support:</strong> {SUPPORT_EMAIL}</p>
               </div>
             </AccordionContent>
           </AccordionItem>

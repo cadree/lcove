@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ProjectChatData } from '@/hooks/useProjectChatData';
-import { useCreateMilestone, useUpdateMilestoneStatus, type ProjectMilestone } from '@/hooks/useProjectMilestones';
+import { useCreateMilestone, useUpdateMilestoneStatus } from '@/hooks/useProjectMilestones';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -30,6 +30,19 @@ function deliverableLabel(entry: DeliverableEntry): string {
 interface ProjectCommandCenterProps {
   project: ProjectChatData;
   isOwner: boolean;
+}
+
+function timelineRange(start: string | null, end: string | null) {
+  const label = (value: string | null, pattern: string) => {
+    if (!value) return null;
+    const date = parseCalendarDate(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return format(date, pattern);
+  };
+  const startLabel = label(start, 'MMM d');
+  const endLabel = label(end, 'MMM d, yyyy');
+  if (startLabel && endLabel) return `${startLabel} → ${endLabel}`;
+  return startLabel || endLabel;
 }
 
 function getYouTubeId(url: string): string | null {
@@ -119,11 +132,8 @@ const ProjectCommandCenter = ({ project, isOwner }: ProjectCommandCenterProps) =
 
   const cycleMilestoneStatus = (ms: ProjectChatData['milestones'][0]) => {
     if (!isOwner) return;
-    const order: ProjectMilestone['status'][] = ['pending', 'in_progress', 'submitted', 'approved', 'paid'];
-    const current = order.find((status) => status === ms.status);
-    const idx = current ? order.indexOf(current) : -1;
-    const next = order[Math.min(idx + 1, order.length - 1)];
-    if (next === ms.status) return;
+    const completed = ms.status === 'in_progress' || ms.status === 'submitted' || ms.status === 'approved' || ms.status === 'paid';
+    const next = completed ? 'pending' : 'approved';
     updateMilestoneStatus.mutate({
       milestoneId: ms.id,
       status: next,
@@ -242,7 +252,7 @@ const ProjectCommandCenter = ({ project, isOwner }: ProjectCommandCenterProps) =
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      {project.timeline_start ? format(parseCalendarDate(project.timeline_start), 'MMM d') : '?'} → {project.timeline_end ? format(parseCalendarDate(project.timeline_end), 'MMM d, yyyy') : '?'}
+                      {timelineRange(project.timeline_start, project.timeline_end) || (isOwner ? 'Add dates' : '')}
                     </p>
                   )}
                 </Section>

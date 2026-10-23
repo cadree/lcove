@@ -1,5 +1,6 @@
 // Application entry point - Ether App
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
+import { loadExplore, loadFeed, loadMessages, loadProfile, prefetchMainTabs } from "@/lib/tabRoutes";
 import { MotionConfig } from "framer-motion";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { WorldLayer } from "@/components/world/WorldLayer";
@@ -14,18 +15,22 @@ import { CreateFlowProvider } from "@/components/create/CreateFlowContext";
 import AccessGate from "@/components/auth/AccessGate";
 import { EtherSplash } from "@/components/brand/EtherSplash";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
+import { IosCheckoutReturn } from "@/components/ios/IosCheckoutReturn";
+import { APP_STORE_APPLE_ID, APP_STORE_URL } from "@/config/launch";
 
 const Landing = lazy(() => import("./pages/Landing"));
-const Feed = lazy(() => import("./pages/Feed"));
-const Explore = lazy(() => import("./pages/Explore"));
+const Waitlist = lazy(() => import("./pages/Waitlist"));
+const Feed = lazy(loadFeed);
+const Explore = lazy(loadExplore);
 const Directory = lazy(() => import("./pages/Directory"));
 const Projects = lazy(() => import("./pages/Projects"));
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
-const Profile = lazy(() => import("./pages/Profile"));
+const Profile = lazy(loadProfile);
+const Tickets = lazy(() => import("./pages/Tickets"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Locked = lazy(() => import("./pages/Locked"));
-const Messages = lazy(() => import("./pages/Messages"));
+const Messages = lazy(loadMessages);
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Wallet = lazy(() => import("./pages/Wallet"));
 const Store = lazy(() => import("./pages/Store"));
@@ -75,6 +80,27 @@ const ActivityTracker = () => {
   return null;
 };
 
+function WarmTabs() {
+  useEffect(() => {
+    prefetchMainTabs();
+  }, []);
+  return null;
+}
+
+function StoreListingMeta() {
+  useEffect(() => {
+    if (!APP_STORE_URL || !APP_STORE_APPLE_ID) return;
+    const meta = document.createElement("meta");
+    meta.name = "apple-itunes-app";
+    meta.content = `app-id=${APP_STORE_APPLE_ID}`;
+    document.head.appendChild(meta);
+    return () => {
+      meta.remove();
+    };
+  }, []);
+  return null;
+}
+
 function RouteFallback() {
   return (
     <div
@@ -103,15 +129,19 @@ const App = () => (
         <WorldLayer />
         <MotionConfig reducedMotion="user">
         <AuthProvider>
+          <IosCheckoutReturn />
           <PresenceProvider>
             <CreateFlowProvider>
               <AccessGate>
                 <ActivityTracker />
+                <WarmTabs />
+                <StoreListingMeta />
                 <Toaster />
               <Sonner />
               <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/" element={<Landing />} />
+                <Route path="/waitlist" element={<Waitlist />} />
                 <Route path="/home" element={<Navigate to="/feed" replace />} />
                 <Route path="/landing" element={<Navigate to="/" replace />} />
                 <Route path="/auth" element={<Auth />} />
@@ -124,6 +154,7 @@ const App = () => (
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/events" element={<Navigate to="/calendar" replace />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/tickets" element={<Tickets />} />
                 <Route path="/profile/:userId" element={<Profile />} />
                 <Route path="/blog" element={<BlogIndex />} />
                 <Route path="/blog/:blogId" element={<BlogPostPage />} />

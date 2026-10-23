@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -42,7 +42,13 @@ import { ProfilePost } from "@/types/post";
 import { usePostInteractions } from "@/hooks/usePostInteractions";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { shareLink, buildShareUrl } from "@/lib/shareLink";
+import { ShareSheet } from "@/components/share/ShareSheet";
+import { useOwnPostViewCounts } from "@/hooks/usePostViews";
+import { useSharingActions } from "@/hooks/useSharing";
+import { ownerOnlyInsight, repostedByLabel, shouldRecordPostView } from "@/lib/sharing";
+import { supabase } from "@/integrations/supabase/client";
+import { EmbedPlayer } from "@/components/feed/EmbedPlayer";
+import { embedFromPost } from "@/lib/videoEmbed";
 
 interface PostDetailModalProps {
   post: ProfilePost | null;
@@ -57,7 +63,6 @@ export function PostDetailModal({
   post, 
   open, 
   onOpenChange, 
-  isOwner,
   onDelete,
   onEdit,
 }: PostDetailModalProps) {
@@ -65,6 +70,10 @@ export function PostDetailModal({
   const { user } = useAuth();
   const [comment, setComment] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const ownsPost = !!user && user.id === post?.user_id;
+  const viewCounts = useOwnPostViewCounts(ownsPost);
+  const { undoRepost } = useSharingActions();
 
   // Use the real interactions hook
   const {
@@ -80,8 +89,15 @@ export function PostDetailModal({
     isSaving,
   } = usePostInteractions(post?.id || "");
 
+  useEffect(() => {
+    if (!open || !post || !shouldRecordPostView(user?.id, post.user_id)) return;
+    void supabase.rpc('record_post_view', { p_post_id: post.id });
+  }, [open, post, user?.id]);
+
   if (!post) return null;
 
+  const insight = ownerOnlyInsight(ownsPost, viewCounts?.[post.id], likesCount);
+  const embed = embedFromPost(post);
   const displayName = post.profile?.display_name || 'Anonymous';
   const avatarUrl = post.profile?.avatar_url;
   const timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true });
@@ -131,11 +147,8 @@ export function PostDetailModal({
     setComment("");
   };
 
-  const handleShare = async () => {
-    await shareLink({
-      title: `Post by ${displayName}`,
-      url: buildShareUrl.post(post.user_id, post.id),
-    });
+  const handleShare = () => {
+    setShareOpen(true);
   };
 
   const handleClose = () => {
@@ -165,11 +178,14 @@ export function PostDetailModal({
           <div className="flex flex-col md:flex-row h-full">
             {/* Media Section */}
             <div className="md:w-[60%] bg-black flex items-center justify-center relative">
-              {post.media_type === 'video' ? (
+              {embed ? (
+                <EmbedPlayer embed={embed} title={post.embed_title || post.content} className="max-h-[60vh] md:max-h-[80vh]" />
+              ) : post.media_type === 'video' ? (
                 <video
                   src={post.media_url || undefined}
                   controls
                   autoPlay
+                  playsInline
                   className="max-w-full max-h-[60vh] md:max-h-[80vh] object-contain"
                 />
               ) : (
@@ -183,6 +199,25 @@ export function PostDetailModal({
 
             {/* Details Section */}
             <div className="flex flex-col bg-card md:w-[40%]">
+              {post.repost && (
+                <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
+                  <button
+                    type="button"
+                    className="min-h-11 text-left text-sm text-muted-foreground"
+                    onClick={() => {
+                      onOpenChange(false);
+                      navigate(`/profile/${post.repost?.user_id}`);
+                    }}
+                  >
+                    {repostedByLabel(post.repost.profile?.display_name)}
+                  </button>
+                  {user?.id === post.repost.user_id && (
+                    <Button variant="ghost" size="sm" onClick={() => undoRepost.mutate(post.id)}>
+                      Undo repost
+                    </Button>
+                  )}
+                </div>
+              )}
               {/* Header */}
               <div className="p-4 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -215,7 +250,7 @@ export function PostDetailModal({
                   </div>
                 </div>
                 
-                {isOwner ? (
+                {ownsPost ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button 
@@ -358,8 +393,8 @@ export function PostDetailModal({
                   </button>
                 </div>
 
-                {isOwner && likesCount > 0 && (
-                  <p className="text-xs text-muted-foreground mb-1">Only you can see this: {likesCount} {likesCount === 1 ? 'like' : 'likes'}</p>
+                {insight && (
+                  <p className="text-xs text-muted-foreground mb-1">{insight}</p>
                 )}
                 <p className="mono-label mb-3 text-[9px] text-muted-foreground">{timeAgo}</p>
 
@@ -415,6 +450,21 @@ export function PostDetailModal({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <ShareSheet
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        target={{
+          kind: 'post',
+          post: {
+            id: post.id,
+            user_id: post.user_id,
+            content: post.content,
+            media_url: post.media_url,
+            media_type: post.media_type,
+            profile: post.profile,
+          },
+        }}
+      />
     </>
   );
 }

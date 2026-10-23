@@ -2,23 +2,27 @@ import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
   Settings, MapPin, Camera, Loader2, Crown, Heart,
-  MessageCircle, Shield, BadgeCheck, UserPlus, UserMinus, Flag, Ban
+  MessageCircle, Shield, BadgeCheck, UserPlus, UserMinus, Flag, Ban, Share2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import type { ProfileCustomization } from '@/hooks/useProfileCustomization';
 import { useCreatorVerification } from '@/hooks/useCreatorVerification';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyXp } from '@/hooks/useXp';
-import { xpBar } from '@/lib/noviQuests';
+import { useXpCelebrate } from '@/hooks/useXpCelebrate';
+import { XpMeter } from '@/components/novi/XpMeter';
 import { Link } from 'react-router-dom';
 import { ReportDialog } from '@/components/safety/ReportDialog';
 import { FriendsDrawer } from '@/components/friends/FriendsDrawer';
+import { ShareSheet } from '@/components/share/ShareSheet';
+import { YourDashboard } from '@/components/profile/YourDashboard';
 
 // Component to show verification badge inline
 function ProfileVerificationBadge({ userId }: { userId: string }) {
@@ -49,6 +53,7 @@ interface ProfileHeaderProps {
   memberTier: "community" | "elite" | null;
   roleLabel?: string;
   postCount?: number;
+  founding?: boolean;
 }
 
 export function ProfileHeader({
@@ -67,14 +72,17 @@ export function ProfileHeader({
   memberTier,
   roleLabel = "Creator",
   postCount = 0,
+  founding = false,
 }: ProfileHeaderProps) {
   const { user } = useAuth();
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const { isBlocked, blockUser, unblockUser } = useUserBlocks();
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
-  const { data: myXp } = useMyXp();
+  const { data: myXp, isSuccess: xpReady } = useMyXp();
+  const burst = useXpCelebrate(myXp?.total ?? 0, "", xpReady);
 
   const isUserFavorite = isFavorite(userId);
   const ownFriends = favorites?.length || 0;
@@ -127,7 +135,7 @@ export function ProfileHeader({
       toast.success('Profile picture updated!');
     } catch (error) {
       console.error('Avatar upload error:', error);
-      toast.error('Failed to upload profile picture');
+      toast.error(errorMessage(error, 'Failed to upload profile picture'));
     } finally {
       setUploadingAvatar(false);
     }
@@ -147,11 +155,16 @@ export function ProfileHeader({
     <div className="px-4 pt-3">
       <div className="flex min-h-11 items-center justify-between">
         <p className="kicker">Familcy // Lcove</p>
-        {isOwnProfile && (
-          <Button variant="ghost" size="icon" onClick={onSettingsClick} aria-label="Settings">
-            <Settings className="h-5 w-5" />
+        <div className="flex items-center">
+          <Button variant="ghost" size="icon" onClick={() => setShareOpen(true)} aria-label="Share profile">
+            <Share2 className="h-5 w-5" />
           </Button>
-        )}
+          {isOwnProfile && (
+            <Button variant="ghost" size="icon" onClick={onSettingsClick} aria-label="Settings">
+              <Settings className="h-5 w-5" />
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="holo-card relative mt-2 overflow-hidden">
@@ -166,7 +179,7 @@ export function ProfileHeader({
         <div className="relative z-[1] -mt-10 px-4 pb-4">
         <div className="flex items-end gap-3">
           <div className="group relative shrink-0">
-            <Avatar className="h-24 w-24 rounded-full border-[3px] border-transparent bg-[conic-gradient(from_140deg,#FF9FC8,#C4142D,#79C3CF,#FF9FC8)] p-[3px] shadow-[0_0_24px_rgba(255,159,200,0.45)]">
+            <Avatar className="h-24 w-24 rounded-full border-[3px] border-transparent bg-[conic-gradient(from_140deg,#FF9FC8,#C4142D,#79C3CF,#FF9FC8)] p-[3px] shadow-[0_0_24px_rgba(255,159,200,0.45)] ring-0 ring-offset-0">
               <AvatarImage src={avatarUrl || undefined} />
               <AvatarFallback className="rounded-full bg-muted font-body text-xl font-bold text-foreground">
                 {displayName.charAt(0).toUpperCase()}
@@ -187,9 +200,9 @@ export function ProfileHeader({
               </>
             )}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="ether-title truncate text-[24px]">{displayName}</h1>
+              <h1 className="ether-title min-w-0 max-w-full whitespace-normal break-words text-[24px] leading-tight">{displayName}</h1>
               <ProfileVerificationBadge userId={userId} />
               {memberTier === "elite" && (
                 <Badge className="gap-1 border-0 bg-gradient-to-r from-amber-400 to-orange-500 text-[10px] text-white">
@@ -206,6 +219,11 @@ export function ProfileHeader({
                   <Shield className="h-3 w-3" /> Admin
                 </Badge>
               )}
+              {founding && (
+                <Badge className="gap-1 border-primary/30 bg-primary/20 text-[10px] text-primary">
+                  Founding
+                </Badge>
+              )}
             </div>
             <p className="lore text-[16px] text-foreground">{roleLabel}</p>
             <p className="mono-label mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
@@ -216,18 +234,7 @@ export function ProfileHeader({
 
         {isOwnProfile && (
           <Link to="/quests" className="mt-3 block">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="mono-label text-[9px] text-[hsl(var(--brand))]">
-                {roleLabel} // Lv {xpBar(myXp?.total ?? 0).level}
-              </span>
-              <span className="mono-label text-[9px] text-muted-foreground">{myXp?.total ?? 0} XP</span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-foreground/10">
-              <div
-                className="h-full rounded-full bg-[linear-gradient(90deg,#FFD6E8,#FF9FC8)]"
-                style={{ width: `${Math.round(xpBar(myXp?.total ?? 0).ratio * 100)}%` }}
-              />
-            </div>
+            <XpMeter total={myXp?.total ?? 0} burstToken={burst} caption={roleLabel} dense />
           </Link>
         )}
 
@@ -278,6 +285,8 @@ export function ProfileHeader({
           )}
         </div>
 
+        {isOwnProfile && <YourDashboard />}
+
         {!isOwnProfile && user && (
           <div className="relative z-[1] mt-2 flex gap-2">
             <Button
@@ -299,6 +308,14 @@ export function ProfileHeader({
         )}
         </div>
       </div>
+      <ShareSheet
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        target={{
+          kind: 'profile',
+          profile: { user_id: userId, display_name: displayName, avatar_url: avatarUrl },
+        }}
+      />
     </div>
   );
 }

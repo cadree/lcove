@@ -1,18 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Radio, Users, Coins, Send, X, Clock, PlayCircle, Trash2 } from 'lucide-react';
+import { Radio, Users, Coins, Send, X, Clock, PlayCircle, Trash2, Share2, Flag } from 'lucide-react';
+import { ReportDialog } from '@/components/safety/ReportDialog';
+import { digitalPurchasesEnabled } from '@/lib/platform';
+import { shareLink, buildShareUrl } from '@/lib/shareLink';
 import { useStream, useStreamReactions, useSendReaction, useTipStream, useJoinStream, useDeleteStream, useStreamPresence } from '@/hooks/useLiveStreams';
 import { StreamChat } from './StreamChat';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WebRTCStreamViewer } from './WebRTCStreamViewer';
 import { WebRTCStreamHost } from './WebRTCStreamHost';
 import { ReplayPlayer } from './ReplayPlayer';
+import { liveSheetState, shouldPopLiveSheet } from '@/lib/liveSheetHistory';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,12 +65,45 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   const [showTipInput, setShowTipInput] = useState(false);
   const [floatingReactions, setFloatingReactions] = useState<{ id: string; emoji: string }[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const cardGifts = digitalPurchasesEnabled();
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   const isHost = user?.id === stream?.host_id;
   useStreamPresence(streamId, open && !!user && !isHost && stream?.is_live === true);
   const streamStatus = stream ? getStreamStatus(stream) : 'draft';
   const hasReplay = streamStatus === 'ended' && stream?.replay_available && stream?.replay_url;
+  const hosting = stream?.stream_type === "webrtc" && isHost && streamStatus !== "ended";
+  const openedAt = useRef(Date.now());
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const pushedSheet = useRef(false);
+
+  useEffect(() => {
+    if (open) openedAt.current = Date.now();
+  }, [open, streamId]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!pushedSheet.current) {
+      window.history.pushState(liveSheetState(window.history.state, streamId), "");
+      pushedSheet.current = true;
+    }
+    const onPop = () => {
+      pushedSheet.current = false;
+      onCloseRef.current();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [open, streamId]);
+
+  const requestClose = () => {
+    if (pushedSheet.current && shouldPopLiveSheet(window.history.state, streamId)) {
+      pushedSheet.current = false;
+      window.history.back();
+    }
+    onCloseRef.current();
+  };
 
   // Join stream on mount (for viewers only, when stream is live)
   useEffect(() => {
@@ -89,6 +128,24 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
     sendReaction.mutate({ streamId, emoji });
   };
 
+  const sendCardGift = async (gift: "rose" | "star" | "crown") => {
+    try {
+      const { data, error } = await supabase.functions.invoke("create-stream-gift", {
+        body: { streamId, gift },
+      });
+      if (error) throw error;
+      if (data?.needs_connect) {
+        toast.error(data.error || "This host can't receive card gifts yet");
+        return;
+      }
+      if (data?.error) throw new Error(data.error);
+      if (!data?.url) throw new Error("Stripe did not return a checkout link");
+      window.location.assign(data.url);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not start the gift checkout");
+    }
+  };
+
   const handleTip = () => {
     const amount = parseInt(tipAmount);
     if (!amount || amount < 1) return;
@@ -102,13 +159,20 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
     if (deleteConfirmText !== 'DELETE') return;
     await deleteStream.mutateAsync(streamId);
     setShowDeleteDialog(false);
-    onClose();
+    requestClose();
   };
 
   const renderEmbed = () => {
     if (!stream) return null;
 
-    // WebRTC streaming (P2P with OPUS audio)
+    if (stream.stream_type === 'obs_rtmp') {
+      return (
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-muted/20 to-background px-6 text-center">
+          <p className="text-muted-foreground">OBS streaming has been removed.</p>
+        </div>
+      );
+    }
+
     if (stream.stream_type === 'webrtc') {
       // REPLAY VIEW: Anyone can watch a replay (host or viewer)
       if (streamStatus === 'ended' && hasReplay) {
@@ -124,10 +188,11 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
       // HOST VIEW: Show host controls if user is host and stream is draft or live
       if (isHost && streamStatus !== 'ended') {
         return (
-          <WebRTCStreamHost 
-            streamId={streamId} 
+          <WebRTCStreamHost
+            streamId={streamId}
             isLive={streamStatus === 'live'}
-            onEnd={onClose}
+            onEnd={requestClose}
+            onClose={requestClose}
           />
         );
       }
@@ -227,15 +292,30 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
 
   return (
     <>
-      <Dialog open={open} onOpenChange={() => onClose()}>
-        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-background">
+      <Dialog open={open} onOpenChange={(next) => { if (!next) requestClose(); }}>
+        <DialogContent
+          className="mt-[env(safe-area-inset-top)] mb-[env(safe-area-inset-bottom)] flex w-full min-w-0 max-w-full flex-col gap-0 overflow-x-hidden overflow-y-auto bg-background p-0 [&>button]:hidden"
+          style={{
+            maxWidth: "min(32rem, calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 2rem))",
+            maxHeight: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 1rem)",
+          }}
+          onPointerDownOutside={(event) => {
+            if (Date.now() - openedAt.current < 700) event.preventDefault();
+          }}
+          onInteractOutside={(event) => {
+            if (Date.now() - openedAt.current < 700) event.preventDefault();
+          }}
+        >
           <DialogTitle className="sr-only">{stream?.title || 'Live Stream'}</DialogTitle>
           <DialogDescription className="sr-only">
             {stream?.description || 'Watch this live stream'}
           </DialogDescription>
           
           {/* Video Area */}
-          <div className="relative aspect-video bg-black">
+          <div className={hosting
+            ? "relative w-full min-w-0 shrink-0 bg-black"
+            : "relative aspect-video max-h-[34vh] w-full min-w-0 shrink-0 overflow-hidden bg-black"
+          }>
             {streamLoading ? (
               <div className="w-full h-full flex items-center justify-center">
                 <Radio className="h-16 w-16 text-primary animate-pulse" />
@@ -284,31 +364,33 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
 
             {/* Close Button */}
             <Button
+              type="button"
               variant="ghost"
               size="icon"
-              className="absolute top-4 right-4 bg-background/50 backdrop-blur-sm z-10"
-              onClick={onClose}
+              className="absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-30 h-11 w-11 bg-background/50 backdrop-blur-sm"
+              onClick={requestClose}
+              aria-label="Close live"
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
 
           {/* Controls */}
-          <div className="p-4 space-y-4">
+          <div className="min-w-0 space-y-4 p-4">
             {/* Host Info */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Avatar>
+            <div className="flex min-w-0 flex-col gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <Avatar className="shrink-0">
                   <AvatarImage src={profile?.avatar_url || undefined} />
                   <AvatarFallback>{profile?.display_name?.charAt(0) || 'D'}</AvatarFallback>
                 </Avatar>
-                <div>
-                  <h3 className="font-semibold">{stream?.title}</h3>
-                  <p className="text-sm text-muted-foreground">{profile?.display_name || 'DJ'}</p>
+                <div className="min-w-0">
+                  <h3 className="truncate font-semibold">{stream?.title}</h3>
+                  <p className="truncate text-sm text-muted-foreground">{profile?.display_name || 'DJ'}</p>
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex min-w-0 flex-wrap gap-2">
                 {/* Delete Button (Host only) */}
                 {isHost && (
                   <Button 
@@ -323,15 +405,48 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
                 )}
 
                 {/* Tip Button (viewers only) */}
-                {user && !isHost && streamStatus === 'live' && (
-                  <Button 
-                    variant="outline" 
-                    className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                    onClick={() => setShowTipInput(!showTipInput)}
+                {user && !isHost && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setReportOpen(true)}
                   >
-                    <Coins className="h-4 w-4 mr-2" />
-                    Tip LC
+                    <Flag className="h-4 w-4 mr-2" />
+                    Report
                   </Button>
+                )}
+                {user && !isHost && streamStatus === 'live' && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => shareLink({
+                        title: stream?.title || "Live on Ether",
+                        url: buildShareUrl.live(stream?.id || streamId),
+                      })}
+                    >
+                      <Share2 className="h-4 w-4 mr-2" />
+                      Share
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                      onClick={() => setShowTipInput(!showTipInput)}
+                    >
+                      <Coins className="h-4 w-4 mr-2" />
+                      Tip LC
+                    </Button>
+                    {cardGifts && (["rose", "star", "crown"] as const).map((gift) => (
+                      <Button
+                        key={gift}
+                        type="button"
+                        variant="outline"
+                        onClick={() => sendCardGift(gift)}
+                      >
+                        {gift === "rose" ? "Rose $1" : gift === "star" ? "Star $5" : "Crown $10"}
+                      </Button>
+                    ))}
+                  </>
                 )}
               </div>
             </div>
@@ -341,22 +456,24 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
               <motion.div 
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
-                className="flex gap-2"
+                className="flex w-full min-w-0 gap-2"
               >
                 <Input
                   type="number"
-                  placeholder="Amount"
+                  placeholder="LC"
                   value={tipAmount}
                   onChange={(e) => setTipAmount(e.target.value)}
-                  className="w-24"
+                  className="w-16 shrink-0 px-2"
+                  aria-label="Tip amount"
                 />
                 <Input
-                  placeholder="Message (optional)"
+                  placeholder="Message"
                   value={tipMessage}
                   onChange={(e) => setTipMessage(e.target.value)}
-                  className="flex-1"
+                  className="w-auto min-w-0 flex-1"
+                  aria-label="Tip message"
                 />
-                <Button onClick={handleTip} disabled={tipStream.isPending}>
+                <Button type="button" className="shrink-0 px-3" onClick={handleTip} disabled={tipStream.isPending} aria-label="Send tip">
                   <Send className="h-4 w-4" />
                 </Button>
               </motion.div>
@@ -364,13 +481,12 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
 
             {/* Reactions (only when live) */}
             {streamStatus === 'live' && (
-              <div className="flex gap-2 justify-center">
+              <div className="grid w-full grid-cols-6 gap-1">
                 {REACTIONS.map((emoji) => (
                   <Button
                     key={emoji}
                     variant="outline"
-                    size="lg"
-                    className="text-2xl hover:scale-110 transition-transform"
+                    className="h-11 w-full min-w-0 px-0 text-xl hover:scale-110 transition-transform"
                     onClick={() => handleReaction(emoji)}
                     disabled={!user}
                   >
@@ -386,6 +502,12 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
+      <ReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        targetType="stream"
+        targetId={streamId}
+      />
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
