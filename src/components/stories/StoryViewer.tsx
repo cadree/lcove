@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { X, ChevronLeft, ChevronRight, Eye, Heart, Share2, Send } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Eye, Heart, Share2, Send, Trash2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useStories } from '@/hooks/useStories';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSharingActions } from '@/hooks/useSharing';
@@ -11,7 +12,17 @@ import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { notifyStoryLike } from '@/lib/notifications';
 import { storyStartIndex } from '@/lib/likeNotice';
-import { storyAdvanceHeld, storyAuthorButtonLabel, storyAuthorProfilePath } from '@/lib/sharing';
+import { storyAdvanceHeld, storyAuthorButtonLabel, storyAuthorProfilePath, storyMediaFit } from '@/lib/sharing';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { ShareSheet } from '@/components/share/ShareSheet';
 import { toast } from 'sonner';
 
@@ -29,6 +40,7 @@ interface Story {
   };
   view_count?: number;
   has_viewed?: boolean;
+  source_post_id?: string | null;
   credit_user_id?: string | null;
   credit_profile?: {
     display_name: string | null;
@@ -55,6 +67,9 @@ const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryView
   const { sendStoryReply } = useSharingActions();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deletingStory, setDeletingStory] = useState(false);
   const recordedViewsRef = useRef<Set<string>>(new Set());
   const heldRef = useRef(false);
   const replyFocusedRef = useRef(false);
@@ -269,6 +284,25 @@ const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryView
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleNext, handlePrev, onClose]);
 
+  const deleteStory = async () => {
+    if (!currentStory || !user) return;
+    setDeletingStory(true);
+    const { error } = await supabase
+      .from('stories')
+      .delete()
+      .eq('id', currentStory.id)
+      .eq('user_id', user.id);
+    setDeletingStory(false);
+    if (error) {
+      toast.error('Could not delete story');
+      return;
+    }
+    toast.success('Story deleted');
+    await queryClient.invalidateQueries({ queryKey: ['stories'] });
+    setConfirmDelete(false);
+    onClose();
+  };
+
   if (!currentStory) return null;
 
   return (
@@ -371,7 +405,33 @@ const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryView
               transition={{ duration: 0.2 }}
               className="absolute inset-0"
             >
-              {currentStory.media_type === 'video' ? (
+              {storyMediaFit(currentStory.source_post_id) === 'contain' ? (
+                <div className="absolute inset-0 bg-[#111]">
+                  {currentStory.media_type !== 'video' && (
+                    <img
+                      src={currentStory.media_url}
+                      alt=""
+                      aria-hidden
+                      className="absolute inset-0 h-full w-full scale-110 object-cover opacity-70 blur-2xl"
+                    />
+                  )}
+                  {currentStory.media_type === 'video' ? (
+                    <video
+                      src={currentStory.media_url}
+                      className="relative z-[1] h-full w-full object-contain"
+                      autoPlay
+                      muted
+                      playsInline
+                    />
+                  ) : (
+                    <img
+                      src={currentStory.media_url}
+                      alt=""
+                      className="relative z-[1] h-full w-full object-contain"
+                    />
+                  )}
+                </div>
+              ) : currentStory.media_type === 'video' ? (
                 <video
                   src={currentStory.media_url}
                   className="w-full h-full object-cover"
@@ -457,6 +517,15 @@ const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryView
                     {viewCount} {viewCount === 1 ? 'view' : 'views'}
                   </span>
                 </motion.div>
+                <div className="flex items-center gap-2">
+                <Button
+                  variant="glass"
+                  size="icon"
+                  aria-label="Delete story"
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  <Trash2 className="h-5 w-5" />
+                </Button>
                 <Button
                   variant="glass"
                   size="icon"
@@ -473,6 +542,7 @@ const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryView
                 >
                   <Share2 className="h-5 w-5" />
                 </Button>
+                </div>
               </div>
             ) : (
               <form
@@ -543,6 +613,20 @@ const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryView
           </div>
         </motion.div>
       </div>
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this story?</AlertDialogTitle>
+            <AlertDialogDescription>This removes it from your story. This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteStory} disabled={deletingStory}>
+              {deletingStory ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <ShareSheet
         open={shareOpen}
         onOpenChange={(next) => {

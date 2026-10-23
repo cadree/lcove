@@ -1,4 +1,15 @@
 import { useState } from 'react';
+import { RepostComposer } from '@/components/share/RepostComposer';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Trash2, Flag, Repeat2 } from 'lucide-react';
@@ -45,6 +56,7 @@ interface Post extends StoredEmbedFields {
     id: string;
     user_id: string;
     created_at: string;
+    caption?: string | null;
     profile?: { display_name: string | null; avatar_url: string | null } | null;
   } | null;
 }
@@ -71,6 +83,8 @@ const FeedPost = ({ post }: { post: Post }) => {
   const [lightbox, setLightbox] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [repostOpen, setRepostOpen] = useState(false);
   const isOwner = user?.id === post.user_id;
   const viewRef = useRecordPostView(post.id, post.user_id);
   const viewCounts = useOwnPostViewCounts(isOwner);
@@ -119,6 +133,9 @@ const FeedPost = ({ post }: { post: Post }) => {
           {repostedByLabel(post.repost.profile?.display_name)}
         </button>
       )}
+      {post.repost?.caption && (
+        <p className="px-4 pb-1 text-sm text-foreground">{post.repost.caption}</p>
+      )}
       {/* Header */}
       <header className="flex items-center justify-between p-4 sm:p-5">
         <div className="flex items-center gap-3">
@@ -154,7 +171,10 @@ const FeedPost = ({ post }: { post: Post }) => {
             <DropdownMenuContent align="end" className="bg-card border-border/50">
               {isOwner && (
                 <DropdownMenuItem
-                  onClick={handleDelete}
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    setConfirmDelete(true);
+                  }}
                   className="text-destructive focus:text-destructive gap-2"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -164,9 +184,10 @@ const FeedPost = ({ post }: { post: Post }) => {
               {!isOwner && canRepostMedia(post.media_type, post.user_id, user?.id) && (
                 <DropdownMenuItem
                   className="gap-2"
-                  onClick={() => {
+                  onSelect={(event) => {
+                    event.preventDefault();
                     if (alreadyReposted) undoRepost.mutate(post.id);
-                    else repostPost.mutate(post.id);
+                    else setRepostOpen(true);
                   }}
                 >
                   <Repeat2 className="w-4 h-4" />
@@ -335,6 +356,26 @@ const FeedPost = ({ post }: { post: Post }) => {
           </motion.div>
         </CollapsibleContent>
       </Collapsible>
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this post?</AlertDialogTitle>
+            <AlertDialogDescription>This removes the post. This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <RepostComposer
+        open={repostOpen}
+        onOpenChange={setRepostOpen}
+        pending={repostPost.isPending}
+        onSubmit={async (caption) => {
+          await repostPost.mutateAsync({ postId: post.id, caption });
+        }}
+      />
       <ShareSheet
         open={shareOpen}
         onOpenChange={setShareOpen}

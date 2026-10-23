@@ -1,4 +1,4 @@
-/** Basic objectionable-text filter for posts, comments, messages, live chat, and profiles. */
+/** Basic objectionable-text filter for posts, comments, messages, live chat, profiles, and repost captions. */
 
 export const OBJECTIONABLE_MESSAGE = "That text isn't allowed.";
 

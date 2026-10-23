@@ -43,6 +43,7 @@ const CommentItem = ({
   const { user } = useAuth();
   const [showReplies, setShowReplies] = useState(depth === 0);
   const [reportOpen, setReportOpen] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const isOwner = user?.id === comment.user_id;
   const hasReplies = comment.replies && comment.replies.length > 0;
 
@@ -110,14 +111,40 @@ const CommentItem = ({
             )}
 
             {isOwner && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onDelete(comment.id)}
-                className="text-muted-foreground hover:text-destructive h-auto py-1 px-2 text-xs"
-              >
-                <Trash2 className="w-3 h-3" />
-              </Button>
+              confirmingDelete ? (
+                <span className="inline-flex items-center gap-2 text-xs">
+                  <span className="text-muted-foreground">Delete this comment?</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      onDelete(comment.id);
+                      setConfirmingDelete(false);
+                    }}
+                    className="h-auto px-2 py-1 text-xs text-destructive"
+                  >
+                    Delete
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setConfirmingDelete(false)}
+                    className="h-auto px-2 py-1 text-xs"
+                  >
+                    Cancel
+                  </Button>
+                </span>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmingDelete(true)}
+                  aria-label="Delete comment"
+                  className="text-muted-foreground hover:text-destructive h-auto py-1 px-2 text-xs"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              )
             )}
 
             {user && !isOwner && (

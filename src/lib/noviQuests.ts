@@ -139,6 +139,11 @@ export function nextQuest(quests: QuestView[]): QuestView | null {
   return quests.find((quest) => quest.id !== "open_studio" && quest.state !== "decrypted") ?? null;
 }
 
+/** One card on the home feed and Explore For You. Studio is not stacked beside it. */
+export function homeQuestCard(quests: QuestView[]): QuestView | null {
+  return nextQuest(quests) ?? studioQuest(quests);
+}
+
 /** Studio stays visible beside the current quest until it is filed. */
 export function studioQuest(quests: QuestView[]): QuestView | null {
   const quest = quests.find((row) => row.id === "open_studio");

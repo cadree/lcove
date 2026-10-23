@@ -11,10 +11,31 @@ export interface RepostRow {
   user_id: string;
   post_id: string;
   created_at: string;
+  caption?: string | null;
   profile?: {
     display_name: string | null;
     avatar_url: string | null;
   } | null;
+}
+
+export const REPOST_COLUMNS = "id, user_id, post_id, created_at, caption";
+export const REPOST_COLUMNS_LEGACY = "id, user_id, post_id, created_at";
+
+/** Empty captions are omitted so a repost still saves before the caption column exists. */
+export function repostCaption(value: string | null | undefined, max = 500): string | null {
+  const trimmed = value?.replace(/\s+/g, " ").trim() ?? "";
+  if (!trimmed) return null;
+  return trimmed.slice(0, max);
+}
+
+export function repostQueryMissingCaption(message: string | undefined): boolean {
+  if (!message) return false;
+  return /caption/i.test(message) && /column|schema|could not find|does not exist/i.test(message);
+}
+
+/** A story made from a post keeps the whole frame. A camera story stays full-bleed. */
+export function storyMediaFit(sourcePostId: string | null | undefined): "contain" | "cover" {
+  return sourcePostId ? "contain" : "cover";
 }
 
 export type ShareTarget =
