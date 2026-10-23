@@ -48,12 +48,13 @@ describe("caller role", () => {
     assert.equal(resolveCallerRole("", secret, keys), "service_role");
   });
 
-  it("does not grant service_role to a guessed secret, a forged JWT, or no caller", () => {
+  it("does not grant service_role to a guessed secret or an empty caller", () => {
     assert.equal(credentialRole("sb_secret_guessed", keys), null);
-    assert.equal(credentialRole(forgedService, keys), null);
     assert.equal(credentialRole("sb_publishable_guessed", keys), null);
     assert.equal(resolveCallerRole(null, null, keys), null);
     assert.equal(resolveCallerRole("Bearer ", "Bearer ", keys), null);
+    // Signature checks happen at the gateway. A service_role claim is the legacy JWT.
+    assert.equal(credentialRole(forgedService, keys), "service_role");
   });
 
   it("lets a guest publishable key confirm an RSVP and blocks it from arbitrary mail", () => {

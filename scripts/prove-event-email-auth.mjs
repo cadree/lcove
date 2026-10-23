@@ -157,6 +157,12 @@ try {
     publishable: keys.publishable.map(prefix),
     secrets: keys.secrets.map(prefix),
   };
+  summary.keyShapes = found.map((key) => ({
+    name: key.name,
+    type: key.type,
+    prefix: prefix(key.value),
+    length: key.value.length,
+  }));
   if (keys.publishable.length === 0 || keys.secrets.length === 0) {
     throw new Error(`missing project keys publishable=${keys.publishable.length} secrets=${keys.secrets.length}`);
   }

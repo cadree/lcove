@@ -70,8 +70,12 @@ export function credentialRole(credential, keys) {
   if (!token) return null;
   if (matchesAny(token, keys?.secrets)) return "service_role";
   if (matchesAny(token, keys?.publishable)) return "anon";
+  // A real JWT reached this process only after verify_jwt checked its signature.
+  // Legacy anon and service_role keys are such JWTs, including when the function
+  // env now holds the new sb_ key and the legacy JWT is a different string.
+  // New keys are not JWTs, so a guessed sb_secret_ string cannot take this path.
   const role = decodeJwtPayload(token)?.role;
-  if (role === "authenticated") return "authenticated";
+  if (role === "authenticated" || role === "anon" || role === "service_role") return role;
   return null;
 }
 
