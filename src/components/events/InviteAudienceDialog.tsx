@@ -215,7 +215,7 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
         toast.success(`Invite sent to ${res.recipientCount} users`);
       } else {
         if (!eventId) throw new Error("External invites require an event");
-        if (validExternals.length === 0) throw new Error("Add at least one guest email");
+        if (validExternals.length === 0) throw new Error("Add at least one guest with an email");
         const { data, error } = await supabase.functions.invoke("send-event-invite", {
           body: {
             eventId,

@@ -8,7 +8,7 @@ import { errorMessage } from '@/lib/errorMessage';
 import { shotContentThin, shotPosts, shotSessionEnabled } from '@/lib/shotSession';
 import { isQueryablePostId } from '@/lib/postId';
 import { assertCleanText } from '@/lib/objectionableText';
-import { mergePostsAndReposts, type RepostRow } from '@/lib/sharing';
+import { mergePostsAndReposts, repostQueryMissingCaption, type RepostRow } from '@/lib/sharing';
 import { refreshXp } from '@/lib/xpRefresh';
 import { embedColumnMissing, embedColumnsForInsert, videoEmbedMigrationMessage, type EmbedDraft, type StoredEmbedFields } from '@/lib/videoEmbed';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -103,11 +103,22 @@ export function usePosts() {
         repost: null,
       })) as Post[];
 
-      const { data: repostData, error: repostError } = await supabase
+      const primaryReposts = await supabase
         .from('reposts')
-        .select('id, user_id, post_id, created_at')
+        .select('id, user_id, post_id, created_at, caption')
         .order('created_at', { ascending: false })
         .limit(200);
+      let repostData = primaryReposts.data as RepostRow[] | null;
+      let repostError = primaryReposts.error;
+      if (repostError && repostQueryMissingCaption(repostError.message)) {
+        const legacyReposts = await supabase
+          .from('reposts')
+          .select('id, user_id, post_id, created_at')
+          .order('created_at', { ascending: false })
+          .limit(200);
+        repostData = legacyReposts.data as RepostRow[] | null;
+        repostError = legacyReposts.error;
+      }
       if (repostError || !repostData?.length) return mapped;
 
       const reposterIds = [...new Set(repostData.map((row) => row.user_id))];

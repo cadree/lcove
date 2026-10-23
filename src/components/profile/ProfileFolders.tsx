@@ -187,7 +187,7 @@ export function ProfileFolders({ userId, isOwner, onFolderClick }: ProfileFolder
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="absolute top-2 right-2 w-7 h-7 bg-background/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-2 right-2 h-11 w-11 bg-background/80 backdrop-blur-sm"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MoreHorizontal className="w-4 h-4" />

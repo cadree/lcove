@@ -5,7 +5,7 @@ import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { errorMessage } from '@/lib/errorMessage';
 import { ProfilePost } from '@/types/post';
-import { profileItemsWithReposts, type RepostRow } from '@/lib/sharing';
+import { profileItemsWithReposts, repostQueryMissingCaption, type RepostRow } from '@/lib/sharing';
 import {
   postsForViewer,
   profilePostFromRow,
@@ -75,11 +75,22 @@ export function useProfilePosts(userId?: string) {
       const own = ownRows.map((post) => profilePostFromRow(post, author));
 
       try {
-        const { data: repostData, error: repostError } = await supabase
+        const primaryReposts = await supabase
           .from('reposts')
-          .select('id, user_id, post_id, created_at')
+          .select('id, user_id, post_id, created_at, caption')
           .eq('user_id', profileUserId)
           .order('created_at', { ascending: false });
+        let repostData = primaryReposts.data as RepostRow[] | null;
+        let repostError = primaryReposts.error;
+        if (repostError && repostQueryMissingCaption(repostError.message)) {
+          const legacyReposts = await supabase
+            .from('reposts')
+            .select('id, user_id, post_id, created_at')
+            .eq('user_id', profileUserId)
+            .order('created_at', { ascending: false });
+          repostData = legacyReposts.data as RepostRow[] | null;
+          repostError = legacyReposts.error;
+        }
         if (repostError || !repostData?.length) return own;
 
         const originalIds = [...new Set(repostData.map((row) => row.post_id))];

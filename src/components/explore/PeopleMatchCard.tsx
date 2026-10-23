@@ -1,6 +1,7 @@
-import { useRef, useState, type PointerEvent } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { matchDropTarget, type MatchRect } from "@/lib/matchDrop";
+import { toast } from "sonner";
+import { matchButtonLabel, matchPhaseFromStatus, type MatchPhase } from "@/lib/peopleMatch";
 
 interface MatchPerson {
   user_id: string;
@@ -12,76 +13,43 @@ export function PeopleMatchCard({
   person,
   onInvite,
   isSelf = false,
+  inviteStatus = null,
 }: {
   person: MatchPerson;
-  onInvite: (recipientId: string) => void;
+  onInvite: (recipientId: string) => Promise<void>;
   isSelf?: boolean;
+  inviteStatus?: string | null;
 }) {
-  const [dragging, setDragging] = useState(false);
-  const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
-  const suppressClick = useRef(false);
+  const [phase, setPhase] = useState<MatchPhase>("idle");
+  const [errorText, setErrorText] = useState<string | null>(null);
+  const saved = matchPhaseFromStatus(inviteStatus);
+  const view: MatchPhase = phase === "saving" || phase === "error" ? phase : saved !== "idle" ? saved : phase;
+  const locked = view === "pending" || view === "matched" || view === "saving";
 
-  const finishDrag = (event: PointerEvent<HTMLDivElement>) => {
-    const moved = drag.current?.moved ?? false;
-    drag.current = null;
-    setDragging(false);
-    if (!moved) return;
-    suppressClick.current = true;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+  const match = async () => {
+    if (locked || isSelf) return;
+    setErrorText(null);
+    setPhase("saving");
+    try {
+      await onInvite(person.user_id);
+      setPhase("pending");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not save that match";
+      setPhase("error");
+      setErrorText(message);
+      toast.error(message);
     }
-    const scroller = event.currentTarget.closest("[data-match-row]");
-    const portRect = scroller?.getBoundingClientRect();
-    const port: MatchRect | null = portRect
-      ? { id: "port", left: portRect.left, top: portRect.top, right: portRect.right, bottom: portRect.bottom }
-      : null;
-    const cards: MatchRect[] = Array.from(document.querySelectorAll("[data-match-id]")).map((node) => {
-      const rect = node.getBoundingClientRect();
-      return {
-        id: node.getAttribute("data-match-id") || "",
-        left: rect.left,
-        top: rect.top,
-        right: rect.right,
-        bottom: rect.bottom,
-      };
-    });
-    const id = matchDropTarget({ x: event.clientX, y: event.clientY }, cards, person.user_id, port);
-    if (id) onInvite(id);
   };
 
   return (
     <div
       data-match-id={person.user_id}
-      onPointerDown={(event) => {
-        if (isSelf || event.button !== 0) return;
-        if ((event.target as HTMLElement).closest("button")) return;
-        drag.current = { x: event.clientX, y: event.clientY, moved: false };
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }}
-      onPointerMove={(event) => {
-        if (!drag.current) return;
-        const distance = Math.hypot(event.clientX - drag.current.x, event.clientY - drag.current.y);
-        if (distance > 10) {
-          drag.current.moved = true;
-          setDragging(true);
-        }
-      }}
-      onPointerUp={(event) => finishDrag(event)}
-      onPointerCancel={() => {
-        drag.current = null;
-        setDragging(false);
-      }}
-      className={`file-panel flex w-[148px] shrink-0 touch-none flex-col items-center px-3 py-4 text-center ${dragging ? "ring-2 ring-[hsl(var(--scan))]" : ""}`}
+      data-match-state={isSelf ? "self" : view}
+      className={`file-panel flex w-[240px] shrink-0 snap-start flex-col items-center px-3 py-4 text-center ${
+        view === "pending" || view === "matched" ? "ring-2 ring-[hsl(var(--scan))]" : ""
+      }`}
     >
-      <Link
-        to={`/profile/${person.user_id}`}
-        className="flex w-full flex-col items-center"
-        onClick={(event) => {
-          if (!suppressClick.current) return;
-          suppressClick.current = false;
-          event.preventDefault();
-        }}
-      >
+      <Link to={`/profile/${person.user_id}`} className="flex w-full flex-col items-center">
         <span className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-[conic-gradient(from_120deg,#FF9FC8,#C4142D,#FF9FC8)] p-[2px]">
           <span className="flex h-full w-full items-center justify-center rounded-full bg-card font-body text-sm font-extrabold">
             {(person.display_name || "?").charAt(0)}
@@ -93,13 +61,20 @@ export function PeopleMatchCard({
       {isSelf ? (
         <span className="mono-label mt-2 inline-flex h-11 items-center text-[10px] text-muted-foreground">You</span>
       ) : (
-        <button
-          type="button"
-          className="mono-label mt-2 inline-flex h-11 items-center text-[10px] text-foreground"
-          onClick={() => onInvite(person.user_id)}
-        >
-          Match
-        </button>
+        <>
+          <button
+            type="button"
+            className="mono-label mt-2 inline-flex h-11 items-center px-3 text-[10px] text-foreground"
+            onClick={match}
+            disabled={locked}
+            aria-live="polite"
+          >
+            {matchButtonLabel(view)}
+          </button>
+          {view === "error" && errorText && (
+            <p className="text-[11px] text-destructive" role="alert">{errorText}</p>
+          )}
+        </>
       )}
     </div>
   );

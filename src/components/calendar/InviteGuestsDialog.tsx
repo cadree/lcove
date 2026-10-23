@@ -140,7 +140,7 @@ export function InviteGuestsDialog({ eventId, eventTitle, children }: InviteGues
 
           <Button className="w-full gap-2" onClick={handleSend} disabled={sending}>
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {sending ? "Sending..." : `Send ${invitees.filter((i) => i.email).length} Invitation${invitees.filter((i) => i.email).length !== 1 ? "s" : ""}`}
+            {sending ? "Sending..." : `Send ${invitees.filter((i) => i.email.trim()).length} Invitation${invitees.filter((i) => i.email.trim()).length !== 1 ? "s" : ""}`}
           </Button>
         </div>
       </DialogContent>
