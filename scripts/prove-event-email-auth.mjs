@@ -27,6 +27,8 @@ const guestApikeyEmail = `guest-apikey-proof-${runId}@staging.ether.test`;
 const inviteEmail = `invite-proof-${runId}@staging.ether.test`;
 const bulkEmail = `bulk-proof-${runId}@staging.ether.test`;
 const forgedEmail = `forged-proof-${runId}@staging.ether.test`;
+const secretProofEmail = `secret-proof-${runId}@staging.ether.test`;
+const legacyProofEmail = `legacy-service-proof-${runId}@staging.ether.test`;
 const password = randomBytes(24).toString("base64url");
 
 function redact(value) {
@@ -300,6 +302,39 @@ try {
     bulk.status >= 200 && bulk.status < 300 && bulk.json?.sentCount >= 1,
     `status=${bulk.status} body=${bulk.text}`,
   );
+
+  const sbSecret = keys.secrets.find((key) => key.startsWith("sb_secret_"));
+  const legacyService = keys.secrets.find((key) => key.startsWith("eyJ"));
+  const directBody = (email) => ({
+    templateName: "event-reminder",
+    recipientEmail: email,
+    idempotencyKey: `direct-${email}`,
+    templateData: {
+      organizerName: "Staging",
+      recipientName: "Staging Guest",
+      eventTitle: "Staging email auth proof",
+      eventDate: "December 1",
+      eventTime: "6:00 PM",
+      location: "Staging",
+      eventUrl: "https://vjdrihmriufkameqngfg.supabase.co",
+    },
+  });
+  if (!sbSecret || !legacyService) {
+    check("both secret key formats present", false, `sb_secret=${Boolean(sbSecret)} legacy=${Boolean(legacyService)}`);
+  } else {
+    const secretCall = await callFunction("send-transactional-email", authHeaders(sbSecret), directBody(secretProofEmail));
+    check(
+      "sb_secret can queue transactional email",
+      secretCall.status >= 200 && secretCall.status < 300 && secretCall.json?.success === true,
+      `status=${secretCall.status} body=${secretCall.text}`,
+    );
+    const legacyCall = await callFunction("send-transactional-email", authHeaders(legacyService), directBody(legacyProofEmail));
+    check(
+      "legacy service_role JWT can queue transactional email",
+      legacyCall.status >= 200 && legacyCall.status < 300 && legacyCall.json?.success === true,
+      `status=${legacyCall.status} body=${legacyCall.text}`,
+    );
+  }
 
   const forgedBody = {
     templateName: "event-reminder",
