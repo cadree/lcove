@@ -145,9 +145,10 @@ Deno.test("valid secret and an empty queue returns 200", async () => {
 Deno.test("mocked Resend send deletes, and failures move to the DLQ", async () => {
   const ok = message("msg-ok", 11);
   const denied = message("msg-denied", 22, { idempotency_key: "idem-denied" });
+  const later = message("msg-later", 44);
   const exhausted = message("msg-exhausted", 33);
   const supabase = fakeSupabase({
-    queues: { auth_emails: [ok, denied, exhausted], transactional_emails: [] },
+    queues: { auth_emails: [ok, denied, later, exhausted], transactional_emails: [] },
     failed: Array.from({ length: 5 }, () => ({ message_id: "msg-exhausted" })),
   });
   const sent: string[] = [];
@@ -179,9 +180,9 @@ Deno.test("mocked Resend send deletes, and failures move to the DLQ", async () =
 
   assert.equal(response.status, 200);
   const body = await response.json();
-  // 403 stops the batch after the DLQ write, so the exhausted message waits for the next read.
-  assert.deepEqual(sent, ["msg-ok", "msg-denied"]);
-  assert.equal(fetches.length, 2);
+  // One 403 is dead-lettered. The rest of this batch still sends.
+  assert.deepEqual(sent, ["msg-ok", "msg-denied", "msg-later"]);
+  assert.equal(fetches.length, 3);
   assert.equal(fetches[0].url, "https://api.resend.com/emails");
   assert.equal(fetches[0].authorization, "Bearer resend-test-key");
   assert.equal(fetches[0].from, DEFAULT_EMAIL_FROM);
@@ -190,20 +191,25 @@ Deno.test("mocked Resend send deletes, and failures move to the DLQ", async () =
     "Ether <notifications@etherbylcove.com>",
   );
   assert.equal(
+    resolveQueueFrom(
+      "notifications@notifications.etherbylcove.com",
+      "Ada via Ether <events@notifications.etherbylcove.com>",
+    ),
+    "Ada via Ether <events@etherbylcove.com>",
+  );
+  assert.equal(
     resolveQueueFrom(DEFAULT_EMAIL_FROM, "Evil <notifications@evil.example>"),
     DEFAULT_EMAIL_FROM,
   );
   assert.equal(fetches[1].idempotency, "idem-denied");
-  assert.equal(body.processed, 1);
-  assert.equal(body.stopped, "emails_disabled");
+  assert.equal(body.processed, 2);
+  assert.equal(body.stopped, undefined);
 
   const deletes = supabase.calls.filter((call) => call.name === "delete_email");
-  assert.equal(deletes.length, 1);
-  assert.equal(deletes[0].args?.message_id, 11);
+  assert.deepEqual(deletes.map((call) => call.args?.message_id), [11, 44]);
 
   const dlq = supabase.calls.filter((call) => call.name === "move_to_dlq");
-  assert.equal(dlq.length, 1);
-  assert.equal(dlq[0].args?.message_id, 22);
+  assert.deepEqual(dlq.map((call) => call.args?.message_id), [22, 33]);
   assert.equal(dlq[0].args?.dlq_name, "auth_emails_dlq");
 
   const sentLog = supabase.calls.find(
