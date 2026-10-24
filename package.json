@@ -110,6 +110,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
+    "node-forge": "^1.4.0",
     "playwright": "^1.56.1",
     "postcss": "^8.5.6",
     "stripe": "^18.5.0",

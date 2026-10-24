@@ -5491,6 +5491,10 @@ export type Database = {
           suspension_reason: string | null
           updated_at: string | null
           user_id: string
+          username: string | null
+          birthday_month: number | null
+          birthday_day: number | null
+          show_birthday: boolean
         }
         Insert: {
           access_level?: Database["public"]["Enums"]["access_level"] | null
@@ -5527,6 +5531,10 @@ export type Database = {
           suspension_reason?: string | null
           updated_at?: string | null
           user_id: string
+          username?: string | null
+          birthday_month?: number | null
+          birthday_day?: number | null
+          show_birthday?: boolean
         }
         Update: {
           access_level?: Database["public"]["Enums"]["access_level"] | null
@@ -5563,6 +5571,10 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
           founding?: boolean
+          username?: string | null
+          birthday_month?: number | null
+          birthday_day?: number | null
+          show_birthday?: boolean
         }
         Relationships: []
       }
@@ -8036,6 +8048,10 @@ export type Database = {
       }
       get_campaign_analytics: { Args: { p_event_id?: string }; Returns: Json }
       get_client_project_by_token: { Args: { p_token: string }; Returns: Json }
+      get_my_ether_id: { Args: never; Returns: Json }
+      refresh_my_ether_id_token: { Args: never; Returns: string }
+      get_ether_id_by_token: { Args: { p_token: string }; Returns: Json }
+      ensure_ether_id_pass: { Args: { p_pass_type_id: string }; Returns: Json }
       public_event_attendance_count: {
         Args: { p_event_id: string }
         Returns: number

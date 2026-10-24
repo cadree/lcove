@@ -39,6 +39,10 @@ export interface Profile {
   phone: string | null;
   social_links: SocialLinks | null;
   founding: boolean;
+  username: string | null;
+  birthday_month: number | null;
+  birthday_day: number | null;
+  show_birthday: boolean;
 }
 
 const profileCache = new Map<string, Profile>();
@@ -72,6 +76,10 @@ function profileFromRow(data: Record<string, unknown>, own: boolean): Profile {
     phone: own ? ((data.phone as string | null) ?? null) : null,
     social_links: (data.social_links as SocialLinks | null) ?? null,
     founding: Boolean(data.founding),
+    username: own ? ((data.username as string | null) ?? null) : null,
+    birthday_month: own ? ((data.birthday_month as number | null) ?? null) : null,
+    birthday_day: own ? ((data.birthday_day as number | null) ?? null) : null,
+    show_birthday: own ? Boolean(data.show_birthday) : false,
   };
 }
 
