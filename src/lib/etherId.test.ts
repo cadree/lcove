@@ -15,7 +15,7 @@ import {
 } from "./etherId.ts";
 
 const migration = readFileSync(
-  new URL("../../supabase/migrations/20261024150000_ether_id.sql", import.meta.url),
+  new URL("../../supabase/migrations/20261024190000_ether_id.sql", import.meta.url),
   "utf8",
 );
 
@@ -144,5 +144,10 @@ describe("ether id migration inventory", () => {
     assert.match(migration, /birth_year is unrelated/);
     assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.get_ether_id_by_token\(text\) TO anon, authenticated, service_role/);
     assert.match(migration, /REVOKE ALL ON TABLE public\.ether_id_secret FROM PUBLIC, anon, authenticated/);
+    assert.match(migration, /SET search_path = public, extensions, pg_temp/);
+    const calls = migration.match(/\b(?:gen_random_bytes|crypt|gen_salt|digest|hmac)\s*\(/g) ?? [];
+    const qualified = migration.match(/\b(?:extensions|public)\.(?:gen_random_bytes|crypt|gen_salt|digest|hmac)\s*\(/g) ?? [];
+    assert.ok(calls.length > 0);
+    assert.equal(calls.length, qualified.length);
   });
 });

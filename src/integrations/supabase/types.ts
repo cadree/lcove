@@ -2732,6 +2732,14 @@ export type Database = {
           title: string
           updated_at: string
           venue: string | null
+          video_url: string | null
+          flyer_font: string | null
+          page_theme: string
+          hide_address: boolean
+          absorb_fees: boolean
+          allow_transfers: boolean
+          password_protected: boolean
+          features: string[]
           waitlist_enabled: boolean
         }
         Insert: {
@@ -2763,6 +2771,14 @@ export type Database = {
           title: string
           updated_at?: string
           venue?: string | null
+          video_url?: string | null
+          flyer_font?: string | null
+          page_theme?: string
+          hide_address?: boolean
+          absorb_fees?: boolean
+          allow_transfers?: boolean
+          password_protected?: boolean
+          features?: string[]
           waitlist_enabled?: boolean
         }
         Update: {
@@ -2794,6 +2810,14 @@ export type Database = {
           title?: string
           updated_at?: string
           venue?: string | null
+          video_url?: string | null
+          flyer_font?: string | null
+          page_theme?: string
+          hide_address?: boolean
+          absorb_fees?: boolean
+          allow_transfers?: boolean
+          password_protected?: boolean
+          features?: string[]
           waitlist_enabled?: boolean
         }
         Relationships: [
@@ -7678,6 +7702,78 @@ export type Database = {
       }
     }
     Views: {
+      consumer_creators: {
+        Row: {
+          avatar_url: string | null
+          display_name: string | null
+          user_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          display_name?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          display_name?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      consumer_live_streams: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          ended_at: string | null
+          external_url: string | null
+          host_id: string | null
+          id: string | null
+          is_live: boolean | null
+          playback_url: string | null
+          replay_available: boolean | null
+          replay_url: string | null
+          started_at: string | null
+          stream_type: string | null
+          thumbnail_url: string | null
+          title: string | null
+          viewer_count: number | null
+        }
+        Insert: {
+          created_at?: never
+          description?: never
+          ended_at?: never
+          external_url?: never
+          host_id?: never
+          id?: never
+          is_live?: never
+          playback_url?: never
+          replay_available?: never
+          replay_url?: never
+          started_at?: never
+          stream_type?: never
+          thumbnail_url?: never
+          title?: never
+          viewer_count?: never
+        }
+        Update: {
+          created_at?: never
+          description?: never
+          ended_at?: never
+          external_url?: never
+          host_id?: never
+          id?: never
+          is_live?: never
+          playback_url?: never
+          replay_available?: never
+          replay_url?: never
+          started_at?: never
+          stream_type?: never
+          thumbnail_url?: never
+          title?: never
+          viewer_count?: never
+        }
+        Relationships: []
+      }
       live_streams_public: {
         Row: {
           created_at: string | null
@@ -7959,6 +8055,40 @@ export type Database = {
       public_event_attendance_count: {
         Args: { p_event_id: string }
         Returns: number
+      }
+      public_event_guest_preview: {
+        Args: { p_event_id: string }
+        Returns: Json
+      }
+      public_event_location: {
+        Args: { p_event_id: string; p_order_id?: string; p_rsvp_id?: string }
+        Returns: string
+      }
+      public_host_stats: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
+      host_follower_count: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
+      host_event_address: {
+        Args: { p_event_id: string }
+        Returns: string
+      }
+      event_password_ok: {
+        Args: { p_event_id: string; p_password: string }
+        Returns: boolean
+      }
+      set_event_access: {
+        Args: {
+          p_event_id: string
+          p_hide_address: boolean
+          p_private_address: string
+          p_password: string
+          p_password_protected: boolean
+        }
+        Returns: undefined
       }
       release_abandoned_ticket_orders: {
         Args: { p_older_than?: string }

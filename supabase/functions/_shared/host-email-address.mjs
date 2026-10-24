@@ -28,6 +28,18 @@ export function hostFromHeader(fromName) {
   return `${sanitizeDisplayName(fromName)} <${HOST_EVENT_FROM_ADDRESS}>`;
 }
 
+// Display form required on guest mail: "Host Name via Ether".
+// Sanitizing stays in sanitizeDisplayName. Reply-To is unchanged.
+export function hostViaEtherName(name) {
+  const suffix = " via Ether";
+  const clean = sanitizeDisplayName(name) || "Host";
+  if (/via ether$/i.test(clean)) {
+    return clean.slice(0, HOST_DISPLAY_NAME_MAX);
+  }
+  const room = Math.max(1, HOST_DISPLAY_NAME_MAX - suffix.length);
+  return `${clean.slice(0, room).trim()}${suffix}`;
+}
+
 export function rewriteSenderAddress(value) {
   if (typeof value !== "string") return "";
   return value.replaceAll(`@${UNVERIFIED_SENDER_DOMAIN}`, `@${VERIFIED_SENDER_DOMAIN}`);

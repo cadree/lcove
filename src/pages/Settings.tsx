@@ -804,7 +804,7 @@ const Settings = () => {
                             ? "Enabled - receiving notifications"
                             : pushStatus === 'error'
                               ? pushError || "Configuration error"
-                              : "Click to enable push notifications"}
+                              : "Turn on push notifications"}
                   </p>
                 )}
                 {pushError && pushStatus !== 'permission_denied' && pushStatus !== 'error' && pushStatus !== 'needs_home_screen' && pushStatus !== 'not_supported' && (

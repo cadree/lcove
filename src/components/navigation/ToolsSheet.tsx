@@ -141,9 +141,8 @@ export function ToolsSheet({ open, onOpenChange }: ToolsSheetProps) {
         <div className="mx-auto mb-4 mt-1 h-1 w-10 rounded-full bg-foreground/20" aria-hidden="true" />
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <p className="kicker">Profile</p>
             <SheetTitle className="ether-title text-[26px] text-left">
-              Tools
+              Studio
             </SheetTitle>
             <SheetDescription className="sr-only">Studio tools and shortcuts</SheetDescription>
           </div>

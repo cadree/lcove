@@ -32,6 +32,7 @@ const Tickets = lazy(() => import("./pages/Tickets"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Locked = lazy(() => import("./pages/Locked"));
+const Denied = lazy(() => import("./pages/Denied"));
 const Messages = lazy(loadMessages);
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Wallet = lazy(() => import("./pages/Wallet"));
@@ -68,7 +69,16 @@ const PartnerPortal = lazy(() => import("./pages/PartnerPortal"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const EventsDashboard = lazy(() => import("./pages/EventsDashboard"));
 const EventDetail = lazy(() => import("./pages/EventDetail"));
+const HostHome = lazy(() => import("./pages/HostHome"));
+const HostFinance = lazy(() => import("./pages/HostFinance"));
+const HostDoor = lazy(() => import("./pages/HostDoor"));
+const HostEventEditor = lazy(() => import("./pages/HostEventEditor"));
+const EventTickets = lazy(() => import("./pages/EventTickets"));
+const EventCheckout = lazy(() => import("./pages/EventCheckout"));
+const HostingShots = import.meta.env.DEV ? lazy(() => import("./pages/HostingShots")) : null;
 const PublicEventPage = lazy(() => import("./pages/PublicEventPage"));
+const PublicProductPage = lazy(() => import("./pages/PublicProductPage"));
+const PublicLivePage = lazy(() => import("./pages/PublicLivePage"));
 const BlogPostPage = lazy(() => import("./pages/BlogPost"));
 const BlogIndex = lazy(() => import("./pages/BlogIndex"));
 const EventConfirmation = lazy(() => import("./pages/EventConfirmation"));
@@ -149,6 +159,7 @@ const App = () => (
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/onboarding" element={<Onboarding />} />
                 <Route path="/locked" element={<Locked />} />
+                <Route path="/denied" element={<Denied />} />
                 <Route path="/feed" element={<Feed />} />
                 <Route path="/explore" element={<Explore />} />
                 <Route path="/directory" element={<Directory />} />
@@ -172,6 +183,8 @@ const App = () => (
                 <Route path="/fund" element={<FundDashboard />} />
                 <Route path="/membership" element={<Membership />} />
                 <Route path="/live" element={<Live />} />
+                <Route path="/live/:streamId" element={<PublicLivePage />} />
+                <Route path="/product/:itemId" element={<PublicProductPage />} />
                 <Route path="/book" element={<BookOfLcove />} />
                 <Route path="/quests" element={<QuestLog />} />
                 <Route path="/cinema" element={<Cinema />} />
@@ -197,9 +210,17 @@ const App = () => (
                 <Route path="/partner-portal" element={<PartnerPortal />} />
                 <Route path="/collectives" element={<Collectives />} />
                 <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/dashboard/events" element={<EventsDashboard />} />
+                <Route path="/dashboard/events" element={<HostHome />} />
+                <Route path="/dashboard/events/calendar" element={<EventsDashboard />} />
+                <Route path="/dashboard/events/finances" element={<HostFinance />} />
+                <Route path="/dashboard/events/door" element={<HostDoor />} />
+                <Route path="/dashboard/events/new" element={<HostEventEditor />} />
+                <Route path="/dashboard/events/:eventId/edit" element={<HostEventEditor />} />
                 <Route path="/dashboard/events/:eventId" element={<EventDetail />} />
                 <Route path="/event/:eventId" element={<PublicEventPage />} />
+                {HostingShots && <Route path="/preview/hosting" element={<HostingShots />} />}
+                <Route path="/event/:eventId/tickets" element={<EventTickets />} />
+                <Route path="/event/:eventId/checkout" element={<EventCheckout />} />
                 <Route path="/event/:eventId/confirmation" element={<EventConfirmation />} />
                 <Route path="/project/:projectId" element={<PublicProjectPage />} />
                 <Route path="/client/:token" element={<PublicClientPortal />} />

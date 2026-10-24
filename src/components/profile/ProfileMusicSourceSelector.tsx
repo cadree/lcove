@@ -17,7 +17,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
-import { AUDIO_FILE_ACCEPT, audioContentType, isAudioUpload } from "@/lib/audioFiles";
+import {
+  AUDIO_FILE_ACCEPT,
+  AUDIO_UPLOAD_ACTION,
+  AUDIO_UPLOAD_DETAIL,
+  AUDIO_UPLOAD_HINT,
+  AUDIO_UPLOAD_REJECTED,
+  AUDIO_UPLOAD_SUBTITLE,
+  audioContentType,
+  isAudioUpload,
+} from "@/lib/audioFiles";
 import { cn } from "@/lib/utils";
 
 // Icons for music services - wrapped with forwardRef to prevent ref warnings
@@ -177,7 +186,7 @@ export const ProfileMusicSourceSelector = ({
     if (!file || !user) return;
 
     if (!isAudioUpload(file)) {
-      setError("Choose an mp3, wav, flac, m4a, or aac file.");
+      setError(AUDIO_UPLOAD_REJECTED);
       return;
     }
 
@@ -298,7 +307,7 @@ export const ProfileMusicSourceSelector = ({
       icon: Upload,
       color: 'text-primary',
       bgColor: 'bg-primary/10 hover:bg-primary/20',
-      description: 'Upload MP3, WAV, or M4A',
+      description: AUDIO_UPLOAD_SUBTITLE,
     },
   ];
 
@@ -575,7 +584,7 @@ export const ProfileMusicSourceSelector = ({
                   <span className="font-medium">Upload Audio File</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Upload an MP3, WAV, or M4A file (max 20MB). Full playback for visitors.
+                  {AUDIO_UPLOAD_DETAIL}
                 </p>
                 <label
                   htmlFor="profile-audio-file"
@@ -589,9 +598,9 @@ export const ProfileMusicSourceSelector = ({
                   ) : (
                     <>
                       <Music className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                      <p className="text-sm font-medium">Click to upload</p>
+                      <p className="text-sm font-medium">{AUDIO_UPLOAD_ACTION}</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        MP3, WAV, FLAC, M4A, AAC • Max 20MB
+                        {AUDIO_UPLOAD_HINT}
                       </p>
                     </>
                   )}
