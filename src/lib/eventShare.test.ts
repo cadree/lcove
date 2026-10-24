@@ -10,11 +10,14 @@ import {
   eventPublicUrl,
   eventReturnPath,
   eventShareDescription,
+  fetchShareCard,
   routeEventShare,
   safeImageUrl,
   slugifyEventName,
+  supabaseFromConfig,
 } from "../../functions/_shared/eventShare.js";
-import { jpegSize, pngSize, renderFlyerDerivative } from "../../functions/_shared/flyerImage.js";
+import { decodeFlyer, encodePng, jpegSize, pngSize, renderFlyerDerivative } from "../../functions/_shared/flyerImage.js";
+import { eventShareConfig } from "../../scripts/event-share-config.mjs";
 
 const SHELL = `<!doctype html><html><head>
 <title>Ether</title>
@@ -186,6 +189,31 @@ describe("event share links", () => {
     assert.equal(card.contentType, "image/jpeg");
     assert.deepEqual(pngSize(icon.bytes), { width: 180, height: 180 });
     assert.equal(icon.contentType, "image/png");
+    const tiny = new Uint8Array(8 * 8 * 4).fill(255);
+    const decoded = decodeFlyer(encodePng(tiny, 8, 8), "image/png");
+    assert.equal(decoded?.width, 8);
+    assert.equal(decoded?.height, 8);
+  });
+
+  it("calls the public project baked at build time", async () => {
+    assert.deepEqual(eventShareConfig({ VITE_SUPABASE_URL: "https://example.supabase.co/", VITE_SUPABASE_PUBLISHABLE_KEY: "anon-public" }), {
+      url: "https://example.supabase.co",
+      key: "anon-public",
+    });
+    assert.equal(supabaseFromConfig(null), null);
+    assert.equal(supabaseFromConfig({ url: "", key: "anon-public" }), null);
+    const calls = [];
+    const result = await fetchShareCard(
+      { url: "https://example.supabase.co", key: "anon-public" },
+      "listening-night",
+      async (url, init) => {
+        calls.push({ url, apikey: init.headers.apikey });
+        return new Response(JSON.stringify([CARD]), { status: 200 });
+      },
+    );
+    assert.equal(result.configured, true);
+    assert.equal(result.card.title, "Listening night");
+    assert.deepEqual(calls, [{ url: "https://example.supabase.co/rest/v1/rpc/public_event_share", apikey: "anon-public" }]);
   });
 
   it("leaves the landing shell and the feed out of the event function", () => {
@@ -193,6 +221,11 @@ describe("event share links", () => {
     assert.match(index, /<title>Ether<\/title>/);
     assert.match(index, /og:image" content="https:\/\/etherbylcove\.com\/og\.png"/);
     assert.equal(existsSync(new URL("../../functions/_middleware.js", import.meta.url)), false);
+    assert.equal(existsSync(new URL("../../wrangler.toml", import.meta.url)), false);
+    const share = readFileSync(new URL("../../functions/_shared/eventShare.js", import.meta.url), "utf8");
+    const request = readFileSync(new URL("../../functions/_shared/eventShareRequest.js", import.meta.url), "utf8");
+    assert.equal(share.includes("VITE_SUPABASE"), false);
+    assert.equal(request.includes("VITE_SUPABASE"), false);
     const sql = readFileSync(new URL("../../supabase/migrations/20261024211000_event_share_slug.sql", import.meta.url), "utf8");
     assert.match(sql, /is_public IS TRUE/);
     assert.match(sql, /'draft'/);

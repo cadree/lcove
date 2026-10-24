@@ -1,17 +1,25 @@
 import jpeg from "jpeg-js";
-import pngjs from "pngjs";
-import { Buffer } from "node:buffer";
+import { decode as decodePng, encode as encodePngImage } from "fast-png";
 import { safeImageUrl } from "./eventShare.js";
-
-if (typeof globalThis.Buffer === "undefined") globalThis.Buffer = Buffer;
-
-const PNG = pngjs.PNG;
 
 export const OG_WIDTH = 1200;
 export const OG_HEIGHT = 630;
 export const ICON_SIZE = 180;
 const MAX_PIXELS = 20_000_000;
 const MAX_BYTES = 8_000_000;
+
+// jpeg-js encode returns Buffer.from when a CommonJS module object exists.
+// Workers have no Node Buffer. A tiny stand-in keeps the crop off nodejs_compat.
+if (typeof globalThis.Buffer === "undefined") {
+  globalThis.Buffer = {
+    from(value) {
+      return value instanceof Uint8Array ? value : Uint8Array.from(value);
+    },
+    alloc(size) {
+      return new Uint8Array(size);
+    },
+  };
+}
 
 export function coverCrop(src, sw, sh, dw, dh) {
   const scale = Math.max(dw / sw, dh / sh);
@@ -35,9 +43,46 @@ export function coverCrop(src, sw, sh, dw, dh) {
   return out;
 }
 
-function asBuffer(bytes) {
-  const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+function asRgba(image) {
+  if (!image || image.depth !== 8) return null;
+  const width = image.width;
+  const height = image.height;
+  const channels = image.channels;
+  if (!width || !height || width * height > MAX_PIXELS) return null;
+  const pixels = image.data instanceof Uint8Array ? image.data : new Uint8Array(image.data);
+  const count = width * height;
+  if (channels === 4 && pixels.length >= count * 4) return { width, height, data: pixels };
+  const rgba = new Uint8Array(count * 4);
+  if (channels === 3 && pixels.length >= count * 3) {
+    for (let i = 0; i < count; i += 1) {
+      rgba[i * 4] = pixels[i * 3];
+      rgba[i * 4 + 1] = pixels[i * 3 + 1];
+      rgba[i * 4 + 2] = pixels[i * 3 + 2];
+      rgba[i * 4 + 3] = 255;
+    }
+    return { width, height, data: rgba };
+  }
+  if (channels === 2 && pixels.length >= count * 2) {
+    for (let i = 0; i < count; i += 1) {
+      const gray = pixels[i * 2];
+      rgba[i * 4] = gray;
+      rgba[i * 4 + 1] = gray;
+      rgba[i * 4 + 2] = gray;
+      rgba[i * 4 + 3] = pixels[i * 2 + 1];
+    }
+    return { width, height, data: rgba };
+  }
+  if (channels === 1 && pixels.length >= count) {
+    for (let i = 0; i < count; i += 1) {
+      const gray = pixels[i];
+      rgba[i * 4] = gray;
+      rgba[i * 4 + 1] = gray;
+      rgba[i * 4 + 2] = gray;
+      rgba[i * 4 + 3] = 255;
+    }
+    return { width, height, data: rgba };
+  }
+  return null;
 }
 
 export function decodeFlyer(bytes, contentType = "") {
@@ -47,13 +92,9 @@ export function decodeFlyer(bytes, contentType = "") {
     const type = String(contentType || "").toLowerCase();
     const png = data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4e && data[3] === 0x47;
     const jpg = data[0] === 0xff && data[1] === 0xd8;
-    if (png || type.includes("png")) {
-      const image = PNG.sync.read(asBuffer(data));
-      if (!image.width || !image.height || image.width * image.height > MAX_PIXELS) return null;
-      return { width: image.width, height: image.height, data: image.data };
-    }
+    if (png || type.includes("png")) return asRgba(decodePng(data));
     if (jpg || type.includes("jpeg") || type.includes("jpg")) {
-      const image = jpeg.decode(asBuffer(data), { useTArray: true, formatAsRGBA: true });
+      const image = jpeg.decode(data, { useTArray: true, formatAsRGBA: true });
       if (!image.width || !image.height || image.width * image.height > MAX_PIXELS) return null;
       return { width: image.width, height: image.height, data: image.data };
     }
@@ -68,10 +109,8 @@ export function encodeJpeg(rgba, width, height, quality = 82) {
 }
 
 export function encodePng(rgba, width, height) {
-  const png = new PNG({ width, height });
   const source = rgba instanceof Uint8Array ? rgba : new Uint8Array(rgba);
-  png.data.set(source.subarray(0, width * height * 4));
-  return PNG.sync.write(png);
+  return encodePngImage({ width, height, data: source, depth: 8, channels: 4 });
 }
 
 export function renderFlyerDerivative(bytes, contentType, kind) {

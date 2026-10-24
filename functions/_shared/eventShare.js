@@ -297,17 +297,17 @@ export function shareResultResponse(result, method = "GET") {
   return null;
 }
 
-export function supabaseEnv(env) {
-  const source = env || {};
-  const url = String(source.SUPABASE_URL || source.VITE_SUPABASE_URL || "").trim().replace(/\/$/, "");
-  const key = String(source.SUPABASE_ANON_KEY || source.VITE_SUPABASE_PUBLISHABLE_KEY || "").trim();
-  if (!url || !key) return null;
+/** Public project baked into dist/event-share-config.json. Not a runtime env var. */
+export function supabaseFromConfig(body) {
+  if (!body || typeof body !== "object") return null;
+  const url = String(body.url || "").trim().replace(/\/$/, "");
+  const key = String(body.key || "").trim();
+  if (!/^https?:\/\//i.test(url) || !key) return null;
   return { url, key };
 }
 
-export async function fetchShareCard(env, ref, fetchImpl = fetch) {
-  const target = supabaseEnv(env);
-  if (!target) return { configured: false, card: null };
+export async function fetchShareCard(target, ref, fetchImpl = fetch) {
+  if (!target?.url || !target?.key) return { configured: false, card: null };
   let response;
   try {
     response = await fetchImpl(`${target.url}/rest/v1/rpc/public_event_share`, {
@@ -339,7 +339,7 @@ function cardCacheRequest(ref) {
   return new Request(`https://ether.internal/event-share/${encodeURIComponent(ref)}`);
 }
 
-export async function loadShareCard(env, ref, context) {
+export async function loadShareCard(target, ref, context) {
   try {
     const cache = globalThis.caches?.default;
     if (cache) {
@@ -352,7 +352,7 @@ export async function loadShareCard(env, ref, context) {
   } catch {
     // The cache API is a Cloudflare runtime. Tests and local node skip it.
   }
-  const loaded = await fetchShareCard(env, ref);
+  const loaded = await fetchShareCard(target, ref);
   if (loaded.configured) {
     try {
       const cache = globalThis.caches?.default;

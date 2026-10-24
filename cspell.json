@@ -85,6 +85,8 @@
     "mobilenet",
     "hentai",
     "indexeddb",
-    "wasm"
+    "wasm",
+    "slugifies",
+    "pgcrypto"
   ]
 }

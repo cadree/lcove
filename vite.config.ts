@@ -2,6 +2,21 @@ import { spawnSync } from "node:child_process";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import { eventShareConfigJson } from "./scripts/event-share-config.mjs";
+
+function eventShareConfigPlugin() {
+  return {
+    name: "event-share-config",
+    apply: "build" as const,
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "event-share-config.json",
+        source: eventShareConfigJson(process.env),
+      });
+    },
+  };
+}
 
 function previewSupabaseGuard() {
   const result = spawnSync(
@@ -152,7 +167,7 @@ export default defineConfig(() => ({
     host: "::",
     port: 8080,
   },
-  plugins: [previewSupabaseGuard(), react(), routePreloadPlugin()],
+  plugins: [previewSupabaseGuard(), eventShareConfigPlugin(), react(), routePreloadPlugin()],
   resolve: {
     alias: [
       // Exact match so a regenerated src/integrations/supabase/client.ts

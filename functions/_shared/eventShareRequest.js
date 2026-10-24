@@ -1,5 +1,14 @@
-import { loadShareCard, routeEventShare, shareResultResponse } from "./eventShare.js";
+import { loadShareCard, routeEventShare, shareResultResponse, supabaseFromConfig } from "./eventShare.js";
 import { fetchFlyerDerivative } from "./flyerImage.js";
+
+async function readBakedProject(context) {
+  const assets = context.env?.ASSETS;
+  if (!assets?.fetch) return null;
+  const assetUrl = new URL("/event-share-config.json", context.request.url);
+  const response = await assets.fetch(new Request(assetUrl));
+  if (!response.ok) return null;
+  return supabaseFromConfig(await response.json());
+}
 
 async function cachedImage(request) {
   try {
@@ -19,7 +28,7 @@ export async function onEventShareRequest(context) {
   }
   try {
     const result = await routeEventShare(context.request, {
-      loadCard: (ref) => loadShareCard(context.env, ref, context),
+      loadCard: async (ref) => loadShareCard(await readBakedProject(context), ref, context),
       loadHtml: async () => {
         const assetUrl = new URL("/index.html", context.request.url);
         const response = await context.env.ASSETS.fetch(new Request(assetUrl));
