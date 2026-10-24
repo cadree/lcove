@@ -22,6 +22,7 @@ import {
   Flag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/navigation/BackButton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -232,7 +233,8 @@ export default function PublicProjectPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background">
+        <div className="px-4 pt-4"><BackButton label="Back" fallback="/projects" /></div>
         <div className="w-full max-w-lg mx-auto px-4 space-y-4">
           <Skeleton className="h-48 w-full rounded-2xl" />
           <Skeleton className="h-8 w-3/4" />
@@ -250,6 +252,7 @@ export default function PublicProjectPage() {
           <Target className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
           <h1 className="text-2xl font-display font-bold mb-2">Project Not Found</h1>
           <p className="text-muted-foreground">This project isn't available.</p>
+          <BackButton showLabel label="Back" fallback="/projects" className="mt-4" />
         </div>
       </div>
     );
@@ -265,7 +268,10 @@ export default function PublicProjectPage() {
     new Intl.NumberFormat("en-US", { style: "currency", currency: project.currency || "USD", minimumFractionDigits: 0 }).format(amount);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative min-h-screen bg-background">
+      <div className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-20">
+        <BackButton label="Back" fallback="/projects" className="bg-background/70 backdrop-blur" />
+      </div>
       {/* Hero */}
       <div className="relative">
         {project.cover_image_url ? (

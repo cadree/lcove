@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { LandingNav } from "@/components/landing/LandingNav";
+import { BackButton } from "@/components/navigation/BackButton";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,6 +94,7 @@ export default function Waitlist() {
       <LandingNav />
       <main className="px-4 pb-16 pt-28 sm:px-6">
         <div className="mx-auto w-full max-w-md lg:max-w-lg">
+          <BackButton showLabel label="Back" fallback="/" className="mb-4" />
           {refCode ? (
             <div className="file-panel px-4 py-6 text-center sm:px-6">
               <h1 className="ether-title text-3xl text-foreground">{WAITLIST_CONFIRMATION}</h1>

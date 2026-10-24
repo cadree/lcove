@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { STORE_PLATFORM_FEE_PERCENT } from "../_shared/fees.mjs";
+import { STORE_PLATFORM_FEE_PERCENT, storeCashSplit } from "../_shared/fees.mjs";
+
 import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
 import { verifiedDestination } from "../_shared/creator-connect.mjs";
 import { ledgerBalances } from "../_shared/credit-balances.ts";
@@ -13,8 +14,6 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-const PLATFORM_FEE_PERCENT = STORE_PLATFORM_FEE_PERCENT;
 
 const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
@@ -71,6 +70,18 @@ serve(async (req) => {
       if (paymentType !== "cash") throw new Error("Sign in to pay with credits");
       const guest = parseGuestCheckout({ ...body, paymentType: "cash", quantity });
       if (!guest) throw new Error("name and email required");
+      const { data: priced, error: priceError } = await supabaseAdmin
+        .from("store_items")
+        .select("price, type, store:stores(flat_shipping_cents, tax_line_cents)")
+        .eq("id", itemId)
+        .maybeSingle();
+      if (priceError || !priced?.price) throw new Error("Item not found");
+      const pricedStore = Array.isArray(priced.store) ? priced.store[0] : priced.store;
+      const split = storeCashSplit(
+        Math.round(Number(priced.price) * 100) * guest.quantity,
+        priced.type === "product" ? Number(pricedStore?.flat_shipping_cents || 0) : 0,
+        Number(pricedStore?.tax_line_cents || 0),
+      );
       const ipKey = await clientRateKey(req.headers);
       const { data: started, error: startError } = await supabaseAdmin.rpc("begin_guest_store_order", {
         p_item_id: itemId,
@@ -78,6 +89,7 @@ serve(async (req) => {
         p_guest_email: guest.email,
         p_quantity: guest.quantity,
         p_ip_key: ipKey || null,
+        p_platform_fee_cents: split.platformFeeCents,
       });
       if (startError || !started?.order_id) throw new Error(startError?.message || "Failed to create order");
       const order = started as {
@@ -188,7 +200,7 @@ serve(async (req) => {
         source_id: order.order_id,
         amount: order.platform_fee_cents / 100,
         credits_amount: 0,
-        description: `Platform fee (10%): ${order.title}`,
+        description: `Platform fee (${STORE_PLATFORM_FEE_PERCENT}%): ${order.title}`,
       });
       return new Response(
         JSON.stringify({ url: session.url, orderId: order.order_id }),
@@ -316,12 +328,16 @@ serve(async (req) => {
         throw new Error("This item is sold outside Ether");
       }
 
-      const merchandiseCents = Math.round(item.price * 100) * quantity;
-      const shippingCents = item.type === "product" ? Number(store.flat_shipping_cents || 0) : 0;
-      const taxCents = Number(store.tax_line_cents || 0);
-      const platformFeeAmount = Math.round(merchandiseCents * (PLATFORM_FEE_PERCENT / 100));
-      const sellerAmount = merchandiseCents - platformFeeAmount + shippingCents + taxCents;
-      const totalPrice = (merchandiseCents + shippingCents + taxCents) / 100;
+      const split = storeCashSplit(
+        Math.round(item.price * 100) * quantity,
+        item.type === "product" ? Number(store.flat_shipping_cents || 0) : 0,
+        Number(store.tax_line_cents || 0),
+      );
+      const platformFeeAmount = split.platformFeeCents;
+      const sellerAmount = split.sellerCents;
+      const shippingCents = split.shippingCents;
+      const taxCents = split.taxCents;
+      const totalPrice = split.totalCents / 100;
 
       logStep("Cash split calculated", { 
         totalPrice, 
@@ -458,7 +474,7 @@ serve(async (req) => {
         source_id: order.id,
         amount: platformFeeAmount / 100,
         credits_amount: 0,
-        description: `Platform fee (${PLATFORM_FEE_PERCENT}%): ${item.title}`,
+        description: `Platform fee (${STORE_PLATFORM_FEE_PERCENT}%): ${item.title}`,
       });
 
       logStep("Checkout session created", { sessionUrl: session.url, orderId: order.id });

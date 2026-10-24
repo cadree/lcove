@@ -71,6 +71,81 @@ export async function shareLink(opts: ShareLinkOptions): Promise<void> {
 /** Canonical share domain for the platform. */
 export const SHARE_BASE_URL = 'https://etherbylcove.com';
 
+/** Free sms: link. The handset opens Messages. This never calls a paid SMS API. */
+export function smsShareHref(url: string, text?: string): string {
+  const trimmed = url.trim();
+  const note = text?.replace(/\s+/g, " ").trim();
+  const body = encodeURIComponent(note ? `${note} ${trimmed}` : trimmed);
+  return `sms:?&body=${body}`;
+}
+
+export function nativeSharePlan(options: {
+  nativePlatform: boolean;
+  pluginAvailable: boolean;
+  webShare: boolean;
+}): "capacitor" | "web" | "unavailable" {
+  if (options.nativePlatform && options.pluginAvailable) return "capacitor";
+  if (options.webShare) return "web";
+  return "unavailable";
+}
+
+function shareWasCancelled(error: unknown): boolean {
+  if (typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "AbortError") {
+    return true;
+  }
+  const message = error instanceof Error ? error.message : "";
+  return /cancel/i.test(message);
+}
+
+/**
+ * iOS Safari uses navigator.share. The Capacitor app uses the Share plugin
+ * when it is installed, then the web sheet. Nothing here sends a paid text.
+ */
+export async function openNativeShare(opts: {
+  title?: string;
+  text?: string;
+  url: string;
+}): Promise<"shared" | "cancelled" | "unavailable"> {
+  const webShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  let nativePlatform = false;
+  let pluginAvailable = false;
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+    nativePlatform = Capacitor.isNativePlatform();
+    pluginAvailable = Capacitor.isPluginAvailable("Share");
+  } catch {
+    nativePlatform = false;
+  }
+  const plan = nativeSharePlan({ nativePlatform, pluginAvailable, webShare });
+  try {
+    if (plan === "capacitor") {
+      const { Share } = await import("@capacitor/share");
+      await Share.share({
+        title: opts.title,
+        text: opts.text,
+        url: opts.url,
+        dialogTitle: opts.title || "Share",
+      });
+      return "shared";
+    }
+    if (plan === "web" && typeof navigator.share === "function") {
+      await navigator.share({ title: opts.title, text: opts.text, url: opts.url });
+      return "shared";
+    }
+  } catch (error) {
+    if (shareWasCancelled(error)) return "cancelled";
+    if (plan === "capacitor" && webShare && typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: opts.title, text: opts.text, url: opts.url });
+        return "shared";
+      } catch (webError) {
+        if (shareWasCancelled(webError)) return "cancelled";
+      }
+    }
+  }
+  return "unavailable";
+}
+
 export type ShareChannel =
   | 'native'
   | 'copy'

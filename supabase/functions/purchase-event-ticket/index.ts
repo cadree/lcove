@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { EVENT_PLATFORM_FEE_PERCENT } from "../_shared/fees.mjs";
+import { EVENT_PLATFORM_FEE_PERCENT, platformFeeCents } from "../_shared/fees.mjs";
 import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
 import { httpStatusForError } from "../_shared/http-error.mjs";
 import { clientRateKey, GUEST_LIMITS } from "../_shared/guest-consumer.mjs";
@@ -365,7 +365,7 @@ serve(async (req) => {
     };
 
     if (creatorConnectId && creatorPayoutEnabled) {
-      const applicationFee = Math.round(totalCents * (EVENT_PLATFORM_FEE_PERCENT / 100));
+      const applicationFee = platformFeeCents(totalCents, EVENT_PLATFORM_FEE_PERCENT);
       sessionConfig.payment_intent_data = {
         transfer_data: { destination: creatorConnectId },
         ...(applicationFee > 0 ? { application_fee_amount: applicationFee } : {}),

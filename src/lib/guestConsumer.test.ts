@@ -51,7 +51,7 @@ describe("guest consumer input", () => {
 
 describe("anon column grants", () => {
   it("matches the migration grants and leaves contact fields out", () => {
-    const sql = readFileSync("supabase/migrations/20261024120000_anon_consumer_access.sql", "utf8");
+    const sql = readFileSync("supabase/migrations/20261024130000_anon_consumer_access.sql", "utf8");
     const grant = (table: string) => {
       const marker = `) ON public.${table} TO anon;`;
       const end = sql.indexOf(marker);

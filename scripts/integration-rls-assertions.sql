@@ -1962,7 +1962,8 @@ BEGIN;
     'Buyer Guest',
     'checkout-rollback@example.com',
     1,
-    'ip-hash-for-test'
+    'ip-hash-for-test',
+    123
   );
   DO $$
   BEGIN
@@ -1971,8 +1972,9 @@ BEGIN;
       WHERE guest_email = 'checkout-rollback@example.com'
         AND buyer_id IS NULL
         AND status = 'pending'
+        AND platform_fee = 1.23
     ) THEN
-      RAISE EXCEPTION 'FAIL: guest checkout order did not write';
+      RAISE EXCEPTION 'FAIL: guest checkout order did not store the supplied fee';
     END IF;
     IF EXISTS (
       SELECT 1 FROM public.store_orders
@@ -2011,7 +2013,8 @@ BEGIN;
     'Service Guest',
     'service-checkout@example.com',
     2,
-    NULL
+    NULL,
+    0
   );
 ROLLBACK;
 RESET ROLE;

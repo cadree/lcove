@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, parseISO } from "date-fns";
 import { formatEventDate } from "@/lib/eventTime";
 import {
-  ArrowLeft,
   Calendar,
   List,
   ChevronLeft,
@@ -19,6 +18,7 @@ import {
   Rss,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/navigation/BackButton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -156,14 +156,7 @@ export default function EventsDashboard() {
       >
         <div className="flex items-center justify-between px-4 h-14">
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/dashboard")}
-              className="h-9 w-9"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <BackButton label="Back" fallback="/dashboard" className="h-11 w-11" />
             <div>
               <h1 className="ether-title text-lg">My Events</h1>
               <p className="text-xs text-muted-foreground">{events?.length || 0} events</p>

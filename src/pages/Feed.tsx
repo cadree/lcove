@@ -23,6 +23,7 @@ import { useFavorites } from "@/hooks/useFavorites";
 import { QuestCard } from "@/components/novi/QuestCard";
 import { useNoviQuests } from "@/hooks/useNoviQuests";
 import { homeQuestCard } from "@/lib/noviQuests";
+import { FEED_RENDER_PAGE, nextRenderedCount } from "@/lib/feedWindow";
 import bearLogo from "@/assets/ether-bear-logo.webp";
 const Feed = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -45,8 +46,11 @@ const Feed = () => {
   } = useProfile(user?.id);
   const {
     posts,
-    isLoading
+    isLoading,
+    isError,
+    refetch,
   } = usePosts();
+  const [shown, setShown] = useState(FEED_RENDER_PAGE);
   const postCreatorRef = useRef<HTMLTextAreaElement>(null);
 
   // Handle action params from FAB
@@ -122,12 +126,16 @@ const Feed = () => {
     return matchesCategory && matchesPostType && matchesRegion;
   });
   const favoriteIds = new Set(favorites);
+  useEffect(() => {
+    setShown(FEED_RENDER_PAGE);
+  }, [lane, activeCategory, postTypeFilter, regionFilter, isShuffled]);
   const lanePosts = filteredPosts.filter((post) => {
     if (lane === "friends") return favoriteIds.has(post.user_id);
     if (lane === "city") return !!profile?.city && (post.profile?.city === profile.city || post.profile?.city_display === profile.city_display);
     if (lane === "live") return false;
     return true;
   });
+  const visiblePosts = lanePosts.slice(0, shown);
   return <PageLayout>
       <div className="px-4 sm:px-6 pt-3">
         <header className="mb-3 flex min-h-11 items-center justify-between gap-3">
@@ -231,17 +239,26 @@ const Feed = () => {
             <span className="mono-label rounded-full bg-[hsl(var(--brand))] px-2 py-1 text-[8px] text-[#0A0A0A]">Live</span>
           </Link>
         )}
-        {isLoading ? <div className="flex items-center justify-center py-20">
+        {isLoading ? <div className="flex items-center justify-center py-20" role="status">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <span className="sr-only">Loading the feed</span>
+          </div> : isError ? <div className="py-16 text-center">
+            <p className="text-sm text-muted-foreground">The feed did not load.</p>
+            <Button type="button" variant="outline" className="mt-3 min-h-11" onClick={() => void refetch()}>Try again</Button>
           </div> : <div className="space-y-5 pb-32">
-            <FeedEngagementProvider postIds={lanePosts.map((post) => post.id)}>
+            <FeedEngagementProvider postIds={visiblePosts.map((post) => post.id)}>
             <div className="space-y-5">
-              {lanePosts.map((post) => (
+              {visiblePosts.map((post) => (
                 <div key={post.feed_key ?? post.id} className="[content-visibility:auto] [contain-intrinsic-size:auto_480px]">
                   <FeedPost post={post} />
                 </div>
               ))}
             </div>
+            {shown < lanePosts.length && (
+              <Button type="button" variant="outline" className="min-h-11 w-full" onClick={() => setShown((count) => nextRenderedCount(count, lanePosts.length))}>
+                Show more
+              </Button>
+            )}
             </FeedEngagementProvider>
 
             {lanePosts.length === 0 && posts.length === 0 && user && lane !== "live" && <FirstRunEmpty title="Your feed is empty" description="Start with a post, look through the directory, or read community updates." actions={[{

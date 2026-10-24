@@ -173,7 +173,8 @@ CREATE OR REPLACE FUNCTION public.begin_guest_store_order(
   p_guest_name text,
   p_guest_email text,
   p_quantity integer,
-  p_ip_key text
+  p_ip_key text,
+  p_platform_fee_cents integer
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -235,11 +236,15 @@ BEGIN
   END IF;
   PERFORM public.consume_guest_quota('guest_checkout_global', 'all', 200, 3600);
 
-  -- 10% of the item price. Keep equal to STORE_PLATFORM_FEE_PERCENT.
+  -- Fee cents come from purchase-store-item via storeCashSplit, the same
+  -- helper the member checkout uses. This function stores that amount.
   v_merch := round(v_item.price * 100)::integer * v_qty;
   v_ship := CASE WHEN v_item.type = 'product' THEN COALESCE(v_store.flat_shipping_cents, 0) ELSE 0 END;
   v_tax := COALESCE(v_store.tax_line_cents, 0);
-  v_fee := round(v_merch * 10 / 100.0)::integer;
+  v_fee := p_platform_fee_cents;
+  IF v_fee IS NULL OR v_fee < 0 OR v_fee > v_merch THEN
+    RAISE EXCEPTION 'fee required';
+  END IF;
   v_seller := v_merch - v_fee + v_ship + v_tax;
   v_token := encode(gen_random_bytes(16), 'hex');
 
@@ -282,8 +287,8 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.begin_guest_store_order(uuid, text, text, integer, text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.begin_guest_store_order(uuid, text, text, integer, text) TO service_role;
+REVOKE ALL ON FUNCTION public.begin_guest_store_order(uuid, text, text, integer, text, integer) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.begin_guest_store_order(uuid, text, text, integer, text, integer) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.cancel_guest_store_order(
   p_order_id uuid,

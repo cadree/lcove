@@ -1,5 +1,5 @@
 // Columns the anon role may read. Keep these lists equal to the GRANT
-// statements in supabase/migrations/20261024120000_anon_consumer_access.sql.
+// statements in supabase/migrations/20261024130000_anon_consumer_access.sql.
 
 import type { Database } from "@/integrations/supabase/types";
 
@@ -86,7 +86,7 @@ export type PublicTicketTier = Pick<PublicTable["ticket_tiers"]["Row"], (typeof 
 export type PublicStore = Pick<PublicTable["stores"]["Row"], (typeof PUBLIC_STORE_COLUMNS)[number]>;
 export type PublicStoreItem = Pick<PublicTable["store_items"]["Row"], (typeof PUBLIC_STORE_ITEM_COLUMNS)[number]>;
 
-/** PostgREST cannot parse a joined column list, so the caller names the row. */
+/** A joined column list is not a generated query literal, so the caller names the row. */
 export function publicRow<T>(value: unknown): T {
   return value as T;
 }
