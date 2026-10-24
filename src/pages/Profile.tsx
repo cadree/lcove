@@ -22,6 +22,7 @@ import { ProfileStats } from "@/components/profile/ProfileStats";
 import { ProfileAboutSection } from "@/components/profile/ProfileAboutSection";
 import { ProfileFolders } from "@/components/profile/ProfileFolders";
 import { ProfileBookEntry, ProfileQuickLinks, ToolsEntry } from "@/components/profile/ProfileQuickLinks";
+import { EtherIdEntry } from "@/components/profile/EtherIdEntry";
 import { ProfileFilms } from "@/components/profile/ProfileFilms";
 import { ProfileNovi } from "@/components/profile/ProfileNovi";
 import { FolderDetailView } from "@/components/profile/FolderDetailView";
@@ -600,6 +601,7 @@ const Profile = () => {
           founding={profile?.founding}
         />
 
+        {isOwnProfile && <EtherIdEntry />}
         {isOwnProfile && <div className="px-4 pt-4"><ProfileNovi /></div>}
         <ProfileBookEntry />
         {isOwnProfile && <ToolsEntry />}

@@ -283,7 +283,8 @@ END $$;
 RESET ROLE;
 
 -- ---------------------------------------------------------------------------
--- Blocks: A blocks B. The blocker stops seeing B. B cannot message or follow A.
+-- Blocks: A blocks B. The blocker stops seeing B. Either direction blocks
+-- messages (either_blocked). B cannot follow A. A can still follow B.
 -- ---------------------------------------------------------------------------
 
 INSERT INTO public.user_blocks (blocker_id, blocked_id)
@@ -321,18 +322,27 @@ BEGIN
     RAISE EXCEPTION 'FAIL: A cannot see their own post after blocking';
   END IF;
 
-  INSERT INTO public.messages (conversation_id, sender_id, content)
-  VALUES (
-    'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
-    '11111111-1111-4111-8111-111111111111',
-    'A can still write'
-  );
+  BEGIN
+    INSERT INTO public.messages (conversation_id, sender_id, content)
+    VALUES (
+      'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      '11111111-1111-4111-8111-111111111111',
+      'A should not write'
+    );
+    RAISE EXCEPTION 'FAIL: blocker A was allowed to message B';
+  EXCEPTION
+    WHEN insufficient_privilege OR raise_exception THEN
+      IF SQLERRM ILIKE '%FAIL:%' THEN
+        RAISE;
+      END IF;
+      RAISE NOTICE 'PASS: A cannot message B after blocking (%)', SQLERRM;
+  END;
   INSERT INTO public.favorite_friends (user_id, friend_user_id)
   VALUES (
     '11111111-1111-4111-8111-111111111111',
     '22222222-2222-4222-8222-222222222222'
   );
-  RAISE NOTICE 'PASS: A hides B and can still message and follow B';
+  RAISE NOTICE 'PASS: A hides B and can still follow B';
 END $$;
 
 RESET ROLE;

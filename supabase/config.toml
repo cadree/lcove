@@ -242,3 +242,8 @@ verify_jwt = false
 
 [functions.resend-webhook]
 verify_jwt = false
+
+# Apple Wallet devices call this without a Supabase JWT. The handler checks
+# the user JWT for downloads and the ApplePass token for PassKit routes.
+[functions.ether-id-pass]
+verify_jwt = false

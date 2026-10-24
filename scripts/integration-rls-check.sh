@@ -77,5 +77,7 @@ done < <(find "$ROOT/supabase/migrations" -maxdepth 1 -type f -name '*.sql' | so
 echo "applied $count migrations"
 echo "running RLS assertions"
 psql -v ON_ERROR_STOP=1 -d "$DB_NAME" -f "$ROOT/scripts/integration-rls-assertions.sql"
+echo "running ether id checks"
+psql -v ON_ERROR_STOP=1 -d "$DB_NAME" -f "$ROOT/scripts/ether-id-rls.sql"
 echo "integration rls checks passed"
 echo "scratch database $DB_NAME dropped after the check"

@@ -43,6 +43,10 @@ export const shotProfile = {
   phone: null,
   social_links: null,
   founding: false,
+  username: "maya",
+  birthday_month: 3,
+  birthday_day: 4,
+  show_birthday: true,
 };
 
 const friend = (id: string, name: string) => ({
