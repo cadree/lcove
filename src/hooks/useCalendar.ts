@@ -30,6 +30,7 @@ export interface CalendarEvent {
   timezone: string | null;
   recurrence: string | null;
   status: string | null;
+  slug?: string | null;
   created_at: string;
   rsvp_count?: number;
   user_rsvp?: EventRSVP | null;

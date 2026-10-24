@@ -146,6 +146,45 @@ export async function openNativeShare(opts: {
   return "unavailable";
 }
 
+/** Copy the event link. Does not open the system share sheet. */
+export async function copyEventLink(url: string, copyMessage = "Link copied"): Promise<void> {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(copyMessage);
+      return;
+    } catch {
+      // fall through
+    }
+  }
+  if (typeof document !== "undefined") {
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = url;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      if (ok) {
+        toast.success(copyMessage);
+        return;
+      }
+    } catch {
+      // fall through
+    }
+  }
+  if (typeof window !== "undefined") window.prompt("Copy this link:", url);
+}
+
+/** Capacitor share sheet, then the browser sheet, then copy. */
+export async function shareEventLink(opts: { title?: string; text?: string; url: string }): Promise<void> {
+  const result = await openNativeShare(opts);
+  if (result === "shared" || result === "cancelled") return;
+  await copyEventLink(opts.url);
+}
+
 export type ShareChannel =
   | 'native'
   | 'copy'
@@ -249,8 +288,10 @@ export async function shareToChannel(
 
   switch (channel) {
     case 'native':
+      await shareEventLink(opts);
+      return;
     case 'copy':
-      await shareLink(opts);
+      await copyEventLink(url);
       return;
 
     case 'twitter': {

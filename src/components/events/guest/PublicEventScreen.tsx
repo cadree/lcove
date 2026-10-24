@@ -42,10 +42,11 @@ interface Props {
   onReport: () => void;
   onCta: () => void;
   reminder?: ReactNode;
+  hostShare?: ReactNode;
 }
 
 export function PublicEventScreen({
-  model, onBack, onSave, onShare, onLocation, onGuestlist, onFollow, following, onCalendar, onContact, onReport, onCta, reminder,
+  model, onBack, onSave, onShare, onLocation, onGuestlist, onFollow, following, onCalendar, onContact, onReport, onCta, reminder, hostShare,
 }: Props) {
   const ctaStyle = model.brandColor ? { backgroundColor: model.brandColor, color: "#1a1020" } : undefined;
   return (
@@ -70,6 +71,7 @@ export function PublicEventScreen({
 
       <div className="relative z-10 -mt-16 space-y-5 px-4 pb-28">
         <h1 className="text-4xl leading-none" style={{ fontFamily: flyerFontFamily(model.fontId) }}>{model.title}</h1>
+        {hostShare}
         <p className="text-sm text-muted-foreground">{model.whenLabel}</p>
         {model.venue && <p className="text-base">{model.venue}</p>}
         <button type="button" className="inline-flex items-center gap-2 text-sm text-primary" onClick={onLocation}>

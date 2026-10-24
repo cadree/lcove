@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { logAuthEvent, logAuthError } from '@/lib/authDebug';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, User, Phone, Wifi, WifiOff } from 'lucide-react';
 import { EtherWordmark } from '@/components/brand/EtherWordmark';
+import { eventReturnPath, rememberEventReturn } from '../../functions/_shared/eventShare.js';
 
 const signupSchema = z.object({
   email: z.string().email('Please enter a valid email').max(255),
@@ -236,6 +237,13 @@ const Auth = () => {
           description: 'Sign up with the invited email.',
           variant: 'destructive',
         });
+        return;
+      }
+      const eventReturn = eventReturnPath(searchParams.get('redirect'));
+      if (eventReturn) {
+        rememberEventReturn(eventReturn);
+        logAuthEvent('User authenticated, returning to the event');
+        navigate(eventReturn, { replace: true });
         return;
       }
       logAuthEvent('User authenticated, continuing to onboarding');

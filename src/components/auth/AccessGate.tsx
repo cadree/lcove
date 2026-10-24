@@ -6,6 +6,7 @@ import bearLogo from '@/assets/ether-bear-logo.webp';
 import { isKnownPath, isPublicPath } from "@/lib/appRoutes";
 import { NO_FAKE_LINE, WELCOME_HOME } from "@/content/copy";
 import { SignUpPrompt } from "@/components/auth/SignUpPrompt";
+import { EVENT_RETURN_KEY, eventReturnPath, rememberEventReturn } from "../../../functions/_shared/eventShare.js";
 
 interface AccessGateProps {
   children: React.ReactNode;
@@ -60,8 +61,16 @@ const AccessGate = ({ children }: AccessGateProps) => {
       
       // If onboarding not completed and no session flag, force onboarding
       if (!profile.onboarding_completed && !justCompletedOnboarding) {
+        rememberEventReturn(`${location.pathname}${location.search}`);
         navigate('/onboarding');
         return;
+      }
+
+      if (profile.onboarding_completed) {
+        const stored = eventReturnPath(sessionStorage.getItem(EVENT_RETURN_KEY));
+        if (stored && stored.split("#")[0] === `${location.pathname}${location.search}`) {
+          sessionStorage.removeItem(EVENT_RETURN_KEY);
+        }
       }
       
       // Clear the session flag only after profile shows onboarding is complete
@@ -96,7 +105,7 @@ const AccessGate = ({ children }: AccessGateProps) => {
         }
       }
     }
-  }, [user, profile, authLoading, profileLoading, isPublicRoute, isLandingRoute, knownRoute, legacyStreamId, navigate, location.pathname, hasSeenWelcome]);
+  }, [user, profile, authLoading, profileLoading, isPublicRoute, isLandingRoute, knownRoute, legacyStreamId, navigate, location.pathname, location.search, hasSeenWelcome]);
 
   if (!knownRoute) {
     return <>{children}</>;

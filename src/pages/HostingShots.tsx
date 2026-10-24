@@ -7,6 +7,7 @@ import { CreateEventChoice } from "@/components/events/host/CreateEventChoice";
 import { EventFormScreen, type EventFormValues } from "@/components/events/host/EventFormScreen";
 import { FinanceScreen } from "@/components/events/host/FinanceScreen";
 import { HostDashboardScreen } from "@/components/events/host/HostDashboardScreen";
+import { HostShareBar } from "@/components/events/HostShareBar";
 
 const flyer = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="560"><rect width="100%" height="100%" fill="#24141c"/><text x="50%" y="48%" fill="#ffc2dc" font-size="42" text-anchor="middle" font-family="Georgia">ADA</text></svg>')}`;
 const avatar = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><circle cx="40" cy="40" r="40" fill="#ffb3d1"/><text x="40" y="48" text-anchor="middle" font-size="28" font-family="Georgia" fill="#1a1020">A</text></svg>')}`;
@@ -190,9 +191,17 @@ export default function HostingShots() {
     );
   }
 
+  const hostShare = screen === "host" ? (
+    <div className="rounded-2xl border border-border/60 bg-card/80 p-3">
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Share your event</p>
+      <HostShareBar title={event.title} url="https://etherbylcove.com/e/listening-night" />
+    </div>
+  ) : undefined;
+
   return (
     <PublicEventScreen
       model={event}
+      hostShare={hostShare}
       following={false}
       onBack={noop}
       onSave={noop}

@@ -36,7 +36,9 @@ import { CalendarFeedSettings } from "@/components/calendar/CalendarFeedSettings
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { shareLink, buildShareUrl } from "@/lib/shareLink";
+import { shareEventLink } from "@/lib/shareLink";
+import { HostShareBar } from "@/components/events/HostShareBar";
+import { eventPublicUrl } from "../../../functions/_shared/eventShare.js";
 
 interface EventWithStats {
   id: string;
@@ -46,6 +48,8 @@ interface EventWithStats {
   image_url: string | null;
   ticket_type: string;
   status: string | null;
+  is_public?: boolean | null;
+  slug?: string | null;
   city: string;
   rsvpCount?: number;
   ticketCount?: number;
@@ -100,10 +104,10 @@ export function ProfileEventsDashboard() {
   }, [eventsWithStats]);
 
   const handleShare = async (event: EventWithStats) => {
-    await shareLink({
+    await shareEventLink({
       title: event.title,
       text: `Check out this event: ${event.title}`,
-      url: buildShareUrl.event(event.id),
+      url: eventPublicUrl(event),
     });
   };
 
@@ -391,8 +395,9 @@ function CompactListView({ events, onEventClick, onEdit, onShare, onDuplicate, o
         return (
           <div
             key={event.id}
-            className="flex items-center gap-3 p-2 rounded-lg border border-border/30 bg-background/50 hover:bg-muted/50 transition-colors"
+            className="space-y-2 p-2 rounded-lg border border-border/30 bg-background/50"
           >
+          <div className="flex items-center gap-3">
             <button
               onClick={() => onEventClick(event.id)}
               className="flex-1 flex items-center gap-3 text-left"
@@ -463,6 +468,8 @@ function CompactListView({ events, onEventClick, onEdit, onShare, onDuplicate, o
                 </button>
               </PopoverContent>
             </Popover>
+          </div>
+          <HostShareBar title={event.title} url={eventPublicUrl(event)} />
           </div>
         );
       })}

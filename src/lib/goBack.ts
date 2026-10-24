@@ -39,9 +39,9 @@ export function parentFallback(pathname: string): string {
   if (pathname === "/dashboard/events") return "/dashboard";
   if (/^\/admin\/onboarding\/[^/]+/.test(pathname)) return "/admin/onboarding";
   if (pathname === "/admin/onboarding") return "/admin";
-  const confirmation = pathname.match(/^\/event\/([^/]+)\/confirmation\/?$/);
-  if (confirmation) return `/event/${confirmation[1]}`;
-  if (pathname.startsWith("/event/")) return "/calendar";
+  const confirmation = pathname.match(/^\/(?:event|e)\/([^/]+)\/confirmation\/?$/);
+  if (confirmation) return `${pathname.startsWith("/e/") ? "/e" : "/event"}/${confirmation[1]}`;
+  if (pathname.startsWith("/event/") || pathname.startsWith("/e/")) return "/calendar";
   if (pathname.startsWith("/project/")) return "/projects";
   if (pathname === "/book") return "/feed";
   if (pathname.startsWith("/book/")) return "/";

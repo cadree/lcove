@@ -14,9 +14,12 @@ import { backTarget } from "@/lib/goBack";
 import { lowestBuyerCents } from "@/lib/ticketFees";
 import { stickyCtaLabel } from "@/lib/guestEvent";
 import { EventReminderToggle } from "@/components/events/EventReminderToggle";
-import { buildShareUrl, shareLink } from "@/lib/shareLink";
+import { shareEventLink } from "@/lib/shareLink";
 import { PageMeta } from "@/components/seo/PageMeta";
-import { PUBLIC_EVENT_SELECT, publicRow } from "@/lib/consumerAccess";
+import { HostShareBar } from "@/components/events/HostShareBar";
+import { usePublicEvent } from "@/hooks/usePublicEvent";
+import { eventIsShareable, eventPublicPath, eventPublicUrl, eventShareDescription, flyerVersion } from "../../functions/_shared/eventShare.js";
+import { SHARE_BASE_URL } from "@/lib/shareLink";
 import { toast } from "sonner";
 
 const savedKey = "ether-saved-events";
@@ -40,38 +43,9 @@ export default function PublicEventPage() {
   const [guestsOpen, setGuestsOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [location, setLocation] = useState<string | null>(null);
-
-  const { data: event, isLoading } = useQuery({
-    queryKey: ["public-event", eventId],
-    enabled: !!eventId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("events")
-        .select(`${PUBLIC_EVENT_SELECT}, flyer_font, page_theme, hide_address, absorb_fees`)
-        .eq("id", eventId)
-        .or("status.is.null,status.neq.draft")
-        .single();
-      if (error) throw error;
-      return publicRow<{
-        id: string;
-        creator_id: string;
-        title: string;
-        description: string | null;
-        start_date: string;
-        end_date: string | null;
-        venue: string | null;
-        address: string | null;
-        city: string | null;
-        state: string | null;
-        image_url: string | null;
-        timezone: string | null;
-        flyer_font: string | null;
-        page_theme: string | null;
-        hide_address: boolean;
-        absorb_fees: boolean;
-      }>(data);
-    },
-  });
+  const { data: event, isLoading } = usePublicEvent(eventId);
+  const returnPath = event ? eventPublicPath(event) : `/event/${eventId}`;
+  const shareable = event ? eventIsShareable(event) : false;
 
   const { data: host } = useQuery({
     queryKey: ["public-event-organizer", event?.creator_id],
@@ -206,9 +180,26 @@ export default function PublicEventPage() {
 
   return (
     <>
-      <PageMeta title={`${event.title}`} description={event.description || event.title} image={event.image_url || undefined} />
+      <PageMeta
+        title={shareable ? event.title : "Ether"}
+        description={shareable ? eventShareDescription({
+          hostName: model.hostName,
+          startDate: event.start_date,
+          timeZone: event.timezone,
+          venue: event.venue,
+          city: event.city,
+        }) : "A culture of aspirations"}
+        image={shareable && event.slug && event.image_url ? `${SHARE_BASE_URL}/e/${event.slug}/flyer.jpg?v=${flyerVersion(event.image_url)}` : shareable ? "" : undefined}
+        icon={shareable && event.slug && event.image_url ? `${SHARE_BASE_URL}/e/${event.slug}/icon.png?v=${flyerVersion(event.image_url)}` : undefined}
+      />
       <PublicEventScreen
         model={model}
+        hostShare={user && user.id === event.creator_id ? (
+          <div className="rounded-2xl border border-border/70 bg-card/80 p-3">
+            <p className="mb-2 text-xs text-muted-foreground">Share your event</p>
+            <HostShareBar title={event.title} url={eventPublicUrl(event)} />
+          </div>
+        ) : null}
         following={!!event.creator_id && isFavorite(event.creator_id)}
         onBack={goBack}
         onSave={() => {
@@ -216,12 +207,12 @@ export default function PublicEventPage() {
           localStorage.setItem(savedKey, JSON.stringify(list));
           setSaved(readSaved(event.id));
         }}
-        onShare={() => shareLink({ title: event.title, text: event.title, url: buildShareUrl.event(event.id) })}
+        onShare={() => shareEventLink({ title: event.title, text: event.title, url: eventPublicUrl(event) })}
         onLocation={showLocation}
         onGuestlist={() => setGuestsOpen(true)}
         onFollow={() => {
           if (!user) {
-            navigate(`/auth?redirect=/event/${event.id}`);
+            navigate(`/auth?redirect=${encodeURIComponent(returnPath)}`);
             return;
           }
           if (!event.creator_id) return;
@@ -237,14 +228,14 @@ export default function PublicEventPage() {
         }}
         onContact={async () => {
           if (!user || !event.creator_id) {
-            navigate(`/auth?redirect=/event/${event.id}`);
+            navigate(`/auth?redirect=${encodeURIComponent(returnPath)}`);
             return;
           }
           const conversation = await createDirectConversation.mutateAsync(event.creator_id);
           navigate(`/messages?chat=${conversation.id}`);
         }}
         onReport={() => setReportOpen(true)}
-        onCta={() => navigate(`/event/${event.id}/tickets`)}
+        onCta={() => navigate(`${returnPath}/tickets`)}
         reminder={model.past ? null : <EventReminderToggle eventId={event.id} />}
       />
       <Dialog open={guestsOpen} onOpenChange={setGuestsOpen}>

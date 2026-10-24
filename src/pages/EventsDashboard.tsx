@@ -41,7 +41,9 @@ import BottomNav from "@/components/navigation/BottomNav";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { shareLink, buildShareUrl } from "@/lib/shareLink";
+import { shareEventLink, copyEventLink } from "@/lib/shareLink";
+import { HostShareBar } from "@/components/events/HostShareBar";
+import { eventPublicUrl } from "../../functions/_shared/eventShare.js";
 
 interface EventWithStats {
   id: string;
@@ -52,6 +54,8 @@ interface EventWithStats {
   image_url: string | null;
   ticket_type: string;
   status: string | null;
+  is_public?: boolean | null;
+  slug?: string | null;
   city: string;
   rsvpCount?: number;
   ticketCount?: number;
@@ -106,10 +110,10 @@ export default function EventsDashboard() {
   }, [eventsWithStats]);
 
   const handleShare = async (event: EventWithStats) => {
-    await shareLink({
+    await shareEventLink({
       title: event.title,
-      text: `Check out this event: ${event.title}`,
-      url: buildShareUrl.event(event.id),
+      text: event.title,
+      url: eventPublicUrl(event),
     });
   };
 
@@ -439,6 +443,13 @@ function EventBlock({ event, onClick, onEdit, onShare, onDuplicate }: EventBlock
             Edit
           </button>
           <button
+            onClick={(e) => { e.stopPropagation(); copyEventLink(eventPublicUrl(event)); }}
+            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Copy link
+          </button>
+          <button
             onClick={(e) => { e.stopPropagation(); onShare(); }}
             className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors"
           >
@@ -517,6 +528,10 @@ function ListView({ events, onEventClick, onEdit, onShare, onDuplicate }: ListVi
             </div>
           </div>
         </button>
+
+        <div className="mt-3">
+          <HostShareBar title={event.title} url={eventPublicUrl(event)} />
+        </div>
 
         {/* Quick Actions */}
         <DropdownMenu>

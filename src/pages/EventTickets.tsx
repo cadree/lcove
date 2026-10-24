@@ -3,6 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { TicketPickerScreen } from "@/components/events/guest/TicketPickerScreen";
 import { supabase } from "@/integrations/supabase/client";
+import { usePublicEvent } from "@/hooks/usePublicEvent";
+import { eventPublicPath } from "../../functions/_shared/eventShare.js";
 import { saveTicketLines } from "@/lib/guestEvent";
 import { tierPriceLabel } from "@/lib/ticketFees";
 
@@ -11,15 +13,8 @@ export default function EventTickets() {
   const navigate = useNavigate();
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
-  const { data: event } = useQuery({
-    queryKey: ["public-event", eventId],
-    enabled: !!eventId,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("events").select("id, title, creator_id, absorb_fees, page_theme").eq("id", eventId).single();
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: event } = usePublicEvent(eventId);
+  const eventKey = event?.id || "";
   const { data: host } = useQuery({
     queryKey: ["public-event-organizer", event?.creator_id],
     enabled: !!event?.creator_id,
@@ -29,10 +24,10 @@ export default function EventTickets() {
     },
   });
   const { data: tiers = [] } = useQuery({
-    queryKey: ["public-event-tier-picker", eventId],
-    enabled: !!eventId,
+    queryKey: ["public-event-tier-picker", eventKey],
+    enabled: !!eventKey,
     queryFn: async () => {
-      const { data } = await supabase.from("ticket_tiers").select("id, name, description, price_cents, capacity, quantity_sold, is_active").eq("event_id", eventId).eq("is_active", true).order("sort_order");
+      const { data } = await supabase.from("ticket_tiers").select("id, name, description, price_cents, capacity, quantity_sold, is_active").eq("event_id", eventKey).eq("is_active", true).order("sort_order");
       return data || [];
     },
   });
@@ -59,10 +54,11 @@ export default function EventTickets() {
       theme={event?.page_theme === "light" ? "light" : "dark"}
       tiers={rows}
       onChange={(id, quantity) => setQuantities((current) => ({ ...current, [id]: Math.max(0, quantity) }))}
-      onBack={() => navigate(`/event/${eventId}`)}
+      onBack={() => navigate(event ? eventPublicPath(event) : "/calendar")}
       onContinue={() => {
-        saveTicketLines(eventId, rows.map((tier) => ({ tierId: tier.id, quantity: tier.quantity })));
-        navigate(`/event/${eventId}/checkout`);
+        if (!event) return;
+        saveTicketLines(event.id, rows.map((tier) => ({ tierId: tier.id, quantity: tier.quantity })));
+        navigate(`${eventPublicPath(event)}/checkout`);
       }}
     />
   );

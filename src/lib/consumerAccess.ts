@@ -91,7 +91,7 @@ export function publicRow<T>(value: unknown): T {
   return value as T;
 }
 
-const CONSUMER_PREFIXES = ["/event/", "/product/", "/live/"];
+const CONSUMER_PREFIXES = ["/event/", "/e/", "/product/", "/live/"];
 
 export function isConsumerPath(pathname: string): boolean {
   return CONSUMER_PREFIXES.some((prefix) => pathname.startsWith(prefix));

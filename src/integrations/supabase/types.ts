@@ -2729,6 +2729,7 @@ export type Database = {
           start_date: string
           state: string | null
           status: string | null
+          slug: string | null
           ticket_price: number | null
           ticket_type: string
           timezone: string | null
@@ -2768,6 +2769,7 @@ export type Database = {
           start_date: string
           state?: string | null
           status?: string | null
+          slug?: string | null
           ticket_price?: number | null
           ticket_type?: string
           timezone?: string | null
@@ -2807,6 +2809,7 @@ export type Database = {
           start_date?: string
           state?: string | null
           status?: string | null
+          slug?: string | null
           ticket_price?: number | null
           ticket_type?: string
           timezone?: string | null
@@ -8061,6 +8064,20 @@ export type Database = {
       refresh_my_ether_id_token: { Args: never; Returns: string }
       get_ether_id_by_token: { Args: { p_token: string }; Returns: Json }
       ensure_ether_id_pass: { Args: { p_pass_type_id: string }; Returns: Json }
+      public_event_share: {
+        Args: { p_ref: string }
+        Returns: {
+          id: string
+          slug: string
+          title: string
+          host_name: string
+          start_date: string
+          timezone: string | null
+          venue: string | null
+          city: string | null
+          image_url: string | null
+        }[]
+      }
       public_event_attendance_count: {
         Args: { p_event_id: string }
         Returns: number

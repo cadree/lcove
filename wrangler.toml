@@ -1,0 +1,6 @@
+# Cloudflare Pages reads this for the event-share functions.
+# nodejs_compat lets the flyer crop use Buffer and zlib. No paid image service.
+name = "ether"
+compatibility_date = "2026-10-24"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist"

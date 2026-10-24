@@ -126,6 +126,8 @@ describe("app routes", () => {
   it("opens event, product, and live links and gates community routes", () => {
     const id = "04040404-0404-4404-8404-040404040404";
     assert.equal(isPublicPath(`/event/${id}`), true);
+    assert.equal(isPublicPath("/e/listening-night"), true);
+    assert.equal(isKnownPath("/e/listening-night"), true);
     assert.equal(isPublicPath(`/product/${id}`), true);
     assert.equal(isPublicPath(`/live/${id}`), true);
     assert.equal(isKnownPath(`/live/${id}`), true);
