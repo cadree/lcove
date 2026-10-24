@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { capacitorStorage } from "@/lib/capacitorStorage";
 import { prepareStorageBody, StorageLimitError } from "@/lib/prepareStorageUpload";
 import { withServerFunctionMessage } from "@/lib/functionError";
+import { reviewImageUpload } from "@/lib/nsfwImageCheck";
 import { fileKind, isStorageSizeRejection, storageLimitMessage } from "@/lib/storageLimit";
 import { supabaseProjectRef } from "@/lib/supabaseTarget.mjs";
 import type { Database } from "@/integrations/supabase/types";
@@ -58,6 +59,8 @@ supabase.functions.invoke = (async (functionName, options) => {
 // cap are sent unchanged. Larger videos are compressed in the browser first,
 // with a progress toast. Larger images and other files are rejected with a
 // plain message, and a size rejection from the server uses that same message.
+// Image bytes are also checked before they are stored. The check lives in
+// nsfwImageCheck and loads only when the file is a picture.
 // The guard lives in this file, not the generated integrations client, so a
 // Lovable regen of client.ts keeps it while the vite and tsconfig aliases
 // still point here.
@@ -65,6 +68,10 @@ let compressToastSerial = 0;
 
 function limitError(message: string) {
   return new StorageApiError(message, 413, "413");
+}
+
+function blockedImageError(message: string) {
+  return new StorageApiError(message, 422, "422");
 }
 
 const originalFrom = supabase.storage.from.bind(supabase.storage);
@@ -99,6 +106,17 @@ supabase.storage.from = ((bucketId: string) => {
         return { data: null, error: limitError(message) };
       } finally {
         if (shown) toast.dismiss(toastId);
+      }
+
+      const name = blob instanceof File ? blob.name : "";
+      try {
+        const review = await reviewImageUpload(blob, name);
+        if (review.ok === false) {
+          console.error("Upload blocked before storage", review.message);
+          return { data: null, error: blockedImageError(review.message) };
+        }
+      } catch (error) {
+        console.error("Image check failed open", error);
       }
     }
 

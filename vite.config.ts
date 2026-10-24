@@ -173,6 +173,15 @@ export default defineConfig(() => ({
           // The CommonJS interop helper is shared with React. Leaving it in
           // the charts chunk makes every page download recharts.
           if (id.includes("commonjsHelpers")) return "vendor";
+          // Image checks import these only on upload. One async chunk keeps
+          // TensorFlow off the entry and out of the route preload list.
+          if (
+            id.includes("/node_modules/nsfwjs/") ||
+            id.includes("/node_modules/@tensorflow/") ||
+            id.includes("/node_modules/buffer/")
+          ) {
+            return "nsfw";
+          }
           if (isCharts(id)) return "charts";
           if (id.includes("/hls.js/")) return "video";
           if (isEditors(id)) return "editors";
