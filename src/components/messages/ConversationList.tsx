@@ -180,14 +180,16 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
         ) : (
           <AnimatePresence>
             {filteredConversations.map((conv) => (
-              <motion.button
+              <motion.div
                 key={conv.id}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
+                className={`flex w-full items-center ${selectedId === conv.id ? "bg-accent/40" : ""}`}
+              >
+              <button
+                type="button"
                 onClick={() => onSelect(conv.id)}
-                className={`w-full flex items-center gap-3 p-4 hover:bg-accent/30 transition-colors text-left ${
-                  selectedId === conv.id ? 'bg-accent/40' : ''
-                }`}
+                className="flex min-w-0 flex-1 items-center gap-3 p-4 text-left transition-colors hover:bg-accent/30"
               >
                 <div className="relative">
                   <Avatar className="w-12 h-12 border-2 border-border/50">
@@ -245,6 +247,7 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
                     {getLastMessagePreview(conv)}
                   </p>
                 </div>
+              </button>
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -288,7 +291,7 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </motion.button>
+              </motion.div>
             ))}
           </AnimatePresence>
         )}
