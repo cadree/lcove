@@ -157,7 +157,7 @@ serve(async (req) => {
               templateName: "event-reminder",
               recipientEmail: email,
               idempotencyKey: `reminder-${eventId}-${recipient.key}-${crypto.randomUUID()}`,
-              from: "Ether <notifications@etherbylcove.com>",
+              from: identity.fromHeader,
               replyTo: identity.replyTo,
               templateData: {
                 organizerName: identity.organizerName,

@@ -1,913 +1,218 @@
-import { useState, useCallback } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { motion } from "framer-motion";
-import { formatEventDate, formatEventTime } from "@/lib/eventTime";
-import { useRSVP } from "@/hooks/useCalendar";
-import {
-  Calendar,
-  MapPin,
-  Users,
-  Clock,
-  Ticket,
-  CheckCircle2,
-  ExternalLink,
-  Share2,
-  Copy,
-  LogIn,
-  Phone,
-  Loader2,
-  Bell,
-  Wallet,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
+import { useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PublicEventScreen } from "@/components/events/guest/PublicEventScreen";
+import { ReportDialog } from "@/components/safety/ReportDialog";
 import { supabase } from "@/integrations/supabase/client";
-import { errorMessage } from "@/lib/errorMessage";
 import { useAuth } from "@/contexts/AuthContext";
-import { toast } from "sonner";
-import { shareLink, buildShareUrl } from "@/lib/shareLink";
-import { resolveVapidPublicKey } from "@/lib/vapidPublicKey";
-import { EventMoodboardView } from "@/components/calendar/EventMoodboardView";
-import { AddToCalendarButtons } from "@/components/calendar/AddToCalendarButtons";
+import { useFavorites } from "@/hooks/useFavorites";
+import { useConversations } from "@/hooks/useConversations";
+import { formatEventDate, formatEventTime } from "@/lib/eventTime";
+import { lowestBuyerCents } from "@/lib/ticketFees";
+import { stickyCtaLabel } from "@/lib/guestEvent";
+import { buildShareUrl, shareLink } from "@/lib/shareLink";
 import { PageMeta } from "@/components/seo/PageMeta";
-import { attendanceLabel, attendanceSummary, parseGuestRsvp } from "@/lib/eventGuests";
+import { toast } from "sonner";
 
-const VAPID_PUBLIC_KEY = resolveVapidPublicKey(import.meta.env.VITE_VAPID_PUBLIC_KEY);
-const walletPassesEnabled = import.meta.env.VITE_WALLET_PASSES_ENABLED === "true";
+const savedKey = "ether-saved-events";
+
+function readSaved(id: string) {
+  try {
+    const list = JSON.parse(localStorage.getItem(savedKey) || "[]");
+    return Array.isArray(list) && list.includes(id);
+  } catch {
+    return false;
+  }
+}
 
 export default function PublicEventPage() {
-  const { eventId } = useParams();
+  const { eventId = "" } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { rsvp, isRsvping } = useRSVP();
-  const queryClient = useQueryClient();
-  const [guestName, setGuestName] = useState("");
-  const [guestEmail, setGuestEmail] = useState("");
-  const [guestPhone, setGuestPhone] = useState("");
-  const [rsvpSuccess, setRsvpSuccess] = useState(false);
-  const [waitlisted, setWaitlisted] = useState(false);
-  const inviteCampaignId = searchParams.get("invite");
-  const [ticketPurchaseSuccess, setTicketPurchaseSuccess] = useState(
-    searchParams.get("ticket_success") === "true"
-  );
-  const [isPurchasing, setIsPurchasing] = useState(false);
-  const [ticketGuestName, setTicketGuestName] = useState("");
-  const [ticketGuestEmail, setTicketGuestEmail] = useState("");
-  const [ticketGuestPhone, setTicketGuestPhone] = useState("");
-  const [pushStatus, setPushStatus] = useState<'idle' | 'subscribing' | 'subscribed' | 'error'>('idle');
+  const { isFavorite, addFavorite, removeFavorite } = useFavorites();
+  const { createDirectConversation } = useConversations();
+  const [saved, setSaved] = useState(() => readSaved(eventId));
+  const [guestsOpen, setGuestsOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [location, setLocation] = useState<string | null>(null);
 
-  const urlBase64ToArrayBuffer = useCallback((base64String: string): ArrayBuffer => {
-    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const rawData = atob(base64);
-    const buffer = new ArrayBuffer(rawData.length);
-    const view = new Uint8Array(buffer);
-    for (let i = 0; i < rawData.length; ++i) {
-      view[i] = rawData.charCodeAt(i);
-    }
-    return buffer;
-  }, []);
-
-  const handleSubscribePush = useCallback(async (email: string) => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      toast.info("Push notifications aren't supported in this browser");
-      return;
-    }
-    setPushStatus('subscribing');
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') {
-        toast.error('Notification permission denied');
-        setPushStatus('error');
-        return;
-      }
-      const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-      await navigator.serviceWorker.ready;
-      let subscription = await registration.pushManager.getSubscription();
-      if (!subscription) {
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToArrayBuffer(VAPID_PUBLIC_KEY),
-        });
-      }
-      const subJson = subscription.toJSON();
-      if (!subJson.endpoint || !subJson.keys?.p256dh || !subJson.keys?.auth) {
-        throw new Error('Invalid push subscription');
-      }
-      const { error } = await supabase.from('guest_push_subscriptions').upsert({
-        guest_email: email.trim().toLowerCase(),
-        event_id: eventId!,
-        endpoint: subJson.endpoint,
-        p256dh: subJson.keys.p256dh,
-        auth: subJson.keys.auth,
-        user_agent: navigator.userAgent,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'guest_email,event_id,endpoint' });
-      if (error) throw error;
-      setPushStatus('subscribed');
-      toast.success('You\'ll get push notifications for this event!');
-    } catch (err) {
-      console.error('Push subscription error:', err);
-      setPushStatus('error');
-      toast.error('Failed to enable notifications');
-    }
-  }, [eventId, urlBase64ToArrayBuffer]);
-
-  // Fetch event (public – anon can read)
   const { data: event, isLoading } = useQuery({
     queryKey: ["public-event", eventId],
+    enabled: !!eventId,
     queryFn: async () => {
-      if (!eventId) throw new Error("No event ID");
-      const { data, error } = await supabase
-        .from("events")
-        .select("*")
-        .eq("id", eventId)
-        .eq("is_public", true)
-        .single();
+      const { data, error } = await supabase.from("events").select("*").eq("id", eventId).or("status.is.null,status.neq.draft").single();
       if (error) throw error;
       return data;
     },
-    enabled: !!eventId,
   });
 
-  // Fetch organizer profile
-  const { data: organizer } = useQuery({
+  const { data: host } = useQuery({
     queryKey: ["public-event-organizer", event?.creator_id],
+    enabled: !!event?.creator_id,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("profiles_public")
-        .select("display_name, avatar_url")
-        .eq("user_id", event!.creator_id)
-        .maybeSingle();
+      const { data } = await supabase.from("profiles_public").select("display_name, avatar_url, social_links").eq("user_id", event!.creator_id).maybeSingle();
       return data;
     },
-    enabled: !!event?.creator_id,
   });
 
-  // Fetch combined attendance count: confirmed/checked_in attendees + legacy 'going' RSVPs
-  const { data: rsvpCount } = useQuery({
+  const { data: going = 0 } = useQuery({
     queryKey: ["public-event-attendee-count", eventId],
+    enabled: !!eventId,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("public_event_attendance_count", {
-        p_event_id: eventId!,
-      });
+      const { data, error } = await supabase.rpc("public_event_attendance_count", { p_event_id: eventId });
       if (error) throw error;
       return data ?? 0;
     },
+  });
+
+  const { data: preview } = useQuery({
+    queryKey: ["public-event-guests", eventId],
     enabled: !!eventId,
-    refetchInterval: 15000,
-  });
-
-  const { data: myRsvp } = useQuery({
-    queryKey: ["my-event-rsvp", eventId, user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("event_rsvps")
-        .select("id, status")
-        .eq("event_id", eventId!)
-        .eq("user_id", user!.id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
+      const { data, error } = await supabase.rpc("public_event_guest_preview", { p_event_id: eventId });
+      if (error) return { names: [] as string[], avatars: [] as (string | null)[] };
+      const row = (data || {}) as { names?: unknown; avatars?: unknown };
+      return {
+        names: Array.isArray(row.names) ? row.names.filter((name): name is string => typeof name === "string") : [],
+        avatars: Array.isArray(row.avatars) ? row.avatars.map((item) => (typeof item === "string" ? item : null)) : [],
+      };
     },
-    enabled: !!eventId && !!user,
   });
 
-  // Fetch ticket tiers (for type detection)
-  const { data: tiers } = useQuery({
-    queryKey: ["public-event-tiers", eventId],
+  const { data: hostStats } = useQuery({
+    queryKey: ["public-host-stats", event?.creator_id],
+    enabled: !!event?.creator_id,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("ticket_tiers")
-        .select("id, price_cents, credits_price, is_active")
-        .eq("event_id", eventId!)
-        .eq("is_active", true);
+      const { data, error } = await supabase.rpc("public_host_stats", { p_user_id: event!.creator_id });
+      if (error) return { events: 0, attendees: 0 };
+      const row = (data || {}) as { events?: number; attendees?: number };
+      return { events: row.events || 0, attendees: row.attendees || 0 };
+    },
+  });
+
+  const { data: tiers = [] } = useQuery({
+    queryKey: ["public-event-tiers", eventId],
+    enabled: !!eventId,
+    queryFn: async () => {
+      const { data } = await supabase.from("ticket_tiers").select("id, name, price_cents, capacity, quantity_sold, is_active, description").eq("event_id", eventId).eq("is_active", true);
       return data || [];
     },
+  });
+
+  const { data: branding } = useQuery({
+    queryKey: ["public-event-brand", eventId],
     enabled: !!eventId,
-  });
-
-  // Guest RSVP mutation
-  const guestRsvpMutation = useMutation({
-    mutationFn: async () => {
-      if (!eventId) throw new Error("No event");
-      const { data, error } = await supabase.rpc("create_guest_event_rsvp", {
-        p_event_id: eventId,
-        p_guest_name: guestName.trim(),
-        p_guest_email: guestEmail.trim().toLowerCase(),
-        p_guest_phone: guestPhone.trim() || undefined,
-        p_campaign_id: inviteCampaignId || undefined,
-      });
-      if (error) {
-        if (error.message.toLowerCase().includes("already")) {
-          throw new Error("You've already RSVP'd with this email!");
-        }
-        if (error.message.toLowerCase().includes("sold out")) {
-          throw new Error("This event is sold out.");
-        }
-        throw error;
-      }
-      return parseGuestRsvp(data);
-    },
-    onSuccess: async (result) => {
-      if (result.id) {
-        supabase.functions.invoke('send-rsvp-confirmation', {
-          body: { event_id: eventId, rsvp_id: result.id },
-        }).catch((err) => console.error('Confirmation email failed:', err));
-      }
-      queryClient.invalidateQueries({ queryKey: ["public-event-attendee-count", eventId] });
-      if (result.status === "waitlist") {
-        setWaitlisted(true);
-        toast.success("You're on the waitlist.");
-        return;
-      }
-      setRsvpSuccess(true);
-      toast.success("You're on the list!");
-      navigate(`/event/${eventId}/confirmation?free=1`);
-    },
-    onError: (err: Error) => {
-      toast.error(err.message || "Failed to RSVP");
+    queryFn: async () => {
+      const { data } = await supabase.from("event_email_branding").select("brand_color, organizer_name").eq("event_id", eventId).maybeSingle();
+      return data;
     },
   });
 
-  const handleGuestRsvp = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!guestName.trim() || !guestEmail.trim()) {
-      toast.error("Please enter your name and email");
+  const model = useMemo(() => {
+    if (!event) return null;
+    const absorb = event.absorb_fees === true;
+    const paid = tiers.some((tier) => (tier.price_cents || 0) > 0);
+    const from = lowestBuyerCents(tiers, absorb);
+    const end = event.end_date || event.start_date;
+    return {
+      title: event.title,
+      summary: event.description,
+      flyerUrl: event.image_url,
+      fontId: event.flyer_font,
+      theme: event.page_theme === "light" ? "light" as const : "dark" as const,
+      brandColor: branding?.brand_color || null,
+      whenLabel: `${formatEventDate(event.start_date, event.timezone)} · ${formatEventTime(event.start_date, event.timezone)}${event.end_date ? ` – ${formatEventTime(event.end_date, event.timezone)}` : ""}`,
+      venue: event.venue,
+      addressHidden: event.hide_address === true,
+      location,
+      hostName: branding?.organizer_name || host?.display_name || "Host",
+      hostAvatar: host?.avatar_url || null,
+      hostEvents: hostStats?.events || 0,
+      hostAttendees: hostStats?.attendees || 0,
+      guestNames: preview?.names || [],
+      guestAvatars: preview?.avatars || [],
+      going: going || 0,
+      cta: stickyCtaLabel(paid ? from : 0, !paid),
+      saved,
+      past: new Date(end) < new Date(),
+    };
+  }, [event, tiers, branding, host, hostStats, preview, going, location, saved]);
+
+  const showLocation = async () => {
+    if (!event) return;
+    if (!event.hide_address) {
+      const text = [event.venue, event.address, event.city, event.state].filter(Boolean).join(", ");
+      setLocation(text);
+      if (text) window.open(`https://maps.google.com/?q=${encodeURIComponent(text)}`, "_blank", "noopener");
       return;
     }
-    guestRsvpMutation.mutate();
+    const { data } = await supabase.rpc("public_event_location", { p_event_id: event.id });
+    if (!data) {
+      toast.message("The address stays hidden until you RSVP.");
+      return;
+    }
+    setLocation(data);
+    window.open(`https://maps.google.com/?q=${encodeURIComponent(data)}`, "_blank", "noopener");
   };
 
-  const shareUrl = buildShareUrl.event(eventId || '');
-
-  const handleShare = async () => {
-    await shareLink({
-      title: event?.title,
-      text: `Check out this event: ${event?.title}`,
-      url: shareUrl,
-    });
-  };
-
-  const handleCopy = async () => {
-    await shareLink({ url: shareUrl });
-  };
-
-  const isPast = event ? new Date(event.end_date || event.start_date) < new Date() : false;
-  const attendance = attendanceSummary(event?.capacity, rsvpCount || 0);
-  const isSoldOut = attendance.soldOut;
-  const hasPaidTier = (tiers || []).some((t) => (t.price_cents || 0) > 0);
-  const hasFreeTier = (tiers || []).some((t) => (t.price_cents || 0) === 0 && (t.credits_price || 0) === 0);
-  const isFree = !hasPaidTier && (!event?.ticket_price || event.ticket_price <= 0);
-  const eventType: { label: string; tone: "free" | "paid" | "hybrid" | "info" } =
-    hasPaidTier && hasFreeTier
-      ? { label: "Hybrid", tone: "hybrid" }
-      : hasPaidTier || (event?.ticket_price && event.ticket_price > 0)
-      ? { label: "Paid Ticket", tone: "paid" }
-      : event?.external_url && !isFree
-      ? { label: "External", tone: "info" }
-      : { label: "Free RSVP", tone: "free" };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-full max-w-lg mx-auto px-4 space-y-4">
-          <Skeleton className="h-48 w-full rounded-2xl" />
-          <Skeleton className="h-8 w-3/4" />
-          <Skeleton className="h-4 w-1/2" />
-          <Skeleton className="h-32 w-full" />
-        </div>
-      </div>
-    );
+  if (isLoading) return <div className="min-h-screen bg-background" />;
+  if (!event || !model) {
+    return <div className="min-h-screen bg-background px-6 py-16 text-center"><h1 className="ether-title text-3xl">Event not found</h1></div>;
   }
-
-  if (!event) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center px-6">
-          <Calendar className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <h1 className="text-2xl font-display font-bold mb-2">Event Not Found</h1>
-          <p className="text-muted-foreground">This event doesn't exist or isn't public.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const shareImage = event.image_url?.startsWith("https://") ? event.image_url : undefined;
-  const onTheList = rsvpSuccess || myRsvp?.status === "going";
-  const onTheWaitlist = waitlisted || myRsvp?.status === "waitlist";
 
   return (
-    <div className="min-h-screen bg-background">
-      <PageMeta
-        title={`${event.title} · Ether`}
-        description={`${attendanceLabel(event.capacity, rsvpCount || 0)}. ${formatEventDate(event.start_date, event.timezone)}.`}
-        image={shareImage}
+    <>
+      <PageMeta title={`${event.title}`} description={event.description || event.title} image={event.image_url || undefined} />
+      <PublicEventScreen
+        model={model}
+        following={!!event.creator_id && isFavorite(event.creator_id)}
+        onBack={() => navigate(-1)}
+        onSave={() => {
+          const list = readSaved(event.id) ? JSON.parse(localStorage.getItem(savedKey) || "[]").filter((id: string) => id !== event.id) : [...(JSON.parse(localStorage.getItem(savedKey) || "[]") as string[]), event.id];
+          localStorage.setItem(savedKey, JSON.stringify(list));
+          setSaved(readSaved(event.id));
+        }}
+        onShare={() => shareLink({ title: event.title, text: event.title, url: buildShareUrl.event(event.id) })}
+        onLocation={showLocation}
+        onGuestlist={() => setGuestsOpen(true)}
+        onFollow={() => {
+          if (!user) {
+            navigate(`/auth?redirect=/event/${event.id}`);
+            return;
+          }
+          if (!event.creator_id) return;
+          if (isFavorite(event.creator_id)) removeFavorite.mutate(event.creator_id);
+          else addFavorite.mutate(event.creator_id);
+        }}
+        onCalendar={() => {
+          const start = new Date(event.start_date);
+          const end = event.end_date ? new Date(event.end_date) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
+          const stamp = (date: Date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+          const where = [event.venue, event.city].filter(Boolean).join(", ");
+          window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${stamp(start)}/${stamp(end)}&location=${encodeURIComponent(where)}`, "_blank", "noopener");
+        }}
+        onContact={async () => {
+          if (!user || !event.creator_id) {
+            navigate(`/auth?redirect=/event/${event.id}`);
+            return;
+          }
+          const conversation = await createDirectConversation.mutateAsync(event.creator_id);
+          navigate(`/messages?chat=${conversation.id}`);
+        }}
+        onReport={() => setReportOpen(true)}
+        onCta={() => navigate(`/event/${event.id}/tickets`)}
       />
-      {/* Hero */}
-      <div className="relative">
-        {event.image_url ? (
-          <div className="h-56 sm:h-72 w-full overflow-hidden">
-            <img src={event.image_url} alt={event.title} className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
-          </div>
-        ) : (
-          <div className="h-40 sm:h-56 w-full bg-gradient-to-br from-primary/20 via-primary/10 to-background" />
-        )}
-
-        {/* Share buttons */}
-        <div className="absolute top-4 right-4 flex gap-2">
-          <Button variant="secondary" size="icon" className="h-9 w-9 rounded-full backdrop-blur-md bg-background/60" onClick={handleCopy}>
-            <Copy className="h-4 w-4" />
-          </Button>
-          <Button variant="secondary" size="icon" className="h-9 w-9 rounded-full backdrop-blur-md bg-background/60" onClick={handleShare}>
-            <Share2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="max-w-lg mx-auto px-4 -mt-12 relative z-10 pb-28">
-        {/* Event info card */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <Card className="border-border/50 shadow-xl bg-card/95 backdrop-blur-md">
-            <CardContent className="p-5 space-y-4">
-              <div>
-                <div className="flex items-start justify-between gap-3">
-                  <h1 className="text-xl sm:text-2xl font-display font-bold leading-tight">{event.title}</h1>
-                  <div className="flex flex-col gap-1 shrink-0 items-end">
-                    {isPast && (
-                      <Badge variant="outline" className="bg-muted text-muted-foreground">Past</Badge>
-                    )}
-                    <Badge
-                      variant="outline"
-                      className={
-                        eventType.tone === "paid"
-                          ? "bg-primary/10 text-primary border-primary/30"
-                          : eventType.tone === "hybrid"
-                          ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
-                          : eventType.tone === "info"
-                          ? "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30"
-                          : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
-                      }
-                    >
-                      {eventType.label}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-
-              {/* Add-to-calendar quick action */}
-              {!isPast && (
-                <div className="flex flex-wrap gap-2">
-                  <AddToCalendarButtons
-                    variant="compact"
-                    event={{
-                      title: event.title,
-                      description: event.description,
-                      startDate: new Date(event.start_date),
-                      endDate: event.end_date ? new Date(event.end_date) : null,
-                      location: [event.venue, event.address, event.city, event.state].filter(Boolean).join(", ") || null,
-                      url: shareUrl,
-                    }}
-                  />
-                </div>
-              )}
-
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Calendar className="h-4 w-4 text-primary shrink-0" />
-                <span>{formatEventDate(event.start_date, event.timezone)}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="h-4 w-4 text-primary shrink-0" />
-                <span>
-                  {formatEventTime(event.start_date, event.timezone)}
-                  {event.end_date && ` – ${formatEventTime(event.end_date, event.timezone)}`}
-                </span>
-              </div>
-
-              {(event.venue || event.city) && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <MapPin className="h-4 w-4 text-primary shrink-0" />
-                  <span>{[event.venue, event.address, event.city, event.state].filter(Boolean).join(", ")}</span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Users className="h-4 w-4 text-primary shrink-0" />
-                <span>{attendanceLabel(event.capacity, rsvpCount || 0)}</span>
-              </div>
-
-              <div className="flex items-center gap-2 text-sm">
-                <Ticket className="h-4 w-4 text-primary shrink-0" />
-                <span className="font-medium">{isFree ? "Free Event" : `$${event.ticket_price}`}</span>
-              </div>
-
-              {organizer && (
-                <div className="flex items-center gap-3 pt-2 border-t border-border/30">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={organizer.avatar_url || undefined} />
-                    <AvatarFallback>{organizer.display_name?.[0] || "?"}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Hosted by</p>
-                    <p className="text-sm font-medium">{organizer.display_name}</p>
-                  </div>
-                </div>
-              )}
-
-              {event.description && (
-                <div className="pt-2 border-t border-border/30">
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{event.description}</p>
-                </div>
-              )}
-
-              {event.external_url && (
-                <a href={event.external_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline">
-                  <ExternalLink className="h-4 w-4" />
-                  Event Link
-                </a>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Moodboard & Itinerary */}
-        <div className="mt-4">
-          <EventMoodboardView eventId={eventId!} />
-        </div>
-
-        {/* RSVP Section for free events */}
-        {!isPast && isFree && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-            <Card className="mt-4 border-border/50 shadow-lg bg-card/95 backdrop-blur-md">
-              <CardContent className="p-5">
-                {waitlisted || myRsvp?.status === "waitlist" ? (
-                  <div className="text-center py-4 space-y-3">
-                    <Users className="h-12 w-12 text-primary mx-auto" />
-                    <h3 className="text-lg font-display font-semibold">You're on the waitlist</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {event.title} is full. We'll email you if a seat opens.
-                    </p>
-                    {user && (
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        disabled={isRsvping}
-                        onClick={() => rsvp({ eventId: event.id, status: "cancelled" })}
-                      >
-                        {isRsvping ? "Updating…" : "Leave waitlist"}
-                      </Button>
-                    )}
-                  </div>
-                ) : rsvpSuccess || myRsvp?.status === "going" ? (
-                  <div className="text-center py-4 space-y-3">
-                    <CheckCircle2 className="h-12 w-12 text-primary mx-auto" />
-                    <h3 className="text-lg font-display font-semibold">You're on the list!</h3>
-                    <p className="text-sm text-muted-foreground">
-                      We've saved your RSVP for <strong>{event.title}</strong>.
-                    </p>
-                    {/* Add to Google Calendar */}
-                    <Button
-                      variant="outline"
-                      className="w-full gap-2 mt-2"
-                      onClick={() => {
-                        const start = new Date(event.start_date);
-                        const end = event.end_date ? new Date(event.end_date) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
-                        const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-                        const location = [event.venue, event.address, event.city, event.state].filter(Boolean).join(', ');
-                        const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${fmt(start)}/${fmt(end)}&details=${encodeURIComponent(event.description || '')}&location=${encodeURIComponent(location)}`;
-                        window.open(gcalUrl, '_blank', 'noopener');
-                      }}
-                    >
-                      <Calendar className="h-4 w-4" />
-                      Add to Google Calendar
-                    </Button>
-                    {/* Download .ics */}
-                    <Button
-                      variant="ghost"
-                      className="w-full gap-2 text-sm"
-                      onClick={() => {
-                        const start = new Date(event.start_date);
-                        const end = event.end_date ? new Date(event.end_date) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
-                        const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-                        const location = [event.venue, event.address, event.city, event.state].filter(Boolean).join(', ');
-                        const ics = [
-                          'BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT',
-                          `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`,
-                          `SUMMARY:${event.title}`, `LOCATION:${location}`,
-                          `DESCRIPTION:${(event.description || '').replace(/\n/g, '\\n')}`,
-                          'END:VEVENT', 'END:VCALENDAR'
-                        ].join('\r\n');
-                        const blob = new Blob([ics], { type: 'text/calendar' });
-                        const a = document.createElement('a');
-                        a.href = URL.createObjectURL(blob);
-                        a.download = `${event.title.replace(/\s+/g, '-')}.ics`;
-                        a.click();
-                      }}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      Download .ics File
-                    </Button>
-                    {walletPassesEnabled && (
-                    <Button
-                      variant="outline"
-                      className="w-full gap-2 text-sm"
-                      onClick={async () => {
-                        try {
-                          const { data, error } = await supabase.functions.invoke("generate-wallet-pass", {
-                            body: {
-                              eventId: event.id,
-                              eventTitle: event.title,
-                              eventDate: event.start_date,
-                              eventEndDate: event.end_date,
-                              venue: [event.venue, event.city].filter(Boolean).join(', '),
-                              guestName: guestName || 'Guest',
-                              ticketType: 'free',
-                            },
-                          });
-                          if (error) throw error;
-                          if (data?.passUrl) {
-                            window.open(data.passUrl, '_blank');
-                          } else {
-                            toast.error("Could not add a wallet pass.");
-                          }
-                        } catch {
-                          toast.error("Could not add a wallet pass.");
-                        }
-                      }}
-                    >
-                      <Wallet className="h-4 w-4" />
-                      Add to Wallet
-                    </Button>
-                    )}
-                    {/* Get Notified - Push */}
-                    {pushStatus !== 'subscribed' && (
-                      <Button
-                        variant="outline"
-                        className="w-full gap-2 text-sm"
-                        disabled={pushStatus === 'subscribing'}
-                        onClick={() => handleSubscribePush(guestEmail)}
-                      >
-                        <Bell className="h-4 w-4" />
-                        {pushStatus === 'subscribing' ? 'Enabling…' : 'Get Event Reminders'}
-                      </Button>
-                    )}
-                    {pushStatus === 'subscribed' && (
-                      <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                        <Bell className="h-3 w-3" /> Push notifications enabled
-                      </p>
-                    )}
-                    {user && (
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        disabled={isRsvping}
-                        onClick={() => rsvp({ eventId: event.id, status: "cancelled" })}
-                      >
-                        {isRsvping ? "Updating…" : "Cancel RSVP"}
-                      </Button>
-                    )}
-                  </div>
-                ) : user ? (
-                  <div className="space-y-3 text-center">
-                    <h3 className="text-lg font-display font-semibold">RSVP</h3>
-                    <p className="text-sm text-muted-foreground">You're signed in. Save your spot with your profile.</p>
-                    <Button
-                      className="w-full"
-                      disabled={isRsvping}
-                      onClick={() => rsvp({ eventId: event.id, status: "going", campaignId: inviteCampaignId })}
-                    >
-                      {isRsvping ? "Saving…" : isSoldOut ? "Join waitlist" : "I'm going"}
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    <h3 className="text-lg font-display font-semibold mb-1">RSVP to this event</h3>
-                    <p className="text-xs text-muted-foreground mb-4">Fill in your info below, or sign in to RSVP with your profile.</p>
-
-                    <form onSubmit={handleGuestRsvp} className="space-y-3">
-                      <div>
-                        <Label htmlFor="guest-name" className="text-xs">Full Name *</Label>
-                        <Input
-                          id="guest-name"
-                          value={guestName}
-                          onChange={(e) => setGuestName(e.target.value)}
-                          placeholder="Enter your full name"
-                          required
-                          maxLength={100}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="guest-email" className="text-xs">Email Address *</Label>
-                        <Input
-                          id="guest-email"
-                          type="email"
-                          value={guestEmail}
-                          onChange={(e) => setGuestEmail(e.target.value)}
-                          placeholder="you@example.com"
-                          required
-                          maxLength={255}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="guest-phone" className="text-xs flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          Phone Number
-                        </Label>
-                        <Input
-                          id="guest-phone"
-                          type="tel"
-                          value={guestPhone}
-                          onChange={(e) => setGuestPhone(e.target.value)}
-                          placeholder="(555) 123-4567"
-                          maxLength={20}
-                        />
-                      </div>
-                      <Button
-                        type="submit"
-                        className="w-full"
-                        disabled={guestRsvpMutation.isPending}
-                      >
-                        {guestRsvpMutation.isPending ? "Submitting…" : isSoldOut ? "Join the waitlist" : "RSVP – I'm Going!"}
-                      </Button>
-                    </form>
-
-                    <div className="relative my-4">
-                      <Separator />
-                      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3 text-xs text-muted-foreground">
-                        or
-                      </span>
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      className="w-full gap-2"
-                      onClick={() => navigate(`/auth?redirect=/calendar?event=${eventId}`)}
-                    >
-                      <LogIn className="h-4 w-4" />
-                      Sign in to RSVP with your profile
-                    </Button>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        {/* Paid event CTA */}
-        {!isPast && !isFree && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-            <Card className="mt-4 border-border/50 shadow-lg bg-card/95 backdrop-blur-md">
-              <CardContent className="p-5">
-                {ticketPurchaseSuccess ? (
-                  <div className="text-center py-4 space-y-3">
-                    <CheckCircle2 className="h-12 w-12 text-primary mx-auto" />
-                    <h3 className="text-lg font-display font-semibold">Ticket Purchased!</h3>
-                    <p className="text-sm text-muted-foreground">
-                      You're all set for <strong>{event.title}</strong>.
-                    </p>
-                    {/* Add to Google Calendar */}
-                    <Button
-                      variant="outline"
-                      className="w-full gap-2 mt-2"
-                      onClick={() => {
-                        const start = new Date(event.start_date);
-                        const end = event.end_date ? new Date(event.end_date) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
-                        const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-                        const location = [event.venue, event.address, event.city, event.state].filter(Boolean).join(', ');
-                        const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${fmt(start)}/${fmt(end)}&details=${encodeURIComponent(event.description || '')}&location=${encodeURIComponent(location)}`;
-                        window.open(gcalUrl, '_blank', 'noopener');
-                      }}
-                    >
-                      <Calendar className="h-4 w-4" />
-                      Add to Google Calendar
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="w-full gap-2 text-sm"
-                      onClick={() => {
-                        const start = new Date(event.start_date);
-                        const end = event.end_date ? new Date(event.end_date) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
-                        const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-                        const location = [event.venue, event.address, event.city, event.state].filter(Boolean).join(', ');
-                        const ics = [
-                          'BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT',
-                          `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`,
-                          `SUMMARY:${event.title}`, `LOCATION:${location}`,
-                          `DESCRIPTION:${(event.description || '').replace(/\n/g, '\\n')}`,
-                          'END:VEVENT', 'END:VCALENDAR'
-                        ].join('\r\n');
-                        const blob = new Blob([ics], { type: 'text/calendar' });
-                        const a = document.createElement('a');
-                        a.href = URL.createObjectURL(blob);
-                        a.download = `${event.title.replace(/\s+/g, '-')}.ics`;
-                        a.click();
-                      }}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      Download .ics File
-                    </Button>
-                    {walletPassesEnabled && (
-                    <Button
-                      variant="outline"
-                      className="w-full gap-2 text-sm"
-                      onClick={async () => {
-                        try {
-                          const { data, error } = await supabase.functions.invoke("generate-wallet-pass", {
-                            body: {
-                              eventId: event.id,
-                              eventTitle: event.title,
-                              eventDate: event.start_date,
-                              eventEndDate: event.end_date,
-                              venue: [event.venue, event.city].filter(Boolean).join(', '),
-                              guestName: ticketGuestName || guestName || 'Guest',
-                              ticketType: 'paid',
-                            },
-                          });
-                          if (error) throw error;
-                          if (data?.passUrl) {
-                            window.open(data.passUrl, '_blank');
-                          } else {
-                            toast.error("Could not add a wallet pass.");
-                          }
-                        } catch {
-                          toast.error("Could not add a wallet pass.");
-                        }
-                      }}
-                    >
-                      <Wallet className="h-4 w-4" />
-                      Add to Wallet
-                    </Button>
-                    )}
-                    {/* Get Notified - Push */}
-                    {pushStatus !== 'subscribed' && (
-                      <Button
-                        variant="outline"
-                        className="w-full gap-2 text-sm"
-                        disabled={pushStatus === 'subscribing'}
-                        onClick={() => handleSubscribePush(ticketGuestEmail || guestEmail)}
-                      >
-                        <Bell className="h-4 w-4" />
-                        {pushStatus === 'subscribing' ? 'Enabling…' : 'Get Event Reminders'}
-                      </Button>
-                    )}
-                    {pushStatus === 'subscribed' && (
-                      <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                        <Bell className="h-3 w-3" /> Push notifications enabled
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    <div className="text-center mb-4">
-                      <Ticket className="h-10 w-10 text-primary mx-auto mb-2" />
-                      <h3 className="text-lg font-display font-semibold">Tickets: ${event.ticket_price}</h3>
-                      <p className="text-xs text-muted-foreground">No account needed — enter your info and buy your ticket.</p>
-                    </div>
-
-                    <form onSubmit={async (e) => {
-                      e.preventDefault();
-                      if (!ticketGuestEmail.trim()) {
-                        toast.error("Please enter your email");
-                        return;
-                      }
-                      setIsPurchasing(true);
-                      try {
-                        const headers: Record<string, string> = {};
-                        if (user) {
-                          const { data: { session } } = await supabase.auth.getSession();
-                          if (session) {
-                            headers.Authorization = `Bearer ${session.access_token}`;
-                          }
-                        }
-                        const { data, error } = await supabase.functions.invoke("purchase-event-ticket", {
-                          body: {
-                            eventId: event.id,
-                            eventTitle: event.title,
-                            ticketPrice: event.ticket_price,
-                            guestName: ticketGuestName.trim(),
-                            guestEmail: ticketGuestEmail.trim().toLowerCase(),
-                            guestPhone: ticketGuestPhone.trim() || undefined,
-                          },
-                          headers,
-                        });
-                        if (error) throw error;
-                        if (data?.url) {
-                          const win = window.open(data.url, "_blank");
-                          if (!win || win.closed) {
-                            try { window.location.href = data.url; } catch {
-                              toast.info("Click to complete purchase", {
-                                duration: 15000,
-                                action: { label: "Open Checkout", onClick: () => window.open(data.url, "_blank") },
-                              });
-                            }
-                          }
-                        }
-                      } catch (err: unknown) {
-                        toast.error(errorMessage(err, "Failed to start checkout"));
-                      } finally {
-                        setIsPurchasing(false);
-                      }
-                    }} className="space-y-3">
-                      <div>
-                        <Label htmlFor="ticket-name" className="text-xs">Full Name</Label>
-                        <Input
-                          id="ticket-name"
-                          value={ticketGuestName}
-                          onChange={(e) => setTicketGuestName(e.target.value)}
-                          placeholder="Your full name"
-                          maxLength={100}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="ticket-email" className="text-xs">Email Address *</Label>
-                        <Input
-                          id="ticket-email"
-                          type="email"
-                          value={ticketGuestEmail}
-                          onChange={(e) => setTicketGuestEmail(e.target.value)}
-                          placeholder="you@example.com"
-                          required
-                          maxLength={255}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="ticket-phone" className="text-xs flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          Phone Number
-                        </Label>
-                        <Input
-                          id="ticket-phone"
-                          type="tel"
-                          value={ticketGuestPhone}
-                          onChange={(e) => setTicketGuestPhone(e.target.value)}
-                          placeholder="(555) 123-4567"
-                          maxLength={20}
-                        />
-                      </div>
-                      <Button type="submit" className="w-full gap-2" disabled={isPurchasing}>
-                        {isPurchasing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ticket className="h-4 w-4" />}
-                        {isPurchasing ? "Redirecting..." : `Buy Ticket — $${event.ticket_price}`}
-                      </Button>
-                    </form>
-
-                    <div className="relative my-4">
-                      <Separator />
-                      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3 text-xs text-muted-foreground">or</span>
-                    </div>
-
-                    <Button variant="outline" className="w-full gap-2" onClick={() => navigate(`/auth?redirect=/calendar?event=${eventId}`)}>
-                      <LogIn className="h-4 w-4" />
-                      Sign in to buy with your profile
-                    </Button>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        {isPast && (
-          <Card className="mt-4 border-border/50 bg-muted/30">
-            <CardContent className="p-5 text-center">
-              <p className="text-sm text-muted-foreground">This event has already ended.</p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-      {!isPast && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border/40 bg-background/95 backdrop-blur-md px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden">
-          <div className="mx-auto flex max-w-lg items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">{attendanceLabel(event.capacity, rsvpCount || 0)}</p>
-              <p className="truncate text-xs text-muted-foreground">{event.title}</p>
-            </div>
-            {isFree && !onTheList && !onTheWaitlist && (
-              <Button
-                className="shrink-0"
-                disabled={isRsvping || guestRsvpMutation.isPending}
-                onClick={() => {
-                  if (user) rsvp({ eventId: event.id, status: "going", campaignId: inviteCampaignId });
-                  else document.getElementById("guest-name")?.focus();
-                }}
-              >
-                {isSoldOut ? "Join waitlist" : "RSVP"}
-              </Button>
-            )}
-            {(onTheList || onTheWaitlist) && (
-              <p className="shrink-0 text-sm font-medium text-primary">{onTheWaitlist ? "Waitlisted" : "You're going"}</p>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+      <Dialog open={guestsOpen} onOpenChange={setGuestsOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Guestlist</DialogTitle></DialogHeader>
+          <ul className="space-y-2 text-sm">
+            {(preview?.names || []).map((name) => <li key={name}>{name}</li>)}
+            {(preview?.names || []).length === 0 && <li className="text-muted-foreground">No one yet.</li>}
+          </ul>
+        </DialogContent>
+      </Dialog>
+      <ReportDialog open={reportOpen} onOpenChange={setReportOpen} targetType="event" targetId={event.id} />
+    </>
   );
 }

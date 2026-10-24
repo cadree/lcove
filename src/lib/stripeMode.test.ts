@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { assertStripeTestKey } from "../../supabase/functions/_shared/stripe-mode.mjs";
+import { assertEventStripeTestKey, assertStripeTestKey } from "../../supabase/functions/_shared/stripe-mode.mjs";
 
 describe("stripe key guard", () => {
   it("accepts test and live secret or restricted keys", () => {
@@ -8,6 +8,12 @@ describe("stripe key guard", () => {
     assert.equal(assertStripeTestKey(" rk_test_abc "), "rk_test_abc");
     assert.equal(assertStripeTestKey("sk_live_abc"), "sk_live_abc");
     assert.equal(assertStripeTestKey("rk_live_abc"), "rk_live_abc");
+  });
+
+  it("refuses a live key for event checkout", () => {
+    assert.equal(assertEventStripeTestKey("sk_test_abc"), "sk_test_abc");
+    assert.throws(() => assertEventStripeTestKey("sk_live_abc"), /test mode/);
+    assert.throws(() => assertEventStripeTestKey("rk_live_abc"), /test mode/);
   });
 
   it("refuses an empty or malformed key", () => {
