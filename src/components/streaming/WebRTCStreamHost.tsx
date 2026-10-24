@@ -718,17 +718,18 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
 
   useEffect(() => {
     let stopped = false;
-    const freshAfter = () => new Date(Date.now() - 45_000).toISOString();
+    // The server writes viewer_count from the same 45s presence window.
+    // Realtime can miss a beat, so poll that column too.
     const refreshCount = async () => {
-      const { count } = await supabase
-        .from("stream_viewers")
-        .select("viewer_id", { count: "exact", head: true })
-        .eq("stream_id", streamId)
-        .is("left_at", null)
-        .gt("last_seen", freshAfter());
-      if (!stopped) setViewerCount(count || 0);
+      const { data, error } = await supabase
+        .from("live_streams_public")
+        .select("viewer_count")
+        .eq("id", streamId)
+        .maybeSingle();
+      if (!stopped && !error) setViewerCount(data?.viewer_count || 0);
     };
     void refreshCount();
+    const timer = window.setInterval(() => void refreshCount(), 10_000);
     const channel = supabase
       .channel(`stream-viewers-${streamId}`)
       .on(
@@ -741,6 +742,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
       .subscribe();
     return () => {
       stopped = true;
+      window.clearInterval(timer);
       supabase.removeChannel(channel);
     };
   }, [streamId]);

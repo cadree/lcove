@@ -165,7 +165,10 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
         if (still()) setPhase((current) => (current === "reconnecting" ? "watching" : current));
       });
       room.on(RoomEvent.Disconnected, () => {
-        if (roomRef.current === room && still()) setPhase("offline");
+        if (roomRef.current !== room || !still()) return;
+        window.setTimeout(() => {
+          if (roomRef.current === room && still()) void connectRef.current();
+        }, 1000);
       });
 
       await withDeadline(
