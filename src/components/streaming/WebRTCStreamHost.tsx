@@ -58,6 +58,7 @@ import {
   tracksNeedRestart,
   type LiveLink,
 } from "@/lib/livePhone";
+import { REPLAY_CACHE_CONTROL, replayObjectPath } from "@/lib/replayStorage";
 import { shotHostPreview } from "@/lib/shotSession";
 import { LIVE_REQUEST_TIMEOUT_MS, withDeadline } from "@/lib/withDeadline";
 
@@ -153,9 +154,13 @@ async function storeReplay(userId: string, streamId: string, blob: Blob, mime: s
   const extension = replayFileExtension(mime);
   const contentType = replayContentType(mime);
   const uploadBlob = contentType === "video/webm" ? await fixWebmDuration(blob, durationMs) : blob;
-  const fileName = `${userId}/replays/${streamId}-${Date.now()}.${extension}`;
+  const fileName = replayObjectPath(userId, streamId, extension);
   const file = new File([uploadBlob], `replay.${extension}`, { type: contentType });
-  const { error } = await supabase.storage.from("media").upload(fileName, file, { contentType, upsert: false });
+  const { error } = await supabase.storage.from("media").upload(fileName, file, {
+    contentType,
+    upsert: false,
+    cacheControl: REPLAY_CACHE_CONTROL,
+  });
   if (error) throw error;
   return {
     replayUrl: supabase.storage.from("media").getPublicUrl(fileName).data.publicUrl,
