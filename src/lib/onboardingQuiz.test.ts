@@ -145,12 +145,14 @@ describe("quiz intro", () => {
 });
 
 describe("wallet pass button", () => {
-  it("stays off the page unless wallet passes are enabled", () => {
-    const source = readFileSync(new URL("../pages/PublicEventPage.tsx", import.meta.url), "utf8");
-    assert.equal(/coming soon/i.test(source), false);
-    assert.equal(/check back soon/i.test(source), false);
-    assert.match(source, /VITE_WALLET_PASSES_ENABLED === "true"/);
-    assert.equal((source.match(/walletPassesEnabled &&/g) ?? []).length, 2);
-    assert.equal((source.match(/Add to Wallet/g) ?? []).length, 2);
+  it("stays off the confirmation until the pass certificate is configured", () => {
+    const page = readFileSync(new URL("../pages/EventConfirmation.tsx", import.meta.url), "utf8");
+    const screen = readFileSync(new URL("../components/events/guest/ConfirmationScreen.tsx", import.meta.url), "utf8");
+    assert.equal(/coming soon/i.test(page + screen), false);
+    assert.equal(/check back soon/i.test(page + screen), false);
+    assert.match(page, /probe\.data\?\.configured === true/);
+    assert.match(screen, /walletEnabled &&/);
+    assert.match(screen, /Add to Apple Wallet/);
+    assert.equal((screen.match(/Add to Apple Wallet/g) ?? []).length, 1);
   });
 });

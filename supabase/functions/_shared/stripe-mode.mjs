@@ -11,3 +11,12 @@ export function assertStripeTestKey(key) {
   }
   return value;
 }
+
+// Event checkout and host payouts stay on Stripe test keys.
+export function assertEventStripeTestKey(key) {
+  const value = assertStripeTestKey(key);
+  if (value.includes("_live_")) {
+    throw new Error("Event payments are in Stripe test mode. A live key was refused.");
+  }
+  return value;
+}

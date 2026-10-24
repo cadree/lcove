@@ -7,7 +7,7 @@ import {
   PLATFORM_FALLBACK_REPLY_TO,
   eventReplyTo,
   hostFromHeader,
-  sanitizeDisplayName,
+  hostViaEtherName,
 } from "./host-email-address.mjs";
 
 export { HOST_EVENT_FROM_ADDRESS, PLATFORM_FALLBACK_REPLY_TO };
@@ -84,10 +84,7 @@ export async function resolveHostIdentity(
     }
   }
 
-  const fromNameRaw =
-    branding?.from_name_override ||
-    `${hostDisplayName} via Ether`;
-  const fromName = sanitizeDisplayName(fromNameRaw);
+  const fromName = hostViaEtherName(branding?.from_name_override || hostDisplayName);
 
   const replyToVerified = Boolean(
     branding?.reply_to_email && branding?.reply_to_verified_at
