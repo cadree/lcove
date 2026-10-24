@@ -21,7 +21,7 @@ const Guidelines = () => {
             </div>
             <div>
               <h1 className="text-2xl font-display font-semibold">Community Guidelines</h1>
-              <p className="text-sm text-muted-foreground">Last updated: October 20, 2026</p>
+              <p className="text-sm text-muted-foreground">Last updated: October 24, 2026</p>
             </div>
           </div>
         </div>
@@ -30,6 +30,9 @@ const Guidelines = () => {
           <p>
             Ether is for people and work they made. Do not harass, scam, or post illegal content.
             Do not impersonate someone else.
+          </p>
+          <p>
+            Do not post or sell sexually explicit content or nudity, work you do not have the rights to, or content that promotes violent extremism or attacks people based on protected characteristics. Accounts that break these rules may be suspended or banned.
           </p>
           <p className="text-foreground">{AI_CONTENT_RULE_ALLOWED}</p>
           <p className="text-foreground">{AI_CONTENT_RULE_FORBIDDEN}</p>
