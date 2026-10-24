@@ -3516,6 +3516,7 @@ export type Database = {
           event_type: string | null
           external_url: string | null
           host_id: string
+          host_seen_at: string | null
           id: string
           is_live: boolean | null
           is_virtual_event: boolean | null
@@ -3545,6 +3546,7 @@ export type Database = {
           event_type?: string | null
           external_url?: string | null
           host_id: string
+          host_seen_at?: string | null
           id?: string
           is_live?: boolean | null
           is_virtual_event?: boolean | null
@@ -3574,6 +3576,7 @@ export type Database = {
           event_type?: string | null
           external_url?: string | null
           host_id?: string
+          host_seen_at?: string | null
           id?: string
           is_live?: boolean | null
           is_virtual_event?: boolean | null
@@ -5449,6 +5452,7 @@ export type Database = {
           id: string
           interests: string[] | null
           is_suspended: boolean | null
+          deleted_at: string | null
           last_active_at: string | null
           mindset_level: number | null
           onboarding_completed: boolean | null
@@ -7668,6 +7672,78 @@ export type Database = {
       }
     }
     Views: {
+      consumer_creators: {
+        Row: {
+          avatar_url: string | null
+          display_name: string | null
+          user_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          display_name?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          display_name?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      consumer_live_streams: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          ended_at: string | null
+          external_url: string | null
+          host_id: string | null
+          id: string | null
+          is_live: boolean | null
+          playback_url: string | null
+          replay_available: boolean | null
+          replay_url: string | null
+          started_at: string | null
+          stream_type: string | null
+          thumbnail_url: string | null
+          title: string | null
+          viewer_count: number | null
+        }
+        Insert: {
+          created_at?: never
+          description?: never
+          ended_at?: never
+          external_url?: never
+          host_id?: never
+          id?: never
+          is_live?: never
+          playback_url?: never
+          replay_available?: never
+          replay_url?: never
+          started_at?: never
+          stream_type?: never
+          thumbnail_url?: never
+          title?: never
+          viewer_count?: never
+        }
+        Update: {
+          created_at?: never
+          description?: never
+          ended_at?: never
+          external_url?: never
+          host_id?: never
+          id?: never
+          is_live?: never
+          playback_url?: never
+          replay_available?: never
+          replay_url?: never
+          started_at?: never
+          stream_type?: never
+          thumbnail_url?: never
+          title?: never
+          viewer_count?: never
+        }
+        Relationships: []
+      }
       live_streams_public: {
         Row: {
           created_at: string | null
@@ -7912,6 +7988,9 @@ export type Database = {
           mindset_level: number
           phone: string
           user_id: string
+          is_suspended: boolean
+          suspension_reason: string
+          deleted_at: string
         }[]
       }
       get_artist_payout_status: {
@@ -8129,7 +8208,12 @@ export type Database = {
         Args: { p_message_ids: string[] }
         Returns: number
       }
+      touch_host_presence: {
+        Args: { p_stream_id: string }
+        Returns: undefined
+      }
       touch_last_active: { Args: never; Returns: undefined }
+      close_stale_live_streams: { Args: never; Returns: number }
       viewer_liked_story: {
         Args: { p_story_id: string; p_owner: string }
         Returns: boolean

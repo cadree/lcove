@@ -1,9 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { EVENT_PLATFORM_FEE_PERCENT } from "../_shared/fees.mjs";
+import { EVENT_PLATFORM_FEE_PERCENT, platformFeeCents } from "../_shared/fees.mjs";
 import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
 import { httpStatusForError } from "../_shared/http-error.mjs";
+import { clientRateKey, GUEST_LIMITS } from "../_shared/guest-consumer.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -171,6 +172,27 @@ serve(async (req) => {
     const totalCents = unitCents * attendeeList.length;
     const isFree = unitCents === 0;
     const purchaserEmail = userEmail || attendeeList[0].email || guestEmail || null;
+    if (!userId) {
+      const ipKey = await clientRateKey(req.headers);
+      if (purchaserEmail) {
+        const { error: emailQuota } = await supabase.rpc("consume_guest_quota", {
+          p_action: "guest_ticket_email",
+          p_key: purchaserEmail,
+          p_limit: GUEST_LIMITS.ticketEmailPerHour,
+          p_window_seconds: 3600,
+        });
+        if (emailQuota) throw new Error(emailQuota.message);
+      }
+      if (ipKey) {
+        const { error: ipQuota } = await supabase.rpc("consume_guest_quota", {
+          p_action: "guest_ticket_ip",
+          p_key: ipKey,
+          p_limit: GUEST_LIMITS.ticketIpPerHour,
+          p_window_seconds: 3600,
+        });
+        if (ipQuota) throw new Error(ipQuota.message);
+      }
+    }
     const purchaserName = attendeeList[0].name || guestName || null;
     const purchaserPhone = attendeeList[0].phone || guestPhone || null;
     const purchaserSocial = attendeeList[0].social || null;
@@ -343,7 +365,7 @@ serve(async (req) => {
     };
 
     if (creatorConnectId && creatorPayoutEnabled) {
-      const applicationFee = Math.round(totalCents * (EVENT_PLATFORM_FEE_PERCENT / 100));
+      const applicationFee = platformFeeCents(totalCents, EVENT_PLATFORM_FEE_PERCENT);
       sessionConfig.payment_intent_data = {
         transfer_data: { destination: creatorConnectId },
         ...(applicationFee > 0 ? { application_fee_amount: applicationFee } : {}),

@@ -1,18 +1,19 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { STORE_PLATFORM_FEE_PERCENT } from "../_shared/fees.mjs";
+import { STORE_PLATFORM_FEE_PERCENT, storeCashSplit } from "../_shared/fees.mjs";
+
 import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
 import { verifiedDestination } from "../_shared/creator-connect.mjs";
 import { ledgerBalances } from "../_shared/credit-balances.ts";
 import { httpStatusForError } from "../_shared/http-error.mjs";
+import { requestRole } from "../_shared/require-caller.ts";
+import { clientRateKey, parseGuestCheckout } from "../_shared/guest-consumer.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-const PLATFORM_FEE_PERCENT = STORE_PLATFORM_FEE_PERCENT;
 
 const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
@@ -38,22 +39,176 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    // Authenticate user
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       throw new Error("Missing authorization header");
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-    
-    if (authError || !user) {
+    const { data: { user } } = await supabaseClient.auth.getUser(token);
+    const role = requestRole(req);
+    if (!user && role !== "anon") {
       throw new Error("Authentication failed");
     }
 
-    logStep("User authenticated", { userId: user.id });
+    const body = await req.json();
+    const { itemId, paymentType, quantity = 1, action, orderId, cancelToken } = body;
 
-    const { itemId, paymentType, quantity = 1, action, orderId } = await req.json();
+    if (!user) {
+      if (action === "cancel") {
+        if (!orderId || !cancelToken) throw new Error("Missing orderId");
+        const { error: cancelError } = await supabaseAdmin.rpc("cancel_guest_store_order", {
+          p_order_id: orderId,
+          p_token: cancelToken,
+        });
+        if (cancelError) throw new Error(cancelError.message);
+        return new Response(
+          JSON.stringify({ cancelled: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+        );
+      }
+      if (paymentType !== "cash") throw new Error("Sign in to pay with credits");
+      const guest = parseGuestCheckout({ ...body, paymentType: "cash", quantity });
+      if (!guest) throw new Error("name and email required");
+      const { data: priced, error: priceError } = await supabaseAdmin
+        .from("store_items")
+        .select("price, type, store:stores(flat_shipping_cents, tax_line_cents)")
+        .eq("id", itemId)
+        .maybeSingle();
+      if (priceError || !priced?.price) throw new Error("Item not found");
+      const pricedStore = Array.isArray(priced.store) ? priced.store[0] : priced.store;
+      const split = storeCashSplit(
+        Math.round(Number(priced.price) * 100) * guest.quantity,
+        priced.type === "product" ? Number(pricedStore?.flat_shipping_cents || 0) : 0,
+        Number(pricedStore?.tax_line_cents || 0),
+      );
+      const ipKey = await clientRateKey(req.headers);
+      const { data: started, error: startError } = await supabaseAdmin.rpc("begin_guest_store_order", {
+        p_item_id: itemId,
+        p_guest_name: guest.name,
+        p_guest_email: guest.email,
+        p_quantity: guest.quantity,
+        p_ip_key: ipKey || null,
+        p_platform_fee_cents: split.platformFeeCents,
+      });
+      if (startError || !started?.order_id) throw new Error(startError?.message || "Failed to create order");
+      const order = started as {
+        order_id: string;
+        cancel_token: string;
+        store_id: string;
+        seller_user_id: string;
+        title: string;
+        description: string | null;
+        image: string | null;
+        currency: string;
+        unit_amount_cents: number;
+        quantity: number;
+        shipping_cents: number;
+        tax_cents: number;
+        tax_label: string | null;
+        platform_fee_cents: number;
+      };
+      const { data: storeSecrets } = await supabaseAdmin
+        .from("store_secrets")
+        .select("stripe_connect_account_id")
+        .eq("store_id", order.store_id)
+        .maybeSingle();
+      const profileDestination = await verifiedDestination(supabaseAdmin, order.seller_user_id);
+      const connectAccountId = profileDestination || storeSecrets?.stripe_connect_account_id || null;
+      if (connectAccountId) {
+        await supabaseAdmin.from("store_orders").update({ seller_payout_status: "processing" }).eq("id", order.order_id);
+      }
+      const stripe = new Stripe(assertStripeTestKey(Deno.env.get("STRIPE_SECRET_KEY")), {
+        apiVersion: "2025-08-27.basil",
+      });
+      const customers = await stripe.customers.list({ email: guest.email, limit: 1 });
+      const customerId = customers.data[0]?.id;
+      const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+        {
+          price_data: {
+            currency: order.currency,
+            product_data: {
+              name: order.title,
+              description: order.description || undefined,
+              images: order.image?.startsWith("https://") ? [order.image] : undefined,
+            },
+            unit_amount: order.unit_amount_cents,
+          },
+          quantity: order.quantity,
+        },
+      ];
+      if (order.shipping_cents > 0) {
+        lineItems.push({
+          price_data: {
+            currency: order.currency,
+            product_data: { name: "Shipping (seller arranges)" },
+            unit_amount: order.shipping_cents,
+          },
+          quantity: 1,
+        });
+      }
+      if (order.tax_cents > 0) {
+        lineItems.push({
+          price_data: {
+            currency: order.currency,
+            product_data: { name: order.tax_label || "Tax" },
+            unit_amount: order.tax_cents,
+          },
+          quantity: 1,
+        });
+      }
+      const origin = req.headers.get("origin") || "http://localhost:3000";
+      const sessionConfig: Stripe.Checkout.SessionCreateParams = {
+        customer: customerId,
+        customer_email: customerId ? undefined : guest.email,
+        line_items: lineItems,
+        mode: "payment",
+        success_url: `${origin}/product/${itemId}?purchase=success&order=${order.order_id}`,
+        cancel_url: `${origin}/product/${itemId}?purchase=cancel&order=${order.order_id}&cancel_token=${order.cancel_token}`,
+        metadata: {
+          type: "store_order",
+          order_id: order.order_id,
+          item_id: itemId,
+        },
+        payment_intent_data: {
+          receipt_email: guest.email,
+        },
+      };
+      if (connectAccountId) {
+        sessionConfig.payment_intent_data = {
+          ...sessionConfig.payment_intent_data,
+          ...(order.platform_fee_cents > 0 ? { application_fee_amount: order.platform_fee_cents } : {}),
+          transfer_data: { destination: connectAccountId },
+        };
+      }
+      let session: Stripe.Checkout.Session;
+      try {
+        session = await stripe.checkout.sessions.create(sessionConfig);
+      } catch (sessionError) {
+        await supabaseAdmin.rpc("cancel_guest_store_order", {
+          p_order_id: order.order_id,
+          p_token: order.cancel_token,
+        });
+        throw sessionError;
+      }
+      await supabaseAdmin
+        .from("store_orders")
+        .update({ stripe_payment_intent_id: session.payment_intent as string })
+        .eq("id", order.order_id);
+      await supabaseAdmin.from("platform_treasury").insert({
+        source_type: "store_order",
+        source_id: order.order_id,
+        amount: order.platform_fee_cents / 100,
+        credits_amount: 0,
+        description: `Platform fee (${STORE_PLATFORM_FEE_PERCENT}%): ${order.title}`,
+      });
+      return new Response(
+        JSON.stringify({ url: session.url, orderId: order.order_id }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+      );
+    }
+
+    logStep("User authenticated", { userId: user.id });
 
     if (action === "cancel") {
       if (!orderId) throw new Error("Missing orderId");
@@ -173,12 +328,16 @@ serve(async (req) => {
         throw new Error("This item is sold outside Ether");
       }
 
-      const merchandiseCents = Math.round(item.price * 100) * quantity;
-      const shippingCents = item.type === "product" ? Number(store.flat_shipping_cents || 0) : 0;
-      const taxCents = Number(store.tax_line_cents || 0);
-      const platformFeeAmount = Math.round(merchandiseCents * (PLATFORM_FEE_PERCENT / 100));
-      const sellerAmount = merchandiseCents - platformFeeAmount + shippingCents + taxCents;
-      const totalPrice = (merchandiseCents + shippingCents + taxCents) / 100;
+      const split = storeCashSplit(
+        Math.round(item.price * 100) * quantity,
+        item.type === "product" ? Number(store.flat_shipping_cents || 0) : 0,
+        Number(store.tax_line_cents || 0),
+      );
+      const platformFeeAmount = split.platformFeeCents;
+      const sellerAmount = split.sellerCents;
+      const shippingCents = split.shippingCents;
+      const taxCents = split.taxCents;
+      const totalPrice = split.totalCents / 100;
 
       logStep("Cash split calculated", { 
         totalPrice, 
@@ -315,7 +474,7 @@ serve(async (req) => {
         source_id: order.id,
         amount: platformFeeAmount / 100,
         credits_amount: 0,
-        description: `Platform fee (${PLATFORM_FEE_PERCENT}%): ${item.title}`,
+        description: `Platform fee (${STORE_PLATFORM_FEE_PERCENT}%): ${item.title}`,
       });
 
       logStep("Checkout session created", { sessionUrl: session.url, orderId: order.id });

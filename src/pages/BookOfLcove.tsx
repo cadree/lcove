@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, Menu, Star, StickyNote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { BackButton } from '@/components/navigation/BackButton';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -157,18 +158,7 @@ const BookOfLcove: React.FC = () => {
         style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
       >
         <div className="max-w-4xl mx-auto flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="shrink-0"
-            aria-label="Back"
-            onClick={() => {
-              if (window.history.length > 1) navigate(-1);
-              else navigate('/profile');
-            }}
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
+          <BackButton label="Back" fallback="/feed" className="shrink-0" />
           
           <div className="min-w-0 flex-1 text-center">
             <p className="mono-label truncate text-[10px] text-muted-foreground">

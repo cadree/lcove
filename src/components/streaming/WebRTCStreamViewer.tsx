@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, Radio, RefreshCw, Users, Volume2, WifiOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { errorMessage } from "@/lib/errorMessage";
 import { LIVE_VIDEO_NOT_CONFIGURED, nextTokenRefreshDelay, parseLiveKitTokenResponse, type LiveKitSession } from "@/lib/livekitSession";
 import { prepareVideoElement, setAudioSession } from "@/lib/livePhone";
@@ -41,8 +40,6 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
   viewerCount,
   thumbnailUrl,
 }) => {
-  const { user } = useAuth();
-  const userId = user?.id ?? null;
   const videoRef = useRef<HTMLVideoElement>(null);
   const roomRef = useRef<Room | null>(null);
   const audioRef = useRef<HTMLMediaElement[]>([]);
@@ -105,7 +102,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
   }, []);
 
   const connect = useCallback(async () => {
-    if (!userId || !isLive) return;
+    if (!isLive) return;
     const attempt = ++attemptRef.current;
     clearTokenTimer();
     disconnectRoom();
@@ -195,11 +192,11 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       setError(errorMessage(err, "Failed to connect"));
       setPhase("offline");
     }
-  }, [disconnectRoom, hostId, isLive, streamId, userId]);
+  }, [disconnectRoom, hostId, isLive, streamId]);
   connectRef.current = connect;
 
   useEffect(() => {
-    if (!isLive || !userId) return;
+    if (!isLive) return;
     const timer = window.setTimeout(() => {
       void connect();
     }, 300);
@@ -209,7 +206,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       attemptRef.current += 1;
       disconnectRoom();
     };
-  }, [connect, disconnectRoom, isLive, userId]);
+  }, [connect, disconnectRoom, isLive]);
 
   useEffect(() => {
     const onVisible = () => {
@@ -220,14 +217,6 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [connect, isLive]);
-
-  if (!userId) {
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/20 to-background px-4">
-        <p className="text-center text-muted-foreground">Sign in to watch this stream.</p>
-      </div>
-    );
-  }
 
   if (!isLive) {
     return (

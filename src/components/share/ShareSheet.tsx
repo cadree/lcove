@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { RepostComposer } from '@/components/share/RepostComposer';
-import { Check, Link2, Repeat2, Plus } from 'lucide-react';
+import { Check, Link2, MessageSquare, Repeat2, Plus, Share } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Sheet,
@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useShareRecipients, useMyReposts, useSharingActions } from '@/hooks/useSharing';
 import { canRepostMedia, shareUrlFor, type SharePerson, type ShareTarget } from '@/lib/sharing';
+import { openNativeShare, smsShareHref } from '@/lib/shareLink';
 import { useAuth } from '@/contexts/AuthContext';
 
 async function copyLink(url: string) {
@@ -126,6 +127,9 @@ export function ShareSheet({
   };
 
   const post = target?.kind === 'post' ? target.post : null;
+  const shareUrl = target ? shareUrlFor(target) : '';
+  const shareText = post?.content?.trim() || undefined;
+  const shareTitle = post?.profile?.display_name ? `${post.profile.display_name} on Ether` : 'Ether';
   const alreadyReposted = post ? postIds.has(post.id) : false;
   const showRepost = post ? canRepostMedia(post.media_type, post.user_id, user?.id) || alreadyReposted : false;
   const showStory = Boolean(post?.media_url && (post.media_type === 'photo' || post.media_type === 'video'));
@@ -189,10 +193,30 @@ export function ShareSheet({
         )}
 
         <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border pt-4">
+          <Button variant="outline" className="min-h-11" asChild disabled={!shareUrl}>
+            <a href={shareUrl ? smsShareHref(shareUrl, shareText) : undefined}>
+              <MessageSquare className="h-4 w-4" />
+              Text message
+            </a>
+          </Button>
           <Button
             variant="outline"
             className="min-h-11"
-            onClick={() => target && copyLink(shareUrlFor(target))}
+            disabled={!shareUrl}
+            onClick={async () => {
+              if (!shareUrl) return;
+              const result = await openNativeShare({ title: shareTitle, text: shareText, url: shareUrl });
+              if (result === 'unavailable') toast.error('Sharing is not available in this browser');
+              if (result === 'shared') close();
+            }}
+          >
+            <Share className="h-4 w-4" />
+            Share
+          </Button>
+          <Button
+            variant="outline"
+            className="min-h-11"
+            onClick={() => shareUrl && copyLink(shareUrl)}
           >
             <Link2 className="h-4 w-4" />
             Copy link

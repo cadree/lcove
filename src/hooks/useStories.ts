@@ -6,6 +6,7 @@ import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { errorMessage } from '@/lib/errorMessage';
 import { shotContentThin, shotSessionEnabled, shotStories } from '@/lib/shotSession';
+import { storyViewShouldRefresh } from '@/lib/feedWindow';
 
 interface Story {
   id: string;
@@ -146,7 +147,12 @@ export function useStories() {
           table: 'story_views',
         },
         (payload) => {
-          // Invalidate stories query to refresh view counts
+          const row = (payload.new ?? null) as { story_id?: string } | null;
+          const cached = queryClient.getQueryData<{ stories?: { id: string; user_id: string }[] }>(['stories']);
+          const owned = new Set(
+            (cached?.stories ?? []).filter((story) => story.user_id === user.id).map((story) => story.id),
+          );
+          if (!storyViewShouldRefresh(row?.story_id, owned)) return;
           queryClient.invalidateQueries({ queryKey: ['stories'] });
         }
       )

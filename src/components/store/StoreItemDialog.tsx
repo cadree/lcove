@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { errorMessage } from '@/lib/errorMessage';
+import { shareLink, buildShareUrl } from "@/lib/shareLink";
 import {
   Package,
   Wrench,
@@ -127,6 +128,15 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
           <DialogTitle className="flex items-center gap-2">
             <TypeIcon className="w-5 h-5 text-primary" />
             {item.title}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="ml-auto h-8 w-8"
+              onClick={() => shareLink({ title: item.title, url: buildShareUrl.product(item.id) })}
+            >
+              <ExternalLink className="h-4 w-4" />
+            </Button>
           </DialogTitle>
         </DialogHeader>
 
