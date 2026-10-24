@@ -13,7 +13,7 @@ export function SignUpPrompt() {
         </p>
         <div className="mt-6 flex flex-col gap-3">
           <Button asChild>
-            <Link to={publicJoinPath()}>Join the waitlist</Link>
+            <Link to={publicJoinPath()}>Join</Link>
           </Button>
           <Button variant="outline" asChild>
             <Link to="/auth">Sign in</Link>
