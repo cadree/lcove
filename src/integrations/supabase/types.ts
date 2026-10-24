@@ -3540,6 +3540,7 @@ export type Database = {
           event_type: string | null
           external_url: string | null
           host_id: string
+          host_seen_at: string | null
           id: string
           is_live: boolean | null
           is_virtual_event: boolean | null
@@ -3569,6 +3570,7 @@ export type Database = {
           event_type?: string | null
           external_url?: string | null
           host_id: string
+          host_seen_at?: string | null
           id?: string
           is_live?: boolean | null
           is_virtual_event?: boolean | null
@@ -3598,6 +3600,7 @@ export type Database = {
           event_type?: string | null
           external_url?: string | null
           host_id?: string
+          host_seen_at?: string | null
           id?: string
           is_live?: boolean | null
           is_virtual_event?: boolean | null
@@ -6782,6 +6785,7 @@ export type Database = {
         Row: {
           id: string
           joined_at: string
+          last_seen: string
           left_at: string | null
           stream_id: string
           viewer_id: string
@@ -6789,6 +6793,7 @@ export type Database = {
         Insert: {
           id?: string
           joined_at?: string
+          last_seen?: string
           left_at?: string | null
           stream_id: string
           viewer_id: string
@@ -6796,6 +6801,7 @@ export type Database = {
         Update: {
           id?: string
           joined_at?: string
+          last_seen?: string
           left_at?: string | null
           stream_id?: string
           viewer_id?: string
@@ -8276,7 +8282,12 @@ export type Database = {
         Args: { p_message_ids: string[] }
         Returns: number
       }
+      touch_host_presence: {
+        Args: { p_stream_id: string }
+        Returns: undefined
+      }
       touch_last_active: { Args: never; Returns: undefined }
+      close_stale_live_streams: { Args: never; Returns: number }
       viewer_liked_story: {
         Args: { p_story_id: string; p_owner: string }
         Returns: boolean

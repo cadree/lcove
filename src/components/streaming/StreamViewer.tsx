@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,9 +15,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { WebRTCStreamViewer } from './WebRTCStreamViewer';
-import { WebRTCStreamHost } from './WebRTCStreamHost';
-import { ReplayPlayer } from './ReplayPlayer';
+const WebRTCStreamViewer = lazy(() => import('./WebRTCStreamViewer').then((mod) => ({ default: mod.WebRTCStreamViewer })));
+const WebRTCStreamHost = lazy(() => import('./WebRTCStreamHost').then((mod) => ({ default: mod.WebRTCStreamHost })));
+const ReplayPlayer = lazy(() => import('./ReplayPlayer').then((mod) => ({ default: mod.ReplayPlayer })));
+
+function LiveMediaFallback() {
+  return (
+    <div className="flex h-full min-h-[34vh] w-full items-center justify-center text-sm text-muted-foreground">
+      Loading live video…
+    </div>
+  );
+}
 import { DeleteStreamButton } from './DeleteStreamButton';
 import { liveSheetState } from '@/lib/liveSheetHistory';
 
@@ -56,7 +64,8 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   const [floatingReactions, setFloatingReactions] = useState<{ id: string; emoji: string; x: number }[]>([]);
   const [reportOpen, setReportOpen] = useState(false);
   const [holdHost, setHoldHost] = useState(false);
-  const cardGifts = digitalPurchasesEnabled();
+  // LC tips and card gifts are digital goods. The iOS app hides both (guideline 3.1.1).
+  const digitalGoods = digitalPurchasesEnabled();
   const isHost = user?.id === stream?.host_id;
   useStreamPresence(streamId, open && !!user && !isHost && stream?.is_live === true);
   const streamStatus = stream ? getStreamStatus(stream) : 'draft';
@@ -124,6 +133,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   };
 
   const sendCardGift = async (gift: "rose" | "star" | "crown") => {
+    if (!digitalGoods) return;
     try {
       const { data, error } = await supabase.functions.invoke("create-stream-gift", {
         body: { streamId, gift },
@@ -142,6 +152,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   };
 
   const handleTip = () => {
+    if (!digitalGoods) return;
     const amount = parseInt(tipAmount);
     if (!amount || amount < 1) return;
     tipStream.mutate({ streamId, amount, message: tipMessage });
@@ -167,9 +178,11 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
       // here used to unmount the recorder before the file was stored.
       if (isHost && (streamStatus !== 'ended' || holdHost)) {
         return (
+          <Suspense fallback={<LiveMediaFallback />}>
           <WebRTCStreamHost
             streamId={streamId}
             isLive={streamStatus === 'live'}
+            serverCount={stream.viewer_count ?? 0}
             onEnd={() => {
               setHoldHost(false);
               endGuard.current = null;
@@ -180,17 +193,20 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
               endGuard.current = guard;
             }}
           />
+          </Suspense>
         );
       }
 
       // REPLAY VIEW: Anyone can watch a replay (host or viewer)
       if (streamStatus === 'ended' && hasReplay) {
         return (
+          <Suspense fallback={<LiveMediaFallback />}>
           <ReplayPlayer 
             src={stream.replay_url!}
             poster={stream.thumbnail_url}
             className="w-full h-full"
           />
+          </Suspense>
         );
       }
       
@@ -222,6 +238,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
       
       // VIEWER: Stream is live - connect to watch
       return (
+        <Suspense fallback={<LiveMediaFallback />}>
         <WebRTCStreamViewer 
           streamId={streamId}
           hostId={stream.host_id}
@@ -229,6 +246,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
           viewerCount={stream.viewer_count || 0}
           thumbnailUrl={stream.thumbnail_url}
         />
+        </Suspense>
       );
     }
 
@@ -411,15 +429,17 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
                       <Share2 className="h-4 w-4 mr-2" />
                       Share
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                      onClick={() => setShowTipInput(!showTipInput)}
-                    >
-                      <Coins className="h-4 w-4 mr-2" />
-                      Tip LC
-                    </Button>
-                    {cardGifts && (["rose", "star", "crown"] as const).map((gift) => (
+                    {digitalGoods && (
+                      <Button
+                        variant="outline"
+                        className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                        onClick={() => setShowTipInput(!showTipInput)}
+                      >
+                        <Coins className="h-4 w-4 mr-2" />
+                        Tip LC
+                      </Button>
+                    )}
+                    {digitalGoods && (["rose", "star", "crown"] as const).map((gift) => (
                       <Button
                         key={gift}
                         type="button"
@@ -435,7 +455,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
             </div>
 
             {/* Tip Input */}
-            {showTipInput && (
+            {digitalGoods && showTipInput && (
               <motion.div 
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}

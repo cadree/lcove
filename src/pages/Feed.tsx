@@ -18,7 +18,6 @@ import { FeedEngagementProvider } from "@/hooks/useFeedEngagement";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
-import { cityFilterOptions, cityMatchesFilter } from "@/lib/cityNormalization";
 import { useFavorites } from "@/hooks/useFavorites";
 import { QuestCard } from "@/components/novi/QuestCard";
 import { useNoviQuests } from "@/hooks/useNoviQuests";
@@ -33,6 +32,7 @@ const Feed = () => {
   const [shuffledPosts, setShuffledPosts] = useState<typeof posts>([]);
   const [isShuffled, setIsShuffled] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const matchCity = useRef<((city: string | null | undefined, key: string | null) => boolean) | null>(null);
   const [lane, setLane] = useState<"for-you" | "friends" | "city" | "live">("for-you");
   const [studioOpen, setStudioOpen] = useState(false);
   const { favorites } = useFavorites();
@@ -87,12 +87,15 @@ const Feed = () => {
     data: availableRegions = []
   } = useQuery({
     queryKey: ["all-regions"],
+    enabled: showFilters,
     queryFn: async () => {
       const {
         data,
         error
       } = await supabase.from("profiles_public").select("city, city_display");
       if (error) throw error;
+      const { cityFilterOptions, cityMatchesFilter } = await import("@/lib/cityNormalization");
+      matchCity.current = cityMatchesFilter;
 
       return cityFilterOptions((data || []).flatMap((profile) => [profile.city, profile.city_display]));
     }
@@ -120,8 +123,10 @@ const Feed = () => {
     // Region filter - check both city and city_display for compatibility
     let matchesRegion = regionFilter === null;
     if (!matchesRegion) {
-      matchesRegion = cityMatchesFilter(post.profile?.city, regionFilter)
-        || cityMatchesFilter(post.profile?.city_display, regionFilter);
+      const match = matchCity.current;
+      matchesRegion = match
+        ? match(post.profile?.city, regionFilter) || match(post.profile?.city_display, regionFilter)
+        : true;
     }
     return matchesCategory && matchesPostType && matchesRegion;
   });

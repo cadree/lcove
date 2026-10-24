@@ -1,7 +1,6 @@
 // Application entry point - Ether App
 import { lazy, Suspense, useEffect } from "react";
-import { loadExplore, loadFeed, loadMessages, loadProfile, prefetchMainTabs } from "@/lib/tabRoutes";
-import { MotionConfig } from "framer-motion";
+import { hasAuthSession, loadExplore, loadFeed, loadMessages, loadProfile, prefetchMainTabs } from "@/lib/tabRoutes";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { WorldLayer } from "@/components/world/WorldLayer";
 import { Toaster } from "@/components/ui/toaster";
@@ -17,6 +16,21 @@ import { EtherSplash } from "@/components/brand/EtherSplash";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
 import { IosCheckoutReturn } from "@/components/ios/IosCheckoutReturn";
 import { APP_STORE_APPLE_ID, APP_STORE_URL } from "@/config/launch";
+import MotionRoot from "@/components/motion/MotionRoot";
+
+// index.html also preloads the open screen. This covers a reload before that
+// map exists, and it shares the promise with the lazy route.
+if (typeof window !== "undefined") {
+  const path = window.location.pathname;
+  const session = hasAuthSession();
+  if (path === "/" || path === "/landing") void import("./pages/Landing");
+  else if (path === "/auth") void import("./pages/Auth");
+  else if ((path === "/feed" || path === "/home") && session) void loadFeed();
+  else if ((path === "/profile" || path.startsWith("/profile/")) && session) void loadProfile();
+  else if (path === "/live" && session) void import("./pages/Live");
+  else if (path.startsWith("/live/")) void import("./pages/PublicLivePage");
+  else if (path.startsWith("/event/")) void import("./pages/PublicEventPage");
+}
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Waitlist = lazy(() => import("./pages/Waitlist"));
@@ -139,7 +153,6 @@ const App = () => (
       <BrowserRouter>
         <ThemeProvider>
         <WorldLayer />
-        <MotionConfig reducedMotion="user">
         <AuthProvider>
           <IosCheckoutReturn />
           <PresenceProvider>
@@ -150,6 +163,7 @@ const App = () => (
                 <StoreListingMeta />
                 <Toaster />
               <Sonner />
+              <MotionRoot>
               <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/" element={<Landing />} />
@@ -229,11 +243,11 @@ const App = () => (
                 <Route path="*" element={<NotFound />} />
               </Routes>
               </Suspense>
+              </MotionRoot>
               </AccessGate>
             </CreateFlowProvider>
           </PresenceProvider>
         </AuthProvider>
-        </MotionConfig>
         <EtherSplash />
         </ThemeProvider>
       </BrowserRouter>

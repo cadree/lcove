@@ -39,6 +39,7 @@ import {
 import {
   LIVE_VIDEO_NOT_CONFIGURED,
   parseLiveKitTokenResponse,
+  nextTokenRefreshDelay,
   pickRecorderMimeType,
   replayContentType,
   replayFileExtension,
@@ -60,11 +61,14 @@ import {
 } from "@/lib/livePhone";
 import { REPLAY_CACHE_CONTROL, replayObjectPath } from "@/lib/replayStorage";
 import { shotHostPreview } from "@/lib/shotSession";
+import { callRpc } from "@/lib/rpc";
 import { LIVE_REQUEST_TIMEOUT_MS, withDeadline } from "@/lib/withDeadline";
 
 interface WebRTCStreamHostProps {
   streamId: string;
   isLive?: boolean;
+  /** Latest viewer_count from the open stream query. */
+  serverCount?: number;
   onEnd: () => void;
   onClose: () => void;
   registerEndGuard?: (guard: (() => boolean) | null) => void;
@@ -171,6 +175,7 @@ async function storeReplay(userId: string, streamId: string, blob: Blob, mime: s
 export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
   streamId,
   isLive: initialIsLive = false,
+  serverCount = 0,
   onEnd,
   onClose,
   registerEndGuard,
@@ -191,8 +196,25 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
   const streamingRef = useRef(initialIsLive);
   const endingRef = useRef(false);
   const recoveringRef = useRef(false);
+  const refreshingTokenRef = useRef(false);
+  const tokenTimerRef = useRef<number | null>(null);
+  const refreshSessionRef = useRef<() => Promise<void>>(async () => undefined);
   const userIdRef = useRef(user?.id);
   userIdRef.current = user?.id;
+
+  const clearTokenTimer = () => {
+    if (tokenTimerRef.current !== null) window.clearTimeout(tokenTimerRef.current);
+    tokenTimerRef.current = null;
+  };
+
+  const armTokenRefresh = (token: string) => {
+    clearTokenTimer();
+    const delay = nextTokenRefreshDelay(token);
+    if (delay === null) return;
+    tokenTimerRef.current = window.setTimeout(() => {
+      void refreshSessionRef.current();
+    }, delay);
+  };
 
   const [isStreaming, setIsStreaming] = useState(initialIsLive);
   const [cameraState, setCameraState] = useState<CameraState>("checking");
@@ -395,6 +417,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
       if (next !== "ended") setLink(next);
     });
     room.on(RoomEvent.Disconnected, () => {
+      if (refreshingTokenRef.current) return;
       const next = liveLinkAfter("disconnected", endingRef.current);
       if (next !== "ended" && streamingRef.current) setLink("offline");
     });
@@ -419,9 +442,29 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
       "Could not join the live room. Try again.",
     );
     await publishLocal(room, media);
+    armTokenRefresh(session.token);
     setLink("live");
     return room;
   }, [bindRoom, streamId]);
+
+  const refreshSession = useCallback(async () => {
+    if (endingRef.current || !streamingRef.current || refreshingTokenRef.current) return;
+    const media = localStreamRef.current;
+    if (!media) return;
+    refreshingTokenRef.current = true;
+    try {
+      const room = roomRef.current;
+      if (room) await room.disconnect(false);
+      roomRef.current = null;
+      await connectRoom(media);
+    } catch (err: unknown) {
+      setLink("offline");
+      setErrorMessage(formatError(err, "The live token expired."));
+    } finally {
+      refreshingTokenRef.current = false;
+    }
+  }, [connectRoom]);
+  refreshSessionRef.current = refreshSession;
 
   const recover = useCallback(async () => {
     if (recoveringRef.current || endingRef.current || !streamingRef.current) return;
@@ -529,6 +572,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
         toast({ title: "No recording data", description: note, variant: "destructive" });
       }
 
+      clearTokenTimer();
       releaseLocalMedia();
       const { error } = await supabase
         .from("live_streams")
@@ -605,6 +649,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
   useEffect(() => {
     return () => {
       cameraAttemptRef.current += 1;
+      clearTokenTimer();
       const wasLive = streamingRef.current && !endingRef.current;
       const userId = userIdRef.current;
       const mime = recorderMimeRef.current;
@@ -649,22 +694,65 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
   }, [streamId]);
 
   useEffect(() => {
+    if (!isStreaming) return;
+    let stopped = false;
+    const beat = () => {
+      if (stopped || !streamingRef.current) return;
+      callRpc("touch_host_presence", { p_stream_id: streamId }).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : "";
+        if (!/not host/i.test(message) || !streamingRef.current) return;
+        void (async () => {
+          const { error: restoreError } = await supabase
+            .from("live_streams")
+            .update({ is_live: true, ended_at: null })
+            .eq("id", streamId);
+          if (restoreError || !streamingRef.current) return;
+          await callRpc("touch_host_presence", { p_stream_id: streamId });
+        })().catch(() => undefined);
+      });
+    };
+    beat();
+    const timer = window.setInterval(beat, 20_000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [isStreaming, streamId]);
+
+  useEffect(() => {
+    let stopped = false;
+    // The server writes viewer_count from the same 45s presence window.
+    // Realtime can miss a beat, so poll that column too.
+    const refreshCount = async () => {
+      const { data, error } = await supabase
+        .from("live_streams_public")
+        .select("viewer_count")
+        .eq("id", streamId)
+        .limit(1);
+      const row = Array.isArray(data) ? data[0] : data;
+      const count = row?.viewer_count;
+      if (!stopped && !error && typeof count === "number") setViewerCount(count);
+    };
+    void refreshCount();
+    const timer = window.setInterval(() => void refreshCount(), 10_000);
     const channel = supabase
       .channel(`stream-viewers-${streamId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "stream_viewers", filter: `stream_id=eq.${streamId}` },
-        async () => {
-          const { count } = await supabase
-            .from("stream_viewers")
-            .select("*", { count: "exact", head: true })
-            .eq("stream_id", streamId);
-          setViewerCount(count || 0);
+        () => {
+          void refreshCount();
         },
       )
       .subscribe();
     return () => {
-      supabase.removeChannel(channel);
+      stopped = true;
+      window.clearInterval(timer);
+      try {
+        void supabase.removeChannel(channel);
+      } catch {
+        // A realtime teardown failure must not drop the next poll.
+      }
     };
   }, [streamId]);
 
@@ -848,7 +936,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
           )}
           <Badge variant="secondary" className="bg-background/80 text-xs backdrop-blur-sm" data-testid="viewer-count">
             <Users className="mr-1 h-3 w-3" />
-            {viewerCount}
+            {serverCount > 0 ? serverCount : viewerCount}
           </Badge>
         </div>
       </div>
