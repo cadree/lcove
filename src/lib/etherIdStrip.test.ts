@@ -32,15 +32,26 @@ describe("ether id strip", () => {
     assert.ok(countAlertPixels(bannedImage) > countAlertPixels(activeImage) * 5);
 
     let colored = 0;
-    for (let y = 40; y < 100; y += 2) {
-      for (let x = 36; x < 110; x += 2) {
+    let letters = 0;
+    for (let y = 86; y < 118; y += 2) {
+      for (let x = 46; x < 76; x += 2) {
         const color = activeImage.getPixelAt(x, y) >>> 0;
         const r = (color >>> 24) & 255;
         const g = (color >>> 16) & 255;
         if (r > 90 && g > 40 && g < 190) colored += 1;
       }
     }
-    assert.ok(colored > 12);
+    for (let y = 16; y < 78; y += 2) {
+      for (let x = 36; x < 82; x += 2) {
+        const color = activeImage.getPixelAt(x, y) >>> 0;
+        const r = (color >>> 24) & 255;
+        const g = (color >>> 16) & 255;
+        const b = (color >>> 8) & 255;
+        if (r > 180 && g > 170 && b > 150) letters += 1;
+      }
+    }
+    assert.ok(colored > 8);
+    assert.ok(letters > 12);
 
     const images = await etherIdImages({ ...card, status: "Banned" });
     const names = images.map((file: { name: string }) => file.name);

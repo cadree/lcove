@@ -1119,12 +1119,12 @@ button.novi-peek:focus-visible {
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 4px),
     linear-gradient(160deg, #3a3a42, #141418 42%, #0c0c10);
   clip-path: polygon(
-    16px 0, 424px 0, 440px 16px,
-    440px 246px, 430px 260px, 440px 274px,
-    440px 571px, 424px 587px,
-    16px 587px, 0 571px,
-    0 274px, 10px 260px, 0 246px,
-    0 16px
+    26px 0, 414px 0, 440px 26px,
+    440px 206px, 428px 224px, 440px 242px,
+    440px 561px, 414px 587px,
+    26px 587px, 0 561px,
+    0 242px, 12px 224px, 0 206px,
+    0 26px
   );
   font-family: "DM Mono", ui-monospace, monospace;
   line-height: 1.1;
@@ -1147,37 +1147,69 @@ button.novi-peek:focus-visible {
 .ether-id-familcy {
   position: absolute;
   z-index: 4;
-  top: 78px;
-  left: 0;
+  top: 32px;
+  left: 6px;
   width: 46px;
-  height: 280px;
+  height: 324px;
   margin: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: 0.42em;
+  letter-spacing: 0.38em;
   writing-mode: vertical-rl;
   transform: rotate(180deg);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 22%),
+    linear-gradient(180deg, #3c3c46, #14141a);
+  clip-path: polygon(
+    0 16px, 14px 0, 100% 0, 100% 100%, 14px 100%, 0 calc(100% - 16px)
+  );
+}
+
+.ether-id-familcy::after {
+  content: "";
+  position: absolute;
+  top: 14px;
+  right: 0;
+  bottom: 14px;
+  width: 1px;
+  background: #ff9fc8;
+  box-shadow: 0 0 8px rgba(255, 159, 200, 0.85);
+}
+
+.ether-id.is-banned .ether-id-familcy {
+  background:
+    linear-gradient(180deg, rgba(255, 61, 73, 0.2), transparent 24%),
+    linear-gradient(180deg, #4a242a, #1a0608);
+}
+
+.ether-id.is-banned .ether-id-familcy::after {
+  background: #ff3d49;
+  box-shadow: 0 0 8px rgba(255, 61, 73, 0.85);
 }
 
 .ether-id-bezel {
   position: absolute;
   z-index: 2;
   top: 16px;
-  left: 52px;
-  width: 334px;
-  height: 382px;
-  border-radius: 18px;
+  left: 60px;
+  width: 308px;
+  height: 338px;
   overflow: hidden;
-  padding: 7px;
+  padding: 3px;
   background:
-    linear-gradient(155deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.08) 28%, rgba(255, 159, 200, 0.55) 62%, rgba(236, 231, 220, 0.4));
+    linear-gradient(155deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.08) 28%, rgba(255, 159, 200, 0.72) 62%, rgba(236, 231, 220, 0.45));
   box-shadow:
-    0 0 0 1px rgba(255, 159, 200, 0.8),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.4),
-    0 0 16px rgba(255, 159, 200, 0.4);
+    0 0 0 1px rgba(255, 159, 200, 0.85),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.45),
+    0 0 16px rgba(255, 159, 200, 0.45);
+  clip-path: polygon(
+    22px 0, calc(100% - 22px) 0, 100% 22px,
+    100% calc(100% - 22px), calc(100% - 22px) 100%,
+    22px 100%, 0 calc(100% - 22px), 0 22px
+  );
 }
 
 .ether-id.is-banned .ether-id-bezel {
@@ -1190,10 +1222,14 @@ button.novi-peek:focus-visible {
 
 .ether-id-photo {
   position: absolute;
-  inset: 7px;
+  inset: 3px;
   overflow: hidden;
-  border-radius: 12px;
   background: #1a1a1e;
+  clip-path: polygon(
+    16px 0, calc(100% - 16px) 0, 100% 16px,
+    100% calc(100% - 16px), calc(100% - 16px) 100%,
+    16px 100%, 0 calc(100% - 16px), 0 16px
+  );
 }
 
 .ether-id-portrait {
@@ -1313,11 +1349,41 @@ button.novi-peek:focus-visible {
 .ether-id-rail {
   position: absolute;
   z-index: 4;
-  top: 28px;
-  right: 0;
-  width: 46px;
-  height: 352px;
+  top: 16px;
+  right: 6px;
+  width: 54px;
+  height: 348px;
   overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 18%),
+    linear-gradient(180deg, #34343e, #121218);
+  clip-path: polygon(
+    0 18px, 16px 0, 100% 0,
+    100% calc(100% - 18px), calc(100% - 16px) 100%,
+    0 100%
+  );
+}
+
+.ether-id-rail::before {
+  content: "";
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  left: 0;
+  width: 1px;
+  background: #ff9fc8;
+  box-shadow: 0 0 8px rgba(255, 159, 200, 0.85);
+}
+
+.ether-id.is-banned .ether-id-rail {
+  background:
+    linear-gradient(180deg, rgba(255, 61, 73, 0.22), transparent 20%),
+    linear-gradient(180deg, #4a242a, #140406);
+}
+
+.ether-id.is-banned .ether-id-rail::before {
+  background: #ff3d49;
+  box-shadow: 0 0 8px rgba(255, 61, 73, 0.85);
 }
 
 .ether-id-rail-spin {
@@ -1325,7 +1391,7 @@ button.novi-peek:focus-visible {
   top: 50%;
   left: 50%;
   display: flex;
-  gap: 16px;
+  gap: 12px;
   align-items: flex-start;
   transform: translate(-50%, -50%) rotate(90deg);
 }
@@ -1395,23 +1461,38 @@ button.novi-peek:focus-visible {
 .ether-id-deck {
   position: absolute;
   z-index: 3;
-  right: 14px;
-  bottom: 14px;
-  left: 14px;
-  height: 162px;
+  right: 10px;
+  bottom: 12px;
+  left: 10px;
+  height: 198px;
   overflow: hidden;
-  border: 1px solid rgba(236, 231, 220, 0.28);
-  border-radius: 14px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 26%),
-    linear-gradient(180deg, #32323a, #141418);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 22%),
+    linear-gradient(165deg, #3a3a44, #1a1a20 46%, #101014);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.32),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.55);
+    inset 0 0 0 1px rgba(236, 231, 220, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  clip-path: polygon(
+    18px 0,
+    64% 0,
+    calc(64% + 14px) 14px,
+    calc(100% - 18px) 14px,
+    100% 32px,
+    100% calc(100% - 18px),
+    calc(100% - 18px) 100%,
+    18px 100%,
+    0 calc(100% - 18px),
+    0 18px
+  );
 }
 
 .ether-id.is-banned .ether-id-deck {
-  border-color: rgba(255, 61, 73, 0.7);
+  background:
+    linear-gradient(180deg, rgba(255, 61, 73, 0.16), transparent 24%),
+    linear-gradient(165deg, #4a2830, #1a0608 50%, #120406);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 61, 73, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
 .ether-id-deck-sheen {
@@ -1452,12 +1533,12 @@ button.novi-peek:focus-visible {
   background: rgba(8, 8, 10, 0.7);
 }
 
-.ether-id-screws i:nth-child(1) { top: 8px; left: 8px; }
-.ether-id-screws i:nth-child(2) { top: 8px; left: 63%; }
-.ether-id-screws i:nth-child(3) { bottom: 8px; left: 8px; }
-.ether-id-screws i:nth-child(4) { bottom: 8px; left: 63%; }
-.ether-id-screws i:nth-child(5) { top: 8px; right: 8px; }
-.ether-id-screws i:nth-child(6) { bottom: 8px; right: 8px; }
+.ether-id-screws i:nth-child(1) { top: 16px; left: 14px; }
+.ether-id-screws i:nth-child(2) { top: 20px; left: 58%; }
+.ether-id-screws i:nth-child(3) { bottom: 14px; left: 14px; }
+.ether-id-screws i:nth-child(4) { bottom: 14px; left: 58%; }
+.ether-id-screws i:nth-child(5) { top: 22px; right: 14px; }
+.ether-id-screws i:nth-child(6) { bottom: 14px; right: 14px; }
 
 .ether-id-identity {
   position: relative;
@@ -1467,26 +1548,14 @@ button.novi-peek:focus-visible {
   gap: 10px;
   width: 66%;
   height: 100%;
-  padding: 18px 8px 12px 14px;
+  padding: 16px 8px 12px 14px;
 }
 
 .ether-id-chip {
-  display: flex;
-  align-items: stretch;
-  justify-content: space-between;
-  width: 22px;
-  height: 72px;
-  margin-top: 8px;
-  padding: 4px 3px;
-  border: 1px solid rgba(236, 231, 220, 0.45);
-  border-radius: 3px;
-  background: rgba(8, 8, 10, 0.35);
-}
-
-.ether-id-chip span {
   display: block;
-  height: 100%;
-  background: #ece7dc;
+  width: 20px;
+  height: 78px;
+  margin-top: 4px;
 }
 
 .ether-id-copy {
@@ -1540,21 +1609,19 @@ button.novi-peek:focus-visible {
 
 .ether-id-stats strong,
 .ether-id-stats em {
-  display: block;
-  overflow: hidden;
   font-style: normal;
   font-weight: 400;
   font-size: 11px;
   letter-spacing: 0.02em;
-  text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
 .ether-id-stats em {
+  margin-left: 6px;
   color: #b9b4a8;
-  font-size: 9px;
-  letter-spacing: 0;
+  font-size: 10px;
+  letter-spacing: 0.04em;
 }
 
 .ether-id-stats .is-wide {
@@ -1576,9 +1643,15 @@ button.novi-peek:focus-visible {
 }
 
 .ether-id-logo {
-  width: 104px;
+  width: 78px;
   max-width: 100%;
   height: auto;
+  filter:
+    grayscale(1)
+    brightness(2.15)
+    contrast(0.92)
+    drop-shadow(0 0 4px rgba(236, 231, 220, 0.72))
+    drop-shadow(0 0 9px rgba(255, 159, 200, 0.32));
 }
 
 @keyframes ether-id-float {

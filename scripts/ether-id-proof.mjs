@@ -63,7 +63,7 @@ for (const status of ["Active", "Banned"]) {
   const strip = images.find((file) => file.name === "strip@2x.png").data;
   writeFileSync(join(outDir, `pass-${slug}.json`), `${JSON.stringify(pass, null, 2)}\n`);
   writeFileSync(join(outDir, `strip-${slug}@2x.png`), strip);
-  writeFileSync(join(outDir, `wallet-${slug}.png`), await renderWalletPreview(member, { strip }));
+  writeFileSync(join(outDir, `wallet-${slug}.png`), await renderWalletPreview(member, { strip, verifyUrl: meta.verifyUrl }));
   console.log(slug, JSON.parse(readFileSync(join(unpacked, "pass.json"), "utf8")).storeCard.headerFields[0].value);
 }
 

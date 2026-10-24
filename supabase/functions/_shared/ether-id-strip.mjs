@@ -1,4 +1,4 @@
-import { personnelName, walletReviewValue, walletStatus } from "./ether-id-pass-json.mjs";
+import { walletReviewValue, walletStatus } from "./ether-id-pass-json.mjs";
 import { NUANCE } from "./ether-id-palette.mjs";
 
 const STRIP_PT = { width: 375, height: 123 };
@@ -292,66 +292,273 @@ async function decodePhoto(bytes) {
   }
 }
 
+function strokeRect(image, x, y, w, h, color, thickness) {
+  const t = Math.max(1, Math.round(thickness));
+  box(image, x, y, w, t, color);
+  box(image, x, y + h - t, w, t, color);
+  box(image, x, y, t, h, color);
+  box(image, x + w - t, y, t, h, color);
+}
+
+function flattenCommands(commands, steps) {
+  const contours = [];
+  let current = [];
+  let cx = 0;
+  let cy = 0;
+  let sx = 0;
+  let sy = 0;
+  for (const cmd of commands) {
+    if (cmd.type === "M") {
+      if (current.length > 2) contours.push(current);
+      current = [[cmd.x, cmd.y]];
+      cx = cmd.x;
+      cy = cmd.y;
+      sx = cx;
+      sy = cy;
+    } else if (cmd.type === "L") {
+      current.push([cmd.x, cmd.y]);
+      cx = cmd.x;
+      cy = cmd.y;
+    } else if (cmd.type === "Q" || cmd.type === "C") {
+      const x0 = cx;
+      const y0 = cy;
+      for (let i = 1; i <= steps; i += 1) {
+        const t = i / steps;
+        const u = 1 - t;
+        const x = cmd.type === "Q"
+          ? u * u * x0 + 2 * u * t * cmd.x1 + t * t * cmd.x
+          : u ** 3 * x0 + 3 * u ** 2 * t * cmd.x1 + 3 * u * t ** 2 * cmd.x2 + t ** 3 * cmd.x;
+        const y = cmd.type === "Q"
+          ? u * u * y0 + 2 * u * t * cmd.y1 + t * t * cmd.y
+          : u ** 3 * y0 + 3 * u ** 2 * t * cmd.y1 + 3 * u * t ** 2 * cmd.y2 + t ** 3 * cmd.y;
+        current.push([x, y]);
+      }
+      cx = cmd.x;
+      cy = cmd.y;
+    } else if (cmd.type === "Z") {
+      if (current.length > 2) contours.push(current);
+      current = [];
+      cx = sx;
+      cy = sy;
+    }
+  }
+  if (current.length > 2) contours.push(current);
+  return contours;
+}
+
+function fillContours(image, contours, color) {
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const points of contours) {
+    for (const point of points) {
+      if (point[1] < minY) minY = point[1];
+      if (point[1] > maxY) maxY = point[1];
+    }
+  }
+  if (!Number.isFinite(minY)) return;
+  const y0 = Math.max(0, Math.floor(minY));
+  const y1 = Math.min(image.height - 1, Math.ceil(maxY));
+  for (let y = y0; y <= y1; y += 1) {
+    const xs = [];
+    for (const points of contours) {
+      for (let i = 0; i < points.length; i += 1) {
+        const [x1, y1] = points[i];
+        const [x2, y2] = points[(i + 1) % points.length];
+        if ((y1 <= y && y2 > y) || (y2 <= y && y1 > y)) {
+          const t = (y - y1) / (y2 - y1);
+          xs.push(x1 + t * (x2 - x1));
+        }
+      }
+    }
+    xs.sort((a, b) => a - b);
+    for (let i = 0; i + 1 < xs.length; i += 2) {
+      const left = Math.max(0, Math.ceil(xs[i]));
+      const right = Math.min(image.width - 1, Math.floor(xs[i + 1]));
+      if (right >= left) box(image, left, y, right - left + 1, 1, color);
+    }
+  }
+}
+
+function downsample(Image, image, factor) {
+  const width = Math.floor(image.width / factor);
+  const height = Math.floor(image.height / factor);
+  const out = new Image(Math.max(1, width), Math.max(1, height));
+  const area = factor * factor;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      let red = 0;
+      let green = 0;
+      let blue = 0;
+      let alpha = 0;
+      for (let dy = 0; dy < factor; dy += 1) {
+        for (let dx = 0; dx < factor; dx += 1) {
+          const color = image.getPixelAt(x * factor + dx + 1, y * factor + dy + 1) >>> 0;
+          const px = color & 255;
+          red += ((color >>> 24) & 255) * px;
+          green += ((color >>> 16) & 255) * px;
+          blue += ((color >>> 8) & 255) * px;
+          alpha += px;
+        }
+      }
+      const summed = Math.round(alpha / area);
+      if (!summed || !alpha) continue;
+      out.setPixelAt(x + 1, y + 1, (
+        (Math.round(red / alpha) << 24)
+        | (Math.round(green / alpha) << 16)
+        | (Math.round(blue / alpha) << 8)
+        | summed
+      ) >>> 0);
+    }
+  }
+  return out;
+}
+
+async function loadOpentype() {
+  try {
+    const mod = await import("opentype.js");
+    return mod.parse ? mod : mod.default;
+  } catch {
+    const mod = await import("npm:opentype.js@1.3.4");
+    return mod.parse ? mod : mod.default;
+  }
+}
+
+async function readSharedBytes(name) {
+  const url = new URL(name, import.meta.url);
+  if (typeof Deno !== "undefined" && Deno.readFile) return Deno.readFile(url);
+  const { readFile } = await import("node:fs/promises");
+  return new Uint8Array(await readFile(url));
+}
+
+let fontPromise;
+function plateFont() {
+  if (!fontPromise) {
+    fontPromise = (async () => {
+      const opentype = await loadOpentype();
+      const bytes = await readSharedBytes("./space-grotesk-700.ttf");
+      const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      return opentype.parse(buffer);
+    })();
+  }
+  return fontPromise;
+}
+
+function rasterText(Image, font, text, fontSize, color, tracking = 0) {
+  const value = String(text || "");
+  const size = Math.max(6, fontSize);
+  const advance = Math.ceil(font.getAdvanceWidth(value, size, { letterSpacing: tracking }));
+  const ascent = Math.ceil((font.ascender / font.unitsPerEm) * size) + 2;
+  const descent = Math.ceil((-font.descender / font.unitsPerEm) * size) + 2;
+  const width = Math.max(1, advance + 2);
+  const height = Math.max(1, ascent + descent);
+  const sample = 2;
+  const path = font.getPath(value, 1, ascent, size, { letterSpacing: tracking });
+  const contours = flattenCommands(path.commands, 6).map((points) => (
+    points.map(([x, y]) => [x * sample, y * sample])
+  ));
+  const big = new Image(width * sample, height * sample);
+  fillContours(big, contours, color);
+  return downsample(Image, big, sample);
+}
+
+function fittedSize(font, text, maxWidth, tracking, start) {
+  let size = start;
+  while (size > 8 && font.getAdvanceWidth(text, size, { letterSpacing: tracking }) > maxWidth) size -= 1;
+  return size;
+}
+
+async function loadQrCode() {
+  try {
+    const mod = await import("qrcode");
+    return mod.create ? mod : mod.default;
+  } catch {
+    const mod = await import("npm:qrcode@1.5.4");
+    return mod.create ? mod : mod.default;
+  }
+}
+
+function drawQr(image, code, x, y, size, dark, light) {
+  const modules = code.modules;
+  const count = modules.size;
+  const quiet = 2;
+  const cells = count + quiet * 2;
+  const cell = Math.max(1, Math.floor(size / cells));
+  const drawn = cell * cells;
+  const originX = Math.round(x + (size - drawn) / 2);
+  const originY = Math.round(y + (size - drawn) / 2);
+  box(image, Math.round(x), Math.round(y), size, size, light);
+  for (let row = 0; row < count; row += 1) {
+    for (let col = 0; col < count; col += 1) {
+      if (!modules.get(row, col)) continue;
+      box(image, originX + (col + quiet) * cell, originY + (row + quiet) * cell, cell, cell, dark);
+    }
+  }
+}
+
 /**
  * storeCard strip. 375×123 pt at @1x, @2x, and @3x.
- * Apple draws the member name on the lower part of this image.
+ * The name stays in the pass fields. This image is only the photo crop.
  */
 export async function renderEtherStrip(card, { scale = 1, photo = null, novi = null } = {}) {
   const { Image } = await imageScript();
+  const font = await plateFont();
   const s = scale;
   const width = STRIP_PT.width * s;
   const height = STRIP_PT.height * s;
   const image = new Image(width, height);
   const banned = walletStatus(card.status) === "BANNED";
-  const ground = banned ? rgba(NUANCE.bgBanned) : INK;
-  image.fill(rgba("#1a1a1e"));
-  box(image, 0, 0, width, Math.max(1, 10 * s), rgba("#3a3a42"));
-  box(image, 0, 0, 28 * s, height, rgba("#24242a"));
+  const edge = banned ? ALERT : BUBBLE;
+  image.fill(banned ? rgba("#140406") : rgba("#101014"));
+  const railW = Math.round(118 * s);
+  box(image, 0, 0, railW, height, banned ? rgba("#2a1218") : rgba("#24242c"));
+  box(image, 0, 0, width, Math.max(1, Math.round(2 * s)), rgba("#ffffff", 42));
 
-  const photoX = 32 * s;
-  const photoY = 8 * s;
-  const photoW = 246 * s;
-  const photoH = height - 16 * s;
-  const portrait = (await decodePhoto(photo)) || monogram(Image, card.display_name, Math.round(photoW), Math.round(photoH));
-  const covered = coverTop(portrait, Math.round(photoW), Math.round(photoH));
-  image.composite(covered, Math.round(photoX), Math.round(photoY));
+  const photoX = railW + Math.round(6 * s);
+  const photoY = Math.round(7 * s);
+  const photoW = width - photoX - Math.round(7 * s);
+  const photoH = height - photoY * 2;
+  const portrait = (await decodePhoto(photo)) || monogram(Image, card.display_name, photoW, photoH);
+  const covered = coverTop(portrait, photoW, photoH);
+  if (covered.width !== photoW || covered.height !== photoH) covered.resize(photoW, photoH);
+  image.composite(covered, photoX, photoY);
 
-  const frame = banned ? ALERT : BUBBLE;
-  strokeRoundRect(image, 3 * s, 3 * s, width - 6 * s, height - 6 * s, 10 * s, frame, Math.max(2, 2 * s));
-  strokeRoundRect(image, photoX, photoY, photoW, photoH, 6 * s, banned ? ALERT : BONE, Math.max(1, s));
-
-  const tile = 26 * s;
-  box(image, photoX + 6 * s, photoY + 6 * s, tile, tile, rgba("#ffffff"));
   const noviSource = novi || await loadNoviImage();
-  const noviH = Math.round(32 * s);
+  const noviH = Math.round(30 * s);
   const noviW = Math.max(1, Math.round(noviH * (noviSource.width / noviSource.height)));
-  const noviX = photoX + 8 * s;
-  const noviY = photoY + tile + 8 * s;
-  glow(image, noviX + noviW * 0.5, noviY + noviH * 0.48, 16 * s, banned ? NUANCE.alert : NUANCE.bubble);
+  const noviX = Math.round((railW - noviW) / 2);
+  const noviY = height - noviH - Math.round(8 * s);
+  glow(image, noviX + noviW * 0.5, noviY + noviH * 0.48, 14 * s, banned ? NUANCE.alert : NUANCE.bubble);
   const mark = noviSource.clone();
   mark.resize(noviW, noviH);
-  image.composite(mark, Math.round(noviX), Math.round(noviY));
-
-  const starX = photoX + photoW - 18 * s;
-  const starY = photoY + 8 * s;
-  box(image, starX + 4 * s, starY, Math.max(1, 2 * s), 12 * s, BONE);
-  box(image, starX, starY + 5 * s, 10 * s, Math.max(1, 2 * s), BONE);
+  image.composite(mark, noviX, noviY);
 
   if (banned) {
-    const bandY = photoY + photoH * 0.4;
-    box(image, photoX, bandY, photoW, 18 * s, rgba(NUANCE.alert, 235));
-    const label = "BANNED";
-    const labelScale = Math.max(1, 2 * s);
-    drawText(image, label, photoX + (photoW - textWidth(label, labelScale)) / 2, bandY + 3 * s, labelScale, rgba("#ffffff"));
+    const bandH = Math.max(14, Math.round(16 * s));
+    const bandY = Math.round(photoY + (photoH - bandH) / 2);
+    box(image, photoX, bandY, photoW, bandH, rgba(NUANCE.alert, 235));
+    const labelSize = fittedSize(font, "BANNED", photoW - 16 * s, 0.16, Math.round(11 * s));
+    const label = rasterText(Image, font, "BANNED", labelSize, rgba("#ffffff"), 0.16);
+    image.composite(
+      label,
+      Math.round(photoX + (photoW - label.width) / 2),
+      Math.round(bandY + (bandH - label.height) / 2),
+    );
   }
 
-  fadeBottom(image, height * 0.82, ground);
-  const letterScale = Math.max(1, 2 * s);
-  let letterY = 8 * s;
-  for (const ch of "FAMILCY") {
-    drawText(image, ch, 7 * s, letterY, letterScale, BONE);
-    letterY += 12 * s;
-  }
+  const inset = Math.round(2 * s);
+  const thick = Math.max(2, Math.round(2 * s));
+  strokeRect(image, inset, inset, width - inset * 2, height - inset * 2, edge, thick);
+  strokeRect(image, photoX, photoY, photoW, photoH, edge, Math.max(1, Math.round(s)));
+  box(image, railW, photoY, Math.max(1, Math.round(s)), photoH, edge);
+
+  const tracking = 0.16;
+  const wordMax = noviY - Math.round(12 * s);
+  const wordSize = fittedSize(font, "FAMILCY", wordMax, tracking, Math.round(15 * s));
+  const word = rasterText(Image, font, "FAMILCY", wordSize, BONE, tracking);
+  word.rotate(90);
+  const wordX = Math.round((railW - word.width) / 2);
+  const wordY = Math.round((noviY - word.height) / 2);
+  image.composite(word, Math.max(inset + thick, wordX), Math.max(inset + thick, wordY));
   return image.encode();
 }
 
@@ -406,8 +613,9 @@ export async function etherIdImages(card, options = {}) {
   return [...files, ...strips];
 }
 
-export async function renderWalletPreview(card, { strip, photo = null } = {}) {
+export async function renderWalletPreview(card, { strip, photo = null, verifyUrl = "" } = {}) {
   const { Image } = await imageScript();
+  const font = await plateFont();
   const banned = walletStatus(card.status) === "BANNED";
   const ground = banned ? rgba(NUANCE.bgBanned) : INK;
   const label = banned ? ALERT : BUBBLE;
@@ -420,15 +628,15 @@ export async function renderWalletPreview(card, { strip, photo = null } = {}) {
   const passW = 750;
   box(image, passX, passY, passW, 968, ground);
 
-  drawText(image, "ETHER", passX + 28, passY + 28, 4, BONE);
+  const title = rasterText(Image, font, "ETHER", 28, BONE, 0.12);
+  image.composite(title, passX + 28, passY + 22);
   const status = walletStatus(card.status);
-  drawText(image, status, passX + passW - 28 - textWidth(status, 3), passY + 34, 3, label);
+  const statusPlate = rasterText(Image, font, status, 18, label, 0.14);
+  image.composite(statusPlate, passX + passW - 28 - statusPlate.width, passY + 28);
+  box(image, passX + 24, passY + 70, passW - 48, 3, label);
 
   const stripImage = strip ? await Image.decode(strip) : await Image.decode(await renderEtherStrip(card, { scale: 2, photo }));
   image.composite(stripImage, passX, passY + 78);
-  const name = personnelName(card.display_name);
-  const nameScale = name.length > 16 ? 4 : 5;
-  drawText(image, name, passX + 28, passY + 78 + 246 - 8 - 7 * nameScale, nameScale, BONE);
 
   const rows = [
     ["USERNAME", card.username ? `@${String(card.username).replace(/^@+/, "")}` : "NO USERNAME"],
@@ -439,17 +647,21 @@ export async function renderWalletPreview(card, { strip, photo = null } = {}) {
   ];
   if (card.birthday_label) rows.push(["BIRTHDAY", card.birthday_label]);
   rows.forEach((row, index) => {
-    const y = passY + 360 + index * 52;
-    drawText(image, row[0], passX + 28, y, 2, label);
-    drawText(image, row[1], passX + 210, y, 2, BONE);
+    const y = passY + 352 + index * 48;
+    const name = rasterText(Image, font, row[0], 14, label, 0.12);
+    const value = rasterText(Image, font, row[1], 16, BONE, 0.02);
+    image.composite(name, passX + 28, y);
+    image.composite(value, passX + 230, y);
   });
 
-  const codeY = passY + 760;
-  box(image, passX + (passW - 180) / 2, codeY, 180, 180, BONE);
-  box(image, passX + (passW - 180) / 2 + 16, codeY + 16, 148, 148, INK);
-  drawText(image, "QR", passX + (passW - textWidth("QR", 4)) / 2, codeY + 70, 4, BONE);
-  const verify = "VERIFY";
-  drawText(image, verify, passX + (passW - textWidth(verify, 2)) / 2, codeY + 192, 2, BONE_DIM);
+  const codeSize = 176;
+  const codeX = passX + Math.round((passW - codeSize) / 2);
+  const codeY = passY + 680;
+  const qr = await loadQrCode();
+  const message = verifyUrl || "https://etherbylcove.com/id";
+  drawQr(image, qr.create(message, { errorCorrectionLevel: "M" }), codeX, codeY, codeSize, rgba("#141416"), BONE);
+  const verify = rasterText(Image, font, "VERIFY", 13, BONE_DIM, 0.18);
+  image.composite(verify, Math.round(passX + (passW - verify.width) / 2), codeY + codeSize + 12);
   return image.encode();
 }
 

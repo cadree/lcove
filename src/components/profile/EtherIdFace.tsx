@@ -23,7 +23,7 @@ export function monthName(month: number) {
   return MONTHS[month - 1] ?? "";
 }
 
-const BARS = [2, 1, 3, 1, 1, 2, 4, 1, 2, 1, 3, 2];
+const BARS = [2, 1, 3, 1, 1, 2, 4, 1, 2, 1, 3, 2, 1, 2];
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(() => (
@@ -129,12 +129,20 @@ function Screws() {
 }
 
 function Chip() {
+  const gap = 1.35;
+  let cursor = 0;
+  const bars = BARS.map((width) => {
+    const bar = { x: cursor, width };
+    cursor += width + gap;
+    return bar;
+  });
+  const viewWidth = cursor - gap;
   return (
-    <div className="ether-id-chip" aria-hidden="true">
-      {BARS.map((width, index) => (
-        <span key={index} style={{ width }} />
+    <svg className="ether-id-chip" viewBox={`0 0 ${viewWidth} 72`} aria-hidden="true">
+      {bars.map((bar, index) => (
+        <rect key={index} x={bar.x} y="0" width={bar.width} height="72" fill="#ece7dc" />
       ))}
-    </div>
+    </svg>
   );
 }
 
@@ -253,7 +261,7 @@ export function EtherIdFace({
                       <div className="ether-id-stats">
                         <p data-plate="stat"><span>05 Reviews</span><strong>{reviews}</strong></p>
                         <p data-plate="stat"><span>06 Projects</span><strong>{full.projects_completed}</strong></p>
-                        <p data-plate="stat">
+                        <p className="is-wide" data-plate="stat">
                           <span>07 Born</span>
                           <strong>{born || "—"}</strong>
                           {born ? <em>self-reported</em> : null}

@@ -62,6 +62,11 @@ describe("pass.json", () => {
     assert.equal(pass.storeCard.headerFields.find((field) => field.key === "status").value, "BANNED");
     assert.equal(pass.storeCard.primaryFields[0].value, "TORRES, MAYA");
     assert.equal(pass.storeCard.backFields.find((field) => field.key === "birthday").value, "March 4 · self-reported");
+    assert.equal(pass.barcode.format, "PKBarcodeFormatQR");
+    assert.equal(pass.barcode.message, meta.verifyUrl);
+    assert.equal(pass.barcode.messageEncoding, "iso-8859-1");
+    assert.equal(pass.barcodes[0].format, "PKBarcodeFormatQR");
+    assert.equal(pass.barcodes[0].message, meta.verifyUrl);
     assert.equal(pass.barcode.message.includes("11111111"), false);
     assert.equal(pass.webServiceURL.endsWith("/ether-id-pass"), true);
     assert.equal(pass.labelColor, "rgb(255, 61, 73)");
