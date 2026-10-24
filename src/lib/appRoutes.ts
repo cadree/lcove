@@ -27,6 +27,7 @@ const APP_EXACT = new Set([
   "/profile",
   "/blog",
   "/settings",
+  "/tickets",
   "/messages",
   "/notifications",
   "/wallet",

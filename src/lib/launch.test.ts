@@ -114,6 +114,11 @@ describe("app routes", () => {
     assert.equal(isKnownPath("/blog/a-post"), true);
     assert.equal(isPublicPath("/blog/a-post"), false);
   });
+
+  it("keeps my tickets behind sign-in", () => {
+    assert.equal(isKnownPath("/tickets"), true);
+    assert.equal(isPublicPath("/tickets"), false);
+  });
 });
 
 describe("campaign copy", () => {
