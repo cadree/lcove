@@ -115,6 +115,24 @@ describe("app routes", () => {
     assert.equal(isPublicPath("/blog/a-post"), false);
   });
 
+  it("opens event, product, and live links and gates community routes", () => {
+    const id = "04040404-0404-4404-8404-040404040404";
+    assert.equal(isPublicPath(`/event/${id}`), true);
+    assert.equal(isPublicPath(`/product/${id}`), true);
+    assert.equal(isPublicPath(`/live/${id}`), true);
+    assert.equal(isKnownPath(`/live/${id}`), true);
+    assert.equal(isPublicPath("/live"), false);
+    assert.equal(isKnownPath("/live"), true);
+    assert.equal(isPublicPath("/feed"), false);
+    assert.equal(isPublicPath("/profile"), false);
+    assert.equal(isPublicPath(`/profile/${id}`), false);
+    assert.equal(isPublicPath("/projects"), false);
+    assert.equal(isPublicPath(`/project/${id}`), false);
+    assert.equal(isKnownPath(`/project/${id}`), true);
+    assert.equal(isKnownPath("/tickets"), true);
+    assert.equal(isPublicPath("/tickets"), false);
+  });
+
   it("keeps my tickets behind sign-in", () => {
     assert.equal(isKnownPath("/tickets"), true);
     assert.equal(isPublicPath("/tickets"), false);

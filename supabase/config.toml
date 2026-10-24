@@ -21,6 +21,9 @@ verify_jwt = true
 [functions.purchase-event-ticket]
 verify_jwt = true
 
+[functions.guest-event-rsvp]
+verify_jwt = true
+
 [functions.purchase-event-with-credits]
 verify_jwt = true
 
