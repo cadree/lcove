@@ -67,6 +67,13 @@ const PartnerPortal = lazy(() => import("./pages/PartnerPortal"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const EventsDashboard = lazy(() => import("./pages/EventsDashboard"));
 const EventDetail = lazy(() => import("./pages/EventDetail"));
+const HostHome = lazy(() => import("./pages/HostHome"));
+const HostFinance = lazy(() => import("./pages/HostFinance"));
+const HostDoor = lazy(() => import("./pages/HostDoor"));
+const HostEventEditor = lazy(() => import("./pages/HostEventEditor"));
+const EventTickets = lazy(() => import("./pages/EventTickets"));
+const EventCheckout = lazy(() => import("./pages/EventCheckout"));
+const HostingShots = import.meta.env.DEV ? lazy(() => import("./pages/HostingShots")) : null;
 const PublicEventPage = lazy(() => import("./pages/PublicEventPage"));
 const PublicProductPage = lazy(() => import("./pages/PublicProductPage"));
 const PublicLivePage = lazy(() => import("./pages/PublicLivePage"));
@@ -199,9 +206,17 @@ const App = () => (
                 <Route path="/partner-portal" element={<PartnerPortal />} />
                 <Route path="/collectives" element={<Collectives />} />
                 <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/dashboard/events" element={<EventsDashboard />} />
+                <Route path="/dashboard/events" element={<HostHome />} />
+                <Route path="/dashboard/events/calendar" element={<EventsDashboard />} />
+                <Route path="/dashboard/events/finances" element={<HostFinance />} />
+                <Route path="/dashboard/events/door" element={<HostDoor />} />
+                <Route path="/dashboard/events/new" element={<HostEventEditor />} />
+                <Route path="/dashboard/events/:eventId/edit" element={<HostEventEditor />} />
                 <Route path="/dashboard/events/:eventId" element={<EventDetail />} />
                 <Route path="/event/:eventId" element={<PublicEventPage />} />
+                {HostingShots && <Route path="/preview/hosting" element={<HostingShots />} />}
+                <Route path="/event/:eventId/tickets" element={<EventTickets />} />
+                <Route path="/event/:eventId/checkout" element={<EventCheckout />} />
                 <Route path="/event/:eventId/confirmation" element={<EventConfirmation />} />
                 <Route path="/project/:projectId" element={<PublicProjectPage />} />
                 <Route path="/client/:token" element={<PublicClientPortal />} />

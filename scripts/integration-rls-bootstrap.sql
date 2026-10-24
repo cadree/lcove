@@ -1,36 +1,21 @@
 -- Local scratch bootstrap only. Not a Supabase migration.
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- pgcrypto lives in extensions, the same place as hosted Supabase.
+-- crypt() and gen_salt() then fail with 42883 when a function sets
+-- search_path to public only.
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+-- New sessions can resolve pgcrypto the way a hosted project does.
+-- A function that sets search_path to public only still cannot.
+DO $$
+BEGIN
+  EXECUTE format('ALTER DATABASE %I SET search_path TO public, extensions', current_database());
+END $$;
 -- Stubs the platform objects migrations expect (roles, auth, storage,
 -- realtime publication) so every file in supabase/migrations can apply
 -- on a throwaway Postgres. Never run this against a hosted database.
 
-CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE SCHEMA IF NOT EXISTS auth;
 CREATE SCHEMA IF NOT EXISTS storage;
-
--- Hosted projects keep pgcrypto in extensions. This scratch database installs
--- it in public so older migrations can call gen_random_bytes unqualified.
--- The qualified name has to exist too, because guest checkout sets
--- search_path = public and calls extensions.gen_random_bytes.
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_proc p
-    JOIN pg_namespace n ON n.oid = p.pronamespace
-    WHERE n.nspname = 'extensions'
-      AND p.proname = 'gen_random_bytes'
-  ) THEN
-    EXECUTE $wrap$
-      CREATE FUNCTION extensions.gen_random_bytes(count integer)
-      RETURNS bytea
-      LANGUAGE sql
-      AS $fn$
-        SELECT public.gen_random_bytes(count);
-      $fn$
-    $wrap$;
-  END IF;
-END $$;
 
 DO $$
 BEGIN
