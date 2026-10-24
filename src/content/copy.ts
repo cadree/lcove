@@ -2,8 +2,7 @@
  * Campaign lines. Use these sentences as written.
  * HERO_TAGLINE is also the meta description in index.html and public/manifest.json.
  */
-import { AI_CONTENT_RULE_ALLOWED, AI_CONTENT_RULE_FORBIDDEN } from "../lib/aiContentRule.ts";
-export const HERO_TAGLINE = "Real creatives. Real work.";
+export const HERO_TAGLINE = "A culture of aspirations";
 
 export const SUPPORT_LINE =
   "A home for creatives where every face is real and every post is real work.";
@@ -37,5 +36,20 @@ export const INVITE_EMAIL_LINES = [
   SLACK_INTRO,
 ] as const;
 
-/** Landing summary of Cadre's guidelines rule. The two sentences stay in aiContentRule. */
-export const GENERATIVE_AI_RULE = `${AI_CONTENT_RULE_ALLOWED} ${AI_CONTENT_RULE_FORBIDDEN}`;
+/** Landing feature preview. The guidelines page keeps the AI rule. */
+export const FEATURE_PREVIEW_LABEL = "App feature preview";
+
+export const FEATURE_PREVIEW = [
+  {
+    title: "Social media for the creative culture",
+    line: "No algorithm, no popularity contest. Real people, real connections.",
+  },
+  {
+    title: "Throw your own event",
+    line: "Tickets or RSVP, your branding on everything, you keep 100%.",
+  },
+  {
+    title: "Find your crew",
+    line: "Post a project and real creatives apply to build it with you.",
+  },
+] as const;

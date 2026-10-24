@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { APP_STORE_URL, APPLE_TEAM_ID, INSTAGRAM_URL, SLACK_URL } from "../config/launch.ts";
+import { APP_STORE_URL, APPLE_TEAM_ID, INSTAGRAM_URL, SLACK_URL, WAITLIST_MODE } from "../config/launch.ts";
 import {
   APP_STORE_COMING,
+  FEATURE_PREVIEW,
+  FEATURE_PREVIEW_LABEL,
   HERO_TAGLINE,
   INVITE_EMAIL_LINES,
   INVITE_EMAIL_SUBJECT,
@@ -31,6 +33,12 @@ describe("publicJoinPath", () => {
 
   it("opens the join tab when waitlist mode is off", () => {
     assert.equal(publicJoinPath("?src=ig", false), "/auth?tab=join");
+  });
+
+  it("sends every public join to signup while the waitlist gate is off", () => {
+    assert.equal(WAITLIST_MODE, false);
+    assert.equal(publicJoinPath(), "/auth?tab=join");
+    assert.equal(publicJoinPath("?src=ig&ref=abcd2345"), "/auth?tab=join");
   });
 });
 
@@ -136,7 +144,7 @@ describe("app routes", () => {
 
 describe("campaign copy", () => {
   it("uses the campaign lines as written", () => {
-    assert.equal(HERO_TAGLINE, "Real creatives. Real work.");
+    assert.equal(HERO_TAGLINE, "A culture of aspirations");
     assert.equal(SUPPORT_LINE, "A home for creatives where every face is real and every post is real work.");
     assert.equal(WELCOME_HOME, "Welcome home, Familcy.");
     assert.equal(NO_FAKE_LINE, "No fake people. No fake work.");
@@ -147,7 +155,7 @@ describe("campaign copy", () => {
     assert.equal(APP_STORE_COMING, "on the web now, iPhone app coming");
     assert.equal(INVITE_EMAIL_SUBJECT, "Welcome home, Familcy.");
     assert.deepEqual(INVITE_EMAIL_LINES, [
-      "Real creatives. Real work.",
+      "A culture of aspirations",
       "A home for creatives where every face is real and every post is real work.",
       "No fake people. No fake work.",
       "Introduce yourself in #start-here.",
@@ -181,6 +189,29 @@ describe("campaign copy", () => {
     assert.equal(invite.includes(SLACK_URL), false);
     assert.equal(readFileSync("index.html", "utf8").includes(HERO_TAGLINE), true);
     assert.equal(readFileSync("public/manifest.json", "utf8").includes(HERO_TAGLINE), true);
+    assert.equal(readFileSync("index.html", "utf8").includes('href="/auth?tab=join"'), true);
+  });
+
+  it("shows the feature preview on the landing page and keeps the AI rule in the guidelines", () => {
+    assert.equal(FEATURE_PREVIEW_LABEL, "App feature preview");
+    assert.deepEqual(FEATURE_PREVIEW.map((feature) => feature.title), [
+      "Social media for the creative culture",
+      "Throw your own event",
+      "Find your crew",
+    ]);
+    assert.equal(
+      FEATURE_PREVIEW[0].line,
+      "No algorithm, no popularity contest. Real people, real connections.",
+    );
+    const landing = readFileSync("src/pages/Landing.tsx", "utf8");
+    assert.equal(landing.includes("GENERATIVE_AI_RULE"), false);
+    assert.equal(landing.includes("AI is allowed"), false);
+    assert.equal(landing.includes("FeaturePreview"), true);
+    const guidelines = readFileSync("src/pages/Guidelines.tsx", "utf8");
+    assert.equal(guidelines.includes("AI_CONTENT_RULE_ALLOWED"), true);
+    assert.equal(guidelines.includes("AI_CONTENT_RULE_FORBIDDEN"), true);
+    const aiRule = readFileSync("src/lib/aiContentRule.ts", "utf8");
+    assert.equal(aiRule.includes("Graphic design is strictly monitored."), true);
   });
 });
 
