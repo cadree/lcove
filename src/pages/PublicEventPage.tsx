@@ -38,6 +38,8 @@ import { EventMoodboardView } from "@/components/calendar/EventMoodboardView";
 import { AddToCalendarButtons } from "@/components/calendar/AddToCalendarButtons";
 import { PageMeta } from "@/components/seo/PageMeta";
 import { attendanceLabel, attendanceSummary, parseGuestRsvp } from "@/lib/eventGuests";
+import { PUBLIC_EVENT_SELECT, publicRow, type PublicEvent } from "@/lib/consumerAccess";
+import { readFunctionError } from "@/lib/functionError";
 
 const VAPID_PUBLIC_KEY = resolveVapidPublicKey(import.meta.env.VITE_VAPID_PUBLIC_KEY);
 const walletPassesEnabled = import.meta.env.VITE_WALLET_PASSES_ENABLED === "true";
@@ -128,12 +130,12 @@ export default function PublicEventPage() {
       if (!eventId) throw new Error("No event ID");
       const { data, error } = await supabase
         .from("events")
-        .select("*")
+        .select(PUBLIC_EVENT_SELECT)
         .eq("id", eventId)
         .eq("is_public", true)
         .single();
       if (error) throw error;
-      return data;
+      return publicRow<PublicEvent>(data);
     },
     enabled: !!eventId,
   });
@@ -143,7 +145,7 @@ export default function PublicEventPage() {
     queryKey: ["public-event-organizer", event?.creator_id],
     queryFn: async () => {
       const { data } = await supabase
-        .from("profiles_public")
+        .from("consumer_creators")
         .select("display_name, avatar_url")
         .eq("user_id", event!.creator_id)
         .maybeSingle();
@@ -199,21 +201,27 @@ export default function PublicEventPage() {
   const guestRsvpMutation = useMutation({
     mutationFn: async () => {
       if (!eventId) throw new Error("No event");
-      const { data, error } = await supabase.rpc("create_guest_event_rsvp", {
-        p_event_id: eventId,
-        p_guest_name: guestName.trim(),
-        p_guest_email: guestEmail.trim().toLowerCase(),
-        p_guest_phone: guestPhone.trim() || undefined,
-        p_campaign_id: inviteCampaignId || undefined,
+      const { data, error } = await supabase.functions.invoke("guest-event-rsvp", {
+        body: {
+          eventId,
+          guestName: guestName.trim(),
+          guestEmail: guestEmail.trim().toLowerCase(),
+          guestPhone: guestPhone.trim() || undefined,
+          campaignId: inviteCampaignId || undefined,
+        },
       });
-      if (error) {
-        if (error.message.toLowerCase().includes("already")) {
+      if (error || (data && typeof data === "object" && "error" in data && data.error)) {
+        const message = await readFunctionError(error, data, "Failed to RSVP");
+        if (message.toLowerCase().includes("already")) {
           throw new Error("You've already RSVP'd with this email!");
         }
-        if (error.message.toLowerCase().includes("sold out")) {
+        if (message.toLowerCase().includes("sold out")) {
           throw new Error("This event is sold out.");
         }
-        throw error;
+        if (message.toLowerCase().includes("limit")) {
+          throw new Error("Too many RSVPs from this address. Try again later.");
+        }
+        throw new Error(message);
       }
       return parseGuestRsvp(data);
     },

@@ -235,12 +235,12 @@ SET ROLE anon;
 
 DO $$
 BEGIN
-  IF EXISTS (
-    SELECT 1 FROM public.profiles_public
-    WHERE user_id = '11111111-1111-4111-8111-111111111111'
-  ) THEN
-    RAISE EXCEPTION 'FAIL: anon can see private A';
-  END IF;
+  BEGIN
+    PERFORM 1 FROM public.profiles_public LIMIT 1;
+    RAISE EXCEPTION 'FAIL: anon can read profiles_public';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS: anon cannot read profiles_public';
+  END;
   IF EXISTS (
     SELECT 1 FROM public.profiles
     WHERE user_id = '11111111-1111-4111-8111-111111111111'
@@ -321,18 +321,27 @@ BEGIN
     RAISE EXCEPTION 'FAIL: A cannot see their own post after blocking';
   END IF;
 
-  INSERT INTO public.messages (conversation_id, sender_id, content)
-  VALUES (
-    'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
-    '11111111-1111-4111-8111-111111111111',
-    'A can still write'
-  );
+  BEGIN
+    INSERT INTO public.messages (conversation_id, sender_id, content)
+    VALUES (
+      'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      '11111111-1111-4111-8111-111111111111',
+      'A should not write'
+    );
+    RAISE EXCEPTION 'FAIL: blocker A was allowed to message B';
+  EXCEPTION
+    WHEN insufficient_privilege OR raise_exception THEN
+      IF SQLERRM ILIKE '%FAIL:%' THEN
+        RAISE;
+      END IF;
+      RAISE NOTICE 'PASS: blocker A cannot message B (%)', SQLERRM;
+  END;
   INSERT INTO public.favorite_friends (user_id, friend_user_id)
   VALUES (
     '11111111-1111-4111-8111-111111111111',
     '22222222-2222-4222-8222-222222222222'
   );
-  RAISE NOTICE 'PASS: A hides B and can still message and follow B';
+  RAISE NOTICE 'PASS: A hides B, cannot message B, and can still follow B';
 END $$;
 
 RESET ROLE;
@@ -1159,7 +1168,24 @@ BEGIN
         WHERE cfg LIKE 'search_path=%'
       )
   ) THEN
-    RAISE EXCEPTION 'FAIL: a public function still has no search_path';
+    RAISE EXCEPTION 'FAIL: a public function still has no search_path: %', (
+      SELECT string_agg(p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')', ', ')
+      FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'public'
+        AND NOT EXISTS (
+          SELECT 1
+          FROM pg_depend d
+          WHERE d.classid = 'pg_proc'::regclass
+            AND d.objid = p.oid
+            AND d.deptype = 'e'
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM unnest(COALESCE(p.proconfig, ARRAY[]::text[])) cfg
+          WHERE cfg LIKE 'search_path=%'
+        )
+    );
   END IF;
   IF NOT EXISTS (
     SELECT 1
@@ -1333,7 +1359,12 @@ SET ROLE anon;
 
 DO $$
 BEGIN
-  PERFORM 1 FROM public.posts LIMIT 1;
+  BEGIN
+    PERFORM 1 FROM public.posts LIMIT 1;
+    RAISE EXCEPTION 'FAIL: anon can read posts';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS: anon cannot read posts';
+  END;
   BEGIN
     PERFORM public.enqueue_email('transactional_emails', '{}'::jsonb);
     RAISE EXCEPTION 'FAIL: anon executed enqueue_email';
@@ -1347,7 +1378,7 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN
     RAISE NOTICE 'PASS: anon cannot insert a notification';
   END;
-  RAISE NOTICE 'PASS: anon can still read posts and cannot call the email queue';
+  RAISE NOTICE 'PASS: anon cannot read the feed and cannot call the email queue';
 END $$;
 
 RESET ROLE;
@@ -1654,4 +1685,334 @@ BEGIN
   END IF;
   RAISE NOTICE 'PASS: authenticated post and profile writes run reject_objectionable_text';
 END $$;
+
+-- Consumer catalog for anon. Community rows, emails, and stream keys stay closed.
+-- Quota and guest-order writes run inside a transaction and roll back.
+
+INSERT INTO public.events (id, creator_id, title, city, start_date, ticket_type, is_public)
+VALUES (
+  '14141414-1414-4414-8414-141414141414',
+  '22222222-2222-4222-8222-222222222222',
+  'Public consumer event',
+  'Austin',
+  now() + interval '3 days',
+  'free',
+  true
+);
+
+INSERT INTO public.events (id, creator_id, title, city, start_date, ticket_type, is_public)
+VALUES (
+  '15151515-1515-4515-8515-151515151515',
+  '11111111-1111-4111-8111-111111111111',
+  'Private consumer event',
+  'Austin',
+  now() + interval '4 days',
+  'free',
+  false
+);
+
+INSERT INTO public.projects (id, creator_id, title, status)
+VALUES (
+  '16161616-1616-4616-8616-161616161616',
+  '11111111-1111-4111-8111-111111111111',
+  'Open community project',
+  'open'
+);
+
+INSERT INTO public.stores (id, user_id, name, is_active, accepts_cash)
+VALUES (
+  '17171717-1717-4717-8717-171717171717',
+  '22222222-2222-4222-8222-222222222222',
+  'Member B shop',
+  true,
+  true
+);
+
+INSERT INTO public.store_items (
+  id, store_id, type, title, price, is_active, contact_email, contact_phone
+) VALUES (
+  '18181818-1818-4818-8818-181818181818',
+  '17171717-1717-4717-8717-171717171717',
+  'product',
+  'Denim jacket',
+  48,
+  true,
+  'secret-buyer@example.com',
+  '5550199999'
+);
+
+INSERT INTO public.live_streams (
+  id, host_id, title, stream_type, is_live, external_url, rtmp_stream_key
+) VALUES (
+  '19191919-1919-4919-8919-191919191919',
+  '22222222-2222-4222-8222-222222222222',
+  'Floor set',
+  'youtube',
+  true,
+  'https://www.youtube.com/watch?v=jNQXAC9IVRw',
+  'secret-stream-key'
+);
+
+INSERT INTO public.live_streams (id, host_id, title, stream_type, is_live)
+VALUES (
+  '1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a',
+  '22222222-2222-4222-8222-222222222222',
+  'Draft room',
+  'webrtc',
+  false
+);
+
+SELECT set_config('request.jwt.claim.sub', '', false);
+SELECT set_config('request.jwt.claim.role', 'anon', false);
+SELECT set_config('request.jwt.claims', '{"role":"anon"}', false);
+SET ROLE anon;
+
+DO $$
+DECLARE
+  event_title text;
+  item_title text;
+  creator_name text;
+  stream_title text;
+  hidden text[];
+BEGIN
+  SELECT title INTO event_title
+  FROM public.events
+  WHERE id = '14141414-1414-4414-8414-141414141414';
+  IF event_title IS DISTINCT FROM 'Public consumer event' THEN
+    RAISE EXCEPTION 'FAIL: anon cannot read a public event title (got %)', event_title;
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.events WHERE id = '15151515-1515-4515-8515-151515151515'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: anon can read a private event';
+  END IF;
+  BEGIN
+    PERFORM project_id FROM public.events WHERE id = '14141414-1414-4414-8414-141414141414';
+    RAISE EXCEPTION 'FAIL: anon can read events.project_id';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS: anon cannot read events.project_id';
+  END;
+
+  SELECT title INTO item_title
+  FROM public.store_items
+  WHERE id = '18181818-1818-4818-8818-181818181818';
+  IF item_title IS DISTINCT FROM 'Denim jacket' THEN
+    RAISE EXCEPTION 'FAIL: anon cannot read a product title (got %)', item_title;
+  END IF;
+  BEGIN
+    PERFORM contact_email FROM public.store_items WHERE id = '18181818-1818-4818-8818-181818181818';
+    RAISE EXCEPTION 'FAIL: anon can read store contact_email';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS: anon cannot read store contact emails';
+  END;
+  BEGIN
+    PERFORM contact_phone FROM public.store_items LIMIT 1;
+    RAISE EXCEPTION 'FAIL: anon can read store contact_phone';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+
+  SELECT title INTO stream_title
+  FROM public.consumer_live_streams
+  WHERE id = '19191919-1919-4919-8919-191919191919';
+  IF stream_title IS DISTINCT FROM 'Floor set' THEN
+    RAISE EXCEPTION 'FAIL: anon cannot watch a public stream (got %)', stream_title;
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.consumer_live_streams
+    WHERE id = '1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: anon can see a draft stream';
+  END IF;
+  BEGIN
+    PERFORM rtmp_stream_key FROM public.live_streams LIMIT 1;
+    RAISE EXCEPTION 'FAIL: anon can read a stream key';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS: anon cannot read stream keys';
+  END;
+  BEGIN
+    PERFORM 1 FROM public.live_streams_public LIMIT 1;
+    RAISE EXCEPTION 'FAIL: anon can read live_streams_public';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS: anon cannot read live_streams_public';
+  END;
+
+  SELECT display_name INTO creator_name
+  FROM public.consumer_creators
+  WHERE user_id = '22222222-2222-4222-8222-222222222222';
+  IF creator_name IS DISTINCT FROM 'Member B' THEN
+    RAISE EXCEPTION 'FAIL: anon cannot see the seller display name (got %)', creator_name;
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.consumer_creators
+    WHERE user_id = '11111111-1111-4111-8111-111111111111'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: anon can see an exam-gated profile on the consumer card';
+  END IF;
+  SELECT array_agg(column_name::text ORDER BY column_name) INTO hidden
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND table_name = 'consumer_creators'
+    AND column_name IN ('email', 'phone', 'bio', 'social_links', 'access_status');
+  IF hidden IS NOT NULL THEN
+    RAISE EXCEPTION 'FAIL: consumer_creators exposes %', hidden;
+  END IF;
+  BEGIN
+    PERFORM 1 FROM public.profiles_public LIMIT 1;
+    RAISE EXCEPTION 'FAIL: anon can read profiles_public';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS: anon cannot read profiles_public';
+  END;
+  BEGIN
+    PERFORM 1 FROM public.projects WHERE title = 'Open community project';
+    RAISE EXCEPTION 'FAIL: anon can read an open project';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS: anon cannot read projects';
+  END;
+  BEGIN
+    PERFORM guest_email FROM public.event_rsvps LIMIT 1;
+    RAISE EXCEPTION 'FAIL: anon can read guest emails';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS: anon cannot read guest emails';
+  END;
+  BEGIN
+    PERFORM public.create_guest_event_rsvp(
+      '14141414-1414-4414-8414-141414141414',
+      'Guest',
+      'guest@example.com',
+      NULL,
+      NULL
+    );
+    RAISE EXCEPTION 'FAIL: anon called create_guest_event_rsvp directly';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS: anon cannot call create_guest_event_rsvp directly';
+  END;
+  RAISE NOTICE 'PASS: anon consumer catalog is limited to public event, product, and live fields';
+END $$;
+
+RESET ROLE;
+
+SELECT set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","email":"b.waiting@example.com"}', false);
+SET ROLE authenticated;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.posts WHERE user_id = '22222222-2222-4222-8222-222222222222'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: a member cannot read their posts';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.projects WHERE title = 'Open community project'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: a member cannot read an open project';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles_public
+    WHERE user_id = '22222222-2222-4222-8222-222222222222'
+      AND display_name = 'Member B'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: a member cannot read profiles_public';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.events WHERE id = '15151515-1515-4515-8515-151515151515'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: a member can read someone else''s private event';
+  END IF;
+  RAISE NOTICE 'PASS: authenticated members still read posts, projects, and public profiles';
+END $$;
+
+RESET ROLE;
+
+BEGIN;
+  SELECT public.consume_guest_quota('guest_rsvp_email', 'quota@example.com', 2, 86400);
+  SELECT public.consume_guest_quota('guest_rsvp_email', 'quota@example.com', 2, 86400);
+  DO $$
+  BEGIN
+    PERFORM public.consume_guest_quota('guest_rsvp_email', 'quota@example.com', 2, 86400);
+    RAISE EXCEPTION 'FAIL: guest quota allowed a third hit';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT ILIKE '%limit reached%' THEN
+      RAISE;
+    END IF;
+  END $$;
+
+  SELECT public.create_guest_event_rsvp(
+    '14141414-1414-4414-8414-141414141414',
+    'Quota Guest',
+    'rsvp-rollback@example.com',
+    NULL,
+    NULL
+  );
+  DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM public.event_rsvps
+      WHERE guest_email = 'rsvp-rollback@example.com'
+        AND event_id = '14141414-1414-4414-8414-141414141414'
+    ) THEN
+      RAISE EXCEPTION 'FAIL: guest RSVP did not write';
+    END IF;
+  END $$;
+
+  SELECT public.begin_guest_store_order(
+    '18181818-1818-4818-8818-181818181818',
+    'Buyer Guest',
+    'checkout-rollback@example.com',
+    1,
+    'ip-hash-for-test'
+  );
+  DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM public.store_orders
+      WHERE guest_email = 'checkout-rollback@example.com'
+        AND buyer_id IS NULL
+        AND status = 'pending'
+    ) THEN
+      RAISE EXCEPTION 'FAIL: guest checkout order did not write';
+    END IF;
+    IF EXISTS (
+      SELECT 1 FROM public.store_orders
+      WHERE guest_email = 'checkout-rollback@example.com'
+        AND guest_cancel_token IS NULL
+    ) THEN
+      RAISE EXCEPTION 'FAIL: guest order is missing a cancel token';
+    END IF;
+  END $$;
+ROLLBACK;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.event_rsvps WHERE guest_email = 'rsvp-rollback@example.com'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: rolled-back guest RSVP is still stored';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.store_orders WHERE guest_email = 'checkout-rollback@example.com'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: rolled-back guest order is still stored';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.guest_action_buckets WHERE bucket_key = 'quota@example.com'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: rolled-back quota bucket is still stored';
+  END IF;
+  RAISE NOTICE 'PASS: guest RSVP and checkout writes rolled back';
+END $$;
+
+SET ROLE service_role;
+BEGIN;
+  SELECT public.begin_guest_store_order(
+    '18181818-1818-4818-8818-181818181818',
+    'Service Guest',
+    'service-checkout@example.com',
+    2,
+    NULL
+  );
+ROLLBACK;
+RESET ROLE;
 

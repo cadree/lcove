@@ -262,10 +262,11 @@ export async function shareToChannel(
 
 export const buildShareUrl = {
   event: (id: string) => `${SHARE_BASE_URL}/event/${id}`,
+  product: (id: string) => `${SHARE_BASE_URL}/product/${id}`,
   project: (id: string) => `${SHARE_BASE_URL}/project/${id}`,
   profile: (userId: string) => `${SHARE_BASE_URL}/profile/${userId}`,
   post: (userId: string, postId: string) => `${SHARE_BASE_URL}/profile/${userId}?post=${postId}`,
   client: (token: string) => `${SHARE_BASE_URL}/client/${token}`,
   cinema: (id: string) => `${SHARE_BASE_URL}/cinema?content=${id}`,
-  live: (id: string) => `${SHARE_BASE_URL}/live?stream=${id}`,
+  live: (id: string) => `${SHARE_BASE_URL}/live/${id}`,
 };
