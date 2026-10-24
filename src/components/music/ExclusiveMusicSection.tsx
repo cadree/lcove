@@ -31,6 +31,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
+import { AUDIO_FILE_ACCEPT, audioContentType, audioExtension, isAudioUpload } from "@/lib/audioFiles";
 import { readFunctionError } from "@/lib/functionError";
 
 interface VerifyResultRow {
@@ -177,18 +178,18 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
       toast.error("Title is required");
       return;
     }
-    if (!audioFile) {
-      toast.error("Please select an audio file");
+    if (!audioFile || !isAudioUpload(audioFile)) {
+      toast.error("Choose an mp3, wav, flac, m4a, or aac file");
       return;
     }
 
     setIsUploading(true);
     try {
-      const audioExt = audioFile.name.split(".").pop() || "mp3";
+      const audioExt = audioExtension(audioFile.name) || "mp3";
       const audioPath = `${user.id}/exclusive-${Date.now()}.${audioExt}`;
       const { error: audioErr } = await supabase.storage
         .from("media")
-        .upload(audioPath, audioFile, { upsert: true });
+        .upload(audioPath, audioFile, { upsert: true, contentType: audioContentType(audioFile) });
       if (audioErr) throw audioErr;
       const { data: audioUrl } = supabase.storage.from("media").getPublicUrl(audioPath);
 
@@ -444,10 +445,10 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
             </div>
 
             <div className="space-y-2">
-              <Label>Audio File *</Label>
-              <div
-                className="border-2 border-dashed border-border/60 rounded-xl p-4 text-center cursor-pointer hover:border-primary/40 transition-colors"
-                onClick={() => audioInputRef.current?.click()}
+              <Label htmlFor="exclusive-audio-file">Audio File *</Label>
+              <label
+                htmlFor="exclusive-audio-file"
+                className="relative block border-2 border-dashed border-border/60 rounded-xl p-4 text-center cursor-pointer hover:border-primary/40 transition-colors"
               >
                 {audioFile ? (
                   <p className="text-sm text-foreground">{audioFile.name}</p>
@@ -459,14 +460,24 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
                     </p>
                   </div>
                 )}
-              </div>
-              <input
-                ref={audioInputRef}
-                type="file"
-                accept="audio/*"
-                className="hidden"
-                onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
-              />
+                <input
+                  id="exclusive-audio-file"
+                  ref={audioInputRef}
+                  type="file"
+                  accept={AUDIO_FILE_ACCEPT}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    if (file && !isAudioUpload(file)) {
+                      toast.error("Choose an mp3, wav, flac, m4a, or aac file");
+                      e.target.value = "";
+                      setAudioFile(null);
+                      return;
+                    }
+                    setAudioFile(file);
+                  }}
+                />
+              </label>
             </div>
 
             <div className="space-y-2">

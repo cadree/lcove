@@ -49,8 +49,13 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
     boxSizing: "border-box",
     minWidth: 0,
   }} {...props}>
+        <SheetPrimitive.Close
+          className="absolute right-3 top-3 z-20 inline-flex !min-h-11 !min-w-11 items-center justify-center rounded-md text-foreground hover:bg-muted"
+          aria-label="Close"
+        >
+          <X className="h-5 w-5" />
+        </SheetPrimitive.Close>
         {children}
-        
       </SheetPrimitive.Content>
     </SheetPortal>);
 SheetContent.displayName = SheetPrimitive.Content.displayName;

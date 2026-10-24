@@ -38,6 +38,15 @@ test("a draft round-trips for the same user", () => {
   assert.equal(readOnboardingDraft(storage, "user-2"), null);
 });
 
+test("an old draft skips the tools step that signup no longer asks", () => {
+  const storage = memoryStorage();
+  storage.setItem(
+    "ether-onboarding-draft:user-1",
+    JSON.stringify({ ...sample, step: 4 }),
+  );
+  assert.equal(readOnboardingDraft(storage, "user-1")?.step, 3);
+});
+
 test("a broken draft is ignored and completion clears it", () => {
   const storage = memoryStorage();
   storage.setItem("ether-onboarding-draft:user-1", "{");

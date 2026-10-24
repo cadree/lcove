@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { BackButton } from '@/components/navigation/BackButton';
 import PageLayout from '@/components/layout/PageLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +18,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
 import { 
-  ArrowLeft, Building2, Upload, Save, Globe, MapPin, Image as ImageIcon, 
+  Building2, Upload, Save, Globe, MapPin, Image as ImageIcon, 
   CheckCircle, AlertCircle, Loader2, Trash2
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -307,9 +308,7 @@ export default function PartnerPortal() {
       <div className="container max-w-2xl py-6 px-4 pb-24">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <BackButton label="Back" fallback="/brand-partners" />
           <div className="flex-1">
             <h1 className="text-2xl font-display font-medium">Partner Portal</h1>
             <p className="text-sm text-muted-foreground">Customize your brand partnership profile</p>
