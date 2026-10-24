@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { BackButton } from "@/components/navigation/BackButton";
 import { motion } from "framer-motion";
 import { format, formatDistanceToNow } from "date-fns";
 import { formatEventDate } from "@/lib/eventTime";
 import {
-  ArrowLeft,
   Calendar,
   DollarSign,
   Users,
@@ -64,14 +64,7 @@ export default function Dashboard() {
       >
         <div className="flex items-center justify-between px-4 h-14">
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate(-1)}
-              className="h-9 w-9"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <BackButton label="Back" className="h-11 w-11" />
             <div>
               <h1 className="text-lg font-display font-semibold">Event Dashboard</h1>
               <p className="text-xs text-muted-foreground">Your hosting overview</p>

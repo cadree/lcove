@@ -1,13 +1,12 @@
-import { ArrowLeft, Shield, Database, Users, Lock, Eye, Trash2, Globe, Bell, CreditCard, Mail } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { Shield, Database, Users, Lock, Eye, Trash2, Globe, Bell, CreditCard, Mail } from "lucide-react";
+import { Link } from "react-router-dom";
+import { BackButton } from "@/components/navigation/BackButton";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { PRIVACY_EMAIL, SUPPORT_EMAIL } from "@/config/launch";
 import { WAITLIST_PRIVACY_NOTE } from "@/content/copy";
 import { PageMeta } from "@/components/seo/PageMeta";
 
 const Privacy = () => {
-  const navigate = useNavigate();
   const lastUpdated = "October 18, 2026";
 
   return (
@@ -16,14 +15,7 @@ const Privacy = () => {
       <div className="container max-w-3xl mx-auto px-4 py-8 safe-area-top safe-area-bottom">
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(-1)}
-            aria-label="Go back"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <BackButton label="Go back" />
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
               <Shield className="h-5 w-5 text-primary" />

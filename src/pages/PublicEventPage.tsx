@@ -21,6 +21,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/navigation/BackButton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -278,7 +279,8 @@ export default function PublicEventPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background">
+        <div className="px-4 pt-4"><BackButton label="Back" fallback="/calendar" /></div>
         <div className="w-full max-w-lg mx-auto px-4 space-y-4">
           <Skeleton className="h-48 w-full rounded-2xl" />
           <Skeleton className="h-8 w-3/4" />
@@ -296,6 +298,7 @@ export default function PublicEventPage() {
           <Calendar className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
           <h1 className="text-2xl font-display font-bold mb-2">Event Not Found</h1>
           <p className="text-muted-foreground">This event doesn't exist or isn't public.</p>
+          <BackButton showLabel label="Back" fallback="/calendar" className="mt-4" />
         </div>
       </div>
     );
@@ -306,7 +309,10 @@ export default function PublicEventPage() {
   const onTheWaitlist = waitlisted || myRsvp?.status === "waitlist";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative min-h-screen bg-background">
+      <div className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-20">
+        <BackButton label="Back" fallback="/calendar" className="bg-background/70 backdrop-blur" />
+      </div>
       <PageMeta
         title={`${event.title} · Ether`}
         description={`${attendanceLabel(event.capacity, rsvpCount || 0)}. ${formatEventDate(event.start_date, event.timezone)}.`}

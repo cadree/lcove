@@ -11,6 +11,8 @@ import { assertCleanText } from '@/lib/objectionableText';
 import { mergePostsAndReposts, repostQueryMissingCaption, type RepostRow } from '@/lib/sharing';
 import { refreshXp } from '@/lib/xpRefresh';
 import { embedColumnMissing, embedColumnsForInsert, videoEmbedMigrationMessage, type EmbedDraft, type StoredEmbedFields } from '@/lib/videoEmbed';
+import { FEED_POST_LIMIT } from '@/lib/feedWindow';
+import { abortAfter } from '@/lib/requestDeadline';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 let postsFeedListeners = 0;
@@ -41,17 +43,54 @@ export function usePosts() {
   const queryClient = useQueryClient();
   const { blockedIds } = useUserBlocks();
 
-  const { data: posts = [], isLoading, refetch } = useQuery({
+  const { data: posts = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['posts'],
     queryFn: async (): Promise<Post[]> => {
       if (shotSessionEnabled()) return (shotContentThin() ? [] : shotPosts()) as Post[];
-      // Get all posts, ordered chronologically (newest first)
-      const { data: postsData, error } = await supabase
+      const signal = abortAfter();
+      // Newest page only. The archive is not rendered in one pass on a phone.
+      const { data: latestPosts, error } = await supabase
         .from('posts')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(FEED_POST_LIMIT)
+        .abortSignal(signal);
 
       if (error) throw error;
+      let postsData = latestPosts ?? [];
+
+      const primaryReposts = await supabase
+        .from('reposts')
+        .select('id, user_id, post_id, created_at, caption')
+        .order('created_at', { ascending: false })
+        .limit(FEED_POST_LIMIT)
+        .abortSignal(signal);
+      let repostData = primaryReposts.data as RepostRow[] | null;
+      let repostError = primaryReposts.error;
+      if (repostError && repostQueryMissingCaption(repostError.message)) {
+        const legacyReposts = await supabase
+          .from('reposts')
+          .select('id, user_id, post_id, created_at')
+          .order('created_at', { ascending: false })
+          .limit(FEED_POST_LIMIT)
+          .abortSignal(signal);
+        repostData = legacyReposts.data as RepostRow[] | null;
+        repostError = legacyReposts.error;
+      }
+      if (!repostError && repostData?.length) {
+        const have = new Set(postsData.map((post) => post.id));
+        const missingIds = [...new Set(repostData.map((row) => row.post_id))].filter(
+          (id) => !have.has(id) && isQueryablePostId(id),
+        );
+        if (missingIds.length) {
+          const { data: extraPosts } = await supabase
+            .from('posts')
+            .select('*')
+            .in('id', missingIds)
+            .abortSignal(signal);
+          if (extraPosts?.length) postsData = [...postsData, ...extraPosts];
+        }
+      }
 
       // Get profiles for post creators
       const userIds = [...new Set(postsData?.map(p => p.user_id) || [])].filter(isQueryablePostId);
@@ -103,22 +142,6 @@ export function usePosts() {
         repost: null,
       })) as Post[];
 
-      const primaryReposts = await supabase
-        .from('reposts')
-        .select('id, user_id, post_id, created_at, caption')
-        .order('created_at', { ascending: false })
-        .limit(200);
-      let repostData = primaryReposts.data as RepostRow[] | null;
-      let repostError = primaryReposts.error;
-      if (repostError && repostQueryMissingCaption(repostError.message)) {
-        const legacyReposts = await supabase
-          .from('reposts')
-          .select('id, user_id, post_id, created_at')
-          .order('created_at', { ascending: false })
-          .limit(200);
-        repostData = legacyReposts.data as RepostRow[] | null;
-        repostError = legacyReposts.error;
-      }
       if (repostError || !repostData?.length) return mapped;
 
       const reposterIds = [...new Set(repostData.map((row) => row.user_id))];
@@ -320,6 +343,7 @@ export function usePosts() {
   return {
     posts: visiblePosts,
     isLoading,
+    isError,
     createPost,
     addReaction,
     removeReaction,

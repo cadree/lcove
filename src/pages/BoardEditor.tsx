@@ -3,7 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, ArrowLeft, Check, X, Home } from "lucide-react";
+import { Loader2, Check, X } from "lucide-react";
+import { BackButton } from "@/components/navigation/BackButton";
 import { BoardCanvas } from "@/components/boards/BoardCanvas";
 import { BoardSidebar } from "@/components/boards/BoardSidebar";
 import { DrawingLayer } from "@/components/boards/DrawingLayer";
@@ -299,6 +300,7 @@ const BoardEditor = () => {
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
+        <BackButton showLabel label="Back" fallback="/boards" />
         <h2 className="font-display text-2xl text-foreground">Sign in to view this board</h2>
         <Button onClick={() => navigate("/auth")}>Sign in</Button>
       </div>
@@ -307,8 +309,13 @@ const BoardEditor = () => {
 
   if (boardLoading || itemsLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#2a2a2a]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="relative min-h-screen bg-[#2a2a2a]">
+        <div className="absolute left-3 top-3 z-10">
+          <BackButton label="Back" fallback="/boards" className="text-white hover:bg-white/10" />
+        </div>
+        <div className="flex min-h-screen items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
       </div>
     );
   }
@@ -317,10 +324,7 @@ const BoardEditor = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
         <h2 className="font-display text-2xl text-foreground">Board not found</h2>
-        <Button onClick={() => navigate("/boards")}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Boards
-        </Button>
+        <BackButton showLabel label="Back" fallback="/boards" />
       </div>
     );
   }
@@ -345,15 +349,12 @@ const BoardEditor = () => {
           className="h-12 bg-[#2a2a2a] border-b border-white/10 flex items-center justify-between px-4 z-50"
         >
           <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => navigate("/boards")}
+            <BackButton
+              showLabel
+              label="Back"
+              fallback="/boards"
               className="text-white/70 hover:text-white hover:bg-white/10"
-            >
-              <Home className="w-4 h-4 mr-2" />
-              Home
-            </Button>
+            />
             <span className="text-white/30">/</span>
             
             {isEditingTitle ? (

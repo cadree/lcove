@@ -16,6 +16,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Plus, Users, Sparkles } from "lucide-react";
+import { BackButton } from "@/components/navigation/BackButton";
 import { motion } from "framer-motion";
 
 const topicLabels: Record<string, string> = {
@@ -52,6 +53,7 @@ export default function Collectives() {
   return (
     <PageLayout>
       <div className="container max-w-2xl py-6 px-4">
+        <BackButton label="Back" className="mb-3" />
         <h1 className="text-2xl font-display font-medium mb-6">Collectives</h1>
         
         {/* Hero Section */}

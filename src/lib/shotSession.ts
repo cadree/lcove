@@ -20,6 +20,11 @@ export function shotViewerPreview(): boolean {
   return shotSessionEnabled() && localStorage.getItem("ether-shot-viewer") === "1";
 }
 
+/** Dev screenshots of signup onboarding before the profile is finished. */
+export function shotOnboardingPreview(): boolean {
+  return shotSessionEnabled() && localStorage.getItem("ether-shot-onboarding") === "1";
+}
+
 export const shotProfile = {
   id: SHOT_USER_ID,
   user_id: SHOT_USER_ID,

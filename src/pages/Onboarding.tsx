@@ -5,14 +5,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import OnboardingIntro from '@/components/onboarding/OnboardingIntro';
 import OnboardingName from '@/components/onboarding/OnboardingName';
 import OnboardingPassions from '@/components/onboarding/OnboardingPassions';
 import OnboardingCity from '@/components/onboarding/OnboardingCity';
-import OnboardingRoles from '@/components/onboarding/OnboardingRoles';
 import OnboardingQuestionnaire from '@/components/onboarding/OnboardingQuestionnaire';
-import OnboardingConnections from '@/components/onboarding/OnboardingConnections';
-import OnboardingCompletion from '@/components/onboarding/OnboardingCompletion';
 import { buildUserPassionInserts } from '@/lib/onboardingPassions';
 import { scoreRedFlags, clearQuizSeed, type ChoiceId } from '@/lib/onboardingQuiz';
 import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from '@/lib/onboardingDraft';
@@ -48,7 +44,6 @@ const Onboarding = () => {
     roles: [],
     questionnaireResponses: {}
   });
-  const [accessLevel, setAccessLevel] = useState<'level_1' | 'level_2' | 'level_3' | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -106,12 +101,11 @@ const Onboarding = () => {
         description: 'Please go back and enter your name to complete onboarding.',
         variant: 'destructive'
       });
-      setCurrentStep(1); // Go back to name step
+      setCurrentStep(0);
       return;
     }
 
     const { level, score, passed: passedExam } = calculateMindsetLevel(data.questionnaireResponses);
-    setAccessLevel(passedExam ? 'level_2' : 'level_1');
 
     try {
       // Save questionnaire responses
@@ -139,28 +133,32 @@ const Onboarding = () => {
         if (error) throw error;
       }
 
-      // Save skills
-      const { data: skills } = await supabase
-        .from('skills')
-        .select('id, name')
-        .in('name', data.skills);
-      if (skills && skills.length > 0) {
-        await supabase.from('user_skills').upsert(
-          skills.map(s => ({ user_id: user.id, skill_id: s.id })),
-          { onConflict: 'user_id,skill_id' }
-        );
+      // Tools and roles are no longer asked. A resumed draft can still save
+      // values the person already chose. Empty lists skip the query.
+      if (data.skills.length > 0) {
+        const { data: skills } = await supabase
+          .from('skills')
+          .select('id, name')
+          .in('name', data.skills);
+        if (skills && skills.length > 0) {
+          await supabase.from('user_skills').upsert(
+            skills.map(s => ({ user_id: user.id, skill_id: s.id })),
+            { onConflict: 'user_id,skill_id' }
+          );
+        }
       }
 
-      // Save creative roles
-      const { data: roles } = await supabase
-        .from('creative_roles')
-        .select('id, name')
-        .in('name', data.roles);
-      if (roles && roles.length > 0) {
-        await supabase.from('user_creative_roles').upsert(
-          roles.map(r => ({ user_id: user.id, role_id: r.id })),
-          { onConflict: 'user_id,role_id' }
-        );
+      if (data.roles.length > 0) {
+        const { data: roles } = await supabase
+          .from('creative_roles')
+          .select('id, name')
+          .in('name', data.roles);
+        if (roles && roles.length > 0) {
+          await supabase.from('user_creative_roles').upsert(
+            roles.map(r => ({ user_id: user.id, role_id: r.id })),
+            { onConflict: 'user_id,role_id' }
+          );
+        }
       }
 
       sessionStorage.setItem('onboarding_just_completed', 'true');
@@ -184,7 +182,7 @@ const Onboarding = () => {
         passed_exam: passedExam,
       });
 
-      setCurrentStep(6);
+      navigate('/feed', { replace: true });
     } catch (error) {
       console.error('Error saving onboarding data:', error);
       toast({
@@ -215,20 +213,15 @@ const Onboarding = () => {
   }
 
   const steps = [
-    <OnboardingIntro key="intro" onNext={nextStep} />,
-    <OnboardingName 
-      key="name" 
-      displayName={data.displayName} 
-      updateName={(name) => updateData({ displayName: name })} 
-      onNext={nextStep} 
-      onBack={prevStep} 
+    <OnboardingName
+      key="name"
+      displayName={data.displayName}
+      updateName={(name) => updateData({ displayName: name })}
+      onNext={nextStep}
     />,
     <OnboardingPassions key="passions" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingCity key="city" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
-    <OnboardingRoles key="roles" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingQuestionnaire key="questionnaire" data={data} updateData={updateData} onComplete={handleComplete} onBack={prevStep} />,
-    <OnboardingConnections key="connections" onComplete={() => setCurrentStep(7)} onBack={prevStep} />,
-    <OnboardingCompletion key="completion" accessLevel={accessLevel} />,
   ];
 
   return (
