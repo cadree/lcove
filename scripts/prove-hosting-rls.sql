@@ -6,6 +6,42 @@
 
 BEGIN;
 
+DO $$
+DECLARE
+  v_schema text;
+BEGIN
+  SELECT n.nspname INTO v_schema
+  FROM pg_extension e
+  JOIN pg_namespace n ON n.oid = e.extnamespace
+  WHERE e.extname = 'pgcrypto';
+  IF v_schema IS DISTINCT FROM 'extensions' THEN
+    RAISE EXCEPTION 'FAIL: pgcrypto is in %, not extensions', COALESCE(v_schema, 'nowhere');
+  END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION public._ether_crypt_path_probe()
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public
+AS $probe$
+BEGIN
+  PERFORM crypt('x', gen_salt('bf'));
+END
+$probe$;
+
+DO $$
+BEGIN
+  BEGIN
+    PERFORM public._ether_crypt_path_probe();
+    RAISE EXCEPTION 'FAIL: crypt() was visible with search_path = public';
+  EXCEPTION
+    WHEN undefined_function THEN
+      NULL;
+  END;
+END $$;
+
+DROP FUNCTION public._ether_crypt_path_probe();
+
 ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS raw_user_meta_data jsonb;
 
 INSERT INTO auth.users (id, email)

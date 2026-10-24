@@ -41,7 +41,7 @@ CREATE OR REPLACE FUNCTION public.set_event_access(
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 BEGIN
   IF auth.uid() IS NULL THEN
@@ -90,7 +90,7 @@ RETURNS boolean
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_protected boolean;
@@ -120,7 +120,7 @@ RETURNS text
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_hide boolean;
@@ -185,7 +185,7 @@ RETURNS jsonb
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
   WITH going AS (
     SELECT COALESCE(NULLIF(btrim(a.attendee_name), ''), 'Guest') AS name,
@@ -213,7 +213,7 @@ RETURNS jsonb
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
   SELECT jsonb_build_object(
     'events', (
@@ -233,7 +233,7 @@ RETURNS integer
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
   SELECT COUNT(*)::integer FROM public.favorite_friends WHERE friend_user_id = p_user_id;
 $$;
@@ -262,7 +262,7 @@ RETURNS text
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_address text;

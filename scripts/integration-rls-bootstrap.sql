@@ -1,10 +1,19 @@
 -- Local scratch bootstrap only. Not a Supabase migration.
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- pgcrypto lives in extensions, the same place as hosted Supabase.
+-- crypt() and gen_salt() then fail with 42883 when a function sets
+-- search_path to public only.
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+-- New sessions can resolve pgcrypto the way a hosted project does.
+-- A function that sets search_path to public only still cannot.
+DO $$
+BEGIN
+  EXECUTE format('ALTER DATABASE %I SET search_path TO public, extensions', current_database());
+END $$;
 -- Stubs the platform objects migrations expect (roles, auth, storage,
 -- realtime publication) so every file in supabase/migrations can apply
 -- on a throwaway Postgres. Never run this against a hosted database.
 
-CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE SCHEMA IF NOT EXISTS auth;
 CREATE SCHEMA IF NOT EXISTS storage;
 
