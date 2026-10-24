@@ -18,7 +18,9 @@ export function LandingHero() {
     <section className="relative pb-10 pt-8">
       <div className="mx-auto flex max-w-md flex-col items-center px-4 text-center sm:px-6 lg:max-w-lg">
         <p className="kicker mb-8">Familcy access // Lcove signal</p>
-        <EtherWordmark className="mb-6 w-[18rem] max-w-full" />
+        <h1 className="mb-6">
+          <EtherWordmark className="w-[18rem] max-w-full" />
+        </h1>
         <p className="lore mb-8 text-[22px] text-foreground">{HERO_TAGLINE}</p>
         <Button className="w-full" onClick={() => navigate(publicJoinPath(location.search))}>
           Join

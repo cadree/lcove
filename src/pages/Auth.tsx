@@ -441,17 +441,16 @@ const Auth = () => {
           >
             <EtherWordmark className="mx-auto w-[16rem] max-w-full" />
           </motion.div>
-          {getTitle() ? (
-          <motion.h1 
+          <motion.h1
             className="ether-title text-4xl text-foreground mb-2"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
           >
-            {getTitle()}
+            {getTitle() || getSubtitle()}
           </motion.h1>
-          ) : null}
-          <motion.p 
+          {getTitle() ? (
+          <motion.p
             className="text-muted-foreground"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -459,6 +458,7 @@ const Auth = () => {
           >
             {getSubtitle()}
           </motion.p>
+          ) : null}
         </div>
 
         <motion.div
