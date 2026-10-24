@@ -2,6 +2,12 @@ import { useState, useEffect, DragEvent } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Users, Plus, Search, UserPlus, GripVertical, Pencil, Check, X, Sun } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { BackButton } from "@/components/navigation/BackButton";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +21,7 @@ import { usePipelines, Pipeline as PipelineType } from "@/hooks/usePipelines";
 import { PipelineItemDrawer } from "@/components/pipeline/PipelineItemDrawer";
 import { AddContactDialog, ContactFormData } from "@/components/pipeline/AddContactDialog";
 import { PipelineSelector } from "@/components/pipeline/PipelineSelector";
-import { PipelineItem } from "@/actions/pipelineActions";
+import { PipelineItem, PipelineStage } from "@/actions/pipelineActions";
 import { EnergyIndicator } from "@/components/energy";
 import { toast } from "sonner";
 
@@ -319,6 +325,8 @@ const PipelinePage = () => {
                       onEditingNameChange={setEditingStageName}
                       onSaveEditName={handleSaveStageName}
                       onCancelEditName={handleCancelEditStageName}
+                      stages={stages}
+                      onMove={handleMoveItem}
                     />
                   );
                 })}
@@ -352,6 +360,8 @@ const PipelinePage = () => {
                           onEditingNameChange={setEditingStageName}
                           onSaveEditName={handleSaveStageName}
                           onCancelEditName={handleCancelEditStageName}
+                          stages={stages}
+                          onMove={handleMoveItem}
                         />
                       </div>
                       );
@@ -432,6 +442,8 @@ interface PipelineColumnProps {
   onEditingNameChange: (name: string) => void;
   onSaveEditName: () => void;
   onCancelEditName: () => void;
+  stages: PipelineStage[];
+  onMove: (itemId: string, toStageId: string) => Promise<void>;
 }
 
 function PipelineColumn({ 
@@ -453,7 +465,9 @@ function PipelineColumn({
   onStartEditName,
   onEditingNameChange,
   onSaveEditName,
-  onCancelEditName
+  onCancelEditName,
+  stages,
+  onMove,
 }: PipelineColumnProps) {
   return (
     <Card 
@@ -527,6 +541,8 @@ function PipelineColumn({
                 onDragStart={onDragStart}
                 onDragEnd={onDragEnd}
                 isDragging={draggedItemId === item.id}
+                stages={stages}
+                onMove={onMove}
               />
             ))
           )}
@@ -573,9 +589,11 @@ interface PipelineContactCardProps {
   onDragStart: (e: DragEvent<HTMLDivElement>, itemId: string) => void;
   onDragEnd: () => void;
   isDragging: boolean;
+  stages: PipelineStage[];
+  onMove: (itemId: string, toStageId: string) => Promise<void>;
 }
 
-function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging }: PipelineContactCardProps) {
+function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging, stages, onMove }: PipelineContactCardProps) {
   // Generate initials from name
   const initials = item.name
     .split(' ')
@@ -657,6 +675,39 @@ function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging
               <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
             )}
           </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-11 shrink-0 px-3"
+                aria-label={`Move ${item.name}`}
+                draggable={false}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => event.stopPropagation()}
+              >
+                Move
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[10rem]">
+              {stages.map((stage) => (
+                <DropdownMenuItem
+                  key={stage.id}
+                  disabled={stage.id === item.stage_id}
+                  onSelect={() => {
+                    if (stage.id === item.stage_id) return;
+                    void onMove(item.id, stage.id).then(() => {
+                      toast.success(`Moved to ${stage.name}`);
+                    });
+                  }}
+                >
+                  {stage.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </Card>
     </motion.div>
