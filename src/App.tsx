@@ -30,7 +30,7 @@ if (typeof window !== "undefined") {
   else if ((path === "/profile" || path.startsWith("/profile/")) && session) void loadProfile();
   else if (path === "/live" && session) void import("./pages/Live");
   else if (path.startsWith("/live/")) void import("./pages/PublicLivePage");
-  else if (path.startsWith("/event/")) void import("./pages/PublicEventPage");
+  else if (path.startsWith("/event/") || path.startsWith("/e/")) void import("./pages/PublicEventPage");
 }
 
 const Landing = lazy(() => import("./pages/Landing"));
@@ -241,6 +241,10 @@ const App = () => (
                 <Route path="/dashboard/events/new" element={<HostEventEditor />} />
                 <Route path="/dashboard/events/:eventId/edit" element={<HostEventEditor />} />
                 <Route path="/dashboard/events/:eventId" element={<EventDetail />} />
+                <Route path="/e/:eventId" element={<PublicEventPage />} />
+                <Route path="/e/:eventId/tickets" element={<EventTickets />} />
+                <Route path="/e/:eventId/checkout" element={<EventCheckout />} />
+                <Route path="/e/:eventId/confirmation" element={<EventConfirmation />} />
                 <Route path="/event/:eventId" element={<PublicEventPage />} />
                 {HostingShots && <Route path="/preview/hosting" element={<HostingShots />} />}
                 <Route path="/event/:eventId/tickets" element={<EventTickets />} />

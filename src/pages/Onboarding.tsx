@@ -12,6 +12,7 @@ import OnboardingQuestionnaire from '@/components/onboarding/OnboardingQuestionn
 import { buildUserPassionInserts } from '@/lib/onboardingPassions';
 import { scoreRedFlags, clearQuizSeed, type ChoiceId } from '@/lib/onboardingQuiz';
 import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from '@/lib/onboardingDraft';
+import { takeEventReturn } from '../../functions/_shared/eventShare.js';
 
 export interface OnboardingData {
   displayName: string;
@@ -67,7 +68,7 @@ const Onboarding = () => {
     setInitialized(true);
     if (profile?.onboarding_completed && profile.access_status !== 'banned') {
       clearOnboardingDraft(window.localStorage, user.id);
-      navigate('/feed');
+      navigate(takeEventReturn() || '/feed');
       return;
     }
     const draft = readOnboardingDraft(window.localStorage, user.id);
@@ -182,7 +183,7 @@ const Onboarding = () => {
         passed_exam: passedExam,
       });
 
-      navigate('/feed', { replace: true });
+      navigate(takeEventReturn() || '/feed', { replace: true });
     } catch (error) {
       console.error('Error saving onboarding data:', error);
       toast({

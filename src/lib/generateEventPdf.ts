@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import type { CalendarEvent } from '@/hooks/useCalendar';
+import { eventPublicUrl } from '../../functions/_shared/eventShare.js';
 
 const PAGE_W = 210; // A4 mm
 const PAGE_H = 297;
@@ -142,7 +143,7 @@ export async function generateEventPdf(event: CalendarEvent): Promise<void> {
   }
 
   // Footer with share URL
-  const shareUrl = `https://etherbylcove.com/event/${event.id}`;
+  const shareUrl = eventPublicUrl(event);
   pdf.setFontSize(9);
   pdf.setTextColor(140, 140, 140);
   pdf.text(shareUrl, MARGIN, PAGE_H - 10);

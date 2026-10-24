@@ -15,6 +15,8 @@ interface DashboardEvent {
   timezone: string | null;
   city: string;
   status: string | null;
+  is_public?: boolean | null;
+  slug?: string | null;
   organization_id: string | null;
 }
 

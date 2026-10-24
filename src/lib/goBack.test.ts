@@ -50,6 +50,8 @@ describe("parent screens", () => {
     assert.equal(parentFallback("/admin/onboarding"), "/admin");
     assert.equal(parentFallback("/event/evt/confirmation"), "/event/evt");
     assert.equal(parentFallback("/event/evt"), "/calendar");
+    assert.equal(parentFallback("/e/listening-night/confirmation"), "/e/listening-night");
+    assert.equal(parentFallback("/e/listening-night"), "/calendar");
     assert.equal(parentFallback("/project/proj"), "/projects");
     assert.equal(parentFallback("/book"), "/feed");
     assert.equal(parentFallback("/book/maya"), "/");

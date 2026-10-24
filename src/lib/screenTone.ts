@@ -29,6 +29,7 @@ export function toneForPath(pathname: string): ScreenTone {
     path.startsWith("/live") ||
     path.startsWith("/cinema") ||
     path.startsWith("/event") ||
+    path.startsWith("/e/") ||
     path.startsWith("/calendar") ||
     path.startsWith("/projects") ||
     path.startsWith("/boards") ||

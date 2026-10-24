@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { OrderSummaryScreen } from "@/components/events/guest/OrderSummaryScreen";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePublicEvent } from "@/hooks/usePublicEvent";
+import { eventPublicPath, isEventUuid } from "../../functions/_shared/eventShare.js";
 import { readTicketLines } from "@/lib/guestEvent";
 import { formatUsd, priceCheckout } from "@/lib/ticketFees";
 import { errorMessage } from "@/lib/errorMessage";
@@ -13,7 +15,9 @@ export default function EventCheckout() {
   const { eventId = "" } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const lines = useMemo(() => readTicketLines(eventId), [eventId]);
+  const { data: event } = usePublicEvent(eventId);
+  const eventKey = event?.id || (isEventUuid(eventId) ? eventId : "");
+  const lines = useMemo(() => readTicketLines(eventKey), [eventKey]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState(user?.email || "");
   const [password, setPassword] = useState("");
@@ -21,15 +25,6 @@ export default function EventCheckout() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
-  const { data: event } = useQuery({
-    queryKey: ["public-event-checkout", eventId],
-    enabled: !!eventId,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("events").select("id, title, creator_id, absorb_fees, password_protected, page_theme").eq("id", eventId).single();
-      if (error) throw error;
-      return data;
-    },
-  });
   const { data: host } = useQuery({
     queryKey: ["public-event-organizer", event?.creator_id],
     enabled: !!event?.creator_id,
@@ -39,10 +34,10 @@ export default function EventCheckout() {
     },
   });
   const { data: tiers = [] } = useQuery({
-    queryKey: ["public-event-tier-picker", eventId],
-    enabled: !!eventId,
+    queryKey: ["public-event-tier-picker", eventKey],
+    enabled: !!eventKey,
     queryFn: async () => {
-      const { data } = await supabase.from("ticket_tiers").select("id, name, price_cents, description").eq("event_id", eventId);
+      const { data } = await supabase.from("ticket_tiers").select("id, name, price_cents, description").eq("event_id", eventKey);
       return data || [];
     },
   });
@@ -77,7 +72,7 @@ export default function EventCheckout() {
       }
       const { data, error } = await supabase.functions.invoke("purchase-event-ticket", {
         body: {
-          eventId,
+          eventId: event?.id || eventKey,
           lines: chosen.map((line) => ({ tierId: line.tierId, quantity: line.quantity })),
           buyer: { name: name.trim(), email: email.trim().toLowerCase() },
           marketingConsent: consent,
@@ -127,7 +122,7 @@ export default function EventCheckout() {
       onEmail={setEmail}
       onPassword={setPassword}
       onConsent={setConsent}
-      onBack={() => navigate(`/event/${eventId}/tickets`)}
+      onBack={() => navigate(event ? `${eventPublicPath(event)}/tickets` : "/calendar")}
       onCheckout={checkout}
     />
   );

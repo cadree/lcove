@@ -4,7 +4,9 @@ import { BackButton } from "@/components/navigation/BackButton";
 import { ConfirmationScreen } from "@/components/events/guest/ConfirmationScreen";
 import { supabase } from "@/integrations/supabase/client";
 import { formatEventDate, formatEventTime } from "@/lib/eventTime";
-import { buildShareUrl, shareLink } from "@/lib/shareLink";
+import { shareEventLink } from "@/lib/shareLink";
+import { usePublicEvent } from "@/hooks/usePublicEvent";
+import { eventPublicPath, eventPublicUrl } from "../../functions/_shared/eventShare.js";
 import { errorMessage } from "@/lib/errorMessage";
 import { toast } from "sonner";
 import { EventReminderToggle } from "@/components/events/EventReminderToggle";
@@ -14,6 +16,7 @@ export default function EventConfirmation() {
   const [params] = useSearchParams();
   const sessionId = params.get("session_id");
   const orderIdParam = params.get("order_id");
+  const { data: event, isLoading: eventLoading } = usePublicEvent(eventId);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ticketCount, setTicketCount] = useState(1);
@@ -33,25 +36,30 @@ export default function EventConfirmation() {
   const [walletEnabled, setWalletEnabled] = useState(false);
 
   useEffect(() => {
+    if (eventLoading) return;
+    if (!event) {
+      setLoading(false);
+      setError("Event not found");
+      return;
+    }
     let cancelled = false;
-    const load = async () => {
-      const { data: event } = await supabase.from("events").select("id, title, start_date, end_date, venue, address, city, state, image_url, timezone, creator_id, hide_address, page_theme").eq("id", eventId).maybeSingle();
-      if (cancelled || !event) return;
-      setTitle(event.title);
-      setFlyer(event.image_url);
-      setTheme(event.page_theme === "light" ? "light" : "dark");
-      setStartIso(event.start_date);
-      setEndIso(event.end_date);
-      setWhenLabel(`${formatEventDate(event.start_date, event.timezone)} · ${formatEventTime(event.start_date, event.timezone)}${event.end_date ? ` – ${formatEventTime(event.end_date, event.timezone)}` : ""}`);
+    setTitle(event.title);
+    setFlyer(event.image_url);
+    setTheme(event.page_theme === "light" ? "light" : "dark");
+    setStartIso(event.start_date);
+    setEndIso(event.end_date);
+    setWhenLabel(`${formatEventDate(event.start_date, event.timezone)} · ${formatEventTime(event.start_date, event.timezone)}${event.end_date ? ` – ${formatEventTime(event.end_date, event.timezone)}` : ""}`);
+    const loadHost = async () => {
       const { data: host } = await supabase.from("consumer_creators").select("display_name, avatar_url").eq("user_id", event.creator_id).maybeSingle();
+      if (cancelled) return;
       if (host?.display_name) setHostName(host.display_name);
       if (host?.avatar_url) setHostAvatar(host.avatar_url);
       const { data: hidden } = await supabase.rpc("public_event_location", { p_event_id: event.id, p_order_id: orderIdParam || undefined });
-      setAddress(hidden || [event.venue, event.hide_address ? null : event.address, event.city].filter(Boolean).join(", "));
+      if (!cancelled) setAddress(hidden || [event.venue, event.hide_address ? null : event.address, event.city].filter(Boolean).join(", "));
       const probe = await supabase.functions.invoke("generate-wallet-pass", { body: { probe: true } });
       if (!cancelled) setWalletEnabled(probe.data?.configured === true);
     };
-    load();
+    loadHost();
 
     const verify = async () => {
       if (!sessionId && !orderIdParam) {
@@ -60,7 +68,7 @@ export default function EventConfirmation() {
       }
       try {
         const { data, error: invokeError } = await supabase.functions.invoke("verify-event-purchase", {
-          body: { sessionId, orderId: orderIdParam, eventId },
+          body: { sessionId, orderId: orderIdParam, eventId: event.id },
         });
         if (invokeError) throw invokeError;
         if (data?.error) throw new Error(data.error);
@@ -79,9 +87,9 @@ export default function EventConfirmation() {
     };
     verify();
     return () => { cancelled = true; };
-  }, [eventId, orderIdParam, sessionId]);
+  }, [event, eventLoading, orderIdParam, sessionId]);
 
-  const share = () => shareLink({ title, text: `I'm going to ${title}`, url: buildShareUrl.event(eventId) });
+  const share = () => shareEventLink({ title, text: `I'm going to ${title}`, url: event ? eventPublicUrl(event) : "" });
   const calendar = () => {
     if (!startIso) return;
     const start = new Date(startIso);
@@ -92,7 +100,7 @@ export default function EventConfirmation() {
 
   const back = (
     <div className="px-4 pt-4">
-      <BackButton showLabel label="Back to event" fallback={eventId ? `/event/${eventId}` : "/calendar"} />
+      <BackButton showLabel label="Back to event" fallback={event ? eventPublicPath(event) : "/calendar"} />
     </div>
   );
 

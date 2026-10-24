@@ -13,7 +13,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { supabase } from "@/integrations/supabase/client";
-import { shareLink, shareToChannel, buildShareUrl } from "@/lib/shareLink";
+import { shareToChannel } from "@/lib/shareLink";
+import { eventPublicUrl } from "../../../functions/_shared/eventShare.js";
 import { attendanceLabel, attendanceSummary } from "@/lib/eventGuests";
 import { format, formatDistanceToNow } from "date-fns";
 import { formatEventDate, formatEventTime } from "@/lib/eventTime";
@@ -262,7 +263,7 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
   };
 
   const handleShare = async (method: 'copy' | 'twitter' | 'native' | 'sms' | 'whatsapp' | 'facebook' | 'instagram' | 'email') => {
-    const shareUrl = buildShareUrl.event(event.id);
+    const shareUrl = eventPublicUrl(event);
     const shareText = `Check out "${event.title}" on ${format(eventDate, 'MMMM d')}!`;
     await shareToChannel(method, { title: event.title, text: shareText, url: shareUrl });
   };

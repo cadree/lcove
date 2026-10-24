@@ -46,6 +46,8 @@ Cloudflare Pages and Netlify both honor that file from the output directory. Do 
 
 `/embed/player` is a Cloudflare Pages Function (`functions/embed/player.js`). The iOS app iframes that https URL so YouTube receives a web referrer. Pages Functions run before the splat, so `/embed/player` must not be pointed at `index.html`. `public/embed/player.html` is the same player for a host that serves files from `public/` directly.
 
+`functions/e` and `functions/event` inject Open Graph tags into `index.html` for those paths only. Do not add a root `functions/_middleware.js`; that would run on `/` and `/feed`. Do not add a `wrangler.toml`. This project is configured in the Cloudflare dashboard, and a Wrangler file switches Pages onto that file and can drop the dashboard's environment variables and bindings. The flyer crop uses plain JavaScript (`jpeg-js` and `fast-png`), so the functions do not need `nodejs_compat`. The Vite build writes the public Supabase URL and anon key into `dist/event-share-config.json`. The functions read that file from the built assets. They do not read runtime environment variables. Apply `supabase/migrations/20261024211000_event_share_slug.sql` in the SQL editor before shared links unfurl. Until then the functions pass the request through and the app keeps serving `/event/{id}`.
+
 ### Environment variables
 
 Set these in the host's **Production** environment. Do not copy them into **Preview**. A preview build that contains this project writes posts, likes, and accounts into ether-prod. Preview uses a separate free Supabase project. See `docs/preview-staging.md`. These are public client values. Vite inlines them at build time. Changing them requires a new build.

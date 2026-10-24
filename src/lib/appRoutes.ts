@@ -54,6 +54,7 @@ const APP_EXACT = new Set([
 const PREFIXES = [
   "/admin/",
   "/event/",
+  "/e/",
   "/product/",
   "/live/",
   "/project/",
@@ -74,6 +75,7 @@ export function isPublicPath(pathname: string): boolean {
   return (
     pathname.startsWith("/admin/onboarding") ||
     pathname.startsWith("/event/") ||
+    pathname.startsWith("/e/") ||
     pathname.startsWith("/product/") ||
     pathname.startsWith("/live/") ||
     pathname.startsWith("/book/") ||

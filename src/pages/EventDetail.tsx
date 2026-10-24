@@ -11,12 +11,10 @@ import {
   DollarSign,
   Megaphone,
   UserCog,
-  Share2,
   MoreHorizontal,
   Edit,
   Trash2,
   ExternalLink,
-  Copy,
   Mail,
   Search,
   Download,
@@ -66,7 +64,8 @@ import { formatEventDate, formatEventTime } from "@/lib/eventTime";
 import BottomNav from "@/components/navigation/BottomNav";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { shareLink, buildShareUrl } from "@/lib/shareLink";
+import { HostShareBar } from "@/components/events/HostShareBar";
+import { eventPublicPath, eventPublicUrl } from "../../functions/_shared/eventShare.js";
 import { useEventTicketingData, type TicketOrder, type EventAttendee } from "@/hooks/useEventTicketingData";
 import { useEventCheckIns } from "@/hooks/useEventCheckIn";
 import { CheckInScanner } from "@/components/events/CheckInScanner";
@@ -226,20 +225,6 @@ export default function EventDetail() {
     enabled: v2Attendees.length > 0,
   });
 
-  const handleShare = async () => {
-    if (!eventId) return;
-    await shareLink({
-      title: event?.title,
-      text: `Check out this event: ${event?.title}`,
-      url: buildShareUrl.event(eventId),
-    });
-  };
-
-  const handleCopyLink = async () => {
-    if (!eventId) return;
-    await shareLink({ url: buildShareUrl.event(eventId) });
-  };
-
   const handleDelete = async () => {
     if (!eventId) return;
     setIsDeleting(true);
@@ -314,14 +299,6 @@ export default function EventDetail() {
           <div className="flex items-center justify-between px-4 h-12">
             <BackButton label="Back" fallback="/dashboard/events" className="h-11 w-11" />
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleCopyLink} className="gap-1.5">
-                <Copy className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Copy Link</span>
-              </Button>
-              <Button variant="default" size="sm" onClick={handleShare} className="gap-1.5">
-                <Share2 className="h-3.5 w-3.5" />
-                Share
-              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-9 w-9">
@@ -329,7 +306,7 @@ export default function EventDetail() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => navigate(`/event/${eventId}`)}>
+                  <DropdownMenuItem onClick={() => navigate(event ? eventPublicPath(event) : `/event/${eventId}`)}>
                     <ExternalLink className="h-4 w-4 mr-2" />
                     View Public Page
                   </DropdownMenuItem>
@@ -383,6 +360,9 @@ export default function EventDetail() {
                     )}
                   </div>
                 </div>
+              </div>
+              <div className="mt-3">
+                <HostShareBar title={event.title} url={eventPublicUrl(event)} />
               </div>
             </div>
           ) : null}
