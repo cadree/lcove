@@ -67,6 +67,20 @@ const Cinema = () => {
   return (
     <PageLayout>
       <div className="min-h-screen bg-background">
+        {!currentFeatured && (
+          <div className="flex items-center justify-between gap-3 px-4 py-4">
+            <div className="flex min-w-0 items-center gap-2">
+              <BackButton />
+              <h1 className="ether-title truncate text-2xl text-foreground">Cinema</h1>
+            </div>
+            {user && (
+              <Button onClick={() => setCreateDialogOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Create Network</span>
+              </Button>
+            )}
+          </div>
+        )}
         {/* Netflix-style Hero Section */}
         {currentFeatured && (
           <div className="relative h-[70vh] md:h-[85vh] w-full overflow-hidden">
@@ -94,7 +108,7 @@ const Cinema = () => {
                   <BackButton className="text-foreground hover:bg-background/20" />
                   <div className="flex items-center gap-2">
                     <SquircleIcon icon={Film} fill="ink" size={40} />
-                    <span className="ether-title text-2xl text-foreground">LC Cinema</span>
+                    <h1 className="ether-title text-2xl text-foreground">Cinema</h1>
                   </div>
                 </div>
                 

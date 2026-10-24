@@ -315,7 +315,7 @@ export const EditContentDialog = ({ open, onOpenChange, content }: EditContentDi
                 <label className="cursor-pointer block">
                   <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
                   <span className="text-sm text-muted-foreground">
-                    Click to upload poster (2:3 ratio recommended)
+                    Choose a poster (2:3 ratio recommended)
                   </span>
                   <input
                     type="file"
