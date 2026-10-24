@@ -107,20 +107,40 @@ describe("shouldCheckImage", () => {
 });
 
 describe("image check wiring", () => {
-  it("loads TensorFlow only when an image is checked", () => {
+  it("loads TensorFlow from a dynamic import", () => {
     const checker = source("./nsfwImageCheck.ts");
     assert.equal(/^\s*import\s+(?!type\b).*\bfrom\s+["']nsfwjs/m.test(checker), false);
     assert.equal(/^\s*import\s+(?!type\b).*\bfrom\s+["']@tensorflow/m.test(checker), false);
     assert.equal(checker.includes("nsfwjs/models"), false);
     assert.match(checker, /import\(\s*["']nsfwjs\/core["']\s*\)/);
     assert.match(checker, /import\(\s*["']@tensorflow\/tfjs["']\s*\)/);
+    assert.match(checker, /import\(\s*["']@tensorflow\/tfjs-backend-wasm["']\s*\)/);
     assert.match(checker, /\/nsfw\/mobilenet_v2\/model\.json/);
+    assert.match(checker, /\/nsfw\/wasm\//);
     assert.match(checker, /allowing the upload/);
+    assert.match(checker, /requestIdleCallback/);
+    assert.match(checker, /input\[type="file"\]/);
+    assert.match(checker, /if \(!signedIn/);
+    assert.match(checker, /document\.readyState === "complete"/);
   });
 
-  it("runs from the shared storage upload guard", () => {
+  it("prefetches only after a session, off the module startup path", () => {
+    const app = source("../App.tsx");
+    const startup = app.split("function WarmTabs")[0];
+    assert.equal(startup.includes("watchImageCheckPrefetch("), false);
+    assert.match(app, /watchImageCheckPrefetch\(session != null\)/);
+  });
+
+  it("runs the image check beside the storage upload", () => {
     const client = source("./supabaseClient.ts");
     assert.match(client, /reviewImageUpload/);
     assert.match(client, /blockedImageError/);
+    assert.equal(/await reviewImageUpload/.test(client), false);
+    assert.match(client, /ownsThisUpload/);
+    assert.match(client, /bucket\.remove\(\[path\]\)/);
+    assert.match(client, /Upload removed after the image check/);
+    const reviewAt = client.indexOf("const reviewPromise = reviewImageUpload");
+    const uploadAt = client.indexOf("const result = await originalUpload");
+    assert.ok(reviewAt > 0 && reviewAt < uploadAt);
   });
 });

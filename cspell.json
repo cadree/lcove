@@ -79,6 +79,7 @@
     "tfjs",
     "mobilenet",
     "hentai",
-    "indexeddb"
+    "indexeddb",
+    "wasm"
   ]
 }

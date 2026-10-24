@@ -59,12 +59,22 @@ supabase.functions.invoke = (async (functionName, options) => {
 // cap are sent unchanged. Larger videos are compressed in the browser first,
 // with a progress toast. Larger images and other files are rejected with a
 // plain message, and a size rejection from the server uses that same message.
-// Image bytes are also checked before they are stored. The check lives in
-// nsfwImageCheck and loads only when the file is a picture.
+// Image bytes are checked in parallel with the storage upload. A flagged
+// object is removed. The check lives in nsfwImageCheck and loads only when
+// the file is a picture. A newer upload of the same path wins the removal.
 // The guard lives in this file, not the generated integrations client, so a
 // Lovable regen of client.ts keeps it while the vite and tsconfig aliases
 // still point here.
 let compressToastSerial = 0;
+const storagePathGeneration = new Map<string, number>();
+let storagePathSerial = 0;
+
+function claimStoragePath(bucketId: string, path: string) {
+  const key = `${bucketId}/${path}`;
+  const generation = ++storagePathSerial;
+  storagePathGeneration.set(key, generation);
+  return () => storagePathGeneration.get(key) === generation;
+}
 
 function limitError(message: string) {
   return new StorageApiError(message, 413, "413");
@@ -109,21 +119,32 @@ supabase.storage.from = ((bucketId: string) => {
       }
 
       const name = blob instanceof File ? blob.name : "";
-      try {
-        const review = await reviewImageUpload(blob, name);
-        if (review.ok === false) {
-          console.error("Upload blocked before storage", review.message);
-          return { data: null, error: blockedImageError(review.message) };
-        }
-      } catch (error) {
+      const ownsThisUpload = claimStoragePath(bucketId, path);
+      const reviewPromise = reviewImageUpload(blob, name).catch((error) => {
         console.error("Image check failed open", error);
+        return { ok: true as const };
+      });
+      const result = await originalUpload(path, body, options);
+      if (result.error && isStorageSizeRejection(result.error)) {
+        const kind = fileKind(blob instanceof File ? blob.name : "", blob.type || "");
+        return { data: null, error: limitError(storageLimitMessage(kind)) };
       }
+      if (result.error) return result;
+      const review = await reviewPromise;
+      if (review.ok === false) {
+        if (ownsThisUpload()) {
+          const removed = await bucket.remove([path]);
+          if (removed.error) console.error("Upload remove failed after the image check", removed.error);
+        }
+        console.error("Upload removed after the image check", review.message);
+        return { data: null, error: blockedImageError(review.message) };
+      }
+      return result;
     }
 
     const result = await originalUpload(path, body, options);
     if (result.error && isStorageSizeRejection(result.error)) {
-      const kind = blob ? fileKind(blob instanceof File ? blob.name : "", blob.type || "") : "other";
-      return { data: null, error: limitError(storageLimitMessage(kind)) };
+      return { data: null, error: limitError(storageLimitMessage("other")) };
     }
     return result;
   }) as typeof bucket.upload;
