@@ -9,7 +9,6 @@ import "@fontsource/archivo/latin-700.css";
 import "@fontsource/archivo/latin-800.css";
 import "@fontsource/orbitron/latin-700.css";
 import "@fontsource/orbitron/latin-800.css";
-import "@fontsource/share-tech-mono/latin-400.css";
 import App from "./App.tsx";
 import "./index.css";
 import ErrorBoundary from "@/components/ErrorBoundary";

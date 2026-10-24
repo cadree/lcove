@@ -130,8 +130,8 @@ export function etherIdQr(value: string) {
     size: ETHER_ID_QR_SIZE,
     level: "M" as const,
     marginSize: 2,
-    bgColor: "#08080a",
-    fgColor: "#ece7dc",
+    bgColor: "#ffffff",
+    fgColor: "#141416",
   };
 }
 

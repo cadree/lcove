@@ -304,61 +304,54 @@ export async function renderEtherStrip(card, { scale = 1, photo = null, novi = n
   const image = new Image(width, height);
   const banned = walletStatus(card.status) === "BANNED";
   const ground = banned ? rgba(NUANCE.bgBanned) : INK;
-  image.fill(ground);
+  image.fill(rgba("#1a1a1e"));
+  box(image, 0, 0, width, Math.max(1, 10 * s), rgba("#3a3a42"));
+  box(image, 0, 0, 28 * s, height, rgba("#24242a"));
 
-  const photoX = 8 * s;
+  const photoX = 32 * s;
   const photoY = 8 * s;
-  const photoSide = 107 * s;
-  box(image, photoX, photoY, photoSide, photoSide, BONE);
-  const portrait = (await decodePhoto(photo)) || monogram(Image, card.display_name, photoSide, photoSide);
-  halftone(image, portrait, photoX, photoY, photoSide, photoSide, Math.max(2, 3 * s));
+  const photoW = 246 * s;
+  const photoH = height - 16 * s;
+  const portrait = (await decodePhoto(photo)) || monogram(Image, card.display_name, Math.round(photoW), Math.round(photoH));
+  const covered = coverTop(portrait, Math.round(photoW), Math.round(photoH));
+  image.composite(covered, Math.round(photoX), Math.round(photoY));
 
-  const frame = banned ? ALERT : BONE;
-  const glowFrame = banned ? rgba(NUANCE.alert, 150) : rgba(NUANCE.bubble, 130);
-  strokeRoundRect(image, 4 * s, 4 * s, width - 8 * s, height - 8 * s, 8 * s, glowFrame, Math.max(2, 2 * s));
-  strokeRoundRect(image, 4 * s, 4 * s, width - 8 * s, height - 8 * s, 8 * s, frame, Math.max(1, s));
-  strokeRoundRect(image, photoX, photoY, photoSide, photoSide, 2 * s, frame, Math.max(1, s));
+  const frame = banned ? ALERT : BUBBLE;
+  strokeRoundRect(image, 3 * s, 3 * s, width - 6 * s, height - 6 * s, 10 * s, frame, Math.max(2, 2 * s));
+  strokeRoundRect(image, photoX, photoY, photoW, photoH, 6 * s, banned ? ALERT : BONE, Math.max(1, s));
 
-  const wordScale = 4 * s;
-  drawText(image, "ETHER", 124 * s, 12 * s, wordScale, BONE);
-  curve(
-    image,
-    [250 * s, 28 * s],
-    [270 * s, 28 * s],
-    [268 * s, 12 * s],
-    [292 * s, 12 * s],
-    frame,
-    Math.max(0.8, s * 0.7),
-  );
-
-  const hexY = 58 * s;
-  const hexes = [
-    [136 * s, hexY, 7 * s],
-    [152 * s, hexY + 10 * s, 7 * s],
-    [168 * s, hexY, 7 * s],
-    [152 * s, hexY - 10 * s, 7 * s],
-    [136 * s, hexY + 20 * s, 7 * s],
-    [168 * s, hexY + 20 * s, 7 * s],
-  ];
-  for (const [hx, hy, hr] of hexes) hexagon(image, hx, hy, hr, rgba("#8a857b"));
-
+  const tile = 26 * s;
+  box(image, photoX + 6 * s, photoY + 6 * s, tile, tile, rgba("#ffffff"));
   const noviSource = novi || await loadNoviImage();
-  const noviH = 64 * s;
+  const noviH = Math.round(32 * s);
   const noviW = Math.max(1, Math.round(noviH * (noviSource.width / noviSource.height)));
-  const noviX = width - noviW - 12 * s;
-  const noviY = 8 * s;
+  const noviX = photoX + 8 * s;
+  const noviY = photoY + tile + 8 * s;
+  glow(image, noviX + noviW * 0.5, noviY + noviH * 0.48, 16 * s, banned ? NUANCE.alert : NUANCE.bubble);
   const mark = noviSource.clone();
   mark.resize(noviW, noviH);
-  glow(image, noviX + noviW * 0.5, noviY + noviH * 0.46, 22 * s, banned ? NUANCE.alert : NUANCE.bubble);
-  image.composite(mark, noviX, noviY);
+  image.composite(mark, Math.round(noviX), Math.round(noviY));
+
+  const starX = photoX + photoW - 18 * s;
+  const starY = photoY + 8 * s;
+  box(image, starX + 4 * s, starY, Math.max(1, 2 * s), 12 * s, BONE);
+  box(image, starX, starY + 5 * s, 10 * s, Math.max(1, 2 * s), BONE);
 
   if (banned) {
-    drawText(image, "BANNED", photoX + 8 * s, photoY + photoSide * 0.42, 3 * s, ALERT);
-  } else {
-    ticks(image, 230 * s, 96 * s, 120 * s, Math.max(1, s), BONE_DIM);
+    const bandY = photoY + photoH * 0.4;
+    box(image, photoX, bandY, photoW, 18 * s, rgba(NUANCE.alert, 235));
+    const label = "BANNED";
+    const labelScale = Math.max(1, 2 * s);
+    drawText(image, label, photoX + (photoW - textWidth(label, labelScale)) / 2, bandY + 3 * s, labelScale, rgba("#ffffff"));
   }
-  fadeBottom(image, height * 0.84, ground);
 
+  fadeBottom(image, height * 0.82, ground);
+  const letterScale = Math.max(1, 2 * s);
+  let letterY = 8 * s;
+  for (const ch of "FAMILCY") {
+    drawText(image, ch, 7 * s, letterY, letterScale, BONE);
+    letterY += 12 * s;
+  }
   return image.encode();
 }
 

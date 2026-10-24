@@ -1,5 +1,5 @@
 import { chromium } from 'playwright';
-import { mkdirSync, readFileSync } from 'fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import jsQR from 'jsqr';
 import { Image } from 'imagescript';
@@ -238,6 +238,11 @@ async function shoot(name, path, assertPage, viewport = { width: 390, height: 84
   const errors = [];
   page.on('pageerror', (err) => errors.push(err.message));
   await page.goto(`${base}${path}`, { waitUntil: 'networkidle', timeout: 30000 });
+  await page.waitForFunction(() => !document.getElementById('boot-splash'), { timeout: 8000 });
+  await page.evaluate(() => document.fonts.ready);
+  await page.addStyleTag({
+    content: '.ether-id-float{animation:none !important}.ether-id-pulse{animation:none !important;opacity:.8}',
+  });
   await assertPage(page);
   const wallet = page.getByRole('button', { name: 'Add to Apple Wallet' });
   if (await wallet.count()) {
@@ -256,26 +261,125 @@ async function expectText(page, text) {
 }
 
 async function expectCard(page, status, name) {
+  await expectText(page, 'FAMILCY');
   await expectText(page, 'TORRES, MAYA');
   await expectText(page, '@maya');
   await expectText(page, 'Photography');
   await expectText(page, '4.5/2');
-  await expectText(page, '>PROJECTS');
+  await expectText(page, 'Projects');
   await expectText(page, '03.04');
   await expectText(page, 'self-reported');
   await expectText(page, 'Los Angeles');
   await expectText(page, status);
   await expectText(page, 'This is not age verification.');
-  await page.locator('canvas[data-halftone="ready"]').waitFor({ state: 'visible', timeout: 15000 });
+  const photo = page.locator('img[data-photo]');
+  await photo.waitFor({ state: 'visible', timeout: 15000 });
+  await photo.evaluate((img) => img.complete && img.naturalWidth > 0 ? true : new Promise((resolve, reject) => {
+    img.addEventListener('load', () => resolve(true), { once: true });
+    img.addEventListener('error', () => reject(new Error('photo failed')), { once: true });
+  }));
   await page.locator('img[data-novi]').waitFor({ state: 'visible', timeout: 15000 });
-  const card = page.locator('article.ether-id');
+  const familcy = await page.locator('article.ether-id').innerText();
+  const mentions = familcy.match(/FAMILCY/g) || [];
+  if (mentions.length !== 1) throw new Error(`FAMILCY appears ${mentions.length} times`);
+  await assertNoOverlap(page);
+  const card = page.locator('.ether-id-slot');
   await card.screenshot({ path: resolve(outDir, `${name}-card.png`) });
+}
+
+async function assertNoOverlap(page) {
+  const hits = await page.locator('article.ether-id').evaluate((article) => {
+    const nodes = [...article.querySelectorAll('[data-plate]')];
+    const boxes = nodes.map((node) => {
+      const rect = node.getBoundingClientRect();
+      return {
+        name: `${node.getAttribute('data-plate')}:${(node.innerText || '').replace(/\s+/g, ' ').slice(0, 32)}`,
+        x: rect.x,
+        y: rect.y,
+        w: rect.width,
+        h: rect.height,
+        node,
+      };
+    });
+    const contains = (a, b) => a.x <= b.x + 1 && a.y <= b.y + 1 && a.x + a.w + 1 >= b.x + b.w && a.y + a.h + 1 >= b.y + b.h;
+    const clashes = [];
+    for (let i = 0; i < boxes.length; i += 1) {
+      for (let j = i + 1; j < boxes.length; j += 1) {
+        const a = boxes[i];
+        const b = boxes[j];
+        if (contains(a, b) || contains(b, a)) continue;
+        const iw = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+        const ih = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+        if (iw > 2 && ih > 2) clashes.push(`${a.name} ∩ ${b.name} ${Math.round(iw)}x${Math.round(ih)}`);
+      }
+    }
+    const plate = article.getBoundingClientRect();
+    const outside = boxes
+      .filter((box) => box.x < plate.x - 2 || box.y < plate.y - 2 || box.x + box.w > plate.x + plate.w + 2 || box.y + box.h > plate.y + plate.h + 2)
+      .map((box) => box.name);
+    const overflow = nodes
+      .filter((node) => node.getAttribute('data-plate') !== 'photo' && node.getAttribute('data-plate') !== 'novi')
+      .filter((node) => node.scrollWidth > node.clientWidth + 2 || node.scrollHeight > node.clientHeight + 2)
+      .map((node) => `${node.getAttribute('data-plate')}:${(node.innerText || '').slice(0, 24)}`);
+    const slot = article.closest('.ether-id-slot')?.getBoundingClientRect();
+    const fit = slot ? Math.abs(plate.width - slot.width) : 0;
+    return { clashes, outside, overflow, fit, plate: { w: plate.width, h: plate.height }, slot: slot ? { w: slot.width, h: slot.height } : null };
+  });
+  if (hits.clashes.length || hits.outside.length || hits.overflow.length || hits.fit > 4) {
+    throw new Error(`plate layout\n${JSON.stringify(hits, null, 2)}`);
+  }
+}
+
+async function tiltFrames(page) {
+  const tilt = page.locator('.ether-id-tilt');
+  const slot = page.locator('.ether-id-slot');
+  const frames = [
+    ['tilt-rest', '0', '0'],
+    ['tilt-left', '8', '-12'],
+    ['tilt-right', '-10', '12'],
+  ];
+  for (const [name, rx, ry] of frames) {
+    await tilt.evaluate((node, angles) => {
+      node.style.setProperty('--rx', `${angles.rx}deg`);
+      node.style.setProperty('--ry', `${angles.ry}deg`);
+    }, { rx, ry });
+    await page.waitForTimeout(60);
+    const box = await slot.boundingBox();
+    const viewport = page.viewportSize();
+    if (!box || !viewport) throw new Error('slot missing for tilt frame');
+    const padX = 28;
+    const padY = 36;
+    const x = Math.max(0, box.x - padX);
+    const y = Math.max(0, box.y - padY);
+    await page.screenshot({
+      path: resolve(outDir, `${name}.png`),
+      clip: {
+        x,
+        y,
+        width: Math.min(viewport.width - x, box.width + padX * 2),
+        height: Math.min(viewport.height - y, box.height + padY * 2),
+      },
+    });
+  }
+  await tilt.evaluate((node) => {
+    node.style.setProperty('--rx', '0deg');
+    node.style.setProperty('--ry', '0deg');
+  });
 }
 
 async function scanQr(page) {
   const qr = page.getByTestId('ether-id-qr');
   await qr.waitFor({ state: 'visible', timeout: 15000 });
-  const png = await qr.screenshot();
+  const box = await qr.boundingBox();
+  if (!box) throw new Error('qr box missing');
+  const png = await page.screenshot({
+    clip: {
+      x: Math.max(0, box.x),
+      y: Math.max(0, box.y),
+      width: box.width,
+      height: box.height,
+    },
+  });
   const image = await Image.decode(png);
   const data = new Uint8ClampedArray(image.width * image.height * 4);
   for (let y = 1; y <= image.height; y += 1) {
@@ -291,7 +395,8 @@ async function scanQr(page) {
   const code = jsQR(data, image.width, image.height, { inversionAttempts: 'attemptBoth' });
   const expected = `${base}/id/v/${ACTIVE_TOKEN}`;
   if (!code || code.data !== expected) {
-    throw new Error(`QR decoded ${code?.data || 'nothing'}, expected ${expected}`);
+    writeFileSync(resolve(outDir, 'qr-fail.png'), png);
+    throw new Error(`QR decoded ${code?.data || 'nothing'} (${image.width}x${image.height}), expected ${expected}`);
   }
   console.log('qr ok', code.data);
 }
@@ -310,8 +415,19 @@ await shoot('card-banned-390', '/id', async (page) => {
 });
 
 shotStatus = 'Active';
+await shoot('card-active-768', '/id', async (page) => {
+  await expectCard(page, 'Active', 'card-active-768');
+}, { width: 768, height: 1024 });
+
+shotStatus = 'Banned';
+await shoot('card-banned-768', '/id', async (page) => {
+  await expectCard(page, 'Banned', 'card-banned-768');
+}, { width: 768, height: 1024 });
+
+shotStatus = 'Active';
 await shoot('card-active-desktop', '/id', async (page) => {
   await expectCard(page, 'Active', 'card-active-desktop');
+  await tiltFrames(page);
 }, { width: 1280, height: 900 });
 
 shotStatus = 'Banned';

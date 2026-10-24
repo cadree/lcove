@@ -1044,349 +1044,193 @@ button.novi-peek:focus-visible {
     animation: none !important;
     opacity: 0.82;
   }
+
+  .ether-id-float,
+  .ether-id-tilt,
+  .ether-id-portrait,
+  .ether-id-sheen,
+  .ether-id-deck-sheen {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 
-/* Ether ID plate. Landscape, bone on black. Pink is only the glow. */
-.ether-id-turn {
+/* Ether ID. Portrait Familcy plate. Pink is the edge light. */
+.ether-id-slot {
   container-type: inline-size;
-  width: min(100%, 980px);
-  margin-inline: auto;
+  width: min(100%, 440px);
+  margin: 8px auto 0;
+  aspect-ratio: 440 / 587;
+  position: relative;
+}
+
+.ether-id-fit {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 440px;
+  height: 587px;
+  transform-origin: 0 0;
+  transform: scale(calc(100cqw / 440px));
+  transform-style: preserve-3d;
+}
+
+.ether-id-stage {
+  width: 440px;
+  height: 587px;
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+
+.ether-id-float {
+  width: 440px;
+  height: 587px;
+  transform-style: preserve-3d;
+  animation: ether-id-float 7.5s ease-in-out infinite;
+}
+
+.ether-id-slot.is-reduced .ether-id-float {
+  animation: none;
+}
+
+.ether-id-tilt {
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transform-style: preserve-3d;
+  transition: none;
+}
+
+.ether-id-slot.is-resting .ether-id-tilt,
+.ether-id-slot.is-resting .ether-id-portrait,
+.ether-id-slot.is-resting .ether-id-sheen,
+.ether-id-slot.is-resting .ether-id-deck-sheen {
+  transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .ether-id {
-  container-type: inline-size;
-  width: 100%;
-  aspect-ratio: 1.586 / 1;
-  display: grid;
-  grid-template-rows: 15% minmax(0, 1fr) 14%;
-  gap: 1.1%;
-  padding: 2.1% 2.3% 1.5%;
-  background: #08080a;
-  color: #ece7dc;
-  font-family: "Share Tech Mono", ui-monospace, monospace;
-  line-height: 1.05;
-}
-
-.ether-id.is-banned {
-  background: #140406;
-}
-
-.ether-id-pulse {
-  animation: ether-id-pulse 5.8s ease-in-out infinite;
-}
-
-.ether-id-head,
-.ether-id-foot {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  min-height: 0;
-  gap: 1.2%;
-}
-
-.ether-id-head {
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
-}
-
-.ether-id-glyph {
-  height: 78%;
-  width: auto;
-  fill: #ece7dc;
-}
-
-.ether-id-word,
-.ether-id-foot-center p,
-.ether-id-role,
-.ether-id-tag,
-.ether-id-stamp {
-  font-family: Orbitron, "Share Tech Mono", sans-serif;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.ether-id-word {
-  margin: 0;
-  font-size: 7.4cqw;
-  letter-spacing: 0.06em;
-  line-height: 0.8;
-}
-
-.ether-id-trace,
-.ether-id-bow {
-  width: 100%;
-  height: 70%;
-  overflow: visible;
-}
-
-.ether-id-trace path,
-.ether-id-bow path,
-.ether-id-head-hex polygon {
-  fill: none;
-  stroke: rgba(236, 231, 220, 0.92);
-  stroke-width: 1.4;
-  stroke-linecap: round;
-}
-
-.ether-id-marks {
-  display: flex;
-  align-items: center;
-  gap: 1cqw;
-  height: 100%;
-}
-
-.ether-id-head-hex {
-  width: 8.2cqw;
-  height: auto;
-}
-
-.ether-id-novi-wrap {
   position: relative;
-  width: 4.2cqw;
-  height: 5.6cqw;
-  flex: none;
-}
-
-.ether-id-novi {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: center bottom;
-}
-
-.ether-id-novi-glow {
-  position: absolute;
-  inset: 12% 0 8%;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 159, 200, 0.95), rgba(255, 159, 200, 0.25) 58%, transparent 74%);
-  filter: blur(1px);
-  opacity: 0.75;
-  pointer-events: none;
-}
-
-.ether-id-frame {
-  position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 2.2%;
-  min-height: 0;
-  padding: 2%;
-  border: 1px solid rgba(236, 231, 220, 0.92);
-  border-radius: 0.7cqw;
-}
-
-.ether-id-frame-glow {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  border-radius: inherit;
-  pointer-events: none;
-  box-shadow: 0 0 0 1px rgba(255, 159, 200, 0.35), 0 0 12px rgba(255, 159, 200, 0.45);
-  opacity: 0.72;
-}
-
-.ether-id-photo {
-  position: relative;
-  height: 100%;
-  width: auto;
-  aspect-ratio: 1;
-  border: 1px solid rgba(236, 231, 220, 0.88);
-  background: #e6e1d4;
+  width: 440px;
+  height: 587px;
   overflow: hidden;
-}
-
-.ether-id-halftone {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.ether-id-stamp {
-  position: absolute;
-  z-index: 2;
-  right: 4%;
-  bottom: 28%;
-  left: 4%;
-  margin: 0;
-  padding: 0.3cqw 0;
-  transform: rotate(-16deg);
-  border: 0.28cqw solid #ff3d49;
-  background: rgba(8, 8, 10, 0.28);
-  color: #ff3d49;
-  font-size: 3.4cqw;
-  letter-spacing: 0.22em;
-  text-align: center;
+  color: #ece7dc;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 14%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05), transparent 12%, transparent 88%, rgba(0, 0, 0, 0.28)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 4px),
+    linear-gradient(160deg, #3a3a42, #141418 42%, #0c0c10);
+  clip-path: polygon(
+    16px 0, 424px 0, 440px 16px,
+    440px 246px, 430px 260px, 440px 274px,
+    440px 571px, 424px 587px,
+    16px 587px, 0 571px,
+    0 274px, 10px 260px, 0 246px,
+    0 16px
+  );
+  font-family: "DM Mono", ui-monospace, monospace;
   line-height: 1.1;
 }
 
-.ether-id-body {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
-  min-width: 0;
-  min-height: 0;
-  align-content: start;
-  gap: 0.7%;
+.ether-id.is-banned {
+  background:
+    linear-gradient(180deg, rgba(255, 61, 73, 0.16), transparent 18%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 4px),
+    linear-gradient(160deg, #3a2428, #1a0608 46%, #120406);
 }
 
-.ether-id-name {
-  margin: 0;
-  font-size: 2.7cqw;
-  font-weight: 400;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.ether-id-familcy,
+.ether-id-name,
+.ether-id-band,
+.ether-id-monogram {
+  font-family: "Space Grotesk", Archivo, sans-serif;
 }
 
-.ether-id-role {
-  justify-self: start;
-  margin: 0;
-  padding: 0.25cqw 0.7cqw 0.15cqw;
-  background: #ece7dc;
-  color: #08080a;
-  font-size: 1.7cqw;
-  letter-spacing: 0.14em;
-  line-height: 1.15;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ether-id-code {
-  margin: 0;
-  color: #b9b4a8;
-  font-size: 1.35cqw;
-  letter-spacing: 0.12em;
-}
-
-.ether-id-bars {
-  margin-top: 0.4%;
-}
-
-.ether-id-bar {
-  display: flex;
-  justify-content: space-between;
-  gap: 1cqw;
-  padding: 0.45cqw 0 0.3cqw;
-  border-top: 1px solid rgba(236, 231, 220, 0.72);
-  font-size: 1.45cqw;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.ether-id-bars .ether-id-bar:last-child {
-  border-bottom: 1px solid rgba(236, 231, 220, 0.72);
-}
-
-.ether-id-status {
-  position: relative;
-  color: #ff9fc8;
-  text-shadow: 0 0 8px rgba(255, 159, 200, 0.85);
-}
-
-.ether-id-status-inactive {
-  color: #b9b4a8;
-  text-shadow: none;
-}
-
-.ether-id-status-suspended {
-  color: #c4142d;
-  text-shadow: 0 0 8px rgba(196, 20, 45, 0.7);
-}
-
-.ether-id-status-glow {
+.ether-id-familcy {
   position: absolute;
-  inset: -0.2cqw -0.5cqw;
-  pointer-events: none;
-  box-shadow: 0 0 8px rgba(255, 159, 200, 0.75);
-  opacity: 0.7;
-}
-
-.ether-id-mid {
-  display: grid;
-  grid-template-columns: 28% minmax(0, 1fr);
+  z-index: 4;
+  top: 78px;
+  left: 0;
+  width: 46px;
+  height: 280px;
+  margin: 0;
+  display: flex;
   align-items: center;
-  gap: 2%;
-  min-height: 0;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.42em;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
 }
 
-.ether-id-cluster {
-  width: 100%;
-  height: auto;
-}
-
-.ether-id-cluster polygon {
-  fill: #8a857b;
-  stroke: rgba(8, 8, 10, 0.35);
-  stroke-width: 0.6;
-}
-
-.ether-id-serial {
-  min-width: 0;
-}
-
-.ether-id-number {
-  margin: 0;
-  font-size: 3.15cqw;
-  letter-spacing: 0.16em;
-  white-space: nowrap;
-}
-
-.ether-id-handle {
-  margin: 0.3cqw 0 0;
-  padding-top: 0.35cqw;
-  border-top: 1px solid rgba(236, 231, 220, 0.8);
-  color: #b9b4a8;
-  font-size: 1.35cqw;
-  letter-spacing: 0.08em;
-}
-
-.ether-id-specs {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 2%;
-  align-items: end;
-  min-height: 0;
-}
-
-.ether-id-spec-col,
-.ether-id-spec-side {
-  min-width: 0;
-}
-
-.ether-id-spec-col p,
-.ether-id-spec-side p {
-  margin: 0;
-  font-size: clamp(6.5px, 1.28cqw, 13px);
-  letter-spacing: 0.04em;
-  line-height: 1.25;
-  text-transform: uppercase;
-  white-space: nowrap;
+.ether-id-bezel {
+  position: absolute;
+  z-index: 2;
+  top: 16px;
+  left: 52px;
+  width: 334px;
+  height: 382px;
+  border-radius: 18px;
   overflow: hidden;
-  text-overflow: ellipsis;
+  padding: 7px;
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.08) 28%, rgba(255, 159, 200, 0.55) 62%, rgba(236, 231, 220, 0.4));
+  box-shadow:
+    0 0 0 1px rgba(255, 159, 200, 0.8),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4),
+    0 0 16px rgba(255, 159, 200, 0.4);
 }
 
-.ether-id-tag {
-  display: inline-block;
-  margin: 0 0 0.4cqw;
-  padding: 0.15cqw 0.45cqw;
-  background: #ece7dc;
+.ether-id.is-banned .ether-id-bezel {
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.4), rgba(255, 61, 73, 0.72) 58%, rgba(255, 255, 255, 0.22));
+  box-shadow:
+    0 0 0 1px rgba(255, 61, 73, 0.9),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2),
+    0 0 18px rgba(255, 61, 73, 0.45);
+}
+
+.ether-id-photo {
+  position: absolute;
+  inset: 7px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #1a1a1e;
+}
+
+.ether-id-portrait {
+  position: absolute;
+  width: 118%;
+  height: 118%;
+  left: -9%;
+  top: -4%;
+  object-fit: cover;
+  object-position: center 18%;
+  transform: translate3d(calc(var(--px, 0) * -1px), calc(var(--py, 0) * -1px), 0);
+}
+
+.ether-id-monogram {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 92px;
+  font-weight: 700;
   color: #08080a;
-  font-size: 1.15cqw;
-  letter-spacing: 0.12em;
+  background:
+    radial-gradient(circle at 50% 30%, #fff, #ece7dc 42%, #b9b4a8);
 }
 
 .ether-id-qr {
-  width: clamp(72px, 11cqw, 96px);
-  height: clamp(72px, 11cqw, 96px);
-  margin-top: 0.4cqw;
-  border: 1px solid rgba(236, 231, 220, 0.88);
+  position: absolute;
+  z-index: 5;
+  top: 16px;
+  left: 16px;
+  width: 88px;
+  height: 88px;
+  padding: 4px;
+  border-radius: 4px;
+  background: #fff;
   line-height: 0;
-  justify-self: end;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.38);
 }
 
 .ether-id-qr svg {
@@ -1395,90 +1239,356 @@ button.novi-peek:focus-visible {
   height: 100%;
 }
 
-.ether-id-foot {
-  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr) auto;
-  align-items: center;
+.ether-id-holo {
+  position: absolute;
+  z-index: 4;
+  top: 116px;
+  left: 20px;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  background:
+    linear-gradient(140deg, rgba(255, 255, 255, 0.72), transparent 42%),
+    linear-gradient(120deg, #efeae0 0%, #ff9fc8 38%, #f7f4ee 58%, #79c3cf 100%);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.32);
 }
 
-.ether-id-brand,
-.ether-id-foot-center p {
+.ether-id-holo.is-solo {
+  top: 14px;
+  left: 14px;
+}
+
+.ether-id-holo img {
+  position: relative;
+  z-index: 1;
+  width: 74%;
+  height: 74%;
+  object-fit: contain;
+}
+
+.ether-id-holo-glow {
+  position: absolute;
+  inset: 18%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 159, 200, 0.95), rgba(255, 159, 200, 0) 70%);
+  opacity: 0.75;
+}
+
+.ether-id-pulse {
+  animation: ether-id-pulse 5.8s ease-in-out infinite;
+}
+
+.ether-id-star {
+  position: absolute;
+  z-index: 4;
+  top: 14px;
+  right: 14px;
+  width: 26px;
+  height: 26px;
+  fill: #ece7dc;
+}
+
+.ether-id-band {
+  position: absolute;
+  z-index: 6;
+  top: 54%;
+  right: -8%;
+  left: -8%;
   margin: 0;
-  font-size: 1.35cqw;
-  letter-spacing: 0.14em;
-  white-space: nowrap;
+  padding: 7px 0 6px;
+  transform: translateY(-50%) rotate(-8deg);
+  background: #ff3d49;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  text-align: center;
   text-transform: uppercase;
 }
 
-.ether-id-brand-sub {
-  text-transform: none;
+.ether-id-rail {
+  position: absolute;
+  z-index: 4;
+  top: 28px;
+  right: 0;
+  width: 46px;
+  height: 352px;
+  overflow: hidden;
+}
+
+.ether-id-rail-spin {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.ether-id-field {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ether-id-field span,
+.ether-id-kicker,
+.ether-id-code span,
+.ether-id-stats span {
+  color: #ff9fc8;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ether-id-field strong {
+  font-weight: 400;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ether-id-field.is-active strong {
+  color: #ff9fc8;
+  text-shadow: 0 0 8px rgba(255, 159, 200, 0.75);
+}
+
+.ether-id-field.is-suspended strong {
+  color: #c4142d;
+  text-shadow: 0 0 8px rgba(196, 20, 45, 0.65);
+}
+
+.ether-id-field.is-inactive strong {
+  color: #b9b4a8;
+  text-shadow: none;
+}
+
+.ether-id-field.is-banned strong {
+  color: #ff3d49;
+  text-shadow: 0 0 8px rgba(255, 61, 73, 0.8);
+}
+
+.ether-id-sheen {
+  position: absolute;
+  z-index: 1;
+  inset: -30% -10%;
+  pointer-events: none;
+  background: linear-gradient(
+    108deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.16) 46%,
+    rgba(255, 159, 200, 0.14) 52%,
+    transparent 68%
+  );
+  transform: translate3d(calc(var(--px, 0) * 10px), calc(var(--py, 0) * 6px), 0);
+  mix-blend-mode: screen;
+}
+
+.ether-id-deck {
+  position: absolute;
+  z-index: 3;
+  right: 14px;
+  bottom: 14px;
+  left: 14px;
+  height: 162px;
+  overflow: hidden;
+  border: 1px solid rgba(236, 231, 220, 0.28);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 26%),
+    linear-gradient(180deg, #32323a, #141418);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55);
+}
+
+.ether-id.is-banned .ether-id-deck {
+  border-color: rgba(255, 61, 73, 0.7);
+}
+
+.ether-id-deck-sheen {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 18%, rgba(255, 255, 255, 0.2) 46%, transparent 68%);
+  transform: translate3d(calc(var(--px, 0) * 14px), 0, 0);
+  mix-blend-mode: soft-light;
+}
+
+.ether-id-screws {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ether-id-screw,
+.ether-id-screws i {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, #f7f3ea, #9a958c 46%, #2a2a2e 72%);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2), inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.ether-id-screws i::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 1px;
+  width: 6px;
+  height: 1px;
+  background: rgba(8, 8, 10, 0.7);
+}
+
+.ether-id-screws i:nth-child(1) { top: 8px; left: 8px; }
+.ether-id-screws i:nth-child(2) { top: 8px; left: 63%; }
+.ether-id-screws i:nth-child(3) { bottom: 8px; left: 8px; }
+.ether-id-screws i:nth-child(4) { bottom: 8px; left: 63%; }
+.ether-id-screws i:nth-child(5) { top: 8px; right: 8px; }
+.ether-id-screws i:nth-child(6) { bottom: 8px; right: 8px; }
+
+.ether-id-identity {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
+  width: 66%;
+  height: 100%;
+  padding: 18px 8px 12px 14px;
+}
+
+.ether-id-chip {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  width: 22px;
+  height: 72px;
+  margin-top: 8px;
+  padding: 4px 3px;
+  border: 1px solid rgba(236, 231, 220, 0.45);
+  border-radius: 3px;
+  background: rgba(8, 8, 10, 0.35);
+}
+
+.ether-id-chip span {
+  display: block;
+  height: 100%;
+  background: #ece7dc;
+}
+
+.ether-id-copy {
+  min-width: 0;
+}
+
+.ether-id-kicker,
+.ether-id-name,
+.ether-id-handle,
+.ether-id-code {
+  margin: 0;
+}
+
+.ether-id-name {
+  margin-top: 2px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.ether-id-handle {
+  margin-top: 4px;
+  color: #b9b4a8;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.ether-id-code {
+  margin-top: 6px;
+  font-size: 12px;
   letter-spacing: 0.08em;
 }
 
-.ether-id-foot-center {
-  text-align: center;
+.ether-id-code span {
+  margin-right: 6px;
 }
 
-.ether-id-foot-center p {
-  font-size: 1.55cqw;
-  letter-spacing: 0.18em;
+.ether-id-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 8px;
+  margin-top: 8px;
 }
 
-.ether-id-bow.is-mirror {
-  transform: scaleX(-1);
+.ether-id-stats p {
+  margin: 0;
+  min-width: 0;
 }
 
-.ether-id-ruler {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 0.35cqw;
+.ether-id-stats strong,
+.ether-id-stats em {
+  display: block;
+  overflow: hidden;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.ether-id-ruler span {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.15cqw;
+.ether-id-stats em {
   color: #b9b4a8;
-  font-size: 1.05cqw;
+  font-size: 9px;
   letter-spacing: 0;
 }
 
-.ether-id-ruler i {
-  display: block;
-  width: 1px;
-  height: 0.7cqw;
-  background: #b9b4a8;
+.ether-id-stats .is-wide {
+  grid-column: 1 / -1;
 }
 
-.ether-id-ruler span:nth-child(odd) i {
-  height: 1.15cqw;
+.ether-id-mark {
+  position: absolute;
+  z-index: 2;
+  top: 16px;
+  right: 10px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30%;
+  padding-left: 8px;
+  border-left: 1px solid rgba(236, 231, 220, 0.2);
 }
 
-.ether-id.is-banned .ether-id-frame {
-  border-color: #ff3d49;
+.ether-id-logo {
+  width: 104px;
+  max-width: 100%;
+  height: auto;
 }
 
-.ether-id.is-banned .ether-id-frame-glow,
-.ether-id.is-banned .ether-id-status-glow {
-  box-shadow: 0 0 0 1px rgba(255, 61, 73, 0.7), 0 0 12px rgba(255, 61, 73, 0.72);
-}
-
-.ether-id.is-banned .ether-id-status,
-.ether-id.is-banned .ether-id-status-banned {
-  color: #ff3d49;
-  text-shadow: 0 0 8px rgba(255, 61, 73, 0.9);
-}
-
-.ether-id.is-banned .ether-id-novi-glow {
-  background: radial-gradient(circle, rgba(255, 61, 73, 0.9), rgba(196, 20, 45, 0.2) 58%, transparent 74%);
+@keyframes ether-id-float {
+  0%,
+  100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -5px, 0); }
 }
 
 @keyframes ether-id-pulse {
   0%,
-  100% {
-    opacity: 0.45;
-  }
-  50% {
-    opacity: 1;
-  }
+  100% { opacity: 0.45; }
+  50% { opacity: 1; }
 }
