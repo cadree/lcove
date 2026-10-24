@@ -48,7 +48,7 @@ const Partners: React.FC = () => {
             </div>
           </div>
           <p className="text-muted-foreground ml-12">
-            Exclusive benefits for LC members from our partner network
+            Exclusive benefits for Ether members from our partner network
           </p>
         </div>
 

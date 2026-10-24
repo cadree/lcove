@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { AUDIO_FILE_ACCEPT, audioContentType, isAudioUpload } from "./audioFiles.ts";
+import {
+  AUDIO_FILE_ACCEPT,
+  AUDIO_UPLOAD_DETAIL,
+  AUDIO_UPLOAD_HINT,
+  AUDIO_UPLOAD_REJECTED,
+  AUDIO_UPLOAD_SUBTITLE,
+  audioContentType,
+  isAudioUpload,
+} from "./audioFiles.ts";
 
 describe("iOS audio picker", () => {
   it("lists extensions and MIME types without the audio wildcard", () => {
@@ -30,6 +38,14 @@ describe("iOS audio picker", () => {
     assert.equal(isAudioUpload({ name: "clip.mp4", type: "video/mp4" }), false);
     assert.equal(isAudioUpload({ name: "cover.jpg", type: "image/jpeg" }), false);
     assert.equal(isAudioUpload({ name: "notes.pdf", type: "application/pdf" }), false);
+  });
+
+  it("describes every accepted audio file, not three formats", () => {
+    for (const line of [AUDIO_UPLOAD_SUBTITLE, AUDIO_UPLOAD_DETAIL, AUDIO_UPLOAD_HINT, AUDIO_UPLOAD_REJECTED]) {
+      assert.equal(/MP3, WAV, or M4A/i.test(line), false);
+      assert.match(line, /audio/i);
+    }
+    assert.match(AUDIO_UPLOAD_DETAIL, /20MB/);
   });
 
   it("stores a concrete audio content type", () => {

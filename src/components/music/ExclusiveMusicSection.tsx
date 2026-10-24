@@ -31,7 +31,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
-import { AUDIO_FILE_ACCEPT, audioContentType, audioExtension, isAudioUpload } from "@/lib/audioFiles";
+import { AUDIO_FILE_ACCEPT, AUDIO_UPLOAD_ACTION, AUDIO_UPLOAD_REJECTED, audioContentType, audioExtension, isAudioUpload } from "@/lib/audioFiles";
 import { readFunctionError } from "@/lib/functionError";
 
 interface VerifyResultRow {
@@ -179,7 +179,7 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
       return;
     }
     if (!audioFile || !isAudioUpload(audioFile)) {
-      toast.error("Choose an mp3, wav, flac, m4a, or aac file");
+      toast.error(AUDIO_UPLOAD_REJECTED);
       return;
     }
 
@@ -456,7 +456,7 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
                   <div>
                     <Music className="w-6 h-6 mx-auto mb-1 text-muted-foreground" />
                     <p className="text-xs text-muted-foreground">
-                      Click to select MP3, WAV, FLAC, etc.
+                      {AUDIO_UPLOAD_ACTION}
                     </p>
                   </div>
                 )}
@@ -469,7 +469,7 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
                   onChange={(e) => {
                     const file = e.target.files?.[0] || null;
                     if (file && !isAudioUpload(file)) {
-                      toast.error("Choose an mp3, wav, flac, m4a, or aac file");
+                      toast.error(AUDIO_UPLOAD_REJECTED);
                       e.target.value = "";
                       setAudioFile(null);
                       return;
