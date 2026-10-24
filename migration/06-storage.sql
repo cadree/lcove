@@ -15,7 +15,7 @@ VALUES (
   'media',
   true,
   52428800, -- 50MB
-  ARRAY['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'audio/mpeg', 'audio/wav']
+  ARRAY['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/flac', 'audio/x-flac', 'audio/mp4', 'audio/x-m4a', 'audio/m4a', 'audio/aac', 'audio/aacp', 'audio/x-aac']
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Contact avatars bucket (private) - for pipeline contact avatars

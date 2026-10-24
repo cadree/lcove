@@ -63,6 +63,9 @@
     "timeslice",
     "Timeslice",
     "dynacast",
-    "KHTML"
+    "KHTML",
+    "flac",
+    "m4a",
+    "aacp"
   ]
 }

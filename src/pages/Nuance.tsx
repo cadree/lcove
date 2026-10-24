@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
+import { BackButton } from "@/components/navigation/BackButton";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
@@ -10,16 +10,7 @@ import { NUANCE_BRAND_LINE, NUANCE_STORE_URL, nuanceProducts, type NuanceProduct
 import { PageMeta } from "@/components/seo/PageMeta";
 
 const Nuance = () => {
-  const navigate = useNavigate();
   const { user } = useAuth();
-
-  const goBack = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
-      return;
-    }
-    navigate(user ? "/feed" : "/");
-  };
 
   return (
     <PageLayout>
@@ -30,15 +21,7 @@ const Nuance = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={goBack}
-            className="mb-4"
-            aria-label="Go back"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <BackButton label="Go back" fallback={user ? "/feed" : "/"} className="mb-4" />
           <p className="text-xs font-medium uppercase tracking-[0.22em] text-primary">
             Nuance by LCOVE
           </p>

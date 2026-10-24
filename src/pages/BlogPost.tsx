@@ -1,15 +1,14 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ArrowLeft } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/navigation/BackButton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function BlogPostPage() {
   const { blogId } = useParams<{ blogId: string }>();
-  const navigate = useNavigate();
   const { user } = useAuth();
 
   const { data, isLoading, isError } = useQuery({
@@ -40,19 +39,7 @@ export default function BlogPostPage() {
   return (
     <PageLayout>
       <article className="mx-auto max-w-2xl px-4 py-6 pb-28">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mb-4 gap-2"
-          onClick={() => {
-            const index = window.history.state?.idx;
-            if (typeof index === "number" && index > 0) navigate(-1);
-            else navigate("/blog");
-          }}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Button>
+        <BackButton showLabel label="Back" fallback="/blog" className="mb-4" />
 
         {isLoading ? (
           <div className="h-40 animate-pulse rounded-lg bg-muted" />

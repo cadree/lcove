@@ -989,6 +989,20 @@ button.novi-peek:focus-visible {
   100% { transform: translateY(100vh); }
 }
 
+/* Full-screen feTurbulence plus a moving blend layer stalls iPhone Safari. */
+@media (hover: none) and (pointer: coarse) {
+  .world-grain {
+    animation: none;
+    background-image: none;
+    opacity: 0;
+  }
+
+  .world-sweep {
+    animation: none;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .world-grain,
   .world-sweep,
