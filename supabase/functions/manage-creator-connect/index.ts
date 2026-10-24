@@ -7,6 +7,7 @@ import {
   testStripe,
 } from "../_shared/creator-connect.mjs";
 import { httpStatusForError } from "../_shared/http-error.mjs";
+import { assertEventStripeTestKey } from "../_shared/stripe-mode.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -55,6 +56,73 @@ serve(async (req) => {
     }
 
     const profile = await loadProfileConnect(admin, user.id);
+
+    if (action === "finances" || action === "transfer" || action === "add_payout_method") {
+      assertEventStripeTestKey(Deno.env.get("STRIPE_SECRET_KEY"));
+      let accountId = profile?.stripe_connect_account_id || null;
+      if (action === "add_payout_method") {
+        accountId = accountId || await ensureExpressAccount(stripe, admin, user);
+        const link = await stripe.accountLinks.create({
+          account: accountId,
+          type: "account_onboarding",
+          refresh_url: `${origin}/dashboard/events/finances?connect=refresh`,
+          return_url: `${origin}/dashboard/events/finances?connect=return`,
+        });
+        return json({ url: link.url });
+      }
+      if (!accountId) {
+        return json({
+          available: [],
+          pending: [],
+          country: null,
+          currency: null,
+          charges_enabled: false,
+          payouts_enabled: false,
+          transfers_active: false,
+          payouts: [],
+          methods: [],
+        });
+      }
+      const account = await stripe.accounts.retrieve(accountId);
+      if (action === "transfer") {
+        if (!account.payouts_enabled) return json({ error: "Payouts are not enabled yet." }, 400);
+        const balance = await stripe.balance.retrieve({ stripeAccount: accountId });
+        const bucket = balance.available.find((item) => item.currency === account.default_currency) || balance.available[0];
+        if (!bucket || bucket.amount <= 0) return json({ error: "Nothing available to transfer." }, 400);
+        const payout = await stripe.payouts.create(
+          { amount: bucket.amount, currency: bucket.currency },
+          { stripeAccount: accountId },
+        );
+        return json({ id: payout.id, amount: payout.amount, currency: payout.currency, status: payout.status });
+      }
+      const balance = await stripe.balance.retrieve({ stripeAccount: accountId });
+      const payouts = await stripe.payouts.list({ limit: 12 }, { stripeAccount: accountId });
+      const banks = await stripe.accounts.listExternalAccounts(accountId, { object: "bank_account", limit: 10 });
+      return json({
+        country: account.country,
+        currency: account.default_currency,
+        charges_enabled: account.charges_enabled === true,
+        payouts_enabled: account.payouts_enabled === true,
+        transfers_active: account.capabilities?.transfers === "active",
+        available: balance.available,
+        pending: balance.pending,
+        payouts: payouts.data.map((item) => ({
+          id: item.id,
+          amount: item.amount,
+          currency: item.currency,
+          status: item.status,
+          arrival_date: item.arrival_date,
+        })),
+        methods: banks.data.map((item) => ({
+          id: item.id,
+          bank_name: item.bank_name,
+          last4: item.last4,
+          currency: item.currency,
+          default_for_currency: item.default_for_currency === true,
+        })),
+      });
+    }
+
     if (!profile?.stripe_connect_account_id) {
       return json({
         status: "pending",

@@ -294,6 +294,10 @@ Deno.serve(async (req) => {
   }
 
   // 4. Render React Email template to HTML and plain text
+  templateData = {
+    ...templateData,
+    unsubscribeUrl: `https://etherbylcove.com/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}`,
+  }
   const html = await renderAsync(
     React.createElement(template.component, templateData)
   )

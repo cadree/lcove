@@ -4,6 +4,9 @@ import { eventDateLabel, eventTimeLabel } from "../_shared/event-time.mjs";
 import { getBearerUser, requestRole } from "../_shared/require-caller.ts";
 import { authorizeRsvpConfirmation, escapeHtml } from "../_shared/notification-auth.mjs";
 import { httpStatusForError } from "../_shared/http-error.mjs";
+import { resolveHostIdentity } from "../_shared/host-email-identity.ts";
+import { guestEventEmailHtml } from "../_shared/guest-event-email.mjs";
+import { unsubscribeLink } from "../_shared/unsubscribe-link.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -98,51 +101,51 @@ serve(async (req) => {
       return new Response(JSON.stringify({ skipped: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const start = new Date(event.start_date);
-    const end = event.end_date ? new Date(event.end_date) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
     const dateStr = eventDateLabel(event.start_date, event.timezone);
     const timeStr = eventTimeLabel(event.start_date, event.timezone);
     const location = [event.venue, event.address, event.city, event.state].filter(Boolean).join(", ") || "Location TBA";
     const eventUrl = `https://etherbylcove.com/event/${event.id}`;
-    const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-    const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${fmt(start)}/${fmt(end)}&details=${encodeURIComponent(event.description || '')}&location=${encodeURIComponent(location)}`;
+    const mapUrl = `https://maps.google.com/?q=${encodeURIComponent(location)}`;
+    const identity = await resolveHostIdentity(admin, event_id);
+    const unsub = await unsubscribeLink(admin, email);
+    if (unsub.suppressed) {
+      log("Unsubscribed");
+      return new Response(JSON.stringify({ skipped: true, reason: "unsubscribed" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const waitlisted = rsvp.status === "waitlist";
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #ffffff;">
-        <h1 style="color: #1a1a2e; margin: 0 0 8px;">${waitlisted ? "You're on the waitlist" : "You're going!"}</h1>
-        <p style="color: #555; margin: 0 0 20px;">Hey ${escapeHtml(name)}, ${waitlisted
-          ? `the event is full. You're on the waitlist for <strong>${escapeHtml(event.title)}</strong>. We'll email you if a seat opens.`
-          : `your RSVP for <strong>${escapeHtml(event.title)}</strong> is confirmed${rsvp.ticket_purchased ? " — ticket purchased." : "."}`}</p>
-        ${event.image_url ? `<img src="${event.image_url}" style="width:100%;max-height:280px;object-fit:cover;border-radius:12px;margin-bottom:16px" />` : ''}
-        <div style="background: #f8f8f8; border-radius: 12px; padding: 20px; margin: 16px 0;">
-          <h2 style="margin: 0 0 12px; color: #1a1a2e; font-size: 20px;">${escapeHtml(event.title)}</h2>
-          <p style="margin: 6px 0; color: #555;">📅 ${dateStr}</p>
-          <p style="margin: 6px 0; color: #555;">🕐 ${timeStr}</p>
-          <p style="margin: 6px 0; color: #555;">📍 ${location}</p>
-        </div>
-        <table cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;">
-          <tr>
-            <td style="padding-right: 8px;">
-              <a href="${eventUrl}" style="display:inline-block;background:#e91e8c;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">View Event</a>
-            </td>
-            <td>
-              <a href="${gcalUrl}" style="display:inline-block;background:#1a1a2e;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Add to Calendar</a>
-            </td>
-          </tr>
-        </table>
-        <p style="color:#888;font-size:12px;margin-top:24px;">The host can email you about this event. — ETHER by lcove</p>
-      </div>`;
+    const intro = waitlisted
+      ? `Hey ${escapeHtml(name)}, the event is full. You're on the waitlist. We'll email you if a seat opens.`
+      : `Hey ${escapeHtml(name)}, you're in.`;
+    const html = guestEventEmailHtml({
+      hostName: identity.hostDisplayName,
+      hostAvatarUrl: identity.hostAvatarUrl,
+      flyerUrl: identity.headerImageUrl,
+      brandColor: identity.brandColor,
+      eventTitle: event.title,
+      eventDate: dateStr,
+      eventTime: timeStr,
+      location,
+      mapUrl,
+      intro,
+      eventUrl,
+      unsubscribeUrl: unsub.url,
+    });
+
+    const payload: Record<string, unknown> = {
+      from: identity.fromHeader,
+      to: [email],
+      subject: waitlisted ? `You're on the waitlist for ${event.title}` : `You're in for ${event.title}`,
+      html,
+    };
+    if (identity.replyTo) payload.reply_to = identity.replyTo;
 
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: "notifications@etherbylcove.com",
-        to: [email],
-        subject: waitlisted ? `You're on the waitlist for ${event.title}` : `You're confirmed for ${event.title}`,
-        html,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {

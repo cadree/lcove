@@ -7,6 +7,7 @@ import {
   PLATFORM_QUEUE_FROM,
   eventReplyTo,
   hostFromHeader,
+  hostViaEtherName,
   isVerifiedSender,
   sanitizeDisplayName,
 } from "../../supabase/functions/_shared/host-email-address.mjs";
@@ -30,6 +31,11 @@ describe("host email sender", () => {
     assert.equal(spoofed, "Ada guest example.com Name <events@etherbylcove.com>");
     assert.equal((spoofed.match(/@/g) || []).length, 1);
     assert.equal(isVerifiedSender(hostFromHeader("Ada via Ether")), true);
+    assert.equal(hostViaEtherName("Ada"), "Ada via Ether");
+    assert.equal(hostViaEtherName("Ada via Ether"), "Ada via Ether");
+    assert.equal(hostViaEtherName('Ada <guest@example.com>'), "Ada guest example.com via Ether");
+    assert.equal(hostViaEtherName("A".repeat(200)).length, HOST_DISPLAY_NAME_MAX);
+    assert.match(hostViaEtherName("A".repeat(200)), / via Ether$/);
     assert.equal(HOST_EVENT_FROM_ADDRESS.endsWith("@etherbylcove.com"), true);
     assert.equal(HOST_EVENT_FROM_ADDRESS.includes("notifications.etherbylcove.com"), false);
   });

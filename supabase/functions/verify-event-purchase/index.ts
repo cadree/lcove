@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { httpStatusForError } from "../_shared/http-error.mjs";
+import { assertEventStripeTestKey } from "../_shared/stripe-mode.mjs";
+import { sendOrderConfirmation } from "../_shared/order-confirmation-email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -71,6 +73,7 @@ serve(async (req) => {
         .select("id, qr_code, ticket_number, attendee_name, attendee_email, status")
         .eq("order_id", order.id)
         .order("created_at");
+      sendOrderConfirmation(supabase, order.id).catch((error) => log("email", { message: errorMessage(error) }));
       return new Response(JSON.stringify({ order, attendees: attendees || [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -79,7 +82,7 @@ serve(async (req) => {
     // Otherwise: verify with Stripe
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) throw new Error("Stripe not configured");
-    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
+    const stripe = new Stripe(assertEventStripeTestKey(stripeKey), { apiVersion: "2025-08-27.basil" });
 
     const session = await stripe.checkout.sessions.retrieve(sessionId || order.stripe_session_id);
     log("Session", { status: session.payment_status });
@@ -100,6 +103,9 @@ serve(async (req) => {
       .eq("order_id", order.id)
       .order("created_at");
 
+    if (refreshedOrder?.payment_status === "paid") {
+      sendOrderConfirmation(supabase, order.id).catch((error) => log("email", { message: errorMessage(error) }));
+    }
     return new Response(JSON.stringify({ order: refreshedOrder, attendees: attendees || [] }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
