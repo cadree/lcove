@@ -136,7 +136,11 @@ function routePreloadPlugin() {
         });
         if (routes.length === 0) return html;
         const script = `<script>(function(){var routes=${JSON.stringify(routes)};var path=location.pathname;var best=null;for(var i=0;i<routes.length;i++){var p=routes[i].p;var ok=p==="/"?path==="/":(p.charAt(p.length-1)==="/"?path.indexOf(p)===0:(path===p||path.indexOf(p+"/")===0));if(ok&&(!best||p.length>best.p.length))best=routes[i];}if(!best)return;var members=best.p==="/feed"||best.p==="/profile"||best.p==="/live";if(members){var signedIn=false;try{for(var n=0;n<localStorage.length;n++){var key=localStorage.key(n);if(key&&key.indexOf("-auth-token")!==-1&&localStorage.getItem(key)){signedIn=true;break;}}}catch(e){}if(!signedIn)return;}var head=document.head;var files=best.f||[];var styles=best.s||[];for(var j=0;j<files.length;j++){var l=document.createElement("link");l.rel="modulepreload";l.href=files[j];head.appendChild(l);}for(var k=0;k<styles.length;k++){var c=document.createElement("link");c.rel="preload";c.as="style";c.href=styles[k];head.appendChild(c);}})();</script>`;
-        return html.replace("</head>", `${script}</head>`);
+        // Vite puts the deferred entry in the head, so its download has
+        // started. Run this map after the splash image or it blocks that tag.
+        const splash = html.match(/<div id="boot-splash"[\s\S]*?<\/div>/);
+        if (splash) return html.replace(splash[0], `${splash[0]}${script}`);
+        return html.replace("</body>", `${script}</body>`);
       },
     },
   };
