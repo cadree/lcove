@@ -6,8 +6,13 @@ import { toneForPath } from "./screenTone.ts";
 import {
   birthdayError,
   birthdayFace,
+  cardPhoto,
+  etherIdQr,
   isPublicVerifyCard,
+  memberCode,
+  memberNumber,
   memberStatus,
+  personnelName,
   usernameAt,
   usernameError,
   verifyUrl,
@@ -16,6 +21,10 @@ import {
 
 const migration = readFileSync(
   new URL("../../supabase/migrations/20261024190000_ether_id.sql", import.meta.url),
+  "utf8",
+);
+const photoMigration = readFileSync(
+  new URL("../../supabase/migrations/20261024201000_ether_id_photo.sql", import.meta.url),
   "utf8",
 );
 
@@ -125,10 +134,20 @@ describe("verify payload", () => {
       display_name: "Maya",
       username: "maya",
       avatar_url: null,
+      photo_url: null,
       status: "Active",
       member_since: "2026-10-01",
       member_since_label: "October 2026",
     }), true);
+    assert.equal(personnelName("Maya Torres"), "TORRES, MAYA");
+    assert.equal(personnelName("Maya"), "MAYA");
+    assert.equal(cardPhoto({ photo_url: null, avatar_url: "/a.png" }), "/a.png");
+    assert.equal(cardPhoto({ photo_url: "/id.png", avatar_url: "/a.png" }), "/id.png");
+    const qr = etherIdQr("https://etherbylcove.com/id/v/eid1.abc.1.sig");
+    assert.equal(qr.size >= 72 && qr.size <= 96, true);
+    assert.equal(qr.bgColor, "#08080a");
+    assert.equal(memberCode("maya", "2026-10-01").startsWith("ETR."), true);
+    assert.match(memberNumber("maya", "2026-10-01"), /^\d{2} \d{2} \d{2} \d{2}$/);
     assert.equal(isPublicVerifyCard({ display_name: "Maya", user_id: "secret", birthday_label: "March 4" }), false);
   });
 });
@@ -149,5 +168,20 @@ describe("ether id migration inventory", () => {
     const qualified = migration.match(/\b(?:extensions|public)\.(?:gen_random_bytes|crypt|gen_salt|digest|hmac)\s*\(/g) ?? [];
     assert.ok(calls.length > 0);
     assert.equal(calls.length, qualified.length);
+    assert.match(migration, /IF v_serial IS NOT NULL THEN/);
+    assert.match(migration, /CREATE TRIGGER ether_id_on_profile_status/);
+  });
+});
+
+describe("ether id photo migration", () => {
+  it("stores the portrait on the owner row and keeps bans on the status trigger", () => {
+    assert.match(photoMigration, /ADD COLUMN IF NOT EXISTS id_photo_url text/);
+    assert.match(photoMigration, /Users can update own profile/);
+    assert.match(photoMigration, /Users can upload own media/);
+    assert.match(photoMigration, /'photo_url', COALESCE/);
+    assert.match(photoMigration, /'id_photo_url', NULLIF/);
+    assert.doesNotMatch(photoMigration, /DROP TRIGGER IF EXISTS ether_id_on_profile_status/);
+    assert.match(photoMigration, /ether_member_status/);
+    assert.doesNotMatch(photoMigration, /CREATE POLICY/);
   });
 });

@@ -1,6 +1,8 @@
 import { chromium } from 'playwright';
 import { mkdirSync, readFileSync } from 'fs';
 import { resolve } from 'path';
+import jsQR from 'jsqr';
+import { Image } from 'imagescript';
 
 const outDir = resolve(process.argv[2] || '/opt/cursor/artifacts/ether-id');
 mkdirSync(outDir, { recursive: true });
@@ -73,10 +75,15 @@ const profile = {
   show_birthday: true,
 };
 
+let shotStatus = 'Active';
+
 const ownerCard = {
   display_name: 'Maya Torres',
   username: 'maya',
-  avatar_url: '/nuance/dynasty-denim.png',
+  avatar_url: '/ether-id/shot-portrait.jpg',
+  photo_url: '/ether-id/shot-portrait.jpg',
+  id_photo_url: null,
+  city: 'Los Angeles',
   status: 'Active',
   member_since: '2026-10-01',
   member_since_label: 'October 2026',
@@ -99,7 +106,8 @@ function publicCard(status) {
   return {
     display_name: 'Maya Torres',
     username: 'maya',
-    avatar_url: '/nuance/dynasty-denim.png',
+    avatar_url: '/ether-id/shot-portrait.jpg',
+    photo_url: '/ether-id/shot-portrait.jpg',
     status,
     member_since: '2026-10-01',
     member_since_label: 'October 2026',
@@ -150,7 +158,7 @@ async function handleSupabase(route) {
   }
 
   if (url.pathname.includes('/rpc/get_my_ether_id')) {
-    await fulfillJson(route, ownerCard);
+    await fulfillJson(route, { ...ownerCard, status: shotStatus });
     return;
   }
 
@@ -204,11 +212,11 @@ async function handleSupabase(route) {
 const browser = await chromium.launch({ headless: true });
 const base = process.env.SHOT_BASE || 'http://127.0.0.1:5173';
 
-async function shoot(name, path, assertPage) {
+async function shoot(name, path, assertPage, viewport = { width: 390, height: 844 }) {
   const context = await browser.newContext({
-    viewport: { width: 390, height: 844 },
+    viewport,
     deviceScaleFactor: 1,
-    reducedMotion: 'reduce',
+    reducedMotion: 'no-preference',
   });
   if (typeof context.routeWebSocket === 'function') {
     await context.routeWebSocket(/.*/, (ws) => ws.close());
@@ -247,18 +255,71 @@ async function expectText(page, text) {
   await locator.waitFor({ state: 'visible', timeout: 15000 });
 }
 
-await shoot('card', '/id', async (page) => {
-  await expectText(page, 'Maya Torres');
+async function expectCard(page, status, name) {
+  await expectText(page, 'TORRES, MAYA');
   await expectText(page, '@maya');
   await expectText(page, 'Photography');
-  await expectText(page, '4.5 average · 2 reviews');
-  await expectText(page, '2 completed');
-  await expectText(page, 'March 4');
+  await expectText(page, '4.5/2');
+  await expectText(page, '>PROJECTS');
+  await expectText(page, '03.04');
   await expectText(page, 'self-reported');
-  await expectText(page, 'Active');
+  await expectText(page, 'Los Angeles');
+  await expectText(page, status);
   await expectText(page, 'This is not age verification.');
-  await page.locator('svg').first().waitFor({ state: 'visible', timeout: 15000 });
+  await page.locator('canvas[data-halftone="ready"]').waitFor({ state: 'visible', timeout: 15000 });
+  await page.locator('img[data-novi]').waitFor({ state: 'visible', timeout: 15000 });
+  const card = page.locator('article.ether-id');
+  await card.screenshot({ path: resolve(outDir, `${name}-card.png`) });
+}
+
+async function scanQr(page) {
+  const qr = page.getByTestId('ether-id-qr');
+  await qr.waitFor({ state: 'visible', timeout: 15000 });
+  const png = await qr.screenshot();
+  const image = await Image.decode(png);
+  const data = new Uint8ClampedArray(image.width * image.height * 4);
+  for (let y = 1; y <= image.height; y += 1) {
+    for (let x = 1; x <= image.width; x += 1) {
+      const pixel = image.getPixelAt(x, y) >>> 0;
+      const i = ((y - 1) * image.width + (x - 1)) * 4;
+      data[i] = (pixel >>> 24) & 255;
+      data[i + 1] = (pixel >>> 16) & 255;
+      data[i + 2] = (pixel >>> 8) & 255;
+      data[i + 3] = pixel & 255;
+    }
+  }
+  const code = jsQR(data, image.width, image.height, { inversionAttempts: 'attemptBoth' });
+  const expected = `${base}/id/v/${ACTIVE_TOKEN}`;
+  if (!code || code.data !== expected) {
+    throw new Error(`QR decoded ${code?.data || 'nothing'}, expected ${expected}`);
+  }
+  console.log('qr ok', code.data);
+}
+
+shotStatus = 'Active';
+await shoot('card-active-390', '/id', async (page) => {
+  await expectCard(page, 'Active', 'card-active-390');
+  await scanQr(page);
 });
+
+shotStatus = 'Banned';
+await shoot('card-banned-390', '/id', async (page) => {
+  await expectCard(page, 'Banned', 'card-banned-390');
+  const body = await page.locator('article.ether-id').innerText();
+  if (!/banned/i.test(body)) throw new Error('banned card did not say Banned');
+});
+
+shotStatus = 'Active';
+await shoot('card-active-desktop', '/id', async (page) => {
+  await expectCard(page, 'Active', 'card-active-desktop');
+}, { width: 1280, height: 900 });
+
+shotStatus = 'Banned';
+await shoot('card-banned-desktop', '/id', async (page) => {
+  await expectCard(page, 'Banned', 'card-banned-desktop');
+}, { width: 1280, height: 900 });
+
+shotStatus = 'Active';
 
 await shoot('profile-entry', '/profile', async (page) => {
   const entry = page.getByRole('link', { name: /Show my ID/i });
@@ -271,10 +332,10 @@ await shoot('profile-entry', '/profile', async (page) => {
 });
 
 await shoot('verify-active', `/id/v/${ACTIVE_TOKEN}`, async (page) => {
-  await expectText(page, 'Maya Torres');
+  await expectText(page, 'TORRES, MAYA');
   await expectText(page, '@maya');
   await expectText(page, 'Active');
-  await expectText(page, 'October 2026');
+  await expectText(page, '2026.10.01');
   const body = await page.locator('body').innerText();
   if (body.includes('March 4') || body.includes('4.5') || body.includes('Photography') || body.includes('2 completed')) {
     throw new Error(`verify-active leaked private fields:\n${body}`);
@@ -283,7 +344,7 @@ await shoot('verify-active', `/id/v/${ACTIVE_TOKEN}`, async (page) => {
 
 await shoot('verify-banned', `/id/v/${BANNED_TOKEN}`, async (page) => {
   await expectText(page, 'Banned');
-  await expectText(page, 'Maya Torres');
+  await expectText(page, 'TORRES, MAYA');
   const body = await page.locator('body').innerText();
   if (body.includes('March 4') || body.includes('Active')) {
     throw new Error(`verify-banned showed a stale or private field:\n${body}`);

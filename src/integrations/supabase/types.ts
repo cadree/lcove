@@ -5465,6 +5465,7 @@ export type Database = {
           access_level: Database["public"]["Enums"]["access_level"] | null
           access_status: string | null
           avatar_url: string | null
+          id_photo_url: string | null
           bio: string | null
           birth_year: number | null
           city: string | null
@@ -5506,6 +5507,7 @@ export type Database = {
           access_level?: Database["public"]["Enums"]["access_level"] | null
           access_status?: string | null
           avatar_url?: string | null
+          id_photo_url?: string | null
           bio?: string | null
           birth_year?: number | null
           city?: string | null
@@ -5546,6 +5548,7 @@ export type Database = {
           access_level?: Database["public"]["Enums"]["access_level"] | null
           access_status?: string | null
           avatar_url?: string | null
+          id_photo_url?: string | null
           bio?: string | null
           birth_year?: number | null
           city?: string | null

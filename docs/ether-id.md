@@ -6,7 +6,7 @@ A member card for every account. The in-app card is `/id`. The profile entry is 
 
 | Field | Source |
 | --- | --- |
-| Name, avatar | `profiles.display_name`, `profiles.avatar_url` |
+| Name, photo | `profiles.display_name`. The portrait is `profiles.id_photo_url` when set, otherwise `profiles.avatar_url`. |
 | @username | `profiles.username`. There was no username column. It is lowercase, 3–20 letters, numbers, or underscores. |
 | Passion | Earliest `user_passions` row: `custom_name`, otherwise `passions.name`. Empty when they have none. |
 | Status | `ether_member_status`. See below. |
@@ -26,11 +26,15 @@ A member cannot ban, unban, suspend, or unsuspend themselves. Onboarding can sti
 
 ## Token
 
-The QR is `eid1.<jti>.<exp>.<hmac>`. Signing calls `extensions.hmac` and `extensions.gen_random_bytes`, because hosted Supabase keeps pgcrypto in the `extensions` schema. The HMAC key is one row in `ether_id_secret`. The jti is a row in `ether_id_tokens`, not the user id. Tokens last 30 days, rotate when the member taps **Refresh code**, and stop verifying when revoked or expired. Anon cannot read the token table or the secret. Anon may call `get_ether_id_by_token` only. That function returns name, username, avatar, member since, and the live status.
+The QR is `eid1.<jti>.<exp>.<hmac>`. Signing calls `extensions.hmac` and `extensions.gen_random_bytes`, because hosted Supabase keeps pgcrypto in the `extensions` schema. The HMAC key is one row in `ether_id_secret`. The jti is a row in `ether_id_tokens`, not the user id. Tokens last 30 days, rotate when the member taps **Refresh code**, and stop verifying when revoked or expired. Anon cannot read the token table or the secret. Anon may call `get_ether_id_by_token` only. That function returns name, username, avatar, the portrait URL, member since, and the live status. It does not return passion, reviews, projects, or birthday.
 
 ## Apple Wallet
 
-Generic pass. The status field is the live word in capitals (`ACTIVE`, `INACTIVE`, `SUSPENDED`, `BANNED`). The barcode is the same verify URL. `webServiceURL` is the `ether-id-pass` function.
+Store card, so the pass can carry a strip image. A generic pass has no strip. The strip is rendered per member (`strip.png`, `strip@2x.png`, `strip@3x.png` at 375×123 pt) with the portrait, the Ether wordmark, frames, hexagons, and Novi. `backgroundColor`, `foregroundColor`, and `labelColor` follow the Nuance palette. A ban uses the alert red.
+
+The status field is the live word in capitals (`ACTIVE`, `INACTIVE`, `SUSPENDED`, `BANNED`). The barcode is the same verify URL, in the position Apple fixes for a store card. `webServiceURL` is the `ether-id-pass` function.
+
+Passes already on a phone keep their serial number and pass type identifier. `ensure_ether_id_pass` does not mint a new serial when the pass.json style changes. The next PassKit download replaces the old generic layout with this store card under that same serial.
 
 PassKit routes, all without a Supabase JWT. The device sends `Authorization: ApplePass <token>` except on the serial-number list, which is how PassKit is specified:
 
