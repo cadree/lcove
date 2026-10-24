@@ -108,6 +108,10 @@ BEGIN
   SELECT id, 'note', 'Private note', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
   FROM public.events
   WHERE title = 'Private listening';
+  INSERT INTO public.ticket_tiers (event_id, name, capacity, quantity_sold)
+  SELECT id, 'General Admission', 40, 3
+  FROM public.events
+  WHERE title = 'Listening night';
 END $$;
 
 RESET ROLE;
@@ -120,6 +124,8 @@ DO $$
 DECLARE
   v_id uuid;
   v_preview jsonb;
+  v_capacity integer;
+  v_sold integer;
 BEGIN
   SELECT id INTO v_id FROM public.events WHERE title = 'Listening night';
   IF (SELECT address FROM public.events WHERE id = v_id) IS NOT NULL THEN
@@ -162,7 +168,13 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'FAIL: anon can read a private event moodboard';
   END IF;
-  RAISE NOTICE 'PASS: hidden address, password, guest preview, and public moodboard hold for anon';
+  SELECT capacity, quantity_sold INTO v_capacity, v_sold
+  FROM public.ticket_tiers
+  WHERE event_id = v_id;
+  IF v_capacity IS DISTINCT FROM 40 OR v_sold IS DISTINCT FROM 3 THEN
+    RAISE EXCEPTION 'FAIL: anon cannot read ticket tier capacity or quantity_sold';
+  END IF;
+  RAISE NOTICE 'PASS: hidden address, password, guest preview, public moodboard, and ticket inventory hold for anon';
 END $$;
 
 ROLLBACK;
