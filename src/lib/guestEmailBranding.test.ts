@@ -24,12 +24,23 @@ describe("guest email host branding", () => {
     const senders = [
       "supabase/functions/send-rsvp-confirmation/index.ts",
       "supabase/functions/send-individual-reminder/index.ts",
-      "supabase/functions/auto-event-reminders/index.ts",
     ];
     for (const file of senders) {
       const source = readFileSync(new URL(`../../${file}`, import.meta.url), "utf8");
       assert.match(source, /if \(identity\.replyTo\)/);
       assert.match(source, /identity\.fromHeader/);
     }
+  });
+
+  it("attendee reminders lead with the host and keep Ether in the footer", () => {
+    const source = readFileSync(
+      new URL("../../supabase/migrations/20261024201000_attendee_event_reminders.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(source, /Powered by Ether/);
+    assert.match(source, /via Ether/);
+    assert.match(source, /reply_to_verified_at/);
+    assert.doesNotMatch(source, /ETHER by lcove/i);
+    assert.doesNotMatch(source, /Sent via ETHER/);
   });
 });

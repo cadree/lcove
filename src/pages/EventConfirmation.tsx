@@ -7,6 +7,7 @@ import { formatEventDate, formatEventTime } from "@/lib/eventTime";
 import { buildShareUrl, shareLink } from "@/lib/shareLink";
 import { errorMessage } from "@/lib/errorMessage";
 import { toast } from "sonner";
+import { EventReminderToggle } from "@/components/events/EventReminderToggle";
 
 export default function EventConfirmation() {
   const { eventId = "" } = useParams();
@@ -157,6 +158,7 @@ export default function EventConfirmation() {
       }}
       onCalendar={calendar}
       onShare={share}
+      reminder={<EventReminderToggle eventId={eventId} />}
     />
     </>
   );

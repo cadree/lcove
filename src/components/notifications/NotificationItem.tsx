@@ -70,6 +70,13 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
       onProjectInviteTap(notification);
       return;
     }
+    if (notification.type === 'event_reminder') {
+      const path = notification.data?.path;
+      if (typeof path === 'string' && path.startsWith('/event/')) {
+        navigate(path);
+        return;
+      }
+    }
     onActivate?.(notification);
   };
 

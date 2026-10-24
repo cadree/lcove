@@ -13,6 +13,7 @@ import { formatEventDate, formatEventTime } from "@/lib/eventTime";
 import { backTarget } from "@/lib/goBack";
 import { lowestBuyerCents } from "@/lib/ticketFees";
 import { stickyCtaLabel } from "@/lib/guestEvent";
+import { EventReminderToggle } from "@/components/events/EventReminderToggle";
 import { buildShareUrl, shareLink } from "@/lib/shareLink";
 import { PageMeta } from "@/components/seo/PageMeta";
 import { PUBLIC_EVENT_SELECT, publicRow } from "@/lib/consumerAccess";
@@ -244,6 +245,7 @@ export default function PublicEventPage() {
         }}
         onReport={() => setReportOpen(true)}
         onCta={() => navigate(`/event/${event.id}/tickets`)}
+        reminder={model.past ? null : <EventReminderToggle eventId={event.id} />}
       />
       <Dialog open={guestsOpen} onOpenChange={setGuestsOpen}>
         <DialogContent>

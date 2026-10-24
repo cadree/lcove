@@ -41,10 +41,11 @@ interface Props {
   onContact: () => void;
   onReport: () => void;
   onCta: () => void;
+  reminder?: ReactNode;
 }
 
 export function PublicEventScreen({
-  model, onBack, onSave, onShare, onLocation, onGuestlist, onFollow, following, onCalendar, onContact, onReport, onCta,
+  model, onBack, onSave, onShare, onLocation, onGuestlist, onFollow, following, onCalendar, onContact, onReport, onCta, reminder,
 }: Props) {
   const ctaStyle = model.brandColor ? { backgroundColor: model.brandColor, color: "#1a1020" } : undefined;
   return (
@@ -112,6 +113,7 @@ export function PublicEventScreen({
           <RowButton icon={<MessageCircle className="h-4 w-4" />} label="Contact organizer" onClick={onContact} />
           <RowButton icon={<Flag className="h-4 w-4" />} label="Report event" onClick={onReport} />
         </div>
+        {reminder}
         <PoweredByEther />
       </div>
 
