@@ -255,7 +255,8 @@ export default function PartnerPortal() {
   if (!user) {
     return (
       <PageLayout>
-        <div className="container max-w-2xl py-12 px-4 text-center">
+        <div className="container max-w-2xl py-6 px-4 text-center">
+          <BackButton label="Back" fallback="/partners" className="mb-6" />
           <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h2 className="text-xl font-semibold mb-2">Sign in required</h2>
           <p className="text-muted-foreground mb-4">Please sign in to access your partner portal</p>
@@ -269,6 +270,7 @@ export default function PartnerPortal() {
     return (
       <PageLayout>
         <div className="container max-w-2xl py-6 px-4">
+          <BackButton label="Back" fallback="/partners" className="mb-6" />
           <Skeleton className="h-8 w-48 mb-6" />
           <Skeleton className="h-64 w-full" />
         </div>
@@ -279,7 +281,8 @@ export default function PartnerPortal() {
   if (!partnership) {
     return (
       <PageLayout>
-        <div className="container max-w-2xl py-12 px-4 text-center">
+        <div className="container max-w-2xl py-6 px-4 text-center">
+          <BackButton label="Back" fallback="/partners" className="mb-6" />
           <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h2 className="text-xl font-semibold mb-2">No Partnership Found</h2>
           <p className="text-muted-foreground mb-4">

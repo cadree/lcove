@@ -37,7 +37,7 @@ function inviteEmailHtml(inviteUrl: string): string {
     <!DOCTYPE html>
     <html>
       <body style="margin:0;padding:24px;background:#1a1a1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-        <p style="color:#ffffff;font-size:16px;line-height:1.5;">Real creatives. Real work.</p>
+        <p style="color:#ffffff;font-size:16px;line-height:1.5;">A culture of aspirations</p>
         <p style="color:#ffffff;font-size:16px;line-height:1.5;">A home for creatives where every face is real and every post is real work.</p>
         <p style="color:#ffffff;font-size:16px;line-height:1.5;">No fake people. No fake work.</p>
         <p style="color:#ffffff;font-size:16px;line-height:1.5;">Introduce yourself in #start-here.</p>

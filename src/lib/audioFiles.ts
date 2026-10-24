@@ -26,6 +26,13 @@ export const AUDIO_FILE_ACCEPT = [
   ...AUDIO_MIME_TYPES,
 ].join(",");
 
+/** Shown on upload controls. The picker lists concrete types for iOS; any audio MIME is accepted. */
+export const AUDIO_UPLOAD_SUBTITLE = "Any audio file";
+export const AUDIO_UPLOAD_DETAIL = "Any audio file, up to 20MB. Visitors can play the whole track.";
+export const AUDIO_UPLOAD_HINT = "Any audio file · Max 20MB";
+export const AUDIO_UPLOAD_ACTION = "Choose a file";
+export const AUDIO_UPLOAD_REJECTED = "Choose an audio file.";
+
 const EXTENSIONS = new Set<string>(AUDIO_EXTENSIONS);
 const MIMES = new Set<string>(AUDIO_MIME_TYPES);
 

@@ -39,6 +39,7 @@ export function toneForPath(pathname: string): ScreenTone {
 
   if (
     path.startsWith("/profile") ||
+    path.startsWith("/id") ||
     path.startsWith("/settings") ||
     path.startsWith("/book") ||
     path.startsWith("/blog")

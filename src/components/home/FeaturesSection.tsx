@@ -39,7 +39,7 @@ const features = [
   {
     icon: Handshake,
     title: "Partners",
-    description: "Studios, venues, and businesses offering exclusive benefits to LC members.",
+    description: "Studios, venues, and businesses offering exclusive benefits to Ether members.",
     link: "/partners",
   },
   {

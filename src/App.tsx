@@ -40,10 +40,13 @@ const Directory = lazy(() => import("./pages/Directory"));
 const Projects = lazy(() => import("./pages/Projects"));
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
 const Profile = lazy(loadProfile);
+const EtherId = lazy(() => import("./pages/EtherId"));
+const EtherIdVerify = lazy(() => import("./pages/EtherIdVerify"));
 const Tickets = lazy(() => import("./pages/Tickets"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Locked = lazy(() => import("./pages/Locked"));
+const Denied = lazy(() => import("./pages/Denied"));
 const Messages = lazy(loadMessages);
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Wallet = lazy(() => import("./pages/Wallet"));
@@ -170,6 +173,7 @@ const App = () => (
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/onboarding" element={<Onboarding />} />
                 <Route path="/locked" element={<Locked />} />
+                <Route path="/denied" element={<Denied />} />
                 <Route path="/feed" element={<Feed />} />
                 <Route path="/explore" element={<Explore />} />
                 <Route path="/directory" element={<Directory />} />
@@ -177,6 +181,8 @@ const App = () => (
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/events" element={<Navigate to="/calendar" replace />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/id" element={<EtherId />} />
+                <Route path="/id/v/:token" element={<EtherIdVerify />} />
                 <Route path="/tickets" element={<Tickets />} />
                 <Route path="/profile/:userId" element={<Profile />} />
                 <Route path="/blog" element={<BlogIndex />} />

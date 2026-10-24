@@ -1,8 +1,8 @@
 /**
- * Pre-launch. While this is true, public Join actions open /waitlist.
- * Sign in stays on /auth. Set this to false when signup should open again.
+ * Public Join actions open /auth?tab=join while this is false.
+ * The waitlist table, page, and invite claims stay for rows already collected.
  */
-export const WAITLIST_MODE = true;
+export const WAITLIST_MODE = false;
 
 /**
  * Set when the App Store listing exists. Empty keeps the smart banner off

@@ -187,7 +187,7 @@ export const CreateNetworkDialog = ({ open, onOpenChange }: CreateNetworkDialogP
                 <label className="cursor-pointer block">
                   <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
                   <span className="text-sm text-muted-foreground">
-                    Click to upload banner (16:9 recommended)
+                    Choose a banner (16:9 recommended)
                   </span>
                   <input
                     type="file"
@@ -224,7 +224,7 @@ export const CreateNetworkDialog = ({ open, onOpenChange }: CreateNetworkDialogP
                 <label className="cursor-pointer block">
                   <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
                   <span className="text-sm text-muted-foreground">
-                    Click to upload logo (square)
+                    Choose a logo (square)
                   </span>
                   <input
                     type="file"

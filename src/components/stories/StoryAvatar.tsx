@@ -1,5 +1,6 @@
-import { motion } from 'framer-motion';
-import { Star } from 'lucide-react';
+import { forwardRef } from "react";
+import { motion } from "framer-motion";
+import { Star } from "lucide-react";
 
 interface StoryAvatarProps {
   userId: string;
@@ -13,8 +14,7 @@ interface StoryAvatarProps {
   index: number;
 }
 
-const StoryAvatar = ({
-  userId,
+const StoryAvatar = forwardRef<HTMLDivElement, StoryAvatarProps>(function StoryAvatar({
   displayName,
   avatarUrl,
   isLive = false,
@@ -23,87 +23,82 @@ const StoryAvatar = ({
   onToggleFavorite,
   onClick,
   index,
-}: StoryAvatarProps) => {
+}, ref) {
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onToggleFavorite?.();
   };
 
   return (
-    <motion.button
+    <motion.div
+      ref={ref}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.8 }}
       transition={{ delay: index * 0.05, duration: 0.3 }}
-      whileTap={{ scale: 0.95 }}
-      onClick={onClick}
-      className="relative shrink-0 group"
+      className="relative w-20 shrink-0"
     >
-      <div className="h-20 w-20 rounded-full relative">
-        {/* Animated gradient ring */}
-        <div 
-          className="absolute inset-0 rounded-full p-[2px]"
-          style={{
-            background: hasUnviewed
-              ? 'conic-gradient(from 120deg, #C4142D, #FF9FC8, #C4142D)'
-              : 'conic-gradient(from 120deg, hsl(var(--border)), hsl(var(--muted-foreground)), hsl(var(--border)))'
-          }}
-        >
-          {/* Glass inner ring */}
-          <div className="w-full h-full rounded-full bg-card p-[2px]">
-            {/* Avatar container */}
-            <div className="w-full h-full rounded-full overflow-hidden bg-muted">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={displayName}
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-muted-foreground font-medium text-lg">
-                  {displayName.charAt(0).toUpperCase()}
-                </div>
-              )}
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={`View ${displayName}'s story`}
+        className="group w-full text-left"
+      >
+        <div className="relative h-20 w-20 rounded-full">
+          <div
+            className="absolute inset-0 rounded-full p-[2px]"
+            style={{
+              background: hasUnviewed
+                ? "conic-gradient(from 120deg, #C4142D, #FF9FC8, #C4142D)"
+                : "conic-gradient(from 120deg, hsl(var(--border)), hsl(var(--muted-foreground)), hsl(var(--border)))",
+            }}
+          >
+            <div className="h-full w-full rounded-full bg-card p-[2px]">
+              <div className="h-full w-full overflow-hidden rounded-full bg-muted">
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt=""
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-lg font-medium text-muted-foreground">
+                    {displayName.charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Favorite indicator */}
-        {onToggleFavorite && (
-          <motion.button
-            onClick={handleFavoriteClick}
-            whileHover={{ scale: 1.2 }}
-            whileTap={{ scale: 0.9 }}
-            className={`absolute -top-0.5 -right-0.5 z-10 w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
-              isFavorite 
-                ? 'bg-primary text-primary-foreground' 
-                : 'bg-card/80 text-muted-foreground hover:text-foreground border border-border/50'
-            }`}
-          >
-            <Star className={`w-2.5 h-2.5 ${isFavorite ? 'fill-current' : ''}`} />
-          </motion.button>
-        )}
-
-        {/* LIVE Badge */}
-        {isLive && (
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="absolute -bottom-1 left-1/2 -translate-x-1/2 z-10"
-          >
-            <span className="px-1.5 py-0.5 bg-destructive text-destructive-foreground text-[8px] font-bold rounded uppercase tracking-wider">
+          {isLive && (
+            <span className="absolute -bottom-1 left-1/2 z-10 -translate-x-1/2 rounded bg-destructive px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-destructive-foreground">
               LIVE
             </span>
-          </motion.div>
-        )}
-      </div>
+          )}
+        </div>
 
-      {/* Username */}
-      <span className="mt-1.5 block w-20 truncate text-center font-body text-[10px] text-foreground">
-        {displayName.split(' ')[0]}
-      </span>
-    </motion.button>
+        <span className="mt-1.5 block w-20 truncate text-center font-body text-[10px] text-foreground">
+          {displayName.split(" ")[0]}
+        </span>
+      </button>
+
+      {onToggleFavorite && (
+        <button
+          type="button"
+          onClick={handleFavoriteClick}
+          aria-label={isFavorite ? `Remove ${displayName} from favorites` : `Favorite ${displayName}`}
+          aria-pressed={isFavorite}
+          className={`absolute -right-0.5 -top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full transition-colors ${
+            isFavorite
+              ? "bg-primary text-primary-foreground"
+              : "border border-border/50 bg-card/80 text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Star className={`h-2.5 w-2.5 ${isFavorite ? "fill-current" : ""}`} />
+        </button>
+      )}
+    </motion.div>
   );
-};
+});
 
 export default StoryAvatar;

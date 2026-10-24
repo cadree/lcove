@@ -283,7 +283,8 @@ END $$;
 RESET ROLE;
 
 -- ---------------------------------------------------------------------------
--- Blocks: A blocks B. The blocker stops seeing B. B cannot message or follow A.
+-- Blocks: A blocks B. The blocker stops seeing B. Either direction blocks
+-- messages (either_blocked). B cannot follow A. A can still follow B.
 -- ---------------------------------------------------------------------------
 
 INSERT INTO public.user_blocks (blocker_id, blocked_id)

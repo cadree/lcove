@@ -353,14 +353,10 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
             className="w-full h-full pointer-events-none border-0 scale-100"
             loading="lazy"
           />
-          {/* Overlay to prevent interaction & show click-to-open */}
           <div className="absolute inset-0 bg-transparent group-hover:bg-black/10 transition-colors" />
           <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-background to-transparent p-2 flex items-end justify-between">
             <span className="text-[10px] text-muted-foreground font-medium truncate max-w-[70%]">{att.file_name}</span>
             <Badge className={cn("text-[9px]", badgeColor)}>{att.file_type.toUpperCase()}</Badge>
-          </div>
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Badge className="text-[9px] bg-background/80 text-foreground">Click to open</Badge>
           </div>
         </div>
       );
@@ -828,7 +824,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                         <div className="flex items-center gap-2 text-sm text-muted-foreground"><Users className="h-4 w-4" /><span>{role.slots_filled}/{role.slots_available} filled</span></div>
                         {role.is_locked ? <Badge variant="secondary">Filled</Badge> :
                          hasApplied ? <Badge className="bg-amber-500/20 text-amber-400">Applied</Badge> :
-                         !isCreator && <Badge className={isSelected ? "bg-primary" : "bg-primary/20 text-primary"}>{isSelected ? 'Selected' : 'Click to Apply'}</Badge>}
+                         !isCreator && <Badge className={isSelected ? "bg-primary" : "bg-primary/20 text-primary"}>{isSelected ? 'Selected' : 'Apply'}</Badge>}
                       </div>
                     </div>
                   );
