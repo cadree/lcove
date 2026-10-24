@@ -74,6 +74,8 @@ const EventTickets = lazy(() => import("./pages/EventTickets"));
 const EventCheckout = lazy(() => import("./pages/EventCheckout"));
 const HostingShots = import.meta.env.DEV ? lazy(() => import("./pages/HostingShots")) : null;
 const PublicEventPage = lazy(() => import("./pages/PublicEventPage"));
+const PublicProductPage = lazy(() => import("./pages/PublicProductPage"));
+const PublicLivePage = lazy(() => import("./pages/PublicLivePage"));
 const BlogPostPage = lazy(() => import("./pages/BlogPost"));
 const BlogIndex = lazy(() => import("./pages/BlogIndex"));
 const EventConfirmation = lazy(() => import("./pages/EventConfirmation"));
@@ -175,6 +177,8 @@ const App = () => (
                 <Route path="/fund" element={<FundDashboard />} />
                 <Route path="/membership" element={<Membership />} />
                 <Route path="/live" element={<Live />} />
+                <Route path="/live/:streamId" element={<PublicLivePage />} />
+                <Route path="/product/:itemId" element={<PublicProductPage />} />
                 <Route path="/book" element={<BookOfLcove />} />
                 <Route path="/quests" element={<QuestLog />} />
                 <Route path="/cinema" element={<Cinema />} />

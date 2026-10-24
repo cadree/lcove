@@ -5,6 +5,7 @@ import { assertEventStripeTestKey } from "../_shared/stripe-mode.mjs";
 import { priceCheckout } from "../_shared/ticket-fees.mjs";
 import { sendOrderConfirmation } from "../_shared/order-confirmation-email.ts";
 import { httpStatusForError } from "../_shared/http-error.mjs";
+import { clientRateKey, GUEST_LIMITS } from "../_shared/guest-consumer.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -183,6 +184,28 @@ serve(async (req) => {
         .in("status", ["registered", "approved"]);
       if (seatError) throw seatError;
       if ((count || 0) + totalQty > event.capacity) throw new Error("This event is sold out");
+    }
+
+    if (!userId) {
+      const ipKey = await clientRateKey(req.headers);
+      if (buyerEmail) {
+        const { error: emailQuota } = await supabase.rpc("consume_guest_quota", {
+          p_action: "guest_ticket_email",
+          p_key: buyerEmail,
+          p_limit: GUEST_LIMITS.ticketEmailPerHour,
+          p_window_seconds: 3600,
+        });
+        if (emailQuota) throw new Error(emailQuota.message);
+      }
+      if (ipKey) {
+        const { error: ipQuota } = await supabase.rpc("consume_guest_quota", {
+          p_action: "guest_ticket_ip",
+          p_key: ipKey,
+          p_limit: GUEST_LIMITS.ticketIpPerHour,
+          p_window_seconds: 3600,
+        });
+        if (ipQuota) throw new Error(ipQuota.message);
+      }
     }
 
     const priced = priceCheckout(resolved.map((line) => ({

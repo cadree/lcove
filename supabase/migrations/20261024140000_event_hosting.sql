@@ -288,3 +288,38 @@ $$;
 
 REVOKE ALL ON FUNCTION public.host_event_address(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.host_event_address(uuid) TO authenticated;
+
+-- Guest pages read these columns. The anon grant on events is column-level.
+GRANT SELECT (
+  video_url,
+  flyer_font,
+  page_theme,
+  hide_address,
+  absorb_fees,
+  password_protected
+) ON public.events TO anon;
+
+-- Signed-out guests cannot read event_rsvps, and they cannot execute
+-- can_manage_event. The older moodboard SELECT policies use both, so an
+-- anon read fails before a public event can be shown. Those policies stay
+-- for signed-in members. Anon only checks events.id and events.is_public.
+ALTER POLICY "Moodboard viewable for public events or attendees"
+  ON public.event_moodboard_items
+  TO authenticated;
+
+ALTER POLICY "Public can view moodboard for public events"
+  ON public.event_moodboard_items
+  TO authenticated;
+
+DROP POLICY IF EXISTS "Anon can view moodboard for public events" ON public.event_moodboard_items;
+CREATE POLICY "Anon can view moodboard for public events"
+ON public.event_moodboard_items
+FOR SELECT
+TO anon
+USING (
+  EXISTS (
+    SELECT 1 FROM public.events e
+    WHERE e.id = event_id
+      AND e.is_public
+  )
+);

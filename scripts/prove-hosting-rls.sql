@@ -91,6 +91,23 @@ BEGIN
   IF NOT public.event_password_ok(v_id, 'secret-night') THEN
     RAISE EXCEPTION 'FAIL: the host password was refused';
   END IF;
+  INSERT INTO public.event_moodboard_items (event_id, type, title, created_by)
+  VALUES (v_id, 'note', 'Lineup', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  INSERT INTO public.events (creator_id, title, city, start_date, end_date, venue, is_public, status)
+  VALUES (
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    'Private listening',
+    'New York',
+    '2026-11-03 23:00:00+00',
+    '2026-11-04 02:00:00+00',
+    'The loft',
+    false,
+    'published'
+  );
+  INSERT INTO public.event_moodboard_items (event_id, type, title, created_by)
+  SELECT id, 'note', 'Private note', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  FROM public.events
+  WHERE title = 'Private listening';
 END $$;
 
 RESET ROLE;
@@ -128,7 +145,24 @@ BEGIN
     WHEN insufficient_privilege THEN
       NULL;
   END;
-  RAISE NOTICE 'PASS: hidden address, password, and guest preview hold for anon';
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.event_moodboard_items m
+    JOIN public.events e ON e.id = m.event_id
+    WHERE e.title = 'Listening night'
+      AND e.is_public
+  ) THEN
+    RAISE EXCEPTION 'FAIL: anon cannot read a public event moodboard';
+  END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM public.event_moodboard_items m
+    JOIN public.events e ON e.id = m.event_id
+    WHERE e.title = 'Private listening'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: anon can read a private event moodboard';
+  END IF;
+  RAISE NOTICE 'PASS: hidden address, password, guest preview, and public moodboard hold for anon';
 END $$;
 
 ROLLBACK;

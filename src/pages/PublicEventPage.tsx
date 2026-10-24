@@ -15,6 +15,7 @@ import { lowestBuyerCents } from "@/lib/ticketFees";
 import { stickyCtaLabel } from "@/lib/guestEvent";
 import { buildShareUrl, shareLink } from "@/lib/shareLink";
 import { PageMeta } from "@/components/seo/PageMeta";
+import { PUBLIC_EVENT_SELECT, publicRow } from "@/lib/consumerAccess";
 import { toast } from "sonner";
 
 const savedKey = "ether-saved-events";
@@ -43,9 +44,31 @@ export default function PublicEventPage() {
     queryKey: ["public-event", eventId],
     enabled: !!eventId,
     queryFn: async () => {
-      const { data, error } = await supabase.from("events").select("*").eq("id", eventId).or("status.is.null,status.neq.draft").single();
+      const { data, error } = await supabase
+        .from("events")
+        .select(`${PUBLIC_EVENT_SELECT}, flyer_font, page_theme, hide_address, absorb_fees`)
+        .eq("id", eventId)
+        .or("status.is.null,status.neq.draft")
+        .single();
       if (error) throw error;
-      return data;
+      return publicRow<{
+        id: string;
+        creator_id: string;
+        title: string;
+        description: string | null;
+        start_date: string;
+        end_date: string | null;
+        venue: string | null;
+        address: string | null;
+        city: string | null;
+        state: string | null;
+        image_url: string | null;
+        timezone: string | null;
+        flyer_font: string | null;
+        page_theme: string | null;
+        hide_address: boolean;
+        absorb_fees: boolean;
+      }>(data);
     },
   });
 
@@ -53,7 +76,7 @@ export default function PublicEventPage() {
     queryKey: ["public-event-organizer", event?.creator_id],
     enabled: !!event?.creator_id,
     queryFn: async () => {
-      const { data } = await supabase.from("profiles_public").select("display_name, avatar_url, social_links").eq("user_id", event!.creator_id).maybeSingle();
+      const { data } = await supabase.from("consumer_creators").select("display_name, avatar_url").eq("user_id", event!.creator_id).maybeSingle();
       return data;
     },
   });

@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import bearLogo from '@/assets/ether-bear-logo.webp';
 import { isKnownPath, isPublicPath } from "@/lib/appRoutes";
 import { NO_FAKE_LINE, WELCOME_HOME } from "@/content/copy";
+import { SignUpPrompt } from "@/components/auth/SignUpPrompt";
 
 interface AccessGateProps {
   children: React.ReactNode;
@@ -25,6 +26,9 @@ const AccessGate = ({ children }: AccessGateProps) => {
   const knownRoute = isKnownPath(location.pathname);
   const isPublicRoute = isPublicPath(location.pathname);
   const isLandingRoute = LANDING_ROUTES.includes(location.pathname);
+  const legacyStreamId = location.pathname === "/live"
+    ? new URLSearchParams(location.search).get("stream")
+    : null;
 
   useEffect(() => {
     if (!knownRoute) return;
@@ -36,17 +40,19 @@ const AccessGate = ({ children }: AccessGateProps) => {
       return;
     }
 
+    if (!user && legacyStreamId) {
+      navigate(`/live/${legacyStreamId}`, { replace: true });
+      return;
+    }
+
     // Skip other checks for public routes (unauthenticated users)
     if (isPublicRoute && !user) return;
     
     // Wait for profile to load for authenticated users
     if (profileLoading) return;
 
-    // If not logged in and not on public route, redirect to auth
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
+    // Community routes render a sign-up prompt instead of the page.
+    if (!user) return;
 
     // If profile exists, check access
     if (profile) {
@@ -91,14 +97,30 @@ const AccessGate = ({ children }: AccessGateProps) => {
         }
       }
     }
-  }, [user, profile, authLoading, profileLoading, isPublicRoute, isLandingRoute, knownRoute, navigate, location.pathname, hasSeenWelcome]);
+  }, [user, profile, authLoading, profileLoading, isPublicRoute, isLandingRoute, knownRoute, legacyStreamId, navigate, location.pathname, hasSeenWelcome]);
 
   if (!knownRoute) {
     return <>{children}</>;
   }
 
-  // Private routes stay behind sign-in. The profile request must not hold the
-  // route: onboarding and banned redirects run once that row arrives.
+  if (!user && legacyStreamId) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full"
+        />
+      </div>
+    );
+  }
+
+  // Community routes stay behind a sign-up prompt. The profile request must
+  // not hold a public page: onboarding and banned redirects run once that row arrives.
+  if (!isPublicRoute && !authLoading && !user) {
+    return <SignUpPrompt />;
+  }
+
   if (!isPublicRoute && (authLoading || !user)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">

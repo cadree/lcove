@@ -24,7 +24,7 @@ export default function EventTickets() {
     queryKey: ["public-event-organizer", event?.creator_id],
     enabled: !!event?.creator_id,
     queryFn: async () => {
-      const { data } = await supabase.from("profiles_public").select("display_name, avatar_url").eq("user_id", event!.creator_id).maybeSingle();
+      const { data } = await supabase.from("consumer_creators").select("display_name, avatar_url").eq("user_id", event!.creator_id).maybeSingle();
       return data;
     },
   });

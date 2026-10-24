@@ -40,7 +40,7 @@ export default function EventConfirmation() {
       setStartIso(event.start_date);
       setEndIso(event.end_date);
       setWhenLabel(`${formatEventDate(event.start_date, event.timezone)} · ${formatEventTime(event.start_date, event.timezone)}${event.end_date ? ` – ${formatEventTime(event.end_date, event.timezone)}` : ""}`);
-      const { data: host } = await supabase.from("profiles_public").select("display_name, avatar_url").eq("user_id", event.creator_id).maybeSingle();
+      const { data: host } = await supabase.from("consumer_creators").select("display_name, avatar_url").eq("user_id", event.creator_id).maybeSingle();
       if (host?.display_name) setHostName(host.display_name);
       if (host?.avatar_url) setHostAvatar(host.avatar_url);
       const { data: hidden } = await supabase.rpc("public_event_location", { p_event_id: event.id, p_order_id: orderIdParam || undefined });
