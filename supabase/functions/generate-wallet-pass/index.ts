@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { Buffer } from "node:buffer";
 import { eventDateLabel, eventTimeLabel } from "../_shared/event-time.mjs";
 import { httpStatusForError } from "../_shared/http-error.mjs";
+import { appleWalletConfigured, appleWalletEnv } from "../_shared/wallet-config.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,191 +10,89 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const logStep = (step: string, details?: unknown) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : "";
-  console.log(`[GENERATE-WALLET-PASS] ${step}${detailsStr}`);
-};
+const ICON_PNG = "iVBORw0KGgoAAAANSUhEUgAAAB0AAAAdCAYAAABWk2cPAAAALElEQVR4nO3NQQkAAAgEMPuXsI6tzhaCsMfeq/TkWkmlUqlUKpVKpVLpw3QBwCUnc56YhTIAAAAASUVORK5CYII=";
 
-/**
- * Generates a .pkpass file (Apple Wallet) or Google Wallet JWT link.
- * 
- * For Apple Wallet:
- * - Requires APPLE_PASS_TYPE_ID, APPLE_TEAM_ID, APPLE_PASS_CERT (base64), APPLE_PASS_KEY (base64), APPLE_WWDR_CERT (base64)
- * - Generates a signed .pkpass bundle
- * 
- * For Google Wallet:
- * - Requires GOOGLE_WALLET_ISSUER_ID, GOOGLE_WALLET_SERVICE_ACCOUNT_KEY (JSON)
- * - Creates a JWT save link
- * 
- * Currently returns a structured response indicating setup status.
- * Once certificates are configured, this will generate real passes.
- */
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function decodeSecret(value: string) {
+  const trimmed = value.trim();
+  if (trimmed.includes("BEGIN")) return Buffer.from(trimmed);
+  return Buffer.from(trimmed, "base64");
+}
+
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { eventId, eventTitle, eventDate, eventEndDate, venue, guestName, ticketType, timezone } = await req.json();
-    logStep("Request received", { eventId, eventTitle, guestName, ticketType });
+    const body = await req.json().catch(() => ({}));
+    const configured = appleWalletConfigured(appleWalletEnv());
+    if (body.probe === true) return json({ configured });
+    if (!configured) return json({ configured: false });
 
-    if (!eventId || !eventTitle) {
-      throw new Error("Missing required fields: eventId, eventTitle");
-    }
+    const eventId = typeof body.eventId === "string" ? body.eventId : "";
+    const eventTitle = typeof body.eventTitle === "string" ? body.eventTitle : "";
+    if (!eventId || !eventTitle) throw new Error("Missing eventId or eventTitle");
 
-    // Check if Apple Wallet certs are configured
-    const applePassTypeId = Deno.env.get("APPLE_PASS_TYPE_ID");
-    const appleTeamId = Deno.env.get("APPLE_TEAM_ID");
-    const googleWalletIssuerId = Deno.env.get("GOOGLE_WALLET_ISSUER_ID");
+    const hostName = typeof body.hostName === "string" && body.hostName.trim() ? body.hostName.trim() : "Host";
+    const venue = typeof body.venue === "string" ? body.venue : "";
+    const guestName = typeof body.guestName === "string" ? body.guestName : "Guest";
+    const qr = typeof body.qrCode === "string" && body.qrCode ? body.qrCode : `ether-event:${eventId}`;
+    const dateLabel = eventDateLabel(body.eventDate, body.timezone);
+    const timeLabel = body.eventDate ? eventTimeLabel(body.eventDate, body.timezone) : "";
 
-    const hasAppleConfig = !!applePassTypeId && !!appleTeamId;
-    const hasGoogleConfig = !!googleWalletIssuerId;
-
-    logStep("Config check", { hasAppleConfig, hasGoogleConfig });
-
-    if (!hasAppleConfig && !hasGoogleConfig) {
-      // Return setup instructions - wallet passes not yet configured
-      return new Response(
-        JSON.stringify({
-          configured: false,
-          message: "Wallet pass generation requires certificate setup. Contact your admin.",
-          eventData: {
-            eventId,
-            eventTitle,
-            eventDate,
-            venue,
-            guestName,
-            ticketType,
-          },
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        }
-      );
-    }
-
-    // Generate Google Wallet save link if configured
-    if (hasGoogleConfig) {
-      const serviceAccountKey = Deno.env.get("GOOGLE_WALLET_SERVICE_ACCOUNT_KEY");
-      if (!serviceAccountKey) throw new Error("GOOGLE_WALLET_SERVICE_ACCOUNT_KEY not set");
-
-      // Create a generic pass object
-      const objectId = `${googleWalletIssuerId}.event-${eventId}-${Date.now()}`;
-      
-      const passObject = {
-        id: objectId,
-        classId: `${googleWalletIssuerId}.ether-event-class`,
-        genericType: "GENERIC_EVENT_TICKET",
-        hexBackgroundColor: "#1a1a2e",
-        logo: {
-          sourceUri: { uri: "https://etherbylcove.com/favicon.png" },
-        },
-        cardTitle: { defaultValue: { language: "en", value: "ETHER" } },
-        header: { defaultValue: { language: "en", value: eventTitle } },
-        subheader: { defaultValue: { language: "en", value: venue || "Location TBA" } },
-        textModulesData: [
-          {
-            id: "date",
-            header: "DATE",
-            body: eventDateLabel(eventDate, timezone),
-          },
-          {
-            id: "time",
-            header: "TIME",
-            body: `${eventTimeLabel(eventDate, timezone)} – ${eventTimeLabel(eventEndDate || eventDate, timezone)}`,
-          },
-          {
-            id: "attendee",
-            header: "ATTENDEE",
-            body: guestName || "Guest",
-          },
-          {
-            id: "ticket_type",
-            header: "TYPE",
-            body: ticketType === "paid" ? "Paid Ticket" : "Free RSVP",
-          },
+    const { PKPass } = await import("npm:passkit-generator@3.4.0");
+    const icon = Buffer.from(ICON_PNG, "base64");
+    const passJson = {
+      formatVersion: 1,
+      passTypeIdentifier: Deno.env.get("APPLE_PASS_TYPE_ID"),
+      serialNumber: `${eventId}-${crypto.randomUUID()}`,
+      teamIdentifier: Deno.env.get("APPLE_TEAM_ID"),
+      organizationName: hostName,
+      description: eventTitle,
+      logoText: hostName,
+      foregroundColor: "rgb(255, 248, 252)",
+      backgroundColor: "rgb(24, 16, 22)",
+      labelColor: "rgb(255, 159, 200)",
+      eventTicket: {
+        headerFields: [{ key: "when", label: "WHEN", value: dateLabel }],
+        primaryFields: [{ key: "event", label: hostName, value: eventTitle }],
+        secondaryFields: [
+          { key: "venue", label: "VENUE", value: venue || "Venue" },
+          { key: "guest", label: "GUEST", value: guestName },
         ],
-        barcode: {
-          type: "QR_CODE",
-          value: `ether-event:${eventId}:${Date.now()}`,
-          alternateText: eventTitle,
-        },
-      };
+        auxiliaryFields: timeLabel ? [{ key: "time", label: "TIME", value: timeLabel }] : [],
+        backFields: [
+          { key: "powered", label: "TICKET", value: "Powered by Ether" },
+        ],
+      },
+    };
 
-      // For now, return the Google Wallet "Add to Wallet" URL pattern
-      // Full implementation would sign JWT with service account key
-      const saveUrl = `https://pay.google.com/gp/v/save/${objectId}`;
-
-      logStep("Google Wallet pass generated", { objectId });
-
-      return new Response(
-        JSON.stringify({
-          configured: true,
-          platform: "google",
-          passUrl: saveUrl,
-          passData: passObject,
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        }
-      );
-    }
-
-    // Apple Wallet PKPass generation
-    if (hasAppleConfig) {
-      logStep("Apple Wallet pass - certificates required for signing");
-      
-      // Full Apple Wallet implementation requires:
-      // 1. pass.json with event details
-      // 2. Signing with pass certificate + WWDR cert
-      // 3. Creating .pkpass ZIP bundle
-      // Returning structured data for now
-      return new Response(
-        JSON.stringify({
-          configured: true,
-          platform: "apple",
-          message: "Apple Wallet pass generation ready. Certificate signing in progress.",
-          passData: {
-            formatVersion: 1,
-            passTypeIdentifier: applePassTypeId,
-            teamIdentifier: appleTeamId,
-            organizationName: "ETHER",
-            description: eventTitle,
-            serialNumber: `event-${eventId}-${Date.now()}`,
-            eventTicket: {
-              primaryFields: [{ key: "event", label: "EVENT", value: eventTitle }],
-              secondaryFields: [
-                { key: "date", label: "DATE", value: eventDate },
-                { key: "location", label: "LOCATION", value: venue || "TBA" },
-              ],
-              auxiliaryFields: [
-                { key: "attendee", label: "ATTENDEE", value: guestName || "Guest" },
-                { key: "type", label: "TYPE", value: ticketType === "paid" ? "Paid" : "Free" },
-              ],
-            },
-            barcode: {
-              format: "PKBarcodeFormatQR",
-              message: `ether-event:${eventId}:${Date.now()}`,
-              messageEncoding: "iso-8859-1",
-            },
-          },
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        }
-      );
-    }
-
-    throw new Error("Unexpected state");
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: httpStatusForError(error),
+    const pass = new PKPass({
+      "pass.json": Buffer.from(JSON.stringify(passJson)),
+      "icon.png": icon,
+      "logo.png": icon,
+    }, {
+      wwdr: decodeSecret(Deno.env.get("APPLE_WWDR_CERT") || ""),
+      signerCert: decodeSecret(Deno.env.get("APPLE_PASS_CERT") || ""),
+      signerKey: decodeSecret(Deno.env.get("APPLE_PASS_KEY") || ""),
+      signerKeyPassphrase: Deno.env.get("APPLE_PASS_KEY_PASSPHRASE") || "",
     });
+    pass.setBarcodes({ message: qr, format: "PKBarcodeFormatQR", messageEncoding: "iso-8859-1" });
+    const bytes = pass.getAsBuffer();
+
+    return json({
+      configured: true,
+      platform: "apple",
+      filename: `${eventTitle.replace(/[^\w.-]+/g, "-").slice(0, 40) || "ticket"}.pkpass`,
+      pkpass: Buffer.from(bytes).toString("base64"),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return json({ error: message }, httpStatusForError(error));
   }
 });
