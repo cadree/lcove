@@ -8,7 +8,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useConversations } from "@/hooks/useConversations";
+import { BackButton } from "@/components/navigation/BackButton";
 import { formatEventDate, formatEventTime } from "@/lib/eventTime";
+import { backTarget } from "@/lib/goBack";
 import { lowestBuyerCents } from "@/lib/ticketFees";
 import { stickyCtaLabel } from "@/lib/guestEvent";
 import { buildShareUrl, shareLink } from "@/lib/shareLink";
@@ -156,9 +158,26 @@ export default function PublicEventPage() {
     window.open(`https://maps.google.com/?q=${encodeURIComponent(data)}`, "_blank", "noopener");
   };
 
-  if (isLoading) return <div className="min-h-screen bg-background" />;
+  const goBack = () => {
+    const target = backTarget(typeof window === "undefined" ? null : window.history.state, "/calendar");
+    if (target === -1) navigate(-1);
+    else navigate(target);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="px-4 pt-4"><BackButton label="Back" fallback="/calendar" /></div>
+      </div>
+    );
+  }
   if (!event || !model) {
-    return <div className="min-h-screen bg-background px-6 py-16 text-center"><h1 className="ether-title text-3xl">Event not found</h1></div>;
+    return (
+      <div className="min-h-screen bg-background px-6 py-16 text-center">
+        <BackButton showLabel label="Back" fallback="/calendar" className="mb-6" />
+        <h1 className="ether-title text-3xl">Event not found</h1>
+      </div>
+    );
   }
 
   return (
@@ -167,7 +186,7 @@ export default function PublicEventPage() {
       <PublicEventScreen
         model={model}
         following={!!event.creator_id && isFavorite(event.creator_id)}
-        onBack={() => navigate(-1)}
+        onBack={goBack}
         onSave={() => {
           const list = readSaved(event.id) ? JSON.parse(localStorage.getItem(savedKey) || "[]").filter((id: string) => id !== event.id) : [...(JSON.parse(localStorage.getItem(savedKey) || "[]") as string[]), event.id];
           localStorage.setItem(savedKey, JSON.stringify(list));

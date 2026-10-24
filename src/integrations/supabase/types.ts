@@ -5473,6 +5473,7 @@ export type Database = {
           id: string
           interests: string[] | null
           is_suspended: boolean | null
+          deleted_at: string | null
           last_active_at: string | null
           mindset_level: number | null
           onboarding_completed: boolean | null
@@ -7933,6 +7934,9 @@ export type Database = {
           mindset_level: number
           phone: string
           user_id: string
+          is_suspended: boolean
+          suspension_reason: string
+          deleted_at: string
         }[]
       }
       get_artist_payout_status: {

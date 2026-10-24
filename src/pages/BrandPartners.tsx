@@ -8,6 +8,7 @@ import { BrandPartnerSheet } from "@/components/brandpartners/BrandPartnerSheet"
 import { BrandApplicationForm } from "@/components/brandpartners/BrandApplicationForm";
 import { useBrandPartnerships, type BrandPartnership } from "@/hooks/useBrandPartnerships";
 import { Gift } from "lucide-react";
+import { BackButton } from "@/components/navigation/BackButton";
 import { motion } from "framer-motion";
 
 type FilterType = "all" | "sponsor" | "collaborator" | "supporter";
@@ -31,6 +32,7 @@ export default function BrandPartners() {
   return (
     <PageLayout>
       <div className="container max-w-4xl py-6 px-4">
+        <BackButton label="Back" className="mb-3" />
         <h1 className="text-2xl font-display font-medium mb-6">Brand Partners</h1>
         
         {/* Application Form - Always Visible */}

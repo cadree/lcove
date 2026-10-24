@@ -10,7 +10,7 @@ interface Props {
   displayName: string;
   updateName: (name: string) => void;
   onNext: () => void;
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
@@ -47,6 +47,7 @@ const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center mx-auto mb-6">
             <User className="w-8 h-8 text-primary-foreground" />
           </div>
+          <p className="text-primary text-sm font-medium mb-2">Step 1 of 4</p>
           <h1 className="font-display text-4xl md:text-5xl text-gradient-pink mb-3">
             What's your name?
           </h1>
@@ -108,14 +109,18 @@ const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
           transition={{ delay: 0.3 }}
           className="flex items-center justify-between"
         >
-          <Button
-            variant="ghost"
-            onClick={onBack}
-            className="text-muted-foreground"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
+          {onBack ? (
+            <Button
+              variant="ghost"
+              onClick={onBack}
+              className="text-muted-foreground"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+          ) : (
+            <span />
+          )}
           <Button
             onClick={handleNext}
             disabled={!name.trim()}

@@ -5,6 +5,7 @@ import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Bookmark, ArrowLeft, LayoutGrid, Users, LayoutDashboard, ShoppingBag, Calendar, PenLine } from "lucide-react";
+import { BackButton } from "@/components/navigation/BackButton";
 import { Card } from "@/components/ui/card";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
@@ -211,10 +212,7 @@ const Profile = () => {
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
           <h2 className="font-display text-2xl text-foreground">Private profile</h2>
           <p className="text-muted-foreground text-center">This profile is not available.</p>
-          <Button onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Go Back
-          </Button>
+          <BackButton showLabel label="Go Back" fallback="/directory" />
         </div>
       </PageLayout>
     );
@@ -564,19 +562,7 @@ const Profile = () => {
         <div className="relative z-10">
         {!isOwnProfile && (
           <div className="px-5 pt-4 pb-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-2 text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                const index = window.history.state?.idx;
-                if (typeof index === "number" && index > 0) navigate(-1);
-                else navigate("/feed");
-              }}
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back
-            </Button>
+            <BackButton showLabel label="Back" fallback="/directory" />
           </div>
         )}
 

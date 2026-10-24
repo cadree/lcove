@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
+import { BackButton } from '@/components/navigation/BackButton';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowLeft,
   Film,
   Plus,
   Settings,
@@ -66,8 +66,11 @@ const NetworkManage = () => {
 
   if (networkLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      <div className="min-h-screen bg-background">
+        <div className="px-4 pt-4"><BackButton label="Back" fallback="/cinema" /></div>
+        <div className="flex items-center justify-center py-24">
+          <div className="animate-pulse text-muted-foreground">Loading...</div>
+        </div>
       </div>
     );
   }
@@ -77,9 +80,7 @@ const NetworkManage = () => {
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
         <Film className="w-16 h-16 text-muted-foreground" />
         <h1 className="text-xl font-medium">Network not found</h1>
-        <Link to="/cinema">
-          <Button variant="outline">Back to Cinema</Button>
-        </Link>
+        <BackButton showLabel label="Back" fallback="/cinema" />
       </div>
     );
   }
@@ -123,11 +124,7 @@ const NetworkManage = () => {
       <div className="border-b border-border bg-card/50">
         <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex items-center gap-4 mb-4">
-            <Link to="/cinema">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
+            <BackButton label="Back" fallback="/cinema" />
             <div className="flex items-center gap-3 flex-1">
               {network.logo_url && (
                 <img

@@ -12,6 +12,8 @@ import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { FriendsDrawer } from "@/components/friends/FriendsDrawer";
 import { cityFilterOptions, cityMatchesFilter, cityMatchesQuery } from "@/lib/cityNormalization";
 import { dedupeProfilesByUserId } from "@/lib/directoryProfiles";
+import { DIRECTORY_RENDER_PAGE, listEnterDelay, nextRenderedCount } from "@/lib/feedWindow";
+import { abortAfter } from "@/lib/requestDeadline";
 
 interface Profile {
   id: string;
@@ -58,22 +60,32 @@ const Directory = () => {
   const [selectedCityKey, setSelectedCityKey] = useState<string | null>(null); // null = All Cities
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [shown, setShown] = useState(DIRECTORY_RENDER_PAGE);
 
   useEffect(() => {
-    fetchProfiles();
+    void fetchProfiles();
   }, []);
+
+  useEffect(() => {
+    setShown(DIRECTORY_RENDER_PAGE);
+  }, [searchQuery, selectedCityKey]);
 
   const fetchProfiles = async () => {
     setLoading(true);
+    setLoadError(false);
+    const signal = abortAfter();
     
     // Fetch profiles using profiles_public view to protect sensitive fields
     const { data: profilesData, error: profilesError } = await supabase
       .from('profiles_public')
       .select('id, user_id, display_name, avatar_url, city, city_display, city_key, bio, created_at')
       .eq('onboarding_completed', true)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .abortSignal(signal);
 
     if (profilesError || !profilesData) {
+      setLoadError(true);
       setLoading(false);
       return;
     }
@@ -81,12 +93,14 @@ const Directory = () => {
     // Fetch user passions with passion names
     const { data: passionsData } = await supabase
       .from('user_passions')
-      .select('user_id, custom_name, passions(name)');
+      .select('user_id, custom_name, passions(name)')
+      .abortSignal(signal);
     
     // Fetch user skills with skill names
     const { data: skillsData } = await supabase
       .from('user_skills')
-      .select('user_id, skills(name)');
+      .select('user_id, skills(name)')
+      .abortSignal(signal);
     
     // Group passions by user_id
     const passionsByUser = new Map<string, string[]>();
@@ -154,6 +168,7 @@ const Directory = () => {
     
     return matchesSearch && matchesCity;
   });
+  const visibleProfiles = filteredProfiles.slice(0, shown);
 
   const handleProfileClick = (userId: string) => {
     navigate(`/profile/${userId}`);
@@ -221,20 +236,30 @@ const Directory = () => {
 
         {/* Loading State */}
         {loading && (
-          <div className="flex items-center justify-center py-12">
+          <div className="flex items-center justify-center py-12" role="status">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <span className="sr-only">Loading directory</span>
+          </div>
+        )}
+
+        {!loading && loadError && (
+          <div className="py-12 text-center">
+            <p className="text-sm text-muted-foreground">The directory did not load.</p>
+            <Button type="button" variant="outline" className="mt-3 min-h-11" onClick={() => void fetchProfiles()}>
+              Try again
+            </Button>
           </div>
         )}
 
         {/* Results Grid */}
-        {!loading && (
+        {!loading && !loadError && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredProfiles.map((profile, index) => (
+            {visibleProfiles.map((profile, index) => (
               <motion.div
                 key={profile.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: index * 0.05 }}
+                transition={{ duration: 0.25, delay: listEnterDelay(index) }}
                 onClick={() => handleProfileClick(profile.user_id)}
                 className="file-panel group cursor-pointer p-4"
               >
@@ -272,9 +297,14 @@ const Directory = () => {
             ))}
           </div>
         )}
+        {!loading && !loadError && shown < filteredProfiles.length && (
+          <Button type="button" variant="outline" className="mt-4 min-h-11 w-full" onClick={() => setShown((count) => nextRenderedCount(count, filteredProfiles.length, DIRECTORY_RENDER_PAGE))}>
+            Show more
+          </Button>
+        )}
 
         {/* Empty State */}
-        {!loading && filteredProfiles.length === 0 && (
+        {!loading && !loadError && filteredProfiles.length === 0 && (
           <EmptyState
             icon={Users}
             title="No creatives found"

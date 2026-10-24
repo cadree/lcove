@@ -4,7 +4,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import {
-  ArrowLeft,
   Calendar,
   MapPin,
   Users,
@@ -34,6 +33,7 @@ import {
 } from "lucide-react";
 import { SquircleIcon } from "@/components/world/SquircleIcon";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/navigation/BackButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -312,14 +312,7 @@ export default function EventDetail() {
         >
           {/* Top bar */}
           <div className="flex items-center justify-between px-4 h-12">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/dashboard/events")}
-              className="h-9 w-9"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <BackButton label="Back" fallback="/dashboard/events" className="h-11 w-11" />
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={handleCopyLink} className="gap-1.5">
                 <Copy className="h-3.5 w-3.5" />

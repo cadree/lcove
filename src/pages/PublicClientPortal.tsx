@@ -7,6 +7,7 @@ import { parseCalendarDate } from '@/lib/calendarDate';
 import { Calendar, Download, FileText, Users, MapPin, Wrench, Package, BarChart3, Clock, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { BackButton } from '@/components/navigation/BackButton';
 import { AddToCalendarButtons } from '@/components/calendar/AddToCalendarButtons';
 import { generateProjectPdf } from '@/lib/generateProjectPdf';
 import { cn } from '@/lib/utils';
@@ -94,8 +95,11 @@ export default function PublicClientPortal() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background">
+        <div className="px-4 pt-4"><BackButton label="Back" fallback="/" /></div>
+        <div className="flex min-h-[70vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
       </div>
     );
   }
@@ -106,6 +110,7 @@ export default function PublicClientPortal() {
         <div className="text-center space-y-3">
           <h1 className="text-2xl font-bold">Link Expired or Invalid</h1>
           <p className="text-muted-foreground">This client portal link is no longer valid.</p>
+          <BackButton showLabel label="Back" fallback="/" />
         </div>
       </div>
     );
@@ -135,6 +140,7 @@ export default function PublicClientPortal() {
       {/* Header */}
       <div className="border-b border-border bg-card/50">
         <div className="max-w-2xl mx-auto px-4 py-6">
+          <BackButton label="Back" fallback="/" className="mb-3" />
           {data.client_name && (
             <p className="text-sm text-muted-foreground mb-1">Welcome, {data.client_name}</p>
           )}

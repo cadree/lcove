@@ -17,6 +17,17 @@ export const REPORT_REASONS = [
 
 export type ReportReason = (typeof REPORT_REASONS)[number];
 
+export const AI_VIOLATION_REASONS = [
+  "AI-generated or fake content",
+  "Fake or AI-generated person",
+  "Fully AI-generated scene passed off as real work",
+  "AI slop / spam promotion",
+] as const;
+
+export function isAiViolationReport(reason: string): boolean {
+  return (AI_VIOLATION_REASONS as readonly string[]).includes(reason);
+}
+
 export const REPORT_STATUSES = ["open", "actioned", "dismissed"] as const;
 
 export type ReportStatus = (typeof REPORT_STATUSES)[number];

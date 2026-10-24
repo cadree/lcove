@@ -71,7 +71,8 @@ GRANT EXECUTE ON FUNCTION auth.email() TO anon, authenticated, service_role;
 CREATE TABLE IF NOT EXISTS storage.buckets (
   id text PRIMARY KEY,
   name text NOT NULL,
-  public boolean NOT NULL DEFAULT false
+  public boolean NOT NULL DEFAULT false,
+  allowed_mime_types text[]
 );
 
 CREATE TABLE IF NOT EXISTS storage.objects (

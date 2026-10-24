@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+import { BackButton } from "@/components/navigation/BackButton";
 import { ConfirmationScreen } from "@/components/events/guest/ConfirmationScreen";
 import { supabase } from "@/integrations/supabase/client";
 import { formatEventDate, formatEventTime } from "@/lib/eventTime";
@@ -84,10 +85,32 @@ export default function EventConfirmation() {
     window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${stamp(start)}/${stamp(end)}&location=${encodeURIComponent(address || "")}`, "_blank", "noopener");
   };
 
-  if (loading) return <div className="min-h-screen bg-background px-4 py-16 text-sm text-muted-foreground">Confirming your place…</div>;
-  if (error) return <div className="min-h-screen bg-background px-4 py-16 text-sm text-destructive">{error}</div>;
+  const back = (
+    <div className="px-4 pt-4">
+      <BackButton showLabel label="Back to event" fallback={eventId ? `/event/${eventId}` : "/calendar"} />
+    </div>
+  );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        {back}
+        <p className="px-4 py-16 text-sm text-muted-foreground">Confirming your place…</p>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background">
+        {back}
+        <p className="px-4 py-16 text-sm text-destructive">{error}</p>
+      </div>
+    );
+  }
 
   return (
+    <>
+    {back}
     <ConfirmationScreen
       hostName={hostName}
       hostAvatar={hostAvatar}
@@ -128,5 +151,6 @@ export default function EventConfirmation() {
       onCalendar={calendar}
       onShare={share}
     />
+    </>
   );
 }

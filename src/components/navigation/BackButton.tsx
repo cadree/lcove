@@ -1,21 +1,23 @@
 import { useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button, type ButtonProps } from "@/components/ui/button";
-import { backTarget } from "@/lib/goBack";
+import { backTarget, parentFallback } from "@/lib/goBack";
 import { cn } from "@/lib/utils";
 
-/** Pop the previous in-app screen. A deep link lands on the feed. */
-function useGoBack(fallback = "/feed") {
+/** Pop the previous in-app screen. A deep link lands on this screen's parent. */
+function useGoBack(fallback?: string) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const parent = fallback ?? parentFallback(pathname);
   return useCallback(() => {
     const target = backTarget(
       typeof window === "undefined" ? null : window.history.state,
-      fallback,
+      parent,
     );
     if (target === -1) navigate(-1);
     else navigate(target);
-  }, [fallback, navigate]);
+  }, [parent, navigate]);
 }
 
 interface BackButtonProps extends ButtonProps {
@@ -41,7 +43,7 @@ export function BackButton({
       size={size ?? (showLabel ? "sm" : "icon")}
       onClick={goBack}
       aria-label={label}
-      className={cn(showLabel && "gap-2", className)}
+      className={cn("min-h-11 min-w-11", showLabel && "w-auto gap-2 px-3", className)}
       {...props}
     >
       <ArrowLeft className={showLabel ? "h-4 w-4" : "h-5 w-5"} aria-hidden="true" />
