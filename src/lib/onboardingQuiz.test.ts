@@ -151,6 +151,9 @@ describe("wallet pass button", () => {
     assert.equal(/coming soon/i.test(page + screen), false);
     assert.equal(/check back soon/i.test(page + screen), false);
     assert.match(page, /probe\.data\?\.configured === true/);
+    assert.match(page, /ticketId \? \{ ticketId \} : confirmedOrderId \? \{ orderId: confirmedOrderId \}/);
+    assert.equal(page.includes("qrCode:"), false);
+    assert.equal(page.includes("eventTitle:"), false);
     assert.match(screen, /walletEnabled &&/);
     assert.match(screen, /Add to Apple Wallet/);
     assert.equal((screen.match(/Add to Apple Wallet/g) ?? []).length, 1);

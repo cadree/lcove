@@ -2,7 +2,19 @@
 
 Guest confirmation can offer **Add to Apple Wallet**. The button stays hidden until every required secret is set on the Supabase project. No pass is signed without them.
 
-The pass leads with the host name, the event, and the ticket QR. The only Ether line is `Powered by Ether` on the back of the pass.
+The pass leads with the host name, the event, and the ticket QR. The only Ether line is `Powered by Ether` on the back of the pass. Those values are read from the ticket, the order, the RSVP, and the event. The request cannot supply them.
+
+## Request
+
+Signing requires a signed-in member and one id:
+
+```json
+{ "ticketId": "<event_attendees.id>" }
+```
+
+or `{ "orderId": "<ticket_orders.id>" }`. `{ "probe": true }` only reports whether the secrets below are set. It does not sign a pass.
+
+The member must own that ticket: they are the attendee, the purchaser on a paid order, or the user on the RSVP linked to that attendee row. A pass for someone else's ticket is rejected. Cancelled, unpaid, interested, and waitlisted rows are not issued.
 
 ## Secrets
 
@@ -46,4 +58,4 @@ This uses Cadre's Apple Developer account. Ether does not create the account.
 
 8. Redeploy is not required for secret changes. The next request to `generate-wallet-pass` sees them. Open a confirmation page and the Wallet button appears only after the probe returns `configured: true`.
 
-The library is `passkit-generator` (MIT), loaded inside the edge function only when the secrets are present.
+The pass is signed with the same Wallet builder as Ether ID (`pkpass.mjs`), only after the ownership check.
