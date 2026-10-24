@@ -1,5 +1,15 @@
 import { QRCodeSVG } from "qrcode.react";
-import { birthdayFace, usernameAt, type EtherIdCard, type EtherIdPublic } from "@/lib/etherId";
+import novi from "@/assets/novi-cutout.webp";
+import { EtherIdHalftone } from "@/components/profile/EtherIdHalftone";
+import {
+  birthdayFace,
+  cardPhoto,
+  etherIdQr,
+  personnelName,
+  usernameAt,
+  type EtherIdCard,
+  type EtherIdPublic,
+} from "@/lib/etherId";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -10,11 +20,40 @@ export function monthName(month: number) {
   return MONTHS[month - 1] ?? "";
 }
 
-export function statusClass(status: string) {
-  if (status === "Banned") return "border-destructive text-destructive";
-  if (status === "Suspended") return "border-foreground text-foreground";
-  if (status === "Inactive") return "border-border text-muted-foreground";
-  return "border-primary text-primary";
+function Row({ label, value, note }: { label: string; value: string; note?: string | null }) {
+  return (
+    <div className="ether-id-row">
+      <dt>{label}</dt>
+      <dd>
+        {value}
+        {note ? <span className="ether-id-note">{note}</span> : null}
+      </dd>
+    </div>
+  );
+}
+
+function Hexes() {
+  return (
+    <svg className="ether-id-hex" viewBox="0 0 86 28" aria-hidden="true">
+      <polygon points="14,3 23,8 23,18 14,23 5,18 5,8" />
+      <polygon points="36,6 44,10.5 44,19.5 36,24 28,19.5 28,10.5" />
+      <polygon points="54,2 61,6 61,14 54,18 47,14 47,6" />
+      <polygon points="74,8 81,12 81,20 74,24 67,20 67,12" />
+    </svg>
+  );
+}
+
+function Ruler() {
+  return (
+    <div className="ether-id-ruler" aria-hidden="true">
+      {Array.from({ length: 9 }, (_, index) => (
+        <span key={index}>
+          <i />
+          {index}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 export function EtherIdFace({
@@ -27,83 +66,82 @@ export function EtherIdFace({
   const full = "token" in card ? card : null;
   const birthday = full ? birthdayFace(full) : null;
   const handle = usernameAt(card.username);
+  const banned = card.status === "Banned";
+  const photo = cardPhoto(card);
+  const qr = verifyHref ? etherIdQr(verifyHref) : null;
+  const joined = (card.member_since || "").replace(/-/g, ".");
 
   return (
-    <article className="holo-card overflow-hidden px-4 py-5" data-ether-status={card.status}>
-      <p className="kicker">Ether ID</p>
-      <div className="mt-4 flex items-center gap-3">
-        <div className="media-frame h-16 w-16 shrink-0 overflow-hidden bg-muted">
-          {card.avatar_url ? (
-            <img src={card.avatar_url} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center font-display text-2xl">
-              {(card.display_name || "?").slice(0, 1)}
-            </div>
-          )}
+    <article className={`ether-id${banned ? " is-banned" : ""}`} data-ether-status={card.status}>
+      <div className="ether-id-ring ether-id-pulse" aria-hidden="true" />
+      <header className="ether-id-top">
+        <p className="ether-id-word">Ether</p>
+        <span className="ether-id-novi-wrap">
+          <span className="ether-id-novi-glow ether-id-pulse" aria-hidden="true" />
+          <img src={novi} alt="" data-novi="" className="ether-id-novi" />
+        </span>
+      </header>
+
+      <div className="ether-id-main">
+        <div className="ether-id-photo">
+          <span className="ether-id-frame-glow ether-id-pulse" aria-hidden="true" />
+          <div className="ether-id-photo-clip">
+            <EtherIdHalftone src={photo} name={card.display_name || "E"} banned={banned} />
+            {banned ? <p className="ether-id-stamp">Banned</p> : null}
+          </div>
         </div>
-        <div className="min-w-0">
-          <h2 className="ether-title truncate text-[28px]">{card.display_name || "Name not set"}</h2>
-          <p className="mt-1 text-sm text-foreground">{handle || "No username yet"}</p>
+        <svg className="ether-id-connector" viewBox="0 0 18 120" preserveAspectRatio="none" aria-hidden="true">
+          <path className="ether-id-connector-glow ether-id-pulse" d="M1 26 C 1 70, 17 38, 17 92" />
+          <path className="ether-id-connector-line" d="M1 26 C 1 70, 17 38, 17 92" />
+        </svg>
+        <div className="ether-id-data">
+          <span className="ether-id-frame-glow ether-id-pulse" aria-hidden="true" />
+          <h2 className="ether-id-name">{personnelName(card.display_name)}</h2>
+          <p className="ether-id-handle">{handle || "No username yet"}</p>
+          <p className={`ether-id-status ether-id-status-${card.status.toLowerCase()}`}>
+            <span className="ether-id-status-glow ether-id-pulse" aria-hidden="true" />
+            <span>{card.status}</span>
+          </p>
+          {joined ? <p className="ether-id-serial">{joined}</p> : null}
+          <dl>
+            {full ? (
+              <>
+                <Row label="Passion" value={full.passion || "—"} />
+                <Row label="Reviews" value={full.peer_review_label} />
+                <Row label="Projects" value={full.projects_label} />
+                <Row label="Joined" value={card.member_since_label || "—"} />
+                {birthday ? <Row label="Born" value={birthday.label} note={birthday.note} /> : null}
+              </>
+            ) : (
+              <Row label="Joined" value={card.member_since_label || "—"} />
+            )}
+          </dl>
+          <Hexes />
         </div>
       </div>
 
-      <p className={`mt-4 inline-flex min-h-11 items-center border px-3 text-sm font-semibold ${statusClass(card.status)}`}>
-        {card.status}
-      </p>
-
-      {full && (
-        <dl className="mt-5 space-y-3 text-sm">
-          <div className="flex items-baseline justify-between gap-3 border-b border-border pb-2">
-            <dt className="text-muted-foreground">Passion</dt>
-            <dd className="text-right text-foreground">{full.passion || "—"}</dd>
+      <footer className="ether-id-foot">
+        <div>
+          <div className="ether-id-brands">
+            <span>Ether</span>
+            <span>Ether</span>
           </div>
-          <div className="flex items-baseline justify-between gap-3 border-b border-border pb-2">
-            <dt className="text-muted-foreground">Peer reviews</dt>
-            <dd className="text-right text-foreground">{full.peer_review_label}</dd>
-          </div>
-          <div className="flex items-baseline justify-between gap-3 border-b border-border pb-2">
-            <dt className="text-muted-foreground">Projects</dt>
-            <dd className="text-right text-foreground">{full.projects_label}</dd>
-          </div>
-          <div className="flex items-baseline justify-between gap-3 border-b border-border pb-2">
-            <dt className="text-muted-foreground">Member since</dt>
-            <dd className="text-right text-foreground">{card.member_since_label || "—"}</dd>
-          </div>
-          {birthday && (
-            <div className="flex items-baseline justify-between gap-3 border-b border-border pb-2">
-              <dt className="text-muted-foreground">Birthday</dt>
-              <dd className="text-right text-foreground">
-                {birthday.label}
-                <span className="mt-0.5 block text-xs text-muted-foreground">{birthday.note}</span>
-              </dd>
-            </div>
-          )}
-        </dl>
-      )}
-
-      {!full && (
-        <dl className="mt-5 space-y-3 text-sm">
-          <div className="flex items-baseline justify-between gap-3 border-b border-border pb-2">
-            <dt className="text-muted-foreground">Member since</dt>
-            <dd className="text-right text-foreground">{card.member_since_label || "—"}</dd>
-          </div>
-          <div className="flex items-baseline justify-between gap-3 border-b border-border pb-2">
-            <dt className="text-muted-foreground">Status</dt>
-            <dd className="text-right text-foreground">Live</dd>
-          </div>
-        </dl>
-      )}
-
-      {verifyHref && (
-        <div className="mt-5 flex flex-col items-center">
-          <div className="bg-white p-3">
-            <QRCodeSVG value={verifyHref} size={168} level="M" bgColor="#ffffff" fgColor="#121212" />
-          </div>
-          <p className="mt-3 text-center text-sm text-muted-foreground">
-            Scan to read the live status. A saved image is not proof.
-          </p>
+          <Ruler />
         </div>
-      )}
+        {qr ? (
+          <div className="ether-id-qr" data-testid="ether-id-qr">
+            <QRCodeSVG
+              value={qr.value}
+              size={qr.size}
+              level={qr.level}
+              marginSize={qr.marginSize}
+              bgColor={qr.bgColor}
+              fgColor={qr.fgColor}
+              title="Ether ID verify code"
+            />
+          </div>
+        ) : null}
+      </footer>
     </article>
   );
 }

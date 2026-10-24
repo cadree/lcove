@@ -3,7 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getBearerUser } from "../_shared/require-caller.ts";
 import { missingWalletSecrets, walletConfigured, PUSH_SECRET_NAME, matchEtherIdRoute } from "../_shared/ether-id-config.mjs";
 import { etherIdPassJson } from "../_shared/ether-id-pass-json.mjs";
-import { buildPkpass, passImages } from "../_shared/pkpass.mjs";
+import { etherIdImages } from "../_shared/ether-id-strip.mjs";
+import { buildPkpass } from "../_shared/pkpass.mjs";
 import { pushPassUpdate, signApnsJwt } from "../_shared/apns.mjs";
 
 const corsHeaders = {
@@ -69,6 +70,26 @@ function timingSafeEqual(a: string, b: string) {
   return diff === 0;
 }
 
+async function memberPhoto(card: Record<string, unknown>) {
+  const raw = (typeof card.photo_url === "string" && card.photo_url) || (typeof card.avatar_url === "string" ? card.avatar_url : "");
+  if (!raw || !/^https?:\/\//i.test(raw)) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  try {
+    const response = await fetch(raw, { signal: controller.signal });
+    if (!response.ok) return null;
+    const type = response.headers.get("content-type") || "";
+    if (type && !type.startsWith("image/")) return null;
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.byteLength < 32 || bytes.byteLength > 6_000_000) return null;
+    return bytes;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function signedPass(card: Record<string, unknown>, passRow: {
   serial_number: string;
   authentication_token: string;
@@ -85,10 +106,12 @@ async function signedPass(card: Record<string, unknown>, passRow: {
     webServiceURL: `${supabaseUrl}/functions/v1/ether-id-pass`,
     authenticationToken: passRow.authentication_token,
   });
+  const photo = await memberPhoto(card);
+  const images = await etherIdImages(card, { photo });
   const bytes = await buildPkpass(
     [
       { name: "pass.json", data: JSON.stringify(pass) },
-      ...passImages(),
+      ...images,
     ],
     {
       certPem: env.APPLE_PASS_CERT_PEM,

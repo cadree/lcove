@@ -38,6 +38,7 @@ const SHOT_CARD: EtherIdCard = {
   show_birthday: true,
   birthday_month: 3,
   birthday_day: 4,
+  id_photo_url: null,
   token: "eid1.shot.1.signature",
   verify_path: "/id/v/shot-active",
 };
@@ -144,12 +145,55 @@ export default function EtherId() {
     URL.revokeObjectURL(url);
   };
 
+  const photoUpload = useMutation({
+    mutationFn: async (file: File) => {
+      if (shot) return;
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) throw new Error("Sign in to save your Ether ID");
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+      const path = `${userId}/ether-id-photo.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("media").upload(path, file, {
+        upsert: true,
+        contentType: file.type || undefined,
+      });
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ id_photo_url: `${publicUrl}?v=${Date.now()}` })
+        .eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["ether-id"] });
+      toast.success("ID photo updated");
+    },
+    onError: (error: Error) => toast.error(error.message || "Could not update the ID photo"),
+  });
+
+  const clearPhoto = useMutation({
+    mutationFn: async () => {
+      if (shot) return;
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) throw new Error("Sign in to save your Ether ID");
+      const { error } = await supabase.from("profiles").update({ id_photo_url: null }).eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["ether-id"] });
+      toast.success("Using your profile picture");
+    },
+    onError: (error: Error) => toast.error(error.message || "Could not clear the ID photo"),
+  });
+
   const href = card ? verifyUrl(window.location.origin, card.verify_path) : "";
   const showWallet = walletButtonVisible(shot ? false : walletQuery.data?.configured);
 
   return (
     <PageLayout>
-      <div className="px-6 pb-24 pt-6">
+      <div className="mx-auto max-w-[760px] px-4 pb-24 pt-6 sm:px-6">
         <PageHeader
           eyebrow="Member"
           title="Ether ID"
@@ -179,6 +223,35 @@ export default function EtherId() {
                 save.mutate();
               }}
             >
+              <div className="space-y-2">
+                <Label htmlFor="ether-id-photo">ID photo</Label>
+                <p className="text-sm text-muted-foreground">
+                  The card uses your profile picture until you choose a different one. The other photo is only for this card.
+                </p>
+                <Input
+                  id="ether-id-photo"
+                  type="file"
+                  accept="image/*"
+                  className="min-h-11"
+                  disabled={photoUpload.isPending}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (file) photoUpload.mutate(file);
+                  }}
+                />
+                {card.id_photo_url ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-11 w-full"
+                    disabled={clearPhoto.isPending}
+                    onClick={() => clearPhoto.mutate()}
+                  >
+                    Use profile picture
+                  </Button>
+                ) : null}
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="ether-username">Username</Label>
                 <Input

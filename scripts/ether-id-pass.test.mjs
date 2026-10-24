@@ -5,8 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { missingWalletSecrets, matchEtherIdRoute, walletConfigured } from "../supabase/functions/_shared/ether-id-config.mjs";
-import { etherIdPassJson, walletStatus } from "../supabase/functions/_shared/ether-id-pass-json.mjs";
+import { etherIdPassJson, personnelName, walletReviewValue, walletStatus } from "../supabase/functions/_shared/ether-id-pass-json.mjs";
 import { buildPkpass, solidPng } from "../supabase/functions/_shared/pkpass.mjs";
+import { etherIdImages } from "../supabase/functions/_shared/ether-id-strip.mjs";
 import { signApnsJwt } from "../supabase/functions/_shared/apns.mjs";
 
 const card = {
@@ -14,11 +15,22 @@ const card = {
   username: "maya",
   status: "Banned",
   passion: "Photography",
+  peer_review_average: 4.5,
+  peer_review_count: 2,
   peer_review_label: "4.5 average · 2 reviews",
   projects_label: "2 completed",
   member_since_label: "October 2026",
   birthday_label: "March 4",
   verify_path: "/id/v/eid1.example.1.sig",
+};
+
+const meta = {
+  passTypeIdentifier: "pass.com.ether.id",
+  serialNumber: "eid_abc",
+  teamIdentifier: "TEAM123456",
+  verifyUrl: "https://etherbylcove.com/id/v/eid1.example.1.sig",
+  webServiceURL: "https://example.supabase.co/functions/v1/ether-id-pass",
+  authenticationToken: "a".repeat(32),
 };
 
 describe("wallet config", () => {
@@ -44,31 +56,34 @@ describe("pass.json", () => {
   it("puts the live status in capitals and keeps the birthday self-reported", () => {
     assert.equal(walletStatus("Banned"), "BANNED");
     assert.equal(walletStatus("Inactive"), "INACTIVE");
-    const pass = etherIdPassJson(card, {
-      passTypeIdentifier: "pass.com.ether.id",
-      serialNumber: "eid_abc",
-      teamIdentifier: "TEAM123456",
-      verifyUrl: "https://etherbylcove.com/id/v/eid1.example.1.sig",
-      webServiceURL: "https://example.supabase.co/functions/v1/ether-id-pass",
-      authenticationToken: "a".repeat(32),
-    });
-    assert.equal(pass.generic.secondaryFields.find((field) => field.key === "status").value, "BANNED");
-    assert.equal(pass.generic.backFields.find((field) => field.key === "birthday").value, "March 4 · self-reported");
+    assert.equal(personnelName("Maya Torres"), "TORRES, MAYA");
+    assert.equal(walletReviewValue(card), "4.5 · 2");
+    const pass = etherIdPassJson(card, meta);
+    assert.equal(pass.storeCard.headerFields.find((field) => field.key === "status").value, "BANNED");
+    assert.equal(pass.storeCard.primaryFields[0].value, "TORRES, MAYA");
+    assert.equal(pass.storeCard.backFields.find((field) => field.key === "birthday").value, "March 4 · self-reported");
     assert.equal(pass.barcode.message.includes("11111111"), false);
     assert.equal(pass.webServiceURL.endsWith("/ether-id-pass"), true);
+    assert.equal(pass.labelColor, "rgb(255, 61, 73)");
+    assert.equal(pass.generic, undefined);
   });
 
   it("omits the birthday when the member has not opted in", () => {
-    const pass = etherIdPassJson({ ...card, birthday_label: null, status: "Active" }, {
-      passTypeIdentifier: "pass.com.ether.id",
-      serialNumber: "eid_abc",
-      teamIdentifier: "TEAM123456",
-      verifyUrl: "https://etherbylcove.com/id/v/eid1.example.1.sig",
-      webServiceURL: "https://example.supabase.co/functions/v1/ether-id-pass",
-      authenticationToken: "a".repeat(32),
-    });
-    assert.equal(pass.generic.backFields.some((field) => field.key === "birthday"), false);
-    assert.equal(pass.generic.secondaryFields.find((field) => field.key === "status").value, "ACTIVE");
+    const pass = etherIdPassJson({ ...card, birthday_label: null, status: "Active" }, meta);
+    assert.equal(pass.storeCard.backFields.some((field) => field.key === "birthday"), false);
+    assert.equal(pass.storeCard.auxiliaryFields.some((field) => field.key === "birthday"), false);
+    assert.equal(pass.storeCard.headerFields.find((field) => field.key === "status").value, "ACTIVE");
+    assert.equal(pass.backgroundColor, "rgb(8, 8, 10)");
+    assert.equal(pass.foregroundColor, "rgb(236, 231, 220)");
+    assert.equal(pass.labelColor, "rgb(255, 159, 200)");
+  });
+
+  it("keeps an existing serial and pass type when the style is a store card", () => {
+    const pass = etherIdPassJson(card, { ...meta, serialNumber: "eid_already_on_phone", passTypeIdentifier: "pass.com.ether.id" });
+    assert.equal(pass.serialNumber, "eid_already_on_phone");
+    assert.equal(pass.passTypeIdentifier, "pass.com.ether.id");
+    assert.equal(pass.storeCard.headerFields.length > 0, true);
+    assert.equal("generic" in pass, false);
   });
 });
 
@@ -91,14 +106,7 @@ describe("signed pkpass", () => {
       execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-keyout", "wwdr.key", "-out", "wwdr.pem", "-days", "2", "-nodes", "-subj", "/CN=Test WWDR"], { cwd: dir });
       execFileSync("openssl", ["req", "-newkey", "rsa:2048", "-keyout", "pass.key", "-out", "pass.csr", "-nodes", "-subj", "/CN=Ether ID"], { cwd: dir });
       execFileSync("openssl", ["x509", "-req", "-in", "pass.csr", "-CA", "wwdr.pem", "-CAkey", "wwdr.key", "-CAcreateserial", "-out", "pass.crt", "-days", "2"], { cwd: dir });
-      const pass = etherIdPassJson({ ...card, status: "Inactive" }, {
-        passTypeIdentifier: "pass.com.ether.id",
-        serialNumber: "eid_abc",
-        teamIdentifier: "TEAM123456",
-        verifyUrl: "https://etherbylcove.com/id/v/eid1.example.1.sig",
-        webServiceURL: "https://example.supabase.co/functions/v1/ether-id-pass",
-        authenticationToken: "a".repeat(32),
-      });
+      const pass = etherIdPassJson({ ...card, status: "Inactive" }, meta);
       const bytes = await buildPkpass(
         [
           { name: "pass.json", data: JSON.stringify(pass) },
@@ -127,6 +135,46 @@ describe("signed pkpass", () => {
       const manifest = JSON.parse(readFileSync(join(dir, "unpacked/manifest.json"), "utf8"));
       assert.equal(typeof manifest["pass.json"], "string");
       assert.equal(manifest.signature, undefined);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("signs a store card whose pass.json and strips come out of the pkpass", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ether-id-strip-pass-"));
+    try {
+      execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-keyout", "wwdr.key", "-out", "wwdr.pem", "-days", "2", "-nodes", "-subj", "/CN=Test WWDR"], { cwd: dir });
+      execFileSync("openssl", ["req", "-newkey", "rsa:2048", "-keyout", "pass.key", "-out", "pass.csr", "-nodes", "-subj", "/CN=Ether ID"], { cwd: dir });
+      execFileSync("openssl", ["x509", "-req", "-in", "pass.csr", "-CA", "wwdr.pem", "-CAkey", "wwdr.key", "-CAcreateserial", "-out", "pass.crt", "-days", "2"], { cwd: dir });
+      const active = { ...card, status: "Active", birthday_label: null };
+      const pass = etherIdPassJson(active, { ...meta, serialNumber: "eid_already_on_phone" });
+      const images = await etherIdImages(active);
+      const bytes = await buildPkpass(
+        [
+          { name: "pass.json", data: JSON.stringify(pass) },
+          ...images,
+        ],
+        {
+          certPem: readFileSync(join(dir, "pass.crt"), "utf8"),
+          keyPem: readFileSync(join(dir, "pass.key"), "utf8"),
+          wwdrPem: readFileSync(join(dir, "wwdr.pem"), "utf8"),
+        },
+      );
+      writeFileSync(join(dir, "ether-id.pkpass"), bytes);
+      execFileSync("unzip", ["-o", "ether-id.pkpass", "-d", "unpacked"], { cwd: dir });
+      const packed = JSON.parse(readFileSync(join(dir, "unpacked/pass.json"), "utf8"));
+      assert.equal(packed.serialNumber, "eid_already_on_phone");
+      assert.equal(packed.storeCard.primaryFields[0].value, "TORRES, MAYA");
+      assert.equal(packed.generic, undefined);
+      const strip = readFileSync(join(dir, "unpacked/strip@2x.png"));
+      assert.equal(strip[0], 137);
+      const width = strip.readUInt32BE(16);
+      const height = strip.readUInt32BE(20);
+      assert.deepEqual([width, height], [750, 246]);
+      assert.equal(readFileSync(join(dir, "unpacked/strip@3x.png")).readUInt32BE(16), 1125);
+      const strip1 = readFileSync(join(dir, "unpacked/strip.png"));
+      assert.equal(strip1.readUInt32BE(16), 375);
+      assert.equal(strip1.readUInt32BE(20), 123);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -5,6 +5,7 @@ export interface EtherIdPublic {
   display_name: string | null;
   username: string | null;
   avatar_url: string | null;
+  photo_url?: string | null;
   status: EtherIdStatus;
   member_since: string | null;
   member_since_label: string | null;
@@ -22,6 +23,7 @@ export interface EtherIdCard extends EtherIdPublic {
   show_birthday: boolean;
   birthday_month: number | null;
   birthday_day: number | null;
+  id_photo_url: string | null;
   token: string;
   verify_path: string;
 }
@@ -96,10 +98,41 @@ export const PUBLIC_VERIFY_KEYS = [
   "display_name",
   "username",
   "avatar_url",
+  "photo_url",
   "status",
   "member_since",
   "member_since_label",
 ] as const;
+
+/** The card shows a chosen ID photo, then the profile picture. */
+export function cardPhoto(card: { photo_url?: string | null; avatar_url?: string | null }) {
+  return card.photo_url || card.avatar_url || null;
+}
+
+/** LAST, REST from the real display name. No rank is added. */
+export function personnelName(displayName: string | null | undefined) {
+  const clean = (displayName || "").trim().replace(/\s+/g, " ");
+  if (!clean) return "NAME NOT SET";
+  const parts = clean.split(" ");
+  if (parts.length === 1) return parts[0].toUpperCase();
+  const last = parts[parts.length - 1].toUpperCase();
+  const rest = parts.slice(0, -1).join(" ").toUpperCase();
+  return `${last}, ${rest}`;
+}
+
+export const ETHER_ID_QR_SIZE = 112;
+
+/** Same payload the card renders. Quiet zone is marginSize modules inside size. */
+export function etherIdQr(value: string) {
+  return {
+    value,
+    size: ETHER_ID_QR_SIZE,
+    level: "M" as const,
+    marginSize: 4,
+    bgColor: "#ffffff",
+    fgColor: "#08080a",
+  };
+}
 
 export function isPublicVerifyCard(value: Record<string, unknown>) {
   const keys = Object.keys(value);
