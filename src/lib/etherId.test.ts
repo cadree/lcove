@@ -9,6 +9,8 @@ import {
   cardPhoto,
   etherIdQr,
   isPublicVerifyCard,
+  memberCode,
+  memberNumber,
   memberStatus,
   personnelName,
   usernameAt,
@@ -141,7 +143,11 @@ describe("verify payload", () => {
     assert.equal(personnelName("Maya"), "MAYA");
     assert.equal(cardPhoto({ photo_url: null, avatar_url: "/a.png" }), "/a.png");
     assert.equal(cardPhoto({ photo_url: "/id.png", avatar_url: "/a.png" }), "/id.png");
-    assert.equal(etherIdQr("https://etherbylcove.com/id/v/eid1.abc.1.sig").size >= 96, true);
+    const qr = etherIdQr("https://etherbylcove.com/id/v/eid1.abc.1.sig");
+    assert.equal(qr.size >= 72 && qr.size <= 96, true);
+    assert.equal(qr.bgColor, "#08080a");
+    assert.equal(memberCode("maya", "2026-10-01").startsWith("ETR."), true);
+    assert.match(memberNumber("maya", "2026-10-01"), /^\d{2} \d{2} \d{2} \d{2}$/);
     assert.equal(isPublicVerifyCard({ display_name: "Maya", user_id: "secret", birthday_label: "March 4" }), false);
   });
 });

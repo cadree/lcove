@@ -110,6 +110,7 @@ DECLARE
   v_day smallint;
   v_show boolean;
   v_id_photo text;
+  v_city text;
   v_birthday text;
   v_review_label text;
 BEGIN
@@ -156,8 +157,8 @@ BEGIN
       )
     );
 
-  SELECT birthday_month, birthday_day, show_birthday, id_photo_url
-  INTO v_month, v_day, v_show, v_id_photo
+  SELECT birthday_month, birthday_day, show_birthday, id_photo_url, city_display
+  INTO v_month, v_day, v_show, v_id_photo, v_city
   FROM public.profiles
   WHERE user_id = p_user_id;
 
@@ -179,7 +180,8 @@ BEGIN
     'show_birthday', COALESCE(v_show, false),
     'birthday_month', v_month,
     'birthday_day', v_day,
-    'id_photo_url', NULLIF(btrim(v_id_photo), '')
+    'id_photo_url', NULLIF(btrim(v_id_photo), ''),
+    'city', NULLIF(btrim(v_city), '')
   );
 END;
 $$;

@@ -34,7 +34,7 @@ const meta = {
   authenticationToken: "proof-token",
 };
 
-const photo = readFileSync(new URL("../public/nuance/dynasty-denim.png", import.meta.url));
+const photo = readFileSync(new URL("../public/ether-id/shot-portrait.jpg", import.meta.url));
 
 const dir = mkdtempSync(join(tmpdir(), "ether-id-proof-"));
 execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-keyout", "wwdr.key", "-out", "wwdr.pem", "-days", "2", "-nodes", "-subj", "/CN=Test WWDR"], { cwd: dir });

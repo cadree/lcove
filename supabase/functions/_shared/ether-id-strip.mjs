@@ -57,7 +57,6 @@ const BONE = rgba(NUANCE.bone);
 const BONE_DIM = rgba(NUANCE.boneDim);
 const FAINT = rgba(NUANCE.faint);
 const BUBBLE = rgba(NUANCE.bubble);
-const SCAN = rgba(NUANCE.scan);
 const ALERT = rgba(NUANCE.alert);
 
 async function loadImageScript() {
@@ -217,27 +216,24 @@ function coverTop(image, width, height) {
 
 function monogram(Image, name, width, height) {
   const image = new Image(width, height);
-  image.fill(INK);
+  image.fill(BONE);
   const letter = (String(name || "E").trim()[0] || "E").toUpperCase();
   const scale = Math.max(2, Math.floor(Math.min(width, height) / 12));
   const w = textWidth(letter, scale);
-  drawText(image, letter, Math.round((width - w) / 2), Math.round((height - 7 * scale) / 2), scale, BONE);
+  drawText(image, letter, Math.round((width - w) / 2), Math.round((height - 7 * scale) / 2), scale, INK);
   return image;
 }
 
-function halftone(image, source, originX, originY, width, height, cell, banned) {
+function halftone(image, source, originX, originY, width, height, cell) {
   const covered = coverTop(source, width, height);
   for (let y = 0; y < covered.height; y += cell) {
-    for (let x = 0; x < covered.width; x += cell) {
-      const raw = luminance(covered, x + cell / 2, y + cell / 2);
-      const light = Math.pow(Math.min(1, raw * 2.2), 0.5);
-      const radius = Math.max(light * cell * 0.5, raw > 0.035 ? cell * 0.22 : 0);
-      if (radius < 0.45) continue;
-      let color = BONE;
-      if (banned && light < 0.45) color = ALERT;
-      else if (light > 0.78) color = SCAN;
-      else if (light < 0.42) color = BUBBLE;
-      circle(image, originX + x + cell / 2, originY + y + cell / 2, radius, color);
+    const shift = (Math.floor(y / cell) % 2) * cell * 0.5;
+    for (let x = -cell; x < covered.width; x += cell) {
+      const raw = luminance(covered, x + shift + cell / 2, y + cell / 2);
+      const stretched = Math.min(1, Math.max(0, (raw - 0.08) / 0.78));
+      const darkness = Math.pow(1 - stretched, 0.72);
+      const radius = Math.max(cell * 0.1, darkness * cell * 0.56);
+      circle(image, originX + x + shift + cell / 2, originY + y + cell / 2, radius, INK);
     }
   }
 }
@@ -310,70 +306,58 @@ export async function renderEtherStrip(card, { scale = 1, photo = null, novi = n
   const ground = banned ? rgba(NUANCE.bgBanned) : INK;
   image.fill(ground);
 
-  const photoX = 7 * s;
-  const photoY = 7 * s;
-  const photoW = 112 * s;
-  const photoH = height - 14 * s;
-  const portrait = (await decodePhoto(photo)) || monogram(Image, card.display_name, photoW, photoH);
-  halftone(image, portrait, photoX, photoY, photoW, photoH, Math.max(2, 3 * s), banned);
-  fadeBottom(image, height * 0.7, ground);
-
-  const noviSource = novi || await loadNoviImage();
-  const noviH = 74 * s;
-  const noviW = Math.max(1, Math.round(noviH * (noviSource.width / noviSource.height)));
-  const noviX = width - noviW - 8 * s;
-  const noviY = 6 * s;
-  const mark = noviSource.clone();
-  mark.resize(noviW, noviH);
-  const glowColor = banned ? NUANCE.alert : NUANCE.bubble;
-  glow(image, noviX + noviW * 0.5, noviY + noviH * 0.42, 34 * s, glowColor);
-  if (!banned) glow(image, noviX + noviW * 0.2, noviY + noviH * 0.7, 16 * s, NUANCE.scan);
-  image.composite(mark, noviX, noviY);
+  const photoX = 8 * s;
+  const photoY = 8 * s;
+  const photoSide = 107 * s;
+  box(image, photoX, photoY, photoSide, photoSide, BONE);
+  const portrait = (await decodePhoto(photo)) || monogram(Image, card.display_name, photoSide, photoSide);
+  halftone(image, portrait, photoX, photoY, photoSide, photoSide, Math.max(2, 3 * s));
 
   const frame = banned ? ALERT : BONE;
-  const glowFrame = banned ? rgba(NUANCE.alert, 150) : rgba(NUANCE.bubble, 140);
-  strokeRoundRect(image, 5 * s, 5 * s, 116 * s, height - 10 * s, 10 * s, glowFrame, Math.max(2, 2 * s));
-  strokeRoundRect(image, 5 * s, 5 * s, 116 * s, height - 10 * s, 10 * s, frame, Math.max(1, s));
-  strokeRoundRect(image, 128 * s, 6 * s, width - 136 * s, 76 * s, 10 * s, glowFrame, Math.max(2, 2 * s));
-  strokeRoundRect(image, 128 * s, 6 * s, width - 136 * s, 76 * s, 10 * s, frame, Math.max(1, s));
+  const glowFrame = banned ? rgba(NUANCE.alert, 150) : rgba(NUANCE.bubble, 130);
+  strokeRoundRect(image, 4 * s, 4 * s, width - 8 * s, height - 8 * s, 8 * s, glowFrame, Math.max(2, 2 * s));
+  strokeRoundRect(image, 4 * s, 4 * s, width - 8 * s, height - 8 * s, 8 * s, frame, Math.max(1, s));
+  strokeRoundRect(image, photoX, photoY, photoSide, photoSide, 2 * s, frame, Math.max(1, s));
+
+  const wordScale = 4 * s;
+  drawText(image, "ETHER", 124 * s, 12 * s, wordScale, BONE);
   curve(
     image,
-    [118 * s, 36 * s],
-    [124 * s, 58 * s],
-    [122 * s, 28 * s],
-    [132 * s, 58 * s],
-    glowFrame,
-    Math.max(1.4, 1.6 * s),
-  );
-  curve(
-    image,
-    [118 * s, 36 * s],
-    [124 * s, 58 * s],
-    [122 * s, 28 * s],
-    [132 * s, 58 * s],
+    [250 * s, 28 * s],
+    [270 * s, 28 * s],
+    [268 * s, 12 * s],
+    [292 * s, 12 * s],
     frame,
     Math.max(0.8, s * 0.7),
   );
 
-  const wordScale = 4 * s;
-  drawText(image, "ETHER", 136 * s, 12 * s, wordScale, BONE);
-
-  const hexY = 50 * s;
+  const hexY = 58 * s;
   const hexes = [
-    [148 * s, hexY, 7 * s, rgba(NUANCE.faint, 230)],
-    [162 * s, hexY + 6 * s, 5 * s, rgba(NUANCE.boneDim, 180)],
-    [136 * s, hexY + 8 * s, 4 * s, rgba(NUANCE.scan, banned ? 80 : 200)],
-    [174 * s, hexY - 4 * s, 3.5 * s, rgba(NUANCE.bubble, banned ? 90 : 210)],
-    [186 * s, hexY + 7 * s, 4 * s, FAINT],
+    [136 * s, hexY, 7 * s],
+    [152 * s, hexY + 10 * s, 7 * s],
+    [168 * s, hexY, 7 * s],
+    [152 * s, hexY - 10 * s, 7 * s],
+    [136 * s, hexY + 20 * s, 7 * s],
+    [168 * s, hexY + 20 * s, 7 * s],
   ];
-  for (const [hx, hy, hr, color] of hexes) hexagon(image, hx, hy, hr, color);
+  for (const [hx, hy, hr] of hexes) hexagon(image, hx, hy, hr, rgba("#8a857b"));
+
+  const noviSource = novi || await loadNoviImage();
+  const noviH = 64 * s;
+  const noviW = Math.max(1, Math.round(noviH * (noviSource.width / noviSource.height)));
+  const noviX = width - noviW - 12 * s;
+  const noviY = 8 * s;
+  const mark = noviSource.clone();
+  mark.resize(noviW, noviH);
+  glow(image, noviX + noviW * 0.5, noviY + noviH * 0.46, 22 * s, banned ? NUANCE.alert : NUANCE.bubble);
+  image.composite(mark, noviX, noviY);
 
   if (banned) {
-    drawText(image, "BANNED", 136 * s, 62 * s, 3 * s, ALERT);
-    box(image, 136 * s, 84 * s, textWidth("BANNED", 3 * s), Math.max(1, s), ALERT);
+    drawText(image, "BANNED", photoX + 8 * s, photoY + photoSide * 0.42, 3 * s, ALERT);
   } else {
-    ticks(image, 140 * s, 64 * s, 150 * s, Math.max(1, s), BONE_DIM);
+    ticks(image, 230 * s, 96 * s, 120 * s, Math.max(1, s), BONE_DIM);
   }
+  fadeBottom(image, height * 0.84, ground);
 
   return image.encode();
 }

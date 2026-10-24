@@ -42,7 +42,7 @@ export default function EtherIdVerify() {
 
   return (
     <PageLayout>
-      <div className="mx-auto max-w-[760px] px-4 pb-24 pt-6 sm:px-6">
+      <div className="mx-auto max-w-[980px] px-4 pb-24 pt-6 sm:px-6">
         <PageHeader
           eyebrow="Live status"
           title="Verify"

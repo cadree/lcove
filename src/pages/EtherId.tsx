@@ -193,7 +193,7 @@ export default function EtherId() {
 
   return (
     <PageLayout>
-      <div className="mx-auto max-w-[760px] px-4 pb-24 pt-6 sm:px-6">
+      <div className="mx-auto max-w-[980px] px-4 pb-24 pt-6 sm:px-6">
         <PageHeader
           eyebrow="Member"
           title="Ether ID"

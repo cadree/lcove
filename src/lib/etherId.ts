@@ -24,6 +24,7 @@ export interface EtherIdCard extends EtherIdPublic {
   birthday_month: number | null;
   birthday_day: number | null;
   id_photo_url: string | null;
+  city?: string | null;
   token: string;
   verify_path: string;
 }
@@ -120,18 +121,45 @@ export function personnelName(displayName: string | null | undefined) {
   return `${last}, ${rest}`;
 }
 
-export const ETHER_ID_QR_SIZE = 112;
+export const ETHER_ID_QR_SIZE = 96;
 
-/** Same payload the card renders. Quiet zone is marginSize modules inside size. */
+/** Light modules on the card ground. Quiet zone is marginSize modules inside size. */
 export function etherIdQr(value: string) {
   return {
     value,
     size: ETHER_ID_QR_SIZE,
     level: "M" as const,
-    marginSize: 4,
-    bgColor: "#ffffff",
-    fgColor: "#08080a",
+    marginSize: 2,
+    bgColor: "#08080a",
+    fgColor: "#ece7dc",
   };
+}
+
+function plateHash(input: string) {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+/** Stable display code. Not a secret and not the verify token. */
+export function memberCode(username: string | null | undefined, memberSince: string | null | undefined) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // cspell:disable-line
+  let n = plateHash(`${username || "member"}|${memberSince || ""}`);
+  let out = "";
+  for (let i = 0; i < 4; i += 1) {
+    out += alphabet[n % alphabet.length];
+    n = Math.floor(n / alphabet.length);
+  }
+  return `ETR.${out}`;
+}
+
+/** Eight digits grouped like the plate's serial. Derived from the same public fields. */
+export function memberNumber(username: string | null | undefined, memberSince: string | null | undefined) {
+  const digits = String(plateHash(`n|${username || ""}|${memberSince || ""}`) % 100000000).padStart(8, "0");
+  return `${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4, 6)} ${digits.slice(6, 8)}`;
 }
 
 export function isPublicVerifyCard(value: Record<string, unknown>) {

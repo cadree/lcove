@@ -80,9 +80,10 @@ let shotStatus = 'Active';
 const ownerCard = {
   display_name: 'Maya Torres',
   username: 'maya',
-  avatar_url: '/nuance/dynasty-denim.png',
-  photo_url: '/nuance/dynasty-denim.png',
+  avatar_url: '/ether-id/shot-portrait.jpg',
+  photo_url: '/ether-id/shot-portrait.jpg',
   id_photo_url: null,
+  city: 'Los Angeles',
   status: 'Active',
   member_since: '2026-10-01',
   member_since_label: 'October 2026',
@@ -105,8 +106,8 @@ function publicCard(status) {
   return {
     display_name: 'Maya Torres',
     username: 'maya',
-    avatar_url: '/nuance/dynasty-denim.png',
-    photo_url: '/nuance/dynasty-denim.png',
+    avatar_url: '/ether-id/shot-portrait.jpg',
+    photo_url: '/ether-id/shot-portrait.jpg',
     status,
     member_since: '2026-10-01',
     member_since_label: 'October 2026',
@@ -258,10 +259,11 @@ async function expectCard(page, status, name) {
   await expectText(page, 'TORRES, MAYA');
   await expectText(page, '@maya');
   await expectText(page, 'Photography');
-  await expectText(page, '4.5 average · 2 reviews');
-  await expectText(page, '2 completed');
-  await expectText(page, 'March 4');
+  await expectText(page, '4.5/2');
+  await expectText(page, '>PROJECTS');
+  await expectText(page, '03.04');
   await expectText(page, 'self-reported');
+  await expectText(page, 'Los Angeles');
   await expectText(page, status);
   await expectText(page, 'This is not age verification.');
   await page.locator('canvas[data-halftone="ready"]').waitFor({ state: 'visible', timeout: 15000 });
@@ -286,7 +288,7 @@ async function scanQr(page) {
       data[i + 3] = pixel & 255;
     }
   }
-  const code = jsQR(data, image.width, image.height);
+  const code = jsQR(data, image.width, image.height, { inversionAttempts: 'attemptBoth' });
   const expected = `${base}/id/v/${ACTIVE_TOKEN}`;
   if (!code || code.data !== expected) {
     throw new Error(`QR decoded ${code?.data || 'nothing'}, expected ${expected}`);
@@ -333,7 +335,7 @@ await shoot('verify-active', `/id/v/${ACTIVE_TOKEN}`, async (page) => {
   await expectText(page, 'TORRES, MAYA');
   await expectText(page, '@maya');
   await expectText(page, 'Active');
-  await expectText(page, 'October 2026');
+  await expectText(page, '2026.10.01');
   const body = await page.locator('body').innerText();
   if (body.includes('March 4') || body.includes('4.5') || body.includes('Photography') || body.includes('2 completed')) {
     throw new Error(`verify-active leaked private fields:\n${body}`);
