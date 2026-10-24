@@ -51,7 +51,7 @@ export function PublicEventScreen({
     <div className={model.theme === "light" ? "light min-h-screen bg-background text-foreground" : "min-h-screen bg-background text-foreground"}>
       <div className="relative min-h-[70vh] bg-card">
         {model.flyerUrl ? (
-          <img src={model.flyerUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <img src={model.flyerUrl} alt={model.title} fetchPriority="high" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-b from-primary/40 via-card to-background" />
         )}

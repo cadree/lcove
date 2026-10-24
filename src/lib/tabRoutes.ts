@@ -8,8 +8,25 @@ const tabLoads = [loadFeed, loadExplore, loadMessages, loadProfile];
 /** Wait until the first screen has painted before warming the other tabs. */
 export const TAB_PREFETCH_DELAY_MS = 12_000;
 
+/** True when this browser already has a Supabase session. Signed-out member routes render a prompt, not the page. */
+export function hasAuthSession(): boolean {
+  if (typeof localStorage === "undefined") return false;
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key?.includes("-auth-token") && localStorage.getItem(key)) return true;
+    }
+  } catch {
+    // Private mode can throw. Treat that as signed out.
+  }
+  return false;
+}
+
 /** Pull the four tab screens after the landing work is done. A tap still prefetches that one tab. */
 export function prefetchMainTabs() {
+  // Signed-out /feed, /profile, and /live never mount those screens. Warming them
+  // queues the route graph ahead of the splash image.
+  if (!hasAuthSession()) return;
   const run = () => {
     for (const load of tabLoads) void load();
   };

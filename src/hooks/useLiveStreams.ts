@@ -173,6 +173,10 @@ export const useStream = (streamId: string | undefined) => {
       } as LiveStream;
     },
     enabled: !!streamId,
+    // The host badge reads this row. Keep polling while the sheet is open,
+    // including when the tab is in the background.
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
   });
 
   useEffect(() => {

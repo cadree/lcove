@@ -1,6 +1,6 @@
 // Application entry point - Ether App
 import { lazy, Suspense, useEffect } from "react";
-import { loadExplore, loadFeed, loadMessages, loadProfile, prefetchMainTabs } from "@/lib/tabRoutes";
+import { hasAuthSession, loadExplore, loadFeed, loadMessages, loadProfile, prefetchMainTabs } from "@/lib/tabRoutes";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { WorldLayer } from "@/components/world/WorldLayer";
 import { Toaster } from "@/components/ui/toaster";
@@ -16,16 +16,19 @@ import { EtherSplash } from "@/components/brand/EtherSplash";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
 import { IosCheckoutReturn } from "@/components/ios/IosCheckoutReturn";
 import { APP_STORE_APPLE_ID, APP_STORE_URL } from "@/config/launch";
+import MotionRoot from "@/components/motion/MotionRoot";
 
-const motionRootPromise = import("@/components/motion/MotionRoot");
-const MotionRoot = lazy(() => motionRootPromise);
-
-// The open route starts downloading with the entry, in parallel with MotionRoot.
-// Other tabs wait for an idle prefetch so they do not compete with first paint.
+// index.html also preloads the open screen. This covers a reload before that
+// map exists, and it shares the promise with the lazy route.
 if (typeof window !== "undefined") {
   const path = window.location.pathname;
+  const session = hasAuthSession();
   if (path === "/" || path === "/landing") void import("./pages/Landing");
   else if (path === "/auth") void import("./pages/Auth");
+  else if ((path === "/feed" || path === "/home") && session) void loadFeed();
+  else if ((path === "/profile" || path.startsWith("/profile/")) && session) void loadProfile();
+  else if (path === "/live" && session) void import("./pages/Live");
+  else if (path.startsWith("/live/")) void import("./pages/PublicLivePage");
   else if (path.startsWith("/event/")) void import("./pages/PublicEventPage");
 }
 
@@ -157,8 +160,8 @@ const App = () => (
                 <StoreListingMeta />
                 <Toaster />
               <Sonner />
-              <Suspense fallback={<RouteFallback />}>
               <MotionRoot>
+              <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/waitlist" element={<Waitlist />} />
@@ -233,8 +236,8 @@ const App = () => (
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
-              </MotionRoot>
               </Suspense>
+              </MotionRoot>
               </AccessGate>
             </CreateFlowProvider>
           </PresenceProvider>

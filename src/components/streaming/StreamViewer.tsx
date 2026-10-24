@@ -64,7 +64,8 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   const [floatingReactions, setFloatingReactions] = useState<{ id: string; emoji: string; x: number }[]>([]);
   const [reportOpen, setReportOpen] = useState(false);
   const [holdHost, setHoldHost] = useState(false);
-  const cardGifts = digitalPurchasesEnabled();
+  // LC tips and card gifts are digital goods. The iOS app hides both (guideline 3.1.1).
+  const digitalGoods = digitalPurchasesEnabled();
   const isHost = user?.id === stream?.host_id;
   useStreamPresence(streamId, open && !!user && !isHost && stream?.is_live === true);
   const streamStatus = stream ? getStreamStatus(stream) : 'draft';
@@ -132,6 +133,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   };
 
   const sendCardGift = async (gift: "rose" | "star" | "crown") => {
+    if (!digitalGoods) return;
     try {
       const { data, error } = await supabase.functions.invoke("create-stream-gift", {
         body: { streamId, gift },
@@ -150,6 +152,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   };
 
   const handleTip = () => {
+    if (!digitalGoods) return;
     const amount = parseInt(tipAmount);
     if (!amount || amount < 1) return;
     tipStream.mutate({ streamId, amount, message: tipMessage });
@@ -179,6 +182,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
           <WebRTCStreamHost
             streamId={streamId}
             isLive={streamStatus === 'live'}
+            serverCount={stream.viewer_count ?? 0}
             onEnd={() => {
               setHoldHost(false);
               endGuard.current = null;
@@ -425,15 +429,17 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
                       <Share2 className="h-4 w-4 mr-2" />
                       Share
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                      onClick={() => setShowTipInput(!showTipInput)}
-                    >
-                      <Coins className="h-4 w-4 mr-2" />
-                      Tip LC
-                    </Button>
-                    {cardGifts && (["rose", "star", "crown"] as const).map((gift) => (
+                    {digitalGoods && (
+                      <Button
+                        variant="outline"
+                        className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                        onClick={() => setShowTipInput(!showTipInput)}
+                      >
+                        <Coins className="h-4 w-4 mr-2" />
+                        Tip LC
+                      </Button>
+                    )}
+                    {digitalGoods && (["rose", "star", "crown"] as const).map((gift) => (
                       <Button
                         key={gift}
                         type="button"
@@ -449,7 +455,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
             </div>
 
             {/* Tip Input */}
-            {showTipInput && (
+            {digitalGoods && showTipInput && (
               <motion.div 
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}

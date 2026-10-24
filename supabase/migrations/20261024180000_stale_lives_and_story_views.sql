@@ -20,7 +20,7 @@ CREATE OR REPLACE FUNCTION public.touch_host_presence(p_stream_id uuid)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 BEGIN
   IF auth.uid() IS NULL THEN
@@ -46,7 +46,7 @@ CREATE OR REPLACE FUNCTION public.close_stale_live_streams()
 RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_count integer;

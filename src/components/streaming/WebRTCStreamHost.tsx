@@ -67,6 +67,8 @@ import { LIVE_REQUEST_TIMEOUT_MS, withDeadline } from "@/lib/withDeadline";
 interface WebRTCStreamHostProps {
   streamId: string;
   isLive?: boolean;
+  /** Latest viewer_count from the open stream query. */
+  serverCount?: number;
   onEnd: () => void;
   onClose: () => void;
   registerEndGuard?: (guard: (() => boolean) | null) => void;
@@ -173,6 +175,7 @@ async function storeReplay(userId: string, streamId: string, blob: Blob, mime: s
 export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
   streamId,
   isLive: initialIsLive = false,
+  serverCount = 0,
   onEnd,
   onClose,
   registerEndGuard,
@@ -725,8 +728,10 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
         .from("live_streams_public")
         .select("viewer_count")
         .eq("id", streamId)
-        .maybeSingle();
-      if (!stopped && !error) setViewerCount(data?.viewer_count || 0);
+        .limit(1);
+      const row = Array.isArray(data) ? data[0] : data;
+      const count = row?.viewer_count;
+      if (!stopped && !error && typeof count === "number") setViewerCount(count);
     };
     void refreshCount();
     const timer = window.setInterval(() => void refreshCount(), 10_000);
@@ -743,7 +748,11 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
     return () => {
       stopped = true;
       window.clearInterval(timer);
-      supabase.removeChannel(channel);
+      try {
+        void supabase.removeChannel(channel);
+      } catch {
+        // A realtime teardown failure must not drop the next poll.
+      }
     };
   }, [streamId]);
 
@@ -927,7 +936,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
           )}
           <Badge variant="secondary" className="bg-background/80 text-xs backdrop-blur-sm" data-testid="viewer-count">
             <Users className="mr-1 h-3 w-3" />
-            {viewerCount}
+            {serverCount > 0 ? serverCount : viewerCount}
           </Badge>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { SplashScreen } from "@capacitor/splash-screen";
 import wordmark from "@/assets/ether-wordmark-splash.webp";
@@ -20,6 +20,11 @@ export function EtherSplash() {
   const reduced =
     typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const total = reduced ? REDUCED_MS : POWER_MS;
+
+  useLayoutEffect(() => {
+    // index.html paints this image before JavaScript. Drop it once React's splash is in the tree.
+    document.getElementById("boot-splash")?.remove();
+  }, []);
 
   useEffect(() => {
     void hideNativeSplash();
