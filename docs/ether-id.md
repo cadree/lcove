@@ -26,7 +26,7 @@ A member cannot ban, unban, suspend, or unsuspend themselves. Onboarding can sti
 
 ## Token
 
-The QR is `eid1.<jti>.<exp>.<hmac>`. The HMAC key is one row in `ether_id_secret`. The jti is a row in `ether_id_tokens`, not the user id. Tokens last 30 days, rotate when the member taps **Refresh code**, and stop verifying when revoked or expired. Anon cannot read the token table or the secret. Anon may call `get_ether_id_by_token` only. That function returns name, username, avatar, member since, and the live status.
+The QR is `eid1.<jti>.<exp>.<hmac>`. Signing calls `extensions.hmac` and `extensions.gen_random_bytes`, because hosted Supabase keeps pgcrypto in the `extensions` schema. The HMAC key is one row in `ether_id_secret`. The jti is a row in `ether_id_tokens`, not the user id. Tokens last 30 days, rotate when the member taps **Refresh code**, and stop verifying when revoked or expired. Anon cannot read the token table or the secret. Anon may call `get_ether_id_by_token` only. That function returns name, username, avatar, member since, and the live status.
 
 ## Apple Wallet
 

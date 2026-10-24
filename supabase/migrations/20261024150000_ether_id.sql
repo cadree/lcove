@@ -275,8 +275,9 @@ STABLE
 SECURITY DEFINER
 SET search_path = public, extensions, pg_temp
 AS $$
+  -- extensions.hmac: pgcrypto lives in the extensions schema on hosted Supabase.
   SELECT translate(
-    rtrim(encode(hmac(p_body, s.secret, 'sha256'), 'base64'), '='),
+    rtrim(encode(extensions.hmac(p_body, s.secret, 'sha256'), 'base64'), '='),
     '+/',
     '-_'
   )
@@ -653,8 +654,8 @@ BEGIN
       WHERE user_id = v_uid;
     END IF;
   ELSE
-    v_serial := 'eid_' || encode(gen_random_bytes(16), 'hex');
-    v_auth := encode(gen_random_bytes(32), 'hex');
+    v_serial := 'eid_' || encode(extensions.gen_random_bytes(16), 'hex');
+    v_auth := encode(extensions.gen_random_bytes(32), 'hex');
     INSERT INTO public.ether_id_passes (user_id, serial_number, auth_token, pass_type_identifier)
     VALUES (v_uid, v_serial, v_auth, p_pass_type_id);
   END IF;

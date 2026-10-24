@@ -10,6 +10,29 @@
 BEGIN;
 
 DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'extensions'
+      AND p.proname = 'hmac'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: pgcrypto hmac is not in the extensions schema';
+  END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname IN ('hmac', 'gen_random_bytes', 'digest', 'crypt', 'gen_salt')
+  ) THEN
+    RAISE EXCEPTION 'FAIL: pgcrypto is installed in public; scratch must use extensions';
+  END IF;
+  RAISE NOTICE 'PASS: pgcrypto is in extensions';
+END $$;
+
+DO $$
 DECLARE
   hidden text[];
 BEGIN

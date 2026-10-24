@@ -1,10 +1,15 @@
 -- Local scratch bootstrap only. Not a Supabase migration.
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- Stubs the platform objects migrations expect (roles, auth, storage,
 -- realtime publication) so every file in supabase/migrations can apply
 -- on a throwaway Postgres. Never run this against a hosted database.
 
 CREATE SCHEMA IF NOT EXISTS extensions;
+-- Hosted Supabase installs pgcrypto here, not in public. A function that
+-- pins search_path to public and calls hmac or gen_random_bytes then fails
+-- with 42883. integration-rls-check.sh also puts extensions on the database
+-- search_path so migration SQL outside a pinned function still resolves.
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+
 CREATE SCHEMA IF NOT EXISTS auth;
 CREATE SCHEMA IF NOT EXISTS storage;
 

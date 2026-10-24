@@ -61,6 +61,9 @@ createdb "$DB_NAME"
 
 echo "applying bootstrap (roles, auth, storage, publication)"
 psql -v ON_ERROR_STOP=1 -q -d "$DB_NAME" -f "$ROOT/scripts/integration-rls-bootstrap.sql"
+# New connections pick this up. Migration SQL can call pgcrypto unqualified.
+# Functions that pin search_path to public still cannot.
+psql -v ON_ERROR_STOP=1 -q -d "$DB_NAME" -c "ALTER DATABASE \"$DB_NAME\" SET search_path TO public, extensions"
 
 echo "migration order (filename):"
 count=0
