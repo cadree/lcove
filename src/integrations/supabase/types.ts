@@ -7666,6 +7666,78 @@ export type Database = {
       }
     }
     Views: {
+      consumer_creators: {
+        Row: {
+          avatar_url: string | null
+          display_name: string | null
+          user_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          display_name?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          display_name?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      consumer_live_streams: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          ended_at: string | null
+          external_url: string | null
+          host_id: string | null
+          id: string | null
+          is_live: boolean | null
+          playback_url: string | null
+          replay_available: boolean | null
+          replay_url: string | null
+          started_at: string | null
+          stream_type: string | null
+          thumbnail_url: string | null
+          title: string | null
+          viewer_count: number | null
+        }
+        Insert: {
+          created_at?: never
+          description?: never
+          ended_at?: never
+          external_url?: never
+          host_id?: never
+          id?: never
+          is_live?: never
+          playback_url?: never
+          replay_available?: never
+          replay_url?: never
+          started_at?: never
+          stream_type?: never
+          thumbnail_url?: never
+          title?: never
+          viewer_count?: never
+        }
+        Update: {
+          created_at?: never
+          description?: never
+          ended_at?: never
+          external_url?: never
+          host_id?: never
+          id?: never
+          is_live?: never
+          playback_url?: never
+          replay_available?: never
+          replay_url?: never
+          started_at?: never
+          stream_type?: never
+          thumbnail_url?: never
+          title?: never
+          viewer_count?: never
+        }
+        Relationships: []
+      }
       live_streams_public: {
         Row: {
           created_at: string | null

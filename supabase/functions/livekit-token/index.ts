@@ -7,6 +7,8 @@ import {
   readLiveKitConfig,
   signLiveKitToken,
 } from "../_shared/livekit-access.mjs";
+import { requestRole } from "../_shared/require-caller.ts";
+import { clientRateKey, GUEST_LIMITS, watchableStream } from "../_shared/guest-consumer.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,9 +33,10 @@ serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const admin = createClient(supabaseUrl, serviceKey);
     const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-    const { data: authData, error: authError } = await admin.auth.getUser(token);
-    const user = authData?.user;
-    if (authError || !user) return json({ error: "Unauthorized" }, 401);
+    const { data: authData } = await admin.auth.getUser(token);
+    const user = authData?.user ?? null;
+    const role = requestRole(req);
+    if (!user && role !== "anon") return json({ error: "Unauthorized" }, 401);
 
     const config = readLiveKitConfig({
       LIVEKIT_URL: Deno.env.get("LIVEKIT_URL"),
@@ -48,16 +51,33 @@ serve(async (req) => {
 
     const { data: stream, error: streamError } = await admin
       .from("live_streams")
-      .select("id, host_id")
+      .select("id, host_id, is_live, replay_available, replay_url, started_at, stream_type, external_url")
       .eq("id", streamId)
       .maybeSingle();
     if (streamError || !stream?.host_id) return json({ error: "Stream not found" }, 404);
+    if (!user && !watchableStream(stream)) return json({ error: "Stream not found" }, 404);
 
-    const video = liveKitVideoGrant(user.id, stream.host_id, stream.id);
+    let identity = user?.id ?? "";
+    if (!user) {
+      const ipKey = await clientRateKey(req.headers);
+      if (ipKey) {
+        const { error: quotaError } = await admin.rpc("consume_guest_quota", {
+          p_action: "guest_live_ip",
+          p_key: ipKey,
+          p_limit: GUEST_LIMITS.liveIpPerHour,
+          p_window_seconds: 3600,
+        });
+        if (quotaError) return json({ error: "limit reached" }, 400);
+      }
+      identity = `guest-${crypto.randomUUID()}`;
+    }
+
+    const video = liveKitVideoGrant(identity, stream.host_id, stream.id);
+    if (!user) video.canPublish = false;
     const signed = await signLiveKitToken({
       apiKey: config.apiKey,
       apiSecret: config.apiSecret,
-      identity: user.id,
+      identity,
       video,
     });
 
