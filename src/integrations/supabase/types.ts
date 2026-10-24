@@ -6745,6 +6745,7 @@ export type Database = {
         Row: {
           id: string
           joined_at: string
+          last_seen: string
           left_at: string | null
           stream_id: string
           viewer_id: string
@@ -6752,6 +6753,7 @@ export type Database = {
         Insert: {
           id?: string
           joined_at?: string
+          last_seen?: string
           left_at?: string | null
           stream_id: string
           viewer_id: string
@@ -6759,6 +6761,7 @@ export type Database = {
         Update: {
           id?: string
           joined_at?: string
+          last_seen?: string
           left_at?: string | null
           stream_id?: string
           viewer_id?: string

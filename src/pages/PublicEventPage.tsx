@@ -316,7 +316,7 @@ export default function PublicEventPage() {
       <div className="relative">
         {event.image_url ? (
           <div className="h-56 sm:h-72 w-full overflow-hidden">
-            <img src={event.image_url} alt={event.title} className="w-full h-full object-cover" />
+            <img src={event.image_url} alt={event.title} fetchPriority="high" decoding="async" className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
           </div>
         ) : (

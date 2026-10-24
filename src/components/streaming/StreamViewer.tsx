@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,9 +15,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { WebRTCStreamViewer } from './WebRTCStreamViewer';
-import { WebRTCStreamHost } from './WebRTCStreamHost';
-import { ReplayPlayer } from './ReplayPlayer';
+const WebRTCStreamViewer = lazy(() => import('./WebRTCStreamViewer').then((mod) => ({ default: mod.WebRTCStreamViewer })));
+const WebRTCStreamHost = lazy(() => import('./WebRTCStreamHost').then((mod) => ({ default: mod.WebRTCStreamHost })));
+const ReplayPlayer = lazy(() => import('./ReplayPlayer').then((mod) => ({ default: mod.ReplayPlayer })));
+
+function LiveMediaFallback() {
+  return (
+    <div className="flex h-full min-h-[34vh] w-full items-center justify-center text-sm text-muted-foreground">
+      Loading live video…
+    </div>
+  );
+}
 import { DeleteStreamButton } from './DeleteStreamButton';
 import { liveSheetState } from '@/lib/liveSheetHistory';
 
@@ -167,6 +175,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
       // here used to unmount the recorder before the file was stored.
       if (isHost && (streamStatus !== 'ended' || holdHost)) {
         return (
+          <Suspense fallback={<LiveMediaFallback />}>
           <WebRTCStreamHost
             streamId={streamId}
             isLive={streamStatus === 'live'}
@@ -180,17 +189,20 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
               endGuard.current = guard;
             }}
           />
+          </Suspense>
         );
       }
 
       // REPLAY VIEW: Anyone can watch a replay (host or viewer)
       if (streamStatus === 'ended' && hasReplay) {
         return (
+          <Suspense fallback={<LiveMediaFallback />}>
           <ReplayPlayer 
             src={stream.replay_url!}
             poster={stream.thumbnail_url}
             className="w-full h-full"
           />
+          </Suspense>
         );
       }
       
@@ -222,6 +234,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
       
       // VIEWER: Stream is live - connect to watch
       return (
+        <Suspense fallback={<LiveMediaFallback />}>
         <WebRTCStreamViewer 
           streamId={streamId}
           hostId={stream.host_id}
@@ -229,6 +242,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
           viewerCount={stream.viewer_count || 0}
           thumbnailUrl={stream.thumbnail_url}
         />
+        </Suspense>
       );
     }
 

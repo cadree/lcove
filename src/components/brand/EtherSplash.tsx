@@ -42,6 +42,10 @@ export function EtherSplash() {
       <img
         src={wordmark}
         alt=""
+        width={840}
+        height={269}
+        fetchPriority="high"
+        decoding="async"
         className="ether-splash-mark block h-auto w-[min(86vw,26rem)] max-w-full object-contain"
         style={{ animationDuration: `${total}ms` }}
       />

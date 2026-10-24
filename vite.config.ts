@@ -16,7 +16,9 @@ function previewSupabaseGuard() {
 }
 
 function isCharts(id: string): boolean {
-  return id.includes("/recharts/") || id.includes("/d3-") || id.includes("/victory-vendor/");
+  // Only the recharts entry. Forcing d3 into this chunk pulls a shared helper
+  // into it, and the React runtime then imports the whole chart bundle.
+  return id.includes("/node_modules/recharts/");
 }
 
 function isEditors(id: string): boolean {
@@ -28,6 +30,13 @@ function isEditors(id: string): boolean {
     id.includes("/fflate/") ||
     id.includes("/fast-png/") ||
     id.includes("/pako/")
+  );
+}
+
+function isSharedRuntime(id: string): boolean {
+  return (
+    /\/node_modules\/(react|react-dom|scheduler|react-router|react-router-dom|clsx|tailwind-merge)\//.test(id) ||
+    id.includes("/node_modules/@remix-run/router/")
   );
 }
 
@@ -81,16 +90,30 @@ export default defineConfig(() => ({
   build: {
     rollupOptions: {
       output: {
+        // A lazy route's chart/editor chunk must not be hoisted onto the entry.
+        hoistTransitiveImports: false,
         manualChunks(id, { getModuleInfo }) {
+          // The CommonJS interop helper is shared with React. Leaving it in
+          // the charts chunk makes every page download recharts.
+          if (id.includes("commonjsHelpers")) return "vendor";
           if (isCharts(id)) return "charts";
           if (id.includes("/hls.js/")) return "video";
           if (isEditors(id)) return "editors";
           if (id.includes("/html5-qrcode/")) return "scanner";
           // The encoder loads only when a video is over the storage cap.
           if (id.includes("/mediabunny/")) return "video-compress";
-          // Shared runtime stays in its own chunk. Rollup otherwise folds
-          // React and the Vite preload helper into the first heavy chunk.
-          if (reachableFromEntry(id, getModuleInfo) && (id.includes("node_modules") || id.startsWith("\0"))) {
+          // LiveKit stays out of the Live list. The room sheet loads it.
+          if (id.includes("/livekit-client/") || id.includes("/@livekit/")) return "livekit";
+          if (id.includes("/framer-motion/") || id.includes("/motion-dom/") || id.includes("/motion-utils/")) {
+            return "motion";
+          }
+          // React stays in its own chunk. Rollup otherwise folds React and
+          // the Vite preload helper into the first heavy chunk. Other
+          // libraries stay with the route that imports them.
+          if (
+            reachableFromEntry(id, getModuleInfo) &&
+            (isSharedRuntime(id) || id.includes("vite/preload-helper"))
+          ) {
             return "vendor";
           }
           return undefined;

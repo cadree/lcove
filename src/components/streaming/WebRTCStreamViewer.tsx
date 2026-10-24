@@ -6,7 +6,7 @@ import { Loader2, Radio, RefreshCw, Users, Volume2, WifiOff } from "lucide-react
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { errorMessage } from "@/lib/errorMessage";
-import { LIVE_VIDEO_NOT_CONFIGURED, parseLiveKitTokenResponse, type LiveKitSession } from "@/lib/livekitSession";
+import { LIVE_VIDEO_NOT_CONFIGURED, nextTokenRefreshDelay, parseLiveKitTokenResponse, type LiveKitSession } from "@/lib/livekitSession";
 import { prepareVideoElement, setAudioSession } from "@/lib/livePhone";
 import { shotViewerPreview } from "@/lib/shotSession";
 import { LIVE_REQUEST_TIMEOUT_MS, withDeadline } from "@/lib/withDeadline";
@@ -47,7 +47,23 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
   const roomRef = useRef<Room | null>(null);
   const audioRef = useRef<HTMLMediaElement[]>([]);
   const attemptRef = useRef(0);
+  const tokenTimerRef = useRef<number | null>(null);
+  const connectRef = useRef<() => Promise<void>>(async () => undefined);
   const [phase, setPhase] = useState<ViewerPhase>("connecting");
+
+  const clearTokenTimer = () => {
+    if (tokenTimerRef.current !== null) window.clearTimeout(tokenTimerRef.current);
+    tokenTimerRef.current = null;
+  };
+
+  const armTokenRefresh = (token: string) => {
+    clearTokenTimer();
+    const delay = nextTokenRefreshDelay(token);
+    if (delay === null) return;
+    tokenTimerRef.current = window.setTimeout(() => {
+      void connectRef.current();
+    }, delay);
+  };
   const [hasVideo, setHasVideo] = useState(false);
   const [needsSound, setNeedsSound] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,8 +79,9 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
 
   const disconnectRoom = useCallback(() => {
     releaseAudio();
-    roomRef.current?.disconnect();
+    const room = roomRef.current;
     roomRef.current = null;
+    room?.disconnect();
   }, []);
 
   const unlockSound = useCallback(async () => {
@@ -90,6 +107,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
   const connect = useCallback(async () => {
     if (!userId || !isLive) return;
     const attempt = ++attemptRef.current;
+    clearTokenTimer();
     disconnectRoom();
     const still = () => attempt === attemptRef.current;
     setPhase("connecting");
@@ -169,6 +187,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
         });
       });
       if (still()) {
+        armTokenRefresh(session.token);
         setPhase((current) => (current === "connecting" ? "waiting" : current));
       }
     } catch (err: unknown) {
@@ -177,6 +196,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       setPhase("offline");
     }
   }, [disconnectRoom, hostId, isLive, streamId, userId]);
+  connectRef.current = connect;
 
   useEffect(() => {
     if (!isLive || !userId) return;
@@ -185,6 +205,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
     }, 300);
     return () => {
       window.clearTimeout(timer);
+      clearTokenTimer();
       attemptRef.current += 1;
       disconnectRoom();
     };

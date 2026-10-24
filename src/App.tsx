@@ -1,7 +1,6 @@
 // Application entry point - Ether App
 import { lazy, Suspense, useEffect } from "react";
 import { loadExplore, loadFeed, loadMessages, loadProfile, prefetchMainTabs } from "@/lib/tabRoutes";
-import { MotionConfig } from "framer-motion";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { WorldLayer } from "@/components/world/WorldLayer";
 import { Toaster } from "@/components/ui/toaster";
@@ -17,6 +16,18 @@ import { EtherSplash } from "@/components/brand/EtherSplash";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
 import { IosCheckoutReturn } from "@/components/ios/IosCheckoutReturn";
 import { APP_STORE_APPLE_ID, APP_STORE_URL } from "@/config/launch";
+
+const motionRootPromise = import("@/components/motion/MotionRoot");
+const MotionRoot = lazy(() => motionRootPromise);
+
+// The open route starts downloading with the entry, in parallel with MotionRoot.
+// Other tabs wait for an idle prefetch so they do not compete with first paint.
+if (typeof window !== "undefined") {
+  const path = window.location.pathname;
+  if (path === "/" || path === "/landing") void import("./pages/Landing");
+  else if (path === "/auth") void import("./pages/Auth");
+  else if (path.startsWith("/event/")) void import("./pages/PublicEventPage");
+}
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Waitlist = lazy(() => import("./pages/Waitlist"));
@@ -127,7 +138,6 @@ const App = () => (
       <BrowserRouter>
         <ThemeProvider>
         <WorldLayer />
-        <MotionConfig reducedMotion="user">
         <AuthProvider>
           <IosCheckoutReturn />
           <PresenceProvider>
@@ -139,6 +149,7 @@ const App = () => (
                 <Toaster />
               <Sonner />
               <Suspense fallback={<RouteFallback />}>
+              <MotionRoot>
               <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/waitlist" element={<Waitlist />} />
@@ -203,12 +214,12 @@ const App = () => (
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </MotionRoot>
               </Suspense>
               </AccessGate>
             </CreateFlowProvider>
           </PresenceProvider>
         </AuthProvider>
-        </MotionConfig>
         <EtherSplash />
         </ThemeProvider>
       </BrowserRouter>

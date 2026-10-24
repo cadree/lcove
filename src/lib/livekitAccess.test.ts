@@ -15,10 +15,12 @@ import {
 } from "../../supabase/functions/_shared/livekit-access.mjs";
 import {
   LIVE_VIDEO_NOT_CONFIGURED as CLIENT_MESSAGE,
+  nextTokenRefreshDelay,
   parseLiveKitTokenResponse,
   pickRecorderMimeType,
   replayContentType,
   replayFileExtension,
+  tokenRefreshDelayMs,
 } from "./livekitSession.ts";
 
 const STREAM_ID = "0412aaaa-0000-4000-8000-000000000041";
@@ -153,5 +155,26 @@ describe("live video client", () => {
     assert.equal(pickRecorderMimeType((type) => type === "video/mp4"), "video/mp4");
     assert.equal(replayFileExtension("video/mp4"), "mp4");
     assert.equal(replayContentType("video/webm;codecs=vp8,opus"), "video/webm");
+  });
+
+  it("schedules a LiveKit token refresh five minutes before expiry", async () => {
+    const now = 1_700_000_000_000;
+    const { token } = await signLiveKitToken({
+      apiKey: KEY,
+      apiSecret: SECRET,
+      identity: HOST,
+      video: liveKitVideoGrant(HOST, HOST, STREAM_ID),
+      ttlSeconds: 6 * 60 * 60,
+      now,
+    });
+    const sixHours = 6 * 60 * 60 * 1000;
+    const fiveMinutes = 5 * 60 * 1000;
+    assert.equal(tokenRefreshDelayMs(token, now), sixHours - fiveMinutes);
+    assert.equal(nextTokenRefreshDelay(token, now), sixHours - fiveMinutes);
+    const insideLead = now + sixHours - 60_000;
+    assert.equal(tokenRefreshDelayMs(token, insideLead), 0);
+    assert.equal(nextTokenRefreshDelay(token, insideLead), 60_000);
+    assert.equal(tokenRefreshDelayMs("not-a-jwt", now), null);
+    assert.equal(nextTokenRefreshDelay("not-a-jwt", now), null);
   });
 });

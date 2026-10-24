@@ -84,42 +84,38 @@ export function useStories() {
 
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
 
-      // Get view counts for each story (only for own stories)
-      const storiesWithProfiles = await Promise.all(
-        storiesData.map(async (story) => {
-          let viewCount = 0;
-          let hasViewed = false;
+      // One lookup for "have I seen this" and one for the owner's counts.
+      // A query per story was an N+1 on every feed load.
+      const viewedIds = new Set<string>();
+      const viewCounts = new Map<string, number>();
+      if (user && storiesData.length) {
+        const storyIds = storiesData.map((story) => story.id);
+        const { data: viewed } = await supabase
+          .from('story_views')
+          .select('story_id')
+          .eq('viewer_id', user.id)
+          .in('story_id', storyIds);
+        for (const row of viewed ?? []) viewedIds.add(row.story_id);
 
-          if (user) {
-            // Check if current user has viewed this story
-            const { data: viewData } = await supabase
-              .from('story_views')
-              .select('id')
-              .eq('story_id', story.id)
-              .eq('viewer_id', user.id)
-              .maybeSingle();
-            
-            hasViewed = !!viewData;
-
-            // Get view count only if user owns this story
-            if (story.user_id === user.id) {
-              const { count } = await supabase
-                .from('story_views')
-                .select('*', { count: 'exact', head: true })
-                .eq('story_id', story.id);
-              viewCount = count || 0;
-            }
+        const ownIds = storiesData.filter((story) => story.user_id === user.id).map((story) => story.id);
+        if (ownIds.length) {
+          const { data: ownViews } = await supabase
+            .from('story_views')
+            .select('story_id')
+            .in('story_id', ownIds);
+          for (const row of ownViews ?? []) {
+            viewCounts.set(row.story_id, (viewCounts.get(row.story_id) ?? 0) + 1);
           }
+        }
+      }
 
-          return {
-            ...story,
-            profile: profileMap.get(story.user_id) || { display_name: 'Private profile', avatar_url: null },
-            credit_profile: story.credit_user_id ? profileMap.get(story.credit_user_id) || null : null,
-            view_count: viewCount,
-            has_viewed: hasViewed,
-          } as StoryWithProfile;
-        })
-      );
+      const storiesWithProfiles = storiesData.map((story) => ({
+        ...story,
+        profile: profileMap.get(story.user_id) || { display_name: 'Private profile', avatar_url: null },
+        credit_profile: story.credit_user_id ? profileMap.get(story.credit_user_id) || null : null,
+        view_count: viewCounts.get(story.id) ?? 0,
+        has_viewed: viewedIds.has(story.id),
+      })) as StoryWithProfile[];
 
       // Group stories by user
       const groupedByUser = storiesWithProfiles.reduce((acc, story) => {
