@@ -246,7 +246,8 @@ BEGIN
     RAISE EXCEPTION 'fee required';
   END IF;
   v_seller := v_merch - v_fee + v_ship + v_tax;
-  v_token := encode(gen_random_bytes(16), 'hex');
+  -- pgcrypto lives in extensions. search_path is public, so the call is qualified.
+  v_token := encode(extensions.gen_random_bytes(16), 'hex');
 
   INSERT INTO public.store_orders (
     store_id, buyer_id, item_id, quantity, total_price, credits_spent,
@@ -335,19 +336,37 @@ GRANT EXECUTE ON FUNCTION public.cancel_guest_store_order(uuid, text) TO service
 -- consumer catalog, plus two views that hide keys, emails, and profile fields.
 -- ---------------------------------------------------------------------------
 
+-- Same visibility as 20261024120000_admin_console, limited to signed-in members.
+-- Anon is revoked below, so these policies are not granted to anon.
 DROP POLICY IF EXISTS "Anyone can view posts" ON public.posts;
+DROP POLICY IF EXISTS "Members can view posts" ON public.posts;
 CREATE POLICY "Members can view posts"
   ON public.posts
   FOR SELECT
   TO authenticated
-  USING (NOT public.either_blocked(auth.uid(), user_id));
+  USING (
+    public.has_role(auth.uid(), 'admin')
+    OR (
+      removed_at IS NULL
+      AND (hidden_at IS NULL OR user_id = auth.uid())
+      AND NOT public.either_blocked(auth.uid(), user_id)
+    )
+  );
 
 DROP POLICY IF EXISTS "Anyone can view comments" ON public.post_comments;
+DROP POLICY IF EXISTS "Members can view comments" ON public.post_comments;
 CREATE POLICY "Members can view comments"
   ON public.post_comments
   FOR SELECT
   TO authenticated
-  USING (NOT public.either_blocked(auth.uid(), user_id));
+  USING (
+    public.has_role(auth.uid(), 'admin')
+    OR (
+      removed_at IS NULL
+      AND (hidden_at IS NULL OR user_id = auth.uid())
+      AND NOT public.either_blocked(auth.uid(), user_id)
+    )
+  );
 
 DROP POLICY IF EXISTS "Anyone can view non-expired stories" ON public.stories;
 CREATE POLICY "Members can view non-expired stories"
@@ -368,7 +387,14 @@ CREATE POLICY "Projects are visible to the community or their members"
   ON public.projects
   FOR SELECT
   TO authenticated
-  USING (creator_id = auth.uid() OR public.can_view_project(id, auth.uid()));
+  USING (
+    public.has_role(auth.uid(), 'admin')
+    OR (
+      removed_at IS NULL
+      AND (hidden_at IS NULL OR creator_id = auth.uid())
+      AND (creator_id = auth.uid() OR public.can_view_project(id, auth.uid()))
+    )
+  );
 
 DROP POLICY IF EXISTS "Roles follow project visibility" ON public.project_roles;
 CREATE POLICY "Roles follow project visibility"

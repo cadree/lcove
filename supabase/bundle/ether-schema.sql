@@ -24429,7 +24429,8 @@ BEGIN
     RAISE EXCEPTION 'fee required';
   END IF;
   v_seller := v_merch - v_fee + v_ship + v_tax;
-  v_token := encode(gen_random_bytes(16), 'hex');
+  -- pgcrypto lives in extensions. search_path is public, so the call is qualified.
+  v_token := encode(extensions.gen_random_bytes(16), 'hex');
 
   INSERT INTO public.store_orders (
     store_id, buyer_id, item_id, quantity, total_price, credits_spent,
@@ -24526,29 +24527,51 @@ $ether_m181s27$;
 -- consumer catalog, plus two views that hide keys, emails, and profile fields.
 -- ---------------------------------------------------------------------------
 
+-- Same visibility as 20261024120000_admin_console, limited to signed-in members.
+-- Anon is revoked below, so these policies are not granted to anon.
 DROP POLICY IF EXISTS "Anyone can view posts" ON public.posts;
 $ether_m181s28$;
   EXECUTE $ether_m181s29$
+DROP POLICY IF EXISTS "Members can view posts" ON public.posts;
+$ether_m181s29$;
+  EXECUTE $ether_m181s30$
 CREATE POLICY "Members can view posts"
   ON public.posts
   FOR SELECT
   TO authenticated
-  USING (NOT public.either_blocked(auth.uid(), user_id));
-$ether_m181s29$;
-  EXECUTE $ether_m181s30$
-DROP POLICY IF EXISTS "Anyone can view comments" ON public.post_comments;
+  USING (
+    public.has_role(auth.uid(), 'admin')
+    OR (
+      removed_at IS NULL
+      AND (hidden_at IS NULL OR user_id = auth.uid())
+      AND NOT public.either_blocked(auth.uid(), user_id)
+    )
+  );
 $ether_m181s30$;
   EXECUTE $ether_m181s31$
+DROP POLICY IF EXISTS "Anyone can view comments" ON public.post_comments;
+$ether_m181s31$;
+  EXECUTE $ether_m181s32$
+DROP POLICY IF EXISTS "Members can view comments" ON public.post_comments;
+$ether_m181s32$;
+  EXECUTE $ether_m181s33$
 CREATE POLICY "Members can view comments"
   ON public.post_comments
   FOR SELECT
   TO authenticated
-  USING (NOT public.either_blocked(auth.uid(), user_id));
-$ether_m181s31$;
-  EXECUTE $ether_m181s32$
+  USING (
+    public.has_role(auth.uid(), 'admin')
+    OR (
+      removed_at IS NULL
+      AND (hidden_at IS NULL OR user_id = auth.uid())
+      AND NOT public.either_blocked(auth.uid(), user_id)
+    )
+  );
+$ether_m181s33$;
+  EXECUTE $ether_m181s34$
 DROP POLICY IF EXISTS "Anyone can view non-expired stories" ON public.stories;
-$ether_m181s32$;
-  EXECUTE $ether_m181s33$
+$ether_m181s34$;
+  EXECUTE $ether_m181s35$
 CREATE POLICY "Members can view non-expired stories"
   ON public.stories
   FOR SELECT
@@ -24561,77 +24584,84 @@ CREATE POLICY "Members can view non-expired stories"
       OR NOT public.either_blocked(auth.uid(), credit_user_id)
     )
   );
-$ether_m181s33$;
-  EXECUTE $ether_m181s34$
+$ether_m181s35$;
+  EXECUTE $ether_m181s36$
 DROP POLICY IF EXISTS "Projects are visible to the community or their members" ON public.projects;
-$ether_m181s34$;
-  EXECUTE $ether_m181s35$
+$ether_m181s36$;
+  EXECUTE $ether_m181s37$
 CREATE POLICY "Projects are visible to the community or their members"
   ON public.projects
   FOR SELECT
   TO authenticated
-  USING (creator_id = auth.uid() OR public.can_view_project(id, auth.uid()));
-$ether_m181s35$;
-  EXECUTE $ether_m181s36$
+  USING (
+    public.has_role(auth.uid(), 'admin')
+    OR (
+      removed_at IS NULL
+      AND (hidden_at IS NULL OR creator_id = auth.uid())
+      AND (creator_id = auth.uid() OR public.can_view_project(id, auth.uid()))
+    )
+  );
+$ether_m181s37$;
+  EXECUTE $ether_m181s38$
 DROP POLICY IF EXISTS "Roles follow project visibility" ON public.project_roles;
-$ether_m181s36$;
-  EXECUTE $ether_m181s37$
+$ether_m181s38$;
+  EXECUTE $ether_m181s39$
 CREATE POLICY "Roles follow project visibility"
   ON public.project_roles
   FOR SELECT
   TO authenticated
   USING (public.can_view_project(project_id, auth.uid()));
-$ether_m181s37$;
-  EXECUTE $ether_m181s38$
+$ether_m181s39$;
+  EXECUTE $ether_m181s40$
 DROP POLICY IF EXISTS "Anyone can view live streams" ON public.live_streams;
-$ether_m181s38$;
-  EXECUTE $ether_m181s39$
+$ether_m181s40$;
+  EXECUTE $ether_m181s41$
 CREATE POLICY "Members can view live streams"
   ON public.live_streams
   FOR SELECT
   TO authenticated
   USING (NOT public.either_blocked(auth.uid(), host_id));
-$ether_m181s39$;
-  EXECUTE $ether_m181s40$
-REVOKE ALL ON TABLE public.posts FROM anon;
-$ether_m181s40$;
-  EXECUTE $ether_m181s41$
-REVOKE ALL ON TABLE public.post_comments FROM anon;
 $ether_m181s41$;
   EXECUTE $ether_m181s42$
-REVOKE ALL ON TABLE public.stories FROM anon;
+REVOKE ALL ON TABLE public.posts FROM anon;
 $ether_m181s42$;
   EXECUTE $ether_m181s43$
-REVOKE ALL ON TABLE public.reposts FROM anon;
+REVOKE ALL ON TABLE public.post_comments FROM anon;
 $ether_m181s43$;
   EXECUTE $ether_m181s44$
-REVOKE ALL ON TABLE public.projects FROM anon;
+REVOKE ALL ON TABLE public.stories FROM anon;
 $ether_m181s44$;
   EXECUTE $ether_m181s45$
-REVOKE ALL ON TABLE public.project_roles FROM anon;
+REVOKE ALL ON TABLE public.reposts FROM anon;
 $ether_m181s45$;
   EXECUTE $ether_m181s46$
-REVOKE ALL ON TABLE public.project_updates FROM anon;
+REVOKE ALL ON TABLE public.projects FROM anon;
 $ether_m181s46$;
   EXECUTE $ether_m181s47$
-REVOKE ALL ON TABLE public.project_applications FROM anon;
+REVOKE ALL ON TABLE public.project_roles FROM anon;
 $ether_m181s47$;
   EXECUTE $ether_m181s48$
-REVOKE ALL ON TABLE public.project_attachments FROM anon;
+REVOKE ALL ON TABLE public.project_updates FROM anon;
 $ether_m181s48$;
   EXECUTE $ether_m181s49$
-REVOKE ALL ON TABLE public.live_streams FROM anon;
+REVOKE ALL ON TABLE public.project_applications FROM anon;
 $ether_m181s49$;
   EXECUTE $ether_m181s50$
-REVOKE ALL ON TABLE public.live_streams_public FROM anon;
+REVOKE ALL ON TABLE public.project_attachments FROM anon;
 $ether_m181s50$;
   EXECUTE $ether_m181s51$
-REVOKE SELECT ON TABLE public.profiles_public FROM anon;
+REVOKE ALL ON TABLE public.live_streams FROM anon;
 $ether_m181s51$;
   EXECUTE $ether_m181s52$
-REVOKE ALL ON TABLE public.events FROM anon;
+REVOKE ALL ON TABLE public.live_streams_public FROM anon;
 $ether_m181s52$;
   EXECUTE $ether_m181s53$
+REVOKE SELECT ON TABLE public.profiles_public FROM anon;
+$ether_m181s53$;
+  EXECUTE $ether_m181s54$
+REVOKE ALL ON TABLE public.events FROM anon;
+$ether_m181s54$;
+  EXECUTE $ether_m181s55$
 GRANT SELECT (
   id,
   creator_id,
@@ -24656,11 +24686,11 @@ GRANT SELECT (
   is_public,
   status
 ) ON public.events TO anon;
-$ether_m181s53$;
-  EXECUTE $ether_m181s54$
+$ether_m181s55$;
+  EXECUTE $ether_m181s56$
 REVOKE ALL ON TABLE public.ticket_tiers FROM anon;
-$ether_m181s54$;
-  EXECUTE $ether_m181s55$
+$ether_m181s56$;
+  EXECUTE $ether_m181s57$
 GRANT SELECT (
   id,
   event_id,
@@ -24672,11 +24702,11 @@ GRANT SELECT (
   is_active,
   sort_order
 ) ON public.ticket_tiers TO anon;
-$ether_m181s55$;
-  EXECUTE $ether_m181s56$
+$ether_m181s57$;
+  EXECUTE $ether_m181s58$
 REVOKE ALL ON TABLE public.stores FROM anon;
-$ether_m181s56$;
-  EXECUTE $ether_m181s57$
+$ether_m181s58$;
+  EXECUTE $ether_m181s59$
 GRANT SELECT (
   id,
   user_id,
@@ -24691,11 +24721,11 @@ GRANT SELECT (
   tax_line_label,
   tax_line_cents
 ) ON public.stores TO anon;
-$ether_m181s57$;
-  EXECUTE $ether_m181s58$
+$ether_m181s59$;
+  EXECUTE $ether_m181s60$
 REVOKE ALL ON TABLE public.store_items FROM anon;
-$ether_m181s58$;
-  EXECUTE $ether_m181s59$
+$ether_m181s60$;
+  EXECUTE $ether_m181s61$
 GRANT SELECT (
   id,
   store_id,
@@ -24714,8 +24744,8 @@ GRANT SELECT (
   amenities,
   external_url
 ) ON public.store_items TO anon;
-$ether_m181s59$;
-  EXECUTE $ether_m181s60$
+$ether_m181s61$;
+  EXECUTE $ether_m181s62$
 CREATE OR REPLACE VIEW public.consumer_creators
 WITH (security_barrier = true, security_invoker = false) AS
 SELECT p.user_id, p.display_name, p.avatar_url
@@ -24750,14 +24780,14 @@ WHERE COALESCE(p.is_suspended, false) = false
         )
     )
   );
-$ether_m181s60$;
-  EXECUTE $ether_m181s61$
-REVOKE ALL ON TABLE public.consumer_creators FROM PUBLIC, anon, authenticated;
-$ether_m181s61$;
-  EXECUTE $ether_m181s62$
-GRANT SELECT ON TABLE public.consumer_creators TO anon, authenticated;
 $ether_m181s62$;
   EXECUTE $ether_m181s63$
+REVOKE ALL ON TABLE public.consumer_creators FROM PUBLIC, anon, authenticated;
+$ether_m181s63$;
+  EXECUTE $ether_m181s64$
+GRANT SELECT ON TABLE public.consumer_creators TO anon, authenticated;
+$ether_m181s64$;
+  EXECUTE $ether_m181s65$
 CREATE OR REPLACE VIEW public.consumer_live_streams
 WITH (security_barrier = true, security_invoker = false) AS
 SELECT
@@ -24785,21 +24815,21 @@ WHERE COALESCE(is_live, false)
     AND external_url IS NOT NULL
     AND btrim(external_url) <> ''
   );
-$ether_m181s63$;
-  EXECUTE $ether_m181s64$
-REVOKE ALL ON TABLE public.consumer_live_streams FROM PUBLIC, anon, authenticated;
-$ether_m181s64$;
-  EXECUTE $ether_m181s65$
-GRANT SELECT ON TABLE public.consumer_live_streams TO anon, authenticated;
 $ether_m181s65$;
   EXECUTE $ether_m181s66$
+REVOKE ALL ON TABLE public.consumer_live_streams FROM PUBLIC, anon, authenticated;
+$ether_m181s66$;
+  EXECUTE $ether_m181s67$
+GRANT SELECT ON TABLE public.consumer_live_streams TO anon, authenticated;
+$ether_m181s67$;
+  EXECUTE $ether_m181s68$
 -- These helpers predate the search_path rule. Pin them so a caller cannot
 -- shadow md5, btrim, or regexp_replace.
 ALTER FUNCTION public.novi_quest_uuid(text) SET search_path = public;
-$ether_m181s66$;
-  EXECUTE $ether_m181s67$
+$ether_m181s68$;
+  EXECUTE $ether_m181s69$
 ALTER FUNCTION public.objectionable_text(text) SET search_path = public;
-$ether_m181s67$;
+$ether_m181s69$;
   INSERT INTO public.ether_schema_migrations (version) VALUES ('20261024130000_anon_consumer_access.sql');
 END
 $ether_m181$;

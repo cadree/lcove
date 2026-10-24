@@ -67,6 +67,12 @@ describe("anon column grants", () => {
       assert.equal(grant("store_items").includes(column), false, column);
       assert.equal(grant("events").includes(column), false, column);
     }
+    assert.match(sql, /extensions\.gen_random_bytes\(16\)/);
+    assert.equal(sql.split("gen_random_bytes(").length - 1, sql.split("extensions.gen_random_bytes(").length - 1);
+    assert.match(sql, /removed_at IS NULL/);
+    assert.match(sql, /hidden_at IS NULL OR user_id = auth\.uid\(\)/);
+    assert.match(sql, /hidden_at IS NULL OR creator_id = auth\.uid\(\)/);
+    assert.match(sql, /public\.has_role\(auth\.uid\(\), 'admin'\)/);
     assert.match(sql, /REVOKE SELECT ON TABLE public\.profiles_public FROM anon/);
     assert.match(sql, /REVOKE ALL ON TABLE public\.posts FROM anon/);
     assert.match(sql, /REVOKE ALL ON TABLE public\.projects FROM anon/);

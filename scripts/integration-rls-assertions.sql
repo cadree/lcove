@@ -1384,7 +1384,8 @@ END $$;
 RESET ROLE;
 
 -- Project collaborations: private discovery, subgroup reads, and share-up.
--- A owns both projects. B is accepted onto the private one. Admin is a stranger.
+-- A owns both projects. B is accepted onto the private one.
+-- The admin account can read the project row. It is not a chat member.
 -- The block fixture above would correctly stop B from posting into a chat
 -- that includes A. Those block checks have already passed.
 DELETE FROM public.user_blocks
@@ -1620,8 +1621,8 @@ SET ROLE authenticated;
 
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM public.projects WHERE id = 'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2') THEN
-    RAISE EXCEPTION 'FAIL: stranger can see the private project';
+  IF NOT EXISTS (SELECT 1 FROM public.projects WHERE id = 'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2') THEN
+    RAISE EXCEPTION 'FAIL: an admin cannot see the private project';
   END IF;
   IF EXISTS (SELECT 1 FROM public.conversations WHERE id = 'd2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2') THEN
     RAISE EXCEPTION 'FAIL: stranger can see the subgroup';
@@ -1638,7 +1639,7 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN
     RAISE NOTICE 'PASS: chat email throttle is service_role only';
   END;
-  RAISE NOTICE 'PASS: a non-member cannot see the private project or its subgroup';
+  RAISE NOTICE 'PASS: an admin can see a private project, and a non-member cannot see its subgroup';
 END $$;
 
 RESET ROLE;
@@ -1922,6 +1923,114 @@ BEGIN
     RAISE EXCEPTION 'FAIL: a member can read someone else''s private event';
   END IF;
   RAISE NOTICE 'PASS: authenticated members still read posts, projects, and public profiles';
+END $$;
+
+RESET ROLE;
+
+-- Admin hide and remove from 20261024120000 must survive the consumer policy
+-- rewrite. Another member cannot see a hidden or removed row. The author can
+-- see their own hidden row. An admin can see both.
+
+INSERT INTO public.posts (id, user_id, content) VALUES
+  ('a7a7a7a7-a7a7-47a7-87a7-a7a7a7a7a7a7', '11111111-1111-4111-8111-111111111111', 'held post');
+
+INSERT INTO public.post_comments (id, post_id, user_id, content) VALUES
+  ('b7b7b7b7-b7b7-47b7-87b7-b7b7b7b7b7b7', 'a7a7a7a7-a7a7-47a7-87a7-a7a7a7a7a7a7', '11111111-1111-4111-8111-111111111111', 'held comment');
+
+INSERT INTO public.projects (id, creator_id, title, status, is_private)
+VALUES (
+  'c7c7c7c7-c7c7-47c7-87c7-c7c7c7c7c7c7',
+  '11111111-1111-4111-8111-111111111111',
+  'Held project',
+  'open',
+  false
+);
+
+UPDATE public.posts SET hidden_at = now() WHERE id = 'a7a7a7a7-a7a7-47a7-87a7-a7a7a7a7a7a7';
+UPDATE public.post_comments SET hidden_at = now() WHERE id = 'b7b7b7b7-b7b7-47b7-87b7-b7b7b7b7b7b7';
+UPDATE public.projects SET hidden_at = now() WHERE id = 'c7c7c7c7-c7c7-47c7-87c7-c7c7c7c7c7c7';
+
+SELECT set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","email":"b.waiting@example.com"}', false);
+SET ROLE authenticated;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.posts WHERE id = 'a7a7a7a7-a7a7-47a7-87a7-a7a7a7a7a7a7') THEN
+    RAISE EXCEPTION 'FAIL: another member can read an admin-hidden post';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.post_comments WHERE id = 'b7b7b7b7-b7b7-47b7-87b7-b7b7b7b7b7b7') THEN
+    RAISE EXCEPTION 'FAIL: another member can read an admin-hidden comment';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.projects WHERE id = 'c7c7c7c7-c7c7-47c7-87c7-c7c7c7c7c7c7') THEN
+    RAISE EXCEPTION 'FAIL: another member can read an admin-hidden project';
+  END IF;
+  RAISE NOTICE 'PASS: admin-hidden posts, comments, and projects stay hidden from other members';
+END $$;
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","email":"a.passed@example.com"}', false);
+SET ROLE authenticated;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.posts WHERE id = 'a7a7a7a7-a7a7-47a7-87a7-a7a7a7a7a7a7') THEN
+    RAISE EXCEPTION 'FAIL: the author cannot read their hidden post';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.post_comments WHERE id = 'b7b7b7b7-b7b7-47b7-87b7-b7b7b7b7b7b7') THEN
+    RAISE EXCEPTION 'FAIL: the author cannot read their hidden comment';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.projects WHERE id = 'c7c7c7c7-c7c7-47c7-87c7-c7c7c7c7c7c7') THEN
+    RAISE EXCEPTION 'FAIL: the creator cannot read their hidden project';
+  END IF;
+  RAISE NOTICE 'PASS: authors still read their own hidden posts, comments, and projects';
+END $$;
+
+RESET ROLE;
+UPDATE public.posts SET removed_at = now() WHERE id = 'a7a7a7a7-a7a7-47a7-87a7-a7a7a7a7a7a7';
+UPDATE public.post_comments SET removed_at = now() WHERE id = 'b7b7b7b7-b7b7-47b7-87b7-b7b7b7b7b7b7';
+UPDATE public.projects SET removed_at = now() WHERE id = 'c7c7c7c7-c7c7-47c7-87c7-c7c7c7c7c7c7';
+
+SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","email":"a.passed@example.com"}', false);
+SET ROLE authenticated;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.posts WHERE id = 'a7a7a7a7-a7a7-47a7-87a7-a7a7a7a7a7a7') THEN
+    RAISE EXCEPTION 'FAIL: the author can read a removed post';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.post_comments WHERE id = 'b7b7b7b7-b7b7-47b7-87b7-b7b7b7b7b7b7') THEN
+    RAISE EXCEPTION 'FAIL: the author can read a removed comment';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.projects WHERE id = 'c7c7c7c7-c7c7-47c7-87c7-c7c7c7c7c7c7') THEN
+    RAISE EXCEPTION 'FAIL: the creator can read a removed project';
+  END IF;
+  RAISE NOTICE 'PASS: removed posts, comments, and projects stay hidden from their authors';
+END $$;
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', '33333333-3333-4333-8333-333333333333', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","email":"admin@example.com"}', false);
+SET ROLE authenticated;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.posts WHERE id = 'a7a7a7a7-a7a7-47a7-87a7-a7a7a7a7a7a7') THEN
+    RAISE EXCEPTION 'FAIL: an admin cannot read a removed post';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.post_comments WHERE id = 'b7b7b7b7-b7b7-47b7-87b7-b7b7b7b7b7b7') THEN
+    RAISE EXCEPTION 'FAIL: an admin cannot read a removed comment';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.projects WHERE id = 'c7c7c7c7-c7c7-47c7-87c7-c7c7c7c7c7c7') THEN
+    RAISE EXCEPTION 'FAIL: an admin cannot read a removed project';
+  END IF;
+  RAISE NOTICE 'PASS: an admin can read hidden and removed posts, comments, and projects';
 END $$;
 
 RESET ROLE;

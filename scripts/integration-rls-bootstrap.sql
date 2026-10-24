@@ -8,6 +8,30 @@ CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE SCHEMA IF NOT EXISTS auth;
 CREATE SCHEMA IF NOT EXISTS storage;
 
+-- Hosted projects keep pgcrypto in extensions. This scratch database installs
+-- it in public so older migrations can call gen_random_bytes unqualified.
+-- The qualified name has to exist too, because guest checkout sets
+-- search_path = public and calls extensions.gen_random_bytes.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'extensions'
+      AND p.proname = 'gen_random_bytes'
+  ) THEN
+    EXECUTE $wrap$
+      CREATE FUNCTION extensions.gen_random_bytes(count integer)
+      RETURNS bytea
+      LANGUAGE sql
+      AS $fn$
+        SELECT public.gen_random_bytes(count);
+      $fn$
+    $wrap$;
+  END IF;
+END $$;
+
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
