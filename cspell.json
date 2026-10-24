@@ -77,6 +77,14 @@
     "Acreateserial",
     "flac",
     "m4a",
-    "aacp"
+    "aacp",
+    "nsfw",
+    "nsfwjs",
+    "tensorflow",
+    "tfjs",
+    "mobilenet",
+    "hentai",
+    "indexeddb",
+    "wasm"
   ]
 }

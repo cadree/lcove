@@ -8,7 +8,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { watchImageCheckPrefetch } from "@/lib/nsfwImageCheck";
 import { PresenceProvider } from "@/hooks/usePresence";
 import { CreateFlowProvider } from "@/components/create/CreateFlowContext";
 import AccessGate from "@/components/auth/AccessGate";
@@ -107,8 +108,17 @@ const ActivityTracker = () => {
 };
 
 function WarmTabs() {
+  const { session } = useAuth();
   useEffect(() => {
     prefetchMainTabs();
+  }, []);
+  useEffect(() => watchImageCheckPrefetch(session != null), [session]);
+  useEffect(() => {
+    const onRemoved = () => {
+      void queryClient.invalidateQueries();
+    };
+    window.addEventListener("ether-image-removed", onRemoved);
+    return () => window.removeEventListener("ether-image-removed", onRemoved);
   }, []);
   return null;
 }
