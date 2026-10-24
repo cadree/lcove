@@ -8,6 +8,7 @@ import { format, isPast } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useMyTicketOrders, type MyTicketOrder } from "@/hooks/useMyTicketOrders";
+import { EventReminderToggle } from "@/components/events/EventReminderToggle";
 
 export function ProfileMyTickets({ showEmpty = false }: { showEmpty?: boolean }) {
   const { data: orders = [], isLoading } = useMyTicketOrders();
@@ -88,6 +89,7 @@ export function ProfileMyTickets({ showEmpty = false }: { showEmpty?: boolean })
               {o.attendees.length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-3">No tickets attached.</p>
               )}
+              <EventReminderToggle eventId={o.event.id} />
               {o.attendees.map(a => (
                 <div key={a.id} className="flex items-center gap-3 p-2 rounded-md bg-muted/40">
                   <div className="bg-white p-1.5 rounded shrink-0">

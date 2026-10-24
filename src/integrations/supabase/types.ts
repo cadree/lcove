@@ -2297,6 +2297,7 @@ export type Database = {
           notes: string | null
           order_id: string | null
           qr_code: string
+          reminder_enabled: boolean
           status: string
           ticket_number: string
           tier_id: string | null
@@ -2314,6 +2315,7 @@ export type Database = {
           notes?: string | null
           order_id?: string | null
           qr_code?: string
+          reminder_enabled?: boolean
           status?: string
           ticket_number?: string
           tier_id?: string | null
@@ -2331,6 +2333,7 @@ export type Database = {
           notes?: string | null
           order_id?: string | null
           qr_code?: string
+          reminder_enabled?: boolean
           status?: string
           ticket_number?: string
           tier_id?: string | null
@@ -8060,6 +8063,18 @@ export type Database = {
       ensure_ether_id_pass: { Args: { p_pass_type_id: string }; Returns: Json }
       public_event_attendance_count: {
         Args: { p_event_id: string }
+        Returns: number
+      }
+      my_event_reminder_enabled: {
+        Args: { p_event_id: string }
+        Returns: boolean
+      }
+      set_my_event_reminder: {
+        Args: { p_event_id: string; p_enabled: boolean }
+        Returns: boolean
+      }
+      dispatch_attendee_event_reminders: {
+        Args: { p_now?: string }
         Returns: number
       }
       public_event_guest_preview: {

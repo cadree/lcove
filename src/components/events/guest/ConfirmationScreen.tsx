@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { PoweredByEther } from "./PoweredByEther";
@@ -18,6 +19,7 @@ export function ConfirmationScreen({
   onWallet,
   onCalendar,
   onShare,
+  reminder,
 }: {
   hostName: string;
   hostAvatar?: string | null;
@@ -34,6 +36,7 @@ export function ConfirmationScreen({
   onWallet: () => void;
   onCalendar: () => void;
   onShare: () => void;
+  reminder?: ReactNode;
 }) {
   return (
     <div className={`${theme === "light" ? "light " : ""}min-h-screen bg-background px-4 py-6 text-foreground`}>
@@ -64,6 +67,7 @@ export function ConfirmationScreen({
         <p className="mt-1 text-sm text-muted-foreground">Share event</p>
         <Button className="mt-3 w-full rounded-full" onClick={onShare}>Share event</Button>
       </div>
+      {reminder ? <div className="mt-4">{reminder}</div> : null}
       <PoweredByEther />
     </div>
   );
