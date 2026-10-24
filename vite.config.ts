@@ -1,13 +1,13 @@
 import { spawnSync } from "node:child_process";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { eventShareConfigJson } from "./scripts/event-share-config.mjs";
+import { eventShareConfigJson } from "./scripts/event-share-config.ts";
 
-function eventShareConfigPlugin() {
+function eventShareConfigPlugin(): Plugin {
   return {
     name: "event-share-config",
-    apply: "build" as const,
+    apply: "build",
     generateBundle() {
       this.emitFile({
         type: "asset",

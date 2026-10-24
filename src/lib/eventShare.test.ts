@@ -17,7 +17,7 @@ import {
   supabaseFromConfig,
 } from "../../functions/_shared/eventShare.js";
 import { decodeFlyer, encodePng, jpegSize, pngSize, renderFlyerDerivative } from "../../functions/_shared/flyerImage.js";
-import { eventShareConfig } from "../../scripts/event-share-config.mjs";
+import { eventShareConfig } from "../../scripts/event-share-config.ts";
 
 const SHELL = `<!doctype html><html><head>
 <title>Ether</title>
