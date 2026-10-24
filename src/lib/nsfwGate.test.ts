@@ -3,9 +3,12 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   EXPLICIT_BLOCK_MESSAGE,
+  EXPLICIT_REMOVED_MESSAGE,
   EXPLICIT_THRESHOLD,
+  IMAGE_CHECK_WAIT_MS,
   decideExplicit,
   hasImageMagic,
+  settleReview,
   shouldCheckImage,
 } from "./nsfwGate.ts";
 
@@ -57,7 +60,22 @@ describe("decideExplicit", () => {
 
   it("uses a plain message that does not name the class", () => {
     assert.equal(EXPLICIT_BLOCK_MESSAGE, "This image isn't allowed.");
+    assert.equal(EXPLICIT_REMOVED_MESSAGE, "This image isn't allowed. It was removed.");
     assert.equal(/porn|hentai|nsfw|nude/i.test(EXPLICIT_BLOCK_MESSAGE), false);
+    assert.equal(/porn|hentai|nsfw|nude/i.test(EXPLICIT_REMOVED_MESSAGE), false);
+  });
+
+  it("keeps a finished review and gives up when the wait is over", async () => {
+    assert.equal(IMAGE_CHECK_WAIT_MS, 1_000);
+    assert.deepEqual(await settleReview(Promise.resolve({ ok: true }), 0), { ok: true });
+    const started = Date.now();
+    const pending = new Promise<{ ok: false }>(() => {});
+    assert.equal(await settleReview(pending, 30), undefined);
+    assert.ok(Date.now() - started < 250);
+    assert.deepEqual(
+      await settleReview(new Promise((resolve) => setTimeout(() => resolve({ ok: true }), 10)), 200),
+      { ok: true },
+    );
   });
 
   it("blocks on the stronger explicit class", () => {
@@ -139,6 +157,11 @@ describe("image check wiring", () => {
     assert.match(client, /ownsThisUpload/);
     assert.match(client, /bucket\.remove\(\[path\]\)/);
     assert.match(client, /Upload removed after the image check/);
+    assert.match(client, /settleReview\(reviewPromise, IMAGE_CHECK_WAIT_MS/);
+    assert.match(client, /Image check continuing after the upload/);
+    assert.match(client, /EXPLICIT_REMOVED_MESSAGE/);
+    assert.match(client, /retractFlaggedImage/);
+    assert.match(source("../App.tsx"), /ether-image-removed/);
     const reviewAt = client.indexOf("const reviewPromise = reviewImageUpload");
     const uploadAt = client.indexOf("const result = await originalUpload");
     assert.ok(reviewAt > 0 && reviewAt < uploadAt);

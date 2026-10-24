@@ -113,6 +113,13 @@ function WarmTabs() {
     prefetchMainTabs();
   }, []);
   useEffect(() => watchImageCheckPrefetch(session != null), [session]);
+  useEffect(() => {
+    const onRemoved = () => {
+      void queryClient.invalidateQueries();
+    };
+    window.addEventListener("ether-image-removed", onRemoved);
+    return () => window.removeEventListener("ether-image-removed", onRemoved);
+  }, []);
   return null;
 }
 

@@ -8,7 +8,9 @@ import { fileKind } from "./storageLimit.ts";
  * allowed. content_reports cannot record a system reporter: reporter_id
  * references auth.users, and the insert trigger overwrites it with
  * auth.uid(). The content row also does not exist yet when the file is
- * checked, so there is no target to attach a report to.
+ * checked, so there is no target to attach a report to. A check that
+ * finishes after the post is published deletes the file and the member's
+ * rows that point at it.
  */
 export const EXPLICIT_CLASSES = ["Porn", "Hentai"] as const;
 
@@ -24,6 +26,34 @@ export type ExplicitClass = (typeof EXPLICIT_CLASSES)[number];
 export const EXPLICIT_THRESHOLD = 0.7;
 
 export const EXPLICIT_BLOCK_MESSAGE = "This image isn't allowed.";
+
+/** Shown when the picture already uploaded and the check finishes later. */
+export const EXPLICIT_REMOVED_MESSAGE = "This image isn't allowed. It was removed.";
+
+/** How long a submit will wait for the model before the post goes through. */
+export const IMAGE_CHECK_WAIT_MS = 1_000;
+
+/**
+ * Resolves with the review if it finishes within waitMs. An already
+ * finished review wins even when waitMs is 0. Otherwise the submit
+ * continues and the caller keeps the original promise.
+ */
+export function settleReview<T>(promise: Promise<T>, waitMs: number): Promise<T | undefined> {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (value: T | undefined) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(undefined), Math.max(0, waitMs));
+    promise.then(
+      (value) => finish(value),
+      () => finish(undefined),
+    );
+  });
+}
 
 export type ClassScore = {
   className: string;
