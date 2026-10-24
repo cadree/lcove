@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { eventDateLabel, eventTimeLabel } from "../_shared/event-time.mjs";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { resolveHostIdentity } from "../_shared/host-email-identity.ts";
+import { guestEventEmailHtml } from "../_shared/guest-event-email.mjs";
+import { unsubscribeLink } from "../_shared/unsubscribe-link.mjs";
 import { requireInternalSecret } from "../_shared/require-caller.ts";
 import { httpStatusForError } from "../_shared/http-error.mjs";
 
@@ -63,7 +66,7 @@ serve(async (req) => {
 
       const { data: events } = await admin
         .from("events")
-        .select("id, title, start_date, end_date, venue, city, state, image_url, description, timezone")
+        .select("id, title, start_date, end_date, venue, address, city, state, image_url, description, timezone")
         .gte("start_date", startWin.toISOString())
         .lte("start_date", endWin.toISOString());
 
@@ -141,8 +144,9 @@ serve(async (req) => {
 
         const dateStr = eventDateLabel(event.start_date, event.timezone);
         const timeStr = eventTimeLabel(event.start_date, event.timezone);
-        const location = [event.venue, event.city].filter(Boolean).join(", ") || "Location TBA";
+        const location = [event.venue, event.address, event.city].filter(Boolean).join(", ") || "Location TBA";
         const eventUrl = `https://etherbylcove.com/event/${event.id}`;
+        const identity = await resolveHostIdentity(admin, event.id);
 
         for (const recipient of recipients.values()) {
           const email = recipient.email;
@@ -188,29 +192,34 @@ serve(async (req) => {
           // Email
           if (resendKey) {
             try {
-              const html = `
-                <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;background:#ffffff;">
-                  <h1 style="color:#1a1a2e;margin:0 0 8px;">${event.title} is ${win.label} 🎉</h1>
-                  <p style="color:#555;margin:0 0 20px;">Hey ${recipient.name}, just a friendly reminder.</p>
-                  ${event.image_url ? `<img src="${event.image_url}" style="width:100%;max-height:240px;object-fit:cover;border-radius:12px;margin-bottom:16px" />` : ''}
-                  <div style="background:#f8f8f8;border-radius:12px;padding:20px;margin:16px 0;">
-                    <h2 style="margin:0 0 8px;color:#1a1a2e;">${event.title}</h2>
-                    <p style="margin:4px 0;color:#555;">📅 ${dateStr} at ${timeStr}</p>
-                    <p style="margin:4px 0;color:#555;">📍 ${location}</p>
-                  </div>
-                  <a href="${eventUrl}" style="display:inline-block;background:#e91e8c;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">View Event</a>
-                  <p style="color:#888;font-size:12px;margin-top:24px;">— ETHER by lcove</p>
-                </div>`;
+              const unsub = await unsubscribeLink(admin, email);
+              if (unsub.suppressed) continue;
+              const html = guestEventEmailHtml({
+                hostName: identity.hostDisplayName,
+                hostAvatarUrl: identity.hostAvatarUrl,
+                flyerUrl: identity.headerImageUrl || event.image_url,
+                brandColor: identity.brandColor,
+                eventTitle: event.title,
+                eventDate: dateStr,
+                eventTime: timeStr,
+                location,
+                mapUrl: `https://maps.google.com/?q=${encodeURIComponent(location)}`,
+                intro: `${event.title} is ${win.label}.`,
+                eventUrl,
+                unsubscribeUrl: unsub.url,
+              });
+              const payload: Record<string, unknown> = {
+                from: identity.fromHeader,
+                to: [email],
+                subject: `${event.title} is ${win.label}`,
+                html,
+              };
+              if (identity.replyTo) payload.reply_to = identity.replyTo;
 
               const res = await fetch("https://api.resend.com/emails", {
                 method: "POST",
                 headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  from: "notifications@etherbylcove.com",
-                  to: [email],
-                  subject: `${event.title} is ${win.label}`,
-                  html,
-                }),
+                body: JSON.stringify(payload),
               });
               if (!res.ok) {
                 const body = await res.text();

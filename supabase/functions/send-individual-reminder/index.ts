@@ -2,6 +2,9 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { eventStampLabel } from "../_shared/event-time.mjs";
 import { httpStatusForError } from "../_shared/http-error.mjs";
+import { resolveHostIdentity } from "../_shared/host-email-identity.ts";
+import { escapeHtml, guestEventEmailHtml } from "../_shared/guest-event-email.mjs";
+import { unsubscribeLink } from "../_shared/unsubscribe-link.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -49,7 +52,7 @@ serve(async (req) => {
     // Fetch event
     const { data: event, error: ee } = await admin
       .from("events")
-      .select("id, title, start_date, venue, city, creator_id, timezone")
+      .select("id, title, start_date, venue, city, creator_id, timezone, image_url")
       .eq("id", body.eventId)
       .single();
     if (ee || !event) throw new Error("Event not found");
@@ -181,22 +184,36 @@ serve(async (req) => {
       const resendKey = Deno.env.get("RESEND_API_KEY");
       if (resendKey) {
         try {
-          const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-            <h1 style="color:#1a1a2e;">${finalTitle}</h1>
-            <p style="color:#555;line-height:1.6;">${finalBody.replace(/\n/g, "<br/>")}</p>
-            <a href="${eventUrl}" style="display:inline-block;background:#e91e8c;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin-top:16px;">View Event</a>
-            <p style="color:#888;font-size:12px;margin-top:24px;">— ETHER by lcove</p>
-          </div>`;
-          const r = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              from: "notifications@etherbylcove.com",
-              to: [email],
-              subject: finalTitle,
-              html,
-            }),
+          const identity = await resolveHostIdentity(admin, event.id);
+          const unsub = await unsubscribeLink(admin, email);
+          const location = [event.venue, event.city].filter(Boolean).join(", ") || "Location TBA";
+          const html = unsub.suppressed ? "" : guestEventEmailHtml({
+            hostName: identity.hostDisplayName,
+            hostAvatarUrl: identity.hostAvatarUrl,
+            flyerUrl: identity.headerImageUrl || event.image_url,
+            brandColor: identity.brandColor,
+            eventTitle: event.title,
+            eventDate: eventTime,
+            location,
+            mapUrl: `https://maps.google.com/?q=${encodeURIComponent(location)}`,
+            intro: escapeHtml(finalBody).replace(/\n/g, "<br/>"),
+            eventUrl,
+            unsubscribeUrl: unsub.url,
           });
+          const payload: Record<string, unknown> = {
+            from: identity.fromHeader,
+            to: [email],
+            subject: finalTitle,
+            html,
+          };
+          if (identity.replyTo) payload.reply_to = identity.replyTo;
+          const r = unsub.suppressed
+            ? new Response(null, { status: 200 })
+            : await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
           if (r.ok) { results.email = true; await logRow("email", "sent"); }
           else await logRow("email", "failed", await r.text());
         } catch (e) { await logRow("email", "failed", String(e)); }
