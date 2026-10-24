@@ -6,14 +6,18 @@ import { Capacitor } from '@capacitor/core';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
-import { PENDING_SIGNUP_KEY, applyPendingSignupProfile } from '@/lib/pendingSignup';
+import { PENDING_SIGNUP_KEY, applyPendingSignupProfile, inviteTokenFromMetadata } from '@/lib/pendingSignup';
+import { captureSignupAttribution } from '@/lib/signupAttribution';
+import { WAITLIST_MODE } from '@/config/launch';
+import { PageMeta } from '@/components/seo/PageMeta';
+import { HERO_TAGLINE } from '@/content/copy';
 import { getAuthRedirectUrl } from '@/lib/capacitorStorage';
 import { resendCooldownRemaining } from '@/lib/resendCooldown';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { logAuthEvent, logAuthError } from '@/lib/authDebug';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, User, Phone, Wifi, WifiOff } from 'lucide-react';
-import etherBearLogo from '@/assets/ether-bear-logo.png';
+import { EtherWordmark } from '@/components/brand/EtherWordmark';
 
 const signupSchema = z.object({
   email: z.string().email('Please enter a valid email').max(255),
@@ -105,8 +109,11 @@ const getAuthErrorMessage = (error: Error): { title: string; description: string
 const Auth = () => {
   const [searchParams] = useSearchParams();
   const isResetMode = searchParams.get('reset') === 'true';
+  const tab = searchParams.get('tab');
   
-  const [mode, setMode] = useState<AuthMode>(isResetMode ? 'reset' : 'login');
+  const [mode, setMode] = useState<AuthMode>(
+    isResetMode ? 'reset' : tab === 'join' ? 'signup' : 'login',
+  );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -119,6 +126,11 @@ const Auth = () => {
   const [confirmationSentAt, setConfirmationSentAt] = useState<number | null>(null);
   const [resendNow, setResendNow] = useState(() => Date.now());
   const [isResending, setIsResending] = useState(false);
+  const inviteToken = searchParams.get('invite')?.trim() ?? '';
+  const [inviteEmail, setInviteEmail] = useState<string | null>(null);
+  const [inviteState, setInviteState] = useState<'none' | 'checking' | 'ready' | 'inactive'>(
+    inviteToken ? 'checking' : 'none',
+  );
 
   const { signIn, signUp, user, resetPassword, updatePassword } = useAuth();
   const navigate = useNavigate();
@@ -153,7 +165,11 @@ const Auth = () => {
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email,
-      options: { emailRedirectTo: getAuthRedirectUrl('/auth?confirmed=1') },
+      options: {
+        emailRedirectTo: getAuthRedirectUrl(
+          inviteToken ? `/auth?confirmed=1&invite=${encodeURIComponent(inviteToken)}` : '/auth?confirmed=1',
+        ),
+      },
     });
     setIsResending(false);
     if (error) {
@@ -181,38 +197,67 @@ const Auth = () => {
   }, []);
 
   useEffect(() => {
-    if (!user || searchParams.get('confirmed') !== '1') return;
+    if (!inviteToken) return;
     let cancelled = false;
-    applyPendingSignupProfile(user.id).finally(() => {
-      if (!cancelled) {
-        logAuthEvent('Confirmed email, resuming onboarding');
-        navigate('/onboarding', { replace: true });
+    setInviteState('checking');
+    supabase.rpc('preview_waitlist_invite', { p_token: inviteToken }).then(({ data, error }) => {
+      if (cancelled) return;
+      if (error || !data) {
+        setInviteState('inactive');
+        return;
       }
+      const existing = sessionStorage.getItem(PENDING_SIGNUP_KEY);
+      let parsed: { displayName?: string; phone?: string } = {};
+      try {
+        parsed = existing ? JSON.parse(existing) : {};
+      } catch {
+        parsed = {};
+      }
+      sessionStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({ ...parsed, inviteToken }));
+      setInviteEmail(data);
+      setEmail(data);
+      setMode('signup');
+      setInviteState('ready');
     });
     return () => {
       cancelled = true;
     };
-  }, [user, searchParams, navigate]);
+  }, [inviteToken]);
 
   useEffect(() => {
-    if (searchParams.get('confirmed') === '1') return;
-    if (!user || mode === 'reset') return;
-    if (mode === 'confirm-email') {
-      applyPendingSignupProfile(user.id).finally(() => {
-        logAuthEvent('Email confirmed in this browser, resuming onboarding');
-        navigate('/onboarding');
-      });
-      return;
-    }
-    logAuthEvent('User authenticated, navigating to onboarding');
-    navigate('/onboarding');
-  }, [user, navigate, mode, searchParams]);
+    if (!user || mode === 'reset' || mode === 'forgot') return;
+    if (inviteToken && inviteState === 'checking') return;
+    let cancelled = false;
+    applyPendingSignupProfile(user.id, inviteTokenFromMetadata(user.user_metadata)).then((result) => {
+      if (cancelled) return;
+      if (result === 'invite-failed') {
+        toast({
+          title: 'Invite not applied',
+          description: 'Sign up with the invited email.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      logAuthEvent('User authenticated, continuing to onboarding');
+      navigate('/onboarding', { replace: searchParams.get('confirmed') === '1' });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, navigate, mode, inviteToken, inviteState, searchParams]);
+
+  useEffect(() => {
+    captureSignupAttribution(window.location.search, window.location.pathname, window.localStorage);
+  }, []);
 
   useEffect(() => {
     if (isResetMode) {
       setMode('reset');
+      return;
     }
-  }, [isResetMode]);
+    if (tab === 'join') setMode('signup');
+    else if (tab === 'signin' || tab === 'login') setMode('login');
+  }, [isResetMode, tab]);
 
   const validateForm = () => {
     if (mode === 'forgot') {
@@ -281,29 +326,29 @@ const Auth = () => {
           toast({ title, description, variant: 'destructive' });
         } else {
           logAuthEvent('Login successful');
-          navigate('/onboarding');
         }
       } else if (mode === 'signup') {
-        const { error, session } = await signUp(email, password);
+        if (WAITLIST_MODE && inviteState !== 'ready') return;
+        if (inviteEmail && email.trim().toLowerCase() !== inviteEmail.toLowerCase()) {
+          setErrors({ email: 'Use the invited email.' });
+          return;
+        }
+        sessionStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({
+          displayName: displayName.trim(),
+          phone: phone.trim(),
+          ...(inviteToken ? { inviteToken } : {}),
+        }));
+        const { error, session } = await signUp(email, password, inviteToken || undefined);
         if (error) {
           logAuthError('Signup failed', error);
           const { title, description } = getAuthErrorMessage(error);
           toast({ title, description, variant: 'destructive' });
         } else if (!session) {
           logAuthEvent('Signup needs email confirmation');
-          sessionStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({
-            displayName: displayName.trim(),
-            phone: phone.trim(),
-          }));
           setConfirmationSentAt(Date.now());
           setMode('confirm-email');
         } else {
           logAuthEvent('Signup successful');
-          await supabase.from('profiles').update({
-            display_name: displayName.trim(),
-            phone: phone.trim() || null,
-          }).eq('user_id', session.user.id);
-          navigate('/onboarding');
         }
       } else if (mode === 'forgot') {
         const { error } = await resetPassword(email);
@@ -353,13 +398,13 @@ const Auth = () => {
       case 'forgot': return 'Reset Password';
       case 'reset': return 'New Password';
       case 'confirm-email': return 'Check your email';
-      default: return 'ETHER';
+      default: return '';
     }
   };
 
   const getSubtitle = () => {
     switch (mode) {
-      case 'login': return 'Log in';
+      case 'login': return 'Sign in';
       case 'signup': return 'Create an account. Free to join.';
       case 'forgot': return resetEmailSent ? 'Check your inbox' : 'Enter your email to reset';
       case 'reset': return 'Create your new password';
@@ -369,6 +414,7 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 safe-area-all">
+      <PageMeta title="Sign in · Ether" description={HERO_TAGLINE} />
       {/* Offline indicator */}
       {!isOnline && (
         <motion.div
@@ -393,22 +439,18 @@ const Auth = () => {
             transition={{ delay: 0.1 }}
             className="mb-4"
           >
-            <img 
-              src={etherBearLogo} 
-              alt="Ether" 
-              className="h-24 w-auto mx-auto object-contain"
-            />
+            <EtherWordmark className="mx-auto w-[16rem] max-w-full" />
           </motion.div>
-          <p className="eyebrow mb-2">Ether</p>
-          <motion.h1 
+          <motion.h1
             className="ether-title text-4xl text-foreground mb-2"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
           >
-            {getTitle()}
+            {getTitle() || getSubtitle()}
           </motion.h1>
-          <motion.p 
+          {getTitle() ? (
+          <motion.p
             className="text-muted-foreground"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -416,35 +458,42 @@ const Auth = () => {
           >
             {getSubtitle()}
           </motion.p>
+          ) : null}
         </div>
 
         <motion.div
-          className="border border-border rounded-[2px] bg-card p-8"
+          className="file-panel p-8"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
         >
+          {inviteState === 'inactive' && (
+            <p className="mb-4 text-center text-sm text-destructive" role="status">
+              This invite is not active.
+            </p>
+          )}
+
           {(mode === 'login' || mode === 'signup') && (
-            <div className="flex mb-8 border border-border p-1">
+            <div className="mb-8 flex rounded-[16px] border border-border p-1">
               <button
                 onClick={() => setMode('login')}
-                className={`flex-1 min-h-11 rounded-[2px] text-sm font-medium transition-all ${
+                className={`mono-label flex-1 min-h-11 rounded-[14px] text-[12px] transition-all ${
                   mode === 'login' 
-                    ? 'bg-primary text-primary-foreground' 
+                    ? 'bg-gradient-to-br from-[#FFD6E8] to-[#FF9FC8] text-[#0A0A0A]' 
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                Log in
+                Sign in
               </button>
               <button
                 onClick={() => setMode('signup')}
-                className={`flex-1 min-h-11 rounded-[2px] text-sm font-medium transition-all ${
+                className={`mono-label flex-1 min-h-11 rounded-[14px] text-[12px] transition-all ${
                   mode === 'signup' 
-                    ? 'bg-primary text-primary-foreground' 
+                    ? 'bg-gradient-to-br from-[#FFD6E8] to-[#FF9FC8] text-[#0A0A0A]' 
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                Sign Up
+                Join
               </button>
             </div>
           )}
@@ -508,6 +557,19 @@ const Auth = () => {
                 Try another email
               </Button>
             </div>
+          ) : mode === 'signup' && WAITLIST_MODE && inviteState !== 'ready' ? (
+            <div className="space-y-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                {inviteState === 'checking'
+                  ? 'Checking this invite.'
+                  : inviteState === 'inactive'
+                    ? 'This invite is not active.'
+                    : 'Accounts open from an invite. Join the waitlist until then.'}
+              </p>
+              <Button asChild className="w-full">
+                <Link to="/waitlist">Waitlist</Link>
+              </Button>
+            </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               {mode === 'signup' && (
@@ -519,7 +581,10 @@ const Auth = () => {
                         type="email"
                         placeholder="Email *"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => {
+                          if (!inviteEmail) setEmail(e.target.value);
+                        }}
+                        readOnly={Boolean(inviteEmail)}
                         className="pl-11 h-12 bg-input border-border focus:border-primary"
                         required
                       />
@@ -622,13 +687,13 @@ const Auth = () => {
               <Button
                 type="submit"
                 disabled={isLoading || !isOnline}
-                className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-medium glow-pink"
+                className="w-full h-12 font-medium"
               >
                 {isLoading ? (
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                    className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full"
+                    className="w-5 h-5 border-2 border-[#0A0A0A]/30 border-t-[#0A0A0A] rounded-full"
                   />
                 ) : !isOnline ? (
                   <>
@@ -637,8 +702,8 @@ const Auth = () => {
                   </>
                 ) : (
                   <>
-                    {mode === 'login' && 'Log in'}
-                    {mode === 'signup' && 'Begin Journey'}
+                    {mode === 'login' && 'Sign in'}
+                    {mode === 'signup' && 'Join'}
                     {mode === 'forgot' && 'Send Reset Link'}
                     {mode === 'reset' && 'Update Password'}
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -670,7 +735,7 @@ const Auth = () => {
                 >
                   {mode === 'login' ? (
                     <>
-                      Don&apos;t have an account? Use the Sign Up tab above.{" "}
+                      Don&apos;t have an account? Use the Join tab above.{" "}
                       <Link to="/privacy" className="text-primary underline">Privacy</Link>
                       {" · "}
                       <Link to="/terms" className="text-primary underline">Terms</Link>

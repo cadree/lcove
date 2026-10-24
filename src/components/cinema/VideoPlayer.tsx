@@ -17,7 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { NetworkContent, useContentPlayback, useIncrementViewCount, useUpdateWatchProgress } from '@/hooks/useCinema';
-import { isIosApp } from '@/lib/platform';
+import { digitalPurchasesEnabled } from '@/lib/platform';
 import { cn } from '@/lib/utils';
 
 interface VideoPlayerProps {
@@ -300,13 +300,42 @@ export const VideoPlayer = ({
       )}
 
       {isEmbed ? (
-        // External Embed (YouTube, Vimeo) - For embeds, we can't control preview
-        <iframe
-          src={externalUrl?.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
-          className="w-full h-full"
-          allowFullScreen
-          allow="autoplay; encrypted-media"
-        />
+        isPreviewOnly ? (
+          <div
+            className="flex h-full w-full items-center justify-center bg-black px-6 text-center"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="max-w-md">
+              <Lock className="mx-auto mb-4 h-10 w-10 text-primary" />
+              <h2 className="mb-2 text-2xl font-display font-bold text-white">Locked</h2>
+              <p className="mb-6 text-white/70">
+                {!digitalPurchasesEnabled()
+                  ? "This film isn't available to purchase in the iOS app."
+                  : "Subscribe to this network to watch. The embed stays off until the lock opens."}
+              </p>
+              {digitalPurchasesEnabled() && (
+                <Button
+                  size="lg"
+                  className="w-full"
+                  onClick={() => {
+                    onSubscribe?.();
+                    onClose();
+                  }}
+                >
+                  Subscribe Now
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <iframe
+            src={externalUrl?.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+            className="w-full h-full"
+            allowFullScreen
+            allow="encrypted-media"
+            title={content.title || "Film"}
+          />
+        )
       ) : videoUrl ? (
         // Native Video Player
         <>
@@ -359,12 +388,12 @@ export const VideoPlayer = ({
                 </h2>
                 
                 <p className="text-white/70 mb-6">
-                  {isIosApp()
+                  {!digitalPurchasesEnabled()
                     ? "The rest of this network isn't available to purchase in the iOS app."
                     : "Subscribe to this network to watch the full content and access all exclusive films and shows."}
                 </p>
 
-                {!isIosApp() && networkPrice && (
+                {digitalPurchasesEnabled() && networkPrice && (
                   <div className="mb-6 p-4 rounded-lg bg-white/10 border border-white/20">
                     <div className="flex items-center justify-center gap-2 text-primary">
                       <Crown className="w-5 h-5" />
@@ -377,7 +406,7 @@ export const VideoPlayer = ({
                 )}
 
                 <div className="flex flex-col gap-3">
-                  {!isIosApp() && (
+                  {digitalPurchasesEnabled() && (
                   <Button
                     size="lg"
                     className="w-full gap-2"

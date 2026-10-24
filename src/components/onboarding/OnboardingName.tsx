@@ -4,12 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowRight, ArrowLeft, User } from 'lucide-react';
+import { displayNameError } from '@/lib/displayName';
 
 interface Props {
   displayName: string;
   updateName: (name: string) => void;
   onNext: () => void;
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
@@ -18,26 +19,9 @@ const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
 
   const handleNext = () => {
     const trimmedName = name.trim();
-    
-    if (!trimmedName) {
-      setError('Please enter your name to continue');
-      return;
-    }
-    
-    if (trimmedName.length < 2) {
-      setError('Name must be at least 2 characters');
-      return;
-    }
-    
-    if (trimmedName.length > 50) {
-      setError('Name must be less than 50 characters');
-      return;
-    }
-
-    // Basic validation - no special characters that could be problematic
-    const nameRegex = /^[a-zA-Z\s\-'.]+$/;
-    if (!nameRegex.test(trimmedName)) {
-      setError('Please use only letters, spaces, hyphens, or apostrophes');
+    const nextError = displayNameError(trimmedName);
+    if (nextError) {
+      setError(nextError);
       return;
     }
 
@@ -63,6 +47,7 @@ const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center mx-auto mb-6">
             <User className="w-8 h-8 text-primary-foreground" />
           </div>
+          <p className="text-primary text-sm font-medium mb-2">Step 1 of 4</p>
           <h1 className="font-display text-4xl md:text-5xl text-gradient-pink mb-3">
             What's your name?
           </h1>
@@ -97,9 +82,13 @@ const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
               className="h-14 text-lg bg-background/50"
               maxLength={50}
               autoFocus
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? 'displayName-error' : 'displayName-hint'}
             />
             {error && (
               <motion.p
+                id="displayName-error"
+                role="alert"
                 initial={{ opacity: 0, y: -5 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="text-destructive text-sm"
@@ -107,8 +96,8 @@ const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
                 {error}
               </motion.p>
             )}
-            <p className="text-muted-foreground text-xs">
-              Use your real name or a professional alias — this cannot be left empty
+            <p id="displayName-hint" className="text-muted-foreground text-xs">
+              Letters, spaces, hyphens, or apostrophes.
             </p>
           </div>
         </motion.div>
@@ -120,14 +109,18 @@ const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
           transition={{ delay: 0.3 }}
           className="flex items-center justify-between"
         >
-          <Button
-            variant="ghost"
-            onClick={onBack}
-            className="text-muted-foreground"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
+          {onBack ? (
+            <Button
+              variant="ghost"
+              onClick={onBack}
+              className="text-muted-foreground"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+          ) : (
+            <span />
+          )}
           <Button
             onClick={handleNext}
             disabled={!name.trim()}

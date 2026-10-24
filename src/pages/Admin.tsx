@@ -1,12 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { 
   Shield, Users, AlertTriangle, CheckCircle, Clock, History, Search, 
-  ArrowLeft, Ban, UserCheck, ClipboardList, Trash2, Eye, Phone, Mail, MapPin, 
+  Ban, UserCheck, ClipboardList, Trash2, Eye, Phone, Mail, MapPin, 
   Briefcase, Heart, Star, Send, Coins, Download, MessageSquare, ShieldCheck, ShieldOff,
   MessageCircle, Building2, Flag, Shirt, Film
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { WaitlistAdminDialog } from '@/components/admin/WaitlistAdminDialog';
+import { WaitlistExportButton } from '@/components/admin/WaitlistExportButton';
+import { cityMatchesQuery, citiesShareGroup } from '@/lib/cityNormalization';
 import PageLayout from '@/components/layout/PageLayout';
+import { BackButton } from '@/components/navigation/BackButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +35,8 @@ import {
   useLowReputationUsers,
   useChangeAccessStatus,
   useDeleteUser,
+  useRestoreUser,
+  useHardDeleteUser,
 } from '@/hooks/useAdmin';
 import {
   useAdminUserData,
@@ -48,6 +54,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PartnerApplicationsTab } from '@/components/admin/PartnerApplicationsTab';
 import { ContentReportsTab } from '@/components/admin/ContentReportsTab';
+import { ContentModerationTab } from '@/components/admin/ContentModerationTab';
+import { AdminStats } from '@/components/admin/AdminStats';
 import { NuanceInterestTab } from '@/components/admin/NuanceInterestTab';
 import { CinemaReviewTab } from '@/components/admin/CinemaReviewTab';
 
@@ -76,6 +84,8 @@ const Admin: React.FC = () => {
   const [suspendDialog, setSuspendDialog] = useState<{ userId: string; name: string } | null>(null);
   const [statusDialog, setStatusDialog] = useState<{ userId: string; name: string; currentStatus: string } | null>(null);
   const [removeDialog, setRemoveDialog] = useState<{ userId: string; name: string } | null>(null);
+  const [hardDeleteDialog, setHardDeleteDialog] = useState<{ userId: string; name: string } | null>(null);
+  const [hardConfirm, setHardConfirm] = useState('');
   const [detailDialog, setDetailDialog] = useState<AdminUserData | null>(null);
   const [creditDialog, setCreditDialog] = useState<{ userId: string; name: string; balance: number } | null>(null);
   const [bulkCreditDialog, setBulkCreditDialog] = useState(false);
@@ -117,6 +127,8 @@ const Admin: React.FC = () => {
   const approveOnboarding = useApproveOnboarding();
   const changeAccessStatus = useChangeAccessStatus();
   const deleteUser = useDeleteUser();
+  const restoreUser = useRestoreUser();
+  const hardDeleteUser = useHardDeleteUser();
   const adjustCredits = useAdjustUserCredits();
   const bulkAwardCredits = useBulkAwardCredits();
   const sendMassNotification = useSendMassNotification();
@@ -132,7 +144,7 @@ const Admin: React.FC = () => {
       const matchesSearch = 
         u.display_name?.toLowerCase().includes(search.toLowerCase()) ||
         u.email?.toLowerCase().includes(search.toLowerCase()) ||
-        u.city?.toLowerCase().includes(search.toLowerCase()) ||
+        cityMatchesQuery(u.city, search) ||
         u.phone?.toLowerCase().includes(search.toLowerCase());
       
       const matchesMindset = mindsetFilter === 'all' || 
@@ -210,7 +222,7 @@ const Admin: React.FC = () => {
       } else if (messageTarget === 'mindset_level') {
         targetUserIds = adminUserData.filter(u => u.mindset_level === parseInt(messageTargetValue)).map(u => u.user_id);
       } else if (messageTarget === 'city') {
-        targetUserIds = adminUserData.filter(u => u.city?.toLowerCase() === messageTargetValue.toLowerCase()).map(u => u.user_id);
+        targetUserIds = adminUserData.filter(u => citiesShareGroup(u.city, messageTargetValue)).map(u => u.user_id);
       }
       
       bulkAwardCredits.mutate({
@@ -329,9 +341,7 @@ const Admin: React.FC = () => {
         {/* Header */}
         <div className="bg-gradient-to-b from-primary/10 to-background px-4 pt-6 pb-8">
           <div className="flex items-center gap-3 mb-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <BackButton />
             <Shield className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>
           </div>
@@ -351,33 +361,7 @@ const Admin: React.FC = () => {
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="px-4 py-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold">{adminUserData?.length || 0}</div>
-              <div className="text-sm text-muted-foreground">Total Users</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-yellow-500">{pendingOnboarding?.length || 0}</div>
-              <div className="text-sm text-muted-foreground">Pending Review</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-primary">{announcements?.length || 0}</div>
-              <div className="text-sm text-muted-foreground">Announcements</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-orange-500">{lowRepUsers?.length || 0}</div>
-              <div className="text-sm text-muted-foreground">Low Reputation</div>
-            </CardContent>
-          </Card>
-        </div>
+        <AdminStats />
 
         {/* Quick Actions */}
         <div className="px-4 pb-4 flex gap-2 flex-wrap">
@@ -407,6 +391,8 @@ const Admin: React.FC = () => {
             <Download className="h-4 w-4" />
             Export CSV
           </Button>
+          <WaitlistExportButton />
+          <WaitlistAdminDialog />
         </div>
 
         {/* Tabs */}
@@ -418,6 +404,9 @@ const Admin: React.FC = () => {
             <TabsTrigger value="messages"><MessageSquare className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="flagged"><AlertTriangle className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="reports" title="Reports"><Flag className="h-4 w-4" /></TabsTrigger>
+            <TabsTrigger value="content" title="Content">
+              <ClipboardList className="h-4 w-4" />
+            </TabsTrigger>
             <TabsTrigger value="history"><History className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="cinema" title="Cinema review">
               <Film className="h-4 w-4" />
@@ -533,6 +522,8 @@ const Admin: React.FC = () => {
                                     </Badge>
                                   )}
                                   {getStatusBadge(user.access_status)}
+                                  {user.is_suspended && <Badge variant="destructive">Suspended</Badge>}
+                                  {user.deleted_at && <Badge variant="destructive">Removed</Badge>}
                                   {getMindsetBadge(user.mindset_level)}
                                   <Badge variant="outline" className="gap-1">
                                     <Coins className="h-3 w-3" />
@@ -638,6 +629,51 @@ const Admin: React.FC = () => {
                                 <MessageCircle className="h-3 w-3 mr-1" />
                                 Message
                               </Button>
+                              {user.is_suspended && !user.deleted_at && user.access_status !== 'banned' ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => unsuspendUser.mutate(user.user_id)}
+                                  disabled={unsuspendUser.isPending}
+                                >
+                                  <UserCheck className="h-3 w-3 mr-1" />
+                                  Unsuspend
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setReason('');
+                                    setSuspendDialog({ userId: user.user_id, name: user.display_name || 'User' });
+                                  }}
+                                >
+                                  <Ban className="h-3 w-3 mr-1" />
+                                  Suspend
+                                </Button>
+                              )}
+                              {user.deleted_at ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => restoreUser.mutate({ userId: user.user_id })}
+                                  disabled={restoreUser.isPending}
+                                >
+                                  Restore
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    setReason('');
+                                    setRemoveDialog({ userId: user.user_id, name: user.display_name || 'User' });
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Remove
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant={user.is_admin ? "destructive" : "outline"}
@@ -837,6 +873,10 @@ const Admin: React.FC = () => {
             <ContentReportsTab />
           </TabsContent>
 
+          <TabsContent value="content" className="mt-4">
+            <ContentModerationTab />
+          </TabsContent>
+
           {/* Action History Tab */}
           <TabsContent value="history" className="mt-4">
             <ScrollArea className="h-[400px]">
@@ -906,8 +946,85 @@ const Admin: React.FC = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSuspendDialog(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleSuspend} disabled={!reason}>
+            <Button variant="destructive" onClick={handleSuspend} disabled={!reason || suspendUser.isPending}>
               Suspend User
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!removeDialog} onOpenChange={() => setRemoveDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove {removeDialog?.name}</DialogTitle>
+            <DialogDescription>
+              This hides the account and signs them out. The row stays so it can be restored.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Reason</Label>
+              <Textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Why is this account being removed?"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveDialog(null)}>Cancel</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (!removeDialog) return;
+                setHardConfirm('');
+                setHardDeleteDialog(removeDialog);
+                setRemoveDialog(null);
+              }}
+            >
+              Delete permanently…
+            </Button>
+            <Button variant="destructive" onClick={handleRemoveUser} disabled={deleteUser.isPending}>
+              Remove account
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!hardDeleteDialog} onOpenChange={() => setHardDeleteDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Permanently delete {hardDeleteDialog?.name}?</DialogTitle>
+            <DialogDescription>
+              This deletes the login and personal data. It cannot be undone. Paste the user id to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>User id</Label>
+            <Input
+              value={hardConfirm}
+              onChange={(e) => setHardConfirm(e.target.value.trim())}
+              placeholder={hardDeleteDialog?.userId}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHardDeleteDialog(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={!hardDeleteDialog || hardConfirm !== hardDeleteDialog.userId || hardDeleteUser.isPending}
+              onClick={() => {
+                if (!hardDeleteDialog) return;
+                hardDeleteUser.mutate({
+                  userId: hardDeleteDialog.userId,
+                  confirm: hardConfirm,
+                  reason: reason || undefined,
+                });
+                setHardDeleteDialog(null);
+                setHardConfirm('');
+                setReason('');
+              }}
+            >
+              Delete permanently
             </Button>
           </DialogFooter>
         </DialogContent>

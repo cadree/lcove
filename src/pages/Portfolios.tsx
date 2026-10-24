@@ -13,6 +13,11 @@ import { CreatePostDialog } from "@/components/profile/CreatePostDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
+import { assertCleanText } from "@/lib/objectionableText";
+import { embedColumnMissing, embedColumnsForInsert, embedFromPost, videoEmbedMigrationMessage } from "@/lib/videoEmbed";
+import { EmbedThumbnail } from "@/components/feed/EmbedPlayer";
+import type { ComposePostInput } from "@/types/post";
 
 interface PortfolioPost {
   id: string;
@@ -21,6 +26,11 @@ interface PortfolioPost {
   content: string | null;
   user_id: string;
   created_at: string;
+  embed_provider?: string | null;
+  embed_video_id?: string | null;
+  embed_hash?: string | null;
+  embed_thumbnail_url?: string | null;
+  embed_title?: string | null;
   creator: {
     id: string;
     display_name: string | null;
@@ -38,12 +48,24 @@ const Portfolios = () => {
   const { data: posts, isLoading } = useQuery({
     queryKey: ["community-portfolio-posts"],
     queryFn: async () => {
-      const { data: portfolioPosts, error } = await supabase
+      const withEmbeds = await supabase
         .from("posts")
-        .select("id, media_url, media_type, content, user_id, created_at")
+        .select("id, media_url, media_type, content, user_id, created_at, embed_provider, embed_video_id, embed_hash, embed_thumbnail_url, embed_title")
         .eq("post_type", "portfolio")
         .order("created_at", { ascending: false })
         .limit(50);
+
+      const legacy = withEmbeds.error && embedColumnMissing(withEmbeds.error)
+        ? await supabase
+          .from("posts")
+          .select("id, media_url, media_type, content, user_id, created_at")
+          .eq("post_type", "portfolio")
+          .order("created_at", { ascending: false })
+          .limit(50)
+        : null;
+
+      const portfolioPosts = legacy ? legacy.data : withEmbeds.data;
+      const error = legacy ? legacy.error : withEmbeds.error;
 
       if (error) throw error;
 
@@ -73,8 +95,8 @@ const Portfolios = () => {
       const { data } = await supabase
         .from("profiles")
         .select("display_name, avatar_url")
-        .eq("id", user.id)
-        .single();
+        .eq("user_id", user.id)
+        .maybeSingle();
       return data;
     },
     enabled: !!user,
@@ -89,16 +111,27 @@ const Portfolios = () => {
       location,
       altText,
       commentsEnabled = true,
-    }: { 
-      content?: string; 
-      file?: File;
-      files?: File[];
-      mediaType?: 'photo' | 'video' | 'text' | 'collage';
-      location?: string;
-      altText?: string;
-      commentsEnabled?: boolean;
-    }) => {
+      embed,
+    }: ComposePostInput & { inlineError?: boolean }) => {
       if (!user) throw new Error('Must be logged in');
+      assertCleanText(content);
+
+      if (embed) {
+        const columns = embedColumnsForInsert(embed);
+        const { error: insertError } = await supabase
+          .from('posts')
+          .insert({
+            user_id: user.id,
+            content: content || null,
+            post_type: 'portfolio',
+            location: location || null,
+            alt_text: altText || null,
+            comments_enabled: commentsEnabled,
+            ...columns,
+          });
+        if (insertError) throw insertError;
+        return;
+      }
 
       let mediaUrl: string | null = null;
 
@@ -158,22 +191,17 @@ const Portfolios = () => {
       toast.success('Portfolio work shared!');
       setShowCreateDialog(false);
     },
-    onError: (error) => {
-      toast.error('Failed to share work');
+    onError: (error, variables) => {
+      if (variables.inlineError) return;
+      toast.error(embedColumnMissing(error)
+        ? videoEmbedMigrationMessage()
+        : errorMessage(error, 'Failed to share work'));
       console.error(error);
     },
   });
 
-  const handleCreatePost = async (data: {
-    content?: string;
-    file?: File;
-    files?: File[];
-    mediaType?: 'photo' | 'video' | 'text' | 'collage';
-    location?: string;
-    altText?: string;
-    commentsEnabled?: boolean;
-  }) => {
-    await createPortfolioPost.mutateAsync(data);
+  const handleCreatePost = async (data: ComposePostInput) => {
+    await createPortfolioPost.mutateAsync({ ...data, inlineError: true });
   };
 
   const visiblePosts = (posts ?? []).filter((post) => !blockedIds.includes(post.user_id));
@@ -212,7 +240,20 @@ const Portfolios = () => {
                 <Link to={`/profile/${post.user_id}`}>
                   <div className="glass rounded-2xl overflow-hidden hover:bg-accent/30 transition-colors group">
                     <div className="aspect-square relative bg-accent/20">
-                      {post.media_url ? (
+                      {embedFromPost(post) ? (
+                        <>
+                          <EmbedThumbnail
+                            embed={embedFromPost(post)!}
+                            thumbnailUrl={post.embed_thumbnail_url}
+                            title={post.embed_title || post.content}
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
+                              <Play className="w-5 h-5 text-white fill-white" />
+                            </div>
+                          </div>
+                        </>
+                      ) : post.media_url ? (
                         post.media_type === "video" ? (
                           <>
                             <video

@@ -6,12 +6,14 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Search, MapPin, Briefcase, Users, Loader2, Heart } from "lucide-react";
+import { Search, Users, Loader2, Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { FriendsDrawer } from "@/components/friends/FriendsDrawer";
-import { computeCityKey, computeCityDisplay } from "@/lib/cityNormalization";
+import { cityFilterOptions, cityMatchesFilter, cityMatchesQuery } from "@/lib/cityNormalization";
 import { dedupeProfilesByUserId } from "@/lib/directoryProfiles";
+import { DIRECTORY_RENDER_PAGE, listEnterDelay, nextRenderedCount } from "@/lib/feedWindow";
+import { abortAfter } from "@/lib/requestDeadline";
 
 interface Profile {
   id: string;
@@ -58,22 +60,32 @@ const Directory = () => {
   const [selectedCityKey, setSelectedCityKey] = useState<string | null>(null); // null = All Cities
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [shown, setShown] = useState(DIRECTORY_RENDER_PAGE);
 
   useEffect(() => {
-    fetchProfiles();
+    void fetchProfiles();
   }, []);
+
+  useEffect(() => {
+    setShown(DIRECTORY_RENDER_PAGE);
+  }, [searchQuery, selectedCityKey]);
 
   const fetchProfiles = async () => {
     setLoading(true);
+    setLoadError(false);
+    const signal = abortAfter();
     
     // Fetch profiles using profiles_public view to protect sensitive fields
     const { data: profilesData, error: profilesError } = await supabase
       .from('profiles_public')
       .select('id, user_id, display_name, avatar_url, city, city_display, city_key, bio, created_at')
       .eq('onboarding_completed', true)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .abortSignal(signal);
 
     if (profilesError || !profilesData) {
+      setLoadError(true);
       setLoading(false);
       return;
     }
@@ -81,12 +93,14 @@ const Directory = () => {
     // Fetch user passions with passion names
     const { data: passionsData } = await supabase
       .from('user_passions')
-      .select('user_id, custom_name, passions(name)');
+      .select('user_id, custom_name, passions(name)')
+      .abortSignal(signal);
     
     // Fetch user skills with skill names
     const { data: skillsData } = await supabase
       .from('user_skills')
-      .select('user_id, skills(name)');
+      .select('user_id, skills(name)')
+      .abortSignal(signal);
     
     // Group passions by user_id
     const passionsByUser = new Map<string, string[]>();
@@ -123,57 +137,38 @@ const Directory = () => {
     setLoading(false);
   };
 
-  // Build deduplicated city list using city_key (or computed key for old data)
+  // Group filter chips from the strings already stored. "Charlotte" and
+  // "Charlotte, NC" share a chip. Stored city fields are left unchanged.
   const cityOptions = useMemo<CityOption[]>(() => {
-    const cityMap = new Map<string, string>(); // key -> display
-    
-    profiles.forEach(profile => {
-      // Use city_key if available, otherwise compute from city
-      const key = profile.city_key || computeCityKey(profile.city);
-      if (!key) return;
-      
-      // Use city_display if available, otherwise compute from city
-      const display = profile.city_display || computeCityDisplay(profile.city);
-      if (!display) return;
-      
-      // Only store first display value seen for each key (they should all be the same after normalization)
-      if (!cityMap.has(key)) {
-        cityMap.set(key, display);
-      }
-    });
-
-    // Convert to array and sort alphabetically by display name
-    return Array.from(cityMap.entries())
-      .map(([key, display]) => ({ key, display }))
-      .sort((a, b) => a.display.localeCompare(b.display));
+    return cityFilterOptions(profiles.flatMap((profile) => [profile.city_display, profile.city]));
   }, [profiles]);
 
-  // Get the city key for a profile (for filtering)
-  const getProfileCityKey = (profile: Profile): string => {
-    return profile.city_key || computeCityKey(profile.city);
+  const profileMatchesSelectedCity = (profile: Profile): boolean => {
+    if (selectedCityKey === null) return true;
+    return [profile.city_display, profile.city].some((value) => cityMatchesFilter(value, selectedCityKey));
   };
 
   // Get the display value for a profile's city
   const getProfileCityDisplay = (profile: Profile): string => {
-    return profile.city_display || computeCityDisplay(profile.city) || profile.city || '';
+    return profile.city || profile.city_display || '';
   };
 
   const filteredProfiles = profiles.filter((profile) => {
     if (blockedIds.includes(profile.user_id)) return false;
-    const cityDisplay = getProfileCityDisplay(profile);
     const searchLower = searchQuery.toLowerCase();
     const matchesSearch = 
       profile.display_name?.toLowerCase().includes(searchLower) ||
       profile.bio?.toLowerCase().includes(searchLower) ||
-      cityDisplay.toLowerCase().includes(searchLower) ||
+      cityMatchesQuery(profile.city, searchQuery) ||
+      cityMatchesQuery(profile.city_display, searchQuery) ||
       profile.passions?.some(passion => passion.toLowerCase().includes(searchLower)) ||
       profile.skills?.some(skill => skill.toLowerCase().includes(searchLower));
     
-    const profileCityKey = getProfileCityKey(profile);
-    const matchesCity = selectedCityKey === null || profileCityKey === selectedCityKey;
+    const matchesCity = profileMatchesSelectedCity(profile);
     
     return matchesSearch && matchesCity;
   });
+  const visibleProfiles = filteredProfiles.slice(0, shown);
 
   const handleProfileClick = (userId: string) => {
     navigate(`/profile/${userId}`);
@@ -187,7 +182,7 @@ const Directory = () => {
           eyebrow="People"
           title="Directory"
           description="Find creatives by name, city, or interests"
-          className="mb-6"
+          className="mb-4"
           actions={
             <FriendsDrawer>
               <Button variant="outline" size="icon" title="Friends" aria-label="Friends">
@@ -197,102 +192,102 @@ const Directory = () => {
           }
         />
 
-        {/* Search Bar */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="relative mb-6"
-        >
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+        <div className="relative mb-3">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search by name, city, passions, or skills..."
+            placeholder="SEARCH NAME, CITY, CRAFT"
+            aria-label="Search by name, city, passions, or skills"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-14 pl-12 pr-4 rounded-xl bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+            className="h-11 w-full rounded-[14px] border border-border bg-input pl-10 pr-4 font-mono text-[11px] uppercase tracking-[0.14em] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(var(--scan))]"
           />
-        </motion.div>
+        </div>
 
-        {/* City Filter */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide"
-        >
-          {/* All Cities button */}
-          <Button
-            key="all-cities"
-            variant={selectedCityKey === null ? "default" : "glass"}
-            size="sm"
+        <div className="mb-5 flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          <button
+            type="button"
             onClick={() => setSelectedCityKey(null)}
-            className="whitespace-nowrap min-h-11"
+            aria-pressed={selectedCityKey === null}
+            className={`mono-label inline-flex h-11 shrink-0 items-center rounded-full border px-3 text-[11px] ${
+              selectedCityKey === null
+                ? "border-[hsl(var(--scan))] text-foreground shadow-[inset_0_0_12px_rgba(121,195,207,0.35)]"
+                : "border-border text-muted-foreground"
+            }`}
           >
-            <MapPin className="w-3 h-3 mr-1" />
-            All Cities
-          </Button>
-          {/* Individual city buttons */}
+            All cities
+          </button>
           {cityOptions.map((cityOption) => (
-            <Button
+            <button
               key={cityOption.key}
-              variant={selectedCityKey === cityOption.key ? "default" : "glass"}
-              size="sm"
+              type="button"
               onClick={() => setSelectedCityKey(cityOption.key)}
-              className="whitespace-nowrap min-h-11"
+              aria-pressed={selectedCityKey === cityOption.key}
+              className={`mono-label inline-flex h-11 shrink-0 items-center rounded-full border px-3 text-[11px] ${
+                selectedCityKey === cityOption.key
+                  ? "border-[hsl(var(--scan))] text-foreground shadow-[inset_0_0_12px_rgba(121,195,207,0.35)]"
+                  : "border-border text-muted-foreground"
+              }`}
             >
-              <MapPin className="w-3 h-3 mr-1" />
               {cityOption.display}
-            </Button>
+            </button>
           ))}
-        </motion.div>
+        </div>
 
         {/* Loading State */}
         {loading && (
-          <div className="flex items-center justify-center py-12">
+          <div className="flex items-center justify-center py-12" role="status">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <span className="sr-only">Loading directory</span>
+          </div>
+        )}
+
+        {!loading && loadError && (
+          <div className="py-12 text-center">
+            <p className="text-sm text-muted-foreground">The directory did not load.</p>
+            <Button type="button" variant="outline" className="mt-3 min-h-11" onClick={() => void fetchProfiles()}>
+              Try again
+            </Button>
           </div>
         )}
 
         {/* Results Grid */}
-        {!loading && (
+        {!loading && !loadError && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredProfiles.map((profile, index) => (
+            {visibleProfiles.map((profile, index) => (
               <motion.div
                 key={profile.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: index * 0.05 }}
+                transition={{ duration: 0.25, delay: listEnterDelay(index) }}
                 onClick={() => handleProfileClick(profile.user_id)}
-                className="bg-card border border-border rounded-[2px] p-5 cursor-pointer group"
+                className="file-panel group cursor-pointer p-4"
               >
-                <div className="flex items-start gap-4">
-                  {/* Avatar */}
-                  <Avatar className="w-16 h-16 rounded-[2px] border border-border">
-                    <AvatarImage src={profile.avatar_url || undefined} className="rounded-[2px]" />
-                    <AvatarFallback className="bg-muted text-foreground text-xl font-medium rounded-[2px]">
-                      {profile.display_name?.charAt(0).toUpperCase() || '?'}
-                    </AvatarFallback>
-                  </Avatar>
+                <div className="flex items-start gap-3">
+                  <span className="rounded-full bg-[conic-gradient(from_120deg,#FF9FC8,#79C3CF,#FF9FC8)] p-[2px]">
+                    <Avatar className="h-14 w-14 rounded-full border-2 border-card">
+                      <AvatarImage src={profile.avatar_url || undefined} className="rounded-full" />
+                      <AvatarFallback className="rounded-full bg-card font-body text-lg font-extrabold text-foreground">
+                        {profile.display_name?.charAt(0).toUpperCase() || '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                  </span>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                    <h3 className="font-display text-lg font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                  <div className="min-w-0 flex-1">
+                    <p className="mono-label text-[8px] text-[hsl(var(--scan))]">// Profile</p>
+                    <div className="flex min-w-0 items-center gap-2">
+                    <h3 className="truncate font-body text-[15px] font-extrabold text-foreground">
                       {profile.display_name || 'Anonymous'}
                     </h3>
                     {profile.created_at && Date.now() - new Date(profile.created_at).getTime() < 14 * 24 * 60 * 60 * 1000 && (
-                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-primary">New</span>
+                      <span className="mono-label shrink-0 text-[8px] text-[hsl(var(--brand))]">New</span>
                     )}
                   </div>
-                    {getProfileCityDisplay(profile) && (
-                      <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
-                        <MapPin className="w-3 h-3" />
-                        {getProfileCityDisplay(profile)}
-                      </p>
-                    )}
+                    <p className="mono-label mt-1 text-[8px] text-muted-foreground">
+                      {getProfileCityDisplay(profile) || "City open"}
+                    </p>
                     {profile.bio && (
-                      <p className="text-xs text-muted-foreground line-clamp-2">
+                      <p className="mt-1 line-clamp-2 font-body text-xs text-muted-foreground">
                         {profile.bio}
                       </p>
                     )}
@@ -302,9 +297,14 @@ const Directory = () => {
             ))}
           </div>
         )}
+        {!loading && !loadError && shown < filteredProfiles.length && (
+          <Button type="button" variant="outline" className="mt-4 min-h-11 w-full" onClick={() => setShown((count) => nextRenderedCount(count, filteredProfiles.length, DIRECTORY_RENDER_PAGE))}>
+            Show more
+          </Button>
+        )}
 
         {/* Empty State */}
-        {!loading && filteredProfiles.length === 0 && (
+        {!loading && !loadError && filteredProfiles.length === 0 && (
           <EmptyState
             icon={Users}
             title="No creatives found"

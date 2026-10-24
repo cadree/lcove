@@ -1,16 +1,16 @@
-import { useState, useCallback, useRef } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useState, useCallback, useRef, useEffect, type CSSProperties } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Plus, Grid, Bookmark, FileText, ArrowLeft, LayoutGrid, Users, LayoutDashboard, ShoppingBag, Calendar, PenLine } from "lucide-react";
+import { Loader2, Bookmark, ArrowLeft, LayoutGrid, Users, LayoutDashboard, ShoppingBag, Calendar, PenLine } from "lucide-react";
+import { BackButton } from "@/components/navigation/BackButton";
 import { Card } from "@/components/ui/card";
 import { MusicProfileBlock } from "@/components/music/MusicProfileBlock";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
 import { ProfileCustomizationDialog } from "@/components/profile/ProfileCustomizationDialog";
 import { ProfileRecordPlayer } from "@/components/profile/ProfileRecordPlayer";
-import { useCreateFlow } from "@/components/create/CreateFlowContext";
 import { ProfilePostsGrid } from "@/components/profile/ProfilePostsGrid";
 import { PostDetailModal } from "@/components/profile/PostDetailModal";
 import { CreateBlogDialog } from "@/components/profile/CreateBlogDialog";
@@ -22,7 +22,10 @@ import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { ProfileStats } from "@/components/profile/ProfileStats";
 import { ProfileAboutSection } from "@/components/profile/ProfileAboutSection";
 import { ProfileFolders } from "@/components/profile/ProfileFolders";
-import { ProfileQuickLinks } from "@/components/profile/ProfileQuickLinks";
+import { ProfileBookEntry, ProfileQuickLinks, ToolsEntry } from "@/components/profile/ProfileQuickLinks";
+import { EtherIdEntry } from "@/components/profile/EtherIdEntry";
+import { ProfileFilms } from "@/components/profile/ProfileFilms";
+import { ProfileNovi } from "@/components/profile/ProfileNovi";
 import { FolderDetailView } from "@/components/profile/FolderDetailView";
 import { ProfileLayoutEditor } from "@/components/profile/ProfileLayoutEditor";
 import { ProfileFriendsSection } from "@/components/profile/ProfileFriendsSection";
@@ -35,7 +38,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useProfileCustomization } from "@/hooks/useProfileCustomization";
 import { useProfilePosts } from "@/hooks/useProfilePosts";
-import { useProfileBlogs, BlogPost } from "@/hooks/useProfileBlogs";
+import { useProfileBlogs } from "@/hooks/useProfileBlogs";
 import { useCreatorRoles } from "@/hooks/useCreatorModules";
 import { useUserSkills, useUserPassions, useUserCreativeRoles } from "@/hooks/useUserDetails";
 import { useUserIsAdmin } from "@/hooks/useUserIsAdmin";
@@ -43,9 +46,21 @@ import { usePortfolioFolders, PortfolioFolder } from "@/hooks/usePortfolioFolder
 import { useProfileLayout, ProfileSection } from "@/hooks/useProfileLayout";
 import { toast } from "sonner";
 import { ProfilePost } from "@/types/post";
+import { applyProfileCustomization, hexToHslChannels } from "@/lib/profileSections";
+import { ProfileEffects } from "@/components/profile/ProfileEffects";
+import { supabase } from "@/integrations/supabase/client";
+import { postPreviewPath } from "@/lib/sharing";
+import {
+  mergeLinkedPost,
+  profilePostFromRow,
+  sameUserId,
+  withProfilePostColumns,
+  type ProfilePostRow,
+} from "@/lib/profilePosts";
 
 const Profile = () => {
   const { userId: urlUserId } = useParams<{ userId?: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const navigate = useNavigate();
   
@@ -57,6 +72,13 @@ const Profile = () => {
   const { credits } = useCredits();
   const { customization, isOwner, saveCustomization } = useProfileCustomization(targetUserId);
   const { posts, isLoading: postsLoading, deletePost } = useProfilePosts(targetUserId);
+  const [linkedPost, setLinkedPost] = useState<ProfilePost | null>(null);
+  const requestedPostId = searchParams.get("post");
+  const displayPosts = mergeLinkedPost(
+    posts,
+    linkedPost?.id === requestedPostId ? linkedPost : null,
+    targetUserId,
+  );
   const { blogs, isLoading: blogsLoading, createBlog, deleteBlog } = useProfileBlogs(targetUserId);
   const { data: creatorRoles = [] } = useCreatorRoles(targetUserId);
   const { data: userSkills = [] } = useUserSkills(targetUserId);
@@ -66,22 +88,74 @@ const Profile = () => {
   const { folders } = usePortfolioFolders(targetUserId);
   const { layout } = useProfileLayout(targetUserId);
   const { createDirectConversation } = useConversations();
-  const { openCreate } = useCreateFlow();
-  
+
   const [showMusicDialog, setShowMusicDialog] = useState(false);
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
   const [showCreateBlogDialog, setShowCreateBlogDialog] = useState(false);
   const [showEditDetailsDialog, setShowEditDetailsDialog] = useState(false);
   const [showLayoutEditor, setShowLayoutEditor] = useState(false);
   const [selectedPost, setSelectedPost] = useState<ProfilePost | null>(null);
-  const [selectedBlog, setSelectedBlog] = useState<BlogPost | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<PortfolioFolder | null>(null);
   const volumeSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const hasCreatorRoles = creatorRoles.length > 0;
 
+  useEffect(() => {
+    if (searchParams.get("action") === "create-blog" && isOwnProfile) {
+      setShowCreateBlogDialog(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, isOwnProfile, setSearchParams]);
+
+  useEffect(() => {
+    const postId = searchParams.get("post");
+    if (!postId) {
+      setLinkedPost(null);
+      return;
+    }
+    const match = posts.find((post) => post.id === postId);
+    if (match) {
+      setLinkedPost(null);
+      setSelectedPost(match);
+      return;
+    }
+
+    let cancel = false;
+    void (async () => {
+      const { data, error } = await withProfilePostColumns((columns) =>
+        supabase.from("posts").select(columns).eq("id", postId).maybeSingle(),
+      );
+      if (cancel || error || !data) return;
+      const row = data as unknown as ProfilePostRow;
+      if (targetUserId && row.user_id && !sameUserId(row.user_id, targetUserId)) {
+        navigate(postPreviewPath(row.user_id, row.id), { replace: true });
+        return;
+      }
+      const author = sameUserId(profile?.user_id, row.user_id)
+        ? { display_name: profile?.display_name ?? null, avatar_url: profile?.avatar_url ?? null }
+        : { display_name: null, avatar_url: null };
+      const linked = profilePostFromRow(row, author);
+      setLinkedPost(linked);
+      setSelectedPost(linked);
+    })();
+
+    return () => {
+      cancel = true;
+    };
+  }, [
+    searchParams,
+    posts,
+    targetUserId,
+    navigate,
+    profile?.user_id,
+    profile?.display_name,
+    profile?.avatar_url,
+  ]);
+
   // Square portfolio grid sits above the rest of the module stack.
-  const visibleSections = layout.filter(s => s.visible).sort((a, b) => a.order - b.order);
+  const visibleSections = applyProfileCustomization(layout, customization)
+    .filter(s => s.visible)
+    .sort((a, b) => a.order - b.order);
   const postsSection = visibleSections.find((section) => section.id === "posts_tabs");
   const moduleSections = visibleSections.filter((section) => section.id !== "posts_tabs");
 
@@ -126,7 +200,7 @@ const Profile = () => {
           <h2 className="font-display text-2xl text-foreground">Sign in to view your profile</h2>
           <p className="text-muted-foreground text-center">Create an account or sign in to customize your profile.</p>
           <Button asChild>
-            <Link to="/auth">Sign In</Link>
+            <Link to="/auth">Sign in</Link>
           </Button>
         </div>
       </PageLayout>
@@ -139,17 +213,14 @@ const Profile = () => {
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
           <h2 className="font-display text-2xl text-foreground">Private profile</h2>
           <p className="text-muted-foreground text-center">This profile is not available.</p>
-          <Button onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Go Back
-          </Button>
+          <BackButton showLabel label="Go Back" fallback="/directory" />
         </div>
       </PageLayout>
     );
   }
 
   const displayName = profile?.display_name || 'Creative';
-  const bio = profile?.bio || 'Welcome to my profile!';
+  const bio = profile?.bio?.trim() || '';
   const city = profile?.city || 'Location not set';
   const avatarUrl = profile?.avatar_url;
 
@@ -266,37 +337,45 @@ const Profile = () => {
               <TabsList className="w-full justify-center border-b border-border rounded-none bg-transparent h-auto py-0 px-0">
                 <TabsTrigger 
                   value="posts" 
-                  className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
+                  className="min-h-11 flex-1 rounded-none border-b-2 border-transparent px-2 font-mono text-[10px] uppercase tracking-[0.14em] data-[state=active]:border-primary data-[state=active]:bg-transparent"
                 >
-                  <Grid className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Posts</span>
+                  Posts
                 </TabsTrigger>
                 <TabsTrigger 
                   value="blogs" 
-                  className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
+                  className="min-h-11 flex-1 rounded-none border-b-2 border-transparent px-2 font-mono text-[10px] uppercase tracking-[0.14em] data-[state=active]:border-primary data-[state=active]:bg-transparent"
                 >
-                  <FileText className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Blog</span>
+                  Blogs
                 </TabsTrigger>
                 <TabsTrigger 
                   value="saved" 
-                  className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
+                  className="min-h-11 flex-1 rounded-none border-b-2 border-transparent px-2 font-mono text-[10px] uppercase tracking-[0.14em] data-[state=active]:border-primary data-[state=active]:bg-transparent"
                 >
-                  <Bookmark className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Saved</span>
+                  Saved
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="posts" className="mt-4">
                 <ProfilePostsGrid 
-                  posts={posts}
+                  posts={displayPosts}
                   onPostClick={(post) => setSelectedPost(post)}
-                  isLoading={postsLoading}
+                  isLoading={postsLoading && displayPosts.length === 0}
+                  isOwner={isOwnProfile}
                 />
               </TabsContent>
               <TabsContent value="blogs" className="mt-4">
+                {isOwnProfile && (
+                  <Button
+                    variant="outline"
+                    className="mb-4 min-h-11"
+                    onClick={() => setShowCreateBlogDialog(true)}
+                  >
+                    <PenLine className="w-4 h-4 mr-2" />
+                    Write a blog
+                  </Button>
+                )}
                 <ProfileBlogsGrid 
                   blogs={blogs}
-                  onBlogClick={(blog) => setSelectedBlog(blog)}
+                  onBlogClick={(blog) => navigate(`/blog/${blog.id}`)}
                   isLoading={blogsLoading}
                   isOwner={isOwnProfile}
                 />
@@ -445,21 +524,48 @@ const Profile = () => {
     }
   };
 
+  const accentChannels = customization?.accent_color_override
+    ? hexToHslChannels(customization.accent_color_override)
+    : null;
+  const profileFont = customization?.custom_font || undefined;
+  const themeVars: Record<string, string> = {};
+  if (profileFont) themeVars["--profile-font"] = profileFont;
+  if (accentChannels) {
+    themeVars["--primary"] = accentChannels;
+    themeVars["--ring"] = accentChannels;
+    themeVars["--accent"] = accentChannels;
+    themeVars["--foreground"] = accentChannels;
+  }
+  const themeStyle = themeVars as CSSProperties;
+  const showEffects = !!(
+    customization?.effect_grain
+    || customization?.effect_scanlines
+    || customization?.effect_neon_glow
+    || customization?.effect_holographic
+    || customization?.effect_motion_gradient
+  );
+
   return (
     <PageLayout showNotificationBell={false}>
-      <div className="min-h-screen pb-20">
-        {/* Back Button - Always at top */}
-        <div className="px-5 pt-4 pb-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-2 text-muted-foreground hover:text-foreground"
-            onClick={() => navigate(-1)}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Button>
-        </div>
+      <div
+        className={`relative -mt-[env(safe-area-inset-top,0px)] min-h-screen pb-20 pt-[env(safe-area-inset-top,0px)] ${profileFont ? "profile-theme" : ""}`}
+        style={{ ...themeStyle, backgroundColor: "hsl(var(--background))" }}
+      >
+        {showEffects && (
+          <ProfileEffects
+            grain={customization?.effect_grain}
+            scanlines={customization?.effect_scanlines}
+            neonGlow={customization?.effect_neon_glow}
+            holographic={customization?.effect_holographic}
+            motionGradient={customization?.effect_motion_gradient}
+          />
+        )}
+        <div className="relative z-10">
+        {!isOwnProfile && (
+          <div className="px-5 pt-4 pb-2">
+            <BackButton showLabel label="Back" fallback="/directory" />
+          </div>
+        )}
 
         {/* Header Section - Always at top */}
         <ProfileHeader
@@ -476,8 +582,16 @@ const Profile = () => {
           onAvatarUpdate={handleAvatarUpdate}
           userId={targetUserId || ''}
           memberTier={isOwnProfile && membership?.subscribed ? membership.tier : null}
+          roleLabel={userCreativeRoles[0]?.name || "Creator"}
+          postCount={displayPosts.length}
+          founding={profile?.founding}
         />
 
+        {isOwnProfile && <EtherIdEntry />}
+        {isOwnProfile && <div className="px-4 pt-4"><ProfileNovi /></div>}
+        <ProfileBookEntry />
+        {isOwnProfile && <ToolsEntry />}
+        {targetUserId && <ProfileFilms ownerId={targetUserId} isOwner={!!isOwnProfile} />}
 
         {postsSection && renderSection(postsSection)}
 
@@ -498,29 +612,6 @@ const Profile = () => {
         )}
 
         {moduleSections.map(section => renderSection(section))}
-
-        {/* Floating Create Buttons - Always visible */}
-        {isOwnProfile && (
-          <div className="fixed bottom-24 right-5 z-40 flex flex-col gap-3">
-            <Button
-              size="icon"
-              className="w-12 h-12 rounded-full shadow-lg bg-secondary hover:bg-secondary/90"
-              onClick={() => setShowCreateBlogDialog(true)}
-              title="Write a blog"
-            >
-              <PenLine className="w-5 h-5" />
-            </Button>
-            <Button
-              size="icon"
-              className="w-14 h-14 rounded-[2px]"
-              onClick={openCreate}
-              title="Create post"
-              aria-label="Create post"
-            >
-              <Plus className="w-6 h-6" />
-            </Button>
-          </div>
-        )}
 
         {/* Dialogs */}
         {isOwnProfile && (
@@ -550,13 +641,22 @@ const Profile = () => {
         <PostDetailModal
           post={selectedPost}
           open={!!selectedPost}
-          onOpenChange={(open) => !open && setSelectedPost(null)}
-          isOwner={isOwnProfile}
+          onOpenChange={(open) => {
+            if (open) return;
+            setSelectedPost(null);
+            if (searchParams.get("post")) {
+              const next = new URLSearchParams(searchParams);
+              next.delete("post");
+              setSearchParams(next, { replace: true });
+            }
+          }}
+          isOwner={!!selectedPost && selectedPost.user_id === user?.id}
           onDelete={(postId) => {
             deletePost.mutate(postId);
             setSelectedPost(null);
           }}
         />
+        </div>
       </div>
     </PageLayout>
   );

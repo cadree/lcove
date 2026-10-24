@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { CityInput } from "@/components/city/CityInput";
+import { resolveCity } from "@/lib/cities";
 import { Separator } from "@/components/ui/separator";
 import {
   User,
@@ -42,10 +44,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "@/hooks/useAdmin";
 import { useNotificationPreferences } from "@/hooks/useNotifications";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { IosPushInstallSteps } from "@/components/settings/IosPushInstallSteps";
 import { useUserBlocks } from "@/hooks/useUserBlocks";
+import { assertCleanText, OBJECTIONABLE_MESSAGE } from "@/lib/objectionableText";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
 import { supabase } from "@/integrations/supabase/client";
+import { SquircleIcon } from "@/components/world/SquircleIcon";
+import { useThemeMode } from "@/components/theme/ThemeProvider";
+import type { ThemeChoice } from "@/lib/themeMode";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertDialog,
@@ -59,7 +66,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+const appearanceChoices: { id: ThemeChoice; label: string }[] = [
+  { id: "system", label: "System" },
+  { id: "dark", label: "Dark" },
+  { id: "light", label: "Light" },
+];
+
 const Settings = () => {
+  const { choice, setChoice } = useThemeMode();
   const { user, updatePassword, signOut } = useAuth();
   const { isAdmin } = useIsAdmin();
   const navigate = useNavigate();
@@ -207,10 +221,15 @@ const Settings = () => {
         }
       });
 
+      assertCleanText(displayName);
+      assertCleanText(bio);
+      const resolvedCity = resolveCity(city);
       const { error } = await updateProfile({
         display_name: displayName || null,
         bio: bio || null,
         city: city || null,
+        city_display: city ? resolvedCity.city_display : null,
+        city_key: city ? resolvedCity.city_key : null,
         phone: phone || null,
         social_links: Object.keys(cleanedSocialLinks).length > 0 ? cleanedSocialLinks : null,
       });
@@ -219,7 +238,7 @@ const Settings = () => {
       toast.success("Profile updated successfully!");
     } catch (error) {
       console.error("Error updating profile:", error);
-      toast.error("Failed to update profile");
+      toast.error(error instanceof Error && error.message === OBJECTIONABLE_MESSAGE ? error.message : "Failed to update profile");
     } finally {
       setSaving(false);
     }
@@ -273,7 +292,7 @@ const Settings = () => {
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
           <h2 className="font-display text-2xl text-foreground">Sign in to access settings</h2>
           <Button asChild>
-            <Link to="/auth">Sign In</Link>
+            <Link to="/auth">Sign in</Link>
           </Button>
         </div>
       </PageLayout>
@@ -296,24 +315,47 @@ const Settings = () => {
         {/* Header */}
         <PageHeader
           title="Settings"
-          icon={<SettingsIcon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
-          backPath="/profile"
+          icon={<SettingsIcon className="w-5 h-5" />}
+          tile="bone"
           className="mb-8"
         />
+
+        <section className="file-panel mb-6 p-5" aria-labelledby="appearance-heading">
+          <h2 id="appearance-heading" className="ether-title text-lg">Appearance</h2>
+          <p className="mb-4 text-sm text-muted-foreground">Follows your system unless you choose dark or light.</p>
+          <div className="grid grid-cols-3 gap-2">
+            {appearanceChoices.map((option) => {
+              const active = choice === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setChoice(option.id)}
+                  className={`mono-label min-h-11 rounded-[14px] border px-2 text-[11px] ${
+                    active
+                      ? "border-[hsl(var(--scan))] bg-card text-foreground"
+                      : "border-border text-muted-foreground"
+                  }`}
+                  aria-pressed={active}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
         {/* Profile Section */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <User className="w-5 h-5 text-primary" />
-            </div>
+            <SquircleIcon icon={User} fill="pink" size={40} />
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Profile</h2>
+              <h2 className="ether-title text-lg text-foreground">Profile</h2>
               <p className="text-sm text-muted-foreground">Customize how others see you</p>
             </div>
           </div>
@@ -332,12 +374,11 @@ const Settings = () => {
 
             <div className="space-y-2">
               <Label htmlFor="city">City</Label>
-              <Input
+              <CityInput
                 id="city"
                 placeholder="Where are you based?"
                 value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="bg-background/50"
+                onChange={setCity}
               />
             </div>
 
@@ -348,7 +389,7 @@ const Settings = () => {
                 placeholder="Tell us about yourself and your creative journey..."
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                className="bg-background/50 min-h-[100px] resize-none"
+                className="bg-background/50 min-h-[100px] resize-none text-left placeholder:text-left"
               />
             </div>
 
@@ -391,14 +432,12 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.12 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Phone className="w-5 h-5 text-primary" />
-            </div>
+            <SquircleIcon icon={Phone} fill="cyan" size={40} />
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Contact Info</h2>
+              <h2 className="ether-title text-lg text-foreground">Contact Info</h2>
               <p className="text-sm text-muted-foreground">Add your phone and social media</p>
             </div>
           </div>
@@ -416,7 +455,7 @@ const Settings = () => {
                 onChange={(e) => setPhone(e.target.value)}
                 className="bg-background/50"
               />
-              <p className="text-xs text-muted-foreground">For SMS notifications from the community</p>
+              <p className="text-xs text-muted-foreground">Optional contact number</p>
             </div>
 
             <Separator className="bg-border/50" />
@@ -533,14 +572,12 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Lock className="w-5 h-5 text-primary" />
-            </div>
+            <SquircleIcon icon={Lock} fill="ink" size={40} />
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Security</h2>
+              <h2 className="ether-title text-lg text-foreground">Security</h2>
               <p className="text-sm text-muted-foreground">Update your password</p>
             </div>
           </div>
@@ -595,14 +632,12 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Bell className="w-5 h-5 text-primary" />
-            </div>
+            <SquircleIcon icon={Bell} fill="rose" size={40} />
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Notifications</h2>
+              <h2 className="ether-title text-lg text-foreground">Notifications</h2>
               <p className="text-sm text-muted-foreground">Choose what updates you receive</p>
             </div>
           </div>
@@ -675,6 +710,32 @@ const Settings = () => {
 
             <div className="flex items-center justify-between py-2">
               <div>
+                <Label className="text-foreground">New Projects</Label>
+                <p className="text-sm text-muted-foreground">When a new project idea is posted. Turn this off to stop those alerts.</p>
+              </div>
+              <Switch
+                checked={preferences?.new_projects_enabled ?? true}
+                onCheckedChange={(checked) => handleNotificationToggle('new_projects_enabled', checked)}
+              />
+            </div>
+
+            <Separator className="bg-border/50" />
+
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <Label className="text-foreground">New Gigs</Label>
+                <p className="text-sm text-muted-foreground">When a new gig is posted. Turn this off to stop those alerts.</p>
+              </div>
+              <Switch
+                checked={preferences?.new_gigs_enabled ?? true}
+                onCheckedChange={(checked) => handleNotificationToggle('new_gigs_enabled', checked)}
+              />
+            </div>
+
+            <Separator className="bg-border/50" />
+
+            <div className="flex items-center justify-between py-2">
+              <div>
                 <Label className="text-foreground">Event Reminders</Label>
                 <p className="text-sm text-muted-foreground">Upcoming event notifications</p>
               </div>
@@ -729,20 +790,24 @@ const Settings = () => {
             <div className="flex items-center justify-between py-2">
               <div className="flex-1">
                 <Label className="text-foreground">Push Notifications</Label>
-                <p className="text-sm text-muted-foreground">
-                  {pushStatus === 'checking'
-                    ? "Checking status..."
-                    : pushStatus === 'not_supported' 
-                      ? "Not supported in this browser" 
-                      : pushStatus === 'permission_denied' 
-                        ? "Blocked in browser settings" 
-                        : pushStatus === 'subscribed' 
-                          ? "Enabled - receiving notifications" 
-                          : pushStatus === 'error'
-                            ? pushError || "Configuration error"
-                            : "Click to enable push notifications"}
-                </p>
-                {pushError && pushStatus !== 'permission_denied' && pushStatus !== 'error' && (
+                {pushStatus === 'needs_home_screen' ? (
+                  <IosPushInstallSteps />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {pushStatus === 'checking'
+                      ? "Checking status..."
+                      : pushStatus === 'not_supported'
+                        ? "Not supported in this browser"
+                        : pushStatus === 'permission_denied'
+                          ? "Blocked in browser settings"
+                          : pushStatus === 'subscribed'
+                            ? "Enabled - receiving notifications"
+                            : pushStatus === 'error'
+                              ? pushError || "Configuration error"
+                              : "Turn on push notifications"}
+                  </p>
+                )}
+                {pushError && pushStatus !== 'permission_denied' && pushStatus !== 'error' && pushStatus !== 'needs_home_screen' && pushStatus !== 'not_supported' && (
                   <p className="text-xs text-destructive mt-1">{pushError}</p>
                 )}
               </div>
@@ -761,23 +826,10 @@ const Settings = () => {
                     }
                   }
                 }}
-                disabled={!pushSupported || pushStatus === 'not_supported' || pushLoading || pushStatus === 'checking'}
+                disabled={!pushSupported || pushStatus === 'not_supported' || pushStatus === 'needs_home_screen' || pushLoading || pushStatus === 'checking'}
               />
             </div>
 
-            <Separator className="bg-border/50" />
-
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <Label className="text-foreground">SMS Notifications</Label>
-                <p className="text-sm text-muted-foreground">Receive text messages (requires phone number)</p>
-              </div>
-              <Switch
-                checked={preferences?.sms_enabled ?? false}
-                onCheckedChange={(checked) => handleNotificationToggle('sms_enabled', checked)}
-                disabled={!phone}
-              />
-            </div>
           </div>
         </motion.section>
 
@@ -786,37 +838,29 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Activity className="w-5 h-5 text-primary" />
-            </div>
+            <SquircleIcon icon={Activity} fill="gold" size={40} />
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Your Activity</h2>
+              <h2 className="ether-title text-lg text-foreground">Your Activity</h2>
               <p className="text-sm text-muted-foreground">See what you've been up to</p>
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-background/50 rounded-xl p-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-pink-500/10 flex items-center justify-center mx-auto mb-2">
-                <Heart className="w-5 h-5 text-pink-500" />
-              </div>
+              <SquircleIcon icon={Heart} fill="pink" size={40} className="mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{activityStats?.likesGiven || 0}</p>
               <p className="text-xs text-muted-foreground">Likes Given</p>
             </div>
             <div className="bg-background/50 rounded-xl p-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-2">
-                <MessageSquare className="w-5 h-5 text-blue-500" />
-              </div>
+              <SquircleIcon icon={MessageSquare} fill="violet" size={40} className="mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{activityStats?.commentsGiven || 0}</p>
               <p className="text-xs text-muted-foreground">Comments</p>
             </div>
             <div className="bg-background/50 rounded-xl p-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-2">
-                <Archive className="w-5 h-5 text-green-500" />
-              </div>
+              <SquircleIcon icon={Archive} fill="green" size={40} className="mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{activityStats?.postsCreated || 0}</p>
               <p className="text-xs text-muted-foreground">Posts</p>
             </div>
@@ -828,37 +872,29 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-primary" />
-            </div>
+            <SquircleIcon icon={BarChart3} fill="cyan" size={40} />
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Insights</h2>
+              <h2 className="ether-title text-lg text-foreground">Insights</h2>
               <p className="text-sm text-muted-foreground">Your profile engagement</p>
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-background/50 rounded-xl p-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-pink-500/10 flex items-center justify-center mx-auto mb-2">
-                <Heart className="w-5 h-5 text-pink-500" />
-              </div>
+              <SquircleIcon icon={Heart} fill="pink" size={40} className="mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{insightsData?.likesReceived || 0}</p>
               <p className="text-xs text-muted-foreground">Likes Received</p>
             </div>
             <div className="bg-background/50 rounded-xl p-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-2">
-                <MessageSquare className="w-5 h-5 text-blue-500" />
-              </div>
+              <SquircleIcon icon={MessageSquare} fill="violet" size={40} className="mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{insightsData?.commentsReceived || 0}</p>
               <p className="text-xs text-muted-foreground">Comments</p>
             </div>
             <div className="bg-background/50 rounded-xl p-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center mx-auto mb-2">
-                <Users className="w-5 h-5 text-purple-500" />
-              </div>
+              <SquircleIcon icon={Users} fill="denim" size={40} className="mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{insightsData?.followers || 0}</p>
               <p className="text-xs text-muted-foreground">Saved as favorite</p>
             </div>
@@ -870,14 +906,14 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
               <Ban className="w-5 h-5 text-destructive" />
             </div>
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Blocked Users</h2>
+              <h2 className="ether-title text-lg text-foreground">Blocked Users</h2>
               <p className="text-sm text-muted-foreground">Manage blocked accounts</p>
             </div>
           </div>
@@ -921,15 +957,13 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.36 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <Link to="/settings/booking" className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <SettingsIcon className="w-5 h-5 text-primary" />
-              </div>
+              <SquircleIcon icon={SettingsIcon} fill="bone" size={40} />
               <div>
-                <h2 className="font-display text-lg font-medium text-foreground">Booking Pages</h2>
+                <h2 className="ether-title text-lg text-foreground">Booking Pages</h2>
                 <p className="text-sm text-muted-foreground">Let others book time with you</p>
               </div>
             </div>
@@ -943,15 +977,13 @@ const Settings = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
-            className="glass-strong rounded-2xl p-6 mb-6"
+            className="file-panel p-6 mb-6"
           >
             <Link to="/admin" className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Shield className="w-5 h-5 text-primary" />
-                </div>
+                <SquircleIcon icon={Shield} fill="denim" size={40} />
                 <div>
-                  <h2 className="font-display text-lg font-medium text-foreground">Admin Dashboard</h2>
+                  <h2 className="ether-title text-lg text-foreground">Admin Dashboard</h2>
                   <p className="text-sm text-muted-foreground">Manage users, credits, and announcements</p>
                 </div>
               </div>
@@ -965,14 +997,12 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.38 }}
-          className="glass-strong rounded-2xl p-6 mb-6"
+          className="file-panel p-6 mb-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Scale className="w-5 h-5 text-primary" />
-            </div>
+            <SquircleIcon icon={Scale} fill="bone" size={40} />
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Legal</h2>
+              <h2 className="ether-title text-lg text-foreground">Legal</h2>
               <p className="text-sm text-muted-foreground">Privacy policy and terms of service</p>
             </div>
           </div>
@@ -1027,14 +1057,14 @@ const Settings = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.42 }}
-          className="glass-strong rounded-2xl p-6"
+          className="file-panel p-6"
         >
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
               <LogOut className="w-5 h-5 text-destructive" />
             </div>
             <div>
-              <h2 className="font-display text-lg font-medium text-foreground">Account</h2>
+              <h2 className="ether-title text-lg text-foreground">Account</h2>
               <p className="text-sm text-muted-foreground">Sign out or delete your account</p>
             </div>
           </div>
@@ -1069,7 +1099,7 @@ const Settings = () => {
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete my account</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This deletes your login and personal data, including your profile, posts, comments, and messages.
+                  This deletes your login, cancels Stripe subscriptions, and removes or anonymizes your profile, posts, comments, and messages.
                   If a payout or other payment is still pending, deletion is refused until that money is settled.
                 </AlertDialogDescription>
               </AlertDialogHeader>

@@ -1,28 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Radio, Users, Coins, Send, X, Clock, PlayCircle, Trash2 } from 'lucide-react';
-import { useStream, useStreamReactions, useSendReaction, useTipStream, useJoinStream, useDeleteStream, useStreamPresence } from '@/hooks/useLiveStreams';
+import { Radio, Users, Coins, Send, X, Clock, PlayCircle, Share2, Flag } from 'lucide-react';
+import { ReportDialog } from '@/components/safety/ReportDialog';
+import { digitalPurchasesEnabled } from '@/lib/platform';
+import { shareLink, buildShareUrl } from '@/lib/shareLink';
+import { useStream, useSendReaction, useTipStream, useJoinStream, useStreamPresence, useStreamCheers } from '@/hooks/useLiveStreams';
 import { StreamChat } from './StreamChat';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { WebRTCStreamViewer } from './WebRTCStreamViewer';
-import { WebRTCStreamHost } from './WebRTCStreamHost';
-import { ReplayPlayer } from './ReplayPlayer';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+const WebRTCStreamViewer = lazy(() => import('./WebRTCStreamViewer').then((mod) => ({ default: mod.WebRTCStreamViewer })));
+const WebRTCStreamHost = lazy(() => import('./WebRTCStreamHost').then((mod) => ({ default: mod.WebRTCStreamHost })));
+const ReplayPlayer = lazy(() => import('./ReplayPlayer').then((mod) => ({ default: mod.ReplayPlayer })));
+
+function LiveMediaFallback() {
+  return (
+    <div className="flex h-full min-h-[34vh] w-full items-center justify-center text-sm text-muted-foreground">
+      Loading live video…
+    </div>
+  );
+}
+import { DeleteStreamButton } from './DeleteStreamButton';
+import { liveSheetState } from '@/lib/liveSheetHistory';
 
 interface StreamViewerProps {
   streamId: string;
@@ -47,24 +52,60 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   const { user } = useAuth();
   const { stream, isLoading: streamLoading } = useStream(streamId);
   const { profile } = useProfile(stream?.host_id);
-  const { reactions } = useStreamReactions(streamId);
+  const { reactions, cheers } = useStreamCheers(streamId);
   const sendReaction = useSendReaction();
   const tipStream = useTipStream();
   const joinStream = useJoinStream();
   const joinStreamMutate = joinStream.mutate;
-  const deleteStream = useDeleteStream();
 
   const [tipAmount, setTipAmount] = useState('');
   const [tipMessage, setTipMessage] = useState('');
   const [showTipInput, setShowTipInput] = useState(false);
-  const [floatingReactions, setFloatingReactions] = useState<{ id: string; emoji: string }[]>([]);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
-
+  const [floatingReactions, setFloatingReactions] = useState<{ id: string; emoji: string; x: number }[]>([]);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [holdHost, setHoldHost] = useState(false);
+  // LC tips and card gifts are digital goods. The iOS app hides both (guideline 3.1.1).
+  const digitalGoods = digitalPurchasesEnabled();
   const isHost = user?.id === stream?.host_id;
   useStreamPresence(streamId, open && !!user && !isHost && stream?.is_live === true);
   const streamStatus = stream ? getStreamStatus(stream) : 'draft';
   const hasReplay = streamStatus === 'ended' && stream?.replay_available && stream?.replay_url;
+  const hosting = stream?.stream_type === "webrtc" && isHost && (streamStatus !== "ended" || holdHost);
+  const openedAt = useRef(Date.now());
+  const endGuard = useRef<(() => boolean) | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const pushedSheet = useRef(false);
+
+  useEffect(() => {
+    if (open) openedAt.current = Date.now();
+  }, [open, streamId]);
+
+  useEffect(() => {
+    if (isHost && stream?.stream_type === "webrtc" && streamStatus !== "ended") setHoldHost(true);
+  }, [isHost, stream?.stream_type, streamStatus]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!pushedSheet.current) {
+      window.history.pushState(liveSheetState(window.history.state, streamId), "");
+      pushedSheet.current = true;
+    }
+    const onPop = () => {
+      pushedSheet.current = false;
+      onCloseRef.current();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [open, streamId]);
+
+  const requestClose = () => {
+    if (endGuard.current?.()) return;
+    // The button close stays on this page. history.back() returns to the same
+    // ?stream= entry, which opens the room again, or leaves Live entirely.
+    pushedSheet.current = false;
+    onCloseRef.current();
+  };
 
   // Join stream on mount (for viewers only, when stream is live)
   useEffect(() => {
@@ -73,15 +114,17 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
     }
   }, [open, user, streamId, isHost, streamStatus, joinStreamMutate]);
 
-  // Show floating reactions
+  const seenReactions = useRef(new Set<string>());
   useEffect(() => {
-    if (reactions.length > 0) {
-      const latest = reactions[0];
-      setFloatingReactions(prev => [...prev, { id: latest.id, emoji: latest.emoji }]);
-      setTimeout(() => {
-        setFloatingReactions(prev => prev.filter(r => r.id !== latest.id));
-      }, 2000);
-    }
+    const latest = reactions[0];
+    if (!latest || seenReactions.current.has(latest.id)) return;
+    seenReactions.current.add(latest.id);
+    const x = 16 + Math.round(Math.random() * 48);
+    setFloatingReactions((prev) => [...prev, { id: latest.id, emoji: latest.emoji, x }]);
+    const timer = window.setTimeout(() => {
+      setFloatingReactions((prev) => prev.filter((item) => item.id !== latest.id));
+    }, 2000);
+    return () => window.clearTimeout(timer);
   }, [reactions]);
 
   const handleReaction = (emoji: string) => {
@@ -89,7 +132,27 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
     sendReaction.mutate({ streamId, emoji });
   };
 
+  const sendCardGift = async (gift: "rose" | "star" | "crown") => {
+    if (!digitalGoods) return;
+    try {
+      const { data, error } = await supabase.functions.invoke("create-stream-gift", {
+        body: { streamId, gift },
+      });
+      if (error) throw error;
+      if (data?.needs_connect) {
+        toast.error(data.error || "This host can't receive card gifts yet");
+        return;
+      }
+      if (data?.error) throw new Error(data.error);
+      if (!data?.url) throw new Error("Stripe did not return a checkout link");
+      window.location.assign(data.url);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not start the gift checkout");
+    }
+  };
+
   const handleTip = () => {
+    if (!digitalGoods) return;
     const amount = parseInt(tipAmount);
     if (!amount || amount < 1) return;
     tipStream.mutate({ streamId, amount, message: tipMessage });
@@ -98,44 +161,59 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
     setShowTipInput(false);
   };
 
-  const handleDelete = async () => {
-    if (deleteConfirmText !== 'DELETE') return;
-    await deleteStream.mutateAsync(streamId);
-    setShowDeleteDialog(false);
-    onClose();
-  };
-
   const renderEmbed = () => {
     if (!stream) return null;
 
-    // WebRTC streaming (P2P with OPUS audio)
+    if (stream.stream_type === 'obs_rtmp') {
+      return (
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-muted/20 to-background px-6 text-center">
+          <p className="text-muted-foreground">OBS streaming has been removed.</p>
+        </div>
+      );
+    }
+
     if (stream.stream_type === 'webrtc') {
+      // HOST VIEW: Keep the host mounted after the row ends so the replay
+      // upload and the save-to-phone step can finish. Swapping to the player
+      // here used to unmount the recorder before the file was stored.
+      if (isHost && (streamStatus !== 'ended' || holdHost)) {
+        return (
+          <Suspense fallback={<LiveMediaFallback />}>
+          <WebRTCStreamHost
+            streamId={streamId}
+            isLive={streamStatus === 'live'}
+            serverCount={stream.viewer_count ?? 0}
+            onEnd={() => {
+              setHoldHost(false);
+              endGuard.current = null;
+              requestClose();
+            }}
+            onClose={requestClose}
+            registerEndGuard={(guard) => {
+              endGuard.current = guard;
+            }}
+          />
+          </Suspense>
+        );
+      }
+
       // REPLAY VIEW: Anyone can watch a replay (host or viewer)
       if (streamStatus === 'ended' && hasReplay) {
         return (
+          <Suspense fallback={<LiveMediaFallback />}>
           <ReplayPlayer 
             src={stream.replay_url!}
             poster={stream.thumbnail_url}
             className="w-full h-full"
           />
-        );
-      }
-      
-      // HOST VIEW: Show host controls if user is host and stream is draft or live
-      if (isHost && streamStatus !== 'ended') {
-        return (
-          <WebRTCStreamHost 
-            streamId={streamId} 
-            isLive={streamStatus === 'live'}
-            onEnd={onClose}
-          />
+          </Suspense>
         );
       }
       
       // VIEWER/HOST: Stream ended without replay
       if (streamStatus === 'ended') {
         return (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted/20 to-background">
+          <div data-testid="stream-ended" className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted/20 to-background">
             <div className="text-center">
               <Radio className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground font-medium">This stream has ended</p>
@@ -160,6 +238,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
       
       // VIEWER: Stream is live - connect to watch
       return (
+        <Suspense fallback={<LiveMediaFallback />}>
         <WebRTCStreamViewer 
           streamId={streamId}
           hostId={stream.host_id}
@@ -167,6 +246,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
           viewerCount={stream.viewer_count || 0}
           thumbnailUrl={stream.thumbnail_url}
         />
+        </Suspense>
       );
     }
 
@@ -227,15 +307,24 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
 
   return (
     <>
-      <Dialog open={open} onOpenChange={() => onClose()}>
-        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-background">
+      <Dialog open={open} onOpenChange={(next) => { if (!next) requestClose(); }}>
+        <DialogContent
+          fullscreen
+          className="[&>button]:hidden"
+          onPointerDownOutside={(event) => event.preventDefault()}
+          onInteractOutside={(event) => event.preventDefault()}
+        >
           <DialogTitle className="sr-only">{stream?.title || 'Live Stream'}</DialogTitle>
           <DialogDescription className="sr-only">
             {stream?.description || 'Watch this live stream'}
           </DialogDescription>
           
+          <div className="flex h-full min-h-0 flex-col overflow-y-auto">
           {/* Video Area */}
-          <div className="relative aspect-video bg-black">
+          <div className={hosting
+            ? "relative w-full min-w-0 shrink-0 bg-black"
+            : "relative aspect-video max-h-[38dvh] w-full min-w-0 shrink-0 overflow-hidden bg-black"
+          }>
             {streamLoading ? (
               <div className="w-full h-full flex items-center justify-center">
                 <Radio className="h-16 w-16 text-primary animate-pulse" />
@@ -249,11 +338,11 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
               {floatingReactions.map((reaction) => (
                 <motion.div
                   key={reaction.id}
-                  initial={{ opacity: 1, y: 0, x: Math.random() * 100 }}
-                  animate={{ opacity: 0, y: -200 }}
+                  initial={{ opacity: 1, y: 0, x: reaction.x }}
+                  animate={{ opacity: 0, y: -160 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 2 }}
-                  className="absolute bottom-20 right-10 text-4xl pointer-events-none"
+                  className="absolute bottom-16 right-6 text-4xl pointer-events-none"
                 >
                   {reaction.emoji}
                 </motion.div>
@@ -284,93 +373,132 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
 
             {/* Close Button */}
             <Button
+              type="button"
               variant="ghost"
               size="icon"
-              className="absolute top-4 right-4 bg-background/50 backdrop-blur-sm z-10"
-              onClick={onClose}
+              className="absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-30 h-11 w-11 bg-background/50 backdrop-blur-sm"
+              onClick={requestClose}
+              aria-label="Close live"
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
 
           {/* Controls */}
-          <div className="p-4 space-y-4">
+          <div className="min-w-0 shrink-0 space-y-3 p-3">
             {/* Host Info */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Avatar>
+            <div className="flex min-w-0 flex-col gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <Avatar className="shrink-0">
                   <AvatarImage src={profile?.avatar_url || undefined} />
                   <AvatarFallback>{profile?.display_name?.charAt(0) || 'D'}</AvatarFallback>
                 </Avatar>
-                <div>
-                  <h3 className="font-semibold">{stream?.title}</h3>
-                  <p className="text-sm text-muted-foreground">{profile?.display_name || 'DJ'}</p>
+                <div className="min-w-0">
+                  <h3 className="truncate font-semibold">{stream?.title}</h3>
+                  <p className="truncate text-sm text-muted-foreground">{profile?.display_name || 'DJ'}</p>
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex min-w-0 flex-wrap gap-2">
                 {/* Delete Button (Host only) */}
-                {isHost && (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
-                    onClick={() => setShowDeleteDialog(true)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Delete
-                  </Button>
+                {isHost && streamStatus !== 'live' && (
+                  <DeleteStreamButton streamId={streamId} onDeleted={requestClose} />
                 )}
 
                 {/* Tip Button (viewers only) */}
-                {user && !isHost && streamStatus === 'live' && (
-                  <Button 
-                    variant="outline" 
-                    className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                    onClick={() => setShowTipInput(!showTipInput)}
+                {user && !isHost && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setReportOpen(true)}
                   >
-                    <Coins className="h-4 w-4 mr-2" />
-                    Tip LC
+                    <Flag className="h-4 w-4 mr-2" />
+                    Report
                   </Button>
+                )}
+                {user && !isHost && streamStatus === 'live' && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => shareLink({
+                        title: stream?.title || "Live on Ether",
+                        url: buildShareUrl.live(stream?.id || streamId),
+                      })}
+                    >
+                      <Share2 className="h-4 w-4 mr-2" />
+                      Share
+                    </Button>
+                    {digitalGoods && (
+                      <Button
+                        variant="outline"
+                        className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                        onClick={() => setShowTipInput(!showTipInput)}
+                      >
+                        <Coins className="h-4 w-4 mr-2" />
+                        Tip LC
+                      </Button>
+                    )}
+                    {digitalGoods && (["rose", "star", "crown"] as const).map((gift) => (
+                      <Button
+                        key={gift}
+                        type="button"
+                        variant="outline"
+                        onClick={() => sendCardGift(gift)}
+                      >
+                        {gift === "rose" ? "Rose $1" : gift === "star" ? "Star $5" : "Crown $10"}
+                      </Button>
+                    ))}
+                  </>
                 )}
               </div>
             </div>
 
             {/* Tip Input */}
-            {showTipInput && (
+            {digitalGoods && showTipInput && (
               <motion.div 
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
-                className="flex gap-2"
+                className="flex w-full min-w-0 gap-2"
               >
                 <Input
                   type="number"
-                  placeholder="Amount"
+                  placeholder="LC"
                   value={tipAmount}
                   onChange={(e) => setTipAmount(e.target.value)}
-                  className="w-24"
+                  className="w-16 shrink-0 px-2"
+                  aria-label="Tip amount"
                 />
                 <Input
-                  placeholder="Message (optional)"
+                  placeholder="Message"
                   value={tipMessage}
                   onChange={(e) => setTipMessage(e.target.value)}
-                  className="flex-1"
+                  className="w-auto min-w-0 flex-1"
+                  aria-label="Tip message"
                 />
-                <Button onClick={handleTip} disabled={tipStream.isPending}>
+                <Button type="button" className="shrink-0 px-3" onClick={handleTip} disabled={tipStream.isPending} aria-label="Send tip">
                   <Send className="h-4 w-4" />
                 </Button>
               </motion.div>
             )}
 
-            {/* Reactions (only when live) */}
-            {streamStatus === 'live' && (
-              <div className="flex gap-2 justify-center">
+            {cheers.length > 0 && (
+              <ul data-testid="cheer-log" className="flex max-h-16 flex-wrap gap-2 overflow-y-auto text-sm">
+                {cheers.map((cheer) => (
+                  <li key={cheer.id} className="rounded-full bg-muted px-2 py-1">{cheer.label}</li>
+                ))}
+              </ul>
+            )}
+
+            {/* Reactions while the room is open, including for the host */}
+            {(streamStatus === 'live' || holdHost) && (
+              <div className="grid w-full grid-cols-6 gap-1">
                 {REACTIONS.map((emoji) => (
                   <Button
                     key={emoji}
                     variant="outline"
-                    size="lg"
-                    className="text-2xl hover:scale-110 transition-transform"
+                    className="h-11 w-full min-w-0 px-0 text-xl hover:scale-110 transition-transform"
+                    data-testid={`reaction-${emoji}`}
                     onClick={() => handleReaction(emoji)}
                     disabled={!user}
                   >
@@ -381,45 +509,20 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
             )}
           </div>
 
-          {stream && <StreamChat streamId={stream.id || streamId} />}
+          <div className="min-h-[9rem] flex-1 overflow-hidden">
+            {stream && <StreamChat streamId={stream.id || streamId} className="h-full" />}
+          </div>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this stream?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the stream and any associated data.
-              <div className="mt-4">
-                <p className="text-sm font-medium mb-2">Type DELETE to confirm:</p>
-                <Input
-                  value={deleteConfirmText}
-                  onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  placeholder="DELETE"
-                  className="uppercase"
-                />
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setShowDeleteDialog(false);
-              setDeleteConfirmText('');
-            }}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDelete}
-              disabled={deleteConfirmText !== 'DELETE' || deleteStream.isPending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete Stream
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        targetType="stream"
+        targetId={streamId}
+      />
     </>
   );
 };

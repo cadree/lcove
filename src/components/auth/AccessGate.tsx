@@ -2,46 +2,17 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
-import { motion } from 'framer-motion';
-import lcBearLogo from '@/assets/lc-bear-logo.png';
+import bearLogo from '@/assets/ether-bear-logo.webp';
+import { isKnownPath, isPublicPath } from "@/lib/appRoutes";
+import { NO_FAKE_LINE, WELCOME_HOME } from "@/content/copy";
+import { SignUpPrompt } from "@/components/auth/SignUpPrompt";
 
 interface AccessGateProps {
   children: React.ReactNode;
 }
 
-// Exact paths a logged-out visitor can open.
-const PUBLIC_EXACT = new Set([
-  '/',
-  '/landing',
-  '/auth',
-  '/onboarding',
-  '/locked',
-  '/admin/onboarding',
-  '/denied',
-  '/admin',
-  '/fund',
-  '/unsubscribe',
-  '/privacy',
-  '/terms',
-  '/guidelines',
-  '/community',
-  '/nuance',
-]);
-
 // Signed-in people leave the public landing for the feed.
 const LANDING_ROUTES = ['/', '/landing'];
-
-function isPublicPath(pathname: string) {
-  if (PUBLIC_EXACT.has(pathname)) return true;
-  return (
-    pathname.startsWith('/admin/onboarding') ||
-    pathname.startsWith('/event/') ||
-    pathname.startsWith('/project/') ||
-    pathname.startsWith('/book/') ||
-    pathname.startsWith('/sign-contract') ||
-    pathname.startsWith('/client/')
-  );
-}
 
 const AccessGate = ({ children }: AccessGateProps) => {
   const { user, loading: authLoading } = useAuth();
@@ -51,15 +22,25 @@ const AccessGate = ({ children }: AccessGateProps) => {
   const [showWelcome, setShowWelcome] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
 
+  const knownRoute = isKnownPath(location.pathname);
   const isPublicRoute = isPublicPath(location.pathname);
   const isLandingRoute = LANDING_ROUTES.includes(location.pathname);
+  const legacyStreamId = location.pathname === "/live"
+    ? new URLSearchParams(location.search).get("stream")
+    : null;
 
   useEffect(() => {
+    if (!knownRoute) return;
     // Wait for auth to load first
     if (authLoading) return;
 
     if (user && isLandingRoute) {
       navigate('/feed', { replace: true });
+      return;
+    }
+
+    if (!user && legacyStreamId) {
+      navigate(`/live/${legacyStreamId}`, { replace: true });
       return;
     }
 
@@ -69,11 +50,8 @@ const AccessGate = ({ children }: AccessGateProps) => {
     // Wait for profile to load for authenticated users
     if (profileLoading) return;
 
-    // If not logged in and not on public route, redirect to auth
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
+    // Community routes render a sign-up prompt instead of the page.
+    if (!user) return;
 
     // If profile exists, check access
     if (profile) {
@@ -118,17 +96,30 @@ const AccessGate = ({ children }: AccessGateProps) => {
         }
       }
     }
-  }, [user, profile, authLoading, profileLoading, isPublicRoute, isLandingRoute, navigate, location.pathname, hasSeenWelcome]);
+  }, [user, profile, authLoading, profileLoading, isPublicRoute, isLandingRoute, knownRoute, legacyStreamId, navigate, location.pathname, hasSeenWelcome]);
 
-  // Show loading state while checking auth/profile
-  if (!isPublicRoute && (authLoading || profileLoading)) {
+  if (!knownRoute) {
+    return <>{children}</>;
+  }
+
+  if (!user && legacyStreamId) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-          className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full"
-        />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary motion-reduce:animate-none" />
+      </div>
+    );
+  }
+
+  // Community routes stay behind a sign-up prompt. The profile request must
+  // not hold a public page: onboarding and banned redirects run once that row arrives.
+  if (!isPublicRoute && !authLoading && !user) {
+    return <SignUpPrompt />;
+  }
+
+  if (!isPublicRoute && (authLoading || !user)) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary motion-reduce:animate-none" />
       </div>
     );
   }
@@ -139,47 +130,36 @@ const AccessGate = ({ children }: AccessGateProps) => {
       
       {/* Welcome Home Popup */}
       {showWelcome && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+        <div
+          className="fixed inset-x-0 top-0 z-40 flex animate-fade-in items-center justify-center bg-background/80 backdrop-blur-sm motion-reduce:animate-none"
+          style={{ bottom: "calc(84px + env(safe-area-inset-bottom, 0px))" }}
           onClick={() => setShowWelcome(false)}
         >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
-            className="bg-card border border-border rounded-2xl p-8 md:p-12 text-center max-w-md mx-4 shadow-2xl"
+          <div
+            className="file-panel mx-4 max-w-md animate-fade-in p-8 text-center motion-reduce:animate-none md:p-12"
             onClick={(e) => e.stopPropagation()}
           >
-            <motion.img
-              src={lcBearLogo}
-              alt="Ether"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
-              className="w-24 h-24 mx-auto mb-6 object-contain"
-            />
-            
-            <h2 className="font-display text-3xl md:text-4xl text-foreground mb-4">
-              Welcome home Familcy
+            <div className="mb-6 flex justify-center">
+              <img src={bearLogo} alt="Ether" className="mx-auto h-28 w-auto" width={112} height={112} />
+            </div>
+
+            <h2 className="ether-title mb-4 text-3xl text-foreground md:text-4xl">
+              {WELCOME_HOME}
             </h2>
-            
-            <p className="text-muted-foreground mb-8">
-              You've been accepted into the community. This is where you belong.
+
+            <p className="mb-8 text-muted-foreground">
+              {NO_FAKE_LINE}
             </p>
-            
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+
+            <button
+              type="button"
               onClick={() => setShowWelcome(false)}
-              className="w-full py-3 px-6 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary/90 transition-colors"
+              className="w-full rounded-xl bg-primary px-6 py-3 font-medium text-primary-foreground transition-transform hover:scale-[1.02] hover:bg-primary/90 active:scale-[0.98] motion-reduce:transform-none"
             >
               Enter
-            </motion.button>
-          </motion.div>
-        </motion.div>
+            </button>
+          </div>
+        </div>
       )}
     </>
   );

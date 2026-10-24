@@ -298,7 +298,7 @@ export function RecentDistributionsCard({ recentDistributions }: {
   return (
     <Card className="bg-card/50 backdrop-blur-sm border-border">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-xl font-serif flex items-center gap-2">
+        <CardTitle className="ether-title flex items-center gap-2 text-xl">
           <DollarSign className="w-5 h-5 text-primary" />
           Recent Distributions
         </CardTitle>

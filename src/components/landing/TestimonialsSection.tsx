@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Quote, Star, Send, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { revealMotion } from "@/lib/reveal";
 import { usePlatformReviews, useMyPlatformReview, useCreatePlatformReview, useUpdatePlatformReview } from "@/hooks/usePlatformReviews";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -73,7 +74,7 @@ function ReviewForm() {
             Sign in to share your experience with Ether
           </p>
           <Button onClick={() => navigate('/auth')} className="min-h-11">
-            Sign In to Review
+            Sign in to review
           </Button>
         </CardContent>
       </Card>
@@ -151,15 +152,13 @@ function ReviewForm() {
 
 export function TestimonialsSection() {
   const { data: reviews, isLoading } = usePlatformReviews();
+  if (isLoading || !reviews || reviews.length === 0) return null;
 
   return (
     <section className="py-20 md:py-32">
       <div className="container px-4 sm:px-6 lg:px-8">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
+          {...revealMotion({ y: 20 })}
           className="text-center mb-12 md:mb-16"
         >
           <p className="eyebrow mb-2">Reviews</p>
@@ -170,17 +169,10 @@ export function TestimonialsSection() {
 
         {/* Reviews Carousel */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.1 }}
+          {...revealMotion({ y: 20, delay: 0.1 })}
           className="mb-12"
         >
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-          ) : reviews && reviews.length > 0 ? (
+          {reviews && reviews.length > 0 ? (
             <Carousel className="w-full max-w-4xl mx-auto">
               <CarouselContent>
                 {reviews.map((review) => (
@@ -220,20 +212,11 @@ export function TestimonialsSection() {
               <CarouselPrevious className="hidden md:flex -left-12" />
               <CarouselNext className="hidden md:flex -right-12" />
             </Carousel>
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <p className="mb-2">No reviews yet</p>
-              <p className="text-sm">Be the first to share your experience!</p>
-            </div>
-          )}
+          ) : null}
         </motion.div>
 
-        {/* Leave a Review Section */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.2 }}
+          {...revealMotion({ y: 20, delay: 0.2 })}
           className="max-w-lg mx-auto"
         >
           <ReviewForm />

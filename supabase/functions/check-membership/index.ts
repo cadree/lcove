@@ -3,10 +3,13 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import {
   invoiceSubscriptionId,
+  isGrantEligible,
   mapMembershipStatus,
   subscriptionPeriodUnix,
   tierFromStripeSubscription,
 } from "../_shared/membership-products.mjs";
+import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,8 +43,7 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
+    const stripeKey = assertStripeTestKey(Deno.env.get("STRIPE_SECRET_KEY"));
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header provided");
@@ -216,7 +218,7 @@ serve(async (req) => {
         current_period_end: subscriptionEnd,
         monthly_amount: monthlyAmount,
         lifetime_contribution: lifetimeContribution,
-        grant_eligible: lifetimeContribution >= 50 || tier === "elite",
+        grant_eligible: isGrantEligible(lifetimeContribution),
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
 
@@ -230,7 +232,7 @@ serve(async (req) => {
       subscription_end: subscriptionEnd,
       monthly_amount: monthlyAmount,
       lifetime_contribution: lifetimeContribution,
-      grant_eligible: lifetimeContribution >= 50 || tier === "elite",
+      grant_eligible: isGrantEligible(lifetimeContribution),
       stripe_subscription_id: membershipSub.id,
       cancel_at_period_end: membershipSub.cancel_at_period_end,
       status: membershipStatus,
@@ -243,7 +245,7 @@ serve(async (req) => {
     logStep("ERROR", { message: errorMessage });
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: httpStatusForError(error),
     });
   }
 });

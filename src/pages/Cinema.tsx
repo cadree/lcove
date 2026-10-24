@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { BackButton } from '@/components/navigation/BackButton';
 import { motion } from 'framer-motion';
 import { 
   Film, 
@@ -13,7 +14,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Users,
-  ArrowLeft,
   Info
 } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
@@ -24,12 +24,12 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useNetworks, useMyNetworks, useContentGenres, Network } from '@/hooks/useCinema';
 import { useAuth } from '@/contexts/AuthContext';
 import { CreateNetworkDialog } from '@/components/cinema/CreateNetworkDialog';
-import { isIosApp } from '@/lib/platform';
+import { digitalPurchasesEnabled } from '@/lib/platform';
 import { cn } from '@/lib/utils';
+import { SquircleIcon } from '@/components/world/SquircleIcon';
 
 const Cinema = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState<string | undefined>();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -67,6 +67,20 @@ const Cinema = () => {
   return (
     <PageLayout>
       <div className="min-h-screen bg-background">
+        {!currentFeatured && (
+          <div className="flex items-center justify-between gap-3 px-4 py-4">
+            <div className="flex min-w-0 items-center gap-2">
+              <BackButton />
+              <h1 className="ether-title truncate text-2xl text-foreground">Cinema</h1>
+            </div>
+            {user && (
+              <Button onClick={() => setCreateDialogOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Create Network</span>
+              </Button>
+            )}
+          </div>
+        )}
         {/* Netflix-style Hero Section */}
         {currentFeatured && (
           <div className="relative h-[70vh] md:h-[85vh] w-full overflow-hidden">
@@ -91,12 +105,10 @@ const Cinema = () => {
             <div className="absolute top-0 left-0 right-0 z-20">
               <div className="flex items-center justify-between px-4 md:px-12 py-4">
                 <div className="flex items-center gap-4">
-                  <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="text-foreground hover:bg-background/20">
-                    <ArrowLeft className="w-5 h-5" />
-                  </Button>
+                  <BackButton className="text-foreground hover:bg-background/20" />
                   <div className="flex items-center gap-2">
-                    <Film className="w-8 h-8 text-primary" />
-                    <span className="font-display text-2xl font-bold text-foreground">LC Cinema</span>
+                    <SquircleIcon icon={Film} fill="ink" size={40} />
+                    <h1 className="ether-title text-2xl text-foreground">Cinema</h1>
                   </div>
                 </div>
                 
@@ -141,7 +153,7 @@ const Cinema = () => {
                 <Badge variant="secondary" className="mb-3 bg-primary/20 text-primary border-primary/30">
                   Featured Network
                 </Badge>
-                <h1 className="font-display text-4xl md:text-6xl font-bold text-foreground mb-3 leading-tight">
+                <h1 className="ether-title mb-3 text-4xl leading-tight text-foreground md:text-6xl">
                   {currentFeatured.name}
                 </h1>
                 <p className="text-muted-foreground text-base md:text-lg line-clamp-2 md:line-clamp-3 mb-4 max-w-xl">
@@ -158,7 +170,7 @@ const Cinema = () => {
                     <Users className="w-4 h-4" />
                     {currentFeatured.subscriber_count} subscribers
                   </span>
-                  {currentFeatured.is_paid && !isIosApp() && (
+                  {currentFeatured.is_paid && digitalPurchasesEnabled() && (
                     <Badge className="bg-primary/20 text-primary border-primary/30">
                       ${currentFeatured.subscription_price}/mo
                     </Badge>
@@ -184,7 +196,7 @@ const Cinema = () => {
               {/* Featured Navigation Dots */}
               {featuredNetworks.length > 1 && (
                 <div className="flex items-center gap-4 mt-6">
-                  <Button variant="ghost" size="icon" onClick={prevFeatured} className="w-8 h-8 rounded-full bg-background/30 hover:bg-background/50">
+                  <Button variant="ghost" size="icon" onClick={prevFeatured} className="h-11 w-11 rounded-[14px] bg-background/40 hover:bg-background/70">
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
                   <div className="flex gap-2">
@@ -199,7 +211,7 @@ const Cinema = () => {
                       />
                     ))}
                   </div>
-                  <Button variant="ghost" size="icon" onClick={nextFeatured} className="w-8 h-8 rounded-full bg-background/30 hover:bg-background/50">
+                  <Button variant="ghost" size="icon" onClick={nextFeatured} className="h-11 w-11 rounded-[14px] bg-background/40 hover:bg-background/70">
                     <ChevronRight className="w-4 h-4" />
                   </Button>
                 </div>
@@ -269,7 +281,7 @@ const Cinema = () => {
           {trendingNetworks.length > 0 && (
             <NetworkRow
               title="Trending Now"
-              icon={<TrendingUp className="w-5 h-5 text-primary" />}
+              icon={<SquircleIcon icon={TrendingUp} fill="rose" size={28} />}
               networks={trendingNetworks}
             />
           )}
@@ -278,15 +290,15 @@ const Cinema = () => {
           {newNetworks.length > 0 && (
             <NetworkRow
               title="New Arrivals"
-              icon={<Star className="w-5 h-5 text-primary" />}
+              icon={<SquircleIcon icon={Star} fill="gold" size={28} />}
               networks={newNetworks}
             />
           )}
 
           {/* All Networks Grid */}
           <div>
-            <h2 className="font-display text-xl font-semibold mb-4 flex items-center gap-2">
-              <Tv className="w-5 h-5" />
+            <h2 className="ether-title mb-4 flex items-center gap-2 text-xl">
+              <SquircleIcon icon={Tv} fill="cyan" size={28} />
               Browse All Networks
             </h2>
             
@@ -339,7 +351,7 @@ const NetworkRow = ({
 }) => (
   <div className="group/row">
     <div className="flex items-center justify-between mb-3">
-      <h2 className="font-display text-lg md:text-xl font-semibold flex items-center gap-2">
+      <h2 className="ether-title flex items-center gap-2 text-lg md:text-xl">
         {icon}
         {title}
       </h2>
@@ -396,7 +408,7 @@ const NetworkCard = ({ network, showManage = false, isRow = false }: { network: 
       </div>
 
       {/* Price Badge */}
-      {network.is_paid && !isIosApp() && (
+      {network.is_paid && digitalPurchasesEnabled() && (
         <Badge className="absolute top-2 right-2 text-[10px] px-1.5 py-0.5 bg-primary/90 text-primary-foreground">
           ${network.subscription_price}/mo
         </Badge>

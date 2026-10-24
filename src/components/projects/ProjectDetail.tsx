@@ -1,11 +1,16 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { format } from 'date-fns';
+import { parseCalendarDate } from '@/lib/calendarDate';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, Play, ExternalLink, Upload, X, Eye, Image as ImageIcon, Camera, Share2, Copy, Pencil, Mail, MessageCircle, UserPlus, Lock } from 'lucide-react';
+import { ArrowLeft, DollarSign, Calendar, Users, Check, XIcon, Clock, Send, Trash2, Download, FileText, Film, Package, Link, MapPin, Wrench, Target, BarChart3, MessageSquare, ExternalLink, Upload, X, Eye, Image as ImageIcon, Camera, Share2, Copy, Pencil, Mail, MessageCircle, UserPlus, Lock } from 'lucide-react';
 import { Project, ProjectRole, useProjectApplications, useProjects } from '@/hooks/useProjects';
+import { formatRoleCompensation } from '@/lib/projectCollaborations';
+import { parseItemList } from '@/lib/itemList';
 import { useProjectAttachments, ProjectAttachment } from '@/hooks/useProjectAttachments';
 import { useProjectUpdates } from '@/hooks/useProjectUpdates';
-import { useProjectMilestones } from '@/hooks/useProjectMilestones';
+import { useProjectMilestones, useUpdateMilestoneStatus } from '@/hooks/useProjectMilestones';
+import { useCalendarTasks } from '@/hooks/useCalendarTasks';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -104,6 +109,8 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
   const { attachments, uploadAttachment, addLinkAttachment, deleteAttachment, isUploading } = useProjectAttachments(project?.id);
   const { updates, addUpdate, isPosting } = useProjectUpdates(project?.id);
   const { data: milestones = [] } = useProjectMilestones(project?.id);
+  const updateMilestoneStatus = useUpdateMilestoneStatus();
+  const { addProjectToMyDay, isAddedToMyDay } = useCalendarTasks();
 
   // Check if user is a client of this project
   const { data: clientStatus } = useQuery({
@@ -153,17 +160,10 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
       });
       if (error) throw error;
 
-      const roleName = project.roles?.find((r) => r.id === roleId)?.role_name || "Unknown Role";
       supabase.functions.invoke("notify-guest-application", {
         body: {
           project_id: project.id,
-          project_title: project.title,
-          role_name: roleName,
-          applicant_name: guestName.trim(),
           applicant_email: guestEmail.trim(),
-          project_creator_id: project.creator_id,
-          portfolio_link: guestPortfolio.trim() || null,
-          message: guestMessage.trim() || null,
         },
       }).catch(() => {});
     },
@@ -334,12 +334,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
 
     if (att.file_type === 'video') {
       return (
-        <div className="w-full h-32 bg-muted/40 flex flex-col items-center justify-center gap-2">
-          <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
-            <Play className="h-5 w-5 text-purple-400" />
-          </div>
-          <span className="text-[10px] text-muted-foreground">Video</span>
-        </div>
+        <video src={att.file_url} controls className="h-32 w-full bg-background object-contain" />
       );
     }
 
@@ -358,14 +353,10 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
             className="w-full h-full pointer-events-none border-0 scale-100"
             loading="lazy"
           />
-          {/* Overlay to prevent interaction & show click-to-open */}
           <div className="absolute inset-0 bg-transparent group-hover:bg-black/10 transition-colors" />
           <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-background to-transparent p-2 flex items-end justify-between">
             <span className="text-[10px] text-muted-foreground font-medium truncate max-w-[70%]">{att.file_name}</span>
             <Badge className={cn("text-[9px]", badgeColor)}>{att.file_type.toUpperCase()}</Badge>
-          </div>
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Badge className="text-[9px] bg-background/80 text-foreground">Click to open</Badge>
           </div>
         </div>
       );
@@ -479,6 +470,17 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                       );
                     })()}
                   </div>
+                )}
+                {isCreator && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0"
+                    disabled={isAddedToMyDay(undefined, project.id) || addProjectToMyDay.isPending}
+                    onClick={() => addProjectToMyDay.mutate({ projectId: project.id, title: project.title, dueAt: project.timeline_start || undefined })}
+                  >
+                    {isAddedToMyDay(undefined, project.id) ? "On My Day" : "Add to My Day"}
+                  </Button>
                 )}
                 {isCreator && (
                   <Button
@@ -636,7 +638,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                     <div key={role.id}>
                       <div className="flex items-center justify-between text-sm mb-1">
                         <span className="text-foreground">{role.role_name}</span>
-                        <span className="text-muted-foreground">{formatCurrency(role.payout_amount)} × {role.slots_available}</span>
+                        <span className="text-muted-foreground">{formatRoleCompensation(role.payout_amount, role.credit_amount || 0)} × {role.slots_available}</span>
                       </div>
                       <div className="h-2 bg-muted rounded-full overflow-hidden">
                         <div className={cn("h-full rounded-full transition-all", colors[index % colors.length])} style={{ width: `${percentage}%` }} />
@@ -656,13 +658,23 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
               <div className="bg-muted/30 rounded-xl p-4 space-y-3">
                 <h4 className="font-medium flex items-center gap-2"><Wrench className="h-4 w-4" /> Resources</h4>
                 {project.equipment_needed && (
-                  <div className="text-sm"><span className="text-muted-foreground">Equipment:</span> {project.equipment_needed}</div>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Equipment</span>
+                    <ul className="mt-1 list-disc pl-4">
+                      {parseItemList(project.equipment_needed).map((item) => <li key={item}>{item}</li>)}
+                    </ul>
+                  </div>
                 )}
                 {project.venue && (
                   <div className="text-sm flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-muted-foreground" /> {project.venue} {project.location_secured && <Badge className="text-[10px] bg-emerald-500/20 text-emerald-400">Secured</Badge>}</div>
                 )}
                 {project.props_needed && (
-                  <div className="text-sm"><span className="text-muted-foreground">Props:</span> {project.props_needed}</div>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Props</span>
+                    <ul className="mt-1 list-disc pl-4">
+                      {parseItemList(project.props_needed).map((item) => <li key={item}>{item}</li>)}
+                    </ul>
+                  </div>
                 )}
                 <div className="flex gap-2 flex-wrap">
                   {project.sponsorship_needed && <Badge variant="outline">Sponsorship Needed</Badge>}
@@ -676,9 +688,9 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
               <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground"><Calendar className="h-4 w-4" /><span>Timeline</span></div>
                 <span>
-                  {project.timeline_start && format(new Date(project.timeline_start), 'MMM d, yyyy')}
+                  {project.timeline_start && format(parseCalendarDate(project.timeline_start), 'MMM d, yyyy')}
                   {project.timeline_start && project.timeline_end && ' → '}
-                  {project.timeline_end && format(new Date(project.timeline_end), 'MMM d, yyyy')}
+                  {project.timeline_end && format(parseCalendarDate(project.timeline_end), 'MMM d, yyyy')}
                 </span>
               </div>
             )}
@@ -690,7 +702,19 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                 <div className="relative pl-6 space-y-4">
                   <div className="absolute left-2 top-1 bottom-1 w-0.5 bg-border" />
                   {milestones.map((ms) => (
-                    <div key={ms.id} className="relative">
+                    <div
+                      key={ms.id}
+                      className="relative block w-full text-left"
+                      onClick={() => {
+                        if (!isCreator || !project) return;
+                        const completed = ms.status === "in_progress" || ms.status === "submitted" || ms.status === "approved" || ms.status === "paid";
+                        updateMilestoneStatus.mutate({
+                          milestoneId: ms.id,
+                          status: completed ? "pending" : "approved",
+                          projectId: project.id,
+                        });
+                      }}
+                    >
                       <div className={cn(
                         "absolute -left-4 top-1 w-3 h-3 rounded-full border-2",
                         ms.status === 'approved' || ms.status === 'paid' ? "bg-emerald-500 border-emerald-500" :
@@ -703,6 +727,34 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                           {ms.phase && <Badge variant="outline" className="text-[10px]">{ms.phase.replace('_', '-')}</Badge>}
                           {ms.due_date && <span className="text-xs text-muted-foreground">{format(new Date(ms.due_date), 'MMM d')}</span>}
                           <Badge className={cn('text-[10px]', ms.status === 'paid' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-muted text-muted-foreground')}>{ms.status}</Badge>
+                          {!isCreator && ms.status !== "paid" && Number(ms.amount) > 0 && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
+                              onClick={async (event) => {
+                                event.stopPropagation();
+                                const { data, error } = await supabase.functions.invoke("create-project-payment", {
+                                  body: { milestoneId: ms.id },
+                                });
+                                if (error || data?.error) {
+                                  const serverMessage = typeof data?.error === "string" && data.error
+                                    ? data.error
+                                    : error instanceof Error ? error.message : "";
+                                  toast({ title: serverMessage || "Could not start payment", variant: "destructive" });
+                                  return;
+                                }
+                                if (data?.needs_connect) {
+                                  toast({ title: data.error, variant: "destructive" });
+                                  return;
+                                }
+                                if (data?.url) window.location.assign(data.url);
+                              }}
+                            >
+                              Pay
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -764,7 +816,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                           {role.description && <p className="text-sm text-muted-foreground">{role.description}</p>}
                         </div>
                         <div className="text-right">
-                          <span className="text-lg font-bold text-primary">{formatCurrency(role.payout_amount)}</span>
+                          <span className="text-lg font-bold text-primary">{formatRoleCompensation(role.payout_amount, role.credit_amount || 0)}</span>
                           <p className="text-xs text-muted-foreground">per person</p>
                         </div>
                       </div>
@@ -772,7 +824,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                         <div className="flex items-center gap-2 text-sm text-muted-foreground"><Users className="h-4 w-4" /><span>{role.slots_filled}/{role.slots_available} filled</span></div>
                         {role.is_locked ? <Badge variant="secondary">Filled</Badge> :
                          hasApplied ? <Badge className="bg-amber-500/20 text-amber-400">Applied</Badge> :
-                         !isCreator && <Badge className={isSelected ? "bg-primary" : "bg-primary/20 text-primary"}>{isSelected ? 'Selected' : 'Click to Apply'}</Badge>}
+                         !isCreator && <Badge className={isSelected ? "bg-primary" : "bg-primary/20 text-primary"}>{isSelected ? 'Selected' : 'Apply'}</Badge>}
                       </div>
                     </div>
                   );
@@ -918,7 +970,9 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
                               <AvatarFallback>{app.applicant?.display_name?.[0] || '?'}</AvatarFallback>
                             </Avatar>
                             <div>
-                              <p className="font-medium">{app.applicant?.display_name || 'Anonymous'}</p>
+                              <RouterLink to={`/profile/${app.applicant_id}`} className="font-medium underline">
+                                {app.applicant?.display_name || 'Anonymous'}
+                              </RouterLink>
                               <p className="text-xs text-muted-foreground">
                                 {app.message?.startsWith('[Custom Role Proposal:') ? 'Proposed custom role' : `Applied for ${app.role?.role_name}`} • {format(new Date(app.created_at), 'MMM d')}
                               </p>

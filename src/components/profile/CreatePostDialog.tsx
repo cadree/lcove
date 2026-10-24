@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Dialog,
@@ -29,19 +29,18 @@ import {
   LayoutGrid,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { VideoLinkField } from "@/components/feed/VideoLinkField";
+import { EmbedThumbnail } from "@/components/feed/EmbedPlayer";
+import { InlineError } from "@/components/ui/inline-error";
+import { writeError } from "@/lib/writeError";
+import { assertCleanText, OBJECTIONABLE_MESSAGE } from "@/lib/objectionableText";
+import type { ComposePostInput } from "@/types/post";
+import type { EmbedDraft } from "@/lib/videoEmbed";
 
 interface CreatePostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreatePost: (data: {
-    content?: string;
-    file?: File;
-    files?: File[];
-    mediaType?: 'photo' | 'video' | 'text' | 'collage';
-    location?: string;
-    altText?: string;
-    commentsEnabled?: boolean;
-  }) => Promise<void>;
+  onCreatePost: (data: ComposePostInput) => Promise<void>;
   userAvatar?: string | null;
   userName?: string | null;
 }
@@ -69,6 +68,10 @@ export function CreatePostDialog({
   const [altText, setAltText] = useState("");
   const [commentsEnabled, setCommentsEnabled] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [embed, setEmbed] = useState<EmbedDraft | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const captionErrorId = useId();
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -85,6 +88,9 @@ export function CreatePostDialog({
     setAltText("");
     setCommentsEnabled(true);
     setIsSubmitting(false);
+    setLinkUrl("");
+    setEmbed(null);
+    setSubmitError(null);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'photo' | 'video') => {
@@ -93,6 +99,8 @@ export function CreatePostDialog({
 
     setSelectedFiles([file]);
     setMediaType(type);
+    setLinkUrl("");
+    setEmbed(null);
     
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -188,19 +196,24 @@ export function CreatePostDialog({
 
   const handlePublish = async () => {
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
+      assertCleanText(caption);
       await onCreatePost({
         content: caption || undefined,
-        file: selectedFiles[0] || undefined,
-        files: selectedFiles.length > 1 ? selectedFiles : undefined,
-        mediaType: mediaType || 'text',
+        file: embed ? undefined : selectedFiles[0] || undefined,
+        files: embed ? undefined : selectedFiles.length > 1 ? selectedFiles : undefined,
+        mediaType: embed ? 'video' : mediaType || 'text',
         location: location || undefined,
         altText: altText || undefined,
         commentsEnabled,
+        embed: embed ?? undefined,
       });
       handleClose();
     } catch (error) {
-      console.error('Failed to create post:', error);
+      const message = writeError(error, 'Failed to create post');
+      setSubmitError(message);
+      if (message === OBJECTIONABLE_MESSAGE) setCurrentStep('caption');
     } finally {
       setIsSubmitting(false);
     }
@@ -219,7 +232,7 @@ export function CreatePostDialog({
 
   const canProceed = () => {
     switch (currentStep) {
-      case 'upload': return selectedFiles.length > 0;
+      case 'upload': return selectedFiles.length > 0 || !!embed;
       case 'preview': return true;
       case 'caption': return true;
       case 'metadata': return true;
@@ -298,14 +311,26 @@ export function CreatePostDialog({
                     <Image className="w-4 h-4 mr-2" />
                     Select Photo
                   </Button>
-                  <Button variant="outline" onClick={() => multiImageInputRef.current?.click()} className="w-full">
-                    <LayoutGrid className="w-4 h-4 mr-2" />
-                    Create Collage (Multiple Photos)
+                  <Button variant="outline" onClick={() => multiImageInputRef.current?.click()} className="h-auto w-full whitespace-normal py-3 text-center">
+                    <LayoutGrid className="h-4 w-4 shrink-0" />
+                    <span className="min-w-0 whitespace-normal">Create Collage (Multiple Photos)</span>
                   </Button>
                   <Button variant="outline" onClick={() => videoInputRef.current?.click()} className="w-full">
                     <Video className="w-4 h-4 mr-2" />
                     Select Video
                   </Button>
+                  <VideoLinkField
+                    url={linkUrl}
+                    onUrlChange={(value) => {
+                      setLinkUrl(value);
+                      if (value.trim()) {
+                        setSelectedFiles([]);
+                        setMediaPreviews([]);
+                        setMediaType(null);
+                      }
+                    }}
+                    onDraft={setEmbed}
+                  />
                 </div>
 
                 <input
@@ -334,7 +359,7 @@ export function CreatePostDialog({
             )}
 
             {/* Step 2: Preview */}
-            {currentStep === 'preview' && mediaPreviews.length > 0 && (
+            {currentStep === 'preview' && (mediaPreviews.length > 0 || embed) && (
               <motion.div
                 key="preview"
                 initial={{ opacity: 0, x: 20 }}
@@ -343,10 +368,13 @@ export function CreatePostDialog({
                 className="relative"
               >
                 <div className="aspect-square bg-black flex items-center justify-center overflow-hidden relative">
-                  {mediaType === 'video' ? (
+                  {embed ? (
+                    <EmbedThumbnail embed={embed} thumbnailUrl={embed.thumbnailUrl} title={embed.title} />
+                  ) : mediaType === 'video' ? (
                     <video 
                       src={mediaPreviews[0]} 
                       controls 
+                      playsInline
                       className="w-full h-full object-contain"
                     />
                   ) : (
@@ -502,9 +530,16 @@ export function CreatePostDialog({
                   <Textarea
                     placeholder="Write a caption..."
                     value={caption}
-                    onChange={(e) => setCaption(e.target.value.slice(0, MAX_CAPTION_LENGTH))}
+                    onChange={(e) => {
+                      setCaption(e.target.value.slice(0, MAX_CAPTION_LENGTH));
+                      setSubmitError(null);
+                    }}
+                    aria-label="Post caption"
+                    aria-invalid={submitError ? true : undefined}
+                    aria-describedby={submitError ? captionErrorId : undefined}
                     className="min-h-[150px] resize-none border-0 focus-visible:ring-0 p-0 text-base"
                   />
+                  <InlineError id={captionErrorId} message={submitError} />
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <Button variant="ghost" size="sm" className="h-8 px-2">
                       <Smile className="w-4 h-4" />
@@ -675,6 +710,7 @@ export function CreatePostDialog({
                   )}
                 </div>
 
+                <InlineError message={submitError} />
                 <p className="text-sm text-muted-foreground text-center">
                   Your post will be shared with the community
                 </p>

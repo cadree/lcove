@@ -53,9 +53,9 @@ Optional names, same **New repository secret** button. Add them when you have th
 | `INTERNAL_FUNCTION_SECRET` | The same value as the ether-prod Vault secret `internal_function_secret` (already created). Database, Vault. The email-queue cron and the reminder cron send it as `x-internal-secret`. |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | Twilio, only if texts are turned on. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | `docs/push-setup.md`. Optional `VAPID_SUBJECT` (`mailto:you@domain`). |
-| `MUX_TOKEN_ID`, `MUX_TOKEN_SECRET` | Mux, only if livestreams are turned on. |
+| `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` | LiveKit Cloud. Camera streams use these. Do not set Mux tokens. Point the LiveKit webhook at `livekit-webhook`. |
 | `SITE_URL`, `APP_URL` | The site people should land on from email links. See the hosting step. |
-| `EMAIL_FROM` | Optional. The queue From address. If you leave it unset, mail is sent as `notifications@notifications.etherbylcove.com`. |
+| `EMAIL_FROM` | Optional. The queue From address. If you leave it unset, mail is sent as `notifications@etherbylcove.com`. The `notifications` subdomain is not a verified sender. |
 | `APPLE_PASS_TYPE_ID`, `APPLE_TEAM_ID`, `GOOGLE_WALLET_ISSUER_ID`, `GOOGLE_WALLET_SERVICE_ACCOUNT_KEY` | Wallet passes, later. Store the Google key as one line. |
 | `LOVABLE_API_KEY` | Only `ai-project-match`. That function is not email. Leave this unset and project matching fails closed. Do not add `LOVABLE_SEND_URL`. Nothing reads it. |
 
@@ -94,7 +94,7 @@ Resend's free plan includes SMTP, 3 domains, and 100 emails a day. That daily ca
 1. Create a free account at [https://resend.com](https://resend.com).
 2. Open **API Keys**, click **Create API key**, choose **Sending access**, and copy the key once.
 3. Add that key as the GitHub secret `RESEND_API_KEY`, then **Re-run all jobs** on the latest **Deploy Supabase functions** run so invite and reminder functions can send.
-4. In Resend, open **Domains**, click **Add Domain**, and enter `notifications.etherbylcove.com`. If it asks for a region, choose North Virginia (`us-east-1`), the same region as ether-prod.
+4. In Resend, open **Domains** and confirm `etherbylcove.com` is verified. Function mail sends only from that domain. `notifications.etherbylcove.com` is not verified, and Resend rejects it with 403. Do not send from that subdomain. The records below are the old subdomain setup. Use them only if you are verifying a new domain, and then only with the host names Resend shows for the domain you added.
 5. Open that domain's **Records** tab. Add the records below at the DNS host for `etherbylcove.com`. Paste the values Resend shows. The DKIM value is unique to this domain and is not something you invent.
 
 | Type | Name | Value |
@@ -128,7 +128,7 @@ Then set Supabase Auth to use Resend. This is separate from the GitHub secret. A
 | Field | Value |
 | --- | --- |
 | Enable custom SMTP | On |
-| Sender email | `noreply@notifications.etherbylcove.com` |
+| Sender email | `noreply@etherbylcove.com` |
 | Sender name | `Ether` |
 | Host | `smtp.resend.com` |
 | Port number | `465` |
@@ -183,7 +183,7 @@ Leave `VITE_VAPID_PUBLIC_KEY` and `VITE_WALLET_PASSES_ENABLED` unset until push 
 3. Framework preset: **None**, or **Vite** if the form offers it.
 4. Build command: `npm run build`
 5. Build output directory: `dist`
-6. Add the three environment variables above for **Production**. Add them for **Preview** too if preview URLs should talk to ether-prod.
+6. Add the three environment variables above for **Production** only. Do not add them under **Preview**. Preview deployments must use a second Supabase project. The steps are in `docs/preview-staging.md`.
 7. Save and deploy. Open the `pages.dev` address Cloudflare gives you.
 
 ### SPA redirect

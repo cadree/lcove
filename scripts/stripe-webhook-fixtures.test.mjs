@@ -11,6 +11,7 @@ import {
 import { communityFundFeeCents } from "../supabase/functions/_shared/fees.mjs";
 import {
   invoiceSubscriptionId,
+  isGrantEligible,
   requireMembershipConfig,
   subscriptionPeriodUnix,
   tierFromStripeSubscription,
@@ -161,6 +162,21 @@ test("store, ticket, network, music, and artist checkouts route apart", async ()
   }
 });
 
+test("invoices, project pay, and stream gifts record the community fund fee", async () => {
+  const cases = [
+    [{ id: "cs_inv", amount_total: 5000, metadata: { type: "contact_invoice", invoice_id: "inv_1" } }, "markContactInvoicePaid"],
+    [{ id: "cs_ms", amount_total: 8000, metadata: { type: "project_payment", milestone_id: "ms_1" } }, "markMilestonePaid"],
+    [{ id: "cs_gift_live", amount_total: 500, metadata: { type: "stream_gift", stream_id: "st", sender_id: "a", host_id: "b", gift: "star" } }, "recordStreamGift"],
+  ];
+  for (const [object, method] of cases) {
+    const { db, calls } = makeDb();
+    const result = await post(event("checkout.session.completed", object), { db });
+    assert.equal(result.status, 200, method);
+    assert.ok(methods(calls).includes(method), method);
+    assert.ok(methods(calls).includes("recordCheckoutCommunityFundFee"), method);
+  }
+});
+
 test("an event ticket is not also confirmed as a store order", async () => {
   const { db, calls } = makeDb();
   await post(event("checkout.session.completed", {
@@ -189,12 +205,16 @@ test("an expired ticket is not also cancelled as a store order", async () => {
   }), { db });
   assert.equal(result.status, 200);
   assert.ok(methods(calls).includes("cancelPendingTicketOrder"));
+  assert.ok(methods(calls).includes("releaseAbandonedTicketOrders"));
   assert.equal(methods(calls).includes("cancelPendingStoreOrder"), false);
 });
 
 test("invoice failure, subscription deletion, and refunds are signed and routed", async () => {
   const cases = [
-    [event("invoice.payment_failed", { id: "in_1", subscription: "sub_1" }), "markInvoiceFailed"],
+    [event("invoice.payment_failed", {
+      id: "in_1",
+      parent: { type: "subscription_details", subscription_details: { subscription: "sub_1" } },
+    }), "markInvoiceFailed"],
     [event("customer.subscription.deleted", { id: "sub_1", status: "canceled", metadata: { tier: "community", type: "membership" } }), "syncSubscription"],
     [event("charge.refunded", { id: "ch_1", payment_intent: "pi_1", amount_refunded: 500 }), "markChargeRefunded"],
   ];
@@ -396,6 +416,11 @@ test("basil subscription periods are read from the item for checkout and subscri
   assert.equal(upsert.payload.tier, "elite");
   assert.equal(upsert.payload.status, "active");
   assert.equal(upsert.payload.monthly_amount, 25);
+  const eligibility = ops.find((op) => op.table === "memberships" && op.op === "update" && Object.prototype.hasOwnProperty.call(op.payload, "grant_eligible"));
+  assert.equal(eligibility.payload.lifetime_contribution, 25);
+  assert.equal(eligibility.payload.grant_eligible, false);
+  assert.equal(isGrantEligible(25), false);
+  assert.equal(isGrantEligible(50), true);
 
   const contribution = ops.find((op) => op.table === "membership_contributions" && op.op === "insert");
   assert.equal(contribution.payload.period_start, start);
@@ -449,6 +474,9 @@ test("basil invoices expose the subscription id on parent", () => {
   assert.match(source, /invoiceSubscriptionId/);
   assert.equal(source.includes("membershipSub.current_period_end"), false);
   assert.equal(source.includes("membershipSub.current_period_start"), false);
+  assert.equal(source.includes("invoice.subscription"), false);
+  assert.equal(source.includes("invoice.payment_intent"), false);
+  assert.equal(source.includes("charge.invoice"), false);
 });
 
 test("event, store, and community-fund fee constants match the edge function and the app", () => {
@@ -558,10 +586,30 @@ function rowDb(seed = {}) {
   };
 }
 
-function stripeStub({ subscriptions = {}, invoices = {}, paymentIntents = {} } = {}) {
+function pageOf(rows, params, match) {
+  const filtered = rows.filter((row) => match(row, params));
+  const start = params?.starting_after
+    ? filtered.findIndex((row) => row.id === params.starting_after) + 1
+    : 0;
+  const limit = params?.limit || filtered.length;
+  const data = filtered.slice(Math.max(start, 0), Math.max(start, 0) + limit);
+  return { data, has_more: start + data.length < filtered.length && data.length > 0 };
+}
+
+function stripeStub({
+  subscriptions = {},
+  invoices = {},
+  paymentIntents = {},
+  invoicePayments = [],
+  refunds = [],
+} = {}) {
   const cancels = [];
+  const invoicePaymentLists = [];
+  const refundLists = [];
   return {
     cancels,
+    invoicePaymentLists,
+    refundLists,
     subscriptions: {
       retrieve: async (id) => {
         if (!subscriptions[id]) throw new Error(`missing subscription ${id}`);
@@ -579,9 +627,52 @@ function stripeStub({ subscriptions = {}, invoices = {}, paymentIntents = {} } =
         return invoices[id];
       },
     },
+    // Basil PaymentIntents have no invoice field. A retrieve must not supply one.
     paymentIntents: {
-      retrieve: async (id) => paymentIntents[id] || { id, invoice: null },
+      retrieve: async (id) => paymentIntents[id] || { id, object: "payment_intent" },
     },
+    invoicePayments: {
+      list: async (params) => {
+        invoicePaymentLists.push(params);
+        return pageOf(invoicePayments, params, (row, query) => {
+          const paymentIntent = query?.payment?.payment_intent;
+          const rowPaymentIntent = typeof row.payment?.payment_intent === "string"
+            ? row.payment.payment_intent
+            : row.payment?.payment_intent?.id;
+          if (paymentIntent && rowPaymentIntent !== paymentIntent) return false;
+          const invoice = query?.invoice;
+          const rowInvoice = typeof row.invoice === "string" ? row.invoice : row.invoice?.id;
+          if (invoice && rowInvoice !== invoice) return false;
+          if (query?.status && row.status !== query.status) return false;
+          return true;
+        });
+      },
+    },
+    refunds: {
+      list: async (params) => {
+        refundLists.push(params);
+        return pageOf(refunds, params, (row, query) => !query?.charge || row.charge === query.charge);
+      },
+    },
+  };
+}
+
+function basilInvoice(id, subscriptionId) {
+  return {
+    id,
+    parent: {
+      type: "subscription_details",
+      subscription_details: { subscription: subscriptionId },
+    },
+  };
+}
+
+function basilInvoicePayment(id, invoiceId, paymentIntentId) {
+  return {
+    id,
+    status: "paid",
+    invoice: invoiceId,
+    payment: { type: "payment_intent", payment_intent: paymentIntentId },
   };
 }
 
@@ -605,7 +696,14 @@ function membershipSubscription() {
 
 test("network and studio payments record a 10% community-fund fee once", async () => {
   const db = rowDb();
-  const stripeClient = stripeStub({ subscriptions: { sub_net: networkSubscription() } });
+  const stripeClient = stripeStub({
+    subscriptions: { sub_net: networkSubscription() },
+    invoicePayments: [
+      basilInvoicePayment("inpay_net", "in_net", "pi_net"),
+      basilInvoicePayment("inpay_net_2", "in_net_2", "pi_net_2"),
+      basilInvoicePayment("inpay_only", "in_only", "pi_only"),
+    ],
+  });
   const adapter = createSupabaseStripeDb(db, stripeClient);
 
   const networkSession = {
@@ -627,15 +725,21 @@ test("network and studio payments record a 10% community-fund fee once", async (
   assert.equal(again.body.duplicate, true);
   assert.equal(db.rows("community_fund_fees").length, 1);
 
-  const renewal = await post(event("invoice.paid", {
+  const renewalInvoice = {
     id: "in_net_2",
     amount_paid: 1000,
     currency: "usd",
     parent: { type: "subscription_details", subscription_details: { subscription: "sub_net" } },
-  }), { db: adapter });
+  };
+  assert.equal(renewalInvoice.payment_intent, undefined);
+  assert.equal(renewalInvoice.subscription, undefined);
+  const renewal = await post(event("invoice.paid", renewalInvoice), { db: adapter });
   assert.equal(renewal.status, 200);
   assert.equal(db.rows("community_fund_fees").length, 2);
   assert.equal(db.rows("community_fund_fees").reduce((sum, row) => sum + row.amount, 0), 2);
+  const renewalFee = db.rows("community_fund_fees").find((row) => row.stripe_invoice_id === "in_net_2");
+  assert.equal(renewalFee.stripe_payment_intent_id, "pi_net_2");
+  assert.equal(stripeClient.invoicePaymentLists.some((params) => params.invoice === "in_net_2" && params.status === "paid"), true);
 
   const sameInvoice = await adapter.recordPaidInvoiceFee({
     id: "in_net",
@@ -683,7 +787,35 @@ test("network and studio payments record a 10% community-fund fee once", async (
   });
   assert.equal(membershipInvoice.status, 200);
   assert.equal(db.rows("community_fund_fees").some((row) => row.stripe_invoice_id === "in_member_fee"), false);
+
+  const checkoutOnly = await adapter.recordCheckoutCommunityFundFee({
+    id: "cs_net_pi",
+    amount_total: 2000,
+    currency: "usd",
+    payment_intent: "pi_only",
+    subscription: "sub_net",
+    metadata: { network_id: "net_1", user_id: "user_1" },
+  }, "network_subscription");
+  assert.equal(checkoutOnly, undefined);
+  const paidLater = await adapter.recordPaidInvoiceFee({
+    id: "in_only",
+    amount_paid: 2000,
+    currency: "usd",
+    parent: { type: "subscription_details", subscription_details: { subscription: "sub_net" } },
+  });
+  assert.equal(paidLater, undefined);
+  assert.equal(db.rows("community_fund_fees").filter((row) => row.stripe_payment_intent_id === "pi_only").length, 1);
 });
+
+function basilCharge(id, paymentIntentId, amountCents) {
+  return {
+    id,
+    object: "charge",
+    payment_intent: paymentIntentId,
+    amount: amountCents,
+    amount_refunded: amountCents,
+  };
+}
 
 test("a refunded membership invoice cancels the membership and the Stripe subscription", async () => {
   const db = rowDb({
@@ -700,30 +832,30 @@ test("a refunded membership invoice cancels the membership and the Stripe subscr
   const subscriptions = { sub_member: membershipSubscription() };
   const stripeClient = stripeStub({
     subscriptions,
-    invoices: {
-      in_member: {
-        id: "in_member",
-        amount_paid: 2500,
-        parent: { type: "subscription_details", subscription_details: { subscription: "sub_member" } },
-      },
-    },
-    paymentIntents: { pi_mem: { id: "pi_mem", invoice: "in_member" } },
+    invoices: { in_member: basilInvoice("in_member", "sub_member") },
+    invoicePayments: [basilInvoicePayment("inpay_mem", "in_member", "pi_mem")],
+    refunds: [{ id: "re_1", amount: 2500, charge: "ch_mem" }],
   });
-  const adapter = createSupabaseStripeDb(db, stripeClient);
-  const charge = {
-    id: "ch_mem",
-    payment_intent: "pi_mem",
-    amount: 2500,
-    amount_refunded: 2500,
-    refunds: { data: [{ id: "re_1", amount: 2500 }] },
+  stripeClient.paymentIntents.retrieve = async () => {
+    throw new Error("payment_intent.invoice is not on basil");
   };
+  const adapter = createSupabaseStripeDb(db, stripeClient);
+  const charge = basilCharge("ch_mem", "pi_mem", 2500);
+  assert.equal(charge.invoice, undefined);
+  assert.equal(charge.refunds, undefined);
 
   const result = await post(event("charge.refunded", charge), { db: adapter });
   assert.equal(result.status, 200);
+  const lookup = stripeClient.invoicePaymentLists[0];
+  assert.equal(lookup.payment.type, "payment_intent");
+  assert.equal(lookup.payment.payment_intent, "pi_mem");
   const membership = db.rows("memberships")[0];
   assert.equal(membership.lifetime_contribution, 5);
   assert.equal(membership.status, "cancelled");
+  assert.equal(membership.grant_eligible, false);
   assert.equal(db.rows("membership_contributions")[0].amount, 0);
+  assert.equal(db.rows("membership_payment_refunds")[0].stripe_refund_id, "re_1");
+  assert.equal(db.rows("membership_payment_refunds")[0].stripe_invoice_id, "in_member");
   assert.deepEqual(stripeClient.cancels, ["sub_member"]);
   assert.equal(subscriptions.sub_member.status, "canceled");
 
@@ -735,6 +867,7 @@ test("a refunded membership invoice cancels the membership and the Stripe subscr
   await adapter.markChargeRefunded(charge);
   assert.equal(db.rows("memberships")[0].lifetime_contribution, 5);
   assert.equal(db.rows("memberships")[0].status, "cancelled");
+  assert.equal(db.rows("membership_payment_refunds").length, 1);
   assert.deepEqual(stripeClient.cancels, ["sub_member"]);
 
   const stamped = db.rows("memberships")[0].updated_at;
@@ -746,6 +879,40 @@ test("a refunded membership invoice cancels the membership and the Stripe subscr
   assert.equal(db.rows("memberships")[0].lifetime_contribution, 5);
   assert.equal(db.rows("memberships")[0].status, "cancelled");
   assert.equal(db.rows("memberships")[0].updated_at, stamped);
+  assert.deepEqual(stripeClient.cancels, ["sub_member"]);
+});
+
+test("a basil community refund floors lifetime contribution at zero", async () => {
+  const db = rowDb({
+    memberships: [{
+      id: "mem_1",
+      stripe_subscription_id: "sub_member",
+      lifetime_contribution: 5,
+      tier: "community",
+      status: "active",
+      grant_eligible: false,
+    }],
+    membership_contributions: [{ id: "mc_1", stripe_invoice_id: "in_community", amount: 5 }],
+  });
+  const subscriptions = {
+    sub_member: {
+      ...membershipSubscription(),
+      metadata: { type: "membership", tier: "community", user_id: "user_1" },
+    },
+  };
+  const stripeClient = stripeStub({
+    subscriptions,
+    invoices: { in_community: basilInvoice("in_community", "sub_member") },
+    invoicePayments: [basilInvoicePayment("inpay_community", "in_community", "pi_community")],
+    refunds: [{ id: "re_community", amount: 500, charge: "ch_community" }],
+  });
+  const adapter = createSupabaseStripeDb(db, stripeClient);
+  await adapter.markChargeRefunded(basilCharge("ch_community", "pi_community", 500));
+  assert.equal(db.rows("memberships")[0].lifetime_contribution, 0);
+  assert.equal(db.rows("memberships")[0].status, "cancelled");
+  assert.equal(db.rows("memberships")[0].grant_eligible, false);
+  assert.equal(db.rows("membership_contributions")[0].amount, 0);
+  assert.equal(db.rows("membership_payment_refunds")[0].amount, 5);
   assert.deepEqual(stripeClient.cancels, ["sub_member"]);
 });
 
@@ -762,18 +929,12 @@ test("a membership refund never drops lifetime contribution below zero", async (
   });
   const stripeClient = stripeStub({
     subscriptions: { sub_member: membershipSubscription() },
-    invoices: {
-      in_member: { id: "in_member", subscription: "sub_member" },
-    },
+    invoices: { in_member: basilInvoice("in_member", "sub_member") },
+    invoicePayments: [basilInvoicePayment("inpay_big", "in_member", "pi_big")],
+    refunds: [{ id: "re_big", amount: 2500, charge: "ch_big" }],
   });
   const adapter = createSupabaseStripeDb(db, stripeClient);
-  await adapter.markChargeRefunded({
-    id: "ch_big",
-    invoice: "in_member",
-    payment_intent: "pi_big",
-    amount_refunded: 2500,
-    refunds: { data: [{ id: "re_big", amount: 2500 }] },
-  });
+  await adapter.markChargeRefunded(basilCharge("ch_big", "pi_big", 2500));
   assert.equal(db.rows("memberships")[0].lifetime_contribution, 0);
   assert.equal(db.rows("memberships")[0].status, "cancelled");
   assert.equal(db.rows("membership_contributions")[0].amount, 0);
@@ -791,30 +952,101 @@ test("a second membership refund subtracts only the new amount", async () => {
     }],
     membership_contributions: [{ id: "mc_1", stripe_invoice_id: "in_member", amount: 40 }],
   });
-  const subscriptions = { sub_member: membershipSubscription() };
+  const refundRows = [{ id: "re_a", amount: 1000, charge: "ch_part" }];
   const stripeClient = stripeStub({
-    subscriptions,
-    invoices: { in_member: { id: "in_member", subscription: "sub_member" } },
+    subscriptions: { sub_member: membershipSubscription() },
+    invoices: { in_member: basilInvoice("in_member", "sub_member") },
+    invoicePayments: [basilInvoicePayment("inpay_part", "in_member", "pi_part")],
+    refunds: refundRows,
   });
   const adapter = createSupabaseStripeDb(db, stripeClient);
-  await adapter.markChargeRefunded({
+  const charge = {
     id: "ch_part",
-    invoice: "in_member",
+    object: "charge",
     payment_intent: "pi_part",
+    amount: 4000,
     amount_refunded: 1000,
-    refunds: { data: [{ id: "re_a", amount: 1000 }] },
-  });
+  };
+  await adapter.markChargeRefunded(charge);
   assert.equal(db.rows("memberships")[0].lifetime_contribution, 30);
-  await adapter.markChargeRefunded({
-    id: "ch_part",
-    invoice: "in_member",
-    payment_intent: "pi_part",
-    amount_refunded: 2500,
-    refunds: { data: [{ id: "re_a", amount: 1000 }, { id: "re_b", amount: 1500 }] },
-  });
+  refundRows.push({ id: "re_b", amount: 1500, charge: "ch_part" });
+  await adapter.markChargeRefunded({ ...charge, amount_refunded: 2500 });
   assert.equal(db.rows("memberships")[0].lifetime_contribution, 15);
   assert.equal(db.rows("membership_contributions")[0].amount, 15);
   assert.equal(db.rows("memberships")[0].status, "cancelled");
+  assert.deepEqual(
+    db.rows("membership_payment_refunds").map((row) => row.stripe_refund_id).sort(),
+    ["re_a", "re_b"],
+  );
+});
+
+test("a basil invoice payment on a later page still refunds the membership", async () => {
+  const db = rowDb({
+    memberships: [{
+      id: "mem_1",
+      stripe_subscription_id: "sub_member",
+      lifetime_contribution: 5,
+      tier: "community",
+      status: "active",
+    }],
+  });
+  const stripeClient = stripeStub({
+    subscriptions: { sub_member: membershipSubscription() },
+    invoices: {
+      in_other: { id: "in_other" },
+      in_member: basilInvoice("in_member", "sub_member"),
+    },
+    refunds: [{ id: "re_page", amount: 500, charge: "ch_page" }],
+  });
+  const pages = [
+    [{ id: "inpay_open", status: "open", invoice: "in_other", payment: { type: "payment_intent", payment_intent: "pi_page" } }],
+    [basilInvoicePayment("inpay_paid", "in_member", "pi_page")],
+  ];
+  stripeClient.invoicePayments.list = async (params) => {
+    stripeClient.invoicePaymentLists.push(params);
+    assert.equal(params.payment.type, "payment_intent");
+    assert.equal(params.payment.payment_intent, "pi_page");
+    const page = params.starting_after ? 1 : 0;
+    if (page === 1) assert.equal(params.starting_after, "inpay_open");
+    return { data: pages[page], has_more: page === 0 };
+  };
+  const adapter = createSupabaseStripeDb(db, stripeClient);
+  await adapter.markChargeRefunded(basilCharge("ch_page", "pi_page", 500));
+  assert.equal(stripeClient.invoicePaymentLists.length, 2);
+  assert.equal(db.rows("memberships")[0].status, "cancelled");
+  assert.equal(db.rows("memberships")[0].lifetime_contribution, 0);
+  assert.equal(db.rows("membership_payment_refunds")[0].stripe_invoice_id, "in_member");
+  assert.deepEqual(stripeClient.cancels, ["sub_member"]);
+});
+
+test("a pre-basil charge.invoice refund still cancels the membership", async () => {
+  const db = rowDb({
+    memberships: [{
+      id: "mem_1",
+      stripe_subscription_id: "sub_member",
+      lifetime_contribution: 25,
+      tier: "elite",
+      status: "active",
+    }],
+  });
+  const stripeClient = stripeStub({
+    subscriptions: { sub_member: membershipSubscription() },
+    invoices: { in_legacy: basilInvoice("in_legacy", "sub_member") },
+  });
+  stripeClient.invoicePayments.list = async () => {
+    throw new Error("legacy charge.invoice should not list invoice payments");
+  };
+  const adapter = createSupabaseStripeDb(db, stripeClient);
+  await adapter.markChargeRefunded({
+    id: "ch_legacy",
+    invoice: "in_legacy",
+    payment_intent: "pi_legacy",
+    amount_refunded: 2500,
+    refunds: { data: [{ id: "re_legacy", amount: 2500 }] },
+  });
+  assert.equal(db.rows("memberships")[0].status, "cancelled");
+  assert.equal(db.rows("memberships")[0].lifetime_contribution, 0);
+  assert.deepEqual(stripeClient.cancels, ["sub_member"]);
 });
 
 test("a network-subscription refund does not cancel a membership", async () => {
@@ -829,20 +1061,37 @@ test("a network-subscription refund does not cancel a membership", async () => {
   });
   const stripeClient = stripeStub({
     subscriptions: { sub_net: networkSubscription() },
-    invoices: { in_net: { id: "in_net", subscription: "sub_net" } },
+    invoices: { in_net: basilInvoice("in_net", "sub_net") },
+    invoicePayments: [basilInvoicePayment("inpay_net", "in_net", "pi_net")],
+    refunds: [{ id: "re_net", amount: 1000, charge: "ch_net" }],
   });
   const adapter = createSupabaseStripeDb(db, stripeClient);
-  await adapter.markChargeRefunded({
-    id: "ch_net",
-    invoice: "in_net",
-    payment_intent: "pi_net",
-    amount_refunded: 1000,
-    refunds: { data: [{ id: "re_net", amount: 1000 }] },
-  });
+  await adapter.markChargeRefunded(basilCharge("ch_net", "pi_net", 1000));
   assert.equal(db.rows("memberships")[0].status, "active");
   assert.equal(db.rows("memberships")[0].lifetime_contribution, 30);
   assert.deepEqual(stripeClient.cancels, []);
   assert.equal(db.rows("membership_payment_refunds").length, 0);
+});
+
+test("a basil invoice.payment_failed marks the membership past due", async () => {
+  const db = rowDb({
+    memberships: [{
+      id: "mem_1",
+      stripe_subscription_id: "sub_member",
+      lifetime_contribution: 5,
+      tier: "community",
+      status: "active",
+    }],
+  });
+  const stripeClient = stripeStub({
+    subscriptions: { sub_member: { ...membershipSubscription(), status: "past_due" } },
+  });
+  const adapter = createSupabaseStripeDb(db, stripeClient);
+  const invoice = basilInvoice("in_fail", "sub_member");
+  assert.equal(invoice.subscription, undefined);
+  await adapter.markInvoiceFailed(invoice);
+  assert.equal(db.rows("memberships")[0].status, "past_due");
+  assert.equal(db.rows("memberships")[0].lifetime_contribution, 5);
 });
 
 test("customer.subscription.deleted still cancels an active membership and leaves lifetime alone", async () => {

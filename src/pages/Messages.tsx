@@ -54,9 +54,9 @@ const Messages = () => {
             <p className="text-muted-foreground mb-6 text-sm">
               Connect with other creatives through direct messages
             </p>
-            <Link to="/auth">
-              <Button className="w-full">Sign In</Button>
-            </Link>
+            <Button asChild className="w-full">
+              <Link to="/auth">Sign in</Link>
+            </Button>
           </motion.div>
         </div>
       </PageLayout>

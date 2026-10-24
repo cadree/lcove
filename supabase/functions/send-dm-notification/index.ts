@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { httpStatusForError } from "../_shared/http-error.mjs";
+import { getBearerUser } from "../_shared/require-caller.ts";
+import { authorizeDirectMessage, displayName, escapeHtml, isUuid } from "../_shared/notification-auth.mjs";
 
 const EMAIL_FROM = "ETHER <notifications@etherbylcove.com>";
 
@@ -26,9 +29,15 @@ const corsHeaders = {
 
 interface DMNotificationRequest {
   recipient_id: string;
-  sender_name: string;
-  message_preview?: string;
-  conversation_id: string;
+  conversation_id?: string;
+  message_id?: string;
+}
+
+function json(status: number, body: Record<string, unknown>): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...corsHeaders },
+  });
 }
 
 const getEmailTemplate = (senderName: string, messagePreview?: string, conversationId?: string) => {
@@ -54,9 +63,9 @@ const getEmailTemplate = (senderName: string, messagePreview?: string, conversat
                     <span style="color: white; font-size: 24px;">✉</span>
                   </div>
                   <h1 style="color: #ffffff; font-size: 24px; margin: 0 0 16px; font-weight: 600;">
-                    New Message from ${senderName}
+                    New Message from ${escapeHtml(senderName)}
                   </h1>
-                  ${messagePreview ? `<p style="color: #a0a0a0; font-size: 16px; line-height: 1.6; margin: 0 0 20px; font-style: italic;">"${messagePreview}"</p>` : ''}
+                  ${messagePreview ? `<p style="color: #a0a0a0; font-size: 16px; line-height: 1.6; margin: 0 0 20px; font-style: italic;">"${escapeHtml(messagePreview)}"</p>` : ''}
                   <p style="color: #a0a0a0; font-size: 14px; margin: 0 0 30px;">
                     Open the app to view and reply to this message.
                   </p>
@@ -206,9 +215,73 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { recipient_id, sender_name, message_preview, conversation_id }: DMNotificationRequest = await req.json();
+    const body = await req.json() as DMNotificationRequest;
+    const recipient_id = typeof body.recipient_id === "string" ? body.recipient_id : "";
+    const requestedConversation = typeof body.conversation_id === "string" ? body.conversation_id : "";
+    const requestedMessage = typeof body.message_id === "string" ? body.message_id : "";
+    const callerId = await getBearerUser(req.headers.get("Authorization"), supabase);
 
-    console.log(`Processing DM notification for recipient: ${recipient_id} from sender: ${sender_name}, conversation: ${conversation_id}`);
+    if (!callerId) return json(401, { error: "Unauthorized" });
+    if (!isUuid(recipient_id)) return json(400, { error: "recipient_id is required" });
+    if (!requestedConversation && !requestedMessage) {
+      return json(400, { error: "conversation_id or message_id is required" });
+    }
+    if (requestedConversation && !isUuid(requestedConversation)) return json(400, { error: "conversation_id is invalid" });
+    if (requestedMessage && !isUuid(requestedMessage)) return json(400, { error: "message_id is invalid" });
+
+    let message: { id: string; conversation_id: string; sender_id: string; content: string | null; media_type: string | null } | null = null;
+    if (requestedMessage) {
+      let query = supabase
+        .from("messages")
+        .select("id, conversation_id, sender_id, content, media_type")
+        .eq("id", requestedMessage)
+        .is("deleted_at", null);
+      if (requestedConversation) query = query.eq("conversation_id", requestedConversation);
+      const { data } = await query.maybeSingle();
+      message = data;
+    } else {
+      const { data } = await supabase
+        .from("messages")
+        .select("id, conversation_id, sender_id, content, media_type")
+        .eq("conversation_id", requestedConversation)
+        .eq("sender_id", callerId)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      message = data;
+    }
+
+    const { data: participants } = message
+      ? await supabase
+        .from("conversation_participants")
+        .select("user_id, is_muted")
+        .eq("conversation_id", message.conversation_id)
+      : { data: [] as Array<{ user_id: string; is_muted: boolean | null }> };
+
+    const decision = authorizeDirectMessage({
+      callerId,
+      recipientId: recipient_id,
+      conversationId: requestedConversation,
+      messageId: requestedMessage,
+      message,
+      participantIds: (participants ?? []).map((row) => row.user_id),
+    });
+    if (!decision.ok) return json(decision.status, { error: decision.error });
+
+    const recipientMuted = (participants ?? []).some((row) => row.user_id === recipient_id && row.is_muted);
+    if (recipientMuted) return json(200, { success: true, skipped: "muted" });
+
+    const { data: senderProfile } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("user_id", callerId)
+      .maybeSingle();
+    const sender_name = displayName(senderProfile?.display_name);
+    const message_preview = decision.preview;
+    const conversation_id = decision.conversationId;
+
+    console.log(`Processing DM notification for recipient: ${recipient_id} from caller: ${callerId}, conversation: ${conversation_id}`);
 
     // Get recipient's notification preferences
     const { data: preferences, error: prefError } = await supabase
@@ -386,7 +459,7 @@ serve(async (req) => {
   } catch (error: unknown) {
     console.error("Error in send-dm-notification function:", error);
     return new Response(JSON.stringify({ error: errorMessage(error) }), {
-      status: 500,
+      status: httpStatusForError(error),
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }

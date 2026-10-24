@@ -1,28 +1,28 @@
 import { useRef, useState } from 'react';
-import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { 
-  Settings, MapPin, Camera, Loader2, Sparkles, Crown, Heart,
-  ArrowLeft, MessageCircle, Edit, Shield, BadgeCheck, UserPlus, UserMinus, Users, Flag, Ban
+  Settings, MapPin, Camera, Loader2, Crown, Heart,
+  MessageCircle, Shield, BadgeCheck, UserPlus, UserMinus, Flag, Ban, Share2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
-import { ProfileEffects } from './ProfileEffects';
+import { errorMessage } from '@/lib/errorMessage';
 import type { ProfileCustomization } from '@/hooks/useProfileCustomization';
 import { useCreatorVerification } from '@/hooks/useCreatorVerification';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyXp } from '@/hooks/useXp';
+import { useXpCelebrate } from '@/hooks/useXpCelebrate';
+import { XpMeter } from '@/components/novi/XpMeter';
+import { Link } from 'react-router-dom';
 import { ReportDialog } from '@/components/safety/ReportDialog';
-import { MoreMenuButton } from '@/components/navigation/MoreMenu';
 import { FriendsDrawer } from '@/components/friends/FriendsDrawer';
-import type { ThemePreset } from '@/lib/profileThemes';
-import { THEME_PRESETS } from '@/lib/profileThemes';
+import { ShareSheet } from '@/components/share/ShareSheet';
+import { YourDashboard } from '@/components/profile/YourDashboard';
 
 // Component to show verification badge inline
 function ProfileVerificationBadge({ userId }: { userId: string }) {
@@ -51,6 +51,9 @@ interface ProfileHeaderProps {
   onAvatarUpdate: (url: string) => void;
   userId: string;
   memberTier: "community" | "elite" | null;
+  roleLabel?: string;
+  postCount?: number;
+  founding?: boolean;
 }
 
 export function ProfileHeader({
@@ -67,21 +70,47 @@ export function ProfileHeader({
   onAvatarUpdate,
   userId,
   memberTier,
+  roleLabel = "Creator",
+  postCount = 0,
+  founding = false,
 }: ProfileHeaderProps) {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const { isBlocked, blockUser, unblockUser } = useUserBlocks();
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
-  const { data: myXp } = useMyXp();
+  const { data: myXp, isSuccess: xpReady } = useMyXp();
+  const burst = useXpCelebrate(myXp?.total ?? 0, "", xpReady);
 
   const isUserFavorite = isFavorite(userId);
-  const friendsCount = favorites?.length || 0;
-
-  const themePreset = (customization?.theme_preset as ThemePreset) || 'clean_modern';
-  const theme = THEME_PRESETS[themePreset];
+  const ownFriends = favorites?.length || 0;
+  const { data: otherFriends = 0 } = useQuery({
+    queryKey: ["profile-friend-count", userId],
+    enabled: !!userId && !isOwnProfile,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("favorite_friends")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId);
+      if (error) return 0;
+      return count ?? 0;
+    },
+  });
+  const { data: projectCount = 0 } = useQuery({
+    queryKey: ["profile-project-count", userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("projects")
+        .select("id", { count: "exact", head: true })
+        .eq("creator_id", userId);
+      if (error) return 0;
+      return count ?? 0;
+    },
+  });
+  const friendsCount = isOwnProfile ? ownFriends : otherFriends;
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -106,270 +135,187 @@ export function ProfileHeader({
       toast.success('Profile picture updated!');
     } catch (error) {
       console.error('Avatar upload error:', error);
-      toast.error('Failed to upload profile picture');
+      toast.error(errorMessage(error, 'Failed to upload profile picture'));
     } finally {
       setUploadingAvatar(false);
     }
   };
 
-  const getBackgroundStyle = () => {
-    if (!customization) {
-      return "bg-gradient-to-br from-primary/20 via-background to-accent/10";
-    }
-    
-    if (customization.background_type === 'image') {
-      return "";
-    }
-    if (customization.background_type === 'color') {
-      return customization.background_value;
-    }
-    return `bg-gradient-to-br ${customization.background_value}`;
-  };
-
-  const backgroundImageStyle = customization?.background_type === 'image' 
-    ? { 
-        backgroundImage: `url(${customization.background_value})`, 
-        backgroundSize: 'cover', 
+  const coverImage = customization?.background_type === 'image' && customization.background_value
+    ? {
+        backgroundImage: `url(${customization.background_value})`,
+        backgroundSize: 'cover',
         backgroundPosition: 'center',
         filter: customization.background_blur ? `blur(${customization.background_blur}px)` : undefined,
         opacity: customization.background_opacity ?? 1,
       }
-    : {
-        opacity: customization?.background_opacity ?? 1,
-      };
+    : null;
 
   return (
-    <>
-      {/* Cover Section */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.6 }}
-        className={cn("relative h-44 sm:h-56 overflow-hidden", getBackgroundStyle())}
-      >
-        {customization?.background_type === 'image' && customization.background_value && (
-          <div className="absolute inset-0" style={backgroundImageStyle} />
-        )}
-
-        {customization?.overlay_tint && (
-          <div 
-            className="absolute inset-0"
-            style={{ 
-              backgroundColor: customization.overlay_tint,
-              opacity: customization.overlay_opacity ?? 0.3,
-            }}
-          />
-        )}
-
-        <ProfileEffects
-          grain={customization?.effect_grain}
-          scanlines={customization?.effect_scanlines}
-          neonGlow={customization?.effect_neon_glow}
-          holographic={customization?.effect_holographic}
-          motionGradient={customization?.effect_motion_gradient}
-        />
-
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
-        
-        {/* Top Actions */}
-        <div className="absolute top-4 left-4 right-4 flex justify-between z-10">
-          {!isOwnProfile ? (
-            <Button 
-              variant="glass" 
-              size="icon" 
-              className="w-10 h-10" 
-              onClick={() => {
-                if (window.history.length > 1) {
-                  navigate(-1);
-                } else {
-                  navigate('/feed');
-                }
-              }}
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          ) : (
-            <div />
-          )}
-          
+    <div className="px-4 pt-3">
+      <div className="flex min-h-11 items-center justify-between">
+        <p className="kicker">Familcy // Lcove</p>
+        <div className="flex items-center">
+          <Button variant="ghost" size="icon" onClick={() => setShareOpen(true)} aria-label="Share profile">
+            <Share2 className="h-5 w-5" />
+          </Button>
           {isOwnProfile && (
-            <div className="flex gap-2">
-              <MoreMenuButton className="bg-background/80 border border-border" />
-              <Button variant="outline" size="icon" className="bg-background/80" onClick={onCustomizeClick} aria-label="Customize profile">
-                <Sparkles className="w-5 h-5" />
-              </Button>
-              <Button variant="outline" size="icon" className="bg-background/80" onClick={onSettingsClick} aria-label="Settings">
-                <Settings className="w-5 h-5" />
-              </Button>
-            </div>
+            <Button variant="ghost" size="icon" onClick={onSettingsClick} aria-label="Settings">
+              <Settings className="h-5 w-5" />
+            </Button>
           )}
         </div>
-      </motion.div>
+      </div>
 
-      {/* Profile Info Section */}
-      <div className="px-5 -mt-14 relative z-10">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="flex items-end gap-4"
-        >
-          {/* Avatar */}
-          <div className="relative group flex-shrink-0">
-            <Avatar className="w-24 h-24 sm:w-28 sm:h-28 rounded-[2px] border border-border">
+      <div className="holo-card relative mt-2 overflow-hidden">
+        <div className="relative h-32">
+          {coverImage ? (
+            <div className="absolute inset-0" style={coverImage} />
+          ) : (
+            <div className="absolute inset-0 bg-[linear-gradient(115deg,#7d0610_0%,#c4142d_46%,#79c3cf_100%)]" />
+          )}
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,hsl(var(--card))_0%,transparent_58%)]" />
+        </div>
+        <div className="relative z-[1] -mt-10 px-4 pb-4">
+        <div className="flex items-end gap-3">
+          <div className="group relative shrink-0">
+            <Avatar className="h-24 w-24 rounded-full border-[3px] border-transparent bg-[conic-gradient(from_140deg,#FF9FC8,#C4142D,#79C3CF,#FF9FC8)] p-[3px] shadow-[0_0_24px_rgba(255,159,200,0.45)] ring-0 ring-offset-0">
               <AvatarImage src={avatarUrl || undefined} />
-              <AvatarFallback className="bg-muted text-muted-foreground text-2xl font-display">
+              <AvatarFallback className="rounded-full bg-muted font-body text-xl font-bold text-foreground">
                 {displayName.charAt(0).toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            
             {isOwnProfile && (
               <>
                 <button
+                  type="button"
                   onClick={() => avatarInputRef.current?.click()}
                   disabled={uploadingAvatar}
-                  className="absolute inset-0 rounded-full bg-background/70 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center cursor-pointer"
+                  className="absolute inset-0 flex items-center justify-center rounded-full bg-background/70 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+                  aria-label="Update profile photo"
                 >
-                  {uploadingAvatar ? (
-                    <Loader2 className="w-6 h-6 animate-spin text-foreground" />
-                  ) : (
-                    <Camera className="w-6 h-6 text-foreground" />
-                  )}
+                  {uploadingAvatar ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
                 </button>
-                <input
-                  ref={avatarInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarUpload}
-                  className="hidden"
-                />
+                <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
               </>
             )}
           </div>
-
-          {/* Name & Location */}
-          <div className="flex-1 pb-2 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="font-display text-2xl sm:text-3xl font-semibold text-foreground truncate">
-                {displayName}
-              </h1>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="ether-title min-w-0 max-w-full whitespace-normal break-words text-[24px] leading-tight">{displayName}</h1>
               <ProfileVerificationBadge userId={userId} />
               {memberTier === "elite" && (
-                <Badge className="bg-gradient-to-r from-amber-400 to-orange-500 text-white border-0 gap-1 text-xs">
-                  <Crown className="w-3 h-3" />
-                  Elite
+                <Badge className="gap-1 border-0 bg-gradient-to-r from-amber-400 to-orange-500 text-[10px] text-white">
+                  <Crown className="h-3 w-3" /> Elite
                 </Badge>
               )}
               {memberTier === "community" && (
-                <Badge className="bg-primary/20 text-primary border-primary/30 gap-1 text-xs">
-                  <Heart className="w-3 h-3" />
-                  Community
+                <Badge className="gap-1 border-primary/30 bg-primary/20 text-[10px] text-primary">
+                  <Heart className="h-3 w-3" /> Community
                 </Badge>
               )}
               {isProfileAdmin && (
-                <Badge className="bg-primary/20 text-primary border-primary/30 gap-1 text-xs">
-                  <Shield className="w-3 h-3" />
-                  Admin
+                <Badge className="gap-1 border-primary/30 bg-primary/20 text-[10px] text-primary">
+                  <Shield className="h-3 w-3" /> Admin
+                </Badge>
+              )}
+              {founding && (
+                <Badge className="gap-1 border-primary/30 bg-primary/20 text-[10px] text-primary">
+                  Founding
                 </Badge>
               )}
             </div>
-            
-            <div className="flex items-center gap-3 mt-1">
-              <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5" />
-                {city}
-              </p>
-              {isOwnProfile && myXp && (
-                <p className="text-sm text-muted-foreground">Level {myXp.level}</p>
-              )}
-              
-              {isOwnProfile && (
-                <FriendsDrawer>
-                  <button className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors">
-                    <Users className="w-3.5 h-3.5" />
-                    <span className="font-medium">{friendsCount}</span> friends
-                  </button>
-                </FriendsDrawer>
-              )}
-            </div>
+            <p className="lore text-[16px] text-foreground">{roleLabel}</p>
+            <p className="mono-label mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+              <MapPin className="h-3 w-3" /> {city}
+            </p>
           </div>
-        </motion.div>
+        </div>
 
-        {/* Action Buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-          className="flex gap-3 mt-5"
-        >
+        {isOwnProfile && (
+          <Link to="/quests" className="mt-3 block">
+            <XpMeter total={myXp?.total ?? 0} burstToken={burst} caption={roleLabel} dense />
+          </Link>
+        )}
+
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="file-panel min-h-11 rounded-[12px] px-2 py-2 text-center">
+            <span className="block font-body text-[19px] font-extrabold text-foreground">{postCount}</span>
+            <span className="mono-label text-[8px] text-muted-foreground">Posts</span>
+          </div>
           {isOwnProfile ? (
-            <Button 
-              variant="outline" 
-              className="flex-1 h-11"
-              onClick={onEditProfileClick}
-            >
-              <Edit className="w-4 h-4 mr-2" />
-              Edit Profile
-            </Button>
+            <FriendsDrawer>
+              <button type="button" className="file-panel min-h-11 w-full rounded-[12px] px-2 py-2 text-center">
+                <span className="block font-body text-[19px] font-extrabold text-foreground">{friendsCount}</span>
+                <span className="mono-label text-[8px] text-muted-foreground">Friends</span>
+              </button>
+            </FriendsDrawer>
+          ) : (
+            <div className="file-panel min-h-11 rounded-[12px] px-2 py-2 text-center">
+              <span className="block font-body text-[19px] font-extrabold text-foreground">{friendsCount}</span>
+              <span className="mono-label text-[8px] text-muted-foreground">Friends</span>
+            </div>
+          )}
+          <div className="file-panel min-h-11 rounded-[12px] px-2 py-2 text-center">
+            <span className="block font-body text-[19px] font-extrabold text-foreground">{projectCount}</span>
+            <span className="mono-label text-[8px] text-muted-foreground">Projects</span>
+          </div>
+        </div>
+
+        <div className="relative z-[1] mt-3 flex gap-2">
+          {isOwnProfile ? (
+            <>
+              <Button className="h-11 flex-1" onClick={onEditProfileClick}>Edit profile</Button>
+              <Button variant="outline" className="h-11 flex-1" onClick={onCustomizeClick}>Customize</Button>
+            </>
           ) : (
             <>
-              <Button 
-                variant="default" 
-                className="flex-1 h-11"
-                onClick={onMessageClick}
-              >
-                <MessageCircle className="w-4 h-4 mr-2" />
-                Message
+              <Button className="h-11 flex-1" onClick={onMessageClick}>
+                <MessageCircle className="h-4 w-4" /> Message
               </Button>
-              <Button 
+              <Button
                 variant={isUserFavorite ? "outline" : "secondary"}
                 className="h-11"
                 onClick={() => toggleFavorite(userId)}
               >
-                {isUserFavorite ? (
-                  <>
-                    <UserMinus className="w-4 h-4 mr-2" />
-                    Remove
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Add Friend
-                  </>
-                )}
+                {isUserFavorite ? <UserMinus className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                {isUserFavorite ? "Remove" : "Add friend"}
               </Button>
             </>
           )}
-        </motion.div>
+        </div>
+
+        {isOwnProfile && <YourDashboard />}
+
         {!isOwnProfile && user && (
-          <div className="flex gap-2 mt-3">
+          <div className="relative z-[1] mt-2 flex gap-2">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => {
-                if (isBlocked(userId)) {
-                  unblockUser.mutate(userId);
-                } else {
-                  blockUser.mutate(userId);
-                }
+                if (isBlocked(userId)) unblockUser.mutate(userId);
+                else blockUser.mutate(userId);
               }}
             >
-              <Ban className="w-4 h-4 mr-2" />
-              {isBlocked(userId) ? 'Unblock' : 'Block'}
+              <Ban className="h-4 w-4" />
+              {isBlocked(userId) ? "Unblock" : "Block"}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setReportOpen(true)}>
-              <Flag className="w-4 h-4 mr-2" />
-              Report
+              <Flag className="h-4 w-4" /> Report
             </Button>
-            <ReportDialog
-              open={reportOpen}
-              onOpenChange={setReportOpen}
-              targetType="profile"
-              targetId={userId}
-            />
+            <ReportDialog open={reportOpen} onOpenChange={setReportOpen} targetType="profile" targetId={userId} />
           </div>
         )}
+        </div>
       </div>
-    </>
+      <ShareSheet
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        target={{
+          kind: 'profile',
+          profile: { user_id: userId, display_name: displayName, avatar_url: avatarUrl },
+        }}
+      />
+    </div>
   );
 }

@@ -12,11 +12,14 @@ const SheetOverlay = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Ove
   ...props
 }, ref) => <SheetPrimitive.Overlay className={cn("fixed inset-0 z-50 bg-background/80 backdrop-blur-md", "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out", className)} {...props} ref={ref} />);
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
+const sheetContain =
+  "box-border min-w-0 overflow-x-hidden break-words [&>*]:min-w-0 [&_input]:min-w-0 [&_input]:max-w-full [&_textarea]:min-w-0 [&_textarea]:max-w-full [&_select]:min-w-0 [&_select]:max-w-full [&_img]:min-w-0 [&_img]:max-w-full [&_button]:min-w-0 [&_button]:max-w-full [&_button]:whitespace-normal [&_label]:min-w-0 [&_label]:max-w-full";
+
 const sheetVariants = cva("fixed z-50 gap-4 bg-card border-border/50 p-6 shadow-elevated transition-all ease-smooth data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-400", {
   variants: {
     side: {
       top: "inset-x-0 top-0 border-b rounded-b-2xl data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
-      bottom: "inset-x-0 bottom-0 border-t rounded-t-2xl data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+      bottom: "inset-x-0 bottom-0 border-t rounded-t-[28px] data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
       left: "inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-md",
       right: "inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-md"
     }
@@ -25,19 +28,34 @@ const sheetVariants = cva("fixed z-50 gap-4 bg-card border-border/50 p-6 shadow-
     side: "right"
   }
 });
-interface SheetContentProps extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>, VariantProps<typeof sheetVariants> {}
+interface SheetContentProps extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>, VariantProps<typeof sheetVariants> {
+  overlayClassName?: string;
+  overlayStyle?: React.CSSProperties;
+}
 const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Content>, SheetContentProps>(({
   side = "right",
   className,
   children,
+  overlayClassName,
+  overlayStyle,
+  style,
   ...props
 }, ref) => <SheetPortal>
-      <SheetOverlay />
+      <SheetOverlay className={overlayClassName} style={overlayStyle} />
       <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({
     side
-  }), "scrollbar-thin overflow-y-auto", className)} {...props}>
+  }), "scrollbar-thin overflow-y-auto", sheetContain, className)} style={{
+    ...style,
+    boxSizing: "border-box",
+    minWidth: 0,
+  }} {...props}>
+        <SheetPrimitive.Close
+          className="absolute right-3 top-3 z-20 inline-flex !min-h-11 !min-w-11 items-center justify-center rounded-md text-foreground hover:bg-muted"
+          aria-label="Close"
+        >
+          <X className="h-5 w-5" />
+        </SheetPrimitive.Close>
         {children}
-        
       </SheetPrimitive.Content>
     </SheetPortal>);
 SheetContent.displayName = SheetPrimitive.Content.displayName;

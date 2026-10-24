@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useEnergy, ENERGY_GAINS } from "@/hooks/useEnergy";
+import { parseCalendarDate } from "@/lib/calendarDate";
+import { refreshXp } from "@/lib/xpRefresh";
 
 export interface CalendarEvent {
   id: string;
@@ -69,6 +71,9 @@ export interface Project {
   timeline_end: string | null;
   status: string;
   creator_id: string;
+  created_at: string;
+  is_private: boolean;
+  hide_from_calendar: boolean;
 }
 
 export interface CalendarItem {
@@ -167,12 +172,12 @@ export function useEventWithRSVP(eventId: string) {
       
       if (error) throw error;
 
-      // Get RSVP count
-      const { count } = await supabase
-        .from('event_rsvps')
-        .select('*', { count: 'exact', head: true })
-        .eq('event_id', eventId)
-        .eq('status', 'going');
+      // Headcount bypasses RSVP row visibility. A member only sees their own row.
+      const { data: attendance, error: attendanceError } = await supabase.rpc(
+        'public_event_attendance_count',
+        { p_event_id: eventId },
+      );
+      if (attendanceError) throw attendanceError;
 
       // Get user's RSVP if logged in
       let userRsvp = null;
@@ -199,7 +204,7 @@ export function useEventWithRSVP(eventId: string) {
 
       return {
         ...event,
-        rsvp_count: count || 0,
+        rsvp_count: attendance ?? 0,
         user_rsvp: userRsvp,
         organizer,
       } as CalendarEvent;
@@ -235,10 +240,11 @@ export function useProjects() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('projects')
-        .select('id, title, description, timeline_start, timeline_end, status, creator_id')
-        .not('timeline_start', 'is', null)
-        .in('status', ['open', 'in_progress'])
-        .order('timeline_start', { ascending: true });
+        .select('id, title, description, timeline_start, timeline_end, status, creator_id, created_at, is_private, hide_from_calendar')
+        .eq('is_private', false)
+        .eq('hide_from_calendar', false)
+        .in('status', ['open', 'in_progress', 'completed'])
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
       return data as Project[];
@@ -260,23 +266,23 @@ export function useCalendarItems(filters?: { city?: string; state?: string; type
 
   if (showEvents && events) {
     events.forEach(event => {
+      if (showProjects && event.project_id) return;
       items.push(...expandCommunityEvent(event));
     });
   }
 
   if (showProjects && projects) {
     projects.forEach(project => {
-      if (project.timeline_start) {
-        items.push({
-          id: project.id,
-          type: 'project',
-          title: project.title,
-          start_date: project.timeline_start,
-          end_date: project.timeline_end,
-          color: '#8B4513', // brown for projects
-          data: project,
-        });
-      }
+      const start = project.timeline_start || project.created_at;
+      items.push({
+        id: project.id,
+        type: 'project',
+        title: project.title,
+        start_date: parseCalendarDate(start).toISOString(),
+        end_date: project.timeline_end ? parseCalendarDate(project.timeline_end).toISOString() : null,
+        color: '#79C3CF',
+        data: project,
+      });
     });
   }
 
@@ -303,7 +309,7 @@ export function useRSVP() {
   const { earnEnergy } = useEnergy();
 
   const rsvpMutation = useMutation({
-    mutationFn: async ({ eventId, status }: { eventId: string; status: string }) => {
+    mutationFn: async ({ eventId, status, campaignId }: { eventId: string; status: string; campaignId?: string | null }) => {
       if (!user) throw new Error('Must be logged in to RSVP');
 
       const { data: existing } = await supabase
@@ -315,17 +321,22 @@ export function useRSVP() {
 
       const reminderEnabled = status === 'interested' ? true : undefined;
       let rsvpId = existing?.id;
+      let settled = status;
 
       if (existing) {
         const updateData: Record<string, unknown> = { status };
         if (reminderEnabled !== undefined) {
           updateData.reminder_enabled = reminderEnabled;
         }
-        const { error } = await supabase
+        if (campaignId) updateData.campaign_id = campaignId;
+        const { data: updated, error } = await supabase
           .from('event_rsvps')
           .update(updateData)
-          .eq('id', existing.id);
+          .eq('id', existing.id)
+          .select('id, status')
+          .single();
         if (error) throw error;
+        settled = updated.status;
       } else {
         const { data: inserted, error } = await supabase
           .from('event_rsvps')
@@ -333,25 +344,39 @@ export function useRSVP() {
             event_id: eventId,
             user_id: user.id,
             status,
-            reminder_enabled: status === 'interested' ? true : true,
+            reminder_enabled: true,
+            ...(campaignId ? { campaign_id: campaignId } : {}),
           })
-          .select('id')
+          .select('id, status')
           .single();
         if (error) throw error;
         rsvpId = inserted.id;
+        settled = inserted.status;
       }
 
-      return { rsvpId, status };
+      return { rsvpId, status: settled };
     },
-    onSuccess: async ({ rsvpId }, { eventId, status }) => {
+    onSuccess: async ({ rsvpId, status }, { eventId }) => {
       queryClient.invalidateQueries({ queryKey: ['event', eventId] });
       queryClient.invalidateQueries({ queryKey: ['events'] });
       queryClient.invalidateQueries({ queryKey: ['my-rsvps'] });
+      queryClient.invalidateQueries({ queryKey: ['my-event-rsvp', eventId] });
+      queryClient.invalidateQueries({ queryKey: ['public-event-attendee-count', eventId] });
+      queryClient.invalidateQueries({ queryKey: ['event-attendees-v2', eventId] });
+      queryClient.invalidateQueries({ queryKey: ['event-seat-counts'] });
 
       if (status === 'interested') {
         toast.success('Marked as interested! Reminder enabled.');
+      } else if (status === 'waitlist') {
+        toast.success("You're on the waitlist. We'll email you if a seat opens.");
+        if (rsvpId) {
+          supabase.functions.invoke('send-rsvp-confirmation', {
+            body: { event_id: eventId, rsvp_id: rsvpId },
+          }).catch((err) => console.error('Failed to send waitlist email:', err));
+        }
       } else if (status === 'going') {
         toast.success("You're going!");
+        refreshXp(queryClient);
 
         // Fire-and-forget confirmation email
         if (rsvpId) {
@@ -480,21 +505,11 @@ export function useCreateEvent() {
       
       if (error) throw error;
 
-      // Get creator name for notification
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('display_name')
-        .eq('user_id', user.id)
-        .single();
-
       // Notify opted-in users about the new event
       supabase.functions.invoke('notify-new-content', {
         body: {
           content_type: 'event',
           content_id: createdEvent.id,
-          title: event.title,
-          description: event.description,
-          creator_name: profile?.display_name || 'A creator'
         }
       }).catch(err => console.error('Failed to send new event notifications:', err));
 

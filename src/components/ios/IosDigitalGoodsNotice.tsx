@@ -1,4 +1,4 @@
-import { isIosApp } from "@/lib/platform";
+import { digitalPurchasesEnabled } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 
 interface IosDigitalGoodsNoticeProps {
@@ -8,15 +8,15 @@ interface IosDigitalGoodsNoticeProps {
 }
 
 /**
- * Shown in place of Stripe checkout buttons on iOS.
- * No external purchase link: Apple has to approve that separately.
+ * Shown in place of Stripe checkout on iOS when the App Store storefront
+ * is not USA. The US storefront uses Safari instead of this notice.
  */
 export function IosDigitalGoodsNotice({
   variant = "full",
   kind = "purchase",
   className,
 }: IosDigitalGoodsNoticeProps) {
-  if (!isIosApp()) return null;
+  if (digitalPurchasesEnabled()) return null;
 
   const text =
     kind === "donation"

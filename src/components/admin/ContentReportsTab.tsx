@@ -4,14 +4,24 @@ import { formatDistanceToNow } from "date-fns";
 import { Flag } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { fromUntyped } from "@/lib/safetyTables";
-import type { ReportStatus, ReportTargetType } from "@/lib/reportReasons";
+import { callRpc } from "@/lib/rpc";
+import { isAiViolationReport, type ReportStatus, type ReportTargetType } from "@/lib/reportReasons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ContentReportRow {
   id: string;
@@ -25,10 +35,14 @@ interface ContentReportRow {
   reporter_name?: string | null;
 }
 
+type ReviewAction = "resolve" | "dismiss" | "hide" | "remove" | "hard_delete";
+
 export function ContentReportsTab() {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [aiOnly, setAiOnly] = useState(false);
+  const [hardTarget, setHardTarget] = useState<ContentReportRow | null>(null);
+  const [confirmId, setConfirmId] = useState("");
 
   const { data: reports = [], isLoading } = useQuery({
     queryKey: ["content-reports"],
@@ -53,30 +67,42 @@ export function ContentReportsTab() {
     },
   });
 
-  const updateStatus = async (id: string, status: "actioned" | "dismissed") => {
-    if (!user) return;
-    setUpdatingId(id);
-    const { error } = await fromUntyped("content_reports")
-      .update({
-        status,
-        reviewed_by: user.id,
-        reviewed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-    setUpdatingId(null);
-
-    if (error) {
-      toast.error("Could not update the report");
-      return;
-    }
-
-    toast.success(status === "actioned" ? "Marked actioned" : "Dismissed");
+  const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["content-reports"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-actions"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-dashboard-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-user-data"] });
   };
 
-  const openReports = reports.filter((report) => report.status === "open");
-  const closedReports = reports.filter((report) => report.status !== "open");
+  const review = async (report: ContentReportRow, action: ReviewAction, confirm?: string) => {
+    setUpdatingId(report.id);
+    try {
+      await callRpc("admin_review_report", {
+        p_report_id: report.id,
+        p_action: action,
+        p_reason: report.reason,
+        p_confirm: confirm ?? null,
+      });
+      toast.success(
+        action === "dismiss" ? "Dismissed" :
+        action === "resolve" ? "Resolved" :
+        action === "hide" ? "Hidden" :
+        action === "hard_delete" ? "Permanently deleted" :
+        "Removed"
+      );
+      refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update the report");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const visible = aiOnly ? reports.filter((report) => isAiViolationReport(report.reason)) : reports;
+  const openReports = visible
+    .filter((report) => report.status === "open")
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const closedReports = visible.filter((report) => report.status !== "open");
 
   if (isLoading) {
     return (
@@ -87,29 +113,63 @@ export function ContentReportsTab() {
   }
 
   return (
-    <ScrollArea className="h-[520px]">
-      {reports.length === 0 ? (
-        <div className="text-center py-12">
-          <Flag className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-muted-foreground">No reports</p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          <ReportList
-            title="Open"
-            reports={openReports}
-            updatingId={updatingId}
-            onUpdate={updateStatus}
-          />
-          <ReportList
-            title="Reviewed"
-            reports={closedReports}
-            updatingId={updatingId}
-            onUpdate={updateStatus}
-          />
-        </div>
-      )}
-    </ScrollArea>
+    <div className="space-y-3">
+      <Button size="sm" variant={aiOnly ? "default" : "outline"} onClick={() => setAiOnly((value) => !value)}>
+        AI-rule violations
+      </Button>
+      <ScrollArea className="h-[520px]">
+        {visible.length === 0 ? (
+          <div className="text-center py-12">
+            <Flag className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">{aiOnly ? "No AI-rule reports" : "No reports"}</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <ReportList title="Open" reports={openReports} updatingId={updatingId} onReview={review} onHardDelete={(report) => { setConfirmId(""); setHardTarget(report); }} />
+            <ReportList title="Reviewed" reports={closedReports} updatingId={updatingId} />
+          </div>
+        )}
+      </ScrollArea>
+
+      <Dialog open={!!hardTarget} onOpenChange={(open) => { if (!open) setHardTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Permanently delete this {hardTarget?.target_type}?</DialogTitle>
+            <DialogDescription>
+              The first remove hides it. This deletes the row. Paste the target id to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Target id</Label>
+            <Input value={confirmId} onChange={(event) => setConfirmId(event.target.value.trim())} placeholder={hardTarget?.target_id} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHardTarget(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={!hardTarget || confirmId !== hardTarget.target_id || updatingId === hardTarget.id}
+              onClick={async () => {
+                if (!hardTarget) return;
+                await review(hardTarget, "hard_delete", confirmId);
+                setHardTarget(null);
+              }}
+            >
+              Delete permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function ReportDeadline({ createdAt }: { createdAt: string }) {
+  const due = new Date(createdAt).getTime() + 24 * 60 * 60 * 1000;
+  const overdue = Date.now() > due;
+  return (
+    <span className={overdue ? "text-destructive" : undefined}>
+      {" "}· {overdue ? "Overdue" : "Act within 24h"}
+    </span>
   );
 }
 
@@ -117,61 +177,62 @@ function ReportList({
   title,
   reports,
   updatingId,
-  onUpdate,
+  onReview,
+  onHardDelete,
 }: {
   title: string;
   reports: ContentReportRow[];
   updatingId: string | null;
-  onUpdate: (id: string, status: "actioned" | "dismissed") => void;
+  onReview?: (report: ContentReportRow, action: ReviewAction) => void;
+  onHardDelete?: (report: ContentReportRow) => void;
 }) {
   if (reports.length === 0) return null;
 
   return (
     <div className="space-y-2">
       <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
-      {reports.map((report) => (
-        <Card key={report.id}>
-          <CardContent className="p-3 space-y-2">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant={report.status === "open" ? "destructive" : "secondary"}>
-                    {report.status}
-                  </Badge>
-                  <Badge variant="outline">{report.target_type}</Badge>
-                  <span className="text-sm font-medium">{report.reason}</span>
+      {reports.map((report) => {
+        const profile = report.target_type === "profile";
+        return (
+          <Card key={report.id}>
+            <CardContent className="p-3 space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant={report.status === "open" ? "destructive" : "secondary"}>{report.status}</Badge>
+                <Badge variant="outline">{report.target_type}</Badge>
+                {isAiViolationReport(report.reason) && <Badge variant="destructive">AI rule</Badge>}
+                <span className="text-sm font-medium">{report.reason}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {report.reporter_name || "Member"} · {formatDistanceToNow(new Date(report.created_at), { addSuffix: true })}
+                {report.status === "open" && <ReportDeadline createdAt={report.created_at} />}
+              </p>
+              {report.details && <p className="text-sm whitespace-pre-wrap">{report.details}</p>}
+              <p className="text-xs text-muted-foreground break-all">Target {report.target_id}</p>
+              {report.status === "open" && onReview && (
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" disabled={updatingId === report.id} onClick={() => onReview(report, "resolve")}>
+                    Resolve
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={updatingId === report.id} onClick={() => onReview(report, "dismiss")}>
+                    Dismiss
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={updatingId === report.id} onClick={() => onReview(report, "hide")}>
+                    {profile ? "Suspend member" : "Hide"}
+                  </Button>
+                  <Button size="sm" disabled={updatingId === report.id} onClick={() => onReview(report, "remove")}>
+                    {profile ? "Remove member" : "Remove"}
+                  </Button>
+                  {onHardDelete && (
+                    <Button size="sm" variant="destructive" disabled={updatingId === report.id} onClick={() => onHardDelete(report)}>
+                      Delete permanently
+                    </Button>
+                  )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {report.reporter_name || "Member"} · {formatDistanceToNow(new Date(report.created_at), { addSuffix: true })}
-                </p>
-              </div>
-            </div>
-            {report.details && (
-              <p className="text-sm text-foreground whitespace-pre-wrap">{report.details}</p>
-            )}
-            <p className="text-xs text-muted-foreground break-all">Target {report.target_id}</p>
-            {report.status === "open" && (
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => onUpdate(report.id, "actioned")}
-                  disabled={updatingId === report.id}
-                >
-                  Mark actioned
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onUpdate(report.id, "dismissed")}
-                  disabled={updatingId === report.id}
-                >
-                  Dismiss
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ))}
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }

@@ -5,6 +5,8 @@ import { Search, Plus, Users, MoreVertical, BellOff, Bell, MessageSquare, Trash2
 import { useAuth } from '@/contexts/AuthContext';
 import { useConversations } from '@/hooks/useConversations';
 import { usePresence } from '@/hooks/usePresence';
+import { shotOnline, shotSessionEnabled } from '@/lib/shotSession';
+import { messagePreview } from '@/lib/shareCard';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +17,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreMenuButton } from '@/components/navigation/MoreMenu';
 
 interface ConversationListProps {
   selectedId: string | null;
@@ -27,7 +28,8 @@ interface ConversationListProps {
 const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversation }: ConversationListProps) => {
   const { user } = useAuth();
   const { conversations, isLoading, toggleMute, deleteConversation } = useConversations();
-  const { isOnline } = usePresence();
+  const { isOnline: presenceOnline } = usePresence();
+  const isOnline = (userId: string) => (shotSessionEnabled() ? shotOnline(userId) : presenceOnline(userId));
   const [search, setSearch] = useState('');
 
   const isConversationMuted = (conv: typeof conversations[0]) =>
@@ -56,13 +58,18 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
     if (conv.last_message.media_type === 'image') return '📷 Photo';
     if (conv.last_message.media_type === 'video') return '🎥 Video';
     if (conv.last_message.media_type === 'audio') return '🎵 Audio';
-    return conv.last_message.content || 'Message';
+    return messagePreview(conv.last_message.content) || conv.last_message.content || 'Message';
   };
 
   const filteredConversations = conversations.filter(conv => {
     const name = getConversationName(conv).toLowerCase();
     return name.includes(search.toLowerCase());
   });
+
+  const onlineNow = conversations.filter((conv) => {
+    const otherId = getOtherUserId(conv);
+    return otherId ? isOnline(otherId) : false;
+  }).slice(0, 8);
 
   if (!user) {
     return (
@@ -75,34 +82,58 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-border">
-        <div className="flex items-start justify-between gap-2 mb-4">
+      <div className="border-b border-border p-4">
+        <div className="mb-3 flex items-start justify-between gap-2">
           <div>
-            <p className="eyebrow">Inbox</p>
-            <h1 className="ether-title text-3xl text-foreground">Messages</h1>
+            <p className="kicker">// Encrypted channel</p>
+            <h1 className="ether-title text-[34px] text-foreground">Messages</h1>
           </div>
-          <div className="flex items-center">
-            <Button variant="ghost" size="icon" onClick={onNewChat} aria-label="New message">
-              <Plus className="w-5 h-5" />
-            </Button>
-            <MoreMenuButton />
-          </div>
+          <Button variant="ghost" size="icon" onClick={onNewChat} aria-label="New message">
+            <Plus className="h-5 w-5" />
+          </Button>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search conversations..."
+            placeholder="SEARCH"
+            aria-label="Search conversations"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 bg-muted/30 border-border/50"
+            className="h-11 rounded-[14px] border-border bg-input pl-10 font-mono text-[12px] uppercase tracking-[0.14em]"
           />
+        </div>
+
+        <div>
+            <p className="kicker mb-2">// Active now</p>
+          {onlineNow.length === 0 ? (
+            <p className="pb-1 text-sm text-muted-foreground">Nobody is online</p>
+          ) : (
+          <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+          {onlineNow.map((conv) => (
+            <button
+              key={conv.id}
+              type="button"
+              onClick={() => onSelect(conv.id)}
+              className="flex w-16 shrink-0 flex-col items-center gap-1"
+            >
+              <span className="relative rounded-full bg-[conic-gradient(from_140deg,#FF9FC8,#8B7CFF,#79C3CF,#FF9FC8)] p-[2px]">
+                <Avatar className="h-14 w-14 rounded-full border-2 border-card">
+                  <AvatarImage src={getConversationAvatar(conv) || undefined} />
+                  <AvatarFallback className="rounded-full font-body text-sm font-extrabold">{getConversationName(conv).charAt(0)}</AvatarFallback>
+                </Avatar>
+                <OnlineIndicator isOnline size="sm" className="absolute bottom-0 right-0" />
+              </span>
+              <span className="w-full truncate text-center font-body text-[10px] text-foreground">{getConversationName(conv).split(" ")[0]}</span>
+            </button>
+          ))}
+          </div>
+          )}
         </div>
       </div>
 
-      {/* Conversations List */}
       <div className="flex-1 overflow-y-auto">
+        <p className="kicker px-4 pt-3">// Chats</p>
         {isLoading ? (
           <div className="p-4 space-y-4">
             {[...Array(5)].map((_, i) => (
@@ -149,14 +180,16 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
         ) : (
           <AnimatePresence>
             {filteredConversations.map((conv) => (
-              <motion.button
+              <motion.div
                 key={conv.id}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
+                className={`flex w-full items-center ${selectedId === conv.id ? "bg-accent/40" : ""}`}
+              >
+              <button
+                type="button"
                 onClick={() => onSelect(conv.id)}
-                className={`w-full flex items-center gap-3 p-4 hover:bg-accent/30 transition-colors text-left ${
-                  selectedId === conv.id ? 'bg-accent/40' : ''
-                }`}
+                className="flex min-w-0 flex-1 items-center gap-3 p-4 text-left transition-colors hover:bg-accent/30"
               >
                 <div className="relative">
                   <Avatar className="w-12 h-12 border-2 border-border/50">
@@ -200,9 +233,21 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
                   <p className={`text-xs truncate ${
                     conv.unread_count > 0 ? 'text-foreground/70 font-medium' : 'text-muted-foreground'
                   }`}>
+                    {conv.project_id ? (
+                    <span className="mono-label mr-1 rounded-full border border-[hsl(var(--scan))] px-1.5 text-[8px] text-[hsl(var(--scan))]">Project</span>
+                  ) : conv.type === "group" ? (
+                    <span className="mono-label mr-1 rounded-full border border-border px-1.5 text-[8px]">Group</span>
+                  ) : null}
+                  {conv.parent_conversation_id ? (
+                      <span className="mono-label text-[9px] text-muted-foreground">Subgroup · </span>
+                    ) : null}
+                    {conv.oversight ? (
+                      <span className="mono-label text-[9px] text-muted-foreground">Owner view · </span>
+                    ) : null}
                     {getLastMessagePreview(conv)}
                   </p>
                 </div>
+              </button>
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -246,7 +291,7 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </motion.button>
+              </motion.div>
             ))}
           </AnimatePresence>
         )}

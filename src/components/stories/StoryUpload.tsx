@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 
 interface StoryUploadProps {
@@ -57,6 +58,7 @@ const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
       <DialogContent className="sm:max-w-md bg-card border-border">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Add to Story</DialogTitle>
+          <DialogDescription className="sr-only">Upload a photo or video for your story</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

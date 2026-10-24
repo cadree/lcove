@@ -5,16 +5,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import OnboardingIntro from '@/components/onboarding/OnboardingIntro';
 import OnboardingName from '@/components/onboarding/OnboardingName';
 import OnboardingPassions from '@/components/onboarding/OnboardingPassions';
 import OnboardingCity from '@/components/onboarding/OnboardingCity';
-import OnboardingSkills from '@/components/onboarding/OnboardingSkills';
-import OnboardingRoles from '@/components/onboarding/OnboardingRoles';
 import OnboardingQuestionnaire from '@/components/onboarding/OnboardingQuestionnaire';
-import OnboardingConnections from '@/components/onboarding/OnboardingConnections';
-import OnboardingCompletion from '@/components/onboarding/OnboardingCompletion';
 import { buildUserPassionInserts } from '@/lib/onboardingPassions';
+import { scoreRedFlags, clearQuizSeed, type ChoiceId } from '@/lib/onboardingQuiz';
+import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from '@/lib/onboardingDraft';
 
 export interface OnboardingData {
   displayName: string;
@@ -47,7 +44,6 @@ const Onboarding = () => {
     roles: [],
     questionnaireResponses: {}
   });
-  const [accessLevel, setAccessLevel] = useState<'level_1' | 'level_2' | 'level_3' | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -65,29 +61,34 @@ const Onboarding = () => {
     }
   }, [profile]);
 
-  // Handle redirect for completed onboarding users
+  // Resume a mid-onboarding refresh. Completed profiles still go to the feed.
   useEffect(() => {
-    if (!profileLoading && !initialized && profile) {
-      setInitialized(true);
-      if (profile.onboarding_completed && profile.access_status !== 'banned') {
-        navigate('/feed');
-      }
+    if (authLoading || profileLoading || initialized || !user) return;
+    setInitialized(true);
+    if (profile?.onboarding_completed && profile.access_status !== 'banned') {
+      clearOnboardingDraft(window.localStorage, user.id);
+      navigate('/feed');
+      return;
     }
-  }, [profile, profileLoading, initialized, navigate]);
+    const draft = readOnboardingDraft(window.localStorage, user.id);
+    if (draft) {
+      setCurrentStep(draft.step);
+      setData(draft.data);
+    }
+  }, [authLoading, profile, profileLoading, initialized, navigate, user]);
 
-  // Scoring: A=1, B=2, C=3 points per question
-  // Threshold: >= 20 points (out of 30 max for 10 questions) = Level 2 (Accepted)
-  const ACCEPTANCE_THRESHOLD = 20;
+  useEffect(() => {
+    if (!user || !initialized || profile?.onboarding_completed) return;
+    writeOnboardingDraft(window.localStorage, user.id, { step: currentStep, data });
+  }, [user, initialized, profile?.onboarding_completed, currentStep, data]);
 
-  const calculateMindsetLevel = (responses: Record<number, 'A' | 'B' | 'C'>): {
+  const calculateMindsetLevel = (responses: Record<number, ChoiceId>): {
     level: 1 | 2;
     score: number;
+    passed: boolean;
   } => {
-    const score = Object.values(responses).reduce((sum, ans) => {
-      return sum + (ans === 'A' ? 1 : ans === 'B' ? 2 : 3);
-    }, 0);
-    const level = score >= ACCEPTANCE_THRESHOLD ? 2 : 1;
-    return { level, score };
+    const result = scoreRedFlags(responses);
+    return { level: result.level, score: result.score, passed: result.passed };
   };
 
   const handleComplete = async () => {
@@ -100,13 +101,11 @@ const Onboarding = () => {
         description: 'Please go back and enter your name to complete onboarding.',
         variant: 'destructive'
       });
-      setCurrentStep(1); // Go back to name step
+      setCurrentStep(0);
       return;
     }
 
-    const { level, score } = calculateMindsetLevel(data.questionnaireResponses);
-    const passedExam = score >= ACCEPTANCE_THRESHOLD;
-    setAccessLevel(passedExam ? 'level_2' : 'level_1');
+    const { level, score, passed: passedExam } = calculateMindsetLevel(data.questionnaireResponses);
 
     try {
       // Save questionnaire responses
@@ -134,34 +133,40 @@ const Onboarding = () => {
         if (error) throw error;
       }
 
-      // Save skills
-      const { data: skills } = await supabase
-        .from('skills')
-        .select('id, name')
-        .in('name', data.skills);
-      if (skills && skills.length > 0) {
-        await supabase.from('user_skills').upsert(
-          skills.map(s => ({ user_id: user.id, skill_id: s.id })),
-          { onConflict: 'user_id,skill_id' }
-        );
+      // Tools and roles are no longer asked. A resumed draft can still save
+      // values the person already chose. Empty lists skip the query.
+      if (data.skills.length > 0) {
+        const { data: skills } = await supabase
+          .from('skills')
+          .select('id, name')
+          .in('name', data.skills);
+        if (skills && skills.length > 0) {
+          await supabase.from('user_skills').upsert(
+            skills.map(s => ({ user_id: user.id, skill_id: s.id })),
+            { onConflict: 'user_id,skill_id' }
+          );
+        }
       }
 
-      // Save creative roles
-      const { data: roles } = await supabase
-        .from('creative_roles')
-        .select('id, name')
-        .in('name', data.roles);
-      if (roles && roles.length > 0) {
-        await supabase.from('user_creative_roles').upsert(
-          roles.map(r => ({ user_id: user.id, role_id: r.id })),
-          { onConflict: 'user_id,role_id' }
-        );
+      if (data.roles.length > 0) {
+        const { data: roles } = await supabase
+          .from('creative_roles')
+          .select('id, name')
+          .in('name', data.roles);
+        if (roles && roles.length > 0) {
+          await supabase.from('user_creative_roles').upsert(
+            roles.map(r => ({ user_id: user.id, role_id: r.id })),
+            { onConflict: 'user_id,role_id' }
+          );
+        }
       }
 
       sessionStorage.setItem('onboarding_just_completed', 'true');
+      clearQuizSeed(window.sessionStorage);
+      clearOnboardingDraft(window.localStorage, user.id);
 
-      // Finishing onboarding always grants access. The score is stored
-      // and passed_exam is derived (score >= 20). It does not lock anyone out.
+      // Finishing onboarding always grants access. passed_exam records
+      // whether the red-flag count stayed under the threshold.
       await updateProfile({
         display_name: data.displayName.trim(),
         city: data.city,
@@ -171,12 +176,13 @@ const Onboarding = () => {
         access_level: passedExam ? 'level_2' : 'level_1',
         onboarding_completed: true,
         mindset_level: level,
+        onboarding_level: level,
         access_status: 'active',
         onboarding_score: score,
         passed_exam: passedExam,
       });
 
-      setCurrentStep(7);
+      navigate('/feed', { replace: true });
     } catch (error) {
       console.error('Error saving onboarding data:', error);
       toast({
@@ -207,21 +213,15 @@ const Onboarding = () => {
   }
 
   const steps = [
-    <OnboardingIntro key="intro" onNext={nextStep} />,
-    <OnboardingName 
-      key="name" 
-      displayName={data.displayName} 
-      updateName={(name) => updateData({ displayName: name })} 
-      onNext={nextStep} 
-      onBack={prevStep} 
+    <OnboardingName
+      key="name"
+      displayName={data.displayName}
+      updateName={(name) => updateData({ displayName: name })}
+      onNext={nextStep}
     />,
     <OnboardingPassions key="passions" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingCity key="city" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
-    <OnboardingSkills key="skills" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
-    <OnboardingRoles key="roles" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingQuestionnaire key="questionnaire" data={data} updateData={updateData} onComplete={handleComplete} onBack={prevStep} />,
-    <OnboardingConnections key="connections" onComplete={() => setCurrentStep(8)} onBack={prevStep} />,
-    <OnboardingCompletion key="completion" accessLevel={accessLevel} />,
   ];
 
   return (

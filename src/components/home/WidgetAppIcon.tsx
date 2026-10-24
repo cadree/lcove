@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { revealMotion } from "@/lib/reveal";
 import { LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -13,10 +14,7 @@ interface WidgetAppIconProps {
 const WidgetAppIcon = ({ title, icon: Icon, link, badge, index = 0 }: WidgetAppIconProps) => {
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      whileInView={{ opacity: 1, scale: 1 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.3, delay: index * 0.05 }}
+      {...revealMotion({ scale: 0.9, duration: 0.3, delay: index * 0.05 })}
     >
       <Link to={link}>
         <motion.div 

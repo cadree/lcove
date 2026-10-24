@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,7 +13,7 @@ const PENDING_CREDIT = "You still have earned credit that can be paid out. Withd
 const PENDING_HOLD = "Money is still held for a project, order, or booking. Wait until it is paid out or refunded, then try again.";
 const PENDING_STRIPE = "Stripe still shows a pending or available balance. Withdraw it before deleting your account.";
 const STRIPE_UNKNOWN = "This account has a Stripe payout connection and we could not confirm the balance is zero, so it was not deleted.";
-const STRIPE_SUBSCRIPTION = "A Stripe subscription is still active. Cancel it, then delete your account.";
+const STRIPE_SUBSCRIPTION = "A Stripe subscription could not be cancelled, so the account was not deleted.";
 const MONEY_CHECK_FAILED = "We could not confirm that no money is pending, so the account was not deleted.";
 
 function json(status: number, body: Record<string, unknown>) {
@@ -24,7 +25,11 @@ function json(status: number, body: Record<string, unknown>) {
 
 function isMissingRelation(error: { code?: string; message?: string } | null) {
   if (!error) return false;
-  return error.code === "42P01" || error.code === "42703" || /does not exist/i.test(error.message ?? "");
+  return error.code === "42P01"
+    || error.code === "42703"
+    || error.code === "PGRST202"
+    || /does not exist/i.test(error.message ?? "")
+    || /could not find the function/i.test(error.message ?? "");
 }
 
 async function countPending(
@@ -154,18 +159,24 @@ async function assertNoPendingMoney(supabase: SupabaseClient, userId: string, em
 
   if (!email) return;
 
+  await cancelCustomerSubscriptions(stripe, email);
+}
+
+const BILLING_STATUSES = ["active", "trialing", "past_due", "unpaid", "incomplete"];
+
+async function cancelCustomerSubscriptions(stripe: Stripe, email: string) {
   try {
-    const customers = await stripe.customers.list({ email, limit: 5 });
+    const customers = await stripe.customers.list({ email, limit: 10 });
     for (const customer of customers.data) {
       const subscriptions = await stripe.subscriptions.list({
         customer: customer.id,
         status: "all",
         limit: 20,
       });
-      const stillBilling = subscriptions.data.some((subscription) =>
-        ["active", "trialing", "past_due", "unpaid", "incomplete"].includes(subscription.status)
-      );
-      if (stillBilling) throw new Error(STRIPE_SUBSCRIPTION);
+      for (const subscription of subscriptions.data) {
+        if (!BILLING_STATUSES.includes(subscription.status)) continue;
+        await stripe.subscriptions.cancel(subscription.id);
+      }
     }
   } catch (error) {
     if (error instanceof Error && error.message === STRIPE_SUBSCRIPTION) throw error;
@@ -216,20 +227,34 @@ serve(async (req) => {
 
     await assertNoPendingMoney(admin, userId, userData.user.email ?? undefined);
 
+    const { error: anonymizeError } = await admin
+      .from("profiles")
+      .update({
+        display_name: "Deleted member",
+        bio: null,
+        avatar_url: null,
+        phone: null,
+        city: null,
+        city_display: null,
+        city_key: null,
+        social_links: null,
+      })
+      .eq("user_id", userId);
+    if (anonymizeError && !isMissingRelation(anonymizeError)) {
+      return json(500, { error: "Could not anonymize the profile" });
+    }
+
+    const { error: purgeError } = await admin.rpc("purge_user_personal_data", { target: userId });
+    if (purgeError && !isMissingRelation(purgeError)) {
+      return json(500, { error: "Could not remove personal content" });
+    }
+
+    await removeStorage(admin, userId);
+
     const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
     if (deleteError) {
       return json(500, { error: deleteError.message || "Could not delete the account" });
     }
-
-    const { error: purgeError } = await admin.rpc("purge_user_personal_data", { target: userId });
-    if (purgeError) {
-      console.log("[delete-account] purge failed after auth delete", userId);
-      return json(500, {
-        error: "The login was deleted, but some personal content could not be removed.",
-      });
-    }
-
-    await removeStorage(admin, userId);
 
     return json(200, { ok: true });
   } catch (error) {
@@ -242,7 +267,7 @@ serve(async (req) => {
       || message === STRIPE_SUBSCRIPTION
       || message === MONEY_CHECK_FAILED
       ? 409
-      : 500;
+      : httpStatusForError(error);
     return json(status, { error: message });
   }
 });

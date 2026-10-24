@@ -207,6 +207,11 @@ export interface PortfolioItem {
   external_url?: string | null;
   thumbnail_url?: string | null;
   title?: string;
+  embed_provider?: string | null;
+  embed_video_id?: string | null;
+  embed_hash?: string | null;
+  embed_thumbnail_url?: string | null;
+  embed_title?: string | null;
   source: 'post' | 'portfolio_item';
 }
 
@@ -306,6 +311,33 @@ export function useAddPortfolioItem(userId?: string) {
     onError: (error) => {
       console.error('Error adding portfolio item:', error);
       toast.error('Failed to add item');
+    },
+  });
+}
+
+export function useDeletePortfolioItem(userId?: string) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const targetUserId = userId || user?.id;
+
+  return useMutation({
+    mutationFn: async ({ id, folderId }: { id: string; folderId: string }) => {
+      if (!user) throw new Error('Not authenticated');
+      const { error } = await supabase
+        .from('portfolio_items')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+      if (error) throw error;
+      return folderId;
+    },
+    onSuccess: (folderId) => {
+      queryClient.invalidateQueries({ queryKey: ['folder-posts', folderId, targetUserId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolio-folders', targetUserId] });
+      toast.success('Item deleted');
+    },
+    onError: () => {
+      toast.error('Could not delete that item');
     },
   });
 }

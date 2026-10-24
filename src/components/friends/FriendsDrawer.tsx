@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
-import { Users, Search, UserMinus, Loader2 } from "lucide-react";
+import { Users, Search, UserMinus, Loader2, ArrowLeft } from "lucide-react";
+import { listEnterDelay } from "@/lib/feedWindow";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useFriendProfiles } from "@/hooks/useFriendProfiles";
 
@@ -19,7 +20,7 @@ export function FriendsDrawer({ children }: FriendsDrawerProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { favorites, removeFavorite, isLoading: favoritesLoading } = useFavorites();
-  const { friendProfiles, isLoading: profilesLoading } = useFriendProfiles(favorites);
+  const { friendProfiles, isLoading: profilesLoading, error, refetch } = useFriendProfiles(favorites);
 
   const isLoading = favoritesLoading || profilesLoading;
 
@@ -44,11 +45,18 @@ export function FriendsDrawer({ children }: FriendsDrawerProps) {
         {children}
       </SheetTrigger>
       <SheetContent side="right" className="w-full sm:w-96 p-0">
-        <SheetHeader className="p-6 pb-4 border-b border-border">
-          <SheetTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-primary" />
-            Friends ({favorites.length})
-          </SheetTitle>
+        <SheetHeader className="p-4 pb-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <SheetClose asChild>
+              <Button type="button" variant="ghost" size="icon" className="min-h-11 min-w-11 shrink-0" aria-label="Back">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </SheetClose>
+            <SheetTitle className="flex items-center gap-2 text-left">
+              <Users className="w-5 h-5 text-primary" />
+              Friends ({favorites.length})
+            </SheetTitle>
+          </div>
         </SheetHeader>
 
         <div className="p-4">
@@ -64,7 +72,14 @@ export function FriendsDrawer({ children }: FriendsDrawerProps) {
         </div>
 
         <ScrollArea className="h-[calc(100vh-180px)] px-4 pb-4">
-          {isLoading ? (
+          {error ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Could not load friends.</p>
+              <Button type="button" variant="outline" className="mt-3 min-h-11" onClick={() => void refetch()}>
+                Try again
+              </Button>
+            </div>
+          ) : isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
@@ -91,7 +106,7 @@ export function FriendsDrawer({ children }: FriendsDrawerProps) {
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
-                    transition={{ delay: index * 0.03 }}
+                    transition={{ delay: listEnterDelay(index) }}
                     onClick={() => handleProfileClick(friend.user_id)}
                     className="flex items-center gap-3 p-3 rounded-xl bg-card hover:bg-accent/20 transition-all cursor-pointer group"
                   >

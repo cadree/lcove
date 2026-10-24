@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { resolveHostIdentity } from "../_shared/host-email-identity.ts";
+import { eventDateLabel, eventTimeLabel } from "../_shared/event-time.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,7 +49,7 @@ serve(async (req) => {
 
     const { data: event, error: eventError } = await supabaseAdmin
       .from("events")
-      .select("id, title, start_date, end_date, venue, city, creator_id, ticket_price, is_public, image_url")
+      .select("id, title, start_date, end_date, venue, city, creator_id, ticket_price, is_public, image_url, timezone")
       .eq("id", eventId)
       .single();
 
@@ -72,12 +74,8 @@ serve(async (req) => {
 
     const eventUrl = `https://etherbylcove.com/event/${eventId}`;
     const isFree = !event.ticket_price || event.ticket_price <= 0;
-    const eventDate = new Date(event.start_date).toLocaleDateString("en-US", {
-      weekday: "long", month: "long", day: "numeric", year: "numeric",
-    });
-    const eventTime = new Date(event.start_date).toLocaleTimeString("en-US", {
-      hour: "numeric", minute: "2-digit",
-    });
+    const eventDate = eventDateLabel(event.start_date, event.timezone);
+    const eventTime = eventTimeLabel(event.start_date, event.timezone);
     const location = [event.venue, event.city].filter(Boolean).join(", ") || "Location TBA";
 
     for (const invitee of invitees) {
@@ -124,41 +122,8 @@ serve(async (req) => {
         }
       }
 
-      if (invitee.phone) {
-        const twilioSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-        const twilioAuth = Deno.env.get("TWILIO_AUTH_TOKEN");
-        const twilioPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
-
-        if (twilioSid && twilioAuth && twilioPhone) {
-          try {
-            const smsBody = `${identity.organizerName} invited you to "${event.title}" on ${eventDate} at ${eventTime}. ${location}. ${isFree ? "RSVP" : "Get tickets"}: ${eventUrl}`;
-            const smsRes = await fetch(
-              `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
-              {
-                method: "POST",
-                headers: {
-                  Authorization: `Basic ${btoa(`${twilioSid}:${twilioAuth}`)}`,
-                  "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: new URLSearchParams({
-                  To: invitee.phone,
-                  From: twilioPhone,
-                  Body: smsBody,
-                }).toString(),
-              }
-            );
-            if (smsRes.ok) {
-              results.push({ phone: invitee.phone, status: "sent" });
-            } else {
-              const errText = await smsRes.text();
-              results.push({ phone: invitee.phone, status: "failed", error: errText });
-            }
-          } catch (err) {
-            results.push({ phone: invitee.phone, status: "failed", error: String(err) });
-          }
-        } else {
-          results.push({ phone: invitee.phone, status: "skipped", error: "SMS not configured" });
-        }
+      if (invitee.phone && !invitee.email) {
+        results.push({ phone: invitee.phone, status: "skipped", error: "Email is required. Text invites are not sent." });
       }
     }
 
@@ -175,7 +140,7 @@ serve(async (req) => {
     logStep("ERROR", { message: errorMessage });
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: httpStatusForError(error),
     });
   }
 });

@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface CalendarEventData {
   title: string;
@@ -173,7 +174,7 @@ export function AddToCalendarButtons({ event, variant = "default", className }: 
     return (
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className={className}>
+          <Button variant="outline" size="sm" className={cn("max-w-full", className)}>
             <Calendar className="h-4 w-4 mr-2" />
             Add to Calendar
             <ChevronDown className="h-3 w-3 ml-1" />

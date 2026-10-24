@@ -28,22 +28,51 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
+/** Phone cap. Applied after caller style so a child or override cannot widen the dialog. */
+const DIALOG_MAX_WIDTH =
+  "min(32rem, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 2rem))";
+
+const dialogContain =
+  "box-border min-w-0 max-w-[min(32rem,calc(100vw-2rem))] grid-cols-[minmax(0,1fr)] break-words [&>*]:min-w-0 [&_input]:min-w-0 [&_input]:max-w-full [&_textarea]:min-w-0 [&_textarea]:max-w-full [&_select]:min-w-0 [&_select]:max-w-full [&_img]:min-w-0 [&_img]:max-w-full [&_button]:min-w-0 [&_button]:max-w-full [&_button]:whitespace-normal [&_label]:min-w-0 [&_label]:max-w-full";
+
+function dialogMaxWidth(caller: React.CSSProperties["maxWidth"] | undefined) {
+  if (typeof caller === "number" && Number.isFinite(caller)) return `min(${caller}px, ${DIALOG_MAX_WIDTH})`;
+  if (typeof caller === "string" && caller.trim()) return `min(${caller}, ${DIALOG_MAX_WIDTH})`;
+  return DIALOG_MAX_WIDTH;
+}
+
+type DialogContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+  fullscreen?: boolean;
+};
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  DialogContentProps
+>(({ className, children, style, fullscreen = false, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className={cn(
+      "fixed inset-0 z-50 flex overflow-hidden",
+      fullscreen ? "items-stretch justify-stretch p-0 pointer-events-auto" : "items-center justify-center p-4",
+    )}>
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
-          "relative z-50 grid w-full max-w-lg",
-          "gap-4 border border-border/50 bg-card p-6 shadow-elevated rounded-2xl",
+          "relative z-50 w-full min-w-0",
+          fullscreen
+            ? "flex h-[100dvh] max-h-[100dvh] max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 bg-background p-0 shadow-none"
+            : "grid max-w-lg gap-4 rounded-[16px] border border-border bg-card p-6 shadow-elevated max-h-[85vh] overflow-x-hidden overflow-y-auto scrollbar-thin",
+          !fullscreen && dialogContain,
           "data-[state=open]:animate-scale-in data-[state=closed]:animate-scale-out",
-          "max-h-[85vh] overflow-y-auto scrollbar-thin",
           className
         )}
+        style={{
+          ...style,
+          boxSizing: "border-box",
+          width: "100%",
+          minWidth: 0,
+          maxWidth: fullscreen ? "100%" : dialogMaxWidth(style?.maxWidth),
+        }}
         {...props}
       >
         {children}
@@ -58,13 +87,13 @@ const DialogContent = React.forwardRef<
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col space-y-2 text-center sm:text-left", className)} {...props} />
+  <div className={cn("flex min-w-0 flex-col space-y-2 text-center sm:text-left", className)} {...props} />
 );
 DialogHeader.displayName = "DialogHeader";
 
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn("flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-2", className)}
+    className={cn("flex min-w-0 flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end", className)}
     {...props}
   />
 );

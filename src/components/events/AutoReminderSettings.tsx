@@ -15,6 +15,9 @@ export function AutoReminderSettings({ eventId }: { eventId: string }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
+        <p className="text-xs text-muted-foreground">
+          These stay off until you turn them on. They send email only. Ether does not text guests.
+        </p>
         <ToggleRow
           label="24 hours before"
           description="Send all confirmed attendees a day-before reminder"

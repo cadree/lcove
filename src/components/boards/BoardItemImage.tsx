@@ -7,6 +7,7 @@ import { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 
 interface ImageContent {
   url?: string;
@@ -87,7 +88,7 @@ export function BoardItemImage({ content, onChange }: BoardItemImageProps) {
       toast.success(`${isVideo ? 'Video' : 'Image'} uploaded successfully`);
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error("Failed to upload file");
+      toast.error(errorMessage(error, "Failed to upload file"));
     } finally {
       setIsUploading(false);
     }

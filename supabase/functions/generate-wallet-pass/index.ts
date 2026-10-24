@@ -1,4 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { Buffer } from "node:buffer";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { httpStatusForError } from "../_shared/http-error.mjs";
+import { getBearerUser } from "../_shared/require-caller.ts";
+import { appleWalletConfigured, appleWalletEnv } from "../_shared/wallet-config.mjs";
+import { issueWalletPass, parseWalletPassBody } from "../_shared/wallet-pass.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,194 +12,153 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const logStep = (step: string, details?: unknown) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : "";
-  console.log(`[GENERATE-WALLET-PASS] ${step}${detailsStr}`);
-};
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 
-/**
- * Generates a .pkpass file (Apple Wallet) or Google Wallet JWT link.
- * 
- * For Apple Wallet:
- * - Requires APPLE_PASS_TYPE_ID, APPLE_TEAM_ID, APPLE_PASS_CERT (base64), APPLE_PASS_KEY (base64), APPLE_WWDR_CERT (base64)
- * - Generates a signed .pkpass bundle
- * 
- * For Google Wallet:
- * - Requires GOOGLE_WALLET_ISSUER_ID, GOOGLE_WALLET_SERVICE_ACCOUNT_KEY (JSON)
- * - Creates a JWT save link
- * 
- * Currently returns a structured response indicating setup status.
- * Once certificates are configured, this will generate real passes.
- */
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+function decodeSecret(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (trimmed.includes("BEGIN")) return trimmed;
+  const decoded = Buffer.from(trimmed, "base64").toString("utf8");
+  return decoded.includes("BEGIN") ? decoded : trimmed;
+}
+
+async function unlockKey(pem: string) {
+  const passphrase = Deno.env.get("APPLE_PASS_KEY_PASSPHRASE") || "";
+  if (!passphrase || !pem.includes("ENCRYPTED")) return pem;
+  const imported = await import("npm:node-forge@1.3.1");
+  const forge = imported.default ?? imported;
+  const key = forge.pki.decryptRsaPrivateKey(pem, passphrase);
+  if (!key) throw new Error("Could not sign the pass");
+  return forge.pki.privateKeyToPem(key);
+}
+
+function serviceClient() {
+  return createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    { auth: { persistSession: false } },
+  );
+}
+
+async function loadTicketRows(
+  admin: ReturnType<typeof serviceClient>,
+  ticketId: string | null,
+  orderId: string | null,
+) {
+  const attendees: Record<string, unknown>[] = [];
+  const orders: Record<string, unknown>[] = [];
+  const rsvps: Record<string, unknown>[] = [];
+  const events: Record<string, unknown>[] = [];
+  const hosts: Record<string, unknown>[] = [];
+
+  const pushAttendee = (row: Record<string, unknown> | null) => {
+    if (!row?.id) return;
+    if (!attendees.some((existing) => existing.id === row.id)) attendees.push(row);
+  };
+
+  if (ticketId) {
+    const { data, error } = await admin.from("event_attendees").select("*").eq("id", ticketId).maybeSingle();
+    if (error) throw new Error("Could not load the ticket");
+    pushAttendee(data);
+  }
+  if (orderId) {
+    const { data, error } = await admin.from("ticket_orders").select("*").eq("id", orderId).maybeSingle();
+    if (error) throw new Error("Could not load the ticket");
+    if (data) orders.push(data);
+    const people = await admin.from("event_attendees").select("*").eq("order_id", orderId);
+    if (people.error) throw new Error("Could not load the ticket");
+    for (const row of people.data || []) pushAttendee(row);
   }
 
+  const missingOrders = [...new Set(attendees.map((row) => row.order_id).filter(Boolean))]
+    .filter((id) => !orders.some((order) => order.id === id));
+  if (missingOrders.length > 0) {
+    const { data, error } = await admin.from("ticket_orders").select("*").in("id", missingOrders);
+    if (error) throw new Error("Could not load the ticket");
+    orders.push(...(data || []));
+  }
+
+  const rsvpIds = [...new Set(attendees.map((row) => row.rsvp_id).filter(Boolean))];
+  if (rsvpIds.length > 0) {
+    const { data, error } = await admin.from("event_rsvps").select("id, event_id, user_id, status").in("id", rsvpIds);
+    if (error) throw new Error("Could not load the ticket");
+    rsvps.push(...(data || []));
+  }
+
+  const eventIds = [...new Set(attendees.map((row) => row.event_id).filter(Boolean))];
+  if (eventIds.length > 0) {
+    const { data, error } = await admin
+      .from("events")
+      .select("id, title, start_date, venue, address, city, state, timezone, creator_id, hide_address")
+      .in("id", eventIds);
+    if (error) throw new Error("Could not load the ticket");
+    events.push(...(data || []));
+    const secrets = await admin.from("event_secrets").select("event_id, private_address").in("event_id", eventIds);
+    if (secrets.error) throw new Error("Could not load the ticket");
+    for (const event of events) {
+      const secret = (secrets.data || []).find((row) => row.event_id === event.id);
+      if (secret?.private_address) event.private_address = secret.private_address;
+    }
+  }
+
+  const creatorIds = [...new Set(events.map((row) => row.creator_id).filter(Boolean))];
+  if (creatorIds.length > 0) {
+    const creators = await admin.from("consumer_creators").select("user_id, display_name").in("user_id", creatorIds);
+    if (creators.error) throw new Error("Could not load the ticket");
+    hosts.push(...(creators.data || []));
+    const missingHosts = creatorIds.filter((id) => !hosts.some((host) => host.user_id === id && host.display_name));
+    if (missingHosts.length > 0) {
+      const profiles = await admin.from("profiles").select("user_id, display_name").in("user_id", missingHosts);
+      if (profiles.error) throw new Error("Could not load the ticket");
+      for (const profile of profiles.data || []) {
+        if (!hosts.some((host) => host.user_id === profile.user_id && host.display_name)) hosts.push(profile);
+      }
+    }
+  }
+
+  return { attendees, orders, rsvps, events, hosts };
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
   try {
-    const { eventId, eventTitle, eventDate, eventEndDate, venue, guestName, ticketType } = await req.json();
-    logStep("Request received", { eventId, eventTitle, guestName, ticketType });
-
-    if (!eventId || !eventTitle) {
-      throw new Error("Missing required fields: eventId, eventTitle");
+    const body = await req.json().catch(() => ({}));
+    const env = appleWalletEnv();
+    const configured = appleWalletConfigured(env);
+    const parsed = parseWalletPassBody(body);
+    if (parsed.probe || !configured) {
+      return json({ configured });
     }
+    if (parsed.error) return json({ error: parsed.error }, 400);
 
-    // Check if Apple Wallet certs are configured
-    const applePassTypeId = Deno.env.get("APPLE_PASS_TYPE_ID");
-    const appleTeamId = Deno.env.get("APPLE_TEAM_ID");
-    const googleWalletIssuerId = Deno.env.get("GOOGLE_WALLET_ISSUER_ID");
+    const admin = serviceClient();
+    const callerId = await getBearerUser(req.headers.get("Authorization"), admin);
+    if (!callerId) return json({ error: "Unauthorized" }, 401);
 
-    const hasAppleConfig = !!applePassTypeId && !!appleTeamId;
-    const hasGoogleConfig = !!googleWalletIssuerId;
-
-    logStep("Config check", { hasAppleConfig, hasGoogleConfig });
-
-    if (!hasAppleConfig && !hasGoogleConfig) {
-      // Return setup instructions - wallet passes not yet configured
-      return new Response(
-        JSON.stringify({
-          configured: false,
-          message: "Wallet pass generation requires certificate setup. Contact your admin.",
-          eventData: {
-            eventId,
-            eventTitle,
-            eventDate,
-            venue,
-            guestName,
-            ticketType,
-          },
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        }
-      );
-    }
-
-    // Generate Google Wallet save link if configured
-    if (hasGoogleConfig) {
-      const serviceAccountKey = Deno.env.get("GOOGLE_WALLET_SERVICE_ACCOUNT_KEY");
-      if (!serviceAccountKey) throw new Error("GOOGLE_WALLET_SERVICE_ACCOUNT_KEY not set");
-
-      const startDate = new Date(eventDate);
-      const endDate = eventEndDate ? new Date(eventEndDate) : new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
-
-      // Create a generic pass object
-      const objectId = `${googleWalletIssuerId}.event-${eventId}-${Date.now()}`;
-      
-      const passObject = {
-        id: objectId,
-        classId: `${googleWalletIssuerId}.ether-event-class`,
-        genericType: "GENERIC_EVENT_TICKET",
-        hexBackgroundColor: "#1a1a2e",
-        logo: {
-          sourceUri: { uri: "https://etherbylcove.com/favicon.png" },
-        },
-        cardTitle: { defaultValue: { language: "en", value: "ETHER" } },
-        header: { defaultValue: { language: "en", value: eventTitle } },
-        subheader: { defaultValue: { language: "en", value: venue || "Location TBA" } },
-        textModulesData: [
-          {
-            id: "date",
-            header: "DATE",
-            body: startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }),
-          },
-          {
-            id: "time",
-            header: "TIME",
-            body: `${startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – ${endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`,
-          },
-          {
-            id: "attendee",
-            header: "ATTENDEE",
-            body: guestName || "Guest",
-          },
-          {
-            id: "ticket_type",
-            header: "TYPE",
-            body: ticketType === "paid" ? "Paid Ticket" : "Free RSVP",
-          },
-        ],
-        barcode: {
-          type: "QR_CODE",
-          value: `ether-event:${eventId}:${Date.now()}`,
-          alternateText: eventTitle,
-        },
-      };
-
-      // For now, return the Google Wallet "Add to Wallet" URL pattern
-      // Full implementation would sign JWT with service account key
-      const saveUrl = `https://pay.google.com/gp/v/save/${objectId}`;
-
-      logStep("Google Wallet pass generated", { objectId });
-
-      return new Response(
-        JSON.stringify({
-          configured: true,
-          platform: "google",
-          passUrl: saveUrl,
-          passData: passObject,
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        }
-      );
-    }
-
-    // Apple Wallet PKPass generation
-    if (hasAppleConfig) {
-      logStep("Apple Wallet pass - certificates required for signing");
-      
-      // Full Apple Wallet implementation requires:
-      // 1. pass.json with event details
-      // 2. Signing with pass certificate + WWDR cert
-      // 3. Creating .pkpass ZIP bundle
-      // Returning structured data for now
-      return new Response(
-        JSON.stringify({
-          configured: true,
-          platform: "apple",
-          message: "Apple Wallet pass generation ready. Certificate signing in progress.",
-          passData: {
-            formatVersion: 1,
-            passTypeIdentifier: applePassTypeId,
-            teamIdentifier: appleTeamId,
-            organizationName: "ETHER",
-            description: eventTitle,
-            serialNumber: `event-${eventId}-${Date.now()}`,
-            eventTicket: {
-              primaryFields: [{ key: "event", label: "EVENT", value: eventTitle }],
-              secondaryFields: [
-                { key: "date", label: "DATE", value: eventDate },
-                { key: "location", label: "LOCATION", value: venue || "TBA" },
-              ],
-              auxiliaryFields: [
-                { key: "attendee", label: "ATTENDEE", value: guestName || "Guest" },
-                { key: "type", label: "TYPE", value: ticketType === "paid" ? "Paid" : "Free" },
-              ],
-            },
-            barcode: {
-              format: "PKBarcodeFormatQR",
-              message: `ether-event:${eventId}:${Date.now()}`,
-              messageEncoding: "iso-8859-1",
-            },
-          },
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        }
-      );
-    }
-
-    throw new Error("Unexpected state");
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+    const rows = await loadTicketRows(admin, parsed.ticketId, parsed.orderId);
+    const issued = await issueWalletPass({
+      callerId,
+      body,
+      rows,
+      configured: true,
+      certs: {
+        certPem: decodeSecret(env.APPLE_PASS_CERT || ""),
+        keyPem: await unlockKey(decodeSecret(env.APPLE_PASS_KEY || "")),
+        wwdrPem: decodeSecret(env.APPLE_WWDR_CERT || ""),
+      },
+      passTypeIdentifier: (env.APPLE_PASS_TYPE_ID || "").trim(),
+      teamIdentifier: (env.APPLE_TEAM_ID || "").trim(),
     });
+    return json(issued.body, issued.status);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not sign the pass";
+    console.error(`[generate-wallet-pass] ${message}`);
+    return json({ error: message === "Could not load the ticket" ? message : "Could not sign the pass" }, httpStatusForError(error));
   }
 });

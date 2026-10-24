@@ -4,30 +4,28 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isIosApp } from '@/lib/platform';
 import { registerIosPush } from '@/lib/nativePush';
+import { resolveVapidPublicKey } from '@/lib/vapidPublicKey';
+import { iosPushNeedsHomeScreen, readIosPushEnvironment } from '@/lib/iosWebPush';
 
-// VAPID public key - this is safe to expose in client code
-// Must be set via VITE_VAPID_PUBLIC_KEY environment variable
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
-
-// Log VAPID key status on load for debugging
-console.log('VAPID public key configured:', !!VAPID_PUBLIC_KEY);
+// Env overrides the committed ether-prod public key. Never log the key.
+const VAPID_PUBLIC_KEY = resolveVapidPublicKey(import.meta.env.VITE_VAPID_PUBLIC_KEY);
 
 // Convert base64url string to ArrayBuffer for push subscription
-function urlBase64ToArrayBuffer(base64String: string): ArrayBuffer {
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = atob(base64);
-  const buffer = new ArrayBuffer(rawData.length);
-  const view = new Uint8Array(buffer);
+  const view = new Uint8Array(rawData.length);
   for (let i = 0; i < rawData.length; ++i) {
     view[i] = rawData.charCodeAt(i);
   }
-  return buffer;
+  return view;
 }
 
 export type PushStatus = 
   | 'checking'
-  | 'not_supported' 
+  | 'not_supported'
+  | 'needs_home_screen'
   | 'permission_denied' 
   | 'not_subscribed' 
   | 'subscribed'
@@ -53,6 +51,12 @@ export const usePushNotifications = () => {
       if (user?.id && isIosApp()) {
         registerIosPush(user.id).catch((error) => console.error('iOS push registration failed', error));
         setState({ status: 'subscribed', error: null, isLoading: false });
+        return;
+      }
+
+      // iOS Safari tabs cannot subscribe. The Home Screen app can, from iOS 16.4.
+      if (iosPushNeedsHomeScreen(readIosPushEnvironment(false))) {
+        setState({ status: 'needs_home_screen', error: null, isLoading: false });
         return;
       }
 
@@ -172,10 +176,6 @@ export const usePushNotifications = () => {
   }, []);
 
   const subscribeToPush = useCallback(async (registration: ServiceWorkerRegistration): Promise<PushSubscription> => {
-    if (!VAPID_PUBLIC_KEY) {
-      throw new Error('VAPID public key not configured. Push notifications are not available.');
-    }
-
     try {
       // Check for existing subscription first
       let subscription = await registration.pushManager.getSubscription();
@@ -189,7 +189,7 @@ export const usePushNotifications = () => {
       console.log('Creating new push subscription...');
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToArrayBuffer(VAPID_PUBLIC_KEY),
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
       });
       
       console.log('Push subscription created:', subscription.endpoint.substring(0, 50));
@@ -204,6 +204,11 @@ export const usePushNotifications = () => {
   }, []);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
+    if (state.status === 'needs_home_screen') {
+      toast.error('Open Ether from your Home Screen, then turn on push');
+      return false;
+    }
+
     if (state.status === 'not_supported') {
       toast.error('Push notifications are not supported in this browser');
       return false;
@@ -211,12 +216,6 @@ export const usePushNotifications = () => {
 
     if (!user?.id) {
       toast.error('Please sign in to enable push notifications');
-      return false;
-    }
-
-    if (!VAPID_PUBLIC_KEY) {
-      toast.error('Push notifications are not configured for this app');
-      setState(prev => ({ ...prev, error: 'VAPID key not configured' }));
       return false;
     }
 
@@ -330,6 +329,7 @@ export const usePushNotifications = () => {
     // Backwards compatible values
     isSupported,
     isSubscribed,
+    needsHomeScreen: state.status === 'needs_home_screen',
     permission,
     
     // Actions

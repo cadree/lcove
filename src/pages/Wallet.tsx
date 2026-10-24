@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useSearchParams } from 'react-router-dom';
 import { 
-  Wallet, Plus, CreditCard, Building2, Smartphone, Trash2, 
-  Check, ArrowUpRight, ArrowDownLeft, Coins, Clock, Send,
+  Wallet, 
+  ArrowUpRight, ArrowDownLeft, Coins, Send,
   Flame, Sparkles, Info
 } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCredits, useCreditLedger, usePayoutMethods, usePayouts, useTransactions } from '@/hooks/useCredits';
+import { useCredits, useCreditLedger, usePayouts, useTransactions } from '@/hooks/useCredits';
+import { connectSetupAction, connectStatusCopy, connectStatusLabel, resolveConnectStatus, useCreatorConnect, withdrawalsEnabled } from '@/hooks/useCreatorConnect';
 import { useMyXp } from '@/hooks/useXp';
 import { TotalBalanceCard, CreditBalanceCard } from '@/components/credits/CreditBalanceCard';
 import { TransferCreditsDialog } from '@/components/credits/TransferCreditsDialog';
@@ -18,20 +19,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SquircleIcon } from '@/components/world/SquircleIcon';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-
-const payoutMethodIcons: Record<string, React.ElementType> = {
-  bank_account: Building2,
-  debit_card: CreditCard,
-  apple_pay: Smartphone,
-};
 
 const statusColors: Record<string, string> = {
   pending: 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
@@ -44,45 +38,47 @@ const statusColors: Record<string, string> = {
 const WalletPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const { credits, isLoading: creditsLoading, genesisBalance, earnedBalance, balance } = useCredits();
   const { data: myXp } = useMyXp();
   const { ledger, isLoading: ledgerLoading } = useCreditLedger();
-  const { methods, isLoading: methodsLoading, setupPayoutMethod, setDefaultMethod, deleteMethod, isSettingUp } = usePayoutMethods();
+  const {
+    data: connect,
+    isLoading: connectLoading,
+    isError: connectFailed,
+    error: connectError,
+    refetch: refetchConnect,
+    open: openConnect,
+  } = useCreatorConnect();
   const { payouts, isLoading: payoutsLoading, requestPayout, isRequesting } = usePayouts();
   const { transactions, isLoading: transactionsLoading } = useTransactions();
 
   const [payoutAmount, setPayoutAmount] = useState('');
-  const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
   const [payoutDialogOpen, setPayoutDialogOpen] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const connectStatus = resolveConnectStatus(connect);
+  const setupAction = connectSetupAction(connectStatus);
+  const connectBadgeClass = connectStatus === "verified"
+    ? statusColors.completed
+    : connectStatus === "needs_info" || connectStatus === "pending"
+      ? statusColors.pending
+      : statusColors.processing;
 
   // Handle Stripe setup callback
   useEffect(() => {
-    const setupResult = searchParams.get('setup');
-    if (setupResult === 'success') {
-      toast({ title: 'Payment method added successfully!' });
-      // Sync payment methods and wait for completion
-      const syncPaymentMethods = async () => {
-        try {
-          await supabase.functions.invoke('setup-payout-method', {
-            body: { type: 'sync' }
-          });
-          await queryClient.invalidateQueries({ queryKey: ['payout-methods'] });
-        } catch (error) {
-          console.error('Failed to sync payment methods:', error);
-        }
-      };
-      syncPaymentMethods();
-      searchParams.delete('setup');
-      setSearchParams(searchParams, { replace: true });
-    } else if (setupResult === 'cancelled') {
-      toast({ title: 'Setup cancelled', variant: 'destructive' });
-      searchParams.delete('setup');
+    const connectResult = searchParams.get('connect');
+    if (connectResult === 'success' || connectResult === 'refresh') {
+      refetchConnect();
+      toast({
+        title: connectResult === 'success' ? 'Checking payout status' : 'Payout setup needs another step',
+        description: connectResult === 'success'
+          ? 'Stripe sent you back. Wallet shows whether you can accept payments and whether payouts are enabled.'
+          : 'Open payout setup again to finish.',
+      });
+      searchParams.delete('connect');
       setSearchParams(searchParams, { replace: true });
     }
-  }, [searchParams, setSearchParams, toast, queryClient]);
+  }, [searchParams, setSearchParams, toast, refetchConnect]);
 
   const handleRequestPayout = () => {
     const amount = parseFloat(payoutAmount);
@@ -101,17 +97,18 @@ const WalletPage: React.FC = () => {
       return;
     }
 
-    if (selectedMethod === 'credits') {
-      requestPayout({ amount, use_credits: true });
-    } else if (selectedMethod) {
-      requestPayout({ amount, payout_method_id: selectedMethod });
-    } else {
-      toast({ title: 'Select a payout method', variant: 'destructive' });
+    if (!withdrawalsEnabled(connect)) {
+      const status = resolveConnectStatus(connect);
+      toast({
+        title: status === 'accepting' ? 'Payouts are under review' : 'Payouts are not enabled yet',
+        description: connectStatusCopy(status),
+        variant: 'destructive',
+      });
       return;
     }
+    requestPayout({ amount, use_credits: true });
     setPayoutDialogOpen(false);
     setPayoutAmount('');
-    setSelectedMethod(null);
   };
 
   // Show loading while auth is initializing
@@ -146,9 +143,11 @@ const WalletPage: React.FC = () => {
       <div className="p-4 sm:p-6 pb-32 max-w-4xl mx-auto">
         {/* Header */}
         <PageHeader
+          eyebrow="Credits"
           title="Wallet"
-          description={myXp ? `Your LC Credit balance and contribution history · Level ${myXp.level}` : "Your LC Credit balance and contribution history"}
-          icon={<Wallet className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+          description={myXp ? `Ledger, payouts, and level ${myXp.level}` : "Ledger and payouts"}
+          icon={<Wallet className="w-5 h-5" />}
+          tile="gold"
           className="mb-6"
         />
 
@@ -227,54 +226,13 @@ const WalletPage: React.FC = () => {
                   />
                 </div>
 
-                <div>
-                  <Label>Payout Method</Label>
-                  <div className="space-y-2 mt-2">
-                    {/* Payment methods */}
-                    {methods.map((method) => {
-                      const Icon = payoutMethodIcons[method.type];
-                      return (
-                        <div
-                          key={method.id}
-                          onClick={() => setSelectedMethod(method.id)}
-                          className={cn(
-                            "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
-                            selectedMethod === method.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
-                          )}
-                        >
-                          <Icon className="h-5 w-5" />
-                          <div className="flex-1">
-                            <p className="font-medium capitalize">
-                              {method.brand || method.type.replace('_', ' ')} •••• {method.last_four}
-                            </p>
-                            <p className="text-xs text-muted-foreground">1-3 business days</p>
-                          </div>
-                          {selectedMethod === method.id && <Check className="h-5 w-5 text-primary" />}
-                        </div>
-                      );
-                    })}
-
-                    {methods.length === 0 && (
-                      <div className="text-center py-4 text-muted-foreground">
-                        <p className="text-sm">No payout methods added</p>
-                        <Button 
-                          variant="link" 
-                          size="sm" 
-                          onClick={() => {
-                            setPayoutDialogOpen(false);
-                            setupPayoutMethod('checkout_setup');
-                          }}
-                        >
-                          Add a payment method
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  1 LC converts to $1. The 10% community-fund fee was already taken when the sale, gift, invoice, or project payment came in. This payout does not take it again.
+                </p>
 
                 <Button 
                   onClick={handleRequestPayout} 
-                  disabled={!payoutAmount || !selectedMethod || isRequesting || parseFloat(payoutAmount) > earnedBalance}
+                  disabled={!payoutAmount || !withdrawalsEnabled(connect) || isRequesting || parseFloat(payoutAmount) > earnedBalance}
                   className="w-full"
                 >
                   {isRequesting ? 'Processing...' : 'Request Payout'}
@@ -284,71 +242,73 @@ const WalletPage: React.FC = () => {
           </Dialog>
         </div>
 
-        {/* Payout Methods */}
         <Card className="mb-6">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-lg">Payout Methods</CardTitle>
-              <CardDescription>For converting Earned Credit to USD</CardDescription>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setupPayoutMethod('checkout_setup')}
-              disabled={isSettingUp}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Add
-            </Button>
+          <CardHeader>
+            <p className="kicker">// Payout</p>
+            <CardTitle className="ether-title text-[22px]">Stripe Connect</CardTitle>
+            <CardDescription>One Express account for sales, gifts, invoices, films, and project pay. Test mode only.</CardDescription>
           </CardHeader>
-          <CardContent>
-            {methods.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">
-                <CreditCard className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">No payout methods added yet</p>
+          <CardContent className="space-y-3">
+            {connectLoading ? (
+              <Skeleton className="h-16 w-full" />
+            ) : connectFailed ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-foreground">Status</span>
+                  <Badge className={statusColors.failed}>Couldn't load</Badge>
+                </div>
+                <p className="text-sm text-destructive">
+                  {connectError instanceof Error ? connectError.message : "The payout status call failed. Nothing was marked pending."}
+                </p>
+                <Button type="button" variant="outline" onClick={() => refetchConnect()}>
+                  Retry
+                </Button>
               </div>
             ) : (
-              <div className="space-y-2">
-                {methods.map((method) => {
-                  const Icon = payoutMethodIcons[method.type];
-                  return (
-                    <div key={method.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                      <div className="flex items-center gap-3">
-                        <Icon className="h-5 w-5" />
-                        <div>
-                          <p className="font-medium capitalize">
-                            {method.brand || method.type.replace('_', ' ')} •••• {method.last_four}
-                          </p>
-                        </div>
-                        {method.is_default && (
-                          <Badge variant="secondary" className="text-xs">Default</Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {!method.is_default && (
-                          <Button variant="ghost" size="sm" onClick={() => setDefaultMethod(method.id)}>
-                            Set Default
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="sm" onClick={() => deleteMethod(method.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-sm text-foreground">Status</span>
+                  <Badge className={cn("h-auto max-w-[16rem] whitespace-normal text-right leading-snug", connectBadgeClass)}>
+                    {connectStatusLabel(connectStatus)}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">{connectStatusCopy(connectStatus)}</p>
+                <div className="flex flex-wrap gap-2">
+                  {setupAction !== "manage" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={openConnect.isPending}
+                      onClick={() => openConnect.mutate("onboard")}
+                    >
+                      {setupAction === "continue" ? "Continue setup" : "Set up payouts"}
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!connect?.accountId || openConnect.isPending}
+                    onClick={() => openConnect.mutate("dashboard")}
+                  >
+                    Manage payouts
+                  </Button>
+                </div>
+                {openConnect.isError && (
+                  <p className="text-sm text-destructive">{openConnect.error instanceof Error ? openConnect.error.message : "Could not open Stripe"}</p>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
 
         {/* Activity Tabs */}
         <Tabs defaultValue="all">
-          <TabsList className="w-full grid grid-cols-4">
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="genesis">Genesis</TabsTrigger>
-            <TabsTrigger value="earned">Earned</TabsTrigger>
-            <TabsTrigger value="payouts">Payouts</TabsTrigger>
+          <p className="kicker mb-2">// Ledger</p>
+          <TabsList className="grid h-auto w-full grid-cols-4 gap-1 rounded-none border-0 bg-transparent p-0">
+            <TabsTrigger value="all" className="mono-label h-11 rounded-none border-0 border-b-2 border-transparent text-[10px] shadow-none data-[state=active]:border-[hsl(var(--bubble))] data-[state=active]:bg-transparent data-[state=active]:shadow-none">All</TabsTrigger>
+            <TabsTrigger value="genesis" className="mono-label h-11 rounded-none border-0 border-b-2 border-transparent text-[10px] shadow-none data-[state=active]:border-[hsl(var(--bubble))] data-[state=active]:bg-transparent data-[state=active]:shadow-none">Genesis</TabsTrigger>
+            <TabsTrigger value="earned" className="mono-label h-11 rounded-none border-0 border-b-2 border-transparent text-[10px] shadow-none data-[state=active]:border-[hsl(var(--bubble))] data-[state=active]:bg-transparent data-[state=active]:shadow-none">Earned</TabsTrigger>
+            <TabsTrigger value="payouts" className="mono-label h-11 rounded-none border-0 border-b-2 border-transparent text-[10px] shadow-none data-[state=active]:border-[hsl(var(--bubble))] data-[state=active]:bg-transparent data-[state=active]:shadow-none">Payouts</TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="mt-4">
@@ -382,9 +342,7 @@ const WalletPage: React.FC = () => {
                 {payouts.map((payout) => (
                   <div key={payout.id} className="flex items-center justify-between p-3 rounded-lg bg-card border border-border">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                        <ArrowUpRight className="h-4 w-4" />
-                      </div>
+                      <SquircleIcon icon={ArrowUpRight} fill="gold" size={32} glyph={16} />
                       <div>
                         <p className="font-medium text-sm">Payout</p>
                         <p className="text-xs text-muted-foreground">

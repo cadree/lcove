@@ -1,5 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { eventStampLabel } from "../_shared/event-time.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
+import { resolveHostIdentity } from "../_shared/host-email-identity.ts";
+import { escapeHtml, guestEventEmailHtml } from "../_shared/guest-event-email.mjs";
+import { unsubscribeLink } from "../_shared/unsubscribe-link.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,7 +52,7 @@ serve(async (req) => {
     // Fetch event
     const { data: event, error: ee } = await admin
       .from("events")
-      .select("id, title, start_date, venue, city, creator_id")
+      .select("id, title, start_date, venue, city, creator_id, timezone, image_url")
       .eq("id", body.eventId)
       .single();
     if (ee || !event) throw new Error("Event not found");
@@ -64,7 +69,6 @@ serve(async (req) => {
     let displayName = body.attendeeName || "there";
     let pushEnabled = false;
     let emailEnabled = true;
-    const smsEnabled = true;
 
     if (body.attendeeUserId) {
       if (!email) {
@@ -98,9 +102,7 @@ serve(async (req) => {
     }
 
     const firstName = (displayName || "there").split(" ")[0];
-    const eventTime = new Date(event.start_date).toLocaleString("en-US", {
-      weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-    });
+    const eventTime = eventStampLabel(event.start_date, event.timezone);
     const vars = {
       first_name: firstName,
       event_name: event.title,
@@ -182,49 +184,39 @@ serve(async (req) => {
       const resendKey = Deno.env.get("RESEND_API_KEY");
       if (resendKey) {
         try {
-          const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-            <h1 style="color:#1a1a2e;">${finalTitle}</h1>
-            <p style="color:#555;line-height:1.6;">${finalBody.replace(/\n/g, "<br/>")}</p>
-            <a href="${eventUrl}" style="display:inline-block;background:#e91e8c;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin-top:16px;">View Event</a>
-            <p style="color:#888;font-size:12px;margin-top:24px;">— ETHER by lcove</p>
-          </div>`;
-          const r = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              from: "notifications@etherbylcove.com",
-              to: [email],
-              subject: finalTitle,
-              html,
-            }),
+          const identity = await resolveHostIdentity(admin, event.id);
+          const unsub = await unsubscribeLink(admin, email);
+          const location = [event.venue, event.city].filter(Boolean).join(", ") || "Location TBA";
+          const html = unsub.suppressed ? "" : guestEventEmailHtml({
+            hostName: identity.hostDisplayName,
+            hostAvatarUrl: identity.hostAvatarUrl,
+            flyerUrl: identity.headerImageUrl || event.image_url,
+            brandColor: identity.brandColor,
+            eventTitle: event.title,
+            eventDate: eventTime,
+            location,
+            mapUrl: `https://maps.google.com/?q=${encodeURIComponent(location)}`,
+            intro: escapeHtml(finalBody).replace(/\n/g, "<br/>"),
+            eventUrl,
+            unsubscribeUrl: unsub.url,
           });
+          const payload: Record<string, unknown> = {
+            from: identity.fromHeader,
+            to: [email],
+            subject: finalTitle,
+            html,
+          };
+          if (identity.replyTo) payload.reply_to = identity.replyTo;
+          const r = unsub.suppressed
+            ? new Response(null, { status: 200 })
+            : await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
           if (r.ok) { results.email = true; await logRow("email", "sent"); }
           else await logRow("email", "failed", await r.text());
         } catch (e) { await logRow("email", "failed", String(e)); }
-      }
-    }
-
-    // SMS
-    if (channels.sms && phone && smsEnabled) {
-      const sid = Deno.env.get("TWILIO_ACCOUNT_SID");
-      const auth = Deno.env.get("TWILIO_AUTH_TOKEN");
-      const from = Deno.env.get("TWILIO_PHONE_NUMBER");
-      if (sid && auth && from) {
-        try {
-          const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
-            method: "POST",
-            headers: {
-              Authorization: `Basic ${btoa(`${sid}:${auth}`)}`,
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-              To: phone, From: from,
-              Body: `${finalTitle}\n\n${finalBody}\n\n${eventUrl}`,
-            }),
-          });
-          if (r.ok) { results.sms = true; await logRow("sms", "sent"); }
-          else await logRow("sms", "failed", `${r.status}`);
-        } catch (e) { await logRow("sms", "failed", String(e)); }
       }
     }
 
@@ -241,7 +233,7 @@ serve(async (req) => {
     const msg = err instanceof Error ? err.message : String(err);
     log("ERROR", { msg });
     return new Response(JSON.stringify({ error: msg }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: httpStatusForError(err), headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
