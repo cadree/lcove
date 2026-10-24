@@ -5,7 +5,8 @@ import { QRCodeSVG } from "qrcode.react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle2, Calendar, Ticket, ArrowLeft, Share2, MapPin, User } from "lucide-react";
+import { Loader2, CheckCircle2, Calendar, Ticket, Share2, MapPin, User } from "lucide-react";
+import { BackButton } from "@/components/navigation/BackButton";
 import { supabase } from "@/integrations/supabase/client";
 import PageLayout from "@/components/layout/PageLayout";
 import { AddToCalendarButtons } from "@/components/calendar/AddToCalendarButtons";
@@ -125,9 +126,7 @@ export default function EventConfirmation() {
   return (
     <PageLayout>
       <div className="max-w-2xl mx-auto px-4 py-6">
-        <Link to={`/event/${eventId}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
-          <ArrowLeft className="w-4 h-4" /> Back to event
-        </Link>
+        <BackButton showLabel label="Back to event" fallback={eventId ? `/event/${eventId}` : "/calendar"} className="mb-4" />
 
         {loading ? (
           <div className="py-16 text-center">

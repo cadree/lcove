@@ -88,7 +88,7 @@ Signed-in callers, or a policy that applies only to `authenticated`.
 
 ## Ether ID
 
-`20261024120000_ether_id.sql` grants these itself.
+`20261024150000_ether_id.sql` grants these itself.
 
 | Function | Class | Who can execute |
 | --- | --- | --- |

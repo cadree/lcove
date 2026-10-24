@@ -18,6 +18,7 @@ interface Role {
   category: string | null;
 }
 
+// Signup no longer mounts this step. Roles stay editable on the profile.
 const OnboardingRoles = ({ data, updateData, onNext, onBack }: Props) => {
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);

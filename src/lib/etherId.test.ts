@@ -15,7 +15,7 @@ import {
 } from "./etherId.ts";
 
 const migration = readFileSync(
-  new URL("../../supabase/migrations/20261024120000_ether_id.sql", import.meta.url),
+  new URL("../../supabase/migrations/20261024150000_ether_id.sql", import.meta.url),
   "utf8",
 );
 

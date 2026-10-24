@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { SHOT_USER_ID, shotProfile, shotSessionEnabled } from '@/lib/shotSession';
+import { SHOT_USER_ID, shotOnboardingPreview, shotProfile, shotSessionEnabled } from '@/lib/shotSession';
 
 export interface SocialLinks {
   instagram?: string;
@@ -94,8 +94,11 @@ function loadProfile(userId: string, own: boolean, fresh = false): Promise<Profi
 
   const pending = (async () => {
     if (shotSessionEnabled() && userId === SHOT_USER_ID) {
-      profileCache.set(key, shotProfile);
-      return shotProfile;
+      const profile = shotOnboardingPreview()
+        ? { ...shotProfile, onboarding_completed: false }
+        : shotProfile;
+      profileCache.set(key, profile);
+      return profile;
     }
 
     // Own row includes phone and the exam score. Other members come from

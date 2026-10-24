@@ -191,9 +191,13 @@ BEGIN
   PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   EXECUTE 'RESET ROLE';
   EXECUTE 'SET LOCAL ROLE authenticated';
-  UPDATE public.profiles
-  SET is_suspended = true, suspended_at = now(), suspension_reason = 'fixture'
-  WHERE user_id = '11111111-1111-4111-8111-111111111111';
+  -- Direct profile updates of standing are refused for every authenticated
+  -- session, including admins. The admin console RPC is the real path.
+  PERFORM public.admin_set_user_access(
+    '11111111-1111-4111-8111-111111111111',
+    'suspend',
+    'fixture'
+  );
 
   PERFORM set_config('request.jwt.claim.role', 'anon', true);
   PERFORM set_config('request.jwt.claim.sub', '', true);
@@ -240,9 +244,11 @@ BEGIN
   PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   EXECUTE 'RESET ROLE';
   EXECUTE 'SET LOCAL ROLE authenticated';
-  UPDATE public.profiles
-  SET access_status = 'banned'
-  WHERE user_id = '11111111-1111-4111-8111-111111111111';
+  PERFORM public.admin_set_user_access(
+    '11111111-1111-4111-8111-111111111111',
+    'ban',
+    'fixture'
+  );
 
   PERFORM set_config('request.jwt.claim.role', 'anon', true);
   PERFORM set_config('request.jwt.claim.sub', '', true);

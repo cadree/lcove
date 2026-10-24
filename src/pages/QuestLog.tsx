@@ -11,6 +11,7 @@ import { dailyDecodeCopy, decryptedKey, type QuestView } from "@/lib/noviQuests"
 import { useXpCelebrate } from "@/hooks/useXpCelebrate";
 import { useEasedNumber } from "@/hooks/useEasedNumber";
 import { QuestHero } from "@/components/novi/QuestHero";
+import { BackButton } from "@/components/navigation/BackButton";
 
 const tabs = ["Active", "Daily", "Story", "Done"] as const;
 type Tab = (typeof tabs)[number];
@@ -35,6 +36,7 @@ const QuestLog = () => {
   return (
     <PageLayout>
       <div className="mx-auto max-w-md px-4 pb-28 pt-4">
+        <BackButton label="Back" className="mb-3" />
         <p className="kicker">// Neo gold</p>
         <QuestHero
           displayedXp={shown}

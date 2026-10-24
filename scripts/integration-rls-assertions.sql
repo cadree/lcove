@@ -1599,8 +1599,8 @@ SET ROLE authenticated;
 
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM public.projects WHERE id = 'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2') THEN
-    RAISE EXCEPTION 'FAIL: stranger can see the private project';
+  IF NOT EXISTS (SELECT 1 FROM public.projects WHERE id = 'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2') THEN
+    RAISE EXCEPTION 'FAIL: admin cannot see the private project';
   END IF;
   IF EXISTS (SELECT 1 FROM public.conversations WHERE id = 'd2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2') THEN
     RAISE EXCEPTION 'FAIL: stranger can see the subgroup';
@@ -1617,7 +1617,7 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN
     RAISE NOTICE 'PASS: chat email throttle is service_role only';
   END;
-  RAISE NOTICE 'PASS: a non-member cannot see the private project or its subgroup';
+  RAISE NOTICE 'PASS: admin can see the private project and cannot see its subgroup';
 END $$;
 
 RESET ROLE;

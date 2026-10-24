@@ -22,7 +22,7 @@ A member card for every account. The in-app card is `/id`. The profile entry is 
 3. **Active** when `access_status = 'active'`, onboarding is complete, and `last_active_at` is within 30 days. That 30-day window is the one audience targeting already uses.
 4. **Inactive** otherwise.
 
-A member cannot ban, unban, suspend, or unsuspend themselves. Onboarding can still move a non-banned account to active. An admin status change updates `ether_id_passes.updated_at` and queues an Apple push when a device is registered. The verify function reads `profiles` on each call, so the public page flips without waiting for Wallet.
+A member cannot ban, unban, suspend, or unsuspend themselves. Onboarding can still move a non-banned account to active. Admins change standing through `admin_set_user_access`. That update moves `ether_id_passes.updated_at` and queues an Apple push when a device is registered. The verify function reads `profiles` on each call, so the public page flips without waiting for Wallet.
 
 ## Token
 
@@ -74,4 +74,4 @@ WHERE id = 1;
 
 Until those secrets and that row are set, the in-app card and the verify page work. Wallet passes are not issued, and a ban does not push to Apple. The pass row's `updated_at` still moves, so the next device fetch would get the new status once signing is configured.
 
-Pushes that touch `supabase/functions` deploy this function. It returns `{ configured: false }` and does not sign anything when the secrets are missing.
+`deploy-supabase` is manual (`workflow_dispatch` only). A push does not deploy this function. When it is deployed, it returns `{ configured: false }` and does not sign anything while the secrets are missing.
