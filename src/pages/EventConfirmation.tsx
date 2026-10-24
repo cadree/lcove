@@ -17,6 +17,8 @@ export default function EventConfirmation() {
   const [error, setError] = useState<string | null>(null);
   const [ticketCount, setTicketCount] = useState(1);
   const [qr, setQr] = useState<string | null>(null);
+  const [ticketId, setTicketId] = useState<string | null>(null);
+  const [confirmedOrderId, setConfirmedOrderId] = useState<string | null>(orderIdParam);
   const [hostName, setHostName] = useState("Host");
   const [title, setTitle] = useState("");
   const [whenLabel, setWhenLabel] = useState("");
@@ -63,6 +65,8 @@ export default function EventConfirmation() {
         if (data?.error) throw new Error(data.error);
         const attendees = data?.attendees || [];
         setTicketCount(data?.order?.quantity || attendees.length || 1);
+        setTicketId(attendees[0]?.id || null);
+        setConfirmedOrderId(data?.order?.id || orderIdParam);
         setQr(attendees[0]?.qr_code || null);
         setLoading(false);
       } catch (failure) {
@@ -122,7 +126,7 @@ export default function EventConfirmation() {
       ticketCount={ticketCount}
       qrValue={qr}
       subscribed={subscribed}
-      walletEnabled={walletEnabled}
+      walletEnabled={walletEnabled && Boolean(ticketId || confirmedOrderId)}
       onUpdates={async () => {
         if (!("Notification" in window)) {
           toast.message("Updates stay in the confirmation email.");
@@ -133,9 +137,12 @@ export default function EventConfirmation() {
         setSubscribed(permission === "granted");
       }}
       onWallet={async () => {
-        const { data, error: walletError } = await supabase.functions.invoke("generate-wallet-pass", {
-          body: { eventId, eventTitle: title, venue: address, guestName: hostName, qrCode: qr, hostName },
-        });
+        const body = ticketId ? { ticketId } : confirmedOrderId ? { orderId: confirmedOrderId } : null;
+        if (!body) {
+          toast.error("Wallet pass is not available.");
+          return;
+        }
+        const { data, error: walletError } = await supabase.functions.invoke("generate-wallet-pass", { body });
         if (walletError || !data?.pkpass) {
           toast.error("Wallet pass is not available.");
           return;
