@@ -22902,12 +22902,15 @@ BEGIN
       USING ERRCODE = '42501';
   END IF;
 
-  IF TG_TABLE_NAME = 'store_items'
-    AND (OLD.hidden_at IS NOT NULL OR OLD.removed_at IS NOT NULL)
-    AND NEW.is_active IS DISTINCT FROM OLD.is_active
-  THEN
-    RAISE EXCEPTION 'An admin is holding this item'
-      USING ERRCODE = '42501';
+  -- Nested so is_active is only read on store_items. PL/pgSQL does not
+  -- short-circuit AND, and other tables have no is_active field.
+  IF TG_TABLE_NAME = 'store_items' THEN
+    IF (OLD.hidden_at IS NOT NULL OR OLD.removed_at IS NOT NULL)
+      AND NEW.is_active IS DISTINCT FROM OLD.is_active
+    THEN
+      RAISE EXCEPTION 'An admin is holding this item'
+        USING ERRCODE = '42501';
+    END IF;
   END IF;
 
   RETURN NEW;
@@ -22936,6 +22939,11 @@ END
 $mod_triggers$;
 $ether_m179s17$;
   EXECUTE $ether_m179s18$
+-- INSERT, and UPDATE of columns a person writes. Not every UPDATE:
+-- a like counter or a read receipt is applied by a SECURITY DEFINER
+-- function while the caller's JWT is still set. This function is also
+-- DEFINER, so current_user cannot tell those apart from a direct edit.
+-- The column list is the split. Bookkeeping columns are left off it.
 CREATE OR REPLACE FUNCTION public.reject_inactive_account()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -22965,19 +22973,76 @@ $ether_m179s18$;
 DO $inactive$
 DECLARE
   target text;
+  wanted text[];
+  present text[];
+  col text;
+  column_list text;
 BEGIN
   FOREACH target IN ARRAY ARRAY['posts', 'post_comments', 'events', 'store_items', 'messages']
   LOOP
     IF to_regclass('public.' || target) IS NULL THEN
       CONTINUE;
     END IF;
+
+    wanted := CASE target
+      WHEN 'posts' THEN ARRAY[
+        'content', 'media_url', 'media_type', 'location', 'alt_text',
+        'collaborators', 'comments_enabled', 'post_type', 'folder_id',
+        'embed_provider', 'embed_video_id', 'embed_hash',
+        'embed_thumbnail_url', 'embed_title'
+      ]
+      WHEN 'post_comments' THEN ARRAY['content']
+      WHEN 'events' THEN ARRAY[
+        'title', 'description', 'city', 'address', 'venue', 'start_date',
+        'end_date', 'image_url', 'event_type', 'ticket_price', 'ticket_type',
+        'capacity', 'is_public', 'external_url', 'credits_price', 'recurrence',
+        'timezone', 'country', 'state', 'status', 'requires_approval',
+        'waitlist_enabled', 'organization_id', 'project_id', 'published_at'
+      ]
+      WHEN 'store_items' THEN ARRAY[
+        'title', 'description', 'price', 'currency', 'images', 'type',
+        'is_active', 'amenities', 'category_id', 'contact_email',
+        'contact_phone', 'credits_price', 'duration_minutes', 'location'
+      ]
+      WHEN 'messages' THEN ARRAY[
+        'content', 'media_url', 'media_type', 'reply_to_id', 'deleted_at',
+        'shared_post_id', 'shared_profile_id', 'shared_story_id',
+        'shared_from_conversation_id', 'shared_from_message_id'
+      ]
+    END;
+
+    present := ARRAY[]::text[];
+    FOREACH col IN ARRAY wanted
+    LOOP
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = target
+          AND column_name = col
+      ) THEN
+        present := present || col;
+      END IF;
+    END LOOP;
+
     EXECUTE format('DROP TRIGGER IF EXISTS reject_inactive_account ON public.%I', target);
-    EXECUTE format(
-      'CREATE TRIGGER reject_inactive_account
-         BEFORE INSERT OR UPDATE ON public.%I
-         FOR EACH ROW EXECUTE FUNCTION public.reject_inactive_account()',
-      target
-    );
+    IF COALESCE(cardinality(present), 0) = 0 THEN
+      EXECUTE format(
+        'CREATE TRIGGER reject_inactive_account
+           BEFORE INSERT ON public.%I
+           FOR EACH ROW EXECUTE FUNCTION public.reject_inactive_account()',
+        target
+      );
+    ELSE
+      SELECT string_agg(quote_ident(c), ', ') INTO column_list FROM unnest(present) AS c;
+      EXECUTE format(
+        'CREATE TRIGGER reject_inactive_account
+           BEFORE INSERT OR UPDATE OF %s ON public.%I
+           FOR EACH ROW EXECUTE FUNCTION public.reject_inactive_account()',
+        column_list,
+        target
+      );
+    END IF;
   END LOOP;
 END
 $inactive$;

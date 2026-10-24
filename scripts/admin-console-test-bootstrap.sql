@@ -209,6 +209,12 @@ CREATE POLICY "Users insert own posts" ON public.posts
   FOR INSERT TO authenticated
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users update own posts" ON public.posts;
+CREATE POLICY "Users update own posts" ON public.posts
+  FOR UPDATE TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
 DROP POLICY IF EXISTS "Admins read actions" ON public.admin_actions;
 CREATE POLICY "Admins read actions" ON public.admin_actions
   FOR SELECT TO authenticated

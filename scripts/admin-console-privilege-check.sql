@@ -161,6 +161,19 @@ BEGIN
   IF EXISTS (SELECT 1 FROM public.posts WHERE content = 'still posting') THEN
     RAISE EXCEPTION 'FAIL suspended post was stored';
   END IF;
+  BEGIN
+    UPDATE public.posts
+      SET content = 'rewritten while suspended'
+      WHERE id = '01999999-0000-4000-8000-000000000010';
+    RAISE EXCEPTION 'FAIL suspended account rewrote a post';
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      RAISE NOTICE 'PASS suspended account cannot edit a post';
+  END;
+  UPDATE public.posts
+    SET created_at = created_at
+    WHERE id = '01999999-0000-4000-8000-000000000010';
+  RAISE NOTICE 'PASS suspended account bookkeeping update is allowed';
   PERFORM set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
 
   PERFORM public.admin_moderate_content('post', '01999999-0000-4000-8000-000000000010', 'hide', 'ai rule', NULL);
