@@ -40,7 +40,9 @@ BEGIN
   FROM information_schema.columns
   WHERE table_schema = 'public'
     AND table_name = 'profiles_public'
-    AND column_name IN ('birthday_month', 'birthday_day', 'show_birthday', 'username', 'birth_year');
+    AND column_name IN (
+      'birthday_month', 'birthday_day', 'show_birthday', 'username', 'birth_year', 'passion_title'
+    );
   IF hidden IS NOT NULL THEN
     RAISE EXCEPTION 'FAIL: profiles_public exposes %', hidden;
   END IF;
@@ -58,6 +60,7 @@ DECLARE
   pass_auth text;
   created boolean;
   pushes integer;
+  wrote integer;
 BEGIN
   PERFORM set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
   PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
@@ -127,6 +130,24 @@ BEGIN
 
   BEGIN
     UPDATE public.profiles
+    SET passion_title = '1234567890123456789012345'
+    WHERE user_id = '11111111-1111-4111-8111-111111111111';
+    RAISE EXCEPTION 'FAIL: passion title over 24 was stored';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE '%24 characters%' THEN
+      RAISE;
+    END IF;
+  END;
+
+  UPDATE public.profiles
+  SET passion_title = '   '
+  WHERE user_id = '11111111-1111-4111-8111-111111111111';
+  IF (SELECT passion_title FROM public.profiles WHERE user_id = '11111111-1111-4111-8111-111111111111') IS NOT NULL THEN
+    RAISE EXCEPTION 'FAIL: blank passion title was not cleared';
+  END IF;
+
+  BEGIN
+    UPDATE public.profiles
     SET is_suspended = true
     WHERE user_id = '11111111-1111-4111-8111-111111111111';
     RAISE EXCEPTION 'FAIL: member suspended themselves';
@@ -139,6 +160,18 @@ BEGIN
   FROM public.passions
   WHERE name = 'Photography'
   LIMIT 1;
+
+  card := public.get_my_ether_id();
+  IF card->>'passion' IS NOT NULL THEN
+    RAISE EXCEPTION 'FAIL: passion fell back to user_passions: %', card->>'passion';
+  END IF;
+
+  UPDATE public.profiles
+  SET passion_title = '  Creative Directing  '
+  WHERE user_id = '11111111-1111-4111-8111-111111111111';
+  IF (SELECT passion_title FROM public.profiles WHERE user_id = '11111111-1111-4111-8111-111111111111') <> 'Creative Directing' THEN
+    RAISE EXCEPTION 'FAIL: passion title was not trimmed';
+  END IF;
 
   INSERT INTO public.projects (id, creator_id, title, status)
   VALUES ('a1111111-1111-4111-8111-1111111111e1', '11111111-1111-4111-8111-111111111111', 'Finished by A', 'completed');
@@ -196,7 +229,7 @@ BEGIN
   IF card->>'status' <> 'Active' THEN
     RAISE EXCEPTION 'FAIL: expected Active, got %', card->>'status';
   END IF;
-  IF card->>'username' <> 'member_a' OR card->>'passion' <> 'Photography' THEN
+  IF card->>'username' <> 'member_a' OR card->>'passion' <> 'Creative Directing' THEN
     RAISE EXCEPTION 'FAIL: username or passion mismatch: %', card;
   END IF;
   IF (card->>'peer_review_count')::int <> 2 OR card->>'peer_review_average' <> '4.5' THEN
@@ -357,6 +390,13 @@ BEGIN
     SELECT 1 FROM public.profiles WHERE user_id = '11111111-1111-4111-8111-111111111111'
   ) THEN
     RAISE EXCEPTION 'FAIL: another member read the owner profile row';
+  END IF;
+  UPDATE public.profiles
+  SET passion_title = 'Stolen'
+  WHERE user_id = '11111111-1111-4111-8111-111111111111';
+  GET DIAGNOSTICS wrote = ROW_COUNT;
+  IF wrote <> 0 THEN
+    RAISE EXCEPTION 'FAIL: another member wrote the passion title';
   END IF;
   BEGIN
     PERFORM public.ether_id_card_for_service('11111111-1111-4111-8111-111111111111');

@@ -22,14 +22,6 @@ export function memberOfPass(value) {
   return shown(value) || "LCOVE";
 }
 
-function usernamePass(value) {
-  const text = shown(value);
-  if (!text || /^no username\b/i.test(text)) return null;
-  const handle = text.replace(/^@+/, "");
-  if (!handle) return null;
-  return `@${handle}`;
-}
-
 function reviewPass(card) {
   const count = card.peer_review_count;
   if (typeof count === "number" && count <= 0) return null;
@@ -110,14 +102,13 @@ function initials(displayName) {
   return `${first}${last}`.toUpperCase();
 }
 
-/** Words painted into the strip. Empty passion, username, and city are left out. */
+/** Words painted into the strip. Empty passion and city are left out. */
 export function etherIdStripCopy(card) {
   const passion = shown(card.passion);
   const city = shown(card.city);
   const kicker = [passion ? passion.split(" ")[0] : "", city || ""].filter(Boolean);
   return {
     nameLines: nameLines(card.display_name),
-    handle: usernamePass(card.username),
     kicker: kicker.length ? `— ${kicker.join(" · ")}`.toUpperCase() : null,
     chip: passion ? passion.toUpperCase() : null,
     initials: initials(card.display_name),

@@ -6,16 +6,16 @@ import { toneForPath } from "./screenTone.ts";
 import {
   birthdayError,
   birthdayFace,
-  cardHandleLine,
   cardInitials,
   cardKicker,
   cardNameLines,
-  firstRoleName,
   isPublicVerifyCard,
   memberOfError,
   memberOfFace,
   memberSinceShort,
   memberStatus,
+  normalizePassionTitle,
+  passionTitleError,
   reviewsFace,
   usernameAt,
   usernameError,
@@ -29,6 +29,14 @@ const migration = readFileSync(
 );
 const memberOfMigration = readFileSync(
   new URL("../../supabase/migrations/20261025120000_profile_member_of.sql", import.meta.url),
+  "utf8",
+);
+const passionTitleMigration = readFileSync(
+  new URL("../../supabase/migrations/20261026120000_profile_passion_title.sql", import.meta.url),
+  "utf8",
+);
+const etherIdFace = readFileSync(
+  new URL("../components/profile/EtherIdFace.tsx", import.meta.url),
   "utf8",
 );
 
@@ -98,14 +106,27 @@ describe("birthday", () => {
   });
 });
 
-describe("in-app handle line", () => {
-  it("prefixes the first role and leaves a card with no role unchanged", () => {
-    assert.equal(firstRoleName([{ name: "  " }, { name: "Designer" }, { name: "Editor" }]), "Designer");
-    assert.equal(firstRoleName([]), null);
-    assert.equal(cardHandleLine("Designer", "maya"), "Designer · @maya");
-    assert.equal(cardHandleLine("Designer", null), "Designer · No username yet");
-    assert.equal(cardHandleLine(null, "maya"), "@maya");
-    assert.equal(cardHandleLine("  ", null), "No username yet");
+describe("passion title", () => {
+  it("trims a typed title and rejects more than 24 characters", () => {
+    assert.equal(normalizePassionTitle("  Filmmaker  "), "Filmmaker");
+    assert.equal(normalizePassionTitle("   "), null);
+    assert.equal(normalizePassionTitle(null), null);
+    assert.equal(passionTitleError(""), null);
+    assert.equal(passionTitleError("x".repeat(24)), null);
+    assert.equal(passionTitleError(`  ${"x".repeat(24)}  `), null);
+    assert.equal(passionTitleError("x".repeat(25)), "Passion is 24 characters or fewer.");
+  });
+
+  it("stores the title on the profile and does not fall back to a role or user passion", () => {
+    assert.match(passionTitleMigration, /ADD COLUMN IF NOT EXISTS passion_title text/);
+    assert.match(passionTitleMigration, /char_length\(passion_title\) <= 24/);
+    assert.match(passionTitleMigration, /passion title is 24 characters or fewer/);
+    assert.match(passionTitleMigration, /passion_title\), ''\)/);
+    assert.match(passionTitleMigration, /v_city, v_passion/);
+    assert.doesNotMatch(passionTitleMigration, /FROM public\.user_passions/);
+    assert.doesNotMatch(etherIdFace, /ether-id-handle/);
+    assert.doesNotMatch(etherIdFace, /Designer/);
+    assert.match(etherIdFace, /Add your passion/);
   });
 });
 
