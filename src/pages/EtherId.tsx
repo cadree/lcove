@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { EtherIdFace, monthName } from "@/components/profile/EtherIdFace";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserCreativeRoles } from "@/hooks/useUserDetails";
 import { supabase } from "@/integrations/supabase/client";
 import { openInSafari } from "@/lib/externalCheckout";
 import { isIosApp } from "@/lib/platform";
@@ -21,6 +22,7 @@ import {
   normalizeUsername,
   usernameError,
   verifyUrl,
+  firstRoleName,
   walletButtonVisible,
   type EtherIdCard,
 } from "@/lib/etherId";
@@ -58,13 +60,15 @@ async function loadCard(): Promise<EtherIdCard | null> {
 }
 
 export default function EtherId() {
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   useEffect(() => {
     document.body.classList.add("ether-id-page");
     return () => document.body.classList.remove("ether-id-page");
   }, []);
   const queryClient = useQueryClient();
   const shot = shotSessionEnabled();
+  const { data: creativeRoles = [] } = useUserCreativeRoles(shot ? undefined : user?.id);
+  const roleName = firstRoleName(creativeRoles);
   const cardQuery = useQuery({ queryKey: ["ether-id"], queryFn: loadCard });
   const walletQuery = useQuery({
     queryKey: ["ether-id-wallet"],
@@ -191,7 +195,7 @@ export default function EtherId() {
         {card && (
           <>
             <div className="min-w-0 max-w-full">
-              <EtherIdFace card={card} verifyHref={href} />
+              <EtherIdFace card={card} verifyHref={href} role={roleName} />
             </div>
             <div className="mt-4 flex flex-col gap-2">
               <Button type="button" variant="outline" className="min-h-11" onClick={() => refresh.mutate()} disabled={refresh.isPending}>

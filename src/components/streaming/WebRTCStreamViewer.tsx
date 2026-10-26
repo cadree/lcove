@@ -2,11 +2,18 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Room, RoomEvent, Track, type RemoteParticipant, type RemoteTrack } from "livekit-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Radio, RefreshCw, Users, Volume2, WifiOff } from "lucide-react";
+import { Loader2, Radio, RefreshCw, Users, VideoOff, Volume2, WifiOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { errorMessage } from "@/lib/errorMessage";
 import { LIVE_VIDEO_NOT_CONFIGURED, nextTokenRefreshDelay, parseLiveKitTokenResponse, type LiveKitSession } from "@/lib/livekitSession";
 import { prepareVideoElement, setAudioSession } from "@/lib/livePhone";
+import {
+  EMPTY_VIEWER_PICTURE,
+  hostCameraOff,
+  reduceViewerPicture,
+  type ViewerPictureEvent,
+  type ViewerPictureState,
+} from "@/lib/liveViewer";
 import { shotViewerPreview } from "@/lib/shotSession";
 import { LIVE_REQUEST_TIMEOUT_MS, withDeadline } from "@/lib/withDeadline";
 
@@ -61,7 +68,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       void connectRef.current();
     }, delay);
   };
-  const [hasVideo, setHasVideo] = useState(false);
+  const [picture, setPicture] = useState<ViewerPictureState>(EMPTY_VIEWER_PICTURE);
   const [needsSound, setNeedsSound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -109,7 +116,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
     const still = () => attempt === attemptRef.current;
     setPhase("connecting");
     setError(null);
-    setHasVideo(false);
+    setPicture(EMPTY_VIEWER_PICTURE);
     setNeedsSound(false);
     setAudioSession(navigator, "playback");
 
@@ -129,21 +136,41 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       });
       roomRef.current = room;
 
+      const notePicture = (event: ViewerPictureEvent) => {
+        setPicture((current) => reduceViewerPicture(current, event));
+      };
+
+      const bindRemoteVideo = (video: HTMLVideoElement) => {
+        prepareVideoElement(video, "remote");
+        video.defaultMuted = true;
+        video.muted = true;
+        video.setAttribute("muted", "");
+        video.play().catch(() => setNeedsSound(true));
+      };
+
       const attachHostTrack = (track: RemoteTrack, participant: RemoteParticipant) => {
         if (participant.identity !== hostId || !still()) return;
         if (track.kind === Track.Kind.Video && videoRef.current) {
-          prepareVideoElement(videoRef.current, "remote");
-          videoRef.current.muted = true;
-          track.attach(videoRef.current);
-          setHasVideo(true);
-          setPhase("watching");
-          videoRef.current.play().catch(() => setNeedsSound(true));
+          const video = videoRef.current;
+          const muted = track.isMuted;
+          prepareVideoElement(video, "remote");
+          video.muted = true;
+          track.attach(video);
+          bindRemoteVideo(video);
+          notePicture({ type: "subscribed", kind: "video", muted });
+          if (!muted) {
+            setPhase("watching");
+            window.setTimeout(() => {
+              if (still() && videoRef.current === video) bindRemoteVideo(video);
+            }, 0);
+          }
         }
         if (track.kind === Track.Kind.Audio) {
           const element = track.attach();
           element.autoplay = true;
           element.setAttribute("playsinline", "true");
           audioRef.current.push(element);
+          notePicture({ type: "subscribed", kind: "audio", muted: track.isMuted });
           element.play().then(() => setNeedsSound(false)).catch(() => setNeedsSound(true));
         }
       };
@@ -153,10 +180,29 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       });
       room.on(RoomEvent.TrackUnsubscribed, (track, _publication, participant) => {
         track.detach();
-        if (participant.identity === hostId && track.kind === Track.Kind.Video && still()) {
-          setHasVideo(false);
+        if (participant.identity !== hostId || !still()) return;
+        if (track.kind === Track.Kind.Video) {
+          notePicture({ type: "unsubscribed", kind: "video" });
           setPhase("waiting");
         }
+        if (track.kind === Track.Kind.Audio) notePicture({ type: "unsubscribed", kind: "audio" });
+      });
+      room.on(RoomEvent.TrackMuted, (publication, participant) => {
+        if (participant.identity !== hostId || !still()) return;
+        if (publication.kind === Track.Kind.Video) notePicture({ type: "muted", kind: "video" });
+      });
+      room.on(RoomEvent.TrackUnmuted, (publication, participant) => {
+        if (participant.identity !== hostId || !still()) return;
+        if (publication.kind !== Track.Kind.Video) return;
+        const video = videoRef.current;
+        if (video && publication.track) {
+          prepareVideoElement(video, "remote");
+          video.muted = true;
+          publication.track.attach(video);
+          bindRemoteVideo(video);
+        }
+        notePicture({ type: "unmuted", kind: "video" });
+        setPhase("watching");
       });
       room.on(RoomEvent.Reconnecting, () => {
         if (still()) setPhase("reconnecting");
@@ -182,8 +228,14 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
       }
       room.remoteParticipants.forEach((participant) => {
         participant.trackPublications.forEach((publication) => {
-          if (publication.track) attachHostTrack(publication.track, participant);
-          else publication.setSubscribed(true);
+          if (publication.track) {
+            attachHostTrack(publication.track, participant);
+            return;
+          }
+          publication.setSubscribed(true);
+          if (participant.identity === hostId && publication.kind === Track.Kind.Video && publication.isMuted && still()) {
+            notePicture({ type: "muted", kind: "video" });
+          }
         });
       });
       if (still()) {
@@ -233,10 +285,11 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
   }
 
   const showWaiting = phase === "waiting" || phase === "connecting" || phase === "reconnecting";
+  const cameraOff = hostCameraOff(picture, phase);
 
   return (
     <div className="relative h-full min-h-[34vh] w-full bg-black">
-      {thumbnailUrl && !hasVideo && (
+      {thumbnailUrl && !picture.hasVideo && (
         <img src={thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" />
       )}
       <video
@@ -245,7 +298,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
         autoPlay
         playsInline
         muted
-        className={`absolute inset-0 h-full w-full object-contain ${hasVideo ? "opacity-100" : "opacity-0"}`}
+        className="absolute inset-0 h-full w-full object-contain"
       />
 
       {phase === "not-configured" && (
@@ -264,7 +317,16 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
         </div>
       )}
 
-      {showWaiting && !error && (
+      {cameraOff && (
+        <div data-testid="host-camera-off" className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-br from-muted/40 to-background/90">
+          <div className="px-4 text-center">
+            <VideoOff className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+            <p className="font-medium text-foreground">Host camera is off</p>
+          </div>
+        </div>
+      )}
+
+      {showWaiting && !error && !cameraOff && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-background/80">
           <div className="text-center">
             {phase === "waiting" ? (
@@ -305,7 +367,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
         </Button>
       )}
 
-      <div className="absolute left-4 top-4 z-10 flex gap-2">
+      <div className="absolute left-4 top-[max(0.75rem,env(safe-area-inset-top))] z-10 flex gap-2">
         <Badge className="animate-pulse bg-red-500">
           <Radio className="mr-1 h-3 w-3" />
           LIVE
