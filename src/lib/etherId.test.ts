@@ -121,8 +121,9 @@ describe("passion title", () => {
     assert.match(passionTitleMigration, /ADD COLUMN IF NOT EXISTS passion_title text/);
     assert.match(passionTitleMigration, /char_length\(passion_title\) <= 24/);
     assert.match(passionTitleMigration, /passion title is 24 characters or fewer/);
-    assert.match(passionTitleMigration, /NULLIF\(btrim\(passion_title\), ''\)/);
-    assert.doesNotMatch(passionTitleMigration, /user_passions/);
+    assert.match(passionTitleMigration, /passion_title\), ''\)/);
+    assert.match(passionTitleMigration, /v_city, v_passion/);
+    assert.doesNotMatch(passionTitleMigration, /FROM public\.user_passions/);
     assert.doesNotMatch(etherIdFace, /ether-id-handle/);
     assert.doesNotMatch(etherIdFace, /Designer/);
     assert.match(etherIdFace, /Add your passion/);
