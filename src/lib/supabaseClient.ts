@@ -3,7 +3,7 @@ import { StorageApiError } from "@supabase/storage-js";
 import { Capacitor } from "@capacitor/core";
 import { toast } from "sonner";
 import { capacitorStorage } from "@/lib/capacitorStorage";
-import { prepareStorageBody, StorageLimitError } from "@/lib/prepareStorageUpload";
+import { HeicConversionError, prepareStorageBody, StorageLimitError } from "@/lib/prepareStorageUpload";
 import { withServerFunctionMessage } from "@/lib/functionError";
 import { reviewImageUpload } from "@/lib/nsfwImageCheck";
 import { EXPLICIT_REMOVED_MESSAGE, IMAGE_CHECK_WAIT_MS, settleReview } from "@/lib/nsfwGate";
@@ -89,6 +89,10 @@ function blockedImageError(message: string) {
   return new StorageApiError(message, 422, "422");
 }
 
+function unsupportedImageError(message: string) {
+  return new StorageApiError(message, 415, "415");
+}
+
 async function removePublishedImage(
   bucket: { remove: (paths: string[]) => Promise<{ error: { message?: string } | null }> },
   bucketId: string,
@@ -135,6 +139,10 @@ supabase.storage.from = ((bucketId: string) => {
           options = { ...fileOptions, contentType: prepared.contentType };
         }
       } catch (error) {
+        if (error instanceof HeicConversionError) {
+          console.error("HEIC conversion failed", error);
+          return { data: null, error: unsupportedImageError(error.message) };
+        }
         const kind = fileKind(blob instanceof File ? blob.name : "", blob.type || "");
         const message = error instanceof StorageLimitError ? error.message : storageLimitMessage(kind);
         console.error("Upload blocked before storage", error);

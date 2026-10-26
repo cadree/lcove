@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
+import { jpegStorageName } from "@/lib/heicImage";
 import { cn } from "@/lib/utils";
 import { ProfileMusicSourceSelector, MusicData } from "./ProfileMusicSourceSelector";
 import { ProfileThemeCustomizer, CustomizationState } from "./ProfileThemeCustomizer";
@@ -158,7 +159,7 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/profile-bg-${Date.now()}.${fileExt}`;
+      const fileName = jpegStorageName(`${user.id}/profile-bg-${Date.now()}.${fileExt}`, file.type);
 
       const { error: uploadError } = await supabase.storage
         .from('media')

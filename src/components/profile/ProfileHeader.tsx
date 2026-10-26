@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { errorMessage } from '@/lib/errorMessage';
+import { jpegStorageName } from '@/lib/heicImage';
 import type { ProfileCustomization } from '@/hooks/useProfileCustomization';
 import { useCreatorVerification } from '@/hooks/useCreatorVerification';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -119,7 +120,7 @@ export function ProfileHeader({
     setUploadingAvatar(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${userId}/avatar.${fileExt}`;
+      const fileName = jpegStorageName(`${userId}/avatar.${fileExt}`, file.type);
 
       const { error: uploadError } = await supabase.storage
         .from('media')

@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { validateEventDraft } from "@/lib/guestEvent";
 import { zonedParts, zonedWallTimeToUtc } from "@/lib/eventTime";
 import { errorMessage } from "@/lib/errorMessage";
+import { isHeicImage, jpegStorageName } from "@/lib/heicImage";
 import { toast } from "sonner";
 
 function browserZone() {
@@ -139,12 +140,12 @@ export default function HostEventEditor() {
   }
 
   const onFlyer = async (file: File) => {
-    if (!file.type.startsWith("image/") || file.size > 10 * 1024 * 1024) {
+    if ((!file.type.startsWith("image/") && !isHeicImage(file.name, file.type)) || file.size > 10 * 1024 * 1024) {
       toast.error("Use an image under 10MB.");
       return;
     }
     const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    const path = `${user.id}/event-images/event-${Date.now()}.${ext}`;
+    const path = jpegStorageName(`${user.id}/event-images/event-${Date.now()}.${ext}`, file.type);
     const { error } = await supabase.storage.from("media").upload(path, file, { upsert: false, contentType: file.type || undefined });
     if (error) {
       toast.error(errorMessage(error, "Flyer upload failed"));
