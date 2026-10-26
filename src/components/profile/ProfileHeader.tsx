@@ -10,7 +10,10 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { errorMessage } from '@/lib/errorMessage';
-import { jpegStorageName } from '@/lib/heicImage';
+import { isHeicImage, jpegStorageName } from '@/lib/heicImage';
+import { prepareStorageBody, StorageLimitError } from '@/lib/prepareStorageUpload';
+import { decideBySize, fileKind } from '@/lib/storageLimit';
+import { ProfilePhotoCropDialog } from '@/components/profile/ProfilePhotoCropDialog';
 import type { ProfileCustomization } from '@/hooks/useProfileCustomization';
 import { useCreatorVerification } from '@/hooks/useCreatorVerification';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -77,6 +80,9 @@ export function ProfileHeader({
 }: ProfileHeaderProps) {
   const { user } = useAuth();
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [preparingAvatar, setPreparingAvatar] = useState(false);
+  const [cropUrl, setCropUrl] = useState<string | null>(null);
+  const cropUrlRef = useRef<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const { isBlocked, blockUser, unblockUser } = useUserBlocks();
@@ -113,30 +119,75 @@ export function ProfileHeader({
   });
   const friendsCount = isOwnProfile ? ownFriends : otherFriends;
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const reportAvatarError = (error: unknown) => {
+    console.error('Avatar upload error:', error);
+    toast.error(errorMessage(error, 'Failed to upload profile picture'));
+  };
+
+  const releaseCrop = () => {
+    const previous = cropUrlRef.current;
+    cropUrlRef.current = null;
+    if (previous) URL.revokeObjectURL(previous);
+    setCropUrl(null);
+  };
+
+  const openCrop = (blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    const previous = cropUrlRef.current;
+    cropUrlRef.current = url;
+    if (previous) URL.revokeObjectURL(previous);
+    setCropUrl(url);
+  };
+
+  const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
 
+    if (fileKind(file.name, file.type) !== 'image') {
+      reportAvatarError(new Error('Failed to upload profile picture'));
+      return;
+    }
+
+    setPreparingAvatar(true);
+    try {
+      // HEIC is converted with the same guard the upload uses, then cropped.
+      // The cropped JPEG is what storage receives, so that guard still runs.
+      let source: Blob = file;
+      if (isHeicImage(file.name, file.type)) {
+        source = (await prepareStorageBody(file)).body;
+      } else {
+        const decision = decideBySize(file.size, 'image');
+        if (decision.action === 'reject') throw new StorageLimitError(decision.message);
+      }
+      openCrop(source);
+    } catch (error) {
+      reportAvatarError(error);
+    } finally {
+      setPreparingAvatar(false);
+    }
+  };
+
+  const handleCroppedAvatar = async (file: File) => {
     setUploadingAvatar(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = jpegStorageName(`${userId}/avatar.${fileExt}`, file.type);
+      const fileName = jpegStorageName(`${userId}/avatar.jpg`, file.type);
 
       const { error: uploadError } = await supabase.storage
         .from('media')
-        .upload(fileName, file, { upsert: true });
+        .upload(fileName, file, { upsert: true, contentType: 'image/jpeg' });
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
         .from('media')
         .getPublicUrl(fileName);
-
-      onAvatarUpdate(publicUrl);
+      const joiner = publicUrl.includes('?') ? '&' : '?';
+      onAvatarUpdate(`${publicUrl}${joiner}v=${Date.now()}`);
       toast.success('Profile picture updated!');
+      releaseCrop();
     } catch (error) {
-      console.error('Avatar upload error:', error);
-      toast.error(errorMessage(error, 'Failed to upload profile picture'));
+      reportAvatarError(error);
     } finally {
       setUploadingAvatar(false);
     }
@@ -191,13 +242,13 @@ export function ProfileHeader({
                 <button
                   type="button"
                   onClick={() => avatarInputRef.current?.click()}
-                  disabled={uploadingAvatar}
+                  disabled={uploadingAvatar || preparingAvatar || cropUrl !== null}
                   className="absolute inset-0 flex items-center justify-center rounded-full bg-background/70 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
                   aria-label="Update profile photo"
                 >
-                  {uploadingAvatar ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+                  {uploadingAvatar || preparingAvatar ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
                 </button>
-                <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+                <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarFile} className="hidden" />
               </>
             )}
           </div>
@@ -309,6 +360,19 @@ export function ProfileHeader({
         )}
         </div>
       </div>
+      <ProfilePhotoCropDialog
+        open={cropUrl !== null}
+        imageUrl={cropUrl}
+        saving={uploadingAvatar}
+        onCancel={releaseCrop}
+        onSave={(file) => { void handleCroppedAvatar(file); }}
+        onCropError={reportAvatarError}
+        onImageError={(failedUrl) => {
+          if (failedUrl !== cropUrlRef.current) return;
+          releaseCrop();
+          reportAvatarError(new Error('Failed to upload profile picture'));
+        }}
+      />
       <ShareSheet
         open={shareOpen}
         onOpenChange={setShareOpen}
