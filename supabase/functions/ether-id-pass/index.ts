@@ -4,7 +4,8 @@ import { getBearerUser } from "../_shared/require-caller.ts";
 import { missingWalletSecrets, walletConfigured, PUSH_SECRET_NAME, matchEtherIdRoute } from "../_shared/ether-id-config.mjs";
 import { etherIdPassJson } from "../_shared/ether-id-pass-json.mjs";
 import { issuePassLink, passLinkParts, verifyPassLink } from "../_shared/ether-id-pass-link.mjs";
-import { buildPkpass, passImages } from "../_shared/pkpass.mjs";
+import { fetchEtherIdThumbnail } from "../_shared/ether-id-pass-photo.mjs";
+import { buildPkpass, etherIdPassImages } from "../_shared/pkpass.mjs";
 import { pushPassUpdate, signApnsJwt } from "../_shared/apns.mjs";
 
 const corsHeaders = {
@@ -86,10 +87,12 @@ async function signedPass(card: Record<string, unknown>, passRow: {
     webServiceURL: `${supabaseUrl}/functions/v1/ether-id-pass`,
     authenticationToken: passRow.authentication_token,
   });
+  const thumbnail = await fetchEtherIdThumbnail(card.avatar_url);
   const bytes = await buildPkpass(
     [
       { name: "pass.json", data: JSON.stringify(pass) },
-      ...passImages(),
+      ...etherIdPassImages(),
+      ...thumbnail,
     ],
     {
       certPem: env.APPLE_PASS_CERT_PEM,

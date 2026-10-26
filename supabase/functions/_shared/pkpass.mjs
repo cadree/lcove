@@ -69,20 +69,7 @@ function chunk(type, data) {
   return body;
 }
 
-/** Solid near-black square with a pink bar. Enough for icon.png and logo.png. */
-export function solidPng(width, height) {
-  const rows = new Uint8Array(height * (1 + width * 3));
-  for (let y = 0; y < height; y += 1) {
-    const row = y * (1 + width * 3);
-    rows[row] = 0;
-    for (let x = 0; x < width; x += 1) {
-      const i = row + 1 + x * 3;
-      const band = y > height * 0.62 && y < height * 0.78;
-      rows[i] = band ? 245 : 18;
-      rows[i + 1] = band ? 166 : 18;
-      rows[i + 2] = band ? 207 : 18;
-    }
-  }
+function encodeRgbPng(width, height, rows) {
   const ihdr = new Uint8Array(13);
   const view = new DataView(ihdr.buffer);
   view.setUint32(0, width);
@@ -96,6 +83,58 @@ export function solidPng(width, height) {
     chunk("IDAT", zlibStore(rows)),
     chunk("IEND", new Uint8Array()),
   ]);
+}
+
+function rgbRows(width, height, paint) {
+  const rows = new Uint8Array(height * (1 + width * 3));
+  for (let y = 0; y < height; y += 1) {
+    const row = y * (1 + width * 3);
+    rows[row] = 0;
+    for (let x = 0; x < width; x += 1) {
+      const [r, g, b] = paint(x, y, width, height);
+      const i = row + 1 + x * 3;
+      rows[i] = r;
+      rows[i + 1] = g;
+      rows[i + 2] = b;
+    }
+  }
+  return rows;
+}
+
+/** Neutral near-black square with a pink bar. Event tickets still use this. */
+export function solidPng(width, height) {
+  return encodeRgbPng(width, height, rgbRows(width, height, (_x, y, _w, h) => {
+    const band = y > h * 0.62 && y < h * 0.78;
+    return band ? [245, 166, 207] : [18, 18, 18];
+  }));
+}
+
+const MARK_BLACK = [16, 14, 12];
+const MARK_CREAM = [236, 231, 220];
+const MARK_RED = [196, 20, 45];
+
+/**
+ * Warm near-black square with a cream E and a deep-red middle bar.
+ * Lock-screen icon for the Ether ID. The pass front uses logoText, not a bar.
+ */
+export function etherMarkPng(width, height) {
+  return encodeRgbPng(width, height, rgbRows(width, height, (x, y, w, h) => {
+    const margin = Math.floor(Math.min(w, h) * 0.2);
+    const x0 = margin;
+    const y0 = margin;
+    const x1 = w - margin;
+    const y1 = h - margin;
+    const stem = Math.max(1, Math.round((x1 - x0) * 0.22));
+    const bar = Math.max(1, Math.round((y1 - y0) * 0.18));
+    const midY = Math.round((y0 + y1) / 2 - bar / 2);
+    const inStem = x >= x0 && x < x0 + stem && y >= y0 && y < y1;
+    const inTop = y >= y0 && y < y0 + bar && x >= x0 && x < x1;
+    const inBottom = y >= y1 - bar && y < y1 && x >= x0 && x < x1;
+    const inMiddle = y >= midY && y < midY + bar && x >= x0 && x < x1;
+    if (inMiddle) return MARK_RED;
+    if (inStem || inTop || inBottom) return MARK_CREAM;
+    return MARK_BLACK;
+  }));
 }
 
 export function zipStore(files) {
@@ -190,6 +229,15 @@ export function passImages() {
     { name: "icon@2x.png", data: solidPng(58, 58) },
     { name: "logo.png", data: solidPng(160, 50) },
     { name: "logo@2x.png", data: solidPng(320, 100) },
+  ];
+}
+
+/** Ether ID icons only. No logo image, so the pass does not show the old pink bar. */
+export function etherIdPassImages() {
+  return [
+    { name: "icon.png", data: etherMarkPng(29, 29) },
+    { name: "icon@2x.png", data: etherMarkPng(58, 58) },
+    { name: "icon@3x.png", data: etherMarkPng(87, 87) },
   ];
 }
 
