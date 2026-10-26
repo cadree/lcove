@@ -297,12 +297,16 @@ export function RecentDistributionsCard({ recentDistributions }: {
 
   return (
     <Card className="bg-card/50 backdrop-blur-sm border-border">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="ether-title flex items-center gap-2 text-xl">
-          <DollarSign className="w-5 h-5 text-primary" />
+      <CardHeader className="flex w-full flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+        <CardTitle className="ether-title flex w-full min-w-0 items-center gap-2 text-xl sm:w-auto">
+          <DollarSign className="w-5 h-5 shrink-0 text-primary" />
           Recent Distributions
         </CardTitle>
-        {isAdmin && <AddDistributionDialog />}
+        {isAdmin && (
+          <div className="ml-auto max-w-full shrink-0">
+            <AddDistributionDialog />
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         {!recentDistributions?.length ? (

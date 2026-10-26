@@ -20,7 +20,7 @@ export function IosDigitalGoodsNotice({
 
   const text =
     kind === "donation"
-      ? "Donations aren't available in the iOS app. Card donations inside the app aren't allowed, and this screen does not link out to a payment page."
+      ? "Support isn't available in the iOS app. Card support inside the app isn't allowed, and this screen does not link out to a payment page."
       : kind === "billing"
       ? "Subscription billing isn't available in the iOS app."
       : variant === "short"
