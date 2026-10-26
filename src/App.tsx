@@ -16,6 +16,7 @@ import AccessGate from "@/components/auth/AccessGate";
 import { EtherSplash } from "@/components/brand/EtherSplash";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
 import { IosCheckoutReturn } from "@/components/ios/IosCheckoutReturn";
+import { NativeIosPush } from "@/components/ios/NativeIosPush";
 import { APP_STORE_APPLE_ID, APP_STORE_URL } from "@/config/launch";
 import MotionRoot from "@/components/motion/MotionRoot";
 
@@ -165,6 +166,7 @@ const App = () => (
         <WorldLayer />
         <AuthProvider>
           <IosCheckoutReturn />
+          <NativeIosPush />
           <PresenceProvider>
             <CreateFlowProvider>
               <AccessGate>
