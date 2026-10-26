@@ -47,6 +47,7 @@ import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { IosPushInstallSteps } from "@/components/settings/IosPushInstallSteps";
 import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { assertCleanText, OBJECTIONABLE_MESSAGE } from "@/lib/objectionableText";
+import { MEMBER_OF_HINT, MEMBER_OF_LIMIT, memberOfError, normalizeMemberOf } from "@/lib/etherId";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
 import { supabase } from "@/integrations/supabase/client";
@@ -83,6 +84,7 @@ const Settings = () => {
   const { blockedUsers, unblockUser, isLoading: blocksLoading } = useUserBlocks();
 
   const [displayName, setDisplayName] = useState("");
+  const [memberOf, setMemberOf] = useState("");
   const [bio, setBio] = useState("");
   const [city, setCity] = useState("");
   const [phone, setPhone] = useState("");
@@ -195,6 +197,7 @@ const Settings = () => {
   useEffect(() => {
     if (profile) {
       setDisplayName(profile.display_name || "");
+      setMemberOf(profile.member_of || "");
       setBio(profile.bio || "");
       setCity(profile.city || "");
       setPhone(profile.phone || "");
@@ -223,9 +226,16 @@ const Settings = () => {
 
       assertCleanText(displayName);
       assertCleanText(bio);
+      assertCleanText(memberOf);
+      const memberError = memberOfError(memberOf);
+      if (memberError) {
+        toast.error(memberError);
+        return;
+      }
       const resolvedCity = resolveCity(city);
       const { error } = await updateProfile({
         display_name: displayName || null,
+        member_of: normalizeMemberOf(memberOf),
         bio: bio || null,
         city: city || null,
         city_display: city ? resolvedCity.city_display : null,
@@ -370,6 +380,19 @@ const Settings = () => {
                 onChange={(e) => setDisplayName(e.target.value)}
                 className="bg-background/50"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="memberOf">Member of</Label>
+              <Input
+                id="memberOf"
+                placeholder="LCOVE"
+                value={memberOf}
+                maxLength={MEMBER_OF_LIMIT}
+                onChange={(e) => setMemberOf(e.target.value)}
+                className="bg-background/50"
+              />
+              <p className="text-xs text-muted-foreground">{MEMBER_OF_HINT}</p>
             </div>
 
             <div className="space-y-2">

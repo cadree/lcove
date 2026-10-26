@@ -19,12 +19,14 @@ import { logAuthEvent, logAuthError } from '@/lib/authDebug';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, User, Phone, Wifi, WifiOff } from 'lucide-react';
 import { EtherWordmark } from '@/components/brand/EtherWordmark';
 import { eventReturnPath, rememberEventReturn } from '../../functions/_shared/eventShare.js';
+import { MEMBER_OF_HINT, MEMBER_OF_LIMIT, memberOfError } from '@/lib/etherId';
 
 const signupSchema = z.object({
   email: z.string().email('Please enter a valid email').max(255),
   password: z.string().min(8, 'Password must be at least 8 characters').max(100),
   displayName: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name must be less than 50 characters'),
   phone: z.string().optional().refine(val => !val || /^[\d\s\-+()]*$/.test(val), 'Please enter a valid phone number'),
+  memberOf: z.string().trim().max(MEMBER_OF_LIMIT, 'Member of is 24 characters or fewer.'),
 });
 
 const loginSchema = z.object({
@@ -118,10 +120,11 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [memberOf, setMemberOf] = useState('');
   const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string; displayName?: string; phone?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; displayName?: string; phone?: string; memberOf?: string }>({});
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [confirmationSentAt, setConfirmationSentAt] = useState<number | null>(null);
@@ -281,9 +284,9 @@ const Auth = () => {
         return false;
       }
     } else if (mode === 'signup') {
-      const result = signupSchema.safeParse({ email, password, displayName, phone });
+      const result = signupSchema.safeParse({ email, password, displayName, phone, memberOf });
       if (!result.success) {
-        const fieldErrors: { email?: string; password?: string; displayName?: string; phone?: string } = {};
+        const fieldErrors: { email?: string; password?: string; displayName?: string; phone?: string; memberOf?: string } = {};
         result.error.errors.forEach((err) => {
           const field = err.path[0] as string;
           fieldErrors[field as keyof typeof fieldErrors] = err.message;
@@ -341,9 +344,15 @@ const Auth = () => {
           setErrors({ email: 'Use the invited email.' });
           return;
         }
+        const memberError = memberOfError(memberOf);
+        if (memberError) {
+          setErrors({ memberOf: memberError });
+          return;
+        }
         sessionStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({
           displayName: displayName.trim(),
           phone: phone.trim(),
+          memberOf: memberOf.trim(),
           ...(inviteToken ? { inviteToken } : {}),
         }));
         const { error, session } = await signUp(email, password, inviteToken || undefined);
@@ -619,6 +628,27 @@ const Auth = () => {
                     </p>
                     {errors.displayName && (
                       <p className="text-sm text-destructive">{errors.displayName}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        placeholder="Member of"
+                        value={memberOf}
+                        maxLength={MEMBER_OF_LIMIT}
+                        onChange={(e) => setMemberOf(e.target.value)}
+                        className="pl-11 h-12 bg-input border-border focus:border-primary"
+                        aria-describedby="member-of-hint"
+                      />
+                    </div>
+                    <p id="member-of-hint" className="text-xs text-muted-foreground pl-1">
+                      {MEMBER_OF_HINT}
+                    </p>
+                    {errors.memberOf && (
+                      <p className="text-sm text-destructive">{errors.memberOf}</p>
                     )}
                   </div>
 

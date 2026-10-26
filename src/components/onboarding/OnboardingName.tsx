@@ -5,28 +5,37 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowRight, ArrowLeft, User } from 'lucide-react';
 import { displayNameError } from '@/lib/displayName';
+import { MEMBER_OF_HINT, MEMBER_OF_LIMIT, memberOfError, normalizeMemberOf } from '@/lib/etherId';
 
 interface Props {
   displayName: string;
+  memberOf: string;
   updateName: (name: string) => void;
+  updateMemberOf: (memberOf: string) => void;
   onNext: () => void;
   onBack?: () => void;
 }
 
-const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
+const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onNext, onBack }: Props) => {
   const [name, setName] = useState(displayName);
+  const [member, setMember] = useState(memberOf);
   const [error, setError] = useState('');
+  const [memberError, setMemberError] = useState('');
 
   const handleNext = () => {
     const trimmedName = name.trim();
     const nextError = displayNameError(trimmedName);
-    if (nextError) {
-      setError(nextError);
+    const nextMemberError = memberOfError(member);
+    if (nextError || nextMemberError) {
+      setError(nextError || '');
+      setMemberError(nextMemberError || '');
       return;
     }
 
     setError('');
+    setMemberError('');
     updateName(trimmedName);
+    updateMemberOf(normalizeMemberOf(member) || '');
     onNext();
   };
 
@@ -98,6 +107,34 @@ const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
             )}
             <p id="displayName-hint" className="text-muted-foreground text-xs">
               Letters, spaces, hyphens, or apostrophes.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <Label htmlFor="memberOf" className="text-base">
+              Member of
+            </Label>
+            <Input
+              id="memberOf"
+              type="text"
+              placeholder="LCOVE"
+              value={member}
+              maxLength={MEMBER_OF_LIMIT}
+              onChange={(e) => {
+                setMember(e.target.value);
+                if (memberError) setMemberError('');
+              }}
+              className="h-14 text-lg bg-background/50"
+              aria-invalid={memberError ? true : undefined}
+              aria-describedby={memberError ? 'memberOf-error' : 'memberOf-hint'}
+            />
+            {memberError && (
+              <p id="memberOf-error" role="alert" className="text-destructive text-sm">
+                {memberError}
+              </p>
+            )}
+            <p id="memberOf-hint" className="text-muted-foreground text-xs">
+              {MEMBER_OF_HINT}
             </p>
           </div>
         </motion.div>

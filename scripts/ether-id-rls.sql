@@ -100,6 +100,33 @@ BEGIN
 
   BEGIN
     UPDATE public.profiles
+    SET member_of = '1234567890123456789012345'
+    WHERE user_id = '11111111-1111-4111-8111-111111111111';
+    RAISE EXCEPTION 'FAIL: member of over 24 was stored';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE '%24 characters%' THEN
+      RAISE;
+    END IF;
+  END;
+
+  UPDATE public.profiles
+  SET member_of = '   '
+  WHERE user_id = '11111111-1111-4111-8111-111111111111';
+  IF (SELECT member_of FROM public.profiles WHERE user_id = '11111111-1111-4111-8111-111111111111') IS NOT NULL THEN
+    RAISE EXCEPTION 'FAIL: blank member of was not cleared';
+  END IF;
+
+  UPDATE public.profiles
+  SET member_of = '  North Hall  ',
+      city = 'Los Angeles',
+      city_display = 'Los Angeles'
+  WHERE user_id = '11111111-1111-4111-8111-111111111111';
+  IF (SELECT member_of FROM public.profiles WHERE user_id = '11111111-1111-4111-8111-111111111111') <> 'North Hall' THEN
+    RAISE EXCEPTION 'FAIL: member of was not trimmed';
+  END IF;
+
+  BEGIN
+    UPDATE public.profiles
     SET is_suspended = true
     WHERE user_id = '11111111-1111-4111-8111-111111111111';
     RAISE EXCEPTION 'FAIL: member suspended themselves';
@@ -187,6 +214,9 @@ BEGIN
   IF card->>'birthday_note' <> 'self-reported' THEN
     RAISE EXCEPTION 'FAIL: birthday note %', card->>'birthday_note';
   END IF;
+  IF card->>'member_of' <> 'North Hall' OR card->>'city' <> 'Los Angeles' THEN
+    RAISE EXCEPTION 'FAIL: member of or city missing from owner card: %', card;
+  END IF;
   IF card->>'verify_path' <> '/id/v/' || tok THEN
     RAISE EXCEPTION 'FAIL: verify path %', card->>'verify_path';
   END IF;
@@ -231,7 +261,8 @@ BEGIN
     RAISE EXCEPTION 'FAIL: live status after suspend is %', pub;
   END IF;
   IF pub ? 'birthday_label' OR pub ? 'birthday_month' OR pub ? 'user_id'
-     OR pub ? 'peer_review_count' OR pub ? 'projects_completed' OR pub ? 'token' THEN
+     OR pub ? 'peer_review_count' OR pub ? 'projects_completed' OR pub ? 'token'
+     OR pub ? 'member_of' OR pub ? 'city' OR pub ? 'passion' THEN
     RAISE EXCEPTION 'FAIL: verify payload is not minimal: %', pub;
   END IF;
   IF pub->>'username' <> 'member_a' OR pub->>'display_name' <> 'Member A' THEN

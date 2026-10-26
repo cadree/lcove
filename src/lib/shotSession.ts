@@ -52,6 +52,7 @@ export const shotProfile = {
   birthday_month: 3,
   birthday_day: 4,
   show_birthday: true,
+  member_of: null,
 };
 
 const friend = (id: string, name: string) => ({

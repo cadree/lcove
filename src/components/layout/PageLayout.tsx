@@ -11,20 +11,22 @@ interface PageLayoutProps {
   className?: string;
   hideNav?: boolean;
   showNotificationBell?: boolean;
+  bleed?: boolean;
 }
 
 const PageLayout = ({
   children,
   className = "",
   hideNav = false,
-  showNotificationBell = true
+  showNotificationBell = true,
+  bleed = false,
 }: PageLayoutProps) => {
   const { user } = useAuth();
   const { pathname } = useLocation();
   const onMainTab = MAIN_TABS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
   
   return (
-    <div className="min-h-screen overflow-x-hidden bg-background">
+    <div className={`min-h-screen bg-background ${bleed ? "overflow-x-visible" : "overflow-x-hidden"}`}>
       <NoviCelebration />
       <main className={`relative safe-area-top ${hideNav ? "safe-area-bottom" : "pb-28"} ${className}`}>
         {children}

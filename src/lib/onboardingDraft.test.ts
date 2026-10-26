@@ -20,6 +20,7 @@ const sample = {
   step: 3,
   data: {
     displayName: "Ada",
+    memberOf: "",
     passions: ["film"],
     passionSeriousness: 7,
     city: "Charlotte",
@@ -45,6 +46,17 @@ test("an old draft skips the tools step that signup no longer asks", () => {
     JSON.stringify({ ...sample, step: 4 }),
   );
   assert.equal(readOnboardingDraft(storage, "user-1")?.step, 3);
+});
+
+test("a draft without member of reads as empty", () => {
+  const storage = memoryStorage();
+  const { memberOf, ...data } = sample.data;
+  void memberOf;
+  storage.setItem(
+    "ether-onboarding-draft:user-1",
+    JSON.stringify({ step: 1, version: 2, data }),
+  );
+  assert.equal(readOnboardingDraft(storage, "user-1")?.data.memberOf, "");
 });
 
 test("a broken draft is ignored and completion clears it", () => {

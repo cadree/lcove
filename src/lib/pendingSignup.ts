@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logAuthError } from '@/lib/authDebug';
+import { memberOfError, normalizeMemberOf } from '@/lib/etherId';
 import { saveSignupAttribution } from '@/lib/saveSignupAttribution';
 import { inviteTokenFromMetadata, WAITLIST_INVITE_METADATA_KEY } from '@/lib/waitlist';
 
@@ -10,6 +11,7 @@ type PendingSignup = {
   displayName?: string;
   phone?: string;
   inviteToken?: string;
+  memberOf?: string;
 };
 
 const claimInflight = new Map<string, Promise<boolean>>();
@@ -47,14 +49,16 @@ export async function applyPendingSignupProfile(
 
   const displayName = parsed.displayName?.trim();
   const phone = parsed.phone?.trim();
+  const memberOf = memberOfError(parsed.memberOf) ? null : normalizeMemberOf(parsed.memberOf);
   const inviteToken = parsed.inviteToken?.trim() || (metadataToken ?? '').trim();
-  if (!displayName && !phone && !inviteToken) return 'empty';
+  if (!displayName && !phone && !memberOf && !inviteToken) return 'empty';
 
   try {
-    if (displayName || phone) {
+    if (displayName || phone || memberOf) {
       await supabase.from('profiles').update({
         ...(displayName ? { display_name: displayName } : {}),
         ...(phone ? { phone } : {}),
+        ...(memberOf ? { member_of: memberOf } : {}),
       }).eq('user_id', userId);
     }
     await saveSignupAttribution(userId);

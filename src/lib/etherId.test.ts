@@ -6,8 +6,15 @@ import { toneForPath } from "./screenTone.ts";
 import {
   birthdayError,
   birthdayFace,
+  cardInitials,
+  cardKicker,
+  cardNameLines,
   isPublicVerifyCard,
+  memberOfError,
+  memberOfFace,
+  memberSinceShort,
   memberStatus,
+  reviewsFace,
   usernameAt,
   usernameError,
   verifyUrl,
@@ -16,6 +23,10 @@ import {
 
 const migration = readFileSync(
   new URL("../../supabase/migrations/20261024190000_ether_id.sql", import.meta.url),
+  "utf8",
+);
+const memberOfMigration = readFileSync(
+  new URL("../../supabase/migrations/20261025120000_profile_member_of.sql", import.meta.url),
   "utf8",
 );
 
@@ -97,6 +108,43 @@ describe("username and verify url", () => {
     const url = verifyUrl("https://etherbylcove.com/", "/id/v/eid1.abc.1.sig");
     assert.equal(url, "https://etherbylcove.com/id/v/eid1.abc.1.sig");
     assert.equal(url.includes("11111111-1111-4111-8111-111111111111"), false);
+  });
+});
+
+describe("member of", () => {
+  it("prints LCOVE when the field is empty and rejects more than 24 characters", () => {
+    assert.equal(memberOfFace(""), "LCOVE");
+    assert.equal(memberOfFace("   "), "LCOVE");
+    assert.equal(memberOfFace(null), "LCOVE");
+    assert.equal(memberOfFace(undefined), "LCOVE");
+    assert.equal(memberOfFace("  North Hall  "), "North Hall");
+    assert.equal(memberOfError(""), null);
+    assert.equal(memberOfError("x".repeat(24)), null);
+    assert.equal(memberOfError(`  ${"x".repeat(24)}  `), null);
+    assert.equal(memberOfError("x".repeat(25)), "Member of is 24 characters or fewer.");
+    assert.equal(memberOfError(` ${"y".repeat(25)} `), "Member of is 24 characters or fewer.");
+  });
+
+  it("stores a length check and an impersonation report reason", () => {
+    assert.match(memberOfMigration, /ADD COLUMN IF NOT EXISTS member_of text/);
+    assert.match(memberOfMigration, /char_length\(member_of\) <= 24/);
+    assert.match(memberOfMigration, /member of is 24 characters or fewer/);
+    assert.match(memberOfMigration, /'Impersonation'/);
+    assert.match(memberOfMigration, /'member_of', v_member_of/);
+    assert.match(memberOfMigration, /'city', v_city/);
+  });
+});
+
+describe("card face", () => {
+  it("formats the approved card from member fields", () => {
+    assert.deepEqual(cardNameLines("Cadre Wallace"), ["Wallace", "Cadre"]);
+    assert.equal(cardInitials("Cadre Wallace"), "CW");
+    assert.equal(cardInitials("Cadre"), "C");
+    assert.equal(cardInitials("  "), "E");
+    assert.equal(cardKicker("Creative Director", "Los Angeles"), "— Creative · Los Angeles");
+    assert.equal(memberSinceShort("2026-10-01", "October 2026"), "Oct 2026");
+    assert.equal(reviewsFace(4.5, 2), "4.5 · 2");
+    assert.equal(reviewsFace(null, 0), "—");
   });
 });
 

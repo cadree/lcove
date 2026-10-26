@@ -2,6 +2,7 @@ import { migrateOnboardingDraftStep } from "./signupOnboarding.ts";
 
 export interface OnboardingDraftData {
   displayName: string;
+  memberOf: string;
   passions: string[];
   passionSeriousness: number;
   city: string;
@@ -48,6 +49,7 @@ export function readOnboardingDraft(storage: Storage, userId: string): Onboardin
       ),
       data: {
         displayName: typeof data.displayName === "string" ? data.displayName : "",
+        memberOf: typeof data.memberOf === "string" ? data.memberOf : "",
         passions: Array.isArray(data.passions) ? data.passions.filter((item) => typeof item === "string") : [],
         passionSeriousness: typeof data.passionSeriousness === "number" ? data.passionSeriousness : 5,
         city: typeof data.city === "string" ? data.city : "",

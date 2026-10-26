@@ -22,9 +22,18 @@ export interface EtherIdCard extends EtherIdPublic {
   show_birthday: boolean;
   birthday_month: number | null;
   birthday_day: number | null;
+  member_of: string | null;
+  city: string | null;
   token: string;
   verify_path: string;
 }
+
+export const MEMBER_OF_LIMIT = 24;
+export const MEMBER_OF_EMPTY = "LCOVE";
+export const MEMBER_OF_HINT = "A community or personal brand you belong to, or N/A or LCOVE.";
+export const ETHER_ID_SITE = "etherbylcove.com";
+
+const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /**
  * Same rule as public.ether_member_status.
@@ -90,6 +99,73 @@ export function walletButtonVisible(configured: boolean | undefined) {
 
 export function verifyUrl(origin: string, verifyPath: string) {
   return `${origin.replace(/\/$/, "")}${verifyPath}`;
+}
+
+export function normalizeMemberOf(raw: string | null | undefined) {
+  const trimmed = (raw ?? "").trim();
+  return trimmed ? trimmed : null;
+}
+
+export function memberOfError(raw: string | null | undefined) {
+  const trimmed = (raw ?? "").trim();
+  if (trimmed.length > MEMBER_OF_LIMIT) return "Member of is 24 characters or fewer.";
+  return null;
+}
+
+/** Empty, blank, and missing all print as LCOVE. A typed value prints as typed. */
+export function memberOfFace(raw: string | null | undefined) {
+  return normalizeMemberOf(raw) || MEMBER_OF_EMPTY;
+}
+
+/** Two initials on the dark plate when a member has no photo. */
+export function cardInitials(displayName: string | null | undefined) {
+  const parts = (displayName || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "E";
+  const first = parts[0].charAt(0);
+  const last = parts.length > 1 ? parts[parts.length - 1].charAt(0) : "";
+  return `${first}${last}`.toUpperCase();
+}
+
+/** LAST, then the rest, from the real display name. */
+export function cardNameLines(displayName: string | null | undefined): [string, string | null] {
+  const clean = (displayName || "").trim().replace(/\s+/g, " ");
+  if (!clean) return ["Name not set", null];
+  if (clean.includes(",")) {
+    const [last, ...rest] = clean.split(",");
+    const first = rest.join(",").trim();
+    return [last.trim() || clean, first || null];
+  }
+  const parts = clean.split(" ");
+  if (parts.length === 1) return [parts[0], null];
+  return [parts[parts.length - 1], parts.slice(0, -1).join(" ")];
+}
+
+/** First word of the passion, then the city. Both come from the member. */
+export function cardKicker(passion: string | null | undefined, city: string | null | undefined) {
+  const discipline = (passion || "").trim().split(/\s+/)[0] || "";
+  const place = (city || "").trim();
+  const parts = [discipline, place].filter(Boolean);
+  if (!parts.length) return null;
+  return `— ${parts.join(" · ")}`;
+}
+
+export function memberSinceShort(memberSince: string | null | undefined, label?: string | null) {
+  const match = /^(\d{4})-(\d{2})/.exec(memberSince || "");
+  if (match) {
+    const month = SHORT_MONTHS[Number(match[2]) - 1];
+    if (month) return `${month} ${match[1]}`;
+  }
+  const fromLabel = /^([A-Za-z]+)\s+(\d{4})$/.exec((label || "").trim());
+  if (fromLabel) return `${fromLabel[1].slice(0, 3)} ${fromLabel[2]}`;
+  return "—";
+}
+
+export function reviewsFace(average: number | null | undefined, count: number | null | undefined) {
+  const reviews = count ?? 0;
+  if (!reviews || average == null || Number.isNaN(Number(average))) return "—";
+  const rounded = Number(average);
+  const text = Number.isInteger(rounded) ? rounded.toFixed(1) : String(rounded);
+  return `${text} · ${reviews}`;
 }
 
 export const PUBLIC_VERIFY_KEYS = [

@@ -74,13 +74,13 @@ const profile = {
 };
 
 const ownerCard = {
-  display_name: 'Maya Torres',
-  username: 'maya',
-  avatar_url: '/nuance/dynasty-denim.png',
+  display_name: 'Cadre Wallace',
+  username: 'cadre',
+  avatar_url: null,
   status: 'Active',
   member_since: '2026-10-01',
   member_since_label: 'October 2026',
-  passion: 'Photography',
+  passion: 'Creative Director',
   peer_review_average: 4.5,
   peer_review_count: 2,
   peer_review_label: '4.5 average · 2 reviews',
@@ -91,6 +91,8 @@ const ownerCard = {
   show_birthday: true,
   birthday_month: 3,
   birthday_day: 4,
+  member_of: null,
+  city: 'Los Angeles',
   token: ACTIVE_TOKEN,
   verify_path: `/id/v/${ACTIVE_TOKEN}`,
 };
@@ -248,16 +250,24 @@ async function expectText(page, text) {
 }
 
 await shoot('card', '/id', async (page) => {
-  await expectText(page, 'Maya Torres');
-  await expectText(page, '@maya');
-  await expectText(page, 'Photography');
-  await expectText(page, '4.5 average · 2 reviews');
-  await expectText(page, '2 completed');
-  await expectText(page, 'March 4');
-  await expectText(page, 'self-reported');
+  await expectText(page, 'Wallace');
+  await expectText(page, 'Cadre');
+  await expectText(page, '@cadre');
+  await expectText(page, 'Creative Director');
+  await expectText(page, '4.5 · 2');
+  await expectText(page, 'LCOVE');
+  await expectText(page, 'Los Angeles');
+  await expectText(page, 'Oct 2026');
+  await expectText(page, 'familcy access // member id');
   await expectText(page, 'Active');
   await expectText(page, 'This is not age verification.');
-  await page.locator('svg').first().waitFor({ state: 'visible', timeout: 15000 });
+  const card = page.getByTestId('ether-id-card');
+  await card.waitFor({ state: 'visible', timeout: 15000 });
+  const body = await page.locator('body').innerText();
+  if (body.includes('ETR.9XC3') || /ID ETR\./.test(body)) {
+    throw new Error('card printed a member code in the footer');
+  }
+  await page.locator('[data-testid="ether-id-qr"] svg').waitFor({ state: 'visible', timeout: 15000 });
 });
 
 await shoot('profile-entry', '/profile', async (page) => {

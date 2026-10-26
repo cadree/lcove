@@ -10,12 +10,15 @@ import OnboardingPassions from '@/components/onboarding/OnboardingPassions';
 import OnboardingCity from '@/components/onboarding/OnboardingCity';
 import OnboardingQuestionnaire from '@/components/onboarding/OnboardingQuestionnaire';
 import { buildUserPassionInserts } from '@/lib/onboardingPassions';
+import { memberOfError, normalizeMemberOf } from '@/lib/etherId';
+import { assertCleanText } from '@/lib/objectionableText';
 import { scoreRedFlags, clearQuizSeed, type ChoiceId } from '@/lib/onboardingQuiz';
 import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from '@/lib/onboardingDraft';
 import { takeEventReturn } from '../../functions/_shared/eventShare.js';
 
 export interface OnboardingData {
   displayName: string;
+  memberOf: string;
   passions: string[];
   passionSeriousness: number;
   city: string;
@@ -36,6 +39,7 @@ const Onboarding = () => {
   const [initialized, setInitialized] = useState(false);
   const [data, setData] = useState<OnboardingData>({
     displayName: '',
+    memberOf: '',
     passions: [],
     passionSeriousness: 5,
     city: '',
@@ -56,9 +60,14 @@ const Onboarding = () => {
   // from a ref so typing in the field does not re-run this effect.
   const displayNameRef = useRef(data.displayName);
   displayNameRef.current = data.displayName;
+  const memberOfRef = useRef(data.memberOf);
+  memberOfRef.current = data.memberOf;
   useEffect(() => {
     if (profile?.display_name && !displayNameRef.current) {
       setData(prev => ({ ...prev, displayName: profile.display_name || '' }));
+    }
+    if (profile?.member_of && !memberOfRef.current) {
+      setData(prev => ({ ...prev, memberOf: profile.member_of || '' }));
     }
   }, [profile]);
 
@@ -102,6 +111,13 @@ const Onboarding = () => {
         description: 'Please go back and enter your name to complete onboarding.',
         variant: 'destructive'
       });
+      setCurrentStep(0);
+      return;
+    }
+
+    const memberError = memberOfError(data.memberOf);
+    if (memberError) {
+      toast({ title: 'Member of', description: memberError, variant: 'destructive' });
       setCurrentStep(0);
       return;
     }
@@ -168,8 +184,10 @@ const Onboarding = () => {
 
       // Finishing onboarding always grants access. passed_exam records
       // whether the red-flag count stayed under the threshold.
+      assertCleanText(data.memberOf);
       await updateProfile({
         display_name: data.displayName.trim(),
+        member_of: normalizeMemberOf(data.memberOf),
         city: data.city,
         city_display: data.cityDisplay,
         city_key: data.cityKey,
@@ -217,7 +235,9 @@ const Onboarding = () => {
     <OnboardingName
       key="name"
       displayName={data.displayName}
+      memberOf={data.memberOf}
       updateName={(name) => updateData({ displayName: name })}
+      updateMemberOf={(memberOf) => updateData({ memberOf })}
       onNext={nextStep}
     />,
     <OnboardingPassions key="passions" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
