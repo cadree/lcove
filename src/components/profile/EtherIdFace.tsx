@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   ETHER_ID_SITE,
+  cardHandleLine,
   cardInitials,
   cardKicker,
   cardNameLines,
@@ -96,12 +97,19 @@ function PublicEtherId({ card }: { card: EtherIdPublic }) {
   );
 }
 
-function OwnerEtherId({ card, verifyHref }: { card: EtherIdCard; verifyHref?: string }) {
+function OwnerEtherId({
+  card,
+  verifyHref,
+  role,
+}: {
+  card: EtherIdCard;
+  verifyHref?: string;
+  role?: string | null;
+}) {
   const reduced = useReducedMotion();
   const qrBoxRef = useRef<HTMLDivElement>(null);
   const qrSize = useQrSize(qrBoxRef);
   const [last, first] = cardNameLines(card.display_name);
-  const handle = usernameAt(card.username);
   const kicker = cardKicker(card.passion, card.city);
   const passion = (card.passion || "").trim();
   const since = memberSinceShort(card.member_since, card.member_since_label);
@@ -145,7 +153,7 @@ function OwnerEtherId({ card, verifyHref }: { card: EtherIdCard; verifyHref?: st
               <span>{first ? `${last},` : last}</span>
               {first ? <span>{first}</span> : null}
             </h2>
-            <p className="ether-id-handle">{handle || "No username yet"}</p>
+            <p className="ether-id-handle">{cardHandleLine(role, card.username)}</p>
             {passion ? <p className="ether-id-pass">{passion}</p> : null}
             {verifyHref ? (
               <div className="ether-id-qrbox">
@@ -209,12 +217,14 @@ function OwnerEtherId({ card, verifyHref }: { card: EtherIdCard; verifyHref?: st
 export function EtherIdFace({
   card,
   verifyHref,
+  role,
 }: {
   card: EtherIdCard | EtherIdPublic;
   verifyHref?: string;
+  role?: string | null;
 }) {
   if (!("passion" in card)) {
     return <PublicEtherId card={card} />;
   }
-  return <OwnerEtherId card={card} verifyHref={verifyHref} />;
+  return <OwnerEtherId card={card} verifyHref={verifyHref} role={role} />;
 }

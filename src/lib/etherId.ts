@@ -61,6 +61,23 @@ export function usernameAt(username: string | null | undefined) {
   return `@${username.replace(/^@+/, "")}`;
 }
 
+/** First named creative role, in the order the profile already returns them. */
+export function firstRoleName(roles: { name?: string | null }[] | null | undefined) {
+  for (const role of roles ?? []) {
+    const name = (role.name ?? "").trim().replace(/\s+/g, " ");
+    if (name) return name;
+  }
+  return null;
+}
+
+/** In-app card line under the name. A role prefixes the handle. */
+export function cardHandleLine(role: string | null | undefined, username: string | null | undefined) {
+  const handle = usernameAt(username) || "No username yet";
+  const title = (role ?? "").trim().replace(/\s+/g, " ");
+  if (!title) return handle;
+  return `${title} · ${handle}`;
+}
+
 /** Month and day only. Never a year, never an age. */
 export function birthdayFace(card: { birthday_label: string | null; birthday_note: string | null }) {
   if (!card.birthday_label) return null;

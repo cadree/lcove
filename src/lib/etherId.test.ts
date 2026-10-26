@@ -6,9 +6,11 @@ import { toneForPath } from "./screenTone.ts";
 import {
   birthdayError,
   birthdayFace,
+  cardHandleLine,
   cardInitials,
   cardKicker,
   cardNameLines,
+  firstRoleName,
   isPublicVerifyCard,
   memberOfError,
   memberOfFace,
@@ -93,6 +95,17 @@ describe("birthday", () => {
     assert.equal(birthdayError(3, null), "Choose a month and a day.");
     assert.equal(birthdayError(2, 29), null);
     assert.equal(birthdayError(null, null), null);
+  });
+});
+
+describe("in-app handle line", () => {
+  it("prefixes the first role and leaves a card with no role unchanged", () => {
+    assert.equal(firstRoleName([{ name: "  " }, { name: "Designer" }, { name: "Editor" }]), "Designer");
+    assert.equal(firstRoleName([]), null);
+    assert.equal(cardHandleLine("Designer", "maya"), "Designer · @maya");
+    assert.equal(cardHandleLine("Designer", null), "Designer · No username yet");
+    assert.equal(cardHandleLine(null, "maya"), "@maya");
+    assert.equal(cardHandleLine("  ", null), "No username yet");
   });
 });
 
