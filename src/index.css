@@ -1333,6 +1333,7 @@ body.ether-id-page {
   top: 0;
   width: min(150px, 18.6%);
   max-width: 22%;
+  overflow: visible;
   text-align: right;
 }
 
@@ -1345,10 +1346,19 @@ body.ether-id-page {
 
 .ether-id-qr svg { width: 100%; height: auto; display: block; }
 
-.ether-id-qrbox .ether-id-lab {
-  margin-top: 6px;
-  font-size: clamp(7px, 0.875cqi, 14px);
-  letter-spacing: 0.1em;
+.ether-id-qr-caption {
+  position: absolute;
+  top: calc(100% + 3px);
+  right: 0;
+  width: max-content;
+  margin: 0;
+  font-size: clamp(6px, 0.78cqi, 14px);
+  letter-spacing: 0.04em;
+  line-height: 1.15;
+  text-align: right;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .ether-id-grid {
@@ -1471,7 +1481,7 @@ body.ether-id-page {
   .ether-id-lab { letter-spacing: 0.04em; }
   .ether-id-val { letter-spacing: 0; }
   .ether-id-qrbox { width: 18.6%; }
-  .ether-id-qrbox .ether-id-lab { margin-top: 3px; letter-spacing: 0.06em; }
+  .ether-id-qr-caption { font-size: 6.5px; letter-spacing: 0.02em; }
   .ether-id-grid { gap: 4px 3px; padding-top: 4px; }
   .ether-id-foot { letter-spacing: 0.03em; }
   .ether-id-brand { font-size: clamp(12px, 1.7cqi, 18px); }

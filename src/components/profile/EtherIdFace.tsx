@@ -159,7 +159,7 @@ function OwnerEtherId({ card, verifyHref }: { card: EtherIdCard; verifyHref?: st
                     title="Ether ID verify code"
                   />
                 </div>
-                <p className="ether-id-lab ether-id-dim">scan to verify</p>
+                <p className="ether-id-qr-caption ether-id-lab ether-id-dim">scan to verify</p>
               </div>
             ) : null}
             <dl className="ether-id-grid">
