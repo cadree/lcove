@@ -8,7 +8,7 @@ A member card for every account. The in-app card is `/id`. The profile entry is 
 | --- | --- |
 | Name, avatar | `profiles.display_name`, `profiles.avatar_url` |
 | @username | `profiles.username`. There was no username column. It is lowercase, 3–20 letters, numbers, or underscores. |
-| Passion | Earliest `user_passions` row: `custom_name`, otherwise `passions.name`. Empty when they have none. The card prints it on the cream bar. The red line uses the first word plus the city. |
+| Passion | `profiles.passion_title`. Free text the member types on `/id`, trimmed, at most 24 characters. The card prints it in capitals on the cream bar. Empty stays empty: other people see no bar, and the owner sees “Add your passion”. It is not filled from roles, skills, or `user_passions`. The red line uses the first word of this title plus the city. |
 | Status | `ether_member_status`. See below. |
 | Peer reviews | `user_reviews` average and count. `reputation_scores` is store reviews and is not used. There is no endorsements table. Zero reviews is "No peer reviews", not a made-up average. The card prints `4.5 · 2`. |
 | Projects completed | Distinct `projects` with `status = 'completed'` where the member is the creator or has an accepted application. Pending applications are not counted. The card prints the count. |
@@ -33,7 +33,7 @@ The QR is `eid1.<jti>.<exp>.<hmac>`. Signing calls `extensions.hmac` and `extens
 
 ## Apple Wallet
 
-Store card. The top is a rendered strip (`strip.png`, `strip@2x.png`, `strip@3x.png`) with the photo or initials, the serif name, the ETHER mark, the @username, and the role chip. Under it, Wallet prints Member of, Member since, Status, and City, then the QR. There is no primary field, so Wallet does not paint system text over the strip. The avatar fetch is still https only, 3 MB, and 2 seconds, and only JPEG or PNG. HEIC and any other miss become initials on the dark plate. The status field is the live word in capitals (`ACTIVE`, `INACTIVE`, `SUSPENDED`, `BANNED`). The barcode is the same verify URL. `webServiceURL` is the `ether-id-pass` function.
+Store card. The top is a rendered strip (`strip.png`, `strip@2x.png`, `strip@3x.png`) with the photo or initials, the serif name, the ETHER mark, and the passion title chip. An empty title leaves the chip off. Under it, Wallet prints Member of, Member since, Status, and City, then the QR. There is no primary field, so Wallet does not paint system text over the strip. The avatar fetch is still https only, 3 MB, and 2 seconds, and only JPEG or PNG. HEIC and any other miss become initials on the dark plate. The status field is the live word in capitals (`ACTIVE`, `INACTIVE`, `SUSPENDED`, `BANNED`). The barcode is the same verify URL. `webServiceURL` is the `ether-id-pass` function.
 
 PassKit routes, all without a Supabase JWT. The device sends `Authorization: ApplePass <token>` except on the serial-number list, which is how PassKit is specified:
 

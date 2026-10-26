@@ -31,6 +31,8 @@ export interface EtherIdCard extends EtherIdPublic {
 export const MEMBER_OF_LIMIT = 24;
 export const MEMBER_OF_EMPTY = "LCOVE";
 export const MEMBER_OF_HINT = "A community or personal brand you belong to, or N/A or LCOVE.";
+export const PASSION_TITLE_LIMIT = 24;
+export const PASSION_TITLE_HINT = "A short title you write yourself, such as Filmmaker or Beat maker.";
 export const ETHER_ID_SITE = "etherbylcove.com";
 
 const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -59,23 +61,6 @@ export function memberStatus(input: {
 export function usernameAt(username: string | null | undefined) {
   if (!username) return null;
   return `@${username.replace(/^@+/, "")}`;
-}
-
-/** First named creative role, in the order the profile already returns them. */
-export function firstRoleName(roles: { name?: string | null }[] | null | undefined) {
-  for (const role of roles ?? []) {
-    const name = (role.name ?? "").trim().replace(/\s+/g, " ");
-    if (name) return name;
-  }
-  return null;
-}
-
-/** In-app card line under the name. A role prefixes the handle. */
-export function cardHandleLine(role: string | null | undefined, username: string | null | undefined) {
-  const handle = usernameAt(username) || "No username yet";
-  const title = (role ?? "").trim().replace(/\s+/g, " ");
-  if (!title) return handle;
-  return `${title} · ${handle}`;
 }
 
 /** Month and day only. Never a year, never an age. */
@@ -126,6 +111,17 @@ export function normalizeMemberOf(raw: string | null | undefined) {
 export function memberOfError(raw: string | null | undefined) {
   const trimmed = (raw ?? "").trim();
   if (trimmed.length > MEMBER_OF_LIMIT) return "Member of is 24 characters or fewer.";
+  return null;
+}
+
+export function normalizePassionTitle(raw: string | null | undefined) {
+  const trimmed = (raw ?? "").trim();
+  return trimmed ? trimmed : null;
+}
+
+export function passionTitleError(raw: string | null | undefined) {
+  const trimmed = (raw ?? "").trim();
+  if (trimmed.length > PASSION_TITLE_LIMIT) return "Passion is 24 characters or fewer.";
   return null;
 }
 

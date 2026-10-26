@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import PageLayout from "@/components/layout/PageLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { EtherIdFace, monthName } from "@/components/profile/EtherIdFace";
 import { useAuth } from "@/contexts/AuthContext";
-import { useUserCreativeRoles } from "@/hooks/useUserDetails";
 import { supabase } from "@/integrations/supabase/client";
 import { openInSafari } from "@/lib/externalCheckout";
 import { isIosApp } from "@/lib/platform";
@@ -16,13 +15,16 @@ import { shotSessionEnabled } from "@/lib/shotSession";
 import {
   MEMBER_OF_HINT,
   MEMBER_OF_LIMIT,
+  PASSION_TITLE_HINT,
+  PASSION_TITLE_LIMIT,
   birthdayError,
   memberOfError,
   normalizeMemberOf,
+  normalizePassionTitle,
   normalizeUsername,
+  passionTitleError,
   usernameError,
   verifyUrl,
-  firstRoleName,
   walletButtonVisible,
   type EtherIdCard,
 } from "@/lib/etherId";
@@ -60,15 +62,14 @@ async function loadCard(): Promise<EtherIdCard | null> {
 }
 
 export default function EtherId() {
-  const { session, user } = useAuth();
+  const { session } = useAuth();
   useEffect(() => {
     document.body.classList.add("ether-id-page");
     return () => document.body.classList.remove("ether-id-page");
   }, []);
   const queryClient = useQueryClient();
   const shot = shotSessionEnabled();
-  const { data: creativeRoles = [] } = useUserCreativeRoles(shot ? undefined : user?.id);
-  const roleName = firstRoleName(creativeRoles);
+  const passionRef = useRef<HTMLInputElement>(null);
   const cardQuery = useQuery({ queryKey: ["ether-id"], queryFn: loadCard });
   const walletQuery = useQuery({
     queryKey: ["ether-id-wallet"],
@@ -83,11 +84,13 @@ export default function EtherId() {
   });
   const card = cardQuery.data;
   const [username, setUsername] = useState<string | null>(null);
+  const [passionTitle, setPassionTitle] = useState<string | null>(null);
   const [memberOf, setMemberOf] = useState<string | null>(null);
   const [month, setMonth] = useState<number | null>(null);
   const [day, setDay] = useState<number | null>(null);
   const [showBirthday, setShowBirthday] = useState<boolean | null>(null);
   const usernameValue = username ?? card?.username ?? "";
+  const passionValue = passionTitle ?? card?.passion ?? "";
   const memberOfValue = memberOf ?? card?.member_of ?? "";
   const monthValue = month ?? card?.birthday_month ?? null;
   const dayValue = day ?? card?.birthday_day ?? null;
@@ -96,9 +99,12 @@ export default function EtherId() {
   const save = useMutation({
     mutationFn: async () => {
       const nameError = usernameError(usernameValue);
+      const titleError = passionTitleError(passionValue);
       const dateError = birthdayError(monthValue, dayValue);
       const ofError = memberOfError(memberOfValue);
-      if (nameError || dateError || ofError) throw new Error(nameError || dateError || ofError || "Check the card");
+      if (nameError || titleError || dateError || ofError) {
+        throw new Error(nameError || titleError || dateError || ofError || "Check the card");
+      }
       if (shot) return;
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
@@ -107,6 +113,7 @@ export default function EtherId() {
         .from("profiles")
         .update({
           username: normalizeUsername(usernameValue) || null,
+          passion_title: normalizePassionTitle(passionValue),
           member_of: normalizeMemberOf(memberOfValue),
           birthday_month: monthValue,
           birthday_day: dayValue,
@@ -195,7 +202,14 @@ export default function EtherId() {
         {card && (
           <>
             <div className="min-w-0 max-w-full">
-              <EtherIdFace card={card} verifyHref={href} role={roleName} />
+              <EtherIdFace
+                card={card}
+                verifyHref={href}
+                onEditPassion={() => {
+                  passionRef.current?.focus();
+                  passionRef.current?.scrollIntoView({ block: "center" });
+                }}
+              />
             </div>
             <div className="mt-4 flex flex-col gap-2">
               <Button type="button" variant="outline" className="min-h-11" onClick={() => refresh.mutate()} disabled={refresh.isPending}>
@@ -227,6 +241,19 @@ export default function EtherId() {
                   className="min-h-11"
                 />
                 <p className="text-sm text-muted-foreground">Shown as @{normalizeUsername(usernameValue) || "username"}.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ether-passion">Passion</Label>
+                <Input
+                  id="ether-passion"
+                  ref={passionRef}
+                  value={passionValue}
+                  maxLength={PASSION_TITLE_LIMIT}
+                  onChange={(event) => setPassionTitle(event.target.value)}
+                  placeholder="Filmmaker"
+                  className="min-h-11"
+                />
+                <p className="text-sm text-muted-foreground">{PASSION_TITLE_HINT}</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ether-member-of">Member of</Label>

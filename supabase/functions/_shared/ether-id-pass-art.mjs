@@ -1,6 +1,6 @@
 // Store-card strip for the Ether ID. Wallet allots 375×144 points.
 // Drawn at 6× and boxed down so @3x, @2x, and @1x stay aligned.
-// Fraunces for the name and mark, DM Mono for the kicker, handle, and chip.
+// Fraunces for the name and mark, DM Mono for the kicker and chip.
 
 import { FRAUNCES_LATIN, FRAUNCES_LATIN_EXT, DM_MONO } from "./ether-id-pass-fonts.mjs";
 import { decodeEtherIdPhoto } from "./ether-id-pass-photo.mjs";
@@ -21,7 +21,6 @@ const WARM = [16, 14, 12];
 const INK = [8, 8, 10];
 const CREAM = [236, 231, 220];
 const RED = [196, 20, 45];
-const HANDLE = [185, 180, 168];
 const FRAME = [58, 52, 46];
 
 let fontsPromise;
@@ -441,15 +440,7 @@ function layoutStrip(fonts, copy) {
     topY = placed.ink.bottom + 3 * SCALE;
   }
 
-  let handle = null;
-  if (copy.handle) {
-    topY += 2 * SCALE;
-    const run = fit(fonts, "mono", copy.handle, 10 * SCALE, 7 * SCALE, 0, HANDLE, maxW);
-    handle = placeRun(run, textX, topY);
-    topY = handle.ink.bottom + 6 * SCALE;
-  } else {
-    topY += 4 * SCALE;
-  }
+  topY += 4 * SCALE;
 
   let chip = null;
   if (copy.chip) {
@@ -479,7 +470,7 @@ function layoutStrip(fonts, copy) {
     };
   }
 
-  return { brand, kicker, names, handle, chip };
+  return { brand, kicker, names, chip };
 }
 
 function renderStrip(fonts, copy, photo) {
@@ -509,9 +500,6 @@ function renderStrip(fonts, copy, photo) {
   }
   for (const name of layout.names) {
     paintRun(buf, WIDTH, HEIGHT, name.run, name.x, name.baseline);
-  }
-  if (layout.handle) {
-    paintRun(buf, WIDTH, HEIGHT, layout.handle.run, layout.handle.x, layout.handle.baseline);
   }
   if (layout.chip) {
     const { box } = layout.chip;

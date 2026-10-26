@@ -108,7 +108,7 @@ describe("pass.json", () => {
     assert.equal(pass.barcode.altText, "Scan to verify");
     const copy = etherIdStripCopy({ ...card, member_of: "North Hall", city: "Los Angeles" });
     assert.deepEqual(copy.nameLines, ["TORRES,", "MAYA"]);
-    assert.equal(copy.handle, "@maya");
+    assert.equal("handle" in copy, false);
     assert.equal(copy.chip, "PHOTOGRAPHY");
     assert.equal(copy.kicker, "— PHOTOGRAPHY · LOS ANGELES");
     assert.equal(copy.initials, "MT");
@@ -137,7 +137,7 @@ describe("pass.json", () => {
       city: "—",
     });
     assert.deepEqual(copy.nameLines, ["WALLACE,", "CADRE"]);
-    assert.equal(copy.handle, null);
+    assert.equal("handle" in copy, false);
     assert.equal(copy.chip, null);
     assert.equal(copy.kicker, null);
     assert.equal(copy.initials, "CW");

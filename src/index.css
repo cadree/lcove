@@ -1300,18 +1300,28 @@ body.ether-id-page {
   white-space: nowrap;
 }
 
-.ether-id-handle {
+.ether-id-pass-empty {
+  display: block;
+  max-width: calc(100% - 22%);
   margin-top: clamp(4px, 1.1cqi, 18px);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #7d786e;
   font-family: "DM Mono", var(--font-mono), ui-monospace, monospace;
-  font-size: clamp(11px, 1.875cqi, 30px);
-  color: #b9b4a8;
-  line-height: 1;
+  font-size: clamp(10px, 1.7cqi, 22px);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  text-align: left;
+  text-transform: none;
+  cursor: pointer;
 }
 
 .ether-id-pass {
   display: inline-block;
   max-width: calc(100% - 22%);
-  margin-top: clamp(6px, 2.1cqi, 34px);
+  margin-top: clamp(4px, 1.1cqi, 18px);
   padding: clamp(3px, 0.75cqi, 12px) clamp(6px, 1.5cqi, 24px);
   overflow: hidden;
   background: #ece7dc;
@@ -1476,7 +1486,7 @@ body.ether-id-page {
 /* Phone widths keep the dossier proportions and stop any line from widening the page. */
 @media (max-width: 520px) {
   .ether-id-name { font-size: clamp(15px, 6.2cqi, 28px); }
-  .ether-id-handle { font-size: clamp(9px, 1.6cqi, 14px); margin-top: 3px; }
+  .ether-id-pass-empty { font-size: clamp(9px, 1.6cqi, 14px); margin-top: 3px; }
   .ether-id-pass { font-size: clamp(7px, 1.7cqi, 12px); margin-top: 4px; padding: 3px 6px; letter-spacing: 0.04em; }
   .ether-id-lab { letter-spacing: 0.04em; }
   .ether-id-val { letter-spacing: 0; }
