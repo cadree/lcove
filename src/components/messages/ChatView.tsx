@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import { keyboardPaddingStyle, pinMessageListToEnd } from '@/lib/liveKeyboard';
+import { useNativeKeyboardInset } from '@/hooks/useNativeKeyboardInset';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -63,6 +65,8 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   const isOwner = !!(projectChatData && user && projectChatData.creator_id === user.id);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesListRef = useRef<HTMLDivElement>(null);
+  const keyboardInset = useNativeKeyboardInset();
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [showProjectInfo, setShowProjectInfo] = useState(false);
   const [reportMessageId, setReportMessageId] = useState<string | null>(null);
@@ -125,6 +129,12 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // The thread is a fixed 100dvh column, so the keyboard does not shrink it.
+  // Padding lives on this shell only. The composer keeps its own safe-area pad.
+  useEffect(() => {
+    pinMessageListToEnd(messagesListRef.current, keyboardInset);
+  }, [keyboardInset]);
 
   // Mark messages as read when viewing
   useEffect(() => {
@@ -203,7 +213,10 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   };
 
   return (
-    <div className="h-full w-full flex flex-col bg-background">
+    <div
+      className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
+      style={keyboardPaddingStyle(keyboardInset)}
+    >
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-border bg-background p-4">
         <Button variant="ghost" size="icon" onClick={onBack}>
@@ -405,7 +418,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div ref={messagesListRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />

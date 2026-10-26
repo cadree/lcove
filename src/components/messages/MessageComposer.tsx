@@ -96,7 +96,7 @@ const MessageComposer = ({ onSend, onTyping, isSending }: MessageComposerProps) 
 
   return (
     <div 
-      className="border-t border-border bg-background p-4"
+      className="shrink-0 border-t border-border bg-background p-4"
       style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 16px), 16px)' }}
     >
       {/* File Preview */}

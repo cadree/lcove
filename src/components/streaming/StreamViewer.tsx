@@ -1,6 +1,4 @@
 import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
-import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
-import { Keyboard } from '@capacitor/keyboard';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Radio, Users, Coins, Send, X, Clock, PlayCircle, Share2, Flag } from 'lucide-react';
 import { ReportDialog } from '@/components/safety/ReportDialog';
-import { liveKeyboardInset } from '@/lib/liveKeyboard';
+import { keyboardPaddingStyle, pinMessageListToEnd } from '@/lib/liveKeyboard';
+import { useNativeKeyboardInset } from '@/hooks/useNativeKeyboardInset';
 import { digitalPurchasesEnabled } from '@/lib/platform';
 import { shareLink, buildShareUrl } from '@/lib/shareLink';
 import { useStream, useSendReaction, useTipStream, useJoinStream, useStreamPresence, useStreamCheers } from '@/hooks/useLiveStreams';
@@ -31,46 +30,6 @@ function LiveMediaFallback() {
 }
 import { DeleteStreamButton } from './DeleteStreamButton';
 import { liveSheetState } from '@/lib/liveSheetHistory';
-
-function useNativeKeyboardInset(active: boolean) {
-  const [inset, setInset] = useState(0);
-
-  useEffect(() => {
-    if (!active || !Capacitor.isNativePlatform()) {
-      setInset(0);
-      return;
-    }
-
-    const handles: PluginListenerHandle[] = [];
-    let cancelled = false;
-
-    const listen = async () => {
-      const show = await Keyboard.addListener('keyboardWillShow', (info) => {
-        setInset(liveKeyboardInset(info.keyboardHeight));
-      });
-      const hide = await Keyboard.addListener('keyboardWillHide', () => {
-        setInset(0);
-      });
-      if (cancelled) {
-        void show.remove();
-        void hide.remove();
-        return;
-      }
-      handles.push(show, hide);
-    };
-
-    void listen();
-    return () => {
-      cancelled = true;
-      handles.forEach((handle) => {
-        void handle.remove();
-      });
-      setInset(0);
-    };
-  }, [active]);
-
-  return inset;
-}
 
 interface StreamViewerProps {
   streamId: string;
@@ -127,10 +86,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   }, [open, streamId]);
 
   useEffect(() => {
-    if (keyboardInset <= 0) return;
-    const sheet = sheetRef.current;
-    if (!sheet) return;
-    sheet.scrollTop = sheet.scrollHeight;
+    pinMessageListToEnd(sheetRef.current, keyboardInset);
   }, [keyboardInset]);
 
   useEffect(() => {
@@ -363,7 +319,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
         <DialogContent
           fullscreen
           className="[&>button]:hidden"
-          style={keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
+          style={keyboardPaddingStyle(keyboardInset)}
           onPointerDownOutside={(event) => event.preventDefault()}
           onInteractOutside={(event) => event.preventDefault()}
         >
@@ -563,7 +519,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
           </div>
 
           <div className="min-h-[9rem] flex-1 overflow-hidden">
-            {stream && <StreamChat streamId={stream.id || streamId} className="h-full" />}
+            {stream && <StreamChat streamId={stream.id || streamId} className="h-full" keyboardInset={keyboardInset} />}
           </div>
           </div>
         </DialogContent>

@@ -84,7 +84,7 @@ const Messages = () => {
         </motion.div>
 
         {/* Chat View */}
-        <div className={`flex-1 ${!selectedConversation ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`min-h-0 flex-1 ${!selectedConversation ? 'hidden md:flex' : 'flex'}`}>
           {selectedConversation ? (
             <ChatView
               conversationId={selectedConversation}

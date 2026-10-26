@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { ReportDialog } from "@/components/safety/ReportDialog";
 import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { assertCleanText, OBJECTIONABLE_MESSAGE } from "@/lib/objectionableText";
+import { pinMessageListToEnd } from "@/lib/liveKeyboard";
 import { Flag } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,7 +22,15 @@ interface ChatRow {
   display_name?: string | null;
 }
 
-export function StreamChat({ streamId, className = "" }: { streamId: string; className?: string }) {
+export function StreamChat({
+  streamId,
+  className = "",
+  keyboardInset = 0,
+}: {
+  streamId: string;
+  className?: string;
+  keyboardInset?: number;
+}) {
   const { user } = useAuth();
   const { blockedIds } = useUserBlocks();
   const queryClient = useQueryClient();
@@ -69,6 +78,10 @@ export function StreamChat({ streamId, className = "" }: { streamId: string; cla
     if (!list) return;
     list.scrollTop = list.scrollHeight;
   }, [messages]);
+
+  useEffect(() => {
+    pinMessageListToEnd(listRef.current, keyboardInset);
+  }, [keyboardInset]);
 
   const send = async () => {
     const text = body.trim();
