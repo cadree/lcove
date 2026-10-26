@@ -115,6 +115,46 @@ function runWidth(run) {
   return width - run[run.length - 1].tracking;
 }
 
+/** Ink bounds relative to a baseline at y = 0 and a pen at x = 0. */
+function inkExtent(run) {
+  let top = 0;
+  let bottom = 0;
+  let left = 0;
+  let right = 0;
+  let any = false;
+  let x = 0;
+  for (const item of run) {
+    x += item.kern;
+    const box = item.glyph.getPath(x, 0, item.fontSize).getBoundingBox();
+    if (Number.isFinite(box.y1) && Number.isFinite(box.y2)) {
+      top = any ? Math.min(top, box.y1) : box.y1;
+      bottom = any ? Math.max(bottom, box.y2) : box.y2;
+      left = any ? Math.min(left, box.x1) : box.x1;
+      right = any ? Math.max(right, box.x2) : box.x2;
+      any = true;
+    }
+    x += item.advance + item.tracking;
+  }
+  return { top, bottom, left, right };
+}
+
+/** Put the run's ink top on topY. Returns the baseline and the ink rectangle. */
+function placeRun(run, x, topY) {
+  const ink = inkExtent(run);
+  const baseline = topY - ink.top;
+  return {
+    run,
+    baseline,
+    x,
+    ink: {
+      left: x + ink.left,
+      right: x + ink.right,
+      top: topY,
+      bottom: baseline + ink.bottom,
+    },
+  };
+}
+
 function fit(fonts, kind, text, size, min, trackingEm, color, maxWidth) {
   let current = size;
   while (current >= min) {
@@ -374,6 +414,74 @@ function markRedE(run) {
   }
 }
 
+function layoutStrip(fonts, copy) {
+  const photoTop = STRIP_PHOTO.y * SCALE;
+  const textX = (STRIP_PHOTO.x + STRIP_PHOTO.w) * SCALE + 12 * SCALE;
+  const maxW = WIDTH - 10 * SCALE - textX;
+  const rowGap = 5 * SCALE;
+  let topY = photoTop + SCALE;
+
+  const brandRun = shape(fonts, "serif", "ETHER", 16 * SCALE, 0.08, CREAM);
+  markRedE(brandRun);
+  const brand = placeRun(brandRun, textX, topY);
+  topY = brand.ink.bottom + rowGap;
+
+  let kicker = null;
+  if (copy.kicker) {
+    const run = fit(fonts, "mono", copy.kicker, 8 * SCALE, 6 * SCALE, 0.04, RED, maxW);
+    kicker = placeRun(run, textX, topY);
+    topY = kicker.ink.bottom + rowGap;
+  }
+
+  const names = [];
+  for (const line of copy.nameLines) {
+    const run = fit(fonts, "serif", line, 26 * SCALE, 13 * SCALE, -0.015, CREAM, maxW);
+    const placed = placeRun(run, textX, topY);
+    names.push(placed);
+    topY = placed.ink.bottom + 3 * SCALE;
+  }
+
+  let handle = null;
+  if (copy.handle) {
+    topY += 2 * SCALE;
+    const run = fit(fonts, "mono", copy.handle, 10 * SCALE, 7 * SCALE, 0, HANDLE, maxW);
+    handle = placeRun(run, textX, topY);
+    topY = handle.ink.bottom + 6 * SCALE;
+  } else {
+    topY += 4 * SCALE;
+  }
+
+  let chip = null;
+  if (copy.chip) {
+    const run = fit(fonts, "mono", copy.chip, 8.5 * SCALE, 6 * SCALE, 0.05, INK, maxW - 16 * SCALE);
+    const ink = inkExtent(run);
+    const padX = 6 * SCALE;
+    const padY = 3.6 * SCALE;
+    const paintX = textX + padX - ink.left;
+    const baseline = topY + padY - ink.top;
+    const box = {
+      left: textX,
+      top: topY,
+      right: textX + (ink.right - ink.left) + padX * 2,
+      bottom: topY + (ink.bottom - ink.top) + padY * 2,
+    };
+    chip = {
+      run,
+      baseline,
+      paintX,
+      box,
+      ink: {
+        left: paintX + ink.left,
+        right: paintX + ink.right,
+        top: baseline + ink.top,
+        bottom: baseline + ink.bottom,
+      },
+    };
+  }
+
+  return { brand, kicker, names, handle, chip };
+}
+
 function renderStrip(fonts, copy, photo) {
   const buf = new Uint8Array(WIDTH * HEIGHT * 4);
   paintBackground(buf);
@@ -394,46 +502,21 @@ function renderStrip(fonts, copy, photo) {
   }
   framePhoto(buf, photoRect);
 
-  const textX = photoRect.x + photoRect.w + 12 * SCALE;
-  const maxW = WIDTH - 10 * SCALE - textX;
-  let baseline = photoRect.y + 15 * SCALE;
-  const brand = shape(fonts, "serif", "ETHER", 16 * SCALE, 0.08, CREAM);
-  markRedE(brand);
-  paintRun(buf, WIDTH, HEIGHT, brand, textX, baseline);
-
-  baseline += 13 * SCALE;
-  if (copy.kicker) {
-    const kicker = fit(fonts, "mono", copy.kicker, 8 * SCALE, 6 * SCALE, 0.04, RED, maxW);
-    paintRun(buf, WIDTH, HEIGHT, kicker, textX, baseline);
-    baseline += 12 * SCALE;
-  } else {
-    baseline += 3 * SCALE;
+  const layout = layoutStrip(fonts, copy);
+  paintRun(buf, WIDTH, HEIGHT, layout.brand.run, layout.brand.x, layout.brand.baseline);
+  if (layout.kicker) {
+    paintRun(buf, WIDTH, HEIGHT, layout.kicker.run, layout.kicker.x, layout.kicker.baseline);
   }
-
-  for (const line of copy.nameLines) {
-    const name = fit(fonts, "serif", line, 28 * SCALE, 14 * SCALE, -0.015, CREAM, maxW);
-    paintRun(buf, WIDTH, HEIGHT, name, textX, baseline);
-    const used = name[0]?.fontSize || 28 * SCALE;
-    baseline += used * 0.9;
+  for (const name of layout.names) {
+    paintRun(buf, WIDTH, HEIGHT, name.run, name.x, name.baseline);
   }
-
-  if (copy.handle) {
-    baseline += 2 * SCALE;
-    const handle = fit(fonts, "mono", copy.handle, 10 * SCALE, 7 * SCALE, 0, HANDLE, maxW);
-    paintRun(buf, WIDTH, HEIGHT, handle, textX, baseline);
-    baseline += 15 * SCALE;
-  } else {
-    baseline += 6 * SCALE;
+  if (layout.handle) {
+    paintRun(buf, WIDTH, HEIGHT, layout.handle.run, layout.handle.x, layout.handle.baseline);
   }
-
-  if (copy.chip) {
-    const chip = fit(fonts, "mono", copy.chip, 8.5 * SCALE, 6 * SCALE, 0.05, INK, maxW - 14 * SCALE);
-    const padX = 6 * SCALE;
-    const padY = 3.2 * SCALE;
-    const boxW = runWidth(chip) + padX * 2;
-    const boxH = (chip[0]?.fontSize || 8.5 * SCALE) + padY * 2;
-    fillRect(buf, WIDTH, HEIGHT, textX, baseline - (chip[0]?.fontSize || 8.5 * SCALE) * 0.78, boxW, boxH, CREAM);
-    paintRun(buf, WIDTH, HEIGHT, chip, textX + padX, baseline);
+  if (layout.chip) {
+    const { box } = layout.chip;
+    fillRect(buf, WIDTH, HEIGHT, box.left, box.top, box.right - box.left, box.bottom - box.top, CREAM);
+    paintRun(buf, WIDTH, HEIGHT, layout.chip.run, layout.chip.paintX, layout.chip.baseline);
   }
   return buf;
 }
