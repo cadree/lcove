@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 import { missingWalletSecrets, matchEtherIdRoute, walletConfigured } from "../supabase/functions/_shared/ether-id-config.mjs";
 import { etherIdThumbnailFiles, fetchEtherIdThumbnail } from "../supabase/functions/_shared/ether-id-pass-photo.mjs";
-import { etherIdStripFiles, STRIP_FILES, STRIP_PHOTO } from "../supabase/functions/_shared/ether-id-pass-art.mjs";
+import { etherIdStripFiles, etherIdStripTextBoxes, STRIP_FILES, STRIP_PHOTO } from "../supabase/functions/_shared/ether-id-pass-art.mjs";
 import { decode as decodePng } from "fast-png";
 import { etherIdPassJson, etherIdStripCopy, memberOfPass, sincePass, walletStatus } from "../supabase/functions/_shared/ether-id-pass-json.mjs";
 import { buildPkpass, etherIdPassImages, etherMarkPng, solidPng } from "../supabase/functions/_shared/pkpass.mjs";
@@ -307,6 +307,47 @@ describe("ether id strip", () => {
     assert.equal(hasPixel(plain, (r, g, b) => r > 210 && g > 200 && b > 180), true);
     const missing = decodePng((await etherIdStripFiles(cadre, null))[2].data);
     assert.equal(pngPixel(missing, (STRIP_PHOTO.x + 8) * 3, (STRIP_PHOTO.y + 8) * 3)[2] < 40, true);
+  });
+
+  it("keeps the subtitle off the name for one line, two lines, and a long city", async () => {
+    const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    const cards = [
+      {
+        display_name: "Prince",
+        username: "prince",
+        passion: "music",
+        city: "Minneapolis",
+        lines: 1,
+      },
+      {
+        display_name: "App Review",
+        username: "appreview",
+        passion: "content creation",
+        city: "Charlotte, NC",
+        lines: 2,
+      },
+      {
+        display_name: "Christopher Alexander-Montgomery",
+        username: "christopher",
+        passion: "editorial photography and film",
+        city: "Los Angeles, California",
+        lines: 2,
+      },
+    ];
+    for (const card of cards) {
+      const boxes = await etherIdStripTextBoxes(card);
+      assert.equal(boxes.names.length, card.lines);
+      assert.ok(boxes.kicker);
+      for (const name of boxes.names) assert.equal(overlaps(boxes.kicker, name), false);
+      assert.equal(boxes.kicker.bottom < boxes.names[0].top, true);
+      if (card.lines === 2) assert.equal(boxes.names[0].bottom < boxes.names[1].top, true);
+      assert.ok(boxes.chip);
+      const inkMid = (boxes.chip.ink.top + boxes.chip.ink.bottom) / 2;
+      const boxMid = (boxes.chip.box.top + boxes.chip.box.bottom) / 2;
+      assert.ok(Math.abs(inkMid - boxMid) < 0.5);
+      assert.equal(boxes.chip.box.bottom <= 144 * 6, true);
+      assert.equal(boxes.names[boxes.names.length - 1].bottom < boxes.chip.box.top, true);
+    }
   });
 });
 
