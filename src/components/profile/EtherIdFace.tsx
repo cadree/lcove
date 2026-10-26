@@ -139,7 +139,7 @@ function OwnerEtherId({ card, verifyHref }: { card: EtherIdCard; verifyHref?: st
             <span className="ether-id-tick ether-id-tick-br" aria-hidden="true" />
           </div>
           <div className="ether-id-info">
-            {kicker ? <p className="ether-id-lab ether-id-red">{kicker}</p> : null}
+            {kicker ? <p className="ether-id-kicker ether-id-lab ether-id-red">{kicker}</p> : null}
             <h2 className="ether-id-name">
               <span>{first ? `${last},` : last}</span>
               {first ? <span>{first}</span> : null}

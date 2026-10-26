@@ -174,7 +174,7 @@ export default function EtherId() {
         {cardQuery.isError && <p className="text-sm text-destructive">Could not load your Ether ID.</p>}
         {card && (
           <>
-            <div className="-mx-2">
+            <div className="min-w-0 max-w-full">
               <EtherIdFace card={card} verifyHref={href} />
             </div>
             <div className="mt-4 flex flex-col gap-2">

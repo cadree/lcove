@@ -1046,11 +1046,13 @@ button.novi-peek:focus-visible {
    The spin is transform-only so it can stay on the compositor. */
 body.ether-id-page {
   overflow-x: visible;
+  max-width: 100%;
 }
 
 .ether-id-scene {
   width: 100%;
-  max-width: 960px;
+  max-width: min(960px, 100%);
+  min-width: 0;
   margin-inline: auto;
   padding: 10px 0 14px;
   perspective: 1100px;
@@ -1064,6 +1066,8 @@ body.ether-id-page {
 .ether-id-spin {
   position: relative;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   aspect-ratio: 8 / 5;
   transform-style: preserve-3d;
   -webkit-transform-style: preserve-3d;
@@ -1172,6 +1176,7 @@ body.ether-id-page {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   z-index: 2;
 }
 
@@ -1190,10 +1195,26 @@ body.ether-id-page {
 
 .ether-id-lab {
   font-family: "DM Mono", var(--font-mono), ui-monospace, monospace;
-  font-size: clamp(8px, 1.1875cqi, 19px);
-  letter-spacing: 0.12em;
+  font-size: clamp(6px, 1.1875cqi, 19px);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   line-height: 1.2;
+  white-space: nowrap;
+}
+
+.ether-id-top .ether-id-lab {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+.ether-id-kicker {
+  max-width: calc(100% - 22%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ether-id-dim { color: #7d786e; }
@@ -1260,16 +1281,22 @@ body.ether-id-page {
 
 .ether-id-name {
   margin: 0.4cqi 0 0;
-  max-width: 68%;
+  max-width: calc(100% - 22%);
+  overflow: hidden;
   font-family: Fraunces, var(--font-lore), Georgia, serif;
   font-weight: 700;
-  font-size: clamp(20px, 7cqi, 112px);
+  font-size: clamp(16px, 6.6cqi, 112px);
   line-height: 0.95;
   letter-spacing: -0.01em;
   text-transform: uppercase;
 }
 
-.ether-id-name span { display: block; }
+.ether-id-name span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .ether-id-handle {
   margin-top: clamp(4px, 1.1cqi, 18px);
@@ -1281,23 +1308,29 @@ body.ether-id-page {
 
 .ether-id-pass {
   display: inline-block;
+  max-width: calc(100% - 22%);
   margin-top: clamp(6px, 2.1cqi, 34px);
-  padding: clamp(4px, 0.75cqi, 12px) clamp(8px, 1.5cqi, 24px);
+  padding: clamp(3px, 0.75cqi, 12px) clamp(6px, 1.5cqi, 24px);
+  overflow: hidden;
   background: #ece7dc;
   color: #08080a;
   font-family: Archivo, var(--font-body), sans-serif;
   font-weight: 800;
-  font-size: clamp(10px, 2.125cqi, 34px);
-  letter-spacing: 0.08em;
+  font-size: clamp(8px, 2.125cqi, 34px);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: top;
 }
 
 .ether-id-qrbox {
   position: absolute;
   right: 0;
   top: 0;
-  width: clamp(64px, 18.6%, 150px);
+  width: min(150px, 18.6%);
+  max-width: 22%;
   text-align: right;
 }
 
@@ -1322,11 +1355,16 @@ body.ether-id-page {
   right: 0;
   bottom: 0;
   display: grid;
-  grid-template-columns: 1fr 1.1fr 1fr;
-  gap: clamp(6px, 2.1cqi, 34px) clamp(4px, 1.6cqi, 30px);
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.25fr) minmax(0, 0.95fr);
+  gap: clamp(4px, 2.1cqi, 34px) clamp(3px, 1.2cqi, 30px);
   border-top: 1px solid #3a342e;
-  padding-top: clamp(6px, 1.8cqi, 30px);
+  padding-top: clamp(4px, 1.8cqi, 30px);
   margin: 0;
+}
+
+.ether-id-grid > div {
+  min-width: 0;
+  overflow: hidden;
 }
 
 .ether-id-grid .ether-id-lab { margin-bottom: clamp(2px, 0.5cqi, 8px); }
@@ -1334,11 +1372,14 @@ body.ether-id-page {
 .ether-id-val {
   font-family: Archivo, var(--font-body), sans-serif;
   font-weight: 700;
-  font-size: clamp(10px, 1.75cqi, 28px);
-  letter-spacing: 0.02em;
+  font-size: clamp(7.5px, 1.75cqi, 28px);
+  letter-spacing: 0.01em;
   text-transform: uppercase;
   line-height: 1.05;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .ether-id-pill {
@@ -1350,8 +1391,11 @@ body.ether-id-page {
   padding: 0.2em 0.7em;
   color: #7fdc8a;
   font-family: "DM Mono", var(--font-mono), ui-monospace, monospace;
-  font-size: clamp(8px, 1.05cqi, 16px);
-  letter-spacing: 0.12em;
+  font-size: clamp(6.5px, 1.05cqi, 16px);
+  letter-spacing: 0.06em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-transform: uppercase;
   line-height: 1.2;
 }
@@ -1379,8 +1423,16 @@ body.ether-id-page {
   display: flex;
   align-items: center;
   gap: clamp(6px, 1.3cqi, 22px);
+  min-width: 0;
   z-index: 2;
-  font-size: clamp(8px, 1.0625cqi, 17px);
+  font-size: clamp(6.5px, 1.0625cqi, 17px);
+  white-space: nowrap;
+}
+
+.ether-id-foot > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ether-id-foot-line {
@@ -1409,29 +1461,19 @@ body.ether-id-page {
   50% { transform: translateX(22%); }
 }
 
-@container etherid (max-width: 520px) {
-  .ether-id-photo { width: 34%; top: 14%; height: 72%; }
-  .ether-id-info { left: 40%; top: 14%; right: 3%; bottom: 13%; }
-  .ether-id-name,
-  .ether-id-handle,
-  .ether-id-pass,
-  .ether-id-info > .ether-id-red { max-width: calc(100% - 74px); }
-  .ether-id-name { font-size: 18px; }
-  .ether-id-handle { font-size: 11px; margin-top: 3px; }
-  .ether-id-pass { font-size: 9px; margin-top: 5px; padding: 3px 6px; letter-spacing: 0.04em; }
-  .ether-id-lab { font-size: 8px; letter-spacing: 0.06em; }
-  .ether-id-val { font-size: 10px; letter-spacing: 0; }
-  .ether-id-qrbox { width: 64px; }
-  .ether-id-grid { gap: 5px 3px; padding-top: 5px; }
-  .ether-id-foot {
-    font-size: 8px;
-    letter-spacing: 0.02em;
-    bottom: 3.6%;
-    white-space: nowrap;
-  }
-  .ether-id-top .ether-id-lab { font-size: 8px; letter-spacing: 0.04em; }
-  .ether-id-brand { font-size: 14px; }
-  .ether-id-pill { font-size: 8px; letter-spacing: 0.06em; padding: 0.12em 0.4em; }
+/* Phone widths keep the dossier proportions and stop any line from widening the page. */
+@media (max-width: 520px) {
+  .ether-id-name { font-size: clamp(15px, 6.2cqi, 28px); }
+  .ether-id-handle { font-size: clamp(9px, 1.6cqi, 14px); margin-top: 3px; }
+  .ether-id-pass { font-size: clamp(7px, 1.7cqi, 12px); margin-top: 4px; padding: 3px 6px; letter-spacing: 0.04em; }
+  .ether-id-lab { letter-spacing: 0.04em; }
+  .ether-id-val { letter-spacing: 0; }
+  .ether-id-qrbox { width: 18.6%; }
+  .ether-id-qrbox .ether-id-lab { margin-top: 3px; letter-spacing: 0.06em; }
+  .ether-id-grid { gap: 4px 3px; padding-top: 4px; }
+  .ether-id-foot { letter-spacing: 0.03em; }
+  .ether-id-brand { font-size: clamp(12px, 1.7cqi, 18px); }
+  .ether-id-pill { letter-spacing: 0.04em; padding: 0.12em 0.35em; }
 }
 
 @media (prefers-reduced-motion: reduce) {
