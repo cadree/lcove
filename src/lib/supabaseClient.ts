@@ -126,6 +126,7 @@ supabase.storage.from = ((bucketId: string) => {
       const toastId = `ether-video-compress-${++compressToastSerial}`;
       let shown = false;
       let lastPercent = -1;
+      let imageForReview = blob;
       try {
         const prepared = await prepareStorageBody(blob, (ratio) => {
           const percent = Math.max(0, Math.min(100, Math.round(ratio * 100)));
@@ -135,6 +136,9 @@ supabase.storage.from = ((bucketId: string) => {
           toast.loading(`Compressing video... ${percent}%`, { id: toastId });
         });
         body = prepared.body;
+        if (prepared.contentType === "image/jpeg" && prepared.body instanceof Blob) {
+          imageForReview = prepared.body;
+        }
         if (prepared.contentType) {
           options = { ...fileOptions, contentType: prepared.contentType };
         }
@@ -154,7 +158,7 @@ supabase.storage.from = ((bucketId: string) => {
       const name = blob instanceof File ? blob.name : "";
       const ownsThisUpload = claimStoragePath(bucketId, path);
       const started = Date.now();
-      const reviewPromise = reviewImageUpload(blob, name).catch((error) => {
+      const reviewPromise = reviewImageUpload(imageForReview, name).catch((error) => {
         console.error("Image check failed open", error);
         return { ok: true as const };
       });
