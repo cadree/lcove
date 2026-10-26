@@ -27,7 +27,7 @@ These ran on Linux, without a Mac and without an Apple Developer account:
 - [x] `ios.scheme` is unset. In Capacitor 8 that key is the Xcode build scheme (default `App`), not a URL scheme. The old value was the Lovable app id and would make `xcodebuild` look for a scheme that does not exist.
 - [x] Auth return links use `app.lovable.e07d9c457fd949f78f3cc7d5998be668://...` from `getAuthRedirectUrl` in `src/lib/capacitorStorage.ts`. The same scheme is in `ios/App/App/Info.plist` under `CFBundleURLTypes`.
 - [x] iOS project generated with `npx cap add ios` (Capacitor 8 default is Swift Package Manager, so CocoaPods is not required).
-- [x] The iOS app icon stays the bear head: `src/assets/lc-bear-logo.png` on black. The launch splash is the ETHER wordmark centered on `#08080A`.
+- [x] The iOS app icon is the ETHER wordmark with a pink border (`ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png`, 1024×1024 RGB). The launch splash is the ETHER wordmark centered on `#08080A`.
 - [x] On iOS, membership, the billing portal, and community-fund donations open Safari only when StoreKit reports the USA storefront. Every other storefront, and an unknown storefront, keeps those buttons hidden. Paid films, exclusive music, and live card gifts stay hidden on every storefront. There are no in-app purchases. Web and Android are unchanged.
 
 ## Digital goods (implemented)
@@ -85,7 +85,7 @@ Supabase Auth redirect allow-list must include `app.lovable.e07d9c457fd949f78f3c
 
 ## Icon and splash
 
-App icon artwork: `src/assets/lc-bear-logo.png` (the LC bear). It is portrait, 1275×1650, and sits on black. `assets/icon.png` (1024×1024) is that bear. The iOS app icon was not changed.
+App icon artwork: the ETHER wordmark with a pink border, in `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png` (1024×1024 RGB, no alpha). iOS masks the corners.
 
 Splash artwork: `src/assets/ether-wordmark.png`, the neon ETHER wordmark with the black keyed out. `assets/splash.png` and `assets/splash-dark.png` (2732×2732) center that mark on `#08080A`. That square is the first frame of the web power-on. `#08080A` is the splash `backgroundColor` in `capacitor.config.ts`. The spinner is off so the native frame matches the web frame.
 
