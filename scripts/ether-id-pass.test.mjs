@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 import { missingWalletSecrets, matchEtherIdRoute, walletConfigured } from "../supabase/functions/_shared/ether-id-config.mjs";
 import { etherIdThumbnailFiles, fetchEtherIdThumbnail } from "../supabase/functions/_shared/ether-id-pass-photo.mjs";
+import { etherIdStripFiles, STRIP_FILES, STRIP_PHOTO } from "../supabase/functions/_shared/ether-id-pass-art.mjs";
+import { decode as decodePng } from "fast-png";
 import { etherIdPassJson, etherIdStripCopy, memberOfPass, sincePass, walletStatus } from "../supabase/functions/_shared/ether-id-pass-json.mjs";
 import { buildPkpass, etherIdPassImages, etherMarkPng, solidPng } from "../supabase/functions/_shared/pkpass.mjs";
 import jpeg from "jpeg-js";
@@ -240,6 +242,71 @@ describe("pass thumbnail", () => {
     const fromJpeg = await etherIdThumbnailFiles(encoded);
     assert.equal(fromJpeg.length, 3);
     assert.equal(fromJpeg[0].data[0], 137);
+  });
+});
+
+function pngPixel(image, x, y) {
+  const i = (Math.round(y) * image.width + Math.round(x)) * image.channels;
+  return [image.data[i], image.data[i + 1], image.data[i + 2]];
+}
+
+function hasPixel(image, match) {
+  const { data, width, height, channels } = image;
+  for (let y = 0; y < height; y += 2) {
+    for (let x = 0; x < width; x += 2) {
+      const i = (y * width + x) * channels;
+      if (match(data[i], data[i + 1], data[i + 2])) return true;
+    }
+  }
+  return false;
+}
+
+describe("ether id strip", () => {
+  const cadre = {
+    display_name: "Cadre Wallace",
+    username: "cadre",
+    passion: "creative directing",
+    city: "Charlotte, NC",
+  };
+
+  it("draws photo, serif name, and the red mark, and falls back to initials", async () => {
+    const raw = new Uint8Array(8 * 8 * 4);
+    for (let i = 0; i < raw.length; i += 4) {
+      raw[i] = 20;
+      raw[i + 1] = 40;
+      raw[i + 2] = 220;
+      raw[i + 3] = 255;
+    }
+    const jpegBytes = jpeg.encode({ data: raw, width: 8, height: 8 }, 90).data;
+    const withPhoto = await etherIdStripFiles(cadre, jpegBytes);
+    assert.deepEqual(withPhoto.map((file) => file.name), STRIP_FILES.map((file) => file.name));
+    const image = decodePng(withPhoto[2].data);
+    assert.equal(image.width, 1125);
+    assert.equal(image.height, 432);
+    assert.equal(withPhoto[2].data[0], 137);
+    assert.equal(withPhoto[2].data[1], 80);
+    assert.deepEqual(pngPixel(image, 2, 2), [16, 14, 12]);
+    assert.equal(decodePng(withPhoto[0].data).width, 375);
+    assert.equal(decodePng(withPhoto[0].data).height, 144);
+    assert.equal(decodePng(withPhoto[1].data).width, 750);
+    assert.equal(decodePng(withPhoto[1].data).height, 288);
+    const cx = (STRIP_PHOTO.x + STRIP_PHOTO.w / 2) * 3;
+    const cy = (STRIP_PHOTO.y + STRIP_PHOTO.h / 2) * 3;
+    const mid = pngPixel(image, cx, cy);
+    assert.equal(mid[2] > 150 && mid[0] < 90, true);
+    assert.equal(hasPixel(image, (r, g, b) => r > 160 && g < 90 && b < 100), true);
+    assert.equal(hasPixel(image, (r, g, b) => r > 210 && g > 200 && b > 180), true);
+
+    const heic = Uint8Array.from([
+      0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70,
+      0x68, 0x65, 0x69, 0x63, 0x00, 0x00, 0x00, 0x00,
+    ]);
+    const plain = decodePng((await etherIdStripFiles(cadre, heic))[2].data);
+    const plate = pngPixel(plain, (STRIP_PHOTO.x + 8) * 3, (STRIP_PHOTO.y + 8) * 3);
+    assert.equal(plate[2] < 40, true);
+    assert.equal(hasPixel(plain, (r, g, b) => r > 210 && g > 200 && b > 180), true);
+    const missing = decodePng((await etherIdStripFiles(cadre, null))[2].data);
+    assert.equal(pngPixel(missing, (STRIP_PHOTO.x + 8) * 3, (STRIP_PHOTO.y + 8) * 3)[2] < 40, true);
   });
 });
 

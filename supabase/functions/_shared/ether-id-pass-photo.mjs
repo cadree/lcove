@@ -220,16 +220,22 @@ function publicPhotoUrl(value) {
   return url.toString();
 }
 
+/** Decoded JPEG or PNG, or null for HEIC and anything else unreadable. */
+export async function decodeEtherIdPhoto(bytes) {
+  return decodePhoto(bytes);
+}
+
 /**
- * Fetch profiles.avatar_url and return thumbnail files.
- * Missing, slow, HEIC, and unreadable photos return no files.
+ * Fetch profiles.avatar_url.
+ * Missing, slow, oversized, private, HEIC, and unreadable photos return null.
+ * Limits stay 3 MB, 2 seconds, and https only.
  */
-export async function fetchEtherIdThumbnail(avatarUrl, {
+export async function fetchEtherIdAvatar(avatarUrl, {
   fetchImpl = globalThis.fetch,
   timeoutMs = TIMEOUT_MS,
 } = {}) {
   const url = publicPhotoUrl(avatarUrl);
-  if (!url) return [];
+  if (!url) return null;
   const controller = new AbortController();
   let timer;
   const timeout = new Promise((_, reject) => {
@@ -243,15 +249,22 @@ export async function fetchEtherIdThumbnail(avatarUrl, {
       fetchImpl(url, { signal: controller.signal, redirect: "follow" }),
       timeout,
     ]);
-    if (!response?.ok) return [];
+    if (!response?.ok) return null;
     const declared = Number(response.headers?.get?.("content-length") || 0);
-    if (Number.isFinite(declared) && declared > MAX_BYTES) return [];
+    if (Number.isFinite(declared) && declared > MAX_BYTES) return null;
     const buffer = new Uint8Array(await Promise.race([response.arrayBuffer(), timeout]));
-    if (!buffer.byteLength || buffer.byteLength > MAX_BYTES) return [];
-    return await etherIdThumbnailFiles(buffer);
+    if (!buffer.byteLength || buffer.byteLength > MAX_BYTES) return null;
+    return buffer;
   } catch {
-    return [];
+    return null;
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Thumbnail files, or nothing when the avatar cannot be used. */
+export async function fetchEtherIdThumbnail(avatarUrl, options) {
+  const buffer = await fetchEtherIdAvatar(avatarUrl, options);
+  if (!buffer) return [];
+  return etherIdThumbnailFiles(buffer);
 }
