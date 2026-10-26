@@ -921,7 +921,7 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
             </div>
           </div>
         )}
-        <div className="absolute left-3 right-14 top-3 z-20 flex gap-2">
+        <div className="absolute left-3 right-14 top-[max(0.75rem,env(safe-area-inset-top))] z-20 flex gap-2">
           {cameraState === "ready" && !isStreaming && (
             <Badge variant="secondary" className="bg-background/80 text-xs backdrop-blur-sm">Preview</Badge>
           )}

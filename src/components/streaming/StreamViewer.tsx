@@ -404,7 +404,7 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
 
             {/* Status Badge (for non-WebRTC streams) */}
             {stream && stream.stream_type !== 'webrtc' && (
-              <div className="absolute top-4 left-4 flex gap-2">
+              <div className="absolute left-4 top-[max(0.75rem,env(safe-area-inset-top))] flex gap-2">
                 {streamStatus === 'live' && (
                   <Badge className="bg-red-500 animate-pulse">
                     <Radio className="h-3 w-3 mr-1" />
