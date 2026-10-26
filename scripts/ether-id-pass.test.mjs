@@ -5,8 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { missingWalletSecrets, matchEtherIdRoute, walletConfigured } from "../supabase/functions/_shared/ether-id-config.mjs";
+import { etherIdThumbnailFiles, fetchEtherIdThumbnail } from "../supabase/functions/_shared/ether-id-pass-photo.mjs";
 import { etherIdPassJson, memberOfPass, walletStatus } from "../supabase/functions/_shared/ether-id-pass-json.mjs";
 import { buildPkpass, etherIdPassImages, etherMarkPng, solidPng } from "../supabase/functions/_shared/pkpass.mjs";
+import jpeg from "jpeg-js";
 import { signApnsJwt } from "../supabase/functions/_shared/apns.mjs";
 
 const card = {
@@ -153,6 +155,66 @@ describe("ether id images", () => {
     assert.equal(icon.includes(Buffer.from([245, 166, 207])), false);
     const names = etherIdPassImages().map((file) => file.name);
     assert.deepEqual(names, ["icon.png", "icon@2x.png", "icon@3x.png"]);
+  });
+});
+
+describe("pass thumbnail", () => {
+  const heic = Uint8Array.from([
+    0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70,
+    0x68, 0x65, 0x69, 0x63, 0x00, 0x00, 0x00, 0x00,
+    0x6d, 0x69, 0x66, 0x31, 0x68, 0x65, 0x69, 0x63,
+  ]);
+
+  it("omits the thumbnail when the photo is missing, unreadable, or HEIC", async () => {
+    let called = false;
+    const fetchImpl = () => {
+      called = true;
+      throw new Error("should not fetch");
+    };
+    assert.deepEqual(await fetchEtherIdThumbnail(null, { fetchImpl }), []);
+    assert.deepEqual(await fetchEtherIdThumbnail("  ", { fetchImpl }), []);
+    assert.deepEqual(await fetchEtherIdThumbnail("http://example.com/a.jpg", { fetchImpl }), []);
+    assert.deepEqual(await fetchEtherIdThumbnail("https://127.0.0.1/a.jpg", { fetchImpl }), []);
+    assert.equal(called, false);
+    assert.deepEqual(await etherIdThumbnailFiles(heic), []);
+    assert.deepEqual(await etherIdThumbnailFiles(Uint8Array.from([0xff, 0xd8, 0xff, 0xd9])), []);
+    assert.deepEqual(await etherIdThumbnailFiles(Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10])), []);
+    assert.deepEqual(await fetchEtherIdThumbnail("https://cdn.example.com/a.jpg", {
+      fetchImpl: async () => {
+        throw new Error("down");
+      },
+    }), []);
+    assert.deepEqual(await fetchEtherIdThumbnail("https://cdn.example.com/a.heic", {
+      fetchImpl: async () => ({
+        ok: true,
+        headers: { get: () => null },
+        arrayBuffer: async () => heic.buffer,
+      }),
+    }), []);
+    assert.deepEqual(await fetchEtherIdThumbnail("https://cdn.example.com/a.jpg", {
+      timeoutMs: 20,
+      fetchImpl: (_url, { signal }) => new Promise((_resolve, reject) => {
+        signal.addEventListener("abort", () => reject(new Error("aborted")));
+      }),
+    }), []);
+  });
+
+  it("turns a decoded jpeg or png into pass thumbnail pngs", async () => {
+    const png = await etherIdThumbnailFiles(solidPng(6, 10));
+    assert.deepEqual(png.map((file) => file.name), ["thumbnail.png", "thumbnail@2x.png", "thumbnail@3x.png"]);
+    assert.equal(png[0].data[0], 137);
+    assert.equal(png[0].data[1], 80);
+    const raw = new Uint8Array(4 * 4 * 4);
+    for (let i = 0; i < raw.length; i += 4) {
+      raw[i] = 20;
+      raw[i + 1] = 30;
+      raw[i + 2] = 40;
+      raw[i + 3] = 255;
+    }
+    const encoded = jpeg.encode({ data: raw, width: 4, height: 4 }, 80).data;
+    const fromJpeg = await etherIdThumbnailFiles(encoded);
+    assert.equal(fromJpeg.length, 3);
+    assert.equal(fromJpeg[0].data[0], 137);
   });
 });
 
