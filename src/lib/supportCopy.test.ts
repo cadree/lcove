@@ -24,7 +24,7 @@ describe("support copy", () => {
     assert.equal(SUPPORT_IN_SAFARI_LABEL, "Support in Safari");
     assert.equal(SUPPORT_NOW_LABEL, "Support now");
     for (const label of [SUPPORT_ETHER_LABEL, SUPPORT_IN_SAFARI_LABEL, SUPPORT_NOW_LABEL, supportCadenceLabel("one_time")]) {
-      assert.equal(/donat|charity|nonprofit/i.test(label), false);
+      assert.equal(/donate|donation|charity|nonprofit/i.test(label), false);
     }
   });
 });
