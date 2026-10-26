@@ -12,7 +12,6 @@ import {
   ShoppingBag,
   Square,
   Users,
-  X,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -89,25 +88,15 @@ export function CreateSheet({ open, onOpenChange }: CreateSheetProps) {
           side="bottom"
           overlayClassName="!bg-transparent"
           overlayStyle={{ backgroundColor: "transparent", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}
-          className="rounded-t-[28px] border-border bg-card/95 px-4 pb-8 backdrop-blur-xl"
+          className="rounded-t-[28px] border-border bg-card/95 px-4 pb-8 pt-14 backdrop-blur-xl"
           style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
         >
           <div className="mx-auto mb-4 mt-1 h-1 w-10 rounded-full bg-foreground/20" aria-hidden="true" />
-          <div className="mb-5 flex items-center justify-between">
-            <div>
-              <SheetTitle className="ether-title text-[26px] text-left">
-                Create
-              </SheetTitle>
-              <SheetDescription className="sr-only">Post, story, live, and other ways to add something</SheetDescription>
-            </div>
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              className="tap-target inline-flex items-center justify-center text-muted-foreground"
-              aria-label="Close create"
-            >
-              <X className="h-5 w-5" />
-            </button>
+          <div className="mb-5">
+            <SheetTitle className="ether-title text-[26px] text-left">
+              Create
+            </SheetTitle>
+            <SheetDescription className="sr-only">Post, story, live, and other ways to add something</SheetDescription>
           </div>
 
           {!user && (
