@@ -1410,19 +1410,28 @@ body.ether-id-page {
 }
 
 @container etherid (max-width: 520px) {
-  .ether-id-photo { width: 33%; top: 15%; height: 70%; }
-  .ether-id-info { left: 39%; top: 15%; right: 3.2%; bottom: 14%; }
-  .ether-id-name { font-size: 20px; max-width: 62%; }
-  .ether-id-handle { font-size: 11px; margin-top: 4px; }
-  .ether-id-pass { font-size: 10px; margin-top: 6px; padding: 4px 7px; letter-spacing: 0.06em; }
-  .ether-id-lab { font-size: 8px; letter-spacing: 0.08em; }
+  .ether-id-photo { width: 34%; top: 14%; height: 72%; }
+  .ether-id-info { left: 40%; top: 14%; right: 3%; bottom: 13%; }
+  .ether-id-name,
+  .ether-id-handle,
+  .ether-id-pass,
+  .ether-id-info > .ether-id-red { max-width: calc(100% - 74px); }
+  .ether-id-name { font-size: 18px; }
+  .ether-id-handle { font-size: 11px; margin-top: 3px; }
+  .ether-id-pass { font-size: 9px; margin-top: 5px; padding: 3px 6px; letter-spacing: 0.04em; }
+  .ether-id-lab { font-size: 8px; letter-spacing: 0.06em; }
   .ether-id-val { font-size: 10px; letter-spacing: 0; }
-  .ether-id-qrbox { width: 68px; }
-  .ether-id-grid { gap: 6px 4px; padding-top: 6px; }
-  .ether-id-foot { font-size: 7.5px; letter-spacing: 0.04em; bottom: 4.6%; }
-  .ether-id-top .ether-id-lab { font-size: 7.5px; letter-spacing: 0.06em; }
-  .ether-id-brand { font-size: 13px; }
-  .ether-id-pill { font-size: 8px; letter-spacing: 0.08em; padding: 0.15em 0.45em; }
+  .ether-id-qrbox { width: 64px; }
+  .ether-id-grid { gap: 5px 3px; padding-top: 5px; }
+  .ether-id-foot {
+    font-size: 8px;
+    letter-spacing: 0.02em;
+    bottom: 3.6%;
+    white-space: nowrap;
+  }
+  .ether-id-top .ether-id-lab { font-size: 8px; letter-spacing: 0.04em; }
+  .ether-id-brand { font-size: 14px; }
+  .ether-id-pill { font-size: 8px; letter-spacing: 0.06em; padding: 0.12em 0.4em; }
 }
 
 @media (prefers-reduced-motion: reduce) {
