@@ -132,17 +132,19 @@ async function publishLocal(room: Room, media: MediaStream) {
       backupCodec: plan.videoCodec === "h264" ? false as const : { codec: "h264" as const },
     };
     try {
-      await room.localParticipant.publishTrack(local, options);
+      const publication = await room.localParticipant.publishTrack(local, options);
+      if (!videoTrack.enabled) await publication.mute();
     } catch (error) {
       if (plan.videoCodec !== "h264") throw error;
       await room.localParticipant.unpublishTrack(local, false).catch(() => undefined);
-      await room.localParticipant.publishTrack(local, {
+      const publication = await room.localParticipant.publishTrack(local, {
         ...options,
         videoCodec: "vp8",
         simulcast: false,
         videoSimulcastLayers: [],
         backupCodec: false,
       });
+      if (!videoTrack.enabled) await publication.mute();
     }
   }
   if (audioTrack) {
@@ -758,9 +760,18 @@ export const WebRTCStreamHost: React.FC<WebRTCStreamHostProps> = ({
 
   const toggleVideo = () => {
     const next = !videoEnabled;
-    localStreamRef.current?.getVideoTracks().forEach((track) => {
-      track.enabled = next;
-    });
+    const publications = roomRef.current
+      ? [...roomRef.current.localParticipant.videoTrackPublications.values()]
+      : [];
+    if (publications.length > 0) {
+      publications.forEach((publication) => {
+        void (next ? publication.unmute() : publication.mute());
+      });
+    } else {
+      localStreamRef.current?.getVideoTracks().forEach((track) => {
+        track.enabled = next;
+      });
+    }
     setVideoEnabled(next);
   };
 
