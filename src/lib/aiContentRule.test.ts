@@ -26,6 +26,7 @@ describe("AI content rule", () => {
       "Fully AI-generated scene passed off as real work",
       "AI slop / spam promotion",
       "Plagiarized or stolen work",
+      "Impersonation",
       "Other",
     ]);
   });

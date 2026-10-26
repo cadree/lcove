@@ -43,6 +43,7 @@ export interface Profile {
   birthday_month: number | null;
   birthday_day: number | null;
   show_birthday: boolean;
+  member_of: string | null;
 }
 
 const profileCache = new Map<string, Profile>();
@@ -80,6 +81,7 @@ function profileFromRow(data: Record<string, unknown>, own: boolean): Profile {
     birthday_month: own ? ((data.birthday_month as number | null) ?? null) : null,
     birthday_day: own ? ((data.birthday_day as number | null) ?? null) : null,
     show_birthday: own ? Boolean(data.show_birthday) : false,
+    member_of: own ? ((data.member_of as string | null) ?? null) : null,
   };
 }
 

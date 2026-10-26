@@ -1040,3 +1040,404 @@ button.novi-peek:focus-visible {
     scroll-behavior: auto !important;
   }
 }
+
+/* Horizontal Ether ID. Proportions follow the 1600×1000 dossier.
+   Floors keep type readable when the card is only as wide as an iPhone.
+   The spin is transform-only so it can stay on the compositor. */
+body.ether-id-page {
+  overflow-x: visible;
+}
+
+.ether-id-scene {
+  width: 100%;
+  max-width: 960px;
+  margin-inline: auto;
+  padding: 10px 0 14px;
+  perspective: 1100px;
+  -webkit-perspective: 1100px;
+}
+
+.ether-id-scene.is-flat {
+  perspective: none;
+}
+
+.ether-id-spin {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 8 / 5;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  animation: ether-id-yaw 18s ease-in-out infinite;
+  will-change: transform;
+}
+
+.ether-id-scene.is-flat .ether-id-spin {
+  animation: none;
+  transform: none;
+  will-change: auto;
+}
+
+.ether-id-face,
+.ether-id-back {
+  position: absolute;
+  inset: 0;
+  border-radius: clamp(14px, 2.25cqi, 36px);
+}
+
+.ether-id-face {
+  container-type: size;
+  container-name: etherid;
+  transform: translateZ(8px);
+  overflow: hidden;
+  background: #08080a;
+  color: #ece7dc;
+  border: 2px solid #2a2622;
+  font-family: Archivo, var(--font-body), sans-serif;
+}
+
+.ether-id-scene.is-flat .ether-id-face {
+  position: relative;
+  transform: none;
+  height: auto;
+  aspect-ratio: 8 / 5;
+}
+
+.ether-id-scene.is-flat .ether-id-spin {
+  aspect-ratio: auto;
+}
+
+.ether-id-back {
+  transform: translateZ(-8px);
+  background: linear-gradient(90deg, #2a2622, #100e0c 46%, #3a342e);
+}
+
+.ether-id-side {
+  position: absolute;
+  background: #1a1714;
+}
+
+.ether-id-side-left,
+.ether-id-side-right {
+  top: 2px;
+  bottom: 2px;
+  width: 16px;
+  background: linear-gradient(#4a433c, #141210 42%, #2c2824);
+}
+
+.ether-id-side-left {
+  left: 0;
+  transform-origin: left center;
+  transform: rotateY(-90deg);
+}
+
+.ether-id-side-right {
+  right: 0;
+  transform-origin: right center;
+  transform: rotateY(90deg);
+}
+
+.ether-id-side-top,
+.ether-id-side-bottom {
+  left: 2px;
+  right: 2px;
+  height: 16px;
+  background: #221e1b;
+}
+
+.ether-id-side-top {
+  top: 0;
+  transform-origin: center top;
+  transform: rotateX(90deg);
+}
+
+.ether-id-side-bottom {
+  bottom: 0;
+  transform-origin: center bottom;
+  transform: rotateX(-90deg);
+}
+
+.ether-id-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(56% 60% at 28% 55%, rgba(255, 179, 209, 0.1), transparent 70%);
+  pointer-events: none;
+}
+
+.ether-id-top {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  top: 4.8%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  z-index: 2;
+}
+
+.ether-id-brand {
+  font-family: Fraunces, var(--font-lore), Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(13px, 1.875cqi, 30px);
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.ether-id-brand b {
+  color: #c4142d;
+  font-weight: 700;
+}
+
+.ether-id-lab {
+  font-family: "DM Mono", var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(8px, 1.1875cqi, 19px);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.ether-id-dim { color: #7d786e; }
+.ether-id-red { color: #c4142d; }
+
+.ether-id-photo {
+  position: absolute;
+  left: 4%;
+  top: 12.8%;
+  width: 37.5%;
+  height: 74%;
+  border: 2px solid #3a342e;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #111;
+  z-index: 1;
+}
+
+.ether-id-photo img,
+.ether-id-monogram {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 20%;
+}
+
+.ether-id-monogram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Fraunces, Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(28px, 8cqi, 96px);
+  color: #ece7dc;
+}
+
+.ether-id-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 70%, rgba(8, 8, 10, 0.55));
+  pointer-events: none;
+}
+
+.ether-id-tick {
+  position: absolute;
+  width: clamp(10px, 2.1cqi, 34px);
+  height: clamp(10px, 2.1cqi, 34px);
+  border: 2px solid #c4142d;
+  z-index: 2;
+}
+
+.ether-id-tick-tl { left: -2px; top: -2px; border-right: 0; border-bottom: 0; }
+.ether-id-tick-br { right: -2px; bottom: -2px; border-left: 0; border-top: 0; }
+
+.ether-id-info {
+  position: absolute;
+  left: 45.5%;
+  top: 12.8%;
+  right: 4%;
+  bottom: 13.2%;
+  z-index: 2;
+}
+
+.ether-id-name {
+  margin: 0.4cqi 0 0;
+  max-width: 68%;
+  font-family: Fraunces, var(--font-lore), Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(20px, 7cqi, 112px);
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+
+.ether-id-name span { display: block; }
+
+.ether-id-handle {
+  margin-top: clamp(4px, 1.1cqi, 18px);
+  font-family: "DM Mono", var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(11px, 1.875cqi, 30px);
+  color: #b9b4a8;
+  line-height: 1;
+}
+
+.ether-id-pass {
+  display: inline-block;
+  margin-top: clamp(6px, 2.1cqi, 34px);
+  padding: clamp(4px, 0.75cqi, 12px) clamp(8px, 1.5cqi, 24px);
+  background: #ece7dc;
+  color: #08080a;
+  font-family: Archivo, var(--font-body), sans-serif;
+  font-weight: 800;
+  font-size: clamp(10px, 2.125cqi, 34px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.ether-id-qrbox {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: clamp(64px, 18.6%, 150px);
+  text-align: right;
+}
+
+.ether-id-qr {
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px;
+  line-height: 0;
+}
+
+.ether-id-qr svg { width: 100%; height: auto; display: block; }
+
+.ether-id-qrbox .ether-id-lab {
+  margin-top: 6px;
+  font-size: clamp(7px, 0.875cqi, 14px);
+  letter-spacing: 0.1em;
+}
+
+.ether-id-grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: 1fr 1.1fr 1fr;
+  gap: clamp(6px, 2.1cqi, 34px) clamp(4px, 1.6cqi, 30px);
+  border-top: 1px solid #3a342e;
+  padding-top: clamp(6px, 1.8cqi, 30px);
+  margin: 0;
+}
+
+.ether-id-grid .ether-id-lab { margin-bottom: clamp(2px, 0.5cqi, 8px); }
+
+.ether-id-val {
+  font-family: Archivo, var(--font-body), sans-serif;
+  font-weight: 700;
+  font-size: clamp(10px, 1.75cqi, 28px);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+.ether-id-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  border: 1.5px solid #7fdc8a;
+  border-radius: 99px;
+  padding: 0.2em 0.7em;
+  color: #7fdc8a;
+  font-family: "DM Mono", var(--font-mono), ui-monospace, monospace;
+  font-size: clamp(8px, 1.05cqi, 16px);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.ether-id-pill i {
+  width: 0.55em;
+  height: 0.55em;
+  border-radius: 50%;
+  background: #7fdc8a;
+  display: block;
+}
+
+.ether-id-pill.is-banned { border-color: #c4142d; color: #c4142d; }
+.ether-id-pill.is-banned i { background: #c4142d; }
+.ether-id-pill.is-suspended { border-color: #ece7dc; color: #ece7dc; }
+.ether-id-pill.is-suspended i { background: #ece7dc; }
+.ether-id-pill.is-inactive { border-color: #7d786e; color: #7d786e; }
+.ether-id-pill.is-inactive i { background: #7d786e; }
+
+.ether-id-foot {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 4.2%;
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, 1.3cqi, 22px);
+  z-index: 2;
+  font-size: clamp(8px, 1.0625cqi, 17px);
+}
+
+.ether-id-foot-line {
+  flex: 1;
+  height: 1px;
+  background: #3a342e;
+}
+
+.ether-id-sheen {
+  position: absolute;
+  inset: -20% -40%;
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.16) 48%, transparent 58%);
+  transform: translateX(-18%);
+  animation: ether-id-sheen 18s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 3;
+}
+
+@keyframes ether-id-yaw {
+  0%, 100% { transform: rotateX(5deg) rotateY(-16deg); }
+  50% { transform: rotateX(2deg) rotateY(18deg); }
+}
+
+@keyframes ether-id-sheen {
+  0%, 100% { transform: translateX(-22%); }
+  50% { transform: translateX(22%); }
+}
+
+@container etherid (max-width: 520px) {
+  .ether-id-photo { width: 33%; top: 15%; height: 70%; }
+  .ether-id-info { left: 39%; top: 15%; right: 3.2%; bottom: 14%; }
+  .ether-id-name { font-size: 20px; max-width: 62%; }
+  .ether-id-handle { font-size: 11px; margin-top: 4px; }
+  .ether-id-pass { font-size: 10px; margin-top: 6px; padding: 4px 7px; letter-spacing: 0.06em; }
+  .ether-id-lab { font-size: 8px; letter-spacing: 0.08em; }
+  .ether-id-val { font-size: 10px; letter-spacing: 0; }
+  .ether-id-qrbox { width: 68px; }
+  .ether-id-grid { gap: 6px 4px; padding-top: 6px; }
+  .ether-id-foot { font-size: 7.5px; letter-spacing: 0.04em; bottom: 4.6%; }
+  .ether-id-top .ether-id-lab { font-size: 7.5px; letter-spacing: 0.06em; }
+  .ether-id-brand { font-size: 13px; }
+  .ether-id-pill { font-size: 8px; letter-spacing: 0.08em; padding: 0.15em 0.45em; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ether-id-scene { perspective: none; }
+  .ether-id-spin {
+    animation: none !important;
+    transform: none !important;
+    aspect-ratio: auto;
+  }
+  .ether-id-face {
+    position: relative !important;
+    transform: none !important;
+    aspect-ratio: 8 / 5;
+  }
+  .ether-id-side,
+  .ether-id-back,
+  .ether-id-sheen { display: none !important; }
+}

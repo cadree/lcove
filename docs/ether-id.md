@@ -8,12 +8,15 @@ A member card for every account. The in-app card is `/id`. The profile entry is 
 | --- | --- |
 | Name, avatar | `profiles.display_name`, `profiles.avatar_url` |
 | @username | `profiles.username`. There was no username column. It is lowercase, 3–20 letters, numbers, or underscores. |
-| Passion | Earliest `user_passions` row: `custom_name`, otherwise `passions.name`. Empty when they have none. |
+| Passion | Earliest `user_passions` row: `custom_name`, otherwise `passions.name`. Empty when they have none. The card prints it on the cream bar. The red line uses the first word plus the city. |
 | Status | `ether_member_status`. See below. |
-| Peer reviews | `user_reviews` average and count. `reputation_scores` is store reviews and is not used. There is no endorsements table. Zero reviews is "No peer reviews", not a made-up average. |
-| Projects completed | Distinct `projects` with `status = 'completed'` where the member is the creator or has an accepted application. Pending applications are not counted. |
-| Member since | `profiles.created_at` |
-| Birthday | `birthday_month` and `birthday_day` only when `show_birthday` is true. No year is stored. The label is `self-reported`. `birth_year` stays an audience filter and is never shown on the card. |
+| Peer reviews | `user_reviews` average and count. `reputation_scores` is store reviews and is not used. There is no endorsements table. Zero reviews is "No peer reviews", not a made-up average. The card prints `4.5 · 2`. |
+| Projects completed | Distinct `projects` with `status = 'completed'` where the member is the creator or has an accepted application. Pending applications are not counted. The card prints the count. |
+| Member since | `profiles.created_at`. The card prints a short month, such as `Oct 2026`. |
+| Member of | `profiles.member_of`. Trimmed, at most 24 characters. Empty prints `LCOVE`. |
+| City | `profiles.city_display`, or `profiles.city` when the display is blank. |
+| Member code | `ETR.` plus four characters derived from the username and member-since date. It is not a secret and not the verify token. It sits in the footer. |
+| Birthday | `birthday_month` and `birthday_day` only when `show_birthday` is true. No year is stored. The label is `self-reported`. `birth_year` stays an audience filter. The dossier face does not print the birthday. The edit form on `/id` still saves it. |
 
 ## Status
 
