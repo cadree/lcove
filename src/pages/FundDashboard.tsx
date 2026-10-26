@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useFundStats } from "@/hooks/useFundStats";
 import { RecentDistributionsCard } from "@/components/fund/FundDistributions";
 import { DonateDialog } from "@/components/fund/DonateDialog";
+import { SUPPORT_IN_SAFARI_LABEL, SUPPORT_NOW_LABEL } from "@/lib/supportCopy";
 import { IosDigitalGoodsNotice } from "@/components/ios/IosDigitalGoodsNotice";
 import { IOS_DONATIONS_ENABLED, digitalPurchasesEnabled, isIosApp } from "@/lib/platform";
 import { toast } from "sonner";
@@ -128,10 +129,10 @@ export default function FundDashboard() {
     const cancelled = searchParams.get("cancelled") === "true";
     if (!donated && !cancelled) return;
     if (cancelled) {
-      toast.info("Donation was cancelled");
+      toast.info("Support was cancelled");
       return;
     }
-    toast.success("Thank you. Your donation shows here after Stripe confirms it.");
+    toast.success("Thank you. Your support shows here after Stripe confirms it.");
     void checkMembership();
     void refetch();
   }, [searchParams, checkMembership, refetch]);
@@ -497,7 +498,7 @@ export default function FundDashboard() {
                       <DonateDialog>
                         <Button variant="default" size="sm">
                           <Heart className="w-3.5 h-3.5 mr-1.5" />
-                          {linkOut ? "Extra donation in Safari" : "Extra Donation"}
+                          {linkOut ? "Extra support in Safari" : "Extra support"}
                         </Button>
                       </DonateDialog>
                       ) : (
@@ -522,16 +523,16 @@ export default function FundDashboard() {
                       <SquircleIcon icon={Crown} fill="gold" size={54} glyph={28} />
                       <div>
                         <h3 className="font-display text-xl font-medium text-foreground mb-1">
-                          Support the Community
+                          Support Ether
                         </h3>
                         <p className="text-muted-foreground max-w-md">
                           {linkOut
-                            ? "Donate once or subscribe monthly. Checkout opens in Safari."
+                            ? "Support once or subscribe monthly. Checkout opens in Safari."
                             : hideDigitalPurchases
                             ? showDonations
-                              ? "Membership checkout is not available in the iOS app. You can still donate."
+                              ? "Membership checkout is not available in the iOS app. You can still support."
                               : "Membership checkout is not available in the iOS app."
-                            : "Donate once or subscribe monthly — no account required."}
+                            : "Support once or subscribe monthly — no account required."}
                         </p>
                       </div>
                     </div>
@@ -539,7 +540,7 @@ export default function FundDashboard() {
                       {showDonations ? (
                       <DonateDialog>
                         <Button size="lg" className="group">
-                          {linkOut ? "Donate in Safari" : "Donate Now"}
+                          {linkOut ? SUPPORT_IN_SAFARI_LABEL : SUPPORT_NOW_LABEL}
                           <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                         </Button>
                       </DonateDialog>

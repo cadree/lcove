@@ -24,6 +24,7 @@ import { useNoviQuests } from "@/hooks/useNoviQuests";
 import { homeQuestCard } from "@/lib/noviQuests";
 import { FEED_RENDER_PAGE, nextRenderedCount } from "@/lib/feedWindow";
 import bearLogo from "@/assets/ether-bear-logo.webp";
+import { SupportEtherButton } from "@/components/fund/SupportEtherButton";
 const Feed = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeCategory, setActiveCategory] = useState("All");
@@ -143,11 +144,14 @@ const Feed = () => {
   const visiblePosts = lanePosts.slice(0, shown);
   return <PageLayout>
       <div className="px-4 sm:px-6 pt-3">
-        <header className="mb-3 flex min-h-11 items-center justify-between gap-3">
-          <Link to="/feed" className="inline-flex min-h-11 items-center" aria-label="Ether home">
-            <img src={bearLogo} alt="" className="h-14 w-auto" />
-          </Link>
-          <div className="flex items-center">
+        <header className="mb-3 flex min-h-11 flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <Link to="/feed" className="inline-flex min-h-11 shrink-0 items-center" aria-label="Ether home">
+              <img src={bearLogo} alt="" className="h-14 w-auto" />
+            </Link>
+            <SupportEtherButton />
+          </div>
+          <div className="ml-auto flex items-center">
             <Button variant="ghost" className="font-body font-extrabold" onClick={() => setStudioOpen(true)} aria-label="Studio">
               Studio
             </Button>
