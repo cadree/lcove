@@ -6,7 +6,9 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 import { missingWalletSecrets, matchEtherIdRoute, walletConfigured } from "../supabase/functions/_shared/ether-id-config.mjs";
 import { etherIdThumbnailFiles, fetchEtherIdThumbnail } from "../supabase/functions/_shared/ether-id-pass-photo.mjs";
-import { etherIdPassJson, memberOfPass, walletStatus } from "../supabase/functions/_shared/ether-id-pass-json.mjs";
+import { etherIdStripFiles, STRIP_FILES, STRIP_PHOTO } from "../supabase/functions/_shared/ether-id-pass-art.mjs";
+import { decode as decodePng } from "fast-png";
+import { etherIdPassJson, etherIdStripCopy, memberOfPass, sincePass, walletStatus } from "../supabase/functions/_shared/ether-id-pass-json.mjs";
 import { buildPkpass, etherIdPassImages, etherMarkPng, solidPng } from "../supabase/functions/_shared/pkpass.mjs";
 import jpeg from "jpeg-js";
 import { signApnsJwt } from "../supabase/functions/_shared/apns.mjs";
@@ -33,8 +35,8 @@ const meta = {
 };
 
 function fieldValues(pass) {
-  const groups = ["primaryFields", "secondaryFields", "auxiliaryFields", "backFields"];
-  return groups.flatMap((name) => (pass.generic[name] || []).map((field) => String(field.value)));
+  const groups = ["headerFields", "primaryFields", "secondaryFields", "auxiliaryFields", "backFields"];
+  return groups.flatMap((name) => (pass.storeCard[name] || []).map((field) => String(field.value)));
 }
 
 describe("wallet config", () => {
@@ -61,43 +63,55 @@ describe("pass.json", () => {
     assert.equal(walletStatus("Banned"), "BANNED");
     assert.equal(walletStatus("Inactive"), "INACTIVE");
     const pass = etherIdPassJson(card, meta);
-    assert.equal(pass.generic.secondaryFields.find((field) => field.key === "status").value, "BANNED");
-    assert.equal(pass.generic.backFields.find((field) => field.key === "birthday").value, "March 4 · self-reported");
+    assert.equal(pass.storeCard.secondaryFields.find((field) => field.key === "status").value, "BANNED");
+    assert.equal(pass.storeCard.backFields.find((field) => field.key === "birthday").value, "March 4 · self-reported");
     assert.equal(pass.barcode.message.includes("11111111"), false);
     assert.equal(pass.webServiceURL.endsWith("/ether-id-pass"), true);
   });
 
   it("omits the birthday when the member has not opted in", () => {
     const pass = etherIdPassJson({ ...card, birthday_label: null, status: "Active" }, meta);
-    assert.equal(pass.generic.backFields.some((field) => field.key === "birthday"), false);
-    assert.equal(pass.generic.secondaryFields.find((field) => field.key === "status").value, "ACTIVE");
+    assert.equal(pass.storeCard.backFields.some((field) => field.key === "birthday"), false);
+    assert.equal(pass.storeCard.secondaryFields.find((field) => field.key === "status").value, "ACTIVE");
   });
 
-  it("uses the card colors, the name as the headline, and Member Of", () => {
+  it("uses a store card so the strip can carry the card art", () => {
     assert.equal(memberOfPass(null), "LCOVE");
     assert.equal(memberOfPass(""), "LCOVE");
     assert.equal(memberOfPass("   "), "LCOVE");
     assert.equal(memberOfPass("  North Hall  "), "North Hall");
+    assert.equal(sincePass({ member_since_label: "October 2026" }), "OCT 2026");
+    assert.equal(sincePass({ member_since: "2026-10-04", member_since_label: "October 2026" }), "OCT 2026");
+    assert.equal(sincePass({ member_since_label: "—" }), null);
 
     const pass = etherIdPassJson({ ...card, member_of: "  North Hall  ", city: "Los Angeles" }, meta);
+    assert.equal(pass.generic, undefined);
+    assert.equal(pass.logoText, undefined);
+    assert.equal(pass.suppressStripShine, true);
     assert.equal(pass.foregroundColor, "rgb(236, 231, 220)");
     assert.equal(pass.backgroundColor, "rgb(16, 14, 12)");
     assert.equal(pass.labelColor, "rgb(255, 179, 209)");
-    assert.equal(pass.logoText, "ETHER");
-    assert.equal(pass.generic.primaryFields[0].value, "Maya Torres");
-    assert.equal(pass.generic.primaryFields[0].label, "");
-    assert.equal(pass.generic.secondaryFields.find((field) => field.key === "member_of").value, "North Hall");
-    assert.equal(pass.generic.secondaryFields.find((field) => field.key === "passion").value, "Photography");
-    assert.equal(pass.generic.secondaryFields.find((field) => field.key === "username").value, "@maya");
-    assert.equal(pass.generic.auxiliaryFields.find((field) => field.key === "city").value, "Los Angeles");
-    assert.equal(pass.generic.auxiliaryFields.find((field) => field.key === "reviews").value, "4.5 average · 2 reviews");
-    assert.equal(pass.generic.auxiliaryFields.find((field) => field.key === "projects").value, "2 completed");
+    assert.equal(pass.storeCard.primaryFields, undefined);
+    assert.deepEqual(pass.storeCard.secondaryFields.map((field) => field.key), ["member_of", "since", "status", "city"]);
+    assert.equal(pass.storeCard.secondaryFields.find((field) => field.key === "member_of").value, "NORTH HALL");
+    assert.equal(pass.storeCard.secondaryFields.find((field) => field.key === "since").value, "OCT 2026");
+    assert.equal(pass.storeCard.secondaryFields.find((field) => field.key === "city").value, "LOS ANGELES");
+    assert.equal(pass.storeCard.auxiliaryFields, undefined);
+    assert.equal(pass.storeCard.backFields.find((field) => field.key === "reviews").value, "4.5 average · 2 reviews");
+    assert.equal(pass.storeCard.backFields.find((field) => field.key === "projects").value, "2 completed");
     assert.equal(pass.passTypeIdentifier, meta.passTypeIdentifier);
     assert.equal(pass.serialNumber, meta.serialNumber);
     assert.equal(pass.authenticationToken, meta.authenticationToken);
     assert.equal(pass.webServiceURL, meta.webServiceURL);
+    assert.equal(pass.barcode.format, "PKBarcodeFormatQR");
     assert.equal(pass.barcode.message, meta.verifyUrl);
     assert.equal(pass.barcode.altText, "Scan to verify");
+    const copy = etherIdStripCopy({ ...card, member_of: "North Hall", city: "Los Angeles" });
+    assert.deepEqual(copy.nameLines, ["TORRES,", "MAYA"]);
+    assert.equal(copy.handle, "@maya");
+    assert.equal(copy.chip, "PHOTOGRAPHY");
+    assert.equal(copy.kicker, "— PHOTOGRAPHY · LOS ANGELES");
+    assert.equal(copy.initials, "MT");
   });
 
   it("prints LCOVE when Member Of is empty and drops placeholder fields", () => {
@@ -116,14 +130,27 @@ describe("pass.json", () => {
       city: "—",
     }, meta);
     const values = fieldValues(pass);
-    assert.equal(pass.generic.primaryFields[0].value, "Cadre Wallace");
-    assert.equal(pass.generic.secondaryFields.find((field) => field.key === "member_of").value, "LCOVE");
-    assert.equal(pass.generic.secondaryFields.find((field) => field.key === "status").value, "ACTIVE");
-    assert.equal(pass.generic.secondaryFields.some((field) => field.key === "username"), false);
-    assert.equal(pass.generic.secondaryFields.some((field) => field.key === "passion"), false);
-    assert.equal(pass.generic.auxiliaryFields.length, 0);
-    assert.equal(pass.generic.backFields.some((field) => field.key === "since"), false);
-    assert.equal(pass.generic.backFields.some((field) => field.key === "verify"), true);
+    const copy = etherIdStripCopy({
+      display_name: "Cadre Wallace",
+      username: "",
+      passion: "   ",
+      city: "—",
+    });
+    assert.deepEqual(copy.nameLines, ["WALLACE,", "CADRE"]);
+    assert.equal(copy.handle, null);
+    assert.equal(copy.chip, null);
+    assert.equal(copy.kicker, null);
+    assert.equal(copy.initials, "CW");
+    assert.equal(pass.storeCard.secondaryFields.find((field) => field.key === "member_of").value, "LCOVE");
+    assert.equal(pass.storeCard.secondaryFields.find((field) => field.key === "status").value, "ACTIVE");
+    assert.equal(pass.storeCard.secondaryFields.some((field) => field.key === "username"), false);
+    assert.equal(pass.storeCard.secondaryFields.some((field) => field.key === "passion"), false);
+    assert.equal(pass.storeCard.secondaryFields.some((field) => field.key === "since"), false);
+    assert.equal(pass.storeCard.secondaryFields.some((field) => field.key === "city"), false);
+    assert.equal(pass.storeCard.backFields.some((field) => field.key === "since"), false);
+    assert.equal(pass.storeCard.backFields.some((field) => field.key === "reviews"), false);
+    assert.equal(pass.storeCard.backFields.some((field) => field.key === "projects"), false);
+    assert.equal(pass.storeCard.backFields.some((field) => field.key === "verify"), true);
     for (const value of values) {
       assert.equal(/no username/i.test(value), false);
       assert.equal(/no peer reviews/i.test(value), false);
@@ -215,6 +242,71 @@ describe("pass thumbnail", () => {
     const fromJpeg = await etherIdThumbnailFiles(encoded);
     assert.equal(fromJpeg.length, 3);
     assert.equal(fromJpeg[0].data[0], 137);
+  });
+});
+
+function pngPixel(image, x, y) {
+  const i = (Math.round(y) * image.width + Math.round(x)) * image.channels;
+  return [image.data[i], image.data[i + 1], image.data[i + 2]];
+}
+
+function hasPixel(image, match) {
+  const { data, width, height, channels } = image;
+  for (let y = 0; y < height; y += 2) {
+    for (let x = 0; x < width; x += 2) {
+      const i = (y * width + x) * channels;
+      if (match(data[i], data[i + 1], data[i + 2])) return true;
+    }
+  }
+  return false;
+}
+
+describe("ether id strip", () => {
+  const cadre = {
+    display_name: "Cadre Wallace",
+    username: "cadre",
+    passion: "creative directing",
+    city: "Charlotte, NC",
+  };
+
+  it("draws photo, serif name, and the red mark, and falls back to initials", async () => {
+    const raw = new Uint8Array(8 * 8 * 4);
+    for (let i = 0; i < raw.length; i += 4) {
+      raw[i] = 20;
+      raw[i + 1] = 40;
+      raw[i + 2] = 220;
+      raw[i + 3] = 255;
+    }
+    const jpegBytes = jpeg.encode({ data: raw, width: 8, height: 8 }, 90).data;
+    const withPhoto = await etherIdStripFiles(cadre, jpegBytes);
+    assert.deepEqual(withPhoto.map((file) => file.name), STRIP_FILES.map((file) => file.name));
+    const image = decodePng(withPhoto[2].data);
+    assert.equal(image.width, 1125);
+    assert.equal(image.height, 432);
+    assert.equal(withPhoto[2].data[0], 137);
+    assert.equal(withPhoto[2].data[1], 80);
+    assert.deepEqual(pngPixel(image, 2, 2), [16, 14, 12]);
+    assert.equal(decodePng(withPhoto[0].data).width, 375);
+    assert.equal(decodePng(withPhoto[0].data).height, 144);
+    assert.equal(decodePng(withPhoto[1].data).width, 750);
+    assert.equal(decodePng(withPhoto[1].data).height, 288);
+    const cx = (STRIP_PHOTO.x + STRIP_PHOTO.w / 2) * 3;
+    const cy = (STRIP_PHOTO.y + STRIP_PHOTO.h / 2) * 3;
+    const mid = pngPixel(image, cx, cy);
+    assert.equal(mid[2] > 150 && mid[0] < 90, true);
+    assert.equal(hasPixel(image, (r, g, b) => r > 160 && g < 90 && b < 100), true);
+    assert.equal(hasPixel(image, (r, g, b) => r > 210 && g > 200 && b > 180), true);
+
+    const heic = Uint8Array.from([
+      0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70,
+      0x68, 0x65, 0x69, 0x63, 0x00, 0x00, 0x00, 0x00,
+    ]);
+    const plain = decodePng((await etherIdStripFiles(cadre, heic))[2].data);
+    const plate = pngPixel(plain, (STRIP_PHOTO.x + 8) * 3, (STRIP_PHOTO.y + 8) * 3);
+    assert.equal(plate[2] < 40, true);
+    assert.equal(hasPixel(plain, (r, g, b) => r > 210 && g > 200 && b > 180), true);
+    const missing = decodePng((await etherIdStripFiles(cadre, null))[2].data);
+    assert.equal(pngPixel(missing, (STRIP_PHOTO.x + 8) * 3, (STRIP_PHOTO.y + 8) * 3)[2] < 40, true);
   });
 });
 

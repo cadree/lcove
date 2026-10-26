@@ -33,7 +33,7 @@ The QR is `eid1.<jti>.<exp>.<hmac>`. Signing calls `extensions.hmac` and `extens
 
 ## Apple Wallet
 
-Generic pass. The status field is the live word in capitals (`ACTIVE`, `INACTIVE`, `SUSPENDED`, `BANNED`). The barcode is the same verify URL. `webServiceURL` is the `ether-id-pass` function.
+Store card. The top is a rendered strip (`strip.png`, `strip@2x.png`, `strip@3x.png`) with the photo or initials, the serif name, the ETHER mark, the @username, and the role chip. Under it, Wallet prints Member of, Member since, Status, and City, then the QR. There is no primary field, so Wallet does not paint system text over the strip. The avatar fetch is still https only, 3 MB, and 2 seconds, and only JPEG or PNG. HEIC and any other miss become initials on the dark plate. The status field is the live word in capitals (`ACTIVE`, `INACTIVE`, `SUSPENDED`, `BANNED`). The barcode is the same verify URL. `webServiceURL` is the `ether-id-pass` function.
 
 PassKit routes, all without a Supabase JWT. The device sends `Authorization: ApplePass <token>` except on the serial-number list, which is how PassKit is specified:
 

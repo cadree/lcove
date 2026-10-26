@@ -63,11 +63,69 @@ function row(fields) {
   return fields.filter(Boolean).slice(0, 4);
 }
 
-export function etherIdPassJson(card, meta) {
-  const name = shown(card.display_name) || "Name not set";
+const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Card face prints a short month, uppercased, such as OCT 2026. */
+export function sincePass(card) {
+  const iso = /^(\d{4})-(\d{2})/.exec(shown(card.member_since) || "");
+  if (iso) {
+    const month = SHORT_MONTHS[Number(iso[2]) - 1];
+    if (month) return `${month} ${iso[1]}`.toUpperCase();
+  }
+  const label = shown(card.member_since_label);
+  if (!label) return null;
+  const fromLabel = /^([A-Za-z]+)\s+(\d{4})$/.exec(label);
+  if (!fromLabel) return label.toUpperCase();
+  const index = SHORT_MONTHS.findIndex((month) => month.toLowerCase() === fromLabel[1].slice(0, 3).toLowerCase());
+  const month = index >= 0 ? SHORT_MONTHS[index] : fromLabel[1].slice(0, 3);
+  return `${month} ${fromLabel[2]}`.toUpperCase();
+}
+
+function nameLines(displayName) {
+  const clean = shown(displayName);
+  if (!clean) return ["NAME NOT SET"];
+  let last = clean;
+  let first = null;
+  if (clean.includes(",")) {
+    const [head, ...rest] = clean.split(",");
+    last = head.trim() || clean;
+    first = rest.join(",").trim() || null;
+  } else {
+    const parts = clean.split(" ");
+    if (parts.length > 1) {
+      last = parts[parts.length - 1];
+      first = parts.slice(0, -1).join(" ");
+    }
+  }
+  const lastUp = last.toUpperCase();
+  if (!first) return [lastUp];
+  return [`${lastUp},`, first.toUpperCase()];
+}
+
+function initials(displayName) {
+  const parts = (shown(displayName) || "").split(" ").filter(Boolean);
+  if (!parts.length) return "E";
+  const first = parts[0].charAt(0);
+  const last = parts.length > 1 ? parts[parts.length - 1].charAt(0) : "";
+  return `${first}${last}`.toUpperCase();
+}
+
+/** Words painted into the strip. Empty passion, username, and city are left out. */
+export function etherIdStripCopy(card) {
   const passion = shown(card.passion);
-  const username = usernamePass(card.username);
-  const since = shown(card.member_since_label);
+  const city = shown(card.city);
+  const kicker = [passion ? passion.split(" ")[0] : "", city || ""].filter(Boolean);
+  return {
+    nameLines: nameLines(card.display_name),
+    handle: usernamePass(card.username),
+    kicker: kicker.length ? `— ${kicker.join(" · ")}`.toUpperCase() : null,
+    chip: passion ? passion.toUpperCase() : null,
+    initials: initials(card.display_name),
+  };
+}
+
+export function etherIdPassJson(card, meta) {
+  const since = sincePass(card);
   const city = shown(card.city);
   const reviews = reviewPass(card);
   const projects = projectPass(card);
@@ -81,6 +139,8 @@ export function etherIdPassJson(card, meta) {
     });
   }
   if (since) backFields.push({ key: "since", label: "Member since", value: since });
+  if (reviews) backFields.push({ key: "reviews", label: "Reviews", value: reviews });
+  if (projects) backFields.push({ key: "projects", label: "Projects", value: projects });
   backFields.push({ key: "verify", label: "Verify", value: meta.verifyUrl });
 
   const barcode = {
@@ -97,23 +157,16 @@ export function etherIdPassJson(card, meta) {
     teamIdentifier: meta.teamIdentifier,
     organizationName: "Ether",
     description: "Ether ID",
-    logoText: "ETHER",
     foregroundColor: CREAM,
     backgroundColor: WARM_BLACK,
     labelColor: SOFT_PINK,
-    generic: {
-      primaryFields: [{ key: "name", label: "", value: name }],
+    suppressStripShine: true,
+    storeCard: {
       secondaryFields: row([
-        { key: "member_of", label: "Member of", value: memberOfPass(card.member_of) },
-        passion ? { key: "passion", label: "Passion", value: passion } : null,
-        { key: "status", label: "Status", value: walletStatus(card.status) },
-        username ? { key: "username", label: "Username", value: username } : null,
-      ]),
-      auxiliaryFields: row([
+        { key: "member_of", label: "Member of", value: memberOfPass(card.member_of).toUpperCase() },
         since ? { key: "since", label: "Member since", value: since } : null,
-        city ? { key: "city", label: "City", value: city } : null,
-        reviews ? { key: "reviews", label: "Reviews", value: reviews } : null,
-        projects ? { key: "projects", label: "Projects", value: projects } : null,
+        { key: "status", label: "Status", value: walletStatus(card.status) },
+        city ? { key: "city", label: "City", value: city.toUpperCase() } : null,
       ]),
       backFields,
     },

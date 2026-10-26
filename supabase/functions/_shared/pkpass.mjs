@@ -115,7 +115,7 @@ const MARK_RED = [196, 20, 45];
 
 /**
  * Warm near-black square with a cream E and a deep-red middle bar.
- * Lock-screen icon for the Ether ID. The pass front uses logoText, not a bar.
+ * Lock-screen icon for the Ether ID. The pass front is the strip image.
  */
 export function etherMarkPng(width, height) {
   return encodeRgbPng(width, height, rgbRows(width, height, (x, y, w, h) => {
