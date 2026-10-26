@@ -68,7 +68,10 @@ function logStep(step: string, details?: Record<string, unknown>) {
 type PushResult = { endpoint: string; status: string; error?: string };
 
 async function loadApnsJwt(subscriptions: { platform?: string; endpoint?: string }[]) {
-  const needsApns = subscriptions.some((sub) => classifyPushSubscription(sub.platform, sub.endpoint).channel === "apns");
+  const needsApns = subscriptions.some((sub) => {
+    const decision = classifyPushSubscription(sub.platform, sub.endpoint);
+    return decision.channel === "apns" && decision.action === "send";
+  });
   if (!needsApns) return "";
   const p8 = Deno.env.get("APPLE_APNS_KEY_P8") ?? "";
   const keyId = (Deno.env.get("APPLE_APNS_KEY_ID") ?? "").trim();
