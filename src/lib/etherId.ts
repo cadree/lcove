@@ -117,6 +117,15 @@ export function memberOfFace(raw: string | null | undefined) {
   return normalizeMemberOf(raw) || MEMBER_OF_EMPTY;
 }
 
+/** Two initials on the dark plate when a member has no photo. */
+export function cardInitials(displayName: string | null | undefined) {
+  const parts = (displayName || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "E";
+  const first = parts[0].charAt(0);
+  const last = parts.length > 1 ? parts[parts.length - 1].charAt(0) : "";
+  return `${first}${last}`.toUpperCase();
+}
+
 /** LAST, then the rest, from the real display name. */
 export function cardNameLines(displayName: string | null | undefined): [string, string | null] {
   const clean = (displayName || "").trim().replace(/\s+/g, " ");

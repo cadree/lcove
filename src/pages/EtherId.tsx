@@ -27,7 +27,7 @@ import { toast } from "sonner";
 const SHOT_CARD: EtherIdCard = {
   display_name: "Cadre Wallace",
   username: "cadre",
-  avatar_url: "/ether-id/shot-avatar.svg",
+  avatar_url: null,
   status: "Active",
   member_since: "2026-10-01",
   member_since_label: "October 2026",

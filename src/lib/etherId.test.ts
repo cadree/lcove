@@ -6,6 +6,7 @@ import { toneForPath } from "./screenTone.ts";
 import {
   birthdayError,
   birthdayFace,
+  cardInitials,
   cardKicker,
   cardNameLines,
   isPublicVerifyCard,
@@ -137,6 +138,9 @@ describe("member of", () => {
 describe("card face", () => {
   it("formats the approved card from member fields", () => {
     assert.deepEqual(cardNameLines("Cadre Wallace"), ["Wallace", "Cadre"]);
+    assert.equal(cardInitials("Cadre Wallace"), "CW");
+    assert.equal(cardInitials("Cadre"), "C");
+    assert.equal(cardInitials("  "), "E");
     assert.equal(cardKicker("Creative Director", "Los Angeles"), "— Creative · Los Angeles");
     assert.equal(memberSinceShort("2026-10-01", "October 2026"), "Oct 2026");
     assert.equal(reviewsFace(4.5, 2), "4.5 · 2");

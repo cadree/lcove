@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   ETHER_ID_SITE,
+  cardInitials,
   cardKicker,
   cardNameLines,
   memberOfFace,
@@ -104,7 +105,7 @@ function OwnerEtherId({ card, verifyHref }: { card: EtherIdCard; verifyHref?: st
   const kicker = cardKicker(card.passion, card.city);
   const passion = (card.passion || "").trim();
   const since = memberSinceShort(card.member_since, card.member_since_label);
-  const initial = (card.display_name || "E").trim().charAt(0).toUpperCase() || "E";
+  const initials = cardInitials(card.display_name);
 
   return (
     <div className={`ether-id-scene${reduced ? " is-flat" : ""}`}>
@@ -133,7 +134,7 @@ function OwnerEtherId({ card, verifyHref }: { card: EtherIdCard; verifyHref?: st
             {card.avatar_url ? (
               <img src={card.avatar_url} alt="" />
             ) : (
-              <span className="ether-id-monogram">{initial}</span>
+              <span className="ether-id-monogram">{initials}</span>
             )}
             <span className="ether-id-tick ether-id-tick-tl" aria-hidden="true" />
             <span className="ether-id-tick ether-id-tick-br" aria-hidden="true" />
