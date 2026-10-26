@@ -159,27 +159,6 @@ export function reviewsFace(average: number | null | undefined, count: number | 
   return `${text} · ${reviews}`;
 }
 
-function plateHash(input: string) {
-  let hash = 2166136261;
-  for (let i = 0; i < input.length; i += 1) {
-    hash ^= input.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-/** Stable display code from the handle and member-since date. Not a secret. */
-export function memberCode(username: string | null | undefined, memberSince: string | null | undefined) {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // cspell:disable-line
-  let n = plateHash(`${(username || "").replace(/^@+/, "").toLowerCase()}|${memberSince || ""}`);
-  let out = "";
-  for (let i = 0; i < 4; i += 1) {
-    out += alphabet[n % alphabet.length];
-    n = Math.floor(n / alphabet.length);
-  }
-  return `ETR.${out}`;
-}
-
 export const PUBLIC_VERIFY_KEYS = [
   "display_name",
   "username",

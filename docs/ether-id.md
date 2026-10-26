@@ -15,7 +15,7 @@ A member card for every account. The in-app card is `/id`. The profile entry is 
 | Member since | `profiles.created_at`. The card prints a short month, such as `Oct 2026`. |
 | Member of | `profiles.member_of`. Trimmed, at most 24 characters. Empty prints `LCOVE`. |
 | City | `profiles.city_display`, or `profiles.city` when the display is blank. |
-| Member code | `ETR.` plus four characters derived from the username and member-since date. It is not a secret and not the verify token. It sits in the footer. |
+| Footer | The site and “scan the code to verify”. The member code is not printed. |
 | Birthday | `birthday_month` and `birthday_day` only when `show_birthday` is true. No year is stored. The label is `self-reported`. `birth_year` stays an audience filter. The dossier face does not print the birthday. The edit form on `/id` still saves it. |
 
 ## Status

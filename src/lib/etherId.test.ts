@@ -9,7 +9,6 @@ import {
   cardKicker,
   cardNameLines,
   isPublicVerifyCard,
-  memberCode,
   memberOfError,
   memberOfFace,
   memberSinceShort,
@@ -136,17 +135,12 @@ describe("member of", () => {
 });
 
 describe("card face", () => {
-  it("formats the approved card from member fields and derives the footer code", () => {
+  it("formats the approved card from member fields", () => {
     assert.deepEqual(cardNameLines("Cadre Wallace"), ["Wallace", "Cadre"]);
     assert.equal(cardKicker("Creative Director", "Los Angeles"), "— Creative · Los Angeles");
     assert.equal(memberSinceShort("2026-10-01", "October 2026"), "Oct 2026");
     assert.equal(reviewsFace(4.5, 2), "4.5 · 2");
     assert.equal(reviewsFace(null, 0), "—");
-    const code = memberCode("cadre", "2026-10-01");
-    assert.match(code, /^ETR\.[A-Z2-9]{4}$/);
-    assert.equal(code, memberCode("@cadre", "2026-10-01"));
-    assert.notEqual(code, memberCode("maya", "2026-10-01"));
-    assert.equal(code.includes("9XC3"), false);
   });
 });
 

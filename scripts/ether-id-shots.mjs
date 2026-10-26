@@ -264,8 +264,8 @@ await shoot('card', '/id', async (page) => {
   const card = page.getByTestId('ether-id-card');
   await card.waitFor({ state: 'visible', timeout: 15000 });
   const body = await page.locator('body').innerText();
-  if (body.includes('ETR.9XC3')) {
-    throw new Error('card printed the mockup sample code');
+  if (body.includes('ETR.9XC3') || /ID ETR\./.test(body)) {
+    throw new Error('card printed a member code in the footer');
   }
   await page.locator('[data-testid="ether-id-qr"] svg').waitFor({ state: 'visible', timeout: 15000 });
 });

@@ -4,7 +4,6 @@ import {
   ETHER_ID_SITE,
   cardKicker,
   cardNameLines,
-  memberCode,
   memberOfFace,
   memberSinceShort,
   reviewsFace,
@@ -104,7 +103,6 @@ function OwnerEtherId({ card, verifyHref }: { card: EtherIdCard; verifyHref?: st
   const handle = usernameAt(card.username);
   const kicker = cardKicker(card.passion, card.city);
   const passion = (card.passion || "").trim();
-  const code = memberCode(card.username, card.member_since);
   const since = memberSinceShort(card.member_since, card.member_since_label);
   const initial = (card.display_name || "E").trim().charAt(0).toUpperCase() || "E";
 
@@ -124,7 +122,6 @@ function OwnerEtherId({ card, verifyHref }: { card: EtherIdCard; verifyHref?: st
           className="ether-id-face"
           data-testid="ether-id-card"
           data-ether-status={card.status}
-          data-member-code={code}
           aria-label="Ether ID"
         >
           <div className="ether-id-glow" aria-hidden="true" />
@@ -199,7 +196,7 @@ function OwnerEtherId({ card, verifyHref }: { card: EtherIdCard; verifyHref?: st
           <footer className="ether-id-foot ether-id-lab ether-id-dim">
             <span>{ETHER_ID_SITE}</span>
             <span className="ether-id-foot-line" />
-            <span>ID {code} · scan the code to verify</span>
+            <span>scan the code to verify</span>
           </footer>
           {reduced ? null : <div className="ether-id-sheen" aria-hidden="true" />}
         </article>
