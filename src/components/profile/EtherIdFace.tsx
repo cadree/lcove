@@ -182,7 +182,7 @@ function OwnerEtherId({ card, verifyHref }: { card: EtherIdCard; verifyHref?: st
               </div>
               <div>
                 <dt className="ether-id-lab ether-id-dim">City</dt>
-                <dd className="ether-id-val">{card.city?.trim() || "—"}</dd>
+                <dd className="ether-id-val ether-id-city">{card.city?.trim() || "—"}</dd>
               </div>
               <div>
                 <dt className="ether-id-lab ether-id-dim">Reviews</dt>

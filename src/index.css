@@ -1482,7 +1482,12 @@ body.ether-id-page {
   .ether-id-val { letter-spacing: 0; }
   .ether-id-qrbox { width: 18.6%; }
   .ether-id-qr-caption { font-size: 6.5px; letter-spacing: 0.02em; }
-  .ether-id-grid { gap: 4px 3px; padding-top: 4px; }
+  .ether-id-grid {
+    grid-template-columns: minmax(0, 1.32fr) minmax(0, 1.12fr) minmax(0, 0.86fr);
+    gap: 4px 3px;
+    padding-top: 4px;
+  }
+  .ether-id-city { font-size: 6.5px; letter-spacing: 0; }
   .ether-id-foot { letter-spacing: 0.03em; }
   .ether-id-brand { font-size: clamp(12px, 1.7cqi, 18px); }
   .ether-id-pill { letter-spacing: 0.04em; padding: 0.12em 0.35em; }
