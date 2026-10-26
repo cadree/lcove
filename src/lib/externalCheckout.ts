@@ -28,3 +28,8 @@ export async function openExternalCheckout(url: string): Promise<void> {
   }
   await EtherStorefront.openExternal({ url });
 }
+
+/** Opens an https URL in Safari through the same native bridge as checkout. */
+export async function openInSafari(url: string): Promise<void> {
+  await EtherStorefront.openExternal({ url });
+}

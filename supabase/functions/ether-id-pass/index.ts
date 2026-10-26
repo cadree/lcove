@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getBearerUser } from "../_shared/require-caller.ts";
 import { missingWalletSecrets, walletConfigured, PUSH_SECRET_NAME, matchEtherIdRoute } from "../_shared/ether-id-config.mjs";
 import { etherIdPassJson } from "../_shared/ether-id-pass-json.mjs";
+import { issuePassLink, passLinkParts, verifyPassLink } from "../_shared/ether-id-pass-link.mjs";
 import { buildPkpass, passImages } from "../_shared/pkpass.mjs";
 import { pushPassUpdate, signApnsJwt } from "../_shared/apns.mjs";
 
@@ -99,9 +100,115 @@ async function signedPass(card: Record<string, unknown>, passRow: {
   return bytes;
 }
 
+function pkpass(bytes: Uint8Array) {
+  return new Response(bytes, {
+    status: 200,
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/vnd.apple.pkpass",
+      "Content-Disposition": "attachment; filename=\"ether-id.pkpass\"",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+function unauthorized() {
+  return new Response(null, { status: 401, headers: corsHeaders });
+}
+
+function linkSecret() {
+  return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+}
+
+function passLinkRequested(url: URL) {
+  return url.searchParams.has("uid") || url.searchParams.has("exp") || url.searchParams.has("sig");
+}
+
+async function ensureOwnerPass(authorization: string, passTypeId: string) {
+  const asUser = userClient(authorization);
+  const cardResult = await asUser.rpc("get_my_ether_id");
+  if (cardResult.error || !cardResult.data) {
+    return { error: cardResult.error?.message || "No Ether ID", status: 400 as const };
+  }
+  const passResult = await asUser.rpc("ensure_ether_id_pass", { p_pass_type_id: passTypeId });
+  if (passResult.error || !passResult.data) {
+    return { error: passResult.error?.message || "Could not open the pass", status: 400 as const };
+  }
+  return {
+    card: cardResult.data as Record<string, unknown>,
+    pass: passResult.data as {
+      serial_number: string;
+      authentication_token: string;
+      pass_type_identifier: string;
+    },
+  };
+}
+
+async function passForLinkedUser(userId: string, passTypeId: string) {
+  const admin = serviceClient();
+  const cardResult = await admin.rpc("ether_id_card_for_service", { p_user_id: userId });
+  if (cardResult.error || !cardResult.data) {
+    return { error: "No Ether ID", status: 400 as const };
+  }
+  const existing = await admin
+    .from("ether_id_passes")
+    .select("serial_number, auth_token, pass_type_identifier")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const row = existing.data as {
+    serial_number?: string;
+    auth_token?: string;
+    pass_type_identifier?: string;
+  } | null;
+  if (existing.error || !row?.serial_number || !row.auth_token) {
+    console.log("[ETHER-ID-PASS] linked pass row unavailable");
+    return { error: "Could not open the pass", status: 400 as const };
+  }
+  let passType = row.pass_type_identifier ?? passTypeId;
+  if (passTypeId && passType !== passTypeId) {
+    const updated = await admin
+      .from("ether_id_passes")
+      .update({ pass_type_identifier: passTypeId, updated_at: new Date().toISOString() })
+      .eq("user_id", userId);
+    if (updated.error) {
+      console.log("[ETHER-ID-PASS] linked pass type update failed");
+      return { error: "Could not open the pass", status: 400 as const };
+    }
+    passType = passTypeId;
+  }
+  const bytes = await signedPass(cardResult.data as Record<string, unknown>, {
+    serial_number: row.serial_number,
+    authentication_token: row.auth_token,
+    pass_type_identifier: passType,
+  });
+  return { bytes };
+}
+
+async function handleSignedPassGet(req: Request, configured: boolean) {
+  const parts = passLinkParts(req.url);
+  const ok = await verifyPassLink({
+    userId: parts.userId,
+    exp: parts.exp,
+    sig: parts.sig,
+    secret: linkSecret(),
+    nowSeconds: Math.floor(Date.now() / 1000),
+  });
+  if (!ok) return unauthorized();
+  if (!configured) return json({ configured: false }, 503);
+  const env = envMap();
+  const loaded = await passForLinkedUser(parts.userId, env.APPLE_PASS_TYPE_ID.trim());
+  if ("error" in loaded) return json({ error: loaded.error }, loaded.status);
+  return pkpass(loaded.bytes);
+}
+
 async function handleApp(req: Request) {
   const env = envMap();
   const configured = walletConfigured(env);
+  const url = new URL(req.url);
+  if (req.method === "GET" && passLinkRequested(url)) {
+    return handleSignedPassGet(req, configured);
+  }
+
   let action = "status";
   if (req.method === "POST") {
     try {
@@ -123,26 +230,25 @@ async function handleApp(req: Request) {
   const userId = await getBearerUser(authorization, admin);
   if (!userId) return json({ error: "Unauthorized" }, 401);
 
-  const asUser = userClient(authorization ?? "");
-  const cardResult = await asUser.rpc("get_my_ether_id");
-  if (cardResult.error || !cardResult.data) {
-    return json({ error: cardResult.error?.message || "No Ether ID" }, 400);
+  const passTypeId = env.APPLE_PASS_TYPE_ID.trim();
+  const owned = await ensureOwnerPass(authorization ?? "", passTypeId);
+  if ("error" in owned) return json({ error: owned.error }, owned.status);
+
+  if (action === "link") {
+    const secret = linkSecret();
+    const base = (env.SUPABASE_URL || "").replace(/\/$/, "");
+    if (!secret || !base) return unauthorized();
+    const issued = await issuePassLink({
+      userId,
+      secret,
+      nowSeconds: Math.floor(Date.now() / 1000),
+      baseUrl: `${base}/functions/v1/ether-id-pass`,
+    });
+    return json({ url: issued.url, expires_at: issued.exp });
   }
-  const passResult = await asUser.rpc("ensure_ether_id_pass", {
-    p_pass_type_id: env.APPLE_PASS_TYPE_ID.trim(),
-  });
-  if (passResult.error || !passResult.data) {
-    return json({ error: passResult.error?.message || "Could not open the pass" }, 400);
-  }
-  const bytes = await signedPass(cardResult.data as Record<string, unknown>, passResult.data);
-  return new Response(bytes, {
-    status: 200,
-    headers: {
-      ...corsHeaders,
-      "Content-Type": "application/vnd.apple.pkpass",
-      "Content-Disposition": "attachment; filename=\"ether-id.pkpass\"",
-    },
-  });
+
+  const bytes = await signedPass(owned.card, owned.pass);
+  return pkpass(bytes);
 }
 
 async function handlePush(req: Request) {

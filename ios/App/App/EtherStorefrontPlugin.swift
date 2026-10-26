@@ -20,6 +20,17 @@ public class EtherStorefrontPlugin: CAPPlugin, CAPBridgedPlugin {
         "billing.stripe.com",
     ]
 
+    /// Signed Ether ID pass links live on the project functions host.
+    /// Checkout hosts stay on the explicit list above.
+    private static func passLinkAllowed(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "https",
+              let host = url.host?.lowercased(),
+              host == "supabase.co" || host.hasSuffix(".supabase.co") else {
+            return false
+        }
+        return url.path.contains("/functions/v1/ether-id-pass")
+    }
+
     @objc public func getCountryCode(_ call: CAPPluginCall) {
         Task {
             let code = await Storefront.current?.countryCode ?? ""
@@ -32,7 +43,7 @@ public class EtherStorefrontPlugin: CAPPlugin, CAPBridgedPlugin {
               let url = URL(string: raw),
               url.scheme?.lowercased() == "https",
               let host = url.host?.lowercased(),
-              Self.allowedHosts.contains(host) else {
+              Self.allowedHosts.contains(host) || Self.passLinkAllowed(url) else {
             call.reject("Checkout link isn't allowed")
             return
         }
