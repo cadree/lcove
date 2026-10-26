@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Search, Plus, Users, MoreVertical, BellOff, Bell, MessageSquare, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConversations } from '@/hooks/useConversations';
 import { usePresence } from '@/hooks/usePresence';
-import { shotOnline, shotSessionEnabled } from '@/lib/shotSession';
+import { supabase } from '@/integrations/supabase/client';
+import { selectActiveNow, type ActiveNowProfile } from '@/lib/activeNow';
+import { shotOnline, shotPeople, shotSessionEnabled } from '@/lib/shotSession';
 import { messagePreview } from '@/lib/shareCard';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -25,12 +29,99 @@ interface ConversationListProps {
   onDeleteConversation?: (id: string) => void;
 }
 
+function profilesOnConversations(
+  conversations: { participants?: { user_id: string; profile?: { display_name: string | null; avatar_url: string | null } | null }[] }[],
+): ActiveNowProfile[] {
+  const rows: ActiveNowProfile[] = [];
+  for (const conv of conversations) {
+    for (const participant of conv.participants ?? []) {
+      rows.push({
+        user_id: participant.user_id,
+        display_name: participant.profile?.display_name ?? null,
+        avatar_url: participant.profile?.avatar_url ?? null,
+      });
+    }
+  }
+  return rows;
+}
+
 const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversation }: ConversationListProps) => {
   const { user } = useAuth();
-  const { conversations, isLoading, toggleMute, deleteConversation } = useConversations();
-  const { isOnline: presenceOnline } = usePresence();
-  const isOnline = (userId: string) => (shotSessionEnabled() ? shotOnline(userId) : presenceOnline(userId));
+  const { conversations, isLoading, toggleMute, deleteConversation, createDirectConversation } = useConversations();
+  const { onlineUsers, isOnline: presenceOnline } = usePresence();
+  const shot = shotSessionEnabled();
+  const isOnline = (userId: string) => (shot ? shotOnline(userId) : presenceOnline(userId));
   const [search, setSearch] = useState('');
+  const [openingId, setOpeningId] = useState<string | null>(null);
+
+  const onlineUserIds = useMemo(() => {
+    if (shot) return shotPeople.map((person) => person.user_id).filter((id) => shotOnline(id));
+    return [...onlineUsers];
+  }, [shot, onlineUsers]);
+
+  const knownProfiles = useMemo(() => {
+    const rows = profilesOnConversations(conversations);
+    if (!shot) return rows;
+    return [
+      ...rows,
+      ...shotPeople.map((person) => ({
+        user_id: person.user_id,
+        display_name: person.display_name,
+        avatar_url: person.avatar_url,
+      })),
+    ];
+  }, [conversations, shot]);
+
+  const profileKey = useMemo(
+    () => selectActiveNow({ onlineUserIds, selfId: user?.id }).map((person) => person.userId).sort().join(','),
+    [onlineUserIds, user?.id],
+  );
+
+  const { data: fetchedProfiles = [] } = useQuery({
+    queryKey: ['active-now-profiles', profileKey],
+    enabled: !shot && profileKey.length > 0,
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      const ids = profileKey.split(',').filter(Boolean);
+      const { data, error } = await supabase
+        .from('profiles_public')
+        .select('user_id, display_name, avatar_url')
+        .in('user_id', ids);
+      if (error) throw error;
+      return (data ?? []).flatMap((row) =>
+        row.user_id
+          ? [{ user_id: row.user_id, display_name: row.display_name, avatar_url: row.avatar_url }]
+          : [],
+      );
+    },
+  });
+
+  const activeNow = useMemo(
+    () => selectActiveNow({
+      onlineUserIds,
+      selfId: user?.id,
+      profiles: [...knownProfiles, ...fetchedProfiles],
+    }),
+    [onlineUserIds, user?.id, knownProfiles, fetchedProfiles],
+  );
+
+  const openActiveUser = async (userId: string) => {
+    if (openingId) return;
+    const existing = conversations.find((conv) => getOtherUserId(conv) === userId);
+    if (existing) {
+      onSelect(existing.id);
+      return;
+    }
+    setOpeningId(userId);
+    try {
+      const conv = await createDirectConversation.mutateAsync(userId);
+      onSelect(conv.id);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to start conversation');
+    } finally {
+      setOpeningId(null);
+    }
+  };
 
   const isConversationMuted = (conv: typeof conversations[0]) =>
     !!conv.participants?.find(p => p.user_id === user?.id)?.is_muted;
@@ -65,11 +156,6 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
     const name = getConversationName(conv).toLowerCase();
     return name.includes(search.toLowerCase());
   });
-
-  const onlineNow = conversations.filter((conv) => {
-    const otherId = getOtherUserId(conv);
-    return otherId ? isOnline(otherId) : false;
-  }).slice(0, 8);
 
   if (!user) {
     return (
@@ -106,25 +192,25 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
 
         <div>
             <p className="kicker mb-2">// Active now</p>
-          {onlineNow.length === 0 ? (
+          {activeNow.length === 0 ? (
             <p className="pb-1 text-sm text-muted-foreground">Nobody is online</p>
           ) : (
           <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
-          {onlineNow.map((conv) => (
+          {activeNow.map((person) => (
             <button
-              key={conv.id}
+              key={person.userId}
               type="button"
-              onClick={() => onSelect(conv.id)}
+              onClick={() => { void openActiveUser(person.userId); }}
               className="flex w-16 shrink-0 flex-col items-center gap-1"
             >
               <span className="relative rounded-full bg-[conic-gradient(from_140deg,#FF9FC8,#8B7CFF,#79C3CF,#FF9FC8)] p-[2px]">
                 <Avatar className="h-14 w-14 rounded-full border-2 border-card">
-                  <AvatarImage src={getConversationAvatar(conv) || undefined} />
-                  <AvatarFallback className="rounded-full font-body text-sm font-extrabold">{getConversationName(conv).charAt(0)}</AvatarFallback>
+                  <AvatarImage src={person.avatarUrl || undefined} />
+                  <AvatarFallback className="rounded-full font-body text-sm font-extrabold">{person.displayName.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <OnlineIndicator isOnline size="sm" className="absolute bottom-0 right-0" />
               </span>
-              <span className="w-full truncate text-center font-body text-[10px] text-foreground">{getConversationName(conv).split(" ")[0]}</span>
+              <span className="w-full truncate text-center font-body text-[10px] text-foreground">{person.displayName.split(" ")[0]}</span>
             </button>
           ))}
           </div>
