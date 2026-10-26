@@ -3,7 +3,7 @@ import { StorageApiError } from "@supabase/storage-js";
 import { Capacitor } from "@capacitor/core";
 import { toast } from "sonner";
 import { capacitorStorage } from "@/lib/capacitorStorage";
-import { prepareStorageBody, StorageLimitError } from "@/lib/prepareStorageUpload";
+import { HeicConversionError, prepareStorageBody, StorageLimitError } from "@/lib/prepareStorageUpload";
 import { withServerFunctionMessage } from "@/lib/functionError";
 import { reviewImageUpload } from "@/lib/nsfwImageCheck";
 import { EXPLICIT_REMOVED_MESSAGE, IMAGE_CHECK_WAIT_MS, settleReview } from "@/lib/nsfwGate";
@@ -89,6 +89,10 @@ function blockedImageError(message: string) {
   return new StorageApiError(message, 422, "422");
 }
 
+function unsupportedImageError(message: string) {
+  return new StorageApiError(message, 415, "415");
+}
+
 async function removePublishedImage(
   bucket: { remove: (paths: string[]) => Promise<{ error: { message?: string } | null }> },
   bucketId: string,
@@ -122,6 +126,7 @@ supabase.storage.from = ((bucketId: string) => {
       const toastId = `ether-video-compress-${++compressToastSerial}`;
       let shown = false;
       let lastPercent = -1;
+      let imageForReview = blob;
       try {
         const prepared = await prepareStorageBody(blob, (ratio) => {
           const percent = Math.max(0, Math.min(100, Math.round(ratio * 100)));
@@ -131,10 +136,17 @@ supabase.storage.from = ((bucketId: string) => {
           toast.loading(`Compressing video... ${percent}%`, { id: toastId });
         });
         body = prepared.body;
+        if (prepared.contentType === "image/jpeg" && prepared.body instanceof Blob) {
+          imageForReview = prepared.body;
+        }
         if (prepared.contentType) {
           options = { ...fileOptions, contentType: prepared.contentType };
         }
       } catch (error) {
+        if (error instanceof HeicConversionError) {
+          console.error("HEIC conversion failed", error);
+          return { data: null, error: unsupportedImageError(error.message) };
+        }
         const kind = fileKind(blob instanceof File ? blob.name : "", blob.type || "");
         const message = error instanceof StorageLimitError ? error.message : storageLimitMessage(kind);
         console.error("Upload blocked before storage", error);
@@ -146,7 +158,7 @@ supabase.storage.from = ((bucketId: string) => {
       const name = blob instanceof File ? blob.name : "";
       const ownsThisUpload = claimStoragePath(bucketId, path);
       const started = Date.now();
-      const reviewPromise = reviewImageUpload(blob, name).catch((error) => {
+      const reviewPromise = reviewImageUpload(imageForReview, name).catch((error) => {
         console.error("Image check failed open", error);
         return { ok: true as const };
       });
