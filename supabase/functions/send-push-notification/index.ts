@@ -4,6 +4,7 @@ import { ApplicationServer, importVapidKeys, Urgency, type ExportedVapidKeys } f
 import { getBearerUser, requestRole, requireUserOrService } from "../_shared/require-caller.ts";
 import { noticeForUser } from "../_shared/notification-auth.mjs";
 import { httpStatusForError } from "../_shared/http-error.mjs";
+import { IOS_APP_TOPIC, classifyPushSubscription, sendApnsAlert, signApnsJwt } from "../_shared/apns.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -62,6 +63,83 @@ async function loadVapidKeys(publicKey: string, privateKey: string) {
 function logStep(step: string, details?: Record<string, unknown>) {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] ${step}`, details ? JSON.stringify(details) : "");
+}
+
+type PushResult = { endpoint: string; status: string; error?: string };
+
+async function loadApnsJwt(subscriptions: { platform?: string; endpoint?: string }[]) {
+  const needsApns = subscriptions.some((sub) => classifyPushSubscription(sub.platform, sub.endpoint).channel === "apns");
+  if (!needsApns) return "";
+  const p8 = Deno.env.get("APPLE_APNS_KEY_P8") ?? "";
+  const keyId = (Deno.env.get("APPLE_APNS_KEY_ID") ?? "").trim();
+  const teamId = (Deno.env.get("APPLE_TEAM_ID") ?? "").trim();
+  if (!p8.trim() || !keyId || !teamId) {
+    logStep("APNs push failed", { reason: "not_configured" });
+    return "";
+  }
+  try {
+    return await signApnsJwt({
+      p8,
+      keyId,
+      teamId,
+      nowSeconds: Math.floor(Date.now() / 1000),
+    });
+  } catch {
+    logStep("APNs push failed", { reason: "auth_failed" });
+    return "";
+  }
+}
+
+async function sendApnsSubscription(input: {
+  decision: { action: string; token?: string };
+  endpoint: string;
+  jwt: string;
+  title: string;
+  body: string;
+  url?: string;
+  data?: Record<string, unknown>;
+  notificationType: string;
+  results: PushResult[];
+  expiredEndpoints: string[];
+}) {
+  const { decision, endpoint, jwt, title, body, url, data, notificationType, results, expiredEndpoints } = input;
+  if (decision.action === "drop" || !decision.token) {
+    if (endpoint) expiredEndpoints.push(endpoint);
+    results.push({ endpoint: "apns", status: "expired" });
+    logStep("APNs subscription dropped", { reason: "invalid" });
+    return;
+  }
+  if (!jwt) {
+    results.push({ endpoint: "apns", status: "failed", error: "APNs is not configured" });
+    return;
+  }
+  try {
+    const result = await sendApnsAlert({
+      jwt,
+      deviceToken: decision.token,
+      topic: IOS_APP_TOPIC,
+      title,
+      body,
+      url,
+      data,
+      notificationType,
+    });
+    if (result.drop) {
+      if (endpoint) expiredEndpoints.push(endpoint);
+      results.push({ endpoint: "apns", status: "expired" });
+      logStep("APNs subscription dropped", { status: result.status, reason: result.reason || "rejected" });
+      return;
+    }
+    if (result.ok) {
+      results.push({ endpoint: "apns", status: "sent" });
+      return;
+    }
+    logStep("APNs push failed", { status: result.status, reason: result.reason || "unknown" });
+    results.push({ endpoint: "apns", status: "failed", error: result.reason || "APNs request failed" });
+  } catch {
+    logStep("APNs push failed", { reason: "request_failed" });
+    results.push({ endpoint: "apns", status: "failed", error: "APNs request failed" });
+  }
 }
 
 serve(async (req) => {
@@ -200,11 +278,27 @@ serve(async (req) => {
 
     const results: { endpoint: string; status: string; error?: string }[] = [];
     const expiredEndpoints: string[] = [];
+    const apnsJwt = await loadApnsJwt(subscriptions);
 
     for (const sub of subscriptions) {
       const endpoint = String(sub.endpoint ?? "");
-      const platform = String(sub.platform ?? "web");
-      if (platform === "apns" || !endpoint.startsWith("https://")) {
+      const decision = classifyPushSubscription(sub.platform, endpoint);
+      if (decision.channel === "apns") {
+        await sendApnsSubscription({
+          decision,
+          endpoint,
+          jwt: apnsJwt,
+          title,
+          body: body || "",
+          url,
+          data,
+          notificationType,
+          results,
+          expiredEndpoints,
+        });
+        continue;
+      }
+      if (decision.action === "skip" || !endpoint.startsWith("https://")) {
         results.push({ endpoint, status: "skipped" });
         continue;
       }

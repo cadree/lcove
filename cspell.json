@@ -87,6 +87,7 @@
     "indexeddb",
     "wasm",
     "slugifies",
-    "pgcrypto"
+    "pgcrypto",
+    "apns"
   ]
 }
