@@ -9,6 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { EtherIdFace, monthName } from "@/components/profile/EtherIdFace";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { openInSafari } from "@/lib/externalCheckout";
+import { isIosApp } from "@/lib/platform";
 import { shotSessionEnabled } from "@/lib/shotSession";
 import {
   MEMBER_OF_HINT,
@@ -136,26 +138,40 @@ export default function EtherId() {
       toast.error("Sign in to add this card to Apple Wallet");
       return;
     }
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ether-id-pass`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ action: "download" }),
-    });
-    if (!response.ok) {
+    let passUrl = "";
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ether-id-pass`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "link" }),
+      });
+      if (!response.ok) {
+        toast.error("Could not build the Apple Wallet pass");
+        return;
+      }
+      const payload = (await response.json()) as { url?: string };
+      passUrl = payload.url ?? "";
+    } catch {
       toast.error("Could not build the Apple Wallet pass");
       return;
     }
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "ether-id.pkpass";
-    link.click();
-    URL.revokeObjectURL(url);
+    if (!passUrl) {
+      toast.error("Could not build the Apple Wallet pass");
+      return;
+    }
+    try {
+      if (isIosApp()) {
+        await openInSafari(passUrl);
+        return;
+      }
+      window.location.assign(passUrl);
+    } catch {
+      toast.error("Could not open Apple Wallet");
+    }
   };
 
   const href = card ? verifyUrl(window.location.origin, card.verify_path) : "";

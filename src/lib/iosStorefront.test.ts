@@ -71,6 +71,8 @@ describe("US storefront checkout", () => {
     const project = readFileSync("ios/App/App.xcodeproj/project.pbxproj", "utf8");
     const association = readFileSync("public/.well-known/apple-app-site-association", "utf8");
     assert.match(plugin, /UIApplication\.shared\.open/);
+    assert.match(plugin, /ether-id-pass/);
+    assert.match(plugin, /supabase\.co/);
     assert.equal(plugin.includes("SFSafariViewController"), false);
     assert.equal(plugin.includes("Storefront.current"), true);
     for (const host of EXTERNAL_CHECKOUT_HOSTS) {
