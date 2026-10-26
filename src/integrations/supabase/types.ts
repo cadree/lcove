@@ -5505,6 +5505,7 @@ export type Database = {
           birthday_day: number | null
           show_birthday: boolean
           member_of: string | null
+          passion_title: string | null
         }
         Insert: {
           access_level?: Database["public"]["Enums"]["access_level"] | null
@@ -5546,6 +5547,7 @@ export type Database = {
           birthday_day?: number | null
           show_birthday?: boolean
           member_of?: string | null
+          passion_title?: string | null
         }
         Update: {
           access_level?: Database["public"]["Enums"]["access_level"] | null
@@ -5587,6 +5589,7 @@ export type Database = {
           birthday_day?: number | null
           show_birthday?: boolean
           member_of?: string | null
+          passion_title?: string | null
         }
         Relationships: []
       }
