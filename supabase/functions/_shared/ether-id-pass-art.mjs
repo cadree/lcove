@@ -554,6 +554,20 @@ function downsample(src, factor) {
   return out;
 }
 
+/**
+ * Ink rectangles for the subtitle and name lines, in the 6× strip canvas
+ * (2250×864). Used to prove those rows do not collide.
+ */
+export async function etherIdStripTextBoxes(card) {
+  const fonts = await loadFonts();
+  const layout = layoutStrip(fonts, etherIdStripCopy(card || {}));
+  return {
+    kicker: layout.kicker ? layout.kicker.ink : null,
+    names: layout.names.map((name) => name.ink),
+    chip: layout.chip ? { box: layout.chip.box, ink: layout.chip.ink } : null,
+  };
+}
+
 /** Strip PNGs. A missing or unreadable avatar becomes initials on the dark plate. */
 export async function etherIdStripFiles(card, avatarBytes) {
   const copy = etherIdStripCopy(card || {});
