@@ -1,12 +1,17 @@
-// Profile photo for the Ether ID pass thumbnail.
-// PassKit image slots are PNG. A JPEG or PNG avatar is cover-cropped to the
-// thumbnail sizes. Anything else, including HEIC, is left out so the pass
-// still builds.
+// Profile photo for the Ether ID pass strip.
+// PassKit image slots are PNG. A JPEG or PNG avatar is cover-cropped onto
+// the strip. Anything else, including HEIC, is left out so the pass still builds.
+//
+// 10 MiB and 10 seconds. The old 3 MB cap and 2 second fetch dropped a normal
+// phone screenshot before decode (the reported file is a 3.5 MB, 1179×2556 PNG).
+// The long edge is 3200 so that screenshot, and taller phone screenshots still
+// under 4 million pixels, are kept. The pixel cap is unchanged, so the decoded
+// avatar stays within about 16 MB of RGBA.
 
-const MAX_BYTES = 3_000_000;
-const MAX_EDGE = 2500;
+const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_EDGE = 3200;
 const MAX_PIXELS = 4_000_000;
-const TIMEOUT_MS = 2000;
+const TIMEOUT_MS = 10_000;
 
 const THUMBS = [
   ["thumbnail.png", 90],
@@ -228,7 +233,8 @@ export async function decodeEtherIdPhoto(bytes) {
 /**
  * Fetch profiles.avatar_url.
  * Missing, slow, oversized, private, HEIC, and unreadable photos return null.
- * Limits stay 3 MB, 2 seconds, and https only.
+ * https only. The body and Content-Length must fit in 10 MiB, and the fetch
+ * aborts after 10 seconds. Pixel and edge checks still run at decode.
  */
 export async function fetchEtherIdAvatar(avatarUrl, {
   fetchImpl = globalThis.fetch,
