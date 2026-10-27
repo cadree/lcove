@@ -311,7 +311,8 @@ function jpegWithComments(jpegBytes, extra) {
   const parts = [Buffer.from([0xff, 0xd8])];
   let left = extra;
   while (left > 0) {
-    const payload = Math.min(left, 65533);
+    // jpeg-js turns each comment into a string via apply, which rejects a 64 KB segment.
+    const payload = Math.min(left, 8000);
     const segment = Buffer.alloc(4 + payload);
     segment[0] = 0xff;
     segment[1] = 0xfe;
