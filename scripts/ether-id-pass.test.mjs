@@ -4,8 +4,9 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+import { crc32, deflateSync } from "node:zlib";
 import { missingWalletSecrets, matchEtherIdRoute, walletConfigured } from "../supabase/functions/_shared/ether-id-config.mjs";
-import { etherIdThumbnailFiles, fetchEtherIdThumbnail } from "../supabase/functions/_shared/ether-id-pass-photo.mjs";
+import { decodeEtherIdPhoto, etherIdThumbnailFiles, fetchEtherIdAvatar, fetchEtherIdThumbnail } from "../supabase/functions/_shared/ether-id-pass-photo.mjs";
 import { etherIdStripFiles, etherIdStripTextBoxes, STRIP_FILES, STRIP_PHOTO } from "../supabase/functions/_shared/ether-id-pass-art.mjs";
 import { decode as decodePng } from "fast-png";
 import { etherIdPassJson, etherIdStripCopy, memberOfPass, sincePass, walletStatus } from "../supabase/functions/_shared/ether-id-pass-json.mjs";
@@ -261,6 +262,68 @@ function hasPixel(image, match) {
   return false;
 }
 
+function pngChunk(type, data) {
+  const body = Buffer.concat([Buffer.from(type), data]);
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  const sum = Buffer.alloc(4);
+  sum.writeUInt32BE(crc32(body) >>> 0);
+  return Buffer.concat([length, body, sum]);
+}
+
+/** RGB PNG built in the test. No fixture file is committed. */
+function pngFile(width, height, rgb) {
+  const row = Buffer.alloc(1 + width * 3);
+  for (let x = 0; x < width; x += 1) {
+    row[1 + x * 3] = rgb[0];
+    row[2 + x * 3] = rgb[1];
+    row[3 + x * 3] = rgb[2];
+  }
+  const raw = Buffer.alloc(row.length * height);
+  for (let y = 0; y < height; y += 1) row.copy(raw, y * row.length);
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk("IHDR", ihdr),
+    pngChunk("IDAT", deflateSync(raw, { level: 0 })),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+function pngSizeHeader(width, height) {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk("IHDR", ihdr),
+  ]);
+}
+
+/** Baseline JPEG with comment segments so the file is large but the image is not. */
+function jpegWithComments(jpegBytes, extra) {
+  const parts = [Buffer.from([0xff, 0xd8])];
+  let left = extra;
+  while (left > 0) {
+    // jpeg-js turns each comment into a string via apply, which rejects a 64 KB segment.
+    const payload = Math.min(left, 8000);
+    const segment = Buffer.alloc(4 + payload);
+    segment[0] = 0xff;
+    segment[1] = 0xfe;
+    segment.writeUInt16BE(payload + 2, 2);
+    parts.push(segment);
+    left -= payload;
+  }
+  parts.push(Buffer.from(jpegBytes.subarray(2)));
+  return Buffer.concat(parts);
+}
+
 describe("ether id strip", () => {
   const cadre = {
     display_name: "Cadre Wallace",
@@ -307,6 +370,59 @@ describe("ether id strip", () => {
     assert.equal(hasPixel(plain, (r, g, b) => r > 210 && g > 200 && b > 180), true);
     const missing = decodePng((await etherIdStripFiles(cadre, null))[2].data);
     assert.equal(pngPixel(missing, (STRIP_PHOTO.x + 8) * 3, (STRIP_PHOTO.y + 8) * 3)[2] < 40, true);
+  });
+
+  it("draws a photo from a multi-megabyte screenshot and drops an image past the pixel cap", async () => {
+    const png = pngFile(1179, 2556, [20, 40, 220]);
+    assert.ok(png.length > 3_485_896);
+    assert.ok(png.length <= 10 * 1024 * 1024);
+
+    const fetched = await fetchEtherIdAvatar("https://cdn.example.com/avatar.png", {
+      fetchImpl: async () => ({
+        ok: true,
+        headers: { get: (name) => (name === "content-length" ? String(png.length) : null) },
+        arrayBuffer: async () => png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength),
+      }),
+    });
+    assert.equal(fetched?.byteLength, png.length);
+
+    const cx = (STRIP_PHOTO.x + STRIP_PHOTO.w / 2) * 3;
+    const cy = (STRIP_PHOTO.y + STRIP_PHOTO.h / 2) * 3;
+    const withPhoto = decodePng((await etherIdStripFiles(cadre, fetched))[2].data);
+    const mid = pngPixel(withPhoto, cx, cy);
+    assert.equal(mid[2] > 150 && mid[0] < 90, true);
+
+    const raw = new Uint8Array(8 * 8 * 4);
+    for (let i = 0; i < raw.length; i += 4) {
+      raw[i] = 20;
+      raw[i + 1] = 40;
+      raw[i + 2] = 220;
+      raw[i + 3] = 255;
+    }
+    const jpegBytes = jpegWithComments(jpeg.encode({ data: raw, width: 8, height: 8 }, 90).data, 3_200_000);
+    assert.ok(jpegBytes.length > 3_000_000);
+    assert.ok(jpegBytes.length <= 10 * 1024 * 1024);
+    const jpegPhoto = await decodeEtherIdPhoto(jpegBytes);
+    assert.equal(jpegPhoto?.width, 8);
+    assert.equal(jpegPhoto?.height, 8);
+
+    const tooManyPixels = pngSizeHeader(2500, 2000);
+    assert.equal(2500 * 2000 > 4_000_000, true);
+    const plain = decodePng((await etherIdStripFiles(cadre, tooManyPixels))[2].data);
+    assert.equal(pngPixel(plain, (STRIP_PHOTO.x + 8) * 3, (STRIP_PHOTO.y + 8) * 3)[2] < 40, true);
+
+    const overBytes = Buffer.concat([png.subarray(0, 32), Buffer.alloc((10 * 1024 * 1024) - 31)]);
+    assert.ok(overBytes.length > 10 * 1024 * 1024);
+    assert.equal(await decodeEtherIdPhoto(overBytes), null);
+    assert.deepEqual(await fetchEtherIdThumbnail("https://cdn.example.com/huge.png", {
+      fetchImpl: async () => ({
+        ok: true,
+        headers: { get: () => String(10 * 1024 * 1024 + 1) },
+        arrayBuffer: async () => {
+          throw new Error("should not read a body over the byte cap");
+        },
+      }),
+    }), []);
   });
 
   it("keeps the subtitle off the name for one line, two lines, and a long city", async () => {
