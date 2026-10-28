@@ -76,6 +76,8 @@ export function guestEventEmailHtml(model) {
   ${model.intro ? `<p style="margin:0 0 12px;color:#333;line-height:1.5;">${model.intro}</p>` : ""}
   ${model.location ? `<p style="margin:0 0 4px;color:#333;">${escapeHtml(model.location)}</p>` : ""}
   ${map ? `<p style="margin:0 0 12px;">${map}</p>` : ""}
+  ${model.hostNotes ? `<p style="margin:0 0 12px;color:#333;white-space:pre-wrap;">${escapeHtml(model.hostNotes)}</p>` : ""}
+  ${Array.isArray(model.guestNames) && model.guestNames.length ? `<p style="margin:0 0 12px;color:#333;">Going: ${escapeHtml(model.guestNames.slice(0, 8).join(", "))}</p>` : ""}
   ${order}
   ${qr}
   ${wallet}

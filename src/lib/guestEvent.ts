@@ -34,7 +34,8 @@ export function validateEventDraft(draft: EventDraftInput): Record<string, strin
 
 export function guestlistLine(names: string[], total: number): string {
   const first = names.map((name) => name.trim()).filter(Boolean);
-  if (total <= 0 || first.length === 0) return "Be the first to go";
+  if (total <= 0) return "Be the first to go";
+  if (first.length === 0) return "RSVP to see who's going";
   if (total === 1) return `${first[0]} is going`;
   const others = Math.max(total - 1, 1);
   return `${first[0]} and ${others} ${others === 1 ? "other" : "others"} going`;
@@ -50,6 +51,42 @@ export function stickyCtaLabel(buyerCents: number | null, rsvpOnly: boolean): st
   if (rsvpOnly || buyerCents === 0) return "RSVP";
   if (buyerCents == null) return "Sold out";
   return `Buy tickets from $${(buyerCents / 100).toFixed(2)}`;
+}
+
+function placePart(value?: string | null): string {
+  const text = (value || "").trim();
+  if (!text || text.toUpperCase() === "TBA") return "";
+  return text;
+}
+
+/** City and state only. The street stays off this label. */
+export function generalAreaLabel(city?: string | null, state?: string | null): string | null {
+  const parts = [placePart(city), placePart(state)].filter(Boolean);
+  return parts.length ? parts.join(", ") : null;
+}
+
+/** A free event has no paid ticket type and no paid tier. */
+export function eventIsFree(ticketType: string | null | undefined, paidTier: boolean): boolean {
+  if (paidTier) return false;
+  if (ticketType === "paid" || ticketType === "credits" || ticketType === "hybrid" || ticketType === "info") return false;
+  return true;
+}
+
+export function publicTicketBadge(input: {
+  ticketType?: string | null;
+  free: boolean;
+  fromCents: number | null;
+  creditsPrice?: number | null;
+}): string {
+  if (input.ticketType === "credits") {
+    return input.creditsPrice ? `${input.creditsPrice} Credits` : "Credits";
+  }
+  if (input.ticketType === "info") return "Info only";
+  if (input.free) return "Free Event";
+  if (input.fromCents && input.fromCents > 0) {
+    return `Tickets from $${(input.fromCents / 100).toFixed(2)}`;
+  }
+  return "Tickets";
 }
 
 export interface TicketLine {

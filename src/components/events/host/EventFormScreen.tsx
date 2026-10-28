@@ -23,6 +23,8 @@ export interface EventFormValues extends EventDraftInput {
   features: string;
   city: string;
   timezone: string;
+  hostNotes: string;
+  hideHostNotes: boolean;
 }
 
 export function EventFormScreen({
@@ -123,6 +125,11 @@ export function EventFormScreen({
             </div>
             {values.hideAddress && <p className="text-xs text-muted-foreground">Hidden until someone RSVPs.</p>}
           </Field>
+          <Toggle label="Hide address until they RSVP" checked={values.hideAddress} onChange={(hideAddress) => onChange({ hideAddress })} />
+          <Field label="Notes for guests" error="">
+            <Textarea value={values.hostNotes} placeholder="Door code, what to bring, how to find the room" onChange={(event) => onChange({ hostNotes: event.target.value })} />
+          </Field>
+          <Toggle label="Hide notes until they RSVP" checked={values.hideHostNotes} onChange={(hideHostNotes) => onChange({ hideHostNotes })} />
           <Field label="Event summary" error="">
             <Textarea value={values.summary} onChange={(event) => onChange({ summary: event.target.value })} />
           </Field>

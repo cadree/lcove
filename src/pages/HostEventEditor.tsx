@@ -44,6 +44,8 @@ function blankForm(mode: "tickets" | "rsvp"): EventFormValues {
     features: "",
     city: "",
     timezone: browserZone(),
+    hostNotes: "",
+    hideHostNotes: false,
   };
 }
 
@@ -94,7 +96,8 @@ export default function HostEventEditor() {
       const names = (attendees || []).map((row) => row.attendee_name).filter((name): name is string => !!name);
       const { count } = await supabase.from("event_attendees").select("id", { count: "exact", head: true }).eq("event_id", event.id).in("status", ["registered", "approved"]);
       const { data: privateAddress } = await supabase.rpc("host_event_address", { p_event_id: event.id });
-      return { event, tier, names, going: count || names.length, privateAddress: privateAddress || "" };
+      const { data: hostNotes } = await supabase.rpc("public_event_host_notes", { p_event_id: event.id });
+      return { event, tier, names, going: count || names.length, privateAddress: privateAddress || "", hostNotes: hostNotes || "" };
     },
   });
 
@@ -127,6 +130,8 @@ export default function HostEventEditor() {
       features: (event.features || []).join(", "),
       city: event.city === "TBA" ? "" : event.city,
       timezone: zone,
+      hostNotes: loaded.hostNotes || "",
+      hideHostNotes: event.hide_host_notes === true,
     });
     setFlyerUrl(event.image_url);
     setHadPassword(event.password_protected === true);
@@ -225,6 +230,8 @@ export default function HostEventEditor() {
         p_private_address: values.address.trim(),
         p_password: values.password,
         p_password_protected: values.passwordProtected,
+        p_host_notes: values.hostNotes,
+        p_hide_host_notes: values.hideHostNotes,
       });
       if (accessError) {
         toast.message("Event saved. Address privacy needs the hosting migration before it can hide the street.");

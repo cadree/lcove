@@ -2,17 +2,21 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { GuestRsvpDialog } from "@/components/events/guest/GuestRsvpDialog";
 import { PublicEventScreen } from "@/components/events/guest/PublicEventScreen";
 import { ReportDialog } from "@/components/safety/ReportDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRSVP, type CalendarEvent } from "@/hooks/useCalendar";
+import { GuestShareButton } from "@/components/events/EventShareActions";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useConversations } from "@/hooks/useConversations";
 import { BackButton } from "@/components/navigation/BackButton";
 import { formatEventDate, formatEventTime } from "@/lib/eventTime";
 import { backTarget } from "@/lib/goBack";
 import { lowestBuyerCents } from "@/lib/ticketFees";
-import { stickyCtaLabel } from "@/lib/guestEvent";
+import { eventIsFree, generalAreaLabel, publicTicketBadge, stickyCtaLabel } from "@/lib/guestEvent";
+import { EventMoodboardView } from "@/components/calendar/EventMoodboardView";
 import { EventReminderToggle } from "@/components/events/EventReminderToggle";
 import { shareEventLink } from "@/lib/shareLink";
 import { PageMeta } from "@/components/seo/PageMeta";
@@ -20,6 +24,7 @@ import { HostShareBar } from "@/components/events/HostShareBar";
 import { usePublicEvent } from "@/hooks/usePublicEvent";
 import { eventIsShareable, eventPublicPath, eventPublicUrl, eventShareDescription, flyerVersion } from "../../functions/_shared/eventShare.js";
 import { SHARE_BASE_URL } from "@/lib/shareLink";
+import { guestRsvpErrorMessage, rememberedGuestRsvp, rememberGuestRsvp } from "@/lib/guestRsvp";
 import { toast } from "sonner";
 
 const savedKey = "ether-saved-events";
@@ -37,6 +42,9 @@ export default function PublicEventPage() {
   const { eventId = "" } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { rsvpAsync } = useRSVP();
+  const [rsvpOpen, setRsvpOpen] = useState(false);
+  const [rsvpBusy, setRsvpBusy] = useState(false);
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { createDirectConversation } = useConversations();
   const [saved, setSaved] = useState(() => readSaved(eventId));
@@ -66,17 +74,36 @@ export default function PublicEventPage() {
     },
   });
 
+  const rsvpHint = rememberedGuestRsvp(eventId);
   const { data: preview } = useQuery({
-    queryKey: ["public-event-guests", eventId],
+    queryKey: ["public-event-guests", eventId, user?.id, rsvpHint],
     enabled: !!eventId,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("public_event_guest_preview", { p_event_id: eventId });
-      if (error) return { names: [] as string[], avatars: [] as (string | null)[] };
-      const row = (data || {}) as { names?: unknown; avatars?: unknown };
+      const { data, error } = await supabase.rpc("public_event_guest_preview", {
+        p_event_id: eventId,
+        p_rsvp_id: rsvpHint || undefined,
+      });
+      if (error) return { names: [] as string[], avatars: [] as (string | null)[], locked: true };
+      const row = (data || {}) as { names?: unknown; avatars?: unknown; locked?: unknown };
+      const names = Array.isArray(row.names) ? row.names.filter((name): name is string => typeof name === "string") : [];
       return {
-        names: Array.isArray(row.names) ? row.names.filter((name): name is string => typeof name === "string") : [],
+        names,
         avatars: Array.isArray(row.avatars) ? row.avatars.map((item) => (typeof item === "string" ? item : null)) : [],
+        locked: row.locked === true,
       };
+    },
+  });
+
+  const { data: hostNotes } = useQuery({
+    queryKey: ["public-event-host-notes", eventId, user?.id, rsvpHint],
+    enabled: !!eventId,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("public_event_host_notes", {
+        p_event_id: eventId,
+        p_rsvp_id: rsvpHint || undefined,
+      });
+      if (error) return null;
+      return typeof data === "string" && data.trim() ? data : null;
     },
   });
 
@@ -112,7 +139,8 @@ export default function PublicEventPage() {
   const model = useMemo(() => {
     if (!event) return null;
     const absorb = event.absorb_fees === true;
-    const paid = tiers.some((tier) => (tier.price_cents || 0) > 0);
+    const paidTier = tiers.some((tier) => (tier.price_cents || 0) > 0);
+    const free = eventIsFree(event.ticket_type, paidTier);
     const from = lowestBuyerCents(tiers, absorb);
     const end = event.end_date || event.start_date;
     return {
@@ -124,6 +152,13 @@ export default function PublicEventPage() {
       brandColor: branding?.brand_color || null,
       whenLabel: `${formatEventDate(event.start_date, event.timezone)} · ${formatEventTime(event.start_date, event.timezone)}${event.end_date ? ` – ${formatEventTime(event.end_date, event.timezone)}` : ""}`,
       venue: event.venue,
+      area: generalAreaLabel(event.city, event.state),
+      ticketBadge: publicTicketBadge({
+        ticketType: event.ticket_type,
+        free,
+        fromCents: paidTier ? from : null,
+        creditsPrice: event.credits_price,
+      }),
       addressHidden: event.hide_address === true,
       location,
       hostName: branding?.organizer_name || host?.display_name || "Host",
@@ -133,7 +168,7 @@ export default function PublicEventPage() {
       guestNames: preview?.names || [],
       guestAvatars: preview?.avatars || [],
       going: going || 0,
-      cta: stickyCtaLabel(paid ? from : 0, !paid),
+      cta: stickyCtaLabel(free ? 0 : from, free),
       saved,
       past: new Date(end) < new Date(),
     };
@@ -141,15 +176,15 @@ export default function PublicEventPage() {
 
   const showLocation = async () => {
     if (!event) return;
-    if (!event.hide_address) {
-      const text = [event.venue, event.address, event.city, event.state].filter(Boolean).join(", ");
-      setLocation(text);
-      if (text) window.open(`https://maps.google.com/?q=${encodeURIComponent(text)}`, "_blank", "noopener");
-      return;
-    }
-    const { data } = await supabase.rpc("public_event_location", { p_event_id: event.id });
+    const { data } = await supabase.rpc("public_event_location", {
+      p_event_id: event.id,
+      p_rsvp_id: rememberedGuestRsvp(event.id) || undefined,
+    });
+    const area = [event.venue, event.city, event.state].filter(Boolean).join(", ");
     if (!data) {
-      toast.message("The address stays hidden until you RSVP.");
+      setLocation(area || null);
+      if (event.hide_address) toast.message("The address stays hidden until you RSVP.");
+      else if (area) window.open(`https://maps.google.com/?q=${encodeURIComponent(area)}`, "_blank", "noopener");
       return;
     }
     setLocation(data);
@@ -178,6 +213,36 @@ export default function PublicEventPage() {
     );
   }
 
+  const pdfEvent: CalendarEvent = {
+    id: event.id,
+    creator_id: event.creator_id,
+    title: event.title,
+    description: event.description,
+    venue: event.venue,
+    address: null,
+    city: event.city || "",
+    state: event.state,
+    country: null,
+    start_date: event.start_date,
+    end_date: event.end_date,
+    image_url: event.image_url,
+    ticket_type: event.ticket_type || "free",
+    ticket_price: event.ticket_price ?? null,
+    credits_price: event.credits_price ?? null,
+    capacity: null,
+    is_public: event.is_public,
+    project_id: null,
+    external_url: null,
+    timezone: event.timezone,
+    recurrence: null,
+    status: event.status,
+    slug: event.slug ?? null,
+    created_at: event.start_date,
+    organizer: { display_name: model.hostName, avatar_url: model.hostAvatar },
+  };
+  const shareText = `Check out "${event.title}" on ${formatEventDate(event.start_date, event.timezone)}!`;
+  const shareUrl = eventPublicUrl(event);
+
   return (
     <>
       <PageMeta
@@ -197,7 +262,21 @@ export default function PublicEventPage() {
         hostShare={user && user.id === event.creator_id ? (
           <div className="rounded-2xl border border-border/70 bg-card/80 p-3">
             <p className="mb-2 text-xs text-muted-foreground">Share your event</p>
-            <HostShareBar title={event.title} url={eventPublicUrl(event)} />
+            <HostShareBar
+              title={event.title}
+              url={shareUrl}
+              share={(
+                <GuestShareButton
+                  variant="bar"
+                  theme={model.theme}
+                  title={event.title}
+                  text={shareText}
+                  url={shareUrl}
+                  imageUrl={event.image_url}
+                  pdfEvent={pdfEvent}
+                />
+              )}
+            />
           </div>
         ) : null}
         following={!!event.creator_id && isFavorite(event.creator_id)}
@@ -207,7 +286,17 @@ export default function PublicEventPage() {
           localStorage.setItem(savedKey, JSON.stringify(list));
           setSaved(readSaved(event.id));
         }}
-        onShare={() => shareEventLink({ title: event.title, text: event.title, url: eventPublicUrl(event) })}
+        onShare={() => shareEventLink({ title: event.title, text: shareText, url: shareUrl })}
+        shareButton={(
+          <GuestShareButton
+            theme={model.theme}
+            title={event.title}
+            text={shareText}
+            url={shareUrl}
+            imageUrl={event.image_url}
+            pdfEvent={pdfEvent}
+          />
+        )}
         onLocation={showLocation}
         onGuestlist={() => setGuestsOpen(true)}
         onFollow={() => {
@@ -235,15 +324,86 @@ export default function PublicEventPage() {
           navigate(`/messages?chat=${conversation.id}`);
         }}
         onReport={() => setReportOpen(true)}
-        onCta={() => navigate(`${returnPath}/tickets`)}
+        onCta={() => {
+          const paidTier = tiers.some((tier) => (tier.price_cents || 0) > 0);
+          if (!eventIsFree(event.ticket_type, paidTier)) {
+            navigate(`${returnPath}/tickets`);
+            return;
+          }
+          if (user) {
+            setRsvpBusy(true);
+            rsvpAsync({ eventId: event.id, status: "going" })
+              .then((result) => {
+                if (!result.rsvpId) return;
+                rememberGuestRsvp(event.id, result.rsvpId);
+                navigate(`${returnPath}/confirmation?rsvp_id=${result.rsvpId}`);
+              })
+              .catch(() => {
+                // useRSVP already shows a toast.
+              })
+              .finally(() => setRsvpBusy(false));
+            return;
+          }
+          setRsvpOpen(true);
+        }}
+        busy={rsvpBusy}
         reminder={model.past ? null : <EventReminderToggle eventId={event.id} />}
+        details={(
+          <div className="space-y-4">
+            <EventMoodboardView eventId={event.id} />
+            {hostNotes ? (
+              <div className="rounded-2xl border border-border/60 bg-card px-4 py-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">From the host</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm">{hostNotes}</p>
+              </div>
+            ) : event.hide_host_notes ? (
+              <p className="text-sm text-muted-foreground">Host notes unlock after you RSVP.</p>
+            ) : null}
+          </div>
+        )}
+      />
+      <GuestRsvpDialog
+        open={rsvpOpen}
+        theme={model.theme}
+        submitting={rsvpBusy}
+        onOpenChange={setRsvpOpen}
+        onSubmit={async (values) => {
+          setRsvpBusy(true);
+          const { data, error } = await supabase.rpc("create_guest_event_rsvp", {
+            p_event_id: event.id,
+            p_guest_name: values.name,
+            p_guest_email: values.email,
+            p_guest_phone: values.phone || undefined,
+            p_nearby_consent: values.consent,
+          });
+          setRsvpBusy(false);
+          if (error) {
+            toast.error(guestRsvpErrorMessage(error));
+            return;
+          }
+          const row = (data || {}) as { id?: string };
+          if (!row.id) {
+            toast.error("Could not save your RSVP. Please try again.");
+            return;
+          }
+          rememberGuestRsvp(event.id, row.id);
+          setRsvpOpen(false);
+          supabase.functions.invoke("send-rsvp-confirmation", {
+            body: { event_id: event.id, rsvp_id: row.id },
+          }).catch(() => {
+            // The RSVP is saved. The email can be retried from the host tools.
+          });
+          navigate(`${returnPath}/confirmation?rsvp_id=${row.id}`);
+        }}
       />
       <Dialog open={guestsOpen} onOpenChange={setGuestsOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Guestlist</DialogTitle></DialogHeader>
           <ul className="space-y-2 text-sm">
             {(preview?.names || []).map((name) => <li key={name}>{name}</li>)}
-            {(preview?.names || []).length === 0 && <li className="text-muted-foreground">No one yet.</li>}
+            {(preview?.names || []).length === 0 && (
+              <li className="text-muted-foreground">{preview?.locked ? "Names show up after you RSVP." : "No one yet."}</li>
+            )}
           </ul>
         </DialogContent>
       </Dialog>

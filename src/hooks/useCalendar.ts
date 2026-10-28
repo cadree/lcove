@@ -428,6 +428,7 @@ export function useRSVP() {
 
   return {
     rsvp: rsvpMutation.mutate,
+    rsvpAsync: rsvpMutation.mutateAsync,
     isRsvping: rsvpMutation.isPending,
     toggleReminder: toggleReminderMutation.mutate,
   };

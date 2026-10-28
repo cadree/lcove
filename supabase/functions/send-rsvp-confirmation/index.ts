@@ -72,7 +72,7 @@ serve(async (req) => {
 
     const { data: event } = await admin
       .from("events")
-      .select("id, title, start_date, end_date, venue, address, city, state, image_url, description, timezone")
+      .select("id, title, start_date, end_date, venue, address, city, state, image_url, description, timezone, hide_address")
       .eq("id", event_id)
       .maybeSingle();
 
@@ -103,7 +103,21 @@ serve(async (req) => {
 
     const dateStr = eventDateLabel(event.start_date, event.timezone);
     const timeStr = eventTimeLabel(event.start_date, event.timezone);
-    const location = [event.venue, event.address, event.city, event.state].filter(Boolean).join(", ") || "Location TBA";
+    const secret = await admin
+      .from("event_secrets")
+      .select("private_address, host_notes")
+      .eq("event_id", event.id)
+      .maybeSingle();
+    const street = event.hide_address ? secret.data?.private_address : event.address;
+    const location = [event.venue, street, event.city, event.state].filter(Boolean).join(", ") || "Location TBA";
+    const hostNotes = typeof secret.data?.host_notes === "string" ? secret.data.host_notes : "";
+    const { data: people } = await admin
+      .from("event_attendees")
+      .select("attendee_name")
+      .eq("event_id", event.id)
+      .in("status", ["registered", "approved", "checked_in"])
+      .limit(8);
+    const guestNames = (people || []).map((person) => person.attendee_name).filter((person): person is string => !!person);
     const eventUrl = `https://etherbylcove.com/event/${event.id}`;
     const mapUrl = `https://maps.google.com/?q=${encodeURIComponent(location)}`;
     const identity = await resolveHostIdentity(admin, event_id);
@@ -128,6 +142,8 @@ serve(async (req) => {
       eventDate: dateStr,
       eventTime: timeStr,
       location,
+      hostNotes,
+      guestNames,
       mapUrl,
       intro,
       eventUrl,

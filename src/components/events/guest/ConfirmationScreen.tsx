@@ -11,6 +11,8 @@ export function ConfirmationScreen({
   title,
   whenLabel,
   address,
+  hostNotes,
+  guestNames,
   ticketCount,
   qrValue,
   subscribed,
@@ -28,6 +30,8 @@ export function ConfirmationScreen({
   title: string;
   whenLabel: string;
   address: string | null;
+  hostNotes?: string | null;
+  guestNames?: string[];
   ticketCount: number;
   qrValue: string | null;
   subscribed: boolean;
@@ -50,6 +54,10 @@ export function ConfirmationScreen({
         <p className="text-xl">{title}</p>
         <p className="text-sm text-muted-foreground">{whenLabel}</p>
         {address && <p className="text-sm">{address}</p>}
+        {hostNotes && <p className="whitespace-pre-wrap text-sm">{hostNotes}</p>}
+        {guestNames && guestNames.length > 0 && (
+          <p className="text-sm text-muted-foreground">Going: {guestNames.slice(0, 8).join(", ")}</p>
+        )}
         <p className="text-sm">{ticketCount} {ticketCount === 1 ? "ticket" : "tickets"}</p>
       </div>
       {qrValue && (

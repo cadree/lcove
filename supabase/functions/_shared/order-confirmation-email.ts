@@ -45,7 +45,7 @@ export async function sendOrderConfirmation(admin, orderId: string): Promise<{ s
 
   const { data: event } = await admin
     .from("events")
-    .select("id, title, start_date, end_date, venue, address, city, state, image_url, timezone")
+    .select("id, title, start_date, end_date, venue, address, city, state, image_url, timezone, hide_address")
     .eq("id", order.event_id)
     .maybeSingle();
   if (!event) return { sent: false, reason: "no_event" };
@@ -61,7 +61,17 @@ export async function sendOrderConfirmation(admin, orderId: string): Promise<{ s
   const tierName = new Map((tiers || []).map((tier) => [tier.id, tier.name]));
 
   const identity = await resolveHostIdentity(admin, event.id);
-  const location = [event.venue, event.address, event.city, event.state].filter(Boolean).join(", ") || "Location TBA";
+  const secret = await admin.from("event_secrets").select("private_address, host_notes").eq("event_id", event.id).maybeSingle();
+  const street = event.hide_address ? secret.data?.private_address : event.address;
+  const location = [event.venue, street, event.city, event.state].filter(Boolean).join(", ") || "Location TBA";
+  const hostNotes = typeof secret.data?.host_notes === "string" ? secret.data.host_notes : "";
+  const { data: namedGuests } = await admin
+    .from("event_attendees")
+    .select("attendee_name")
+    .eq("event_id", event.id)
+    .in("status", ["registered", "approved", "checked_in"])
+    .limit(8);
+  const guestNames = (namedGuests || []).map((person) => person.attendee_name).filter((person) => !!person);
   const eventUrl = `https://etherbylcove.com/event/${event.id}/confirmation?order_id=${orderId}`;
   const qrValue = attendees?.[0]?.qr_code || orderId;
   const qr = await qrDataUrl(qrValue);
@@ -78,6 +88,8 @@ export async function sendOrderConfirmation(admin, orderId: string): Promise<{ s
     eventDate: eventDateLabel(event.start_date, event.timezone),
     eventTime: eventTimeLabel(event.start_date, event.timezone),
     location,
+    hostNotes,
+    guestNames,
     mapUrl: `https://maps.google.com/?q=${encodeURIComponent(location)}`,
     intro: "You're in.",
     order: {

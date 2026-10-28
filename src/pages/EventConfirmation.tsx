@@ -16,6 +16,7 @@ export default function EventConfirmation() {
   const [params] = useSearchParams();
   const sessionId = params.get("session_id");
   const orderIdParam = params.get("order_id");
+  const rsvpId = params.get("rsvp_id");
   const { data: event, isLoading: eventLoading } = usePublicEvent(eventId);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +28,8 @@ export default function EventConfirmation() {
   const [title, setTitle] = useState("");
   const [whenLabel, setWhenLabel] = useState("");
   const [address, setAddress] = useState<string | null>(null);
+  const [hostNotes, setHostNotes] = useState<string | null>(null);
+  const [guestNames, setGuestNames] = useState<string[]>([]);
   const [flyer, setFlyer] = useState<string | null>(null);
   const [hostAvatar, setHostAvatar] = useState<string | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">("dark");
@@ -54,8 +57,16 @@ export default function EventConfirmation() {
       if (cancelled) return;
       if (host?.display_name) setHostName(host.display_name);
       if (host?.avatar_url) setHostAvatar(host.avatar_url);
-      const { data: hidden } = await supabase.rpc("public_event_location", { p_event_id: event.id, p_order_id: orderIdParam || undefined });
-      if (!cancelled) setAddress(hidden || [event.venue, event.hide_address ? null : event.address, event.city].filter(Boolean).join(", "));
+      const reveal = { p_event_id: event.id, p_order_id: orderIdParam || undefined, p_rsvp_id: rsvpId || undefined };
+      const { data: hidden } = await supabase.rpc("public_event_location", reveal);
+      const { data: notes } = await supabase.rpc("public_event_host_notes", reveal);
+      const { data: guests } = await supabase.rpc("public_event_guest_preview", reveal);
+      if (cancelled) return;
+      const area = [event.venue, event.city, event.state].filter(Boolean).join(", ");
+      setAddress(hidden || area || null);
+      setHostNotes(typeof notes === "string" && notes.trim() ? notes : null);
+      const row = (guests || {}) as { names?: unknown };
+      setGuestNames(Array.isArray(row.names) ? row.names.filter((name): name is string => typeof name === "string") : []);
       const probe = await supabase.functions.invoke("generate-wallet-pass", { body: { probe: true } });
       if (!cancelled) setWalletEnabled(probe.data?.configured === true);
     };
@@ -87,7 +98,7 @@ export default function EventConfirmation() {
     };
     verify();
     return () => { cancelled = true; };
-  }, [event, eventLoading, orderIdParam, sessionId]);
+  }, [event, eventLoading, orderIdParam, rsvpId, sessionId]);
 
   const share = () => shareEventLink({ title, text: `I'm going to ${title}`, url: event ? eventPublicUrl(event) : "" });
   const calendar = () => {
@@ -132,6 +143,8 @@ export default function EventConfirmation() {
       title={title}
       whenLabel={whenLabel}
       address={address}
+      hostNotes={hostNotes}
+      guestNames={guestNames}
       ticketCount={ticketCount}
       qrValue={qr}
       subscribed={subscribed}
