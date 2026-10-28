@@ -24,6 +24,9 @@ export function OrderSummaryScreen({
   passwordRequired,
   password,
   consent,
+  consentLabel,
+  phone,
+  onPhone,
   errors,
   submitting,
   onName,
@@ -44,6 +47,9 @@ export function OrderSummaryScreen({
   passwordRequired: boolean;
   password: string;
   consent: boolean;
+  consentLabel?: string;
+  phone?: string;
+  onPhone?: (value: string) => void;
   errors: Record<string, string>;
   submitting: boolean;
   onName: (value: string) => void;
@@ -86,9 +92,14 @@ export function OrderSummaryScreen({
             <Input type="password" value={password} onChange={(event) => onPassword(event.target.value)} />
           </Field>
         )}
+        {onPhone && (
+          <Field label="Phone (optional)" error={errors.phone}>
+            <Input type="tel" value={phone || ""} autoComplete="tel" onChange={(event) => onPhone(event.target.value)} />
+          </Field>
+        )}
         <label className="flex items-start gap-3 text-sm">
           <Checkbox checked={consent} onCheckedChange={(value) => onConsent(value === true)} />
-          <span>Text me updates from {hostName}. Optional, and off unless you check this.</span>
+          <span>{consentLabel || `Text me updates from ${hostName}. Optional, and off unless you check this.`}</span>
         </label>
         <p className="text-xs text-muted-foreground">
           By continuing you agree to the <a className="underline" href="/terms">Terms</a> and <a className="underline" href="/privacy">Privacy</a>.

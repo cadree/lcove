@@ -2,10 +2,12 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { GuestRsvpDialog } from "@/components/events/guest/GuestRsvpDialog";
 import { PublicEventScreen } from "@/components/events/guest/PublicEventScreen";
 import { ReportDialog } from "@/components/safety/ReportDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRSVP } from "@/hooks/useCalendar";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useConversations } from "@/hooks/useConversations";
 import { BackButton } from "@/components/navigation/BackButton";
@@ -21,6 +23,7 @@ import { HostShareBar } from "@/components/events/HostShareBar";
 import { usePublicEvent } from "@/hooks/usePublicEvent";
 import { eventIsShareable, eventPublicPath, eventPublicUrl, eventShareDescription, flyerVersion } from "../../functions/_shared/eventShare.js";
 import { SHARE_BASE_URL } from "@/lib/shareLink";
+import { guestRsvpErrorMessage, rememberGuestRsvp } from "@/lib/guestRsvp";
 import { toast } from "sonner";
 
 const savedKey = "ether-saved-events";
@@ -38,6 +41,9 @@ export default function PublicEventPage() {
   const { eventId = "" } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { rsvp } = useRSVP();
+  const [rsvpOpen, setRsvpOpen] = useState(false);
+  const [rsvpBusy, setRsvpBusy] = useState(false);
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { createDirectConversation } = useConversations();
   const [saved, setSaved] = useState(() => readSaved(eventId));
@@ -244,9 +250,65 @@ export default function PublicEventPage() {
           navigate(`/messages?chat=${conversation.id}`);
         }}
         onReport={() => setReportOpen(true)}
-        onCta={() => navigate(`${returnPath}/tickets`)}
+        onCta={() => {
+          const paidTier = tiers.some((tier) => (tier.price_cents || 0) > 0);
+          if (!eventIsFree(event.ticket_type, paidTier)) {
+            navigate(`${returnPath}/tickets`);
+            return;
+          }
+          if (user) {
+            setRsvpBusy(true);
+            rsvp.mutateAsync({ eventId: event.id, status: "going" })
+              .then((result) => {
+                if (!result.rsvpId) return;
+                rememberGuestRsvp(event.id, result.rsvpId);
+                navigate(`${returnPath}/confirmation?rsvp_id=${result.rsvpId}`);
+              })
+              .catch(() => {
+                // useRSVP already shows a toast.
+              })
+              .finally(() => setRsvpBusy(false));
+            return;
+          }
+          setRsvpOpen(true);
+        }}
+        busy={rsvpBusy}
         reminder={model.past ? null : <EventReminderToggle eventId={event.id} />}
         details={<EventMoodboardView eventId={event.id} />}
+      />
+      <GuestRsvpDialog
+        open={rsvpOpen}
+        theme={model.theme}
+        submitting={rsvpBusy}
+        onOpenChange={setRsvpOpen}
+        onSubmit={async (values) => {
+          setRsvpBusy(true);
+          const { data, error } = await supabase.rpc("create_guest_event_rsvp", {
+            p_event_id: event.id,
+            p_guest_name: values.name,
+            p_guest_email: values.email,
+            p_guest_phone: values.phone || undefined,
+            p_nearby_consent: values.consent,
+          });
+          setRsvpBusy(false);
+          if (error) {
+            toast.error(guestRsvpErrorMessage(error));
+            return;
+          }
+          const row = (data || {}) as { id?: string };
+          if (!row.id) {
+            toast.error("Could not save your RSVP. Please try again.");
+            return;
+          }
+          rememberGuestRsvp(event.id, row.id);
+          setRsvpOpen(false);
+          supabase.functions.invoke("send-rsvp-confirmation", {
+            body: { event_id: event.id, rsvp_id: row.id },
+          }).catch(() => {
+            // The RSVP is saved. The email can be retried from the host tools.
+          });
+          navigate(`${returnPath}/confirmation?rsvp_id=${row.id}`);
+        }}
       />
       <Dialog open={guestsOpen} onOpenChange={setGuestsOpen}>
         <DialogContent>

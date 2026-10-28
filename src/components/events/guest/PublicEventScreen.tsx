@@ -46,10 +46,11 @@ interface Props {
   reminder?: ReactNode;
   hostShare?: ReactNode;
   details?: ReactNode;
+  busy?: boolean;
 }
 
 export function PublicEventScreen({
-  model, onBack, onSave, onShare, onLocation, onGuestlist, onFollow, following, onCalendar, onContact, onReport, onCta, reminder, hostShare, details,
+  model, onBack, onSave, onShare, onLocation, onGuestlist, onFollow, following, onCalendar, onContact, onReport, onCta, reminder, hostShare, details, busy,
 }: Props) {
   const ctaStyle = model.brandColor ? { backgroundColor: model.brandColor, color: "#1a1020" } : undefined;
   return (
@@ -127,8 +128,8 @@ export function PublicEventScreen({
 
       {!model.past && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border/50 bg-background/95 px-4 py-3 pb-[max(env(safe-area-inset-bottom),12px)] backdrop-blur">
-          <Button className="h-12 w-full rounded-full text-base" style={ctaStyle} onClick={onCta} disabled={model.cta === "Sold out"}>
-            {model.cta}
+          <Button className="h-12 w-full rounded-full text-base" style={ctaStyle} onClick={onCta} disabled={busy || model.cta === "Sold out"}>
+            {busy ? "Saving…" : model.cta}
           </Button>
         </div>
       )}

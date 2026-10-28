@@ -65,6 +65,7 @@ serve(async (req) => {
       lines,
       buyer,
       marketingConsent,
+      nearbyConsent,
       password,
       quantity: legacyQty,
       guestName,
@@ -245,29 +246,43 @@ serve(async (req) => {
     });
 
     const isFree = priced.total === 0;
-    const notes = marketingConsent === true ? "marketing_opt_in" : null;
+    const nearbyOptIn = nearbyConsent === true;
+    const nearbyAt = nearbyOptIn ? new Date().toISOString() : null;
+    const notes = [
+      marketingConsent === true ? "marketing_opt_in" : null,
+      nearbyOptIn ? `nearby_events_opt_in@${nearbyAt}` : null,
+    ].filter(Boolean).join("|") || null;
     const currency = resolved[0].tier.currency || "usd";
 
-    const { data: order, error: orderErr } = await supabase
+    const orderRow = {
+      event_id: eventId,
+      purchaser_user_id: userId,
+      purchaser_name: buyerName,
+      purchaser_email: buyerEmail || null,
+      purchaser_phone: buyerPhone || null,
+      purchaser_social: namedAttendees[0]?.social || null,
+      quantity: totalQty,
+      subtotal_cents: priced.subtotal,
+      total_cents: priced.total,
+      currency,
+      payment_method: isFree ? "free" : "stripe",
+      payment_status: isFree ? "paid" : "pending",
+      notes,
+    };
+    let inserted = await supabase
       .from("ticket_orders")
       .insert({
-        event_id: eventId,
-        purchaser_user_id: userId,
-        purchaser_name: buyerName,
-        purchaser_email: buyerEmail || null,
-        purchaser_phone: buyerPhone || null,
-        purchaser_social: namedAttendees[0]?.social || null,
-        quantity: totalQty,
-        subtotal_cents: priced.subtotal,
-        total_cents: priced.total,
-        currency,
-        payment_method: isFree ? "free" : "stripe",
-        payment_status: isFree ? "paid" : "pending",
-        notes,
+        ...orderRow,
+        nearby_events_consent: nearbyOptIn,
+        nearby_events_consent_at: nearbyAt,
       })
       .select()
       .single();
-    if (orderErr) throw orderErr;
+    if (inserted.error && missingColumn(inserted.error)) {
+      inserted = await supabase.from("ticket_orders").insert(orderRow).select().single();
+    }
+    if (inserted.error || !inserted.data) throw inserted.error || new Error("Could not start checkout");
+    const order = inserted.data;
 
     const { data: insertedAttendees, error: attErr } = await supabase
       .from("event_attendees")

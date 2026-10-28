@@ -2654,6 +2654,8 @@ export type Database = {
           guest_name: string | null
           guest_phone: string | null
           id: string
+          nearby_events_consent: boolean
+          nearby_events_consent_at: string | null
           reminder_enabled: boolean | null
           status: string
           stripe_payment_id: string | null
@@ -2671,6 +2673,8 @@ export type Database = {
           guest_name?: string | null
           guest_phone?: string | null
           id?: string
+          nearby_events_consent?: boolean
+          nearby_events_consent_at?: string | null
           reminder_enabled?: boolean | null
           status?: string
           stripe_payment_id?: string | null
@@ -2688,6 +2692,8 @@ export type Database = {
           guest_name?: string | null
           guest_phone?: string | null
           id?: string
+          nearby_events_consent?: boolean
+          nearby_events_consent_at?: string | null
           reminder_enabled?: boolean | null
           status?: string
           stripe_payment_id?: string | null
@@ -2744,6 +2750,7 @@ export type Database = {
           allow_transfers: boolean
           password_protected: boolean
           features: string[]
+          hide_host_notes: boolean
           waitlist_enabled: boolean
         }
         Insert: {
@@ -2784,6 +2791,7 @@ export type Database = {
           allow_transfers?: boolean
           password_protected?: boolean
           features?: string[]
+          hide_host_notes?: boolean
           waitlist_enabled?: boolean
         }
         Update: {
@@ -2824,6 +2832,7 @@ export type Database = {
           allow_transfers?: boolean
           password_protected?: boolean
           features?: string[]
+          hide_host_notes?: boolean
           waitlist_enabled?: boolean
         }
         Relationships: [
@@ -7098,6 +7107,8 @@ export type Database = {
           payment_status: string
           purchaser_email: string | null
           purchaser_name: string | null
+          nearby_events_consent: boolean
+          nearby_events_consent_at: string | null
           purchaser_phone: string | null
           purchaser_social: string | null
           purchaser_user_id: string | null
@@ -7123,6 +7134,8 @@ export type Database = {
           payment_status?: string
           purchaser_email?: string | null
           purchaser_name?: string | null
+          nearby_events_consent?: boolean
+          nearby_events_consent_at?: string | null
           purchaser_phone?: string | null
           purchaser_social?: string | null
           purchaser_user_id?: string | null
@@ -7148,6 +7161,8 @@ export type Database = {
           payment_status?: string
           purchaser_email?: string | null
           purchaser_name?: string | null
+          nearby_events_consent?: boolean
+          nearby_events_consent_at?: string | null
           purchaser_phone?: string | null
           purchaser_social?: string | null
           purchaser_user_id?: string | null
@@ -7999,6 +8014,7 @@ export type Database = {
           p_guest_email: string
           p_guest_name: string
           p_guest_phone?: string
+          p_nearby_consent?: boolean
         }
         Returns: Json
       }
@@ -8101,8 +8117,12 @@ export type Database = {
         Returns: number
       }
       public_event_guest_preview: {
-        Args: { p_event_id: string }
+        Args: { p_event_id: string; p_order_id?: string; p_rsvp_id?: string }
         Returns: Json
+      }
+      public_event_host_notes: {
+        Args: { p_event_id: string; p_order_id?: string; p_rsvp_id?: string }
+        Returns: string
       }
       public_event_location: {
         Args: { p_event_id: string; p_order_id?: string; p_rsvp_id?: string }
@@ -8131,6 +8151,8 @@ export type Database = {
           p_private_address: string
           p_password: string
           p_password_protected: boolean
+          p_host_notes?: string
+          p_hide_host_notes?: boolean
         }
         Returns: undefined
       }

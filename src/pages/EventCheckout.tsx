@@ -20,6 +20,7 @@ export default function EventCheckout() {
   const lines = useMemo(() => readTicketLines(eventKey), [eventKey]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState(user?.email || "");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [consent, setConsent] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -74,8 +75,13 @@ export default function EventCheckout() {
         body: {
           eventId: event?.id || eventKey,
           lines: chosen.map((line) => ({ tierId: line.tierId, quantity: line.quantity })),
-          buyer: { name: name.trim(), email: email.trim().toLowerCase() },
-          marketingConsent: consent,
+          buyer: {
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            phone: user ? undefined : phone.trim() || undefined,
+          },
+          marketingConsent: user ? consent : false,
+          nearbyConsent: !user && consent,
           password,
         },
         headers,
@@ -116,6 +122,9 @@ export default function EventCheckout() {
       passwordRequired={event?.password_protected === true}
       password={password}
       consent={consent}
+      consentLabel={user ? undefined : "Keep me posted on events like this near me. Unsubscribe anytime."}
+      phone={phone}
+      onPhone={user ? undefined : setPhone}
       errors={errors}
       submitting={submitting}
       onName={setName}

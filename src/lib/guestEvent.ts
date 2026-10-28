@@ -67,7 +67,7 @@ export function generalAreaLabel(city?: string | null, state?: string | null): s
 /** A free event has no paid ticket type and no paid tier. */
 export function eventIsFree(ticketType: string | null | undefined, paidTier: boolean): boolean {
   if (paidTier) return false;
-  if (ticketType === "paid" || ticketType === "credits" || ticketType === "hybrid") return false;
+  if (ticketType === "paid" || ticketType === "credits" || ticketType === "hybrid" || ticketType === "info") return false;
   return true;
 }
 

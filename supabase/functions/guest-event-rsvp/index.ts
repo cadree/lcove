@@ -31,6 +31,7 @@ serve(async (req) => {
     const email = normalizeGuestEmail(body?.guestEmail);
     const phone = typeof body?.guestPhone === "string" ? body.guestPhone.trim() : "";
     const campaignId = typeof body?.campaignId === "string" && body.campaignId ? body.campaignId : null;
+    const nearbyConsent = body?.nearbyConsent === true;
     if (!eventId || !name || !email) {
       return json({ error: "name and email required" }, 400);
     }
@@ -57,6 +58,7 @@ serve(async (req) => {
       p_guest_email: email,
       p_guest_phone: phone || null,
       p_campaign_id: campaignId,
+      p_nearby_consent: nearbyConsent,
     });
     if (error) throw new Error(error.message);
 
