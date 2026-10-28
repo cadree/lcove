@@ -41,7 +41,7 @@ export default function PublicEventPage() {
   const { eventId = "" } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { rsvp } = useRSVP();
+  const { rsvpAsync } = useRSVP();
   const [rsvpOpen, setRsvpOpen] = useState(false);
   const [rsvpBusy, setRsvpBusy] = useState(false);
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
@@ -277,7 +277,7 @@ export default function PublicEventPage() {
           }
           if (user) {
             setRsvpBusy(true);
-            rsvp.mutateAsync({ eventId: event.id, status: "going" })
+            rsvpAsync({ eventId: event.id, status: "going" })
               .then((result) => {
                 if (!result.rsvpId) return;
                 rememberGuestRsvp(event.id, result.rsvpId);
