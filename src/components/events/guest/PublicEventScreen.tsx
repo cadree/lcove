@@ -14,6 +14,8 @@ export interface PublicEventModel {
   brandColor: string | null;
   whenLabel: string;
   venue: string | null;
+  area: string | null;
+  ticketBadge: string;
   addressHidden: boolean;
   location: string | null;
   hostName: string;
@@ -43,10 +45,11 @@ interface Props {
   onCta: () => void;
   reminder?: ReactNode;
   hostShare?: ReactNode;
+  details?: ReactNode;
 }
 
 export function PublicEventScreen({
-  model, onBack, onSave, onShare, onLocation, onGuestlist, onFollow, following, onCalendar, onContact, onReport, onCta, reminder, hostShare,
+  model, onBack, onSave, onShare, onLocation, onGuestlist, onFollow, following, onCalendar, onContact, onReport, onCta, reminder, hostShare, details,
 }: Props) {
   const ctaStyle = model.brandColor ? { backgroundColor: model.brandColor, color: "#1a1020" } : undefined;
   return (
@@ -71,15 +74,18 @@ export function PublicEventScreen({
 
       <div className="relative z-10 -mt-16 space-y-5 px-4 pb-28">
         <h1 className="text-4xl leading-none" style={{ fontFamily: flyerFontFamily(model.fontId) }}>{model.title}</h1>
+        <span className="inline-flex rounded-full border border-border/70 bg-card px-3 py-1 text-xs font-medium">{model.ticketBadge}</span>
         {hostShare}
         <p className="text-sm text-muted-foreground">{model.whenLabel}</p>
         {model.venue && <p className="text-base">{model.venue}</p>}
+        {model.area && <p className="text-sm text-muted-foreground">{model.area}</p>}
         <button type="button" className="inline-flex items-center gap-2 text-sm text-primary" onClick={onLocation}>
           <MapPin className="h-4 w-4" />
           {model.addressHidden && !model.location ? "Hidden until you RSVP" : "View location"}
         </button>
         {model.location && <p className="text-sm text-muted-foreground">{model.location}</p>}
         {model.summary && <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">{model.summary}</p>}
+        {details}
 
         <button type="button" onClick={onGuestlist} className="flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-card px-3 py-3 text-left">
           <div className="flex -space-x-2">

@@ -21,6 +21,8 @@ const event: PublicEventModel = {
   brandColor: "#ffb3d1",
   whenLabel: "Sat, Nov 1 · 7:00 PM – 10:00 PM",
   venue: "The loft",
+  area: "Brooklyn, NY",
+  ticketBadge: "Tickets from $20.91",
   addressHidden: true,
   location: null,
   hostName: "Ada Lane",

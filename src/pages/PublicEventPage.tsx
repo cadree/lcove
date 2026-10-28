@@ -12,7 +12,8 @@ import { BackButton } from "@/components/navigation/BackButton";
 import { formatEventDate, formatEventTime } from "@/lib/eventTime";
 import { backTarget } from "@/lib/goBack";
 import { lowestBuyerCents } from "@/lib/ticketFees";
-import { stickyCtaLabel } from "@/lib/guestEvent";
+import { eventIsFree, generalAreaLabel, publicTicketBadge, stickyCtaLabel } from "@/lib/guestEvent";
+import { EventMoodboardView } from "@/components/calendar/EventMoodboardView";
 import { EventReminderToggle } from "@/components/events/EventReminderToggle";
 import { shareEventLink } from "@/lib/shareLink";
 import { PageMeta } from "@/components/seo/PageMeta";
@@ -112,7 +113,8 @@ export default function PublicEventPage() {
   const model = useMemo(() => {
     if (!event) return null;
     const absorb = event.absorb_fees === true;
-    const paid = tiers.some((tier) => (tier.price_cents || 0) > 0);
+    const paidTier = tiers.some((tier) => (tier.price_cents || 0) > 0);
+    const free = eventIsFree(event.ticket_type, paidTier);
     const from = lowestBuyerCents(tiers, absorb);
     const end = event.end_date || event.start_date;
     return {
@@ -124,6 +126,13 @@ export default function PublicEventPage() {
       brandColor: branding?.brand_color || null,
       whenLabel: `${formatEventDate(event.start_date, event.timezone)} · ${formatEventTime(event.start_date, event.timezone)}${event.end_date ? ` – ${formatEventTime(event.end_date, event.timezone)}` : ""}`,
       venue: event.venue,
+      area: generalAreaLabel(event.city, event.state),
+      ticketBadge: publicTicketBadge({
+        ticketType: event.ticket_type,
+        free,
+        fromCents: paidTier ? from : null,
+        creditsPrice: event.credits_price,
+      }),
       addressHidden: event.hide_address === true,
       location,
       hostName: branding?.organizer_name || host?.display_name || "Host",
@@ -133,7 +142,7 @@ export default function PublicEventPage() {
       guestNames: preview?.names || [],
       guestAvatars: preview?.avatars || [],
       going: going || 0,
-      cta: stickyCtaLabel(paid ? from : 0, !paid),
+      cta: stickyCtaLabel(free ? 0 : from, free),
       saved,
       past: new Date(end) < new Date(),
     };
@@ -237,6 +246,7 @@ export default function PublicEventPage() {
         onReport={() => setReportOpen(true)}
         onCta={() => navigate(`${returnPath}/tickets`)}
         reminder={model.past ? null : <EventReminderToggle eventId={event.id} />}
+        details={<EventMoodboardView eventId={event.id} />}
       />
       <Dialog open={guestsOpen} onOpenChange={setGuestsOpen}>
         <DialogContent>

@@ -15,6 +15,9 @@ export interface PublicEventRecord {
   city: string | null;
   state: string | null;
   image_url: string | null;
+  ticket_type?: string | null;
+  ticket_price?: number | null;
+  credits_price?: number | null;
   timezone: string | null;
   flyer_font?: string | null;
   page_theme?: string | null;
