@@ -102,11 +102,11 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
 
         <div className="space-y-4">
           {/* Toggle between DM and Group */}
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               variant={!isGroup ? 'default' : 'outline'}
               size="sm"
-              className="flex-1"
+              className="w-full sm:flex-1"
               onClick={() => {
                 setIsGroup(false);
                 if (selectedUsers.length > 1) {
@@ -119,7 +119,7 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
             <Button
               variant={isGroup ? 'default' : 'outline'}
               size="sm"
-              className="flex-1 gap-2"
+              className="w-full gap-2 sm:flex-1"
               onClick={() => setIsGroup(true)}
             >
               <Users className="w-4 h-4" />

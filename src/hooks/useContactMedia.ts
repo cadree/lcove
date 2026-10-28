@@ -73,12 +73,16 @@ export function useContactMedia(pipelineItemId: string | null) {
 
   const updateNotes = useMutation({
     mutationFn: async ({ mediaId, notes }: { mediaId: string; notes: string }) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('contact_media')
         .update({ notes })
-        .eq('id', mediaId);
+        .eq('id', mediaId)
+        .select('id, notes');
       
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('Notes were not saved');
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contact-media', pipelineItemId] });

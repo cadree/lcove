@@ -1,5 +1,5 @@
-import { useState, forwardRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, forwardRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,17 +7,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, Users, Calendar, GraduationCap, Building2, Briefcase, Heart, Crown, ArrowRight, Wallet, CheckCircle2, PiggyBank, RefreshCw, DollarSign } from "lucide-react";
+import { Users, Calendar, GraduationCap, Building2, Briefcase, Heart, Crown, ArrowRight, Wallet, CheckCircle2, PiggyBank, RefreshCw } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useMembership } from "@/hooks/useMembership";
+import { useIosExternalCheckout } from "@/hooks/useIosExternalCheckout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFundStats } from "@/hooks/useFundStats";
 import { RecentDistributionsCard } from "@/components/fund/FundDistributions";
 import { DonateDialog } from "@/components/fund/DonateDialog";
+import { SUPPORT_IN_SAFARI_LABEL, SUPPORT_NOW_LABEL } from "@/lib/supportCopy";
 import { IosDigitalGoodsNotice } from "@/components/ios/IosDigitalGoodsNotice";
-import { IOS_DONATIONS_ENABLED, isIosApp } from "@/lib/platform";
+import { IOS_DONATIONS_ENABLED, digitalPurchasesEnabled, isIosApp } from "@/lib/platform";
 import { toast } from "sonner";
+import { SquircleIcon, iconFills } from "@/components/world/SquircleIcon";
+import { formatAxisDollars } from "@/lib/formatAxisDollars";
+import { PageMeta } from "@/components/seo/PageMeta";
 
 const ALLOCATION_DATA = [
   { name: "Community Grants", key: "communityGrants", color: "hsl(330, 100%, 71%)", icon: Users, description: "Direct support for creative projects and artist grants" },
@@ -109,12 +114,28 @@ export default function FundDashboard() {
   const [view, setView] = useState<"lifetime" | "monthly">("lifetime");
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { membership, isLoading: membershipLoading, startCheckout, openCustomerPortal } = useMembership();
+  const { membership, isLoading: membershipLoading, checkMembership, openCustomerPortal } = useMembership();
+  const [searchParams] = useSearchParams();
+  const { linkOut } = useIosExternalCheckout();
   const { data: fundStats, isLoading: fundLoading, isError: fundFailed, refetch, isFetching } = useFundStats();
   const fundEmpty = !fundLoading && !fundFailed && (fundStats?.lifetime.totalCollected ?? 0) === 0 && (fundStats?.lifetime.totalDistributed ?? 0) === 0 && (fundStats?.recentDistributions.length ?? 0) === 0;
   
   const iosApp = isIosApp();
-  const showDonations = !iosApp || IOS_DONATIONS_ENABLED;
+  const showDonations = !iosApp || IOS_DONATIONS_ENABLED || linkOut;
+  const hideDigitalPurchases = !digitalPurchasesEnabled() && !linkOut;
+
+  useEffect(() => {
+    const donated = searchParams.get("donated") === "true";
+    const cancelled = searchParams.get("cancelled") === "true";
+    if (!donated && !cancelled) return;
+    if (cancelled) {
+      toast.info("Support was cancelled");
+      return;
+    }
+    toast.success("Thank you. Your support shows here after Stripe confirms it.");
+    void checkMembership();
+    void refetch();
+  }, [searchParams, checkMembership, refetch]);
   const stats = view === "lifetime" ? fundStats?.lifetime : fundStats?.monthly;
   const isMember = membership?.subscribed;
 
@@ -123,6 +144,7 @@ export default function FundDashboard() {
     ...item,
     value: fundStats?.allocations?.[item.key as keyof typeof fundStats.allocations] || 0,
   }));
+  const allocationTotal = pieChartData.reduce((sum, item) => sum + item.value, 0);
 
   const handleContribute = async () => {
     if (!user) {
@@ -151,25 +173,27 @@ export default function FundDashboard() {
 
   return (
     <PageLayout>
+      <PageMeta title="Fund · Ether" description="Community fund activity, updated in real time." />
       <div className="min-h-screen bg-background">
         <div className="max-w-6xl mx-auto px-4 py-8 pb-24">
           {/* Hero Section */}
           <PageHeader
-            title="Community Fund"
-            description="Every dollar, every decision, fully visible. See exactly how community contributions fuel creative dreams."
-            icon={<PiggyBank className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
-            className="mb-8"
+            eyebrow="Neo gold"
+            title="Fund"
+            description="Every dollar, every decision, fully visible."
+            icon={<PiggyBank className="w-5 h-5" />}
+            tile="gold"
+            className="mb-6"
           />
 
-          {/* View Toggle with Refresh */}
-          <div className="flex justify-center items-center gap-4 mb-8">
+          <div className="mb-6 flex items-center gap-3">
             <Tabs value={view} onValueChange={(v) => setView(v as "lifetime" | "monthly")} className="w-auto">
-              <TabsList className="bg-card/50 backdrop-blur-sm border border-border">
-                <TabsTrigger value="lifetime" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsList className="h-auto gap-1 rounded-none border-0 bg-transparent p-0">
+                <TabsTrigger value="lifetime" className="mono-label h-11 rounded-none border-0 border-b-2 border-transparent text-[11px] shadow-none data-[state=active]:border-[hsl(var(--bubble))] data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">
                   Lifetime
                 </TabsTrigger>
-                <TabsTrigger value="monthly" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  This Month
+                <TabsTrigger value="monthly" className="mono-label h-11 rounded-none border-0 border-b-2 border-transparent text-[11px] shadow-none data-[state=active]:border-[hsl(var(--bubble))] data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">
+                  This month
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -212,61 +236,23 @@ export default function FundDashboard() {
             transition={{ duration: 0.4 }}
             className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12"
           >
-            <Card className="bg-gradient-to-br from-primary/20 to-primary/5 border-primary/20 overflow-hidden relative">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-primary/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-              <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground mb-1">Total Collected</p>
+            {[
+              ["// Collected", stats?.totalCollected || 0, "$"],
+              ["// Distributed", stats?.totalDistributed || 0, "$"],
+              ["// Grants", stats?.grantsAwarded || 0, ""],
+              ["// Creators", stats?.creatorsSupported || 0, ""],
+            ].map(([label, value, prefix]) => (
+              <div key={String(label)} className="file-panel px-4 py-4">
+                <p className="kicker">{label}</p>
                 {fundLoading ? (
-                  <Skeleton className="h-8 w-24" />
+                  <Skeleton className="mt-2 h-8 w-24" />
                 ) : (
-                  <p className="text-2xl md:text-3xl font-bold text-foreground">
-                    <AnimatedNumber value={stats?.totalCollected || 0} prefix="$" />
+                  <p className="ether-title mt-2 text-[28px] text-foreground">
+                    <AnimatedNumber value={Number(value)} prefix={String(prefix)} />
                   </p>
                 )}
-              </CardContent>
-            </Card>
-
-            <Card className="bg-card/50 backdrop-blur-sm border-border overflow-hidden relative">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-secondary/20 rounded-full -translate-y-1/2 translate-x-1/2" />
-              <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground mb-1">Distributed</p>
-                {fundLoading ? (
-                  <Skeleton className="h-8 w-24" />
-                ) : (
-                  <p className="text-2xl md:text-3xl font-bold text-foreground">
-                    <AnimatedNumber value={stats?.totalDistributed || 0} prefix="$" />
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="bg-card/50 backdrop-blur-sm border-border overflow-hidden relative">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-secondary/20 rounded-full -translate-y-1/2 translate-x-1/2" />
-              <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground mb-1">Grants Awarded</p>
-                {fundLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  <p className="text-2xl md:text-3xl font-bold text-foreground">
-                    <AnimatedNumber value={stats?.grantsAwarded || 0} />
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="bg-card/50 backdrop-blur-sm border-border overflow-hidden relative">
-              <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground mb-1">Creators Supported</p>
-                {fundLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  <p className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
-                    <AnimatedNumber value={stats?.creatorsSupported || 0} />
-                    <Heart className="w-5 h-5 text-primary fill-primary" />
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+              </div>
+            ))}
           </motion.div>
 
           {/* Charts Section */}
@@ -277,15 +263,21 @@ export default function FundDashboard() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <Card className="bg-card/50 backdrop-blur-sm border-border h-full">
+              <Card className="border-border bg-card h-full">
                 <CardHeader>
-                  <CardTitle className="text-xl font-serif flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-primary" />
-                    Allocation Breakdown
-                  </CardTitle>
+                  <p className="kicker">// Allocation</p>
+                  <CardTitle className="ether-title text-[22px]">Breakdown</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-[300px]">
+                    {!fundLoading && allocationTotal <= 0 ? (
+                      <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+                        <p className="font-medium text-foreground">No allocations yet</p>
+                        <p className="mt-1 max-w-[240px] text-sm text-muted-foreground">
+                          Distributions will appear here once the fund pays out.
+                        </p>
+                      </div>
+                    ) : (
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -310,6 +302,7 @@ export default function FundDashboard() {
                         <Tooltip content={<PieTooltip />} />
                       </PieChart>
                     </ResponsiveContainer>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -321,12 +314,10 @@ export default function FundDashboard() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <Card className="bg-card/50 backdrop-blur-sm border-border h-full">
+              <Card className="border-border bg-card h-full">
                 <CardHeader>
-                  <CardTitle className="text-xl font-serif flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-primary" />
-                    6-Month Trend
-                  </CardTitle>
+                  <p className="kicker">// Trend</p>
+                  <CardTitle className="ether-title text-[22px]">Six months</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-[300px]">
@@ -347,7 +338,7 @@ export default function FundDashboard() {
                             axisLine={false} 
                             tickLine={false}
                             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                            tickFormatter={(value) => `$${value / 1000}k`}
+                            tickFormatter={(value) => formatAxisDollars(Number(value))}
                           />
                           <Tooltip content={<CustomTooltip />} />
                           <Legend 
@@ -383,9 +374,10 @@ export default function FundDashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <Card className="bg-card/50 backdrop-blur-sm border-border">
+            <Card className="border-border bg-card">
               <CardHeader>
-                <CardTitle className="text-xl font-serif">Where Your Contribution Goes</CardTitle>
+                <p className="kicker">// File</p>
+                <CardTitle className="ether-title text-[22px]">Where it goes</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4">
@@ -401,10 +393,10 @@ export default function FundDashboard() {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.1 * index }}
-                        className="flex items-center gap-4 p-4 rounded-xl bg-background/50 hover:bg-background/80 transition-colors"
+                        className="flex items-start gap-3 p-3 sm:gap-4 sm:p-4 rounded-xl bg-background/50 hover:bg-background/80 transition-colors"
                       >
                         <div 
-                          className="w-12 h-12 rounded-xl flex items-center justify-center"
+                          className="w-12 h-12 shrink-0 rounded-xl flex items-center justify-center"
                           style={{ backgroundColor: `${item.color}20` }}
                         >
                           <Icon className="w-6 h-6" style={{ color: item.color }} />
@@ -413,9 +405,9 @@ export default function FundDashboard() {
                           <div className="flex items-center gap-2 mb-1">
                             <h3 className="font-medium text-foreground">{item.name}</h3>
                           </div>
-                          <p className="text-sm text-muted-foreground truncate">{item.description}</p>
+                          <p className="text-sm text-muted-foreground whitespace-normal">{item.description}</p>
                         </div>
-                        <div className="text-right">
+                        <div className="shrink-0 text-right whitespace-nowrap">
                           {fundLoading ? (
                             <Skeleton className="h-6 w-20" />
                           ) : (
@@ -455,12 +447,10 @@ export default function FundDashboard() {
           >
             {isMember ? (
               /* Member Impact Card */
-              <Card className="bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border-primary/30 overflow-hidden">
+              <Card className="overflow-hidden">
                 <CardContent className="p-6 md:p-8">
                   <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                      <CheckCircle2 className="w-5 h-5 text-primary" />
-                    </div>
+                    <SquircleIcon icon={CheckCircle2} fill="green" size={40} />
                     <div>
                       <h3 className="font-display text-lg font-medium text-foreground">Your Impact</h3>
                       <p className="text-sm text-muted-foreground">Thank you for being a member</p>
@@ -496,56 +486,53 @@ export default function FundDashboard() {
                   </div>
 
                   <div className="flex flex-wrap items-center justify-between gap-4">
+                    {membership?.grant_eligible && (
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <Heart className="w-4 h-4 text-primary fill-primary" />
-                      You're part of {stats?.memberCount || 0}+ members building this community
-                      {membership?.grant_eligible && (
-                        <Badge variant="secondary" className="bg-primary/10 text-primary border-0 ml-2">
-                          Grant Eligible
-                        </Badge>
-                      )}
+                      <Badge variant="secondary" className="bg-primary/10 text-primary border-0">
+                        Grant Eligible
+                      </Badge>
                     </div>
+                    )}
                     <div className="flex flex-wrap gap-2">
                       {showDonations ? (
                       <DonateDialog>
                         <Button variant="default" size="sm">
                           <Heart className="w-3.5 h-3.5 mr-1.5" />
-                          Extra Donation
+                          {linkOut ? "Extra support in Safari" : "Extra support"}
                         </Button>
                       </DonateDialog>
                       ) : (
                         <IosDigitalGoodsNotice kind="donation" className="max-w-xs" />
                       )}
-                      {!iosApp && (
+                      {!hideDigitalPurchases && (
                         <Button variant="outline" size="sm" onClick={handleManageSubscription}>
-                          Manage Subscription
+                          {linkOut ? "Manage in Safari" : "Manage Subscription"}
                         </Button>
                       )}
-                      <IosDigitalGoodsNotice kind="billing" />
+                      {hideDigitalPurchases && <IosDigitalGoodsNotice kind="billing" />}
                     </div>
                   </div>
                 </CardContent>
               </Card>
             ) : (
               /* Non-Member CTA */
-              <Card className="bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border-primary/30 overflow-hidden">
+              <Card className="overflow-hidden">
                 <CardContent className="p-6 md:p-8">
                   <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
-                        <Crown className="w-8 h-8 text-primary-foreground" />
-                      </div>
+                      <SquircleIcon icon={Crown} fill="gold" size={54} glyph={28} />
                       <div>
                         <h3 className="font-display text-xl font-medium text-foreground mb-1">
-                          Support the Community
+                          Support Ether
                         </h3>
                         <p className="text-muted-foreground max-w-md">
-                          Join {fundStats?.lifetime.memberCount || 0}+ members funding grants, events, and creative opportunities.{" "}
-                          {iosApp
+                          {linkOut
+                            ? "Support once or subscribe monthly. Checkout opens in Safari."
+                            : hideDigitalPurchases
                             ? showDonations
-                              ? "Membership checkout is not available in the iOS app. You can still donate."
+                              ? "Membership checkout is not available in the iOS app. You can still support."
                               : "Membership checkout is not available in the iOS app."
-                            : "Donate once or subscribe monthly — no account required."}
+                            : "Support once or subscribe monthly — no account required."}
                         </p>
                       </div>
                     </div>
@@ -553,14 +540,14 @@ export default function FundDashboard() {
                       {showDonations ? (
                       <DonateDialog>
                         <Button size="lg" className="group">
-                          Donate Now
+                          {linkOut ? SUPPORT_IN_SAFARI_LABEL : SUPPORT_NOW_LABEL}
                           <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                         </Button>
                       </DonateDialog>
                       ) : (
                         <IosDigitalGoodsNotice kind="donation" className="max-w-xs" />
                       )}
-                      {iosApp ? (
+                      {hideDigitalPurchases ? (
                         <IosDigitalGoodsNotice className="max-w-xs" />
                       ) : (
                       <Button 
@@ -595,9 +582,9 @@ export default function FundDashboard() {
             transition={{ delay: 0.55 }}
             className="mt-8"
           >
-            <Card className="bg-card/50 backdrop-blur-sm border-border">
+            <Card className="border-border bg-card">
               <CardHeader>
-                <CardTitle className="text-xl font-serif flex items-center gap-2">
+                <CardTitle className="text-xl ether-title flex items-center gap-2">
                   <Wallet className="w-5 h-5 text-primary" />
                   How the Fund Works
                 </CardTitle>
@@ -608,29 +595,16 @@ export default function FundDashboard() {
                   Unlike traditional platforms that extract value, every dollar contributed here 
                   goes directly back into supporting creators.
                 </p>
-                <div className="grid md:grid-cols-3 gap-4 pt-2">
+                <div className="grid md:grid-cols-2 gap-4 pt-2">
                   <div className="p-4 rounded-xl bg-background/50">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center mb-3">
-                      <span className="text-primary font-bold">1</span>
-                    </div>
+                    <span className="squircle-icon mb-3 font-body text-sm font-extrabold" style={{ width: 32, height: 32, backgroundImage: iconFills.gold, color: "#0A0A0A" }}>1</span>
                     <h4 className="font-medium text-foreground mb-1">Members Contribute</h4>
                     <p className="text-sm text-muted-foreground">
                       Monthly contributions from members pool together
                     </p>
                   </div>
                   <div className="p-4 rounded-xl bg-background/50">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center mb-3">
-                      <span className="text-primary font-bold">2</span>
-                    </div>
-                    <h4 className="font-medium text-foreground mb-1">Community Decides</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Allocation priorities set by member voting
-                    </p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-background/50">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center mb-3">
-                      <span className="text-primary font-bold">3</span>
-                    </div>
+                    <span className="squircle-icon mb-3 font-body text-sm font-extrabold" style={{ width: 32, height: 32, backgroundImage: iconFills.gold, color: "#0A0A0A" }}>2</span>
                     <h4 className="font-medium text-foreground mb-1">Creators Benefit</h4>
                     <p className="text-sm text-muted-foreground">
                       Funds distributed to grants, events, and programs
@@ -650,7 +624,7 @@ export default function FundDashboard() {
           >
             <p className="text-muted-foreground text-sm flex items-center justify-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500" />
-              Updated in real-time • Audited quarterly • Community-governed decisions
+              Updated in real-time
             </p>
           </motion.div>
         </div>

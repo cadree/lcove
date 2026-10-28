@@ -1583,6 +1583,7 @@ export type Database = {
           join_requests_enabled: boolean | null
           max_members: number | null
           name: string | null
+          parent_conversation_id: string | null
           project_id: string | null
           topic: string | null
           type: string
@@ -1602,6 +1603,7 @@ export type Database = {
           join_requests_enabled?: boolean | null
           max_members?: number | null
           name?: string | null
+          parent_conversation_id?: string | null
           project_id?: string | null
           topic?: string | null
           type: string
@@ -1621,6 +1623,7 @@ export type Database = {
           join_requests_enabled?: boolean | null
           max_members?: number | null
           name?: string | null
+          parent_conversation_id?: string | null
           project_id?: string | null
           topic?: string | null
           type?: string
@@ -2294,6 +2297,7 @@ export type Database = {
           notes: string | null
           order_id: string | null
           qr_code: string
+          reminder_enabled: boolean
           status: string
           ticket_number: string
           tier_id: string | null
@@ -2311,6 +2315,7 @@ export type Database = {
           notes?: string | null
           order_id?: string | null
           qr_code?: string
+          reminder_enabled?: boolean
           status?: string
           ticket_number?: string
           tier_id?: string | null
@@ -2328,6 +2333,7 @@ export type Database = {
           notes?: string | null
           order_id?: string | null
           qr_code?: string
+          reminder_enabled?: boolean
           status?: string
           ticket_number?: string
           tier_id?: string | null
@@ -2639,6 +2645,7 @@ export type Database = {
       }
       event_rsvps: {
         Row: {
+          campaign_id: string | null
           confirmation_sent_at: string | null
           created_at: string
           credits_spent: number | null
@@ -2647,6 +2654,8 @@ export type Database = {
           guest_name: string | null
           guest_phone: string | null
           id: string
+          nearby_events_consent: boolean
+          nearby_events_consent_at: string | null
           reminder_enabled: boolean | null
           status: string
           stripe_payment_id: string | null
@@ -2655,6 +2664,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          campaign_id?: string | null
           confirmation_sent_at?: string | null
           created_at?: string
           credits_spent?: number | null
@@ -2663,6 +2673,8 @@ export type Database = {
           guest_name?: string | null
           guest_phone?: string | null
           id?: string
+          nearby_events_consent?: boolean
+          nearby_events_consent_at?: string | null
           reminder_enabled?: boolean | null
           status?: string
           stripe_payment_id?: string | null
@@ -2671,6 +2683,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          campaign_id?: string | null
           confirmation_sent_at?: string | null
           created_at?: string
           credits_spent?: number | null
@@ -2679,6 +2692,8 @@ export type Database = {
           guest_name?: string | null
           guest_phone?: string | null
           id?: string
+          nearby_events_consent?: boolean
+          nearby_events_consent_at?: string | null
           reminder_enabled?: boolean | null
           status?: string
           stripe_payment_id?: string | null
@@ -2720,12 +2735,22 @@ export type Database = {
           start_date: string
           state: string | null
           status: string | null
+          slug: string | null
           ticket_price: number | null
           ticket_type: string
           timezone: string | null
           title: string
           updated_at: string
           venue: string | null
+          video_url: string | null
+          flyer_font: string | null
+          page_theme: string
+          hide_address: boolean
+          absorb_fees: boolean
+          allow_transfers: boolean
+          password_protected: boolean
+          features: string[]
+          hide_host_notes: boolean
           waitlist_enabled: boolean
         }
         Insert: {
@@ -2751,12 +2776,22 @@ export type Database = {
           start_date: string
           state?: string | null
           status?: string | null
+          slug?: string | null
           ticket_price?: number | null
           ticket_type?: string
           timezone?: string | null
           title: string
           updated_at?: string
           venue?: string | null
+          video_url?: string | null
+          flyer_font?: string | null
+          page_theme?: string
+          hide_address?: boolean
+          absorb_fees?: boolean
+          allow_transfers?: boolean
+          password_protected?: boolean
+          features?: string[]
+          hide_host_notes?: boolean
           waitlist_enabled?: boolean
         }
         Update: {
@@ -2782,12 +2817,22 @@ export type Database = {
           start_date?: string
           state?: string | null
           status?: string | null
+          slug?: string | null
           ticket_price?: number | null
           ticket_type?: string
           timezone?: string | null
           title?: string
           updated_at?: string
           venue?: string | null
+          video_url?: string | null
+          flyer_font?: string | null
+          page_theme?: string
+          hide_address?: boolean
+          absorb_fees?: boolean
+          allow_transfers?: boolean
+          password_protected?: boolean
+          features?: string[]
+          hide_host_notes?: boolean
           waitlist_enabled?: boolean
         }
         Relationships: [
@@ -3510,6 +3555,7 @@ export type Database = {
           event_type: string | null
           external_url: string | null
           host_id: string
+          host_seen_at: string | null
           id: string
           is_live: boolean | null
           is_virtual_event: boolean | null
@@ -3539,6 +3585,7 @@ export type Database = {
           event_type?: string | null
           external_url?: string | null
           host_id: string
+          host_seen_at?: string | null
           id?: string
           is_live?: boolean | null
           is_virtual_event?: boolean | null
@@ -3568,6 +3615,7 @@ export type Database = {
           event_type?: string | null
           external_url?: string | null
           host_id?: string
+          host_seen_at?: string | null
           id?: string
           is_live?: boolean | null
           is_virtual_event?: boolean | null
@@ -3778,6 +3826,11 @@ export type Database = {
           media_url: string | null
           reply_to_id: string | null
           sender_id: string
+          shared_from_conversation_id: string | null
+          shared_from_message_id: string | null
+          shared_post_id: string | null
+          shared_profile_id: string | null
+          shared_story_id: string | null
           updated_at: string
         }
         Insert: {
@@ -3790,6 +3843,11 @@ export type Database = {
           media_url?: string | null
           reply_to_id?: string | null
           sender_id: string
+          shared_from_conversation_id?: string | null
+          shared_from_message_id?: string | null
+          shared_post_id?: string | null
+          shared_profile_id?: string | null
+          shared_story_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -3802,6 +3860,11 @@ export type Database = {
           media_url?: string | null
           reply_to_id?: string | null
           sender_id?: string
+          shared_from_conversation_id?: string | null
+          shared_from_message_id?: string | null
+          shared_post_id?: string | null
+          shared_profile_id?: string | null
+          shared_story_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -4199,12 +4262,14 @@ export type Database = {
           recipient_phone: string | null
           sent_at: string | null
           status: string
+          track_token: string | null
           type: string
           user_id: string | null
         }
         Insert: {
           campaign_id?: string | null
           channel: string
+          track_token?: string | null
           clicked_at?: string | null
           created_at?: string
           error_message?: string | null
@@ -4269,6 +4334,7 @@ export type Database = {
           live_streams_enabled: boolean | null
           messages_enabled: boolean | null
           new_events_enabled: boolean | null
+          new_gigs_enabled: boolean | null
           new_projects_enabled: boolean | null
           project_invites_enabled: boolean | null
           push_enabled: boolean | null
@@ -4289,6 +4355,7 @@ export type Database = {
           live_streams_enabled?: boolean | null
           messages_enabled?: boolean | null
           new_events_enabled?: boolean | null
+          new_gigs_enabled?: boolean | null
           new_projects_enabled?: boolean | null
           project_invites_enabled?: boolean | null
           push_enabled?: boolean | null
@@ -4309,6 +4376,7 @@ export type Database = {
           live_streams_enabled?: boolean | null
           messages_enabled?: boolean | null
           new_events_enabled?: boolean | null
+          new_gigs_enabled?: boolean | null
           new_projects_enabled?: boolean | null
           project_invites_enabled?: boolean | null
           push_enabled?: boolean | null
@@ -5199,6 +5267,35 @@ export type Database = {
           },
         ]
       }
+      post_views: {
+        Row: {
+          created_at: string
+          post_id: string
+          viewed_on: string
+          viewer_id: string
+        }
+        Insert: {
+          created_at?: string
+          post_id: string
+          viewed_on: string
+          viewer_id: string
+        }
+        Update: {
+          created_at?: string
+          post_id?: string
+          viewed_on?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_views_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posts: {
         Row: {
           alt_text: string | null
@@ -5206,6 +5303,11 @@ export type Database = {
           comments_enabled: boolean | null
           content: string | null
           created_at: string
+          embed_hash: string | null
+          embed_provider: string | null
+          embed_thumbnail_url: string | null
+          embed_title: string | null
+          embed_video_id: string | null
           folder_id: string | null
           id: string
           location: string | null
@@ -5220,6 +5322,11 @@ export type Database = {
           comments_enabled?: boolean | null
           content?: string | null
           created_at?: string
+          embed_hash?: string | null
+          embed_provider?: string | null
+          embed_thumbnail_url?: string | null
+          embed_title?: string | null
+          embed_video_id?: string | null
           folder_id?: string | null
           id?: string
           location?: string | null
@@ -5234,6 +5341,11 @@ export type Database = {
           comments_enabled?: boolean | null
           content?: string | null
           created_at?: string
+          embed_hash?: string | null
+          embed_provider?: string | null
+          embed_thumbnail_url?: string | null
+          embed_title?: string | null
+          embed_video_id?: string | null
           folder_id?: string | null
           id?: string
           location?: string | null
@@ -5372,10 +5484,14 @@ export type Database = {
           city_key: string | null
           created_at: string | null
           display_name: string | null
+          founding: boolean
           gender: string | null
+          signup_src: string | null
+          signup_ref: string | null
           id: string
           interests: string[] | null
           is_suspended: boolean | null
+          deleted_at: string | null
           last_active_at: string | null
           mindset_level: number | null
           onboarding_completed: boolean | null
@@ -5389,9 +5505,16 @@ export type Database = {
           social_links: Json | null
           stripe_connect_account_id: string | null
           suspended_at: string | null
+          signup_attribution: Json | null
           suspension_reason: string | null
           updated_at: string | null
           user_id: string
+          username: string | null
+          birthday_month: number | null
+          birthday_day: number | null
+          show_birthday: boolean
+          member_of: string | null
+          passion_title: string | null
         }
         Insert: {
           access_level?: Database["public"]["Enums"]["access_level"] | null
@@ -5404,6 +5527,7 @@ export type Database = {
           city_key?: string | null
           created_at?: string | null
           display_name?: string | null
+          founding?: boolean
           gender?: string | null
           id?: string
           interests?: string[] | null
@@ -5418,12 +5542,21 @@ export type Database = {
           phone?: string | null
           region_country?: string | null
           region_state?: string | null
+          signup_attribution?: Json | null
+          signup_ref?: string | null
+          signup_src?: string | null
           social_links?: Json | null
           stripe_connect_account_id?: string | null
           suspended_at?: string | null
           suspension_reason?: string | null
           updated_at?: string | null
           user_id: string
+          username?: string | null
+          birthday_month?: number | null
+          birthday_day?: number | null
+          show_birthday?: boolean
+          member_of?: string | null
+          passion_title?: string | null
         }
         Update: {
           access_level?: Database["public"]["Enums"]["access_level"] | null
@@ -5450,12 +5583,22 @@ export type Database = {
           phone?: string | null
           region_country?: string | null
           region_state?: string | null
+          signup_attribution?: Json | null
+          signup_ref?: string | null
+          signup_src?: string | null
           social_links?: Json | null
           stripe_connect_account_id?: string | null
           suspended_at?: string | null
           suspension_reason?: string | null
           updated_at?: string | null
           user_id?: string
+          founding?: boolean
+          username?: string | null
+          birthday_month?: number | null
+          birthday_day?: number | null
+          show_birthday?: boolean
+          member_of?: string | null
+          passion_title?: string | null
         }
         Relationships: []
       }
@@ -5814,6 +5957,7 @@ export type Database = {
           description: string | null
           id: string
           is_locked: boolean
+          credit_amount: number
           payout_amount: number
           project_id: string
           role_name: string
@@ -5822,6 +5966,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          credit_amount?: number
           description?: string | null
           id?: string
           is_locked?: boolean
@@ -5833,6 +5978,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          credit_amount?: number
           description?: string | null
           id?: string
           is_locked?: boolean
@@ -5897,9 +6043,11 @@ export type Database = {
           description: string | null
           equipment_needed: string | null
           expected_outcome: string | null
+          hide_from_calendar: boolean
           id: string
           is_moodboard_public: boolean
           is_private: boolean
+          listing_type: string
           location_secured: boolean
           progress_percent: number
           props_needed: string | null
@@ -5925,9 +6073,11 @@ export type Database = {
           description?: string | null
           equipment_needed?: string | null
           expected_outcome?: string | null
+          hide_from_calendar?: boolean
           id?: string
           is_moodboard_public?: boolean
           is_private?: boolean
+          listing_type?: string
           location_secured?: boolean
           progress_percent?: number
           props_needed?: string | null
@@ -5953,9 +6103,11 @@ export type Database = {
           description?: string | null
           equipment_needed?: string | null
           expected_outcome?: string | null
+          hide_from_calendar?: boolean
           id?: string
           is_moodboard_public?: boolean
           is_private?: boolean
+          listing_type?: string
           location_secured?: boolean
           progress_percent?: number
           props_needed?: string | null
@@ -6113,6 +6265,38 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      reposts: {
+        Row: {
+          caption: string | null
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reposts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       saved_posts: {
         Row: {
@@ -6375,6 +6559,11 @@ export type Database = {
           tax_line_label: string | null
           updated_at: string
           user_id: string
+          website_url: string | null
+          import_status: string | null
+          import_error: string | null
+          import_count: number | null
+          imported_at: string | null
         }
         Insert: {
           accepts_cash?: boolean | null
@@ -6397,6 +6586,11 @@ export type Database = {
           tax_line_label?: string | null
           updated_at?: string
           user_id: string
+          website_url?: string | null
+          import_status?: string | null
+          import_error?: string | null
+          import_count?: number | null
+          imported_at?: string | null
         }
         Update: {
           accepts_cash?: boolean | null
@@ -6419,6 +6613,11 @@ export type Database = {
           tax_line_label?: string | null
           updated_at?: string
           user_id?: string
+          website_url?: string | null
+          import_status?: string | null
+          import_error?: string | null
+          import_count?: number | null
+          imported_at?: string | null
         }
         Relationships: []
       }
@@ -6426,28 +6625,34 @@ export type Database = {
         Row: {
           created_at: string
           expires_at: string
+          credit_user_id: string | null
           id: string
           is_live: boolean | null
           media_type: string
           media_url: string
+          source_post_id: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
+          credit_user_id?: string | null
           expires_at?: string
           id?: string
           is_live?: boolean | null
           media_type: string
           media_url: string
+          source_post_id?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
+          credit_user_id?: string | null
           expires_at?: string
           id?: string
           is_live?: boolean | null
           media_type?: string
           media_url?: string
+          source_post_id?: string | null
           user_id?: string
         }
         Relationships: []
@@ -6601,6 +6806,7 @@ export type Database = {
         Row: {
           id: string
           joined_at: string
+          last_seen: string
           left_at: string | null
           stream_id: string
           viewer_id: string
@@ -6608,6 +6814,7 @@ export type Database = {
         Insert: {
           id?: string
           joined_at?: string
+          last_seen?: string
           left_at?: string | null
           stream_id: string
           viewer_id: string
@@ -6615,6 +6822,7 @@ export type Database = {
         Update: {
           id?: string
           joined_at?: string
+          last_seen?: string
           left_at?: string | null
           stream_id?: string
           viewer_id?: string
@@ -6893,11 +7101,14 @@ export type Database = {
           currency: string
           event_id: string
           id: string
+          needs_refund: boolean
           notes: string | null
           payment_method: string
           payment_status: string
           purchaser_email: string | null
           purchaser_name: string | null
+          nearby_events_consent: boolean
+          nearby_events_consent_at: string | null
           purchaser_phone: string | null
           purchaser_social: string | null
           purchaser_user_id: string | null
@@ -6917,11 +7128,14 @@ export type Database = {
           currency?: string
           event_id: string
           id?: string
+          needs_refund?: boolean
           notes?: string | null
           payment_method?: string
           payment_status?: string
           purchaser_email?: string | null
           purchaser_name?: string | null
+          nearby_events_consent?: boolean
+          nearby_events_consent_at?: string | null
           purchaser_phone?: string | null
           purchaser_social?: string | null
           purchaser_user_id?: string | null
@@ -6941,11 +7155,14 @@ export type Database = {
           currency?: string
           event_id?: string
           id?: string
+          needs_refund?: boolean
           notes?: string | null
           payment_method?: string
           payment_status?: string
           purchaser_email?: string | null
           purchaser_name?: string | null
+          nearby_events_consent?: boolean
+          nearby_events_consent_at?: string | null
           purchaser_phone?: string | null
           purchaser_social?: string | null
           purchaser_user_id?: string | null
@@ -7518,6 +7735,78 @@ export type Database = {
       }
     }
     Views: {
+      consumer_creators: {
+        Row: {
+          avatar_url: string | null
+          display_name: string | null
+          user_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          display_name?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          display_name?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      consumer_live_streams: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          ended_at: string | null
+          external_url: string | null
+          host_id: string | null
+          id: string | null
+          is_live: boolean | null
+          playback_url: string | null
+          replay_available: boolean | null
+          replay_url: string | null
+          started_at: string | null
+          stream_type: string | null
+          thumbnail_url: string | null
+          title: string | null
+          viewer_count: number | null
+        }
+        Insert: {
+          created_at?: never
+          description?: never
+          ended_at?: never
+          external_url?: never
+          host_id?: never
+          id?: never
+          is_live?: never
+          playback_url?: never
+          replay_available?: never
+          replay_url?: never
+          started_at?: never
+          stream_type?: never
+          thumbnail_url?: never
+          title?: never
+          viewer_count?: never
+        }
+        Update: {
+          created_at?: never
+          description?: never
+          ended_at?: never
+          external_url?: never
+          host_id?: never
+          id?: never
+          is_live?: never
+          playback_url?: never
+          replay_available?: never
+          replay_url?: never
+          started_at?: never
+          stream_type?: never
+          thumbnail_url?: never
+          title?: never
+          viewer_count?: never
+        }
+        Relationships: []
+      }
       live_streams_public: {
         Row: {
           created_at: string | null
@@ -7634,6 +7923,7 @@ export type Database = {
           city_key: string | null
           created_at: string | null
           display_name: string | null
+          founding: boolean | null
           id: string | null
           is_suspended: boolean | null
           mindset_level: number | null
@@ -7709,9 +7999,24 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: number
       }
+      claim_chat_email_window: {
+        Args: { p_conversation_id: string; p_user_id: string }
+        Returns: boolean
+      }
       can_manage_event: {
         Args: { p_event_id: string; p_user_id: string }
         Returns: boolean
+      }
+      create_guest_event_rsvp: {
+        Args: {
+          p_campaign_id?: string
+          p_event_id: string
+          p_guest_email: string
+          p_guest_name: string
+          p_guest_phone?: string
+          p_nearby_consent?: boolean
+        }
+        Returns: Json
       }
       check_in_attendee: {
         Args: {
@@ -7747,6 +8052,9 @@ export type Database = {
           mindset_level: number
           phone: string
           user_id: string
+          is_suspended: boolean
+          suspension_reason: string
+          deleted_at: string
         }[]
       }
       get_artist_payout_status: {
@@ -7774,6 +8082,178 @@ export type Database = {
       }
       get_campaign_analytics: { Args: { p_event_id?: string }; Returns: Json }
       get_client_project_by_token: { Args: { p_token: string }; Returns: Json }
+      get_my_ether_id: { Args: never; Returns: Json }
+      refresh_my_ether_id_token: { Args: never; Returns: string }
+      get_ether_id_by_token: { Args: { p_token: string }; Returns: Json }
+      ensure_ether_id_pass: { Args: { p_pass_type_id: string }; Returns: Json }
+      public_event_share: {
+        Args: { p_ref: string }
+        Returns: {
+          id: string
+          slug: string
+          title: string
+          host_name: string
+          start_date: string
+          timezone: string | null
+          venue: string | null
+          city: string | null
+          image_url: string | null
+        }[]
+      }
+      public_event_attendance_count: {
+        Args: { p_event_id: string }
+        Returns: number
+      }
+      my_event_reminder_enabled: {
+        Args: { p_event_id: string }
+        Returns: boolean
+      }
+      set_my_event_reminder: {
+        Args: { p_event_id: string; p_enabled: boolean }
+        Returns: boolean
+      }
+      dispatch_attendee_event_reminders: {
+        Args: { p_now?: string }
+        Returns: number
+      }
+      public_event_guest_preview: {
+        Args: { p_event_id: string; p_order_id?: string; p_rsvp_id?: string }
+        Returns: Json
+      }
+      public_event_host_notes: {
+        Args: { p_event_id: string; p_order_id?: string; p_rsvp_id?: string }
+        Returns: string
+      }
+      public_event_location: {
+        Args: { p_event_id: string; p_order_id?: string; p_rsvp_id?: string }
+        Returns: string
+      }
+      public_host_stats: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
+      host_follower_count: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
+      host_event_address: {
+        Args: { p_event_id: string }
+        Returns: string
+      }
+      event_password_ok: {
+        Args: { p_event_id: string; p_password: string }
+        Returns: boolean
+      }
+      set_event_access: {
+        Args: {
+          p_event_id: string
+          p_hide_address: boolean
+          p_private_address: string
+          p_password: string
+          p_password_protected: boolean
+          p_host_notes?: string
+          p_hide_host_notes?: boolean
+        }
+        Returns: undefined
+      }
+      release_abandoned_ticket_orders: {
+        Args: { p_older_than?: string }
+        Returns: number
+      }
+      host_event_attendance_counts: {
+        Args: { p_event_ids: string[] }
+        Returns: {
+          event_id: string
+          going: number
+          waitlist: number
+        }[]
+      }
+      claim_waitlist_invite: {
+        Args: { p_token: string }
+        Returns: undefined
+      }
+      export_waitlist: {
+        Args: { p_src?: string; p_week?: string }
+        Returns: {
+          created_at: string
+          email: string
+          email_me: boolean
+          founding: boolean
+          ig_handle: string
+          name: string
+          ref_code: string
+          referred_by: string
+          src: string
+          what_do_you_make: string
+        }[]
+      }
+      get_or_create_direct_conversation: {
+        Args: { p_other: string }
+        Returns: string
+      }
+      get_own_post_view_counts: {
+        Args: { p_post_ids?: string[] | null }
+        Returns: {
+          post_id: string
+          view_count: number
+        }[]
+      }
+      get_own_view_dashboard: {
+        Args: never
+        Returns: {
+          photo_views_30d: number
+          video_views_30d: number
+          views_30d: number
+        }[]
+      }
+      import_waitlist: {
+        Args: { p_rows: Json; p_src: string }
+        Returns: {
+          email: string
+          outcome: string
+        }[]
+      }
+      invite_waitlist: {
+        Args: { p_ids: string[] }
+        Returns: {
+          email: string
+          id: string
+          invite_token: string
+        }[]
+      }
+      join_waitlist: {
+        Args: {
+          p_company?: string
+          p_email: string
+          p_email_me: boolean
+          p_ig_handle?: string
+          p_name: string
+          p_ref?: string
+          p_src?: string
+          p_what_do_you_make?: string
+        }
+        Returns: string
+      }
+      list_waitlist_admin: {
+        Args: { p_src?: string }
+        Returns: {
+          converted_at: string
+          created_at: string
+          email: string
+          founding: boolean
+          id: string
+          invite_token: string
+          invited_at: string
+          name: string
+          ref_code: string
+          referred_by: string
+          src: string
+        }[]
+      }
+      preview_waitlist_invite: {
+        Args: { p_token: string }
+        Returns: string
+      }
       get_platform_stats: {
         Args: never
         Returns: {
@@ -7854,7 +8334,24 @@ export type Database = {
           read_ct: number
         }[]
       }
+      record_post_view: {
+        Args: { p_post_id: string }
+        Returns: undefined
+      }
+      share_messages_to_project_main: {
+        Args: { p_message_ids: string[] }
+        Returns: number
+      }
+      touch_host_presence: {
+        Args: { p_stream_id: string }
+        Returns: undefined
+      }
       touch_last_active: { Args: never; Returns: undefined }
+      close_stale_live_streams: { Args: never; Returns: number }
+      viewer_liked_story: {
+        Args: { p_story_id: string; p_owner: string }
+        Returns: boolean
+      }
       upsert_attendee_note: {
         Args: { p_email: string; p_note: string; p_user_id: string }
         Returns: string

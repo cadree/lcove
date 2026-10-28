@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -42,7 +42,15 @@ import { ProfilePost } from "@/types/post";
 import { usePostInteractions } from "@/hooks/usePostInteractions";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { shareLink, buildShareUrl } from "@/lib/shareLink";
+import { ShareSheet } from "@/components/share/ShareSheet";
+import { useOwnPostViewCounts } from "@/hooks/usePostViews";
+import { useSharingActions } from "@/hooks/useSharing";
+import { ownerOnlyInsight, repostedByLabel, shouldRecordPostView } from "@/lib/sharing";
+import { supabase } from "@/integrations/supabase/client";
+import { EmbedPlayer } from "@/components/feed/EmbedPlayer";
+import { embedFromPost } from "@/lib/videoEmbed";
+import { InlineError } from "@/components/ui/inline-error";
+import { writeError } from "@/lib/writeError";
 
 interface PostDetailModalProps {
   post: ProfilePost | null;
@@ -57,14 +65,19 @@ export function PostDetailModal({
   post, 
   open, 
   onOpenChange, 
-  isOwner,
   onDelete,
   onEdit,
 }: PostDetailModalProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [comment, setComment] = useState("");
+  const [commentError, setCommentError] = useState<string | null>(null);
+  const commentErrorId = useId();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const ownsPost = !!user && user.id === post?.user_id;
+  const viewCounts = useOwnPostViewCounts(ownsPost);
+  const { undoRepost } = useSharingActions();
 
   // Use the real interactions hook
   const {
@@ -80,8 +93,15 @@ export function PostDetailModal({
     isSaving,
   } = usePostInteractions(post?.id || "");
 
+  useEffect(() => {
+    if (!open || !post || !shouldRecordPostView(user?.id, post.user_id)) return;
+    void supabase.rpc('record_post_view', { p_post_id: post.id });
+  }, [open, post, user?.id]);
+
   if (!post) return null;
 
+  const insight = ownerOnlyInsight(ownsPost, viewCounts?.[post.id], likesCount);
+  const embed = embedFromPost(post);
   const displayName = post.profile?.display_name || 'Anonymous';
   const avatarUrl = post.profile?.avatar_url;
   const timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true });
@@ -121,21 +141,26 @@ export function PostDetailModal({
     toggleSave();
   };
 
-  const handlePostComment = () => {
+  const handlePostComment = async () => {
     if (!user) {
       toast.error("Please sign in to comment");
       return;
     }
-    if (!comment.trim()) return;
-    addComment(comment.trim());
+    const text = comment.trim();
+    if (!text || isCommenting) return;
+    setCommentError(null);
+    try {
+      await addComment(text);
+    } catch (err) {
+      setCommentError(writeError(err, "Failed to add comment"));
+      return;
+    }
     setComment("");
+    setCommentError(null);
   };
 
-  const handleShare = async () => {
-    await shareLink({
-      title: `Post by ${displayName}`,
-      url: buildShareUrl.post(post.user_id, post.id),
-    });
+  const handleShare = () => {
+    setShareOpen(true);
   };
 
   const handleClose = () => {
@@ -145,7 +170,7 @@ export function PostDetailModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl w-full p-0 gap-0 overflow-hidden max-h-[90vh]">
+        <DialogContent className="max-h-[90vh] w-full max-w-4xl gap-0 overflow-hidden border-border bg-card p-0">
           <VisuallyHidden>
             <DialogTitle>Post by {displayName}</DialogTitle>
           </VisuallyHidden>
@@ -155,7 +180,7 @@ export function PostDetailModal({
             variant="ghost"
             size="icon"
             onClick={handleClose}
-            className="absolute right-3 top-3 z-50 h-10 w-10 rounded-full bg-background/80 backdrop-blur-sm hover:bg-background"
+            className="absolute right-3 top-3 z-50 h-11 w-11 rounded-[14px] bg-background/80 backdrop-blur-sm hover:bg-background"
             aria-label="Close post"
             role="button"
           >
@@ -165,11 +190,14 @@ export function PostDetailModal({
           <div className="flex flex-col md:flex-row h-full">
             {/* Media Section */}
             <div className="md:w-[60%] bg-black flex items-center justify-center relative">
-              {post.media_type === 'video' ? (
+              {embed ? (
+                <EmbedPlayer embed={embed} title={post.embed_title || post.content} className="max-h-[60vh] md:max-h-[80vh]" />
+              ) : post.media_type === 'video' ? (
                 <video
                   src={post.media_url || undefined}
                   controls
                   autoPlay
+                  playsInline
                   className="max-w-full max-h-[60vh] md:max-h-[80vh] object-contain"
                 />
               ) : (
@@ -182,7 +210,26 @@ export function PostDetailModal({
             </div>
 
             {/* Details Section */}
-            <div className="md:w-[40%] flex flex-col bg-background">
+            <div className="flex flex-col bg-card md:w-[40%]">
+              {post.repost && (
+                <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
+                  <button
+                    type="button"
+                    className="min-h-11 text-left text-sm text-muted-foreground"
+                    onClick={() => {
+                      onOpenChange(false);
+                      navigate(`/profile/${post.repost?.user_id}`);
+                    }}
+                  >
+                    {repostedByLabel(post.repost.profile?.display_name)}
+                  </button>
+                  {user?.id === post.repost.user_id && (
+                    <Button variant="ghost" size="sm" onClick={() => undoRepost.mutate(post.id)}>
+                      Undo repost
+                    </Button>
+                  )}
+                </div>
+              )}
               {/* Header */}
               <div className="p-4 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -201,7 +248,7 @@ export function PostDetailModal({
                   <div>
                     <button 
                       onClick={handleProfileClick}
-                      className="text-sm font-semibold text-foreground hover:underline"
+                      className="font-body text-sm font-bold text-foreground hover:underline"
                       role="button"
                     >
                       {displayName}
@@ -215,13 +262,13 @@ export function PostDetailModal({
                   </div>
                 </div>
                 
-                {isOwner ? (
+                {ownsPost ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-8 w-8"
+                        className="h-11 w-11"
                         aria-label="Post options"
                         role="button"
                       >
@@ -247,7 +294,7 @@ export function PostDetailModal({
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="h-8 w-8"
+                    className="h-11 w-11"
                     aria-label="More options"
                     role="button"
                   >
@@ -272,7 +319,7 @@ export function PostDetailModal({
                         <span className="font-semibold mr-1">{displayName}</span>
                         {post.content}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">{timeAgo}</p>
+                      <p className="mono-label mt-1 text-[9px] text-muted-foreground">{timeAgo}</p>
                     </div>
                   </div>
                 )}
@@ -322,7 +369,7 @@ export function PostDetailModal({
                       <Heart 
                         className={cn(
                           "w-6 h-6",
-                          hasLiked ? "fill-red-500 text-red-500" : "text-foreground"
+                          hasLiked ? "fill-[#FF9FC8] text-[#FF9FC8]" : "text-foreground"
                         )} 
                       />
                     </button>
@@ -358,36 +405,44 @@ export function PostDetailModal({
                   </button>
                 </div>
 
-                {isOwner && likesCount > 0 && (
-                  <p className="text-xs text-muted-foreground mb-1">Only you can see this: {likesCount} {likesCount === 1 ? 'like' : 'likes'}</p>
+                {insight && (
+                  <p className="text-xs text-muted-foreground mb-1">{insight}</p>
                 )}
-                <p className="text-xs text-muted-foreground mb-3">{timeAgo}</p>
+                <p className="mono-label mb-3 text-[9px] text-muted-foreground">{timeAgo}</p>
 
                 {/* Comment input */}
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder="Add a comment..."
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handlePostComment();
-                      }
-                    }}
-                    className="flex-1 border-0 focus-visible:ring-0 px-0"
-                    aria-label="Add a comment"
-                  />
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={handlePostComment}
-                    disabled={!comment.trim() || isCommenting}
-                    className="text-primary font-semibold"
-                    role="button"
-                  >
-                    {isCommenting ? 'Posting...' : 'Post'}
-                  </Button>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Add a comment..."
+                      value={comment}
+                      onChange={(e) => {
+                        setComment(e.target.value);
+                        setCommentError(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handlePostComment();
+                        }
+                      }}
+                      className="flex-1 border-0 focus-visible:ring-0 px-0"
+                      aria-label="Add a comment"
+                      aria-invalid={commentError ? true : undefined}
+                      aria-describedby={commentError ? commentErrorId : undefined}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handlePostComment}
+                      disabled={!comment.trim() || isCommenting}
+                      className="min-h-11 font-semibold text-primary"
+                      role="button"
+                    >
+                      {isCommenting ? 'Posting...' : 'Post'}
+                    </Button>
+                  </div>
+                  <InlineError id={commentErrorId} message={commentError} />
                 </div>
               </div>
             </div>
@@ -415,6 +470,21 @@ export function PostDetailModal({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <ShareSheet
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        target={{
+          kind: 'post',
+          post: {
+            id: post.id,
+            user_id: post.user_id,
+            content: post.content,
+            media_url: post.media_url,
+            media_type: post.media_type,
+            profile: post.profile,
+          },
+        }}
+      />
     </>
   );
 }

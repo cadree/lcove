@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { ItemListField, XpExplainer } from '@/components/projects/ItemListField';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -30,6 +31,7 @@ interface RoleInput {
   role_name: string;
   description: string;
   payout_amount: number;
+  credit_amount: number;
   slots_available: number;
 }
 
@@ -60,6 +62,8 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
   const [endDate, setEndDate] = useState('');
   const [allowCustomRoles, setAllowCustomRoles] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
+  const [hideFromCalendar, setHideFromCalendar] = useState(false);
+  const [listingType, setListingType] = useState<'project' | 'gig'>('project');
   const [clientChatInProduction, setClientChatInProduction] = useState(false);
   const [roles, setRoles] = useState<RoleInput[]>([]);
   const [isSavingRoles, setIsSavingRoles] = useState(false);
@@ -84,6 +88,8 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
       setEndDate(project.timeline_end ? project.timeline_end.split('T')[0] : '');
       setAllowCustomRoles(project.allow_custom_roles || false);
       setIsPrivate(project.is_private || false);
+      setHideFromCalendar(project.hide_from_calendar || false);
+      setListingType(project.listing_type === 'gig' ? 'gig' : 'project');
       setClientChatInProduction(project.client_chat_in_production || false);
       setRoles(
         project.roles?.map(r => ({
@@ -91,6 +97,7 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
           role_name: r.role_name,
           description: r.description || '',
           payout_amount: r.payout_amount,
+          credit_amount: r.credit_amount || 0,
           slots_available: r.slots_available,
         })) || []
       );
@@ -103,7 +110,7 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
     );
   };
 
-  const addRole = () => setRoles([...roles, { role_name: '', description: '', payout_amount: 0, slots_available: 1 }]);
+  const addRole = () => setRoles([...roles, { role_name: '', description: '', payout_amount: 0, credit_amount: 0, slots_available: 1 }]);
   const removeRole = (i: number) => setRoles(roles.filter((_, idx) => idx !== i));
   const updateRole = (i: number, field: keyof RoleInput, value: string | number) => {
     const updated = [...roles];
@@ -138,6 +145,8 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
           timeline_end: endDate ? `${endDate}T23:59` : null,
           allow_custom_roles: allowCustomRoles,
           is_private: isPrivate,
+          hide_from_calendar: hideFromCalendar,
+          listing_type: listingType,
           client_chat_in_production: clientChatInProduction,
         },
       },
@@ -162,6 +171,7 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
                   role_name: role.role_name,
                   description: role.description || null,
                   payout_amount: role.payout_amount,
+                  credit_amount: role.credit_amount,
                   slots_available: role.slots_available,
                 }).eq('id', role.id);
               } else {
@@ -170,6 +180,7 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
                   role_name: role.role_name,
                   description: role.description || null,
                   payout_amount: role.payout_amount,
+                  credit_amount: role.credit_amount,
                   slots_available: role.slots_available,
                 });
               }
@@ -256,6 +267,31 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
               </button>
             </div>
             {isPrivate && (
+              <p className="text-xs text-muted-foreground">Hidden from discovery, the community calendar, and new-project notifications. Members and invited people can still open it.</p>
+            )}
+            <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+              <div>
+                <Label className="text-sm">Hide from community calendar</Label>
+                <p className="text-xs text-muted-foreground">Public projects stay on the calendar unless this is on</p>
+              </div>
+              <Switch checked={hideFromCalendar} onCheckedChange={setHideFromCalendar} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {(['project', 'gig'] as const).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => setListingType(kind)}
+                  className={cn(
+                    "mono-label rounded-[14px] border p-3 text-[11px]",
+                    listingType === kind ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"
+                  )}
+                >
+                  {kind === 'project' ? 'Project idea' : 'Gig'}
+                </button>
+              ))}
+            </div>
+            {isPrivate && (
               <div className="flex items-center gap-2 p-3 border border-border rounded-lg">
                 <Switch checked={clientChatInProduction} onCheckedChange={setClientChatInProduction} />
                 <div>
@@ -339,10 +375,7 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
           {/* Resources */}
           <div className="space-y-4">
             <Label className="flex items-center gap-2"><Wrench className="h-4 w-4" /> Resources</Label>
-            <div>
-              <Label className="text-xs text-muted-foreground">Equipment Needed</Label>
-              <Input value={equipmentNeeded} onChange={e => setEquipmentNeeded(e.target.value)} />
-            </div>
+            <ItemListField label="Equipment needed" value={equipmentNeeded} onChange={setEquipmentNeeded} placeholder="Add a piece of equipment" />
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" /> Venue</Label>
@@ -353,10 +386,7 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
                 <Label className="text-xs">Location Secured</Label>
               </div>
             </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Props Needed</Label>
-              <Input value={propsNeeded} onChange={e => setPropsNeeded(e.target.value)} />
-            </div>
+            <ItemListField label="Props needed" value={propsNeeded} onChange={setPropsNeeded} placeholder="Add a prop" />
             <div className="flex gap-6">
               <div className="flex items-center gap-2">
                 <Switch checked={sponsorshipNeeded} onCheckedChange={setSponsorshipNeeded} />
@@ -371,6 +401,7 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
 
           {/* Roles */}
           <div className="space-y-3">
+            <XpExplainer />
             <div className="flex items-center justify-between">
               <Label>Roles</Label>
               <Button type="button" variant="outline" size="sm" onClick={addRole}>
@@ -395,10 +426,14 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
                   onChange={e => updateRole(i, 'description', e.target.value)}
                   placeholder="Description (optional)"
                 />
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <Label className="text-xs text-muted-foreground">Payout</Label>
+                    <Label className="text-xs text-muted-foreground">Pay</Label>
                     <Input type="number" value={role.payout_amount} onChange={e => updateRole(i, 'payout_amount', parseFloat(e.target.value) || 0)} min="0" />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">XP</Label>
+                    <Input type="number" value={role.credit_amount} onChange={e => updateRole(i, 'credit_amount', parseFloat(e.target.value) || 0)} min="0" />
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground">Slots</Label>

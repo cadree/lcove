@@ -405,7 +405,7 @@ export function EditProfileDetailsDialog({
 
                 <TabsContent value="skills" className="mt-0">
                   <p className="text-xs text-muted-foreground mb-3">
-                    Select skills you bring to the table ({selectedSkillIds.size + customSkills.length} selected)
+                    Skills and tools, including Adobe, are optional. Add them here anytime ({selectedSkillIds.size + customSkills.length} selected)
                   </p>
                   {renderItemGrid(allSkills, selectedSkillIds, 'skill', skillDescriptions, setSkillDescriptions, customSkills, newCustomSkill, setNewCustomSkill)}
                 </TabsContent>

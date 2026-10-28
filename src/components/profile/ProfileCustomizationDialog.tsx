@@ -8,14 +8,16 @@ import {
   Palette, 
   Music, 
   Sparkles,
-  Upload,
   Loader2,
-  X
 } from "lucide-react";
-import { useProfileCustomization, ProfileCustomization, DEFAULT_CUSTOMIZATION } from "@/hooks/useProfileCustomization";
+import { useProfileCustomization } from "@/hooks/useProfileCustomization";
+import { useProfileLayout } from "@/hooks/useProfileLayout";
+import { explicitSectionOrder, explicitShowTopFriends, sectionFieldsForSave, sectionStateFromLayout } from "@/lib/profileSections";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
+import { jpegStorageName } from "@/lib/heicImage";
 import { cn } from "@/lib/utils";
 import { ProfileMusicSourceSelector, MusicData } from "./ProfileMusicSourceSelector";
 import { ProfileThemeCustomizer, CustomizationState } from "./ProfileThemeCustomizer";
@@ -28,11 +30,13 @@ interface ProfileCustomizationDialogProps {
 
 export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustomizationDialogProps) => {
   const { user } = useAuth();
-  const { customization, saveCustomization } = useProfileCustomization();
+  const { customization, isLoading: customizationLoading, saveCustomization } = useProfileCustomization();
+  const { layout, isLoading: layoutLoading } = useProfileLayout();
   const [activeTab, setActiveTab] = useState("customize");
   const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [localPreview, setLocalPreview] = useState<string | null>(null);
   const initializedRef = useRef(false);
+  const [ready, setReady] = useState(false);
 
   // Customization state
   const [customizationState, setCustomizationState] = useState<CustomizationState>({
@@ -50,8 +54,8 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
     effectMotionGradient: false,
     customFont: null,
     accentColorOverride: null,
-    sectionOrder: ['about', 'music', 'stats', 'links'],
-    showTopFriends: false,
+    sectionOrder: sectionStateFromLayout([]).sectionOrder,
+    showTopFriends: true,
     musicVisualizerEnabled: false,
   });
 
@@ -59,46 +63,54 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
   const [profileMusicEnabled, setProfileMusicEnabled] = useState(false);
   const [musicData, setMusicData] = useState<MusicData | null>(null);
 
-  // Load existing customization - only once when data first arrives
+  // Load saved theme once. Section toggles follow the live profile unless the member set them.
   useEffect(() => {
-    if (customization && !initializedRef.current) {
-      initializedRef.current = true;
-      setCustomizationState({
-        themePreset: (customization.theme_preset as ThemePreset) || 'clean_modern',
-        backgroundType: customization.background_type as 'color' | 'gradient' | 'image',
-        backgroundValue: customization.background_value || 'from-primary/30 via-background to-accent/20',
-        backgroundOpacity: customization.background_opacity ?? 1,
-        backgroundBlur: customization.background_blur ?? 0,
-        overlayTint: customization.overlay_tint,
-        overlayOpacity: customization.overlay_opacity ?? 0,
-        effectGrain: customization.effect_grain ?? false,
-        effectNeonGlow: customization.effect_neon_glow ?? false,
-        effectScanlines: customization.effect_scanlines ?? false,
-        effectHolographic: customization.effect_holographic ?? false,
-        effectMotionGradient: customization.effect_motion_gradient ?? false,
-        customFont: customization.custom_font,
-        accentColorOverride: customization.accent_color_override,
-        sectionOrder: customization.section_order || ['about', 'music', 'stats', 'links'],
-        showTopFriends: customization.show_top_friends ?? false,
-        musicVisualizerEnabled: customization.music_visualizer_enabled ?? false,
-      });
-      
-      setProfileMusicEnabled(customization.profile_music_enabled ?? false);
-      
-      if (customization.profile_music_url || customization.profile_music_preview_url) {
-        setMusicData({
-          source: (customization.profile_music_source as MusicData['source']) || 'upload',
-          url: customization.profile_music_url,
-          previewUrl: customization.profile_music_preview_url,
-          externalId: customization.profile_music_external_id,
-          title: customization.profile_music_title || "",
-          artist: customization.profile_music_artist || "",
-          albumName: customization.profile_music_album_name || "",
-          albumArtUrl: customization.profile_music_album_art_url,
-        });
-      }
+    if (!open) {
+      initializedRef.current = false;
+      setReady(false);
+      return;
     }
-  }, [customization]);
+    if (initializedRef.current || customizationLoading || layoutLoading) return;
+    initializedRef.current = true;
+    const derived = sectionStateFromLayout(layout);
+    const storedOrder = explicitSectionOrder(customization);
+    const storedFriends = explicitShowTopFriends(customization);
+    setCustomizationState({
+      themePreset: (customization?.theme_preset as ThemePreset) || 'clean_modern',
+      backgroundType: (customization?.background_type as 'color' | 'gradient' | 'image') || 'gradient',
+      backgroundValue: customization?.background_value || 'from-primary/30 via-background to-accent/20',
+      backgroundOpacity: customization?.background_opacity ?? 1,
+      backgroundBlur: customization?.background_blur ?? 0,
+      overlayTint: customization?.overlay_tint ?? null,
+      overlayOpacity: customization?.overlay_opacity ?? 0,
+      effectGrain: customization?.effect_grain ?? false,
+      effectNeonGlow: customization?.effect_neon_glow ?? false,
+      effectScanlines: customization?.effect_scanlines ?? false,
+      effectHolographic: customization?.effect_holographic ?? false,
+      effectMotionGradient: customization?.effect_motion_gradient ?? false,
+      customFont: customization?.custom_font ?? null,
+      accentColorOverride: customization?.accent_color_override ?? null,
+      sectionOrder: storedOrder ?? derived.sectionOrder,
+      showTopFriends: storedFriends ?? derived.showTopFriends,
+      musicVisualizerEnabled: customization?.music_visualizer_enabled ?? false,
+    });
+    setReady(true);
+
+    setProfileMusicEnabled(customization?.profile_music_enabled ?? false);
+
+    if (customization?.profile_music_url || customization?.profile_music_preview_url) {
+      setMusicData({
+        source: (customization.profile_music_source as MusicData['source']) || 'upload',
+        url: customization.profile_music_url,
+        previewUrl: customization.profile_music_preview_url,
+        externalId: customization.profile_music_external_id,
+        title: customization.profile_music_title || "",
+        artist: customization.profile_music_artist || "",
+        albumName: customization.profile_music_album_name || "",
+        albumArtUrl: customization.profile_music_album_art_url,
+      });
+    }
+  }, [open, customization, customizationLoading, layout, layoutLoading]);
   
   // Reset initialized flag when dialog closes
   useEffect(() => {
@@ -127,8 +139,8 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
       effectMotionGradient: false,
       customFont: null,
       accentColorOverride: null,
-      sectionOrder: ['about', 'music', 'stats', 'links'],
-      showTopFriends: false,
+      sectionOrder: sectionStateFromLayout(layout).sectionOrder,
+      showTopFriends: sectionStateFromLayout(layout).showTopFriends,
       musicVisualizerEnabled: false,
     });
     toast.success("Reset to default theme");
@@ -138,14 +150,16 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
     toast.info("Preview mode - changes shown but not saved yet");
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleImageUpload = async (file: File) => {
     if (!file || !user) return;
+    const previewUrl = URL.createObjectURL(file);
+    setLocalPreview(previewUrl);
+    setCustomizationState(prev => ({ ...prev, backgroundType: 'image' }));
 
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/profile-bg-${Date.now()}.${fileExt}`;
+      const fileName = jpegStorageName(`${user.id}/profile-bg-${Date.now()}.${fileExt}`, file.type);
 
       const { error: uploadError } = await supabase.storage
         .from('media')
@@ -165,8 +179,10 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
       toast.success('Background image uploaded!');
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Failed to upload image');
+      toast.error(errorMessage(error, 'Failed to upload image'));
     } finally {
+      URL.revokeObjectURL(previewUrl);
+      setLocalPreview(null);
       setUploading(false);
     }
   };
@@ -176,6 +192,7 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
   };
 
   const handleSave = async () => {
+    if (!ready) return;
     await saveCustomization.mutateAsync({
       // Theme & Background
       theme_preset: customizationState.themePreset,
@@ -194,9 +211,8 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
       // Style
       custom_font: customizationState.customFont,
       accent_color_override: customizationState.accentColorOverride,
-      // Layout
-      section_order: customizationState.sectionOrder,
-      show_top_friends: customizationState.showTopFriends,
+      // Layout. Null keeps the profile the member already has.
+      ...sectionFieldsForSave(customizationState, layout),
       // Music
       profile_music_enabled: profileMusicEnabled,
       profile_music_url: musicData?.url || null,
@@ -244,54 +260,10 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
                 onChange={handleCustomizationChange}
                 onReset={handleReset}
                 onPreview={handlePreview}
+                onBackgroundFile={handleImageUpload}
+                backgroundUploading={uploading}
+                backgroundPreviewUrl={localPreview}
               />
-              
-              {/* Image upload for background */}
-              {customizationState.backgroundType === 'image' && (
-                <div className="mt-4 space-y-3">
-                  <Label className="text-sm font-medium">Background Image</Label>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                      className="flex-1"
-                    >
-                      {uploading ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Upload className="w-4 h-4 mr-2" />
-                      )}
-                      Upload Image
-                    </Button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                    />
-                  </div>
-                  {customizationState.backgroundValue?.startsWith('http') && (
-                    <div className="relative h-20 rounded-lg overflow-hidden">
-                      <img 
-                        src={customizationState.backgroundValue} 
-                        alt="Background preview" 
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        onClick={() => handleCustomizationChange({
-                          backgroundType: 'gradient',
-                          backgroundValue: 'from-primary/30 via-background to-accent/20',
-                        })}
-                        className="absolute top-2 right-2 p-1 bg-background/80 rounded-full"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
             </TabsContent>
 
             <TabsContent value="music" className="space-y-6 mt-0">
@@ -332,7 +304,7 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
           <Button 
             className="flex-1" 
             onClick={handleSave}
-            disabled={saveCustomization.isPending}
+            disabled={!ready || saveCustomization.isPending || customizationLoading || layoutLoading}
           >
             {saveCustomization.isPending ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

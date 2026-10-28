@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
+import { keyboardPaddingStyle, pinMessageListToEnd } from '@/lib/liveKeyboard';
+import { useNativeKeyboardInset } from '@/hooks/useNativeKeyboardInset';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { calendarDayKey, dayDividerLabel, localCalendarDayDelta } from '@/lib/calendarDay';
@@ -9,19 +12,24 @@ import {
   Users, Calendar, Info, ChevronDown, ChevronUp, LogOut, Flag
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { useMessages } from '@/hooks/useMessages';
 import { useConversations } from '@/hooks/useConversations';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { usePresence } from '@/hooks/usePresence';
 import { useProjectChatData } from '@/hooks/useProjectChatData';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { ShareCardBubble } from '@/components/messages/ShareCardBubble';
+import { splitShareMessage } from '@/lib/shareCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { OnlineIndicator } from '@/components/ui/online-indicator';
 import MessageComposer from './MessageComposer';
+import { CreateSubgroupDialog } from './CreateSubgroupDialog';
 import ProjectCommandCenter from './ProjectCommandCenter';
 import { toast } from 'sonner';
 import { ReportDialog } from '@/components/safety/ReportDialog';
+import { SharedContentCard } from '@/components/share/SharedContentCard';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,10 +65,17 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   const isOwner = !!(projectChatData && user && projectChatData.creator_id === user.id);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesListRef = useRef<HTMLDivElement>(null);
+  const keyboardInset = useNativeKeyboardInset();
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [showProjectInfo, setShowProjectInfo] = useState(false);
   const [reportMessageId, setReportMessageId] = useState<string | null>(null);
   const [reportProfileId, setReportProfileId] = useState<string | null>(null);
+  const [subgroupOpen, setSubgroupOpen] = useState(false);
+  const [selectingShare, setSelectingShare] = useState(false);
+  const [shareIds, setShareIds] = useState<string[]>([]);
+  const [sharing, setSharing] = useState(false);
+  const queryClient = useQueryClient();
 
   
   // Get the other participant's user ID for direct messages
@@ -73,6 +88,24 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   const otherUserId = getOtherUserId();
   const isMuted = conversation?.participants?.find(p => p.user_id === user?.id)?.is_muted || false;
   const project = conversation?.project;
+  const isParticipant = conversation?.participants?.some((participant) => participant.user_id === user?.id) ?? !conversation?.oversight;
+  const isSubgroup = Boolean(conversation?.parent_conversation_id);
+
+  const { data: subgroups = [] } = useQuery({
+    queryKey: ['project-subgroups', projectId],
+    queryFn: async () => {
+      if (!projectId) return [];
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('id, name, parent_conversation_id')
+        .eq('project_id', projectId)
+        .not('parent_conversation_id', 'is', null)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!projectId && !!isProjectChat,
+  });
 
   const getConversationName = () => {
     if (!conversation) return 'Chat';
@@ -96,6 +129,12 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // The thread is a fixed 100dvh column, so the keyboard does not shrink it.
+  // Padding lives on this shell only. The composer keeps its own safe-area pad.
+  useEffect(() => {
+    pinMessageListToEnd(messagesListRef.current, keyboardInset);
+  }, [keyboardInset]);
 
   // Mark messages as read when viewing
   useEffect(() => {
@@ -131,10 +170,55 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
     await sendMessage.mutateAsync({ content, file, mediaType });
   };
 
+  const toggleShare = (messageId: string) => {
+    setShareIds((current) =>
+      current.includes(messageId) ? current.filter((id) => id !== messageId) : [...current, messageId],
+    );
+  };
+
+  const shareToMain = async () => {
+    if (shareIds.length === 0) return;
+    setSharing(true);
+    try {
+      const { error } = await supabase.rpc('share_messages_to_project_main', {
+        p_message_ids: shareIds,
+      });
+      if (error) throw error;
+      const mainId = conversation?.parent_conversation_id;
+      if (mainId && user) {
+        const { data: shared } = await supabase
+          .from('messages')
+          .select('id')
+          .eq('conversation_id', mainId)
+          .eq('sender_id', user.id)
+          .not('shared_from_message_id', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (shared) {
+          supabase.functions.invoke('notify-chat-message', {
+            body: { conversation_id: mainId, message_id: shared.id },
+          }).catch(() => undefined);
+        }
+      }
+      toast.success('Shared to the main project chat');
+      setShareIds([]);
+      setSelectingShare(false);
+      queryClient.invalidateQueries({ queryKey: ['messages'] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not share those messages');
+    } finally {
+      setSharing(false);
+    }
+  };
+
   return (
-    <div className="h-full w-full flex flex-col bg-background">
+    <div
+      className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
+      style={keyboardPaddingStyle(keyboardInset)}
+    >
       {/* Header */}
-      <div className="flex items-center gap-3 p-4 border-b border-border/50 bg-card/50 backdrop-blur-sm">
+      <div className="flex items-center gap-3 border-b border-border bg-background p-4">
         <Button variant="ghost" size="icon" onClick={onBack}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -158,7 +242,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="font-medium text-foreground truncate">{getConversationName()}</h3>
+            <h3 className="truncate font-body text-[15px] font-bold text-foreground">{getConversationName()}</h3>
             {isProjectChat && (
               <Badge variant="secondary" className="text-xs">Project</Badge>
             )}
@@ -209,15 +293,30 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                   View profile
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem 
-                onClick={() => {
-                  toggleMute.mutate({ conversationId, muted: !isMuted });
-                  toast.success(isMuted ? 'Notifications unmuted' : 'Notifications muted');
-                }}
-              >
-                {isMuted ? 'Unmute notifications' : 'Mute notifications'}
-              </DropdownMenuItem>
-              {conversation?.type === 'group' && (
+              {isParticipant && (
+                <DropdownMenuItem 
+                  onClick={() => {
+                    toggleMute.mutate({ conversationId, muted: !isMuted });
+                    toast.success(isMuted ? 'Notifications unmuted' : 'Notifications muted');
+                  }}
+                >
+                  {isMuted ? 'Unmute notifications' : 'Mute notifications'}
+                </DropdownMenuItem>
+              )}
+              {isProjectChat && isParticipant && !isSubgroup && (
+                <DropdownMenuItem onClick={() => setSubgroupOpen(true)}>
+                  New subgroup
+                </DropdownMenuItem>
+              )}
+              {isSubgroup && isParticipant && (
+                <DropdownMenuItem onClick={() => {
+                  setSelectingShare((current) => !current);
+                  setShareIds([]);
+                }}>
+                  {selectingShare ? 'Cancel share' : 'Share to main chat'}
+                </DropdownMenuItem>
+              )}
+              {conversation?.type === 'group' && isParticipant && (
                 <DropdownMenuItem 
                   className="text-destructive"
                   onClick={() => {
@@ -284,8 +383,42 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
         <ProjectCommandCenter project={projectChatData} isOwner={isOwner} />
       )}
 
+      {isProjectChat && (subgroups.length > 0 || isSubgroup) && (
+        <div className="flex gap-2 overflow-x-auto border-b border-border px-4 py-2">
+          {isSubgroup && conversation?.parent_conversation_id && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mono-label h-8 rounded-full border-border px-3 text-[10px]"
+              onClick={() => navigate(`/messages?chat=${conversation.parent_conversation_id}`)}
+            >
+              Main chat
+            </Button>
+          )}
+          {subgroups.map((subgroup) => (
+            <Button
+              key={subgroup.id}
+              type="button"
+              size="sm"
+              variant={subgroup.id === conversationId ? 'default' : 'outline'}
+              className="mono-label h-8 rounded-full px-3 text-[10px]"
+              onClick={() => navigate(`/messages?chat=${subgroup.id}`)}
+            >
+              {subgroup.name || 'Subgroup'}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {!isParticipant && isProjectChat && (
+        <p className="mono-label border-b border-border px-4 py-2 text-[9px] text-muted-foreground">
+          You can read this chat as the project owner.
+        </p>
+      )}
+
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div ref={messagesListRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
@@ -302,7 +435,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
             <div key={group.date}>
               {/* Date Header */}
               <div className="flex items-center justify-center my-4">
-                <span className="px-3 py-1 rounded-full bg-muted/50 text-xs text-muted-foreground">
+                <span className="mono-label rounded-full border border-border px-3 py-1 text-[9px] text-muted-foreground">
                   {dayDividerLabel(group.messages[0].created_at)}
                 </span>
               </div>
@@ -334,19 +467,35 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
 
                         <div className={`group flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
                           {/* Sender name with role for group chats */}
-                          {!isOwn && conversation?.type === 'group' && (
+                          {conversation?.type === 'group' && (senderRole || !isOwn) && (
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-medium text-foreground">
-                                {msg.profile?.display_name || conversation?.participants?.find(p => p.user_id === msg.sender_id)?.profile?.display_name || 'Member'}
-                              </span>
+                              {!isOwn && (
+                                <span className="text-xs font-medium text-foreground">
+                                  {msg.profile?.display_name || conversation?.participants?.find(p => p.user_id === msg.sender_id)?.profile?.display_name || 'Member'}
+                                </span>
+                              )}
                               {senderRole && (
-                                <Badge variant="outline" className="text-[10px] py-0 h-4">
+                                <Badge variant="outline" className="mono-label h-4 border-border py-0 text-[9px]">
                                   {senderRole}
                                 </Badge>
+                              )}
+                              {selectingShare && (
+                                <input
+                                  type="checkbox"
+                                  checked={shareIds.includes(msg.id)}
+                                  onChange={() => toggleShare(msg.id)}
+                                  aria-label="Share this message"
+                                />
                               )}
                             </div>
                           )}
                           
+                          {msg.share && msg.share.kind !== 'story' && (
+                            <div className="mb-1">
+                              <SharedContentCard share={msg.share} />
+                            </div>
+                          )}
+
                           {/* Media */}
                           {msg.media_url && (
                             <div className="mb-1 rounded-xl overflow-hidden">
@@ -354,14 +503,15 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                                 <img
                                   src={msg.media_url}
                                   alt=""
-                                  className="max-w-[250px] max-h-[300px] object-cover rounded-xl"
+                                  className="max-h-[300px] w-[min(70vw,260px)] rounded-xl bg-muted object-contain"
                                 />
                               )}
                               {msg.media_type === 'video' && (
                                 <video
                                   src={msg.media_url}
                                   controls
-                                  className="max-w-[250px] max-h-[300px] rounded-xl"
+                                  playsInline
+                                  className="max-h-[300px] w-[min(70vw,260px)] rounded-xl bg-black object-contain"
                                 />
                               )}
                               {msg.media_type === 'audio' && (
@@ -370,22 +520,36 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                             </div>
                           )}
 
-                          {/* Text Content */}
-                          {msg.content && (
-                            <div
-                              className={`px-4 py-2 rounded-2xl ${
-                                isOwn
-                                  ? 'bg-primary text-primary-foreground rounded-br-md'
-                                  : 'bg-muted/60 text-foreground rounded-bl-md'
-                              }`}
-                            >
-                              <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                          {/* Encoded share card, note, or plain text */}
+                          {(() => {
+                            const shared = splitShareMessage(msg.content);
+                            const note = shared.card ? shared.note : msg.content;
+                            return (
+                              <>
+                                {shared.card && <ShareCardBubble card={shared.card} />}
+                                {note && (
+                                  <div
+                                    className={`px-4 py-2.5 ${
+                                      isOwn
+                                        ? 'rounded-[18px] rounded-br-[6px] bg-gradient-to-br from-[#FFD6E8] to-[#FF9FC8] text-[#0A0A0A]'
+                                        : 'file-panel rounded-[18px] rounded-bl-[6px] px-4 py-2.5 text-foreground'
+                                    }`}
+                                  >
+                                    <p className="text-sm whitespace-pre-wrap break-words">{note}</p>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                          {msg.share?.kind === 'story' && (
+                            <div className="mt-1">
+                              <SharedContentCard share={msg.share} compact />
                             </div>
                           )}
 
                           {/* Time & Read Receipt */}
                           <div className={`flex items-center gap-1 mt-1 ${isOwn ? 'justify-end' : ''}`}>
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="mono-label text-[9px] text-muted-foreground">
                               {formatMessageTime(new Date(msg.created_at))}
                             </span>
                             {isOwn && (
@@ -446,7 +610,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                   {typingUsers[0]?.profile?.display_name?.charAt(0) || '?'}
                 </AvatarFallback>
               </Avatar>
-              <div className="px-4 py-3 rounded-2xl bg-muted/60 rounded-bl-md">
+              <div className="file-panel rounded-[18px] rounded-bl-[6px] px-4 py-3">
                 <div className="flex gap-1">
                   <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                   <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -460,12 +624,32 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Composer */}
-      <MessageComposer 
-        onSend={handleSend} 
-        onTyping={setTypingIndicator}
-        isSending={sendMessage.isPending}
-      />
+      {selectingShare && (
+        <div className="tab-bar flex items-center justify-between gap-3 border-t border-border px-4 py-3">
+          <span className="mono-label text-[10px] text-muted-foreground">{shareIds.length} selected</span>
+          <Button type="button" size="sm" className="rounded-[14px]" onClick={shareToMain} disabled={sharing || shareIds.length === 0}>
+            {sharing ? 'Sharing...' : 'Share to main chat'}
+          </Button>
+        </div>
+      )}
+
+      {isParticipant ? (
+        <MessageComposer 
+          onSend={handleSend} 
+          onTyping={setTypingIndicator}
+          isSending={sendMessage.isPending}
+        />
+      ) : null}
+      {projectId && !isSubgroup && (
+        <CreateSubgroupDialog
+          open={subgroupOpen}
+          onOpenChange={setSubgroupOpen}
+          projectId={projectId}
+          mainConversationId={conversationId}
+          members={conversation?.participants || []}
+          onCreated={(id) => navigate(`/messages?chat=${id}`)}
+        />
+      )}
       {reportMessageId && (
         <ReportDialog
           open

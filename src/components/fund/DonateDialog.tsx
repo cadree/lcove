@@ -8,7 +8,11 @@ import { Heart, ArrowRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { IOS_DONATIONS_ENABLED, isIosApp } from "@/lib/platform";
+import { openExternalCheckout, readStorefrontCountry } from "@/lib/externalCheckout";
+import { isUsStorefront } from "@/lib/iosStorefront";
+import { errorMessage } from "@/lib/errorMessage";
+import { ETHER_WEB_ORIGIN, isIosApp } from "@/lib/platform";
+import { supportCadenceLabel, supportCheckoutLabel } from "@/lib/supportCopy";
 
 const PRESET_AMOUNTS = [5, 10, 25, 50];
 
@@ -24,12 +28,16 @@ export function DonateDialog({ children }: { children: React.ReactNode }) {
   const effectiveAmount = isCustom ? Number(customAmount) : amount;
 
   const handleDonate = async () => {
-    if (isIosApp() && !IOS_DONATIONS_ENABLED) {
-      toast.error("Donations aren't available in the iOS app.");
-      return;
+    const ios = isIosApp();
+    if (ios) {
+      const country = await readStorefrontCountry();
+      if (!isUsStorefront(country)) {
+        toast.error("Support isn't available in the iOS app.");
+        return;
+      }
     }
     if (!effectiveAmount || effectiveAmount < 1) {
-      toast.error("Minimum donation is $1");
+      toast.error("Minimum support is $1");
       return;
     }
 
@@ -45,18 +53,23 @@ export function DonateDialog({ children }: { children: React.ReactNode }) {
       }
 
       const { data, error } = await supabase.functions.invoke("create-fund-donation", {
-        body: { amount: effectiveAmount, mode },
+        body: { amount: effectiveAmount, mode, ...(ios ? { return_origin: ETHER_WEB_ORIGIN } : {}) },
         headers,
       });
 
       if (error) throw error;
       if (data?.url) {
+        if (ios) {
+          await openExternalCheckout(data.url);
+          setOpen(false);
+          return;
+        }
         const win = window.open(data.url, "_blank");
         if (!win || win.closed) {
           try {
             window.location.href = data.url;
           } catch {
-            toast.info("Click to complete your donation", {
+            toast.info("Click to complete your support", {
               duration: 15000,
               action: { label: "Open Checkout", onClick: () => window.open(data.url, "_blank") },
             });
@@ -65,8 +78,8 @@ export function DonateDialog({ children }: { children: React.ReactNode }) {
         setOpen(false);
       }
     } catch (err) {
-      console.error("Donation error:", err);
-      toast.error("Failed to start checkout. Please try again.");
+      console.error("Support checkout error:", err);
+      toast.error(errorMessage(err, "Failed to start checkout. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -77,9 +90,9 @@ export function DonateDialog({ children }: { children: React.ReactNode }) {
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 font-serif">
+          <DialogTitle className="ether-title flex items-center gap-2 text-2xl">
             <Heart className="w-5 h-5 text-primary" />
-            Support the Community Fund
+            Support Ether
           </DialogTitle>
         </DialogHeader>
 
@@ -133,7 +146,7 @@ export function DonateDialog({ children }: { children: React.ReactNode }) {
           {/* Summary */}
           <div className="rounded-lg bg-muted/50 p-4 text-center">
             <p className="text-sm text-muted-foreground">
-              {mode === "recurring" ? "Monthly donation" : "One-time donation"}
+              {supportCadenceLabel(mode)}
             </p>
             <p className="text-3xl font-bold text-foreground mt-1">
               ${effectiveAmount || 0}
@@ -153,7 +166,7 @@ export function DonateDialog({ children }: { children: React.ReactNode }) {
             ) : (
               <Heart className="w-4 h-4 mr-2" />
             )}
-            {loading ? "Redirecting..." : "Donate Now"}
+            {supportCheckoutLabel(loading)}
             {!loading && <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />}
           </Button>
         </div>

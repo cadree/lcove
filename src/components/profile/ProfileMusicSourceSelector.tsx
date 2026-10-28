@@ -16,6 +16,17 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
+import {
+  AUDIO_FILE_ACCEPT,
+  AUDIO_UPLOAD_ACTION,
+  AUDIO_UPLOAD_DETAIL,
+  AUDIO_UPLOAD_HINT,
+  AUDIO_UPLOAD_REJECTED,
+  AUDIO_UPLOAD_SUBTITLE,
+  audioContentType,
+  isAudioUpload,
+} from "@/lib/audioFiles";
 import { cn } from "@/lib/utils";
 
 // Icons for music services - wrapped with forwardRef to prevent ref warnings
@@ -174,9 +185,8 @@ export const ProfileMusicSourceSelector = ({
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    const validTypes = ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/x-m4a', 'audio/m4a'];
-    if (!validTypes.some(type => file.type.includes(type.split('/')[1]))) {
-      setError("Please upload an MP3, WAV, or M4A file.");
+    if (!isAudioUpload(file)) {
+      setError(AUDIO_UPLOAD_REJECTED);
       return;
     }
 
@@ -194,7 +204,7 @@ export const ProfileMusicSourceSelector = ({
 
       const { error: uploadError } = await supabase.storage
         .from('media')
-        .upload(fileName, file, { upsert: true });
+        .upload(fileName, file, { upsert: true, contentType: audioContentType(file) });
 
       if (uploadError) throw uploadError;
 
@@ -218,7 +228,7 @@ export const ProfileMusicSourceSelector = ({
       toast.success("Music uploaded successfully!");
     } catch (err) {
       console.error('Upload error:', err);
-      setError("Failed to upload audio file.");
+      setError(errorMessage(err, "Failed to upload audio file."));
     } finally {
       setIsProcessing(false);
     }
@@ -253,7 +263,7 @@ export const ProfileMusicSourceSelector = ({
       onMusicChange(updatedData);
       toast.success("Album art uploaded!");
     } catch (err) {
-      toast.error("Failed to upload artwork.");
+      toast.error(errorMessage(err, "Failed to upload artwork."));
     } finally {
       setIsProcessing(false);
     }
@@ -297,7 +307,7 @@ export const ProfileMusicSourceSelector = ({
       icon: Upload,
       color: 'text-primary',
       bgColor: 'bg-primary/10 hover:bg-primary/20',
-      description: 'Upload MP3, WAV, or M4A',
+      description: AUDIO_UPLOAD_SUBTITLE,
     },
   ];
 
@@ -574,12 +584,12 @@ export const ProfileMusicSourceSelector = ({
                   <span className="font-medium">Upload Audio File</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Upload an MP3, WAV, or M4A file (max 20MB). Full playback for visitors.
+                  {AUDIO_UPLOAD_DETAIL}
                 </p>
-                <div
-                  onClick={() => audioInputRef.current?.click()}
+                <label
+                  htmlFor="profile-audio-file"
                   className={cn(
-                    "border-2 border-dashed border-border/50 rounded-xl p-8 text-center cursor-pointer transition-colors",
+                    "relative block border-2 border-dashed border-border/50 rounded-xl p-8 text-center cursor-pointer transition-colors",
                     "hover:border-primary/50 hover:bg-primary/5"
                   )}
                 >
@@ -588,20 +598,21 @@ export const ProfileMusicSourceSelector = ({
                   ) : (
                     <>
                       <Music className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                      <p className="text-sm font-medium">Click to upload</p>
+                      <p className="text-sm font-medium">{AUDIO_UPLOAD_ACTION}</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        MP3, WAV, M4A • Max 20MB
+                        {AUDIO_UPLOAD_HINT}
                       </p>
                     </>
                   )}
-                </div>
-                <input
-                  ref={audioInputRef}
-                  type="file"
-                  accept=".mp3,.wav,.m4a,audio/mpeg,audio/wav,audio/mp4,audio/x-m4a"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
+                  <input
+                    id="profile-audio-file"
+                    ref={audioInputRef}
+                    type="file"
+                    accept={AUDIO_FILE_ACCEPT}
+                    onChange={handleFileUpload}
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  />
+                </label>
               </div>
             )}
 

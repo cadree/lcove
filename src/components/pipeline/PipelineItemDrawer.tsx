@@ -452,7 +452,7 @@ export function PipelineItemDrawer({
               <Button variant="outline" onClick={handleCancel} disabled={isSaving} className="flex-1">
                 Cancel
               </Button>
-              <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+              <Button type="button" onClick={handleSave} disabled={isSaving} className="flex-1">
                 {isSaving ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (

@@ -18,6 +18,7 @@ interface Role {
   category: string | null;
 }
 
+// Signup no longer mounts this step. Roles stay editable on the profile.
 const OnboardingRoles = ({ data, updateData, onNext, onBack }: Props) => {
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,12 +69,15 @@ const OnboardingRoles = ({ data, updateData, onNext, onBack }: Props) => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <p className="text-primary text-sm font-medium mb-2">Step 4 of 4</p>
+          <p className="text-primary text-sm font-medium mb-2">Step 3 of 3</p>
           <h1 className="font-display text-4xl md:text-5xl text-foreground mb-2">
             Your Roles
           </h1>
           <p className="text-muted-foreground">
             How do you identify in the creative space? Select up to 5.
+          </p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Tools such as Adobe are optional. Add them later from your profile.
           </p>
         </motion.div>
 

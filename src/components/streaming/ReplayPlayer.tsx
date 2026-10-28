@@ -254,6 +254,7 @@ export const ReplayPlayer: React.FC<ReplayPlayerProps> = ({ src, poster, classNa
       {/* Video Element */}
       <video
         ref={videoRef}
+        data-testid="replay-video"
         src={src}
         poster={poster || undefined}
         className="w-full h-full object-contain"

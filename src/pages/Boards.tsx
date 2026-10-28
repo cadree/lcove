@@ -29,7 +29,7 @@ const Boards = () => {
       <PageLayout>
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
           <h2 className="font-display text-2xl text-foreground">Sign in to view your boards</h2>
-          <Button onClick={() => navigate("/auth")}>Sign In</Button>
+          <Button onClick={() => navigate("/auth")}>Sign in</Button>
         </div>
       </PageLayout>
     );

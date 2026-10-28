@@ -1,5 +1,8 @@
-import { createContext, useContext, useState, ReactNode } from "react";
-import { CreateShareFlow } from "@/components/create/CreateShareFlow";
+import { createContext, lazy, Suspense, useContext, useState, ReactNode } from "react";
+
+const CreateSheet = lazy(() =>
+  import("@/components/navigation/CreateSheet").then((module) => ({ default: module.CreateSheet })),
+);
 
 interface CreateFlowContextValue {
   openCreate: () => void;
@@ -13,7 +16,9 @@ export function CreateFlowProvider({ children }: { children: ReactNode }) {
   return (
     <CreateFlowContext.Provider value={{ openCreate: () => setOpen(true) }}>
       {children}
-      <CreateShareFlow open={open} onOpenChange={setOpen} />
+      <Suspense fallback={null}>
+        {open ? <CreateSheet open={open} onOpenChange={setOpen} /> : null}
+      </Suspense>
     </CreateFlowContext.Provider>
   );
 }

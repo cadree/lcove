@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { BackButton } from '@/components/navigation/BackButton';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Play,
   Info,
   Search,
-  ArrowLeft,
   Lock,
   Film,
   Tv,
@@ -57,7 +57,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ContentDetailDialog } from '@/components/cinema/ContentDetailDialog';
 import { VideoPlayer } from '@/components/cinema/VideoPlayer';
 import { IosDigitalGoodsNotice } from '@/components/ios/IosDigitalGoodsNotice';
-import { isIosApp } from '@/lib/platform';
+import { digitalPurchasesEnabled } from '@/lib/platform';
 import { SubmitContentDialog } from '@/components/cinema/SubmitContentDialog';
 import { cn } from '@/lib/utils';
 
@@ -146,8 +146,11 @@ const NetworkPage = () => {
 
   if (networkLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading network...</div>
+      <div className="min-h-screen bg-background">
+        <div className="px-4 pt-4"><BackButton label="Back" fallback="/cinema" /></div>
+        <div className="flex items-center justify-center py-24">
+          <div className="animate-pulse text-muted-foreground">Loading network...</div>
+        </div>
       </div>
     );
   }
@@ -157,9 +160,7 @@ const NetworkPage = () => {
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
         <Film className="w-16 h-16 text-muted-foreground" />
         <h1 className="text-xl font-medium">Network not found</h1>
-        <Link to="/cinema">
-          <Button variant="outline">Back to Cinema</Button>
-        </Link>
+        <BackButton showLabel label="Back" fallback="/cinema" />
       </div>
     );
   }
@@ -184,11 +185,7 @@ const NetworkPage = () => {
       <header className="fixed top-0 left-0 right-0 z-30 bg-gradient-to-b from-background via-background/80 to-transparent">
         <div className="flex items-center justify-between px-4 md:px-12 py-3">
           <div className="flex items-center gap-3 md:gap-6">
-            <Link to="/cinema">
-              <Button variant="ghost" size="icon" className="text-foreground hover:bg-background/20 -ml-2">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
+            <BackButton label="Back" fallback="/cinema" className="text-foreground hover:bg-background/20 -ml-2" />
             
             {/* Network Logo/Name - mobile shows just logo */}
             <div className="flex items-center gap-2">
@@ -339,9 +336,19 @@ const NetworkPage = () => {
             </div>
 
             {/* Title */}
-            <h1 className="font-display text-3xl md:text-5xl lg:text-6xl font-bold text-foreground mb-2 leading-[1.1]">
-              {heroContent?.title || 'Welcome'}
-            </h1>
+            {heroContent ? (
+              <button
+                type="button"
+                className="mb-2 text-left font-display text-3xl font-bold leading-[1.1] text-foreground md:text-5xl lg:text-6xl"
+                onClick={() => setSelectedContent(heroContent)}
+              >
+                {heroContent.title}
+              </button>
+            ) : (
+              <h1 className="mb-2 font-display text-3xl font-bold leading-[1.1] text-foreground md:text-5xl lg:text-6xl">
+                Welcome
+              </h1>
+            )}
 
             {/* Meta badges */}
             {heroContent && (
@@ -392,7 +399,7 @@ const NetworkPage = () => {
               </Button>
 
               {network.is_paid && !isSubscribed && !isOwner && (
-                isIosApp() ? (
+                !digitalPurchasesEnabled() ? (
                   <IosDigitalGoodsNotice className="max-w-xs" />
                 ) : (
                 <Button
@@ -439,7 +446,7 @@ const NetworkPage = () => {
             <p className="text-muted-foreground">
               {isOwner
                 ? 'Start adding content to your network!'
-                : 'This network is just getting started. Check back soon!'}
+                : 'Nothing is posted on this network yet.'}
             </p>
             {isOwner && (
               <Link to={`/cinema/manage/${networkId}`}>
@@ -940,6 +947,16 @@ const ContentCard = ({
         </div>
       )}
     </div>
+    <button
+      type="button"
+      className="mt-1.5 w-full truncate px-0.5 text-left text-xs font-medium text-foreground"
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect(content);
+      }}
+    >
+      {content.title}
+    </button>
   </motion.div>
 );
 

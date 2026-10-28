@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ArrowRight, ArrowLeft, MapPin, Check, X } from 'lucide-react';
 import { OnboardingData } from '@/pages/Onboarding';
-import { normalizeCity } from '@/lib/cityNormalization';
+import { resolveCity, suggestCities } from '@/lib/cities';
 
 interface Props {
   data: OnboardingData;
@@ -37,38 +37,36 @@ const OnboardingCity = ({ data, updateData, onNext, onBack }: Props) => {
   const confirmedCity = data.city;
   const isConfirmed = confirmedCity.trim().length > 0;
 
+  const suggestions = useMemo(() => suggestCities(inputValue), [inputValue]);
+  const resolvedInput = useMemo(() => resolveCity(inputValue), [inputValue]);
+  const hint = resolvedInput.confidence === 'fuzzy' ? resolvedInput.suggestion : null;
+
   const confirmCity = (city: string) => {
     const trimmed = city.trim();
     if (trimmed.length >= 2) {
-      // Normalize the city for consistent storage
-      const { city_display, city_key } = normalizeCity(trimmed);
-      updateData({ 
-        city: city_display,
-        cityDisplay: city_display,
-        cityKey: city_key,
+      const resolved = resolveCity(trimmed);
+      updateData({
+        city: trimmed,
+        cityDisplay: resolved.city_display || trimmed,
+        cityKey: resolved.city_key,
       });
-      // Clear input if it matches what was just confirmed (custom input)
-      if (!popularCities.includes(city_display)) {
-        setInputValue(city_display);
-      } else {
-        setInputValue('');
-      }
+      setInputValue(trimmed);
     }
   };
 
   const selectPopularCity = (city: string) => {
-    // Popular cities are already clean, but normalize for consistency
-    const { city_display, city_key } = normalizeCity(city);
-    updateData({ 
-      city: city_display,
-      cityDisplay: city_display,
-      cityKey: city_key,
+    const resolved = resolveCity(city);
+    const label = resolved.suggestion?.label || resolved.city_display || city;
+    updateData({
+      city: label,
+      cityDisplay: label,
+      cityKey: resolved.city_key,
     });
     setInputValue('');
   };
 
   const clearSelection = () => {
-    updateData({ city: '' });
+    updateData({ city: '', cityDisplay: '', cityKey: '' });
     setInputValue('');
   };
 
@@ -78,6 +76,11 @@ const OnboardingCity = ({ data, updateData, onNext, onBack }: Props) => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && suggestions.length > 0) {
+      e.preventDefault();
+      confirmCity(suggestions[0].label);
+      return;
+    }
     if (e.key === 'Enter' && inputValue.trim().length >= 2) {
       e.preventDefault();
       confirmCity(inputValue);
@@ -94,7 +97,7 @@ const OnboardingCity = ({ data, updateData, onNext, onBack }: Props) => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <p className="text-primary text-sm font-medium mb-2">Step 2 of 4</p>
+          <p className="text-primary text-sm font-medium mb-2">Step 3 of 4</p>
           <h1 className="font-display text-4xl md:text-5xl text-foreground mb-2">
             Your City
           </h1>
@@ -111,7 +114,7 @@ const OnboardingCity = ({ data, updateData, onNext, onBack }: Props) => {
         >
           {/* City Input with Confirm Button */}
           <div className="space-y-3">
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <div className="relative flex-1">
                 <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
@@ -135,10 +138,36 @@ const OnboardingCity = ({ data, updateData, onNext, onBack }: Props) => {
               </Button>
             </div>
 
+            {suggestions.length > 0 && inputValue.trim() !== confirmedCity && (
+              <ul className="rounded-xl border border-border bg-popover p-1" role="listbox">
+                {suggestions.map((city) => (
+                  <li key={city.key}>
+                    <button
+                      type="button"
+                      onClick={() => confirmCity(city.label)}
+                      className="flex min-h-11 w-full items-center rounded-lg px-3 text-left text-sm hover:bg-accent"
+                    >
+                      {city.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {hint && inputValue.trim().toLowerCase() !== hint.label.toLowerCase() && (
+              <button
+                type="button"
+                onClick={() => confirmCity(hint.label)}
+                className="min-h-11 text-left text-sm text-primary underline-offset-2 hover:underline"
+              >
+                Did you mean {hint.label}?
+              </button>
+            )}
+
             {/* Helper text when typing but not confirmed */}
             {inputValue.trim().length > 0 && inputValue.trim() !== confirmedCity && (
               <p className="text-sm text-muted-foreground">
-                Type your city, then tap "Use this city" or press Enter
+                Enter uses the top suggestion. Use this city keeps what you typed.
               </p>
             )}
 
@@ -168,7 +197,7 @@ const OnboardingCity = ({ data, updateData, onNext, onBack }: Props) => {
             <p className="text-sm text-muted-foreground mb-4">Or select from popular creative hubs</p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {popularCities.map((city, index) => {
-                const isSelected = confirmedCity === city;
+                const isSelected = confirmedCity.length > 0 && resolveCity(confirmedCity).city_key === resolveCity(city).city_key;
                 return (
                   <motion.button
                     key={city}

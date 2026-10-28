@@ -15,6 +15,7 @@ import { motion } from "framer-motion";
 import { CreatePostDialog } from "@/components/profile/CreatePostDialog";
 import { useProfile } from "@/hooks/useProfile";
 import { usePosts } from "@/hooks/usePosts";
+import type { ComposePostInput } from "@/types/post";
 
 interface FABActionSheetProps {
   open: boolean;
@@ -42,15 +43,18 @@ export function FABActionSheet({ open, onOpenChange }: FABActionSheetProps) {
     setTimeout(action, 150);
   };
 
-  const handleCreatePost = async (data: {
-    content?: string;
-    file?: File;
-    files?: File[];
-    mediaType?: 'photo' | 'video' | 'text' | 'collage';
-    location?: string;
-    altText?: string;
-    commentsEnabled?: boolean;
-  }) => {
+  const handleCreatePost = async (data: ComposePostInput) => {
+    if (data.embed) {
+      await createPost.mutateAsync({
+        content: data.content,
+        mediaType: 'video',
+        embed: data.embed,
+        inlineError: true,
+      });
+      setShowPostDialog(false);
+      return;
+    }
+
     // Map collage to photo for database constraint
     const dbMediaType = data.mediaType === 'collage' ? 'photo' : (data.mediaType || 'text');
     
@@ -61,6 +65,7 @@ export function FABActionSheet({ open, onOpenChange }: FABActionSheetProps) {
       content: data.content,
       file: fileToUpload,
       mediaType: dbMediaType as 'photo' | 'video' | 'text',
+      inlineError: true,
     });
     setShowPostDialog(false);
   };

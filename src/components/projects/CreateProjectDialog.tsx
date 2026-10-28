@@ -6,13 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { milestonesForInsert, roleCreditAmount } from '@/lib/projectCollaborations';
+import { ItemListField, XpExplainer } from '@/components/projects/ItemListField';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import { cn } from '@/lib/utils';
 
 type ProjectType = 'paid' | 'volunteer' | 'hybrid';
@@ -21,6 +23,7 @@ interface RoleInput {
   role_name: string;
   description: string;
   payout_amount: number;
+  credit_amount: number;
   slots_available: number;
 }
 
@@ -78,8 +81,9 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   const [description, setDescription] = useState('');
   const [projectType, setProjectType] = useState<ProjectType>('volunteer');
   const [totalBudget, setTotalBudget] = useState('');
-  const [creditsReward, setCreditsReward] = useState(25);
   const [isPrivate, setIsPrivate] = useState(false);
+  const [hideFromCalendar, setHideFromCalendar] = useState(false);
+  const [listingType, setListingType] = useState<'project' | 'gig'>('project');
 
   // Expected outcome
   const [selectedOutcomes, setSelectedOutcomes] = useState<string[]>([]);
@@ -112,7 +116,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
 
   // Roles
   const [roles, setRoles] = useState<RoleInput[]>([
-    { role_name: '', description: '', payout_amount: 0, slots_available: 1 }
+    { role_name: '', description: '', payout_amount: 0, credit_amount: 0, slots_available: 1 }
   ]);
   const [allowCustomRoles, setAllowCustomRoles] = useState(false);
 
@@ -128,7 +132,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     );
   };
 
-  const addRole = () => setRoles([...roles, { role_name: '', description: '', payout_amount: 0, slots_available: 1 }]);
+  const addRole = () => setRoles([...roles, { role_name: '', description: '', payout_amount: 0, credit_amount: 0, slots_available: 1 }]);
   const removeRole = (i: number) => setRoles(roles.filter((_, idx) => idx !== i));
   const updateRole = (i: number, field: keyof RoleInput, value: string | number) => {
     const updated = [...roles];
@@ -219,7 +223,6 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     if (!user?.id) return;
 
     const validRoles = roles.filter(r => r.role_name.trim());
-    const validMilestones = milestones.filter(m => m.title.trim());
     const validDeliverables = deliverables.filter(d => d.type.trim());
 
     const timelineStart = startDate ? `${startDate}${startTime ? `T${startTime}` : 'T00:00'}` : undefined;
@@ -242,7 +245,11 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
               .from('media')
               .upload(filePath, att.file);
 
-            if (uploadError) { console.error('Upload error:', uploadError); continue; }
+            if (uploadError) {
+              console.error('Upload error:', uploadError);
+              toast.error(errorMessage(uploadError, `Couldn't upload ${att.file.name}`));
+              continue;
+            }
 
             const { data: { publicUrl } } = supabase.storage
               .from('media')
@@ -278,8 +285,13 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
       deliverables: validDeliverables,
       allow_custom_roles: allowCustomRoles,
       is_private: isPrivate,
-      roles: validRoles,
-      milestones: validMilestones,
+      hide_from_calendar: hideFromCalendar,
+      listing_type: listingType,
+      roles: validRoles.map((role) => ({
+        ...role,
+        credit_amount: roleCreditAmount(role.credit_amount),
+      })),
+      milestones: milestonesForInsert(milestones),
     }, {
       onSuccess: async (project) => {
         // Upload attachments to project_attachments table
@@ -302,7 +314,6 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     setDescription('');
     setProjectType('volunteer');
     setTotalBudget('');
-    setCreditsReward(25);
     setIsPrivate(false);
     setSelectedOutcomes([]);
     setAttachments([]);
@@ -320,15 +331,18 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     setEndDate('');
     setEndTime('');
     setMilestones(DEFAULT_PHASES.map(p => ({ title: p.title, phase: p.phase, due_date: '' })));
-    setRoles([{ role_name: '', description: '', payout_amount: 0, slots_available: 1 }]);
+    setRoles([{ role_name: '', description: '', payout_amount: 0, credit_amount: 0, slots_available: 1 }]);
+    setHideFromCalendar(false);
+    setListingType('project');
     setAllowCustomRoles(false);
     setDeliverables([{ type: '', publish_date: '', publish_location: '' }]);
   };
 
+  const roleCredits = roles.reduce((sum, role) => sum + roleCreditAmount(role.credit_amount), 0);
   const canSubmit = title.trim() && (
     projectType === 'volunteer' || 
     (projectType === 'paid' && budgetNum > 0) ||
-    (projectType === 'hybrid' && (budgetNum > 0 || creditsReward > 0))
+    (projectType === 'hybrid' && (budgetNum > 0 || roleCredits > 0))
   );
 
   const fileTypeBadge = (type: string) => {
@@ -398,8 +412,34 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
               </button>
             </div>
             {isPrivate && (
-              <p className="text-xs text-muted-foreground">This project will only be visible to you and invited clients. It won't appear in the public browse feed.</p>
+              <p className="text-xs text-muted-foreground">Hidden from discovery, the community calendar, and new-project notifications. Members and invited people can still open it.</p>
             )}
+            <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+              <div>
+                <Label className="text-sm">Hide from community calendar</Label>
+                <p className="text-xs text-muted-foreground">Public projects are added to the calendar unless you hide them</p>
+              </div>
+              <Switch checked={hideFromCalendar} onCheckedChange={setHideFromCalendar} />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Post as</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['project', 'gig'] as const).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => setListingType(kind)}
+                  className={cn(
+                    "mono-label rounded-[14px] border p-3 text-[11px]",
+                    listingType === kind ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"
+                  )}
+                >
+                  {kind === 'project' ? 'Project idea' : 'Gig'}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Expected Outcome (only for public) */}
@@ -548,36 +588,19 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
             </div>
           )}
 
-          {/* LC Credits Reward */}
-          <div className="space-y-4">
-            <Label className="flex items-center gap-2"><Coins className="h-4 w-4 text-primary" /> LC Credits Reward</Label>
-            <p className="text-xs text-muted-foreground mb-3">Award LC Credits to collaborators (max 100)</p>
-            <Slider value={[creditsReward]} onValueChange={(v) => setCreditsReward(v[0])} max={100} min={5} step={5} />
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">5 (Simple)</span>
-              <span className="font-medium text-primary">{creditsReward} LC</span>
-              <span className="text-muted-foreground">100 (Complex)</span>
-            </div>
-          </div>
-
           {/* Budget & Resources */}
           <div className="space-y-4">
             <Label className="flex items-center gap-2"><Wrench className="h-4 w-4" /> Budget & Resources</Label>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-sm text-muted-foreground">Budget Range</Label>
-                <Select value={budgetRange} onValueChange={setBudgetRange}>
-                  <SelectTrigger><SelectValue placeholder="Select range" /></SelectTrigger>
-                  <SelectContent>
-                    {BUDGET_RANGES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-sm text-muted-foreground">Equipment Needed</Label>
-                <Input value={equipmentNeeded} onChange={(e) => setEquipmentNeeded(e.target.value)} placeholder="Camera, lights, etc." />
-              </div>
+            <div>
+              <Label className="text-sm text-muted-foreground">Budget Range</Label>
+              <Select value={budgetRange} onValueChange={setBudgetRange}>
+                <SelectTrigger><SelectValue placeholder="Select range" /></SelectTrigger>
+                <SelectContent>
+                  {BUDGET_RANGES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
+            <ItemListField label="Equipment needed" value={equipmentNeeded} onChange={setEquipmentNeeded} placeholder="Camera, lights, stand" />
 
             <div className="grid grid-cols-2 gap-3">
               <div className="flex items-center justify-between p-3 border border-border rounded-lg">
@@ -592,10 +615,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
               )}
             </div>
 
-            <div>
-              <Label className="text-sm text-muted-foreground">Props Needed</Label>
-              <Input value={propsNeeded} onChange={(e) => setPropsNeeded(e.target.value)} placeholder="Props, wardrobe, etc." />
-            </div>
+            <ItemListField label="Props needed" value={propsNeeded} onChange={setPropsNeeded} placeholder="Props, wardrobe" />
 
             <div className="grid grid-cols-2 gap-3">
               <div className="flex items-center justify-between p-3 border border-border rounded-lg">
@@ -612,7 +632,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
           {/* Timeline */}
           <div className="space-y-4">
             <Label className="flex items-center gap-2"><Calendar className="h-4 w-4" /> Project Timeline</Label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label className="text-sm text-muted-foreground">Start Date</Label>
                 <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
@@ -622,7 +642,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
                 <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label className="text-sm text-muted-foreground">End Date</Label>
                 <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
@@ -644,20 +664,20 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
             </div>
             <div className="space-y-2">
               {milestones.map((ms, i) => (
-                <div key={i} className="flex items-center gap-2 bg-muted/20 rounded-lg p-3">
-                  <div className="flex-1">
+                <div key={i} className="flex min-w-0 flex-col gap-2 bg-muted/20 rounded-lg p-3 sm:flex-row sm:items-center">
+                  <div className="min-w-0 flex-1">
                     <Input
                       value={ms.title}
                       onChange={(e) => updateMilestone(i, 'title', e.target.value)}
                       placeholder="Milestone name"
-                      className="mb-1"
+                      className="mb-1 w-full"
                     />
                   </div>
                   <Input
                     type="date"
                     value={ms.due_date}
                     onChange={(e) => updateMilestone(i, 'due_date', e.target.value)}
-                    className="w-40"
+                    className="w-full min-w-0 sm:w-40"
                   />
                   {ms.phase === 'custom' && (
                     <Button type="button" variant="ghost" size="sm" onClick={() => removeMilestone(i)} className="text-muted-foreground hover:text-destructive">
@@ -671,6 +691,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
 
           {/* Roles */}
           <div className="space-y-4">
+            <XpExplainer />
             <div className="flex items-center justify-between">
               <Label className="flex items-center gap-2"><Users2 className="h-4 w-4" /> Roles Needed</Label>
               <Button type="button" variant="outline" size="sm" onClick={addRole}>
@@ -704,14 +725,17 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
                     <div className="col-span-2 sm:col-span-1">
                       <Input value={role.description} onChange={(e) => updateRole(index, 'description', e.target.value)} placeholder="Brief description" />
                     </div>
-                    {(projectType === 'paid' || projectType === 'hybrid') && (
-                      <div>
-                        <div className="relative">
-                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input type="number" value={role.payout_amount || ''} onChange={(e) => updateRole(index, 'payout_amount', parseFloat(e.target.value) || 0)} placeholder="Payout" className="pl-9" min={0} />
-                        </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Pay (USD)</Label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input type="number" value={role.payout_amount || ''} onChange={(e) => updateRole(index, 'payout_amount', parseFloat(e.target.value) || 0)} placeholder="0" className="pl-9" min={0} />
                       </div>
-                    )}
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">XP / barter credit</Label>
+                      <Input type="number" value={role.credit_amount || ''} onChange={(e) => updateRole(index, 'credit_amount', parseFloat(e.target.value) || 0)} placeholder="0" min={0} />
+                    </div>
                     <div>
                       <Input type="number" value={role.slots_available} onChange={(e) => updateRole(index, 'slots_available', parseInt(e.target.value) || 1)} placeholder="Slots" min={1} />
                       <span className="text-xs text-muted-foreground">slots available</span>

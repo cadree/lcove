@@ -39,7 +39,7 @@ In the dashboard SQL editor, or with `psql` against this project's connection st
 
 If a notice says this role could not change publication `supabase_realtime` (that publication is owned by `supabase_admin`), add these tables under Database, Publications, `supabase_realtime`:
 
-`post_likes`, `post_comments`, `messages`, `typing_indicators`, `message_read_receipts`, `notifications`, `live_streams`, `stream_reactions`, `story_views`, `fund_distributions`, `conversation_participants`, `project_checklist_items`, `project_item_suggestions`, `events`, `projects`, `ticket_tiers`, `ticket_orders`, `event_attendees`, `event_check_ins`, `donations`, `stream_chat`, `board_items`.
+`post_likes`, `post_comments`, `messages`, `typing_indicators`, `message_read_receipts`, `notifications`, `live_streams`, `stream_reactions`, `stream_tips`, `stream_gifts`, `story_views`, `fund_distributions`, `conversation_participants`, `project_checklist_items`, `project_item_suggestions`, `events`, `projects`, `ticket_tiers`, `ticket_orders`, `event_attendees`, `event_check_ins`, `donations`, `stream_chat`, `board_items`.
 
 `profiles` is not in that list. Realtime would send every column of a row the subscriber can select, including phone and exam fields that `profiles_public` omits. The landing stats query does not subscribe to `profiles`. If a notice says `profiles` could not be removed from the publication, remove it on that same screen.
 
@@ -57,7 +57,7 @@ Dashboard, Authentication, URL configuration:
   - `https://etherbylcove.com/**`
   - `https://etherbylcove.com/auth?reset=true`
   - `https://etherbylcove.com/auth?confirmed=1`
-  - `com.etherbylcove.app://`
+  - `app.lovable.e07d9c457fd949f78f3cc7d5998be668://`
   - `capacitor://localhost`
 
 Add the staging host (`pages.dev` or Netlify) the same way, including `/auth?reset=true` and `/auth?confirmed=1`, while you test. Remove it when you no longer want that host to complete login.
@@ -85,7 +85,7 @@ Profile photos are public URLs in `media`. `avatars` is private and exists so `d
 Supabase injects `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Set the rest as GitHub Actions secrets. The deploy workflow copies each name that is set and skips the rest. Do not put the values in the repo. The click path is in `docs/deploy-ether-prod.md`.
 
 - `INTERNAL_FUNCTION_SECRET` (the existing Vault secret `internal_function_secret`, not a new value)
-- `EMAIL_FROM` (optional; default `notifications@notifications.etherbylcove.com`)
+- `EMAIL_FROM` (optional; default `notifications@etherbylcove.com`)
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET` (from `docs/stripe-setup.md`, for this project's endpoint)
 - `STRIPE_PRODUCT_COMMUNITY`, `STRIPE_PRICE_COMMUNITY`, `STRIPE_PRODUCT_ELITE`, `STRIPE_PRICE_ELITE` (this Stripe account; `docs/stripe-setup.md`)
@@ -95,8 +95,7 @@ Supabase injects `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE
 - `TWILIO_PHONE_NUMBER`
 - `VAPID_PUBLIC_KEY`
 - `VAPID_PRIVATE_KEY`
-- `MUX_TOKEN_ID`
-- `MUX_TOKEN_SECRET`
+- `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (LiveKit Cloud. Camera streams do not use Mux.)
 - `SITE_URL` = `https://etherbylcove.com` (use the `pages.dev` URL until the domain moves)
 - `APP_URL` = `https://etherbylcove.com` (same as `SITE_URL`)
 
@@ -119,6 +118,8 @@ The workflow runs `supabase functions deploy --use-api` (no Docker) and reads `v
 
 Stripe webhook events are listed in `docs/stripe-setup.md`.
 
+Live video is LiveKit Cloud, not Mux. After the functions deploy, set `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET`, and point the LiveKit webhook at `https://aykopqinnnssxdhxqruo.supabase.co/functions/v1/livekit-webhook`. A full deploy does not delete functions already on the project. Delete `mux-stream` and `mux-status` in the Supabase dashboard if they are still there. Until the LiveKit secrets exist, Go Live shows "Live video not configured" and does not open the camera.
+
 ## 9. Regenerate database types
 
 After the bundle has been applied on `aykopqinnnssxdhxqruo`:
@@ -131,7 +132,7 @@ Commit that file. `src/integrations/supabase/client.ts` only re-exports `src/lib
 
 ## 10. Host the client
 
-Follow `docs/hosting-without-lovable.md`. Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_SUPABASE_PROJECT_ID` (`aykopqinnnssxdhxqruo`) on the host and rebuild. Point `etherbylcove.com` only after a `pages.dev` URL signs in.
+Follow `docs/hosting-without-lovable.md`. Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_SUPABASE_PROJECT_ID` (`aykopqinnnssxdhxqruo`) on the host's **Production** environment and rebuild. Do not put those values on **Preview**. Preview uses a second project, in `docs/preview-staging.md`. Point `etherbylcove.com` only after the production `pages.dev` URL signs in.
 
 ## 11. Merge
 

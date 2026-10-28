@@ -35,28 +35,18 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
-	<!-- CONFIRM WITH CADRE: this scheme is the placeholder bundle id.
-	     It must match src/config/nativeIds.ts and the Supabase redirect allow-list. -->
+	<!-- Auth return scheme. Must match NATIVE_APP_ID and the Supabase redirect allow-list. -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.etherbylcove.app</string>
+			<string>app.lovable.e07d9c457fd949f78f3cc7d5998be668</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.etherbylcove.app</string>
+				<string>app.lovable.e07d9c457fd949f78f3cc7d5998be668</string>
 			</array>
 		</dict>
 	</array>

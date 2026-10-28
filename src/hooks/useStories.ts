@@ -1,8 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
+import { shotContentThin, shotSessionEnabled, shotStories } from '@/lib/shotSession';
+import { storyViewShouldRefresh } from '@/lib/feedWindow';
 
 interface Story {
   id: string;
@@ -18,6 +22,12 @@ interface Story {
   };
   view_count?: number;
   has_viewed?: boolean;
+  source_post_id?: string | null;
+  credit_user_id?: string | null;
+  credit_profile?: {
+    display_name: string | null;
+    avatar_url: string | null;
+  } | null;
 }
 
 interface StoryWithProfile extends Story {
@@ -29,11 +39,13 @@ interface StoryWithProfile extends Story {
 
 export function useStories() {
   const { user } = useAuth();
+  const { blockedIds } = useUserBlocks();
   const queryClient = useQueryClient();
 
   const { data, isLoading, refetch, error } = useQuery({
     queryKey: ['stories'],
     queryFn: async () => {
+      if (shotSessionEnabled()) return shotContentThin() ? { stories: [], grouped: {} } : shotStories();
       console.log('[useStories] Fetching stories...');
       
       // Get all non-expired stories
@@ -55,7 +67,10 @@ export function useStories() {
       }
 
       // Get profiles for story creators
-      const userIds = [...new Set(storiesData.map(s => s.user_id))];
+      const userIds = [...new Set([
+        ...storiesData.map(s => s.user_id),
+        ...storiesData.flatMap(s => s.credit_user_id ? [s.credit_user_id] : []),
+      ])];
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles_public')
         .select('user_id, display_name, avatar_url')
@@ -70,41 +85,38 @@ export function useStories() {
 
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
 
-      // Get view counts for each story (only for own stories)
-      const storiesWithProfiles = await Promise.all(
-        storiesData.map(async (story) => {
-          let viewCount = 0;
-          let hasViewed = false;
+      // One lookup for "have I seen this" and one for the owner's counts.
+      // A query per story was an N+1 on every feed load.
+      const viewedIds = new Set<string>();
+      const viewCounts = new Map<string, number>();
+      if (user && storiesData.length) {
+        const storyIds = storiesData.map((story) => story.id);
+        const { data: viewed } = await supabase
+          .from('story_views')
+          .select('story_id')
+          .eq('viewer_id', user.id)
+          .in('story_id', storyIds);
+        for (const row of viewed ?? []) viewedIds.add(row.story_id);
 
-          if (user) {
-            // Check if current user has viewed this story
-            const { data: viewData } = await supabase
-              .from('story_views')
-              .select('id')
-              .eq('story_id', story.id)
-              .eq('viewer_id', user.id)
-              .maybeSingle();
-            
-            hasViewed = !!viewData;
-
-            // Get view count only if user owns this story
-            if (story.user_id === user.id) {
-              const { count } = await supabase
-                .from('story_views')
-                .select('*', { count: 'exact', head: true })
-                .eq('story_id', story.id);
-              viewCount = count || 0;
-            }
+        const ownIds = storiesData.filter((story) => story.user_id === user.id).map((story) => story.id);
+        if (ownIds.length) {
+          const { data: ownViews } = await supabase
+            .from('story_views')
+            .select('story_id')
+            .in('story_id', ownIds);
+          for (const row of ownViews ?? []) {
+            viewCounts.set(row.story_id, (viewCounts.get(row.story_id) ?? 0) + 1);
           }
+        }
+      }
 
-          return {
-            ...story,
-            profile: profileMap.get(story.user_id) || { display_name: 'Private profile', avatar_url: null },
-            view_count: viewCount,
-            has_viewed: hasViewed,
-          } as StoryWithProfile;
-        })
-      );
+      const storiesWithProfiles = storiesData.map((story) => ({
+        ...story,
+        profile: profileMap.get(story.user_id) || { display_name: 'Private profile', avatar_url: null },
+        credit_profile: story.credit_user_id ? profileMap.get(story.credit_user_id) || null : null,
+        view_count: viewCounts.get(story.id) ?? 0,
+        has_viewed: viewedIds.has(story.id),
+      })) as StoryWithProfile[];
 
       // Group stories by user
       const groupedByUser = storiesWithProfiles.reduce((acc, story) => {
@@ -135,7 +147,12 @@ export function useStories() {
           table: 'story_views',
         },
         (payload) => {
-          // Invalidate stories query to refresh view counts
+          const row = (payload.new ?? null) as { story_id?: string } | null;
+          const cached = queryClient.getQueryData<{ stories?: { id: string; user_id: string }[] }>(['stories']);
+          const owned = new Set(
+            (cached?.stories ?? []).filter((story) => story.user_id === user.id).map((story) => story.id),
+          );
+          if (!storyViewShouldRefresh(row?.story_id, owned)) return;
           queryClient.invalidateQueries({ queryKey: ['stories'] });
         }
       )
@@ -172,13 +189,43 @@ export function useStories() {
         });
 
       if (insertError) throw insertError;
+      return { mediaUrl: publicUrl };
+    },
+    onMutate: async ({ file, mediaType }) => {
+      if (!user) return;
+      await queryClient.cancelQueries({ queryKey: ['stories'] });
+      const previous = queryClient.getQueryData(['stories']);
+      const preview = URL.createObjectURL(file);
+      const optimistic = {
+        id: `optimistic-${Date.now()}`,
+        user_id: user.id,
+        media_url: preview,
+        media_type: mediaType,
+        is_live: false,
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        profile: { display_name: 'You', avatar_url: null },
+        view_count: 0,
+        has_viewed: true,
+      };
+      queryClient.setQueryData(['stories'], (current: { stories?: StoryWithProfile[]; grouped?: Record<string, StoryWithProfile[]> } | undefined) => {
+        const stories = [optimistic, ...(current?.stories ?? [])];
+        const grouped = {
+          ...(current?.grouped ?? {}),
+          [user.id]: [optimistic, ...(current?.grouped?.[user.id] ?? [])],
+        };
+        return { stories, grouped };
+      });
+      return { previous, preview };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stories'] });
-      toast.success('Story uploaded!');
+      toast.success('Story posted');
     },
-    onError: (error) => {
-      toast.error('Failed to upload story');
+    onError: (error, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(['stories'], context.previous);
+      if (context?.preview) URL.revokeObjectURL(context.preview);
+      toast.error(errorMessage(error, 'Failed to upload story'));
       console.error(error);
     },
   });
@@ -230,9 +277,26 @@ export function useStories() {
     },
   });
 
+  const stories = useMemo(() => {
+    const rows = (data?.stories || []) as StoryWithProfile[];
+    return rows.filter((story) => {
+      if (blockedIds.includes(story.user_id)) return false;
+      if (story.credit_user_id && blockedIds.includes(story.credit_user_id)) return false;
+      return true;
+    });
+  }, [data?.stories, blockedIds]);
+
+  const groupedStories = useMemo(() => {
+    return stories.reduce((acc, story) => {
+      if (!acc[story.user_id]) acc[story.user_id] = [];
+      acc[story.user_id].push(story);
+      return acc;
+    }, {} as Record<string, StoryWithProfile[]>);
+  }, [stories]);
+
   return {
-    stories: data?.stories || [],
-    groupedStories: data?.grouped || {},
+    stories,
+    groupedStories,
     isLoading,
     error,
     uploadStory,

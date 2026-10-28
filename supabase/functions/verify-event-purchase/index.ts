@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { httpStatusForError } from "../_shared/http-error.mjs";
+import { assertEventStripeTestKey } from "../_shared/stripe-mode.mjs";
+import { sendOrderConfirmation } from "../_shared/order-confirmation-email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,8 +38,15 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { sessionId, orderId } = await req.json();
-    if (!sessionId && !orderId) throw new Error("sessionId or orderId required");
+    const { sessionId, orderId, eventId } = await req.json();
+    if (!sessionId && !orderId) {
+      if (eventId) {
+        return new Response(JSON.stringify({ freeRsvp: true, order: null, attendees: [] }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw new Error("sessionId or orderId required");
+    }
 
     // If we only got sessionId, look up the order
     let order: TicketOrder | null = null;
@@ -49,13 +59,21 @@ serve(async (req) => {
     }
     if (!order) throw new Error("Order not found");
 
-    // If already paid (free order or webhook updated), return immediately
-    if (order.payment_status === "paid") {
+    const orderRecord = order as TicketOrder & { total_cents?: number | null; payment_method?: string | null };
+    const isFreeOrder = orderRecord.payment_method === "free" || (orderRecord.total_cents ?? 0) === 0;
+
+    // Free RSVPs are already confirmed. Do not ask Stripe.
+    if (order.payment_status === "paid" || isFreeOrder) {
+      if (order.payment_status !== "paid") {
+        await supabase.from("ticket_orders").update({ payment_status: "paid" }).eq("id", order.id);
+        order.payment_status = "paid";
+      }
       const { data: attendees } = await supabase
         .from("event_attendees")
         .select("id, qr_code, ticket_number, attendee_name, attendee_email, status")
         .eq("order_id", order.id)
         .order("created_at");
+      sendOrderConfirmation(supabase, order.id).catch((error) => log("email", { message: errorMessage(error) }));
       return new Response(JSON.stringify({ order, attendees: attendees || [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -64,7 +82,7 @@ serve(async (req) => {
     // Otherwise: verify with Stripe
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) throw new Error("Stripe not configured");
-    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
+    const stripe = new Stripe(assertEventStripeTestKey(stripeKey), { apiVersion: "2025-08-27.basil" });
 
     const session = await stripe.checkout.sessions.retrieve(sessionId || order.stripe_session_id);
     log("Session", { status: session.payment_status });
@@ -85,6 +103,9 @@ serve(async (req) => {
       .eq("order_id", order.id)
       .order("created_at");
 
+    if (refreshedOrder?.payment_status === "paid") {
+      sendOrderConfirmation(supabase, order.id).catch((error) => log("email", { message: errorMessage(error) }));
+    }
     return new Response(JSON.stringify({ order: refreshedOrder, attendees: attendees || [] }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -93,7 +114,7 @@ serve(async (req) => {
     log("ERROR", { msg });
     return new Response(JSON.stringify({ error: msg }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 400,
+      status: httpStatusForError(error),
     });
   }
 });

@@ -31,6 +31,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
+import { AUDIO_FILE_ACCEPT, AUDIO_UPLOAD_ACTION, AUDIO_UPLOAD_REJECTED, audioContentType, audioExtension, isAudioUpload } from "@/lib/audioFiles";
+import { readFunctionError } from "@/lib/functionError";
 
 interface VerifyResultRow {
   status?: string;
@@ -46,20 +48,6 @@ interface InvokePayload {
 function asInvokePayload(value: unknown): InvokePayload | null {
   if (typeof value !== "object" || value === null) return null;
   return value as InvokePayload;
-}
-
-function invokeErrorText(error: unknown, data: unknown, fallback: string): string {
-  const payload = asInvokePayload(data);
-  let bodyError: string | undefined;
-  if (typeof error === "object" && error !== null && "context" in error) {
-    const context = error.context;
-    if (typeof context === "object" && context !== null && "body" in context) {
-      const body = asInvokePayload(context.body);
-      if (typeof body?.error === "string" && body.error.length > 0) bodyError = body.error;
-    }
-  }
-  const dataError = typeof payload?.error === "string" && payload.error.length > 0 ? payload.error : undefined;
-  return bodyError || dataError || errorMessage(error, fallback);
 }
 
 interface ExclusiveMusicSectionProps {
@@ -190,18 +178,18 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
       toast.error("Title is required");
       return;
     }
-    if (!audioFile) {
-      toast.error("Please select an audio file");
+    if (!audioFile || !isAudioUpload(audioFile)) {
+      toast.error(AUDIO_UPLOAD_REJECTED);
       return;
     }
 
     setIsUploading(true);
     try {
-      const audioExt = audioFile.name.split(".").pop() || "mp3";
+      const audioExt = audioExtension(audioFile.name) || "mp3";
       const audioPath = `${user.id}/exclusive-${Date.now()}.${audioExt}`;
       const { error: audioErr } = await supabase.storage
         .from("media")
-        .upload(audioPath, audioFile, { upsert: true });
+        .upload(audioPath, audioFile, { upsert: true, contentType: audioContentType(audioFile) });
       if (audioErr) throw audioErr;
       const { data: audioUrl } = supabase.storage.from("media").getPublicUrl(audioPath);
 
@@ -241,7 +229,7 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
       setShowUpload(false);
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error("Failed to upload track");
+      toast.error(errorMessage(error, "Failed to upload track"));
     } finally {
       setIsUploading(false);
     }
@@ -269,10 +257,9 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
       const { data, error } = await supabase.functions.invoke(fnName, { body });
       const payload = asInvokePayload(data);
       if (error) {
-        // Edge function returns error body even on non-2xx
-        const serverMsg = invokeErrorText(error, data, "");
+        const serverMsg = await readFunctionError(error, data, "Failed to start checkout");
         console.error("[MusicPurchase] error", serverMsg);
-        toast.error(serverMsg || "Failed to start checkout", { duration: 6000 });
+        toast.error(serverMsg, { duration: 6000 });
         return;
       }
       if (payload?.error) {
@@ -458,10 +445,10 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
             </div>
 
             <div className="space-y-2">
-              <Label>Audio File *</Label>
-              <div
-                className="border-2 border-dashed border-border/60 rounded-xl p-4 text-center cursor-pointer hover:border-primary/40 transition-colors"
-                onClick={() => audioInputRef.current?.click()}
+              <Label htmlFor="exclusive-audio-file">Audio File *</Label>
+              <label
+                htmlFor="exclusive-audio-file"
+                className="relative block border-2 border-dashed border-border/60 rounded-xl p-4 text-center cursor-pointer hover:border-primary/40 transition-colors"
               >
                 {audioFile ? (
                   <p className="text-sm text-foreground">{audioFile.name}</p>
@@ -469,18 +456,28 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
                   <div>
                     <Music className="w-6 h-6 mx-auto mb-1 text-muted-foreground" />
                     <p className="text-xs text-muted-foreground">
-                      Click to select MP3, WAV, FLAC, etc.
+                      {AUDIO_UPLOAD_ACTION}
                     </p>
                   </div>
                 )}
-              </div>
-              <input
-                ref={audioInputRef}
-                type="file"
-                accept="audio/*"
-                className="hidden"
-                onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
-              />
+                <input
+                  id="exclusive-audio-file"
+                  ref={audioInputRef}
+                  type="file"
+                  accept={AUDIO_FILE_ACCEPT}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    if (file && !isAudioUpload(file)) {
+                      toast.error(AUDIO_UPLOAD_REJECTED);
+                      e.target.value = "";
+                      setAudioFile(null);
+                      return;
+                    }
+                    setAudioFile(file);
+                  }}
+                />
+              </label>
             </div>
 
             <div className="space-y-2">

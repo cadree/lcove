@@ -21,6 +21,7 @@ interface Props {
   ticketPrice?: number
   eventUrl?: string
   moodboardThumbnails?: string[]
+  unsubscribeUrl?: string
 }
 
 const EventInviteEmail = ({
@@ -39,6 +40,7 @@ const EventInviteEmail = ({
   ticketPrice,
   eventUrl = '#',
   moodboardThumbnails = [],
+  unsubscribeUrl,
 }: Props) => {
   const first = (recipientName || '').trim().split(' ')[0] || 'there'
   const cta = isFree ? 'RSVP Now' : 'Get Tickets'
@@ -98,7 +100,15 @@ const EventInviteEmail = ({
             </Section>
           </Section>
           <Text style={footer}>
-            Sent via ETHER by lcove on behalf of {organizerName}
+            Powered by Ether
+            <br />
+            <a href="https://etherbylcove.com/privacy" style={legal}>Privacy</a>
+            {' · '}
+            <a href="https://etherbylcove.com/terms" style={legal}>Terms</a>
+            {unsubscribeUrl ? <>
+              {' · '}
+              <a href={unsubscribeUrl} style={legal}>Unsubscribe</a>
+            </> : null}
           </Text>
         </Container>
       </Body>
@@ -141,4 +151,5 @@ const hr = { borderColor: '#eee', margin: '28px 0 20px' }
 const avatar = { borderRadius: '50%', display: 'inline-block', verticalAlign: 'middle' as const, marginRight: '10px' }
 const hostName = { fontWeight: 600 as const, color: '#1a1a2e', display: 'inline-block', margin: 0 }
 const sig = { color: '#666', fontSize: '13px', margin: '2px 0 0' }
-const footer = { color: '#aaa', fontSize: '11px', textAlign: 'center' as const, marginTop: '16px' }
+const footer = { color: '#9a9a9a', fontSize: '11px', textAlign: 'center' as const, marginTop: '16px', lineHeight: 1.5 }
+const legal = { color: '#9a9a9a', textDecoration: 'underline' }

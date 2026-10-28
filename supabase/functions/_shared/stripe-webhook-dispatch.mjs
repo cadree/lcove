@@ -1,9 +1,11 @@
+import { httpStatusForError } from "./http-error.mjs";
 import {
   COMMUNITY_FUND_FEE_PERCENT,
   communityFundFeeCents,
 } from "./fees.mjs";
 import {
   invoiceSubscriptionId,
+  isGrantEligible,
   mapMembershipStatus,
   subscriptionPeriodUnix,
   tierFromStripeSubscription,
@@ -82,17 +84,33 @@ async function applyCheckoutCompleted(session, db) {
   if (type === "store_order" || (meta.order_id && meta.item_id && type !== "event_ticket")) {
     await db.confirmStoreOrder(session);
   }
+  if (type === "contact_invoice") {
+    await db.markContactInvoicePaid(session);
+    await db.recordCheckoutCommunityFundFee(session, "contact_invoice");
+  }
+  if (type === "project_payment") {
+    await db.markMilestonePaid(session);
+    await db.recordCheckoutCommunityFundFee(session, "project_payment");
+  }
+  if (type === "stream_gift") {
+    await db.recordStreamGift(session);
+    await db.recordCheckoutCommunityFundFee(session, "stream_gift");
+  }
 }
 
 async function applyCheckoutExpired(session, db) {
   const { meta, type } = checkoutMeta(session);
-  if (!meta.order_id) return;
-  if (type === "event_ticket") {
+  if (meta.order_id && type === "event_ticket") {
     await db.cancelPendingTicketOrder(meta.order_id);
-    return;
-  }
-  if (type === "store_order" || meta.item_id) {
+  } else if (meta.order_id && (type === "store_order" || meta.item_id)) {
     await db.cancelPendingStoreOrder(meta.order_id);
+  }
+  // Sessions last at most 24 hours. The timestamp sweep frees holds whose
+  // expired webhook never arrived. It does not call Stripe.
+  try {
+    await db.releaseAbandonedTicketOrders();
+  } catch (err) {
+    console.error("abandoned ticket sweep failed", err);
   }
 }
 
@@ -125,7 +143,7 @@ export async function handleSignedStripeWebhook({
   try {
     claimed = await db.claimEvent(event.id, event.type);
   } catch (err) {
-    return { status: 500, body: { error: err instanceof Error ? err.message : String(err) } };
+    return { status: httpStatusForError(err), body: { error: err instanceof Error ? err.message : String(err) } };
   }
   if (!claimed) {
     return { status: 200, body: { received: true, duplicate: true } };
@@ -140,7 +158,7 @@ export async function handleSignedStripeWebhook({
     } catch {
       // The request still fails so Stripe retries the event.
     }
-    return { status: 500, body: { error: err instanceof Error ? err.message : String(err) } };
+    return { status: httpStatusForError(err), body: { error: err instanceof Error ? err.message : String(err) } };
   }
 }
 
@@ -153,12 +171,72 @@ function subtractDollars(current, delta) {
   return Math.max(0, cents) / 100;
 }
 
-function refundParts(charge) {
-  const parts = Array.isArray(charge?.refunds?.data) ? charge.refunds.data : [];
-  const listed = parts
+async function listPages(list, params) {
+  const rows = [];
+  let startingAfter;
+  for (let page = 0; page < 20; page += 1) {
+    const result = await list({
+      ...params,
+      limit: 100,
+      ...(startingAfter ? { starting_after: startingAfter } : {}),
+    });
+    const data = Array.isArray(result?.data) ? result.data : [];
+    rows.push(...data);
+    if (!result?.has_more || data.length === 0) break;
+    const cursor = data[data.length - 1]?.id;
+    if (!cursor || cursor === startingAfter) break;
+    startingAfter = cursor;
+  }
+  return rows;
+}
+
+function paymentIntentFromInvoicePayment(row) {
+  return idOf(row?.payment?.payment_intent);
+}
+
+// Basil (2025-03-31+) removed Invoice.payment_intent. Checkout Session still
+// has payment_intent; an Invoice does not. A paid InvoicePayment is the link.
+async function paidInvoicePaymentIntentId(stripe, invoice) {
+  const legacy = idOf(invoice?.payment_intent);
+  if (legacy) return legacy;
+  const embedded = Array.isArray(invoice?.payments?.data) ? invoice.payments.data : [];
+  for (const row of embedded) {
+    if (row?.status === "canceled") continue;
+    const id = paymentIntentFromInvoicePayment(row);
+    if (id) return id;
+  }
+  if (!invoice?.id || typeof stripe?.invoicePayments?.list !== "function") return null;
+  const rows = await listPages(
+    (params) => stripe.invoicePayments.list(params),
+    { invoice: invoice.id, status: "paid" },
+  );
+  for (const row of rows) {
+    const id = paymentIntentFromInvoicePayment(row);
+    if (id) return id;
+  }
+  return null;
+}
+
+// charge.refunded has not included refunds.data since 2022-11-15. List the
+// Refund objects so a later partial refund has its own idempotency key.
+async function refundParts(stripe, charge) {
+  const embedded = Array.isArray(charge?.refunds?.data) ? charge.refunds.data : [];
+  const fromEvent = embedded
     .filter((refund) => refund?.id && Number(refund.amount) > 0)
     .map((refund) => ({ id: refund.id, amountCents: Number(refund.amount) }));
-  if (listed.length) return listed;
+  if (fromEvent.length) return fromEvent;
+
+  if (charge?.id && typeof stripe?.refunds?.list === "function") {
+    const rows = await listPages(
+      (params) => stripe.refunds.list(params),
+      { charge: charge.id },
+    );
+    const listed = rows
+      .filter((refund) => refund?.id && Number(refund.amount) > 0)
+      .map((refund) => ({ id: refund.id, amountCents: Number(refund.amount) }));
+    if (listed.length) return listed;
+  }
+
   const amountCents = Number(charge?.amount_refunded ?? 0);
   if (!charge?.id || !Number.isFinite(amountCents) || amountCents <= 0) return [];
   return [{ id: `charge:${charge.id}`, amountCents }];
@@ -345,7 +423,7 @@ export function createSupabaseStripeDb(supabase, stripe) {
         .from("memberships")
         .update({
           lifetime_contribution: lifetime,
-          grant_eligible: lifetime >= 50 || tier === "elite",
+          grant_eligible: isGrantEligible(lifetime),
         })
         .eq("user_id", userId);
       throwIf(lifetimeError);
@@ -371,6 +449,54 @@ export function createSupabaseStripeDb(supabase, stripe) {
         current_period_start: periodStart,
         current_period_end: periodEnd,
       }, { onConflict: "network_id,user_id" });
+      throwIf(error);
+    },
+
+    async markContactInvoicePaid(session) {
+      const invoiceId = session.metadata?.invoice_id;
+      if (!invoiceId) throw new Error("invoice checkout missing id");
+      const { error } = await supabase
+        .from("contact_invoices")
+        .update({
+          status: "paid",
+          paid_at: new Date().toISOString(),
+          stripe_session_id: session.id,
+        })
+        .eq("id", invoiceId)
+        .neq("status", "paid");
+      throwIf(error);
+    },
+
+    async markMilestonePaid(session) {
+      const milestoneId = session.metadata?.milestone_id;
+      if (!milestoneId) throw new Error("project payment missing milestone");
+      const { error } = await supabase
+        .from("project_milestones")
+        .update({
+          status: "paid",
+          paid_at: new Date().toISOString(),
+          stripe_payment_intent_id: idOf(session.payment_intent),
+        })
+        .eq("id", milestoneId)
+        .neq("status", "paid");
+      throwIf(error);
+    },
+
+    async recordStreamGift(session) {
+      const meta = session.metadata || {};
+      if (!meta.stream_id || !meta.sender_id || !meta.host_id) throw new Error("stream gift missing ids");
+      const amount = session.amount_total ?? 0;
+      const fee = communityFundFeeCents(amount);
+      const { error } = await supabase.from("stream_gifts").insert({
+        stream_id: meta.stream_id,
+        sender_id: meta.sender_id,
+        host_id: meta.host_id,
+        gift: meta.gift || "gift",
+        amount_cents: amount,
+        platform_fee_cents: fee,
+        stripe_session_id: session.id,
+      });
+      if (isUniqueViolation(error)) return;
       throwIf(error);
     },
 
@@ -404,6 +530,13 @@ export function createSupabaseStripeDb(supabase, stripe) {
       throwIf(error);
     },
 
+    async releaseAbandonedTicketOrders() {
+      const { error } = await supabase.rpc("release_abandoned_ticket_orders", {
+        p_older_than: "24 hours",
+      });
+      throwIf(error);
+    },
+
     async recordCheckoutCommunityFundFee(session, sourceType) {
       const meta = session.metadata || {};
       const sourceId = sourceType === "studio_booking"
@@ -412,6 +545,9 @@ export function createSupabaseStripeDb(supabase, stripe) {
       if (!sourceId) return;
       const fee = communityFundFeeCents(session.amount_total ?? 0) / 100;
       if (fee <= 0) return;
+      // Checkout Session still carries invoice, subscription, and payment_intent
+      // on 2025-08-27.basil. Those fields were removed from Invoice, Charge,
+      // and PaymentIntent, not from the session.
       await insertCommunityFundFee(supabase, {
         source_type: sourceType,
         source_id: sourceId,
@@ -436,6 +572,9 @@ export function createSupabaseStripeDb(supabase, stripe) {
       if (meta.type !== "network_subscription" && !meta.network_id) return;
       const fee = communityFundFeeCents(invoice.amount_paid ?? 0) / 100;
       if (fee <= 0) return;
+      // Basil removed Invoice.payment_intent. The paid InvoicePayment still
+      // points at the PaymentIntent, and the unique index dedupes on it.
+      const paymentIntentId = await paidInvoicePaymentIntentId(stripe, invoice);
       await insertCommunityFundFee(supabase, {
         source_type: "network_subscription",
         source_id: meta.network_id || subscriptionId,
@@ -444,12 +583,12 @@ export function createSupabaseStripeDb(supabase, stripe) {
         currency: invoice.currency || "usd",
         description: `Community fund fee (${COMMUNITY_FUND_FEE_PERCENT}%)`,
         stripe_invoice_id: invoice.id || null,
-        stripe_payment_intent_id: idOf(invoice.payment_intent),
+        stripe_payment_intent_id: paymentIntentId,
       });
     },
 
     async markInvoiceFailed(invoice) {
-      const subId = idOf(invoice.subscription);
+      const subId = invoiceSubscriptionId(invoice);
       if (!subId) return;
       const sub = await stripe.subscriptions.retrieve(subId);
       await this.syncSubscription(sub, "invoice.payment_failed");
@@ -583,19 +722,44 @@ async function settleStudioBookingFee(supabase, bookingId, fee, paymentIntentId)
   throwIf(bookingError);
 }
 
-async function membershipSubscriptionForCharge(stripe, charge) {
-  let invoiceId = idOf(charge.invoice);
-  if (!invoiceId && idOf(charge.payment_intent) && stripe?.paymentIntents?.retrieve) {
-    const paymentIntent = await stripe.paymentIntents.retrieve(idOf(charge.payment_intent));
-    invoiceId = idOf(paymentIntent?.invoice);
+// Basil removed Charge.invoice and PaymentIntent.invoice. The InvoicePayment
+// list filtered by that PaymentIntent is the supported lookup. A pre-basil
+// event can still carry charge.invoice, which skips the extra request.
+async function invoiceIdsForPaymentIntent(stripe, paymentIntentId) {
+  if (!paymentIntentId || typeof stripe?.invoicePayments?.list !== "function") return [];
+  const rows = await listPages(
+    (params) => stripe.invoicePayments.list(params),
+    {
+      payment: { type: "payment_intent", payment_intent: paymentIntentId },
+    },
+  );
+  const ranked = [
+    ...rows.filter((row) => row?.status === "paid"),
+    ...rows.filter((row) => row && row.status !== "paid" && row.status !== "canceled"),
+  ];
+  const ids = [];
+  for (const row of ranked) {
+    const invoiceId = idOf(row?.invoice);
+    if (invoiceId && !ids.includes(invoiceId)) ids.push(invoiceId);
   }
-  if (!invoiceId || !stripe?.invoices?.retrieve) return null;
-  const invoice = await stripe.invoices.retrieve(invoiceId);
-  const subscriptionId = invoiceSubscriptionId(invoice);
-  if (!subscriptionId || !stripe?.subscriptions?.retrieve) return null;
-  const sub = await stripe.subscriptions.retrieve(subscriptionId);
-  if (!tierFromStripeSubscription(sub)) return null;
-  return { invoiceId, subscriptionId, sub };
+  return ids;
+}
+
+async function membershipSubscriptionForCharge(stripe, charge) {
+  const invoiceIds = [];
+  const direct = idOf(charge?.invoice);
+  if (direct) invoiceIds.push(direct);
+  else invoiceIds.push(...await invoiceIdsForPaymentIntent(stripe, idOf(charge?.payment_intent)));
+  if (!invoiceIds.length || typeof stripe?.invoices?.retrieve !== "function") return null;
+  for (const invoiceId of invoiceIds) {
+    const invoice = await stripe.invoices.retrieve(invoiceId);
+    const subscriptionId = invoiceSubscriptionId(invoice);
+    if (!subscriptionId || typeof stripe?.subscriptions?.retrieve !== "function") continue;
+    const sub = await stripe.subscriptions.retrieve(subscriptionId);
+    if (!tierFromStripeSubscription(sub)) continue;
+    return { invoiceId, subscriptionId, sub };
+  }
+  return null;
 }
 
 async function refundMembershipInvoice(supabase, stripe, charge) {
@@ -611,7 +775,7 @@ async function refundMembershipInvoice(supabase, stripe, charge) {
   throwIf(readError);
   if (!membership) return;
 
-  const parts = refundParts(charge);
+  const parts = await refundParts(stripe, charge);
   const insertedIds = [];
   let applied = 0;
   try {
@@ -637,7 +801,7 @@ async function refundMembershipInvoice(supabase, stripe, charge) {
       .update({
         lifetime_contribution: lifetime,
         status: "cancelled",
-        grant_eligible: lifetime >= 50 || membership.tier === "elite",
+        grant_eligible: isGrantEligible(lifetime),
         updated_at: new Date().toISOString(),
       })
       .eq("id", membership.id);

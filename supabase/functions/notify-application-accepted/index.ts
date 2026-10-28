@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireUserOrService } from "../_shared/require-caller.ts";
+import { getBearerUser, requestRole, requireUserOrService } from "../_shared/require-caller.ts";
+import { authorizeApplicationAccepted, escapeHtml } from "../_shared/notification-auth.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const EMAIL_FROM = "ETHER <notifications@etherbylcove.com>";
@@ -42,10 +44,10 @@ const getEmailTemplate = (projectTitle: string, roleTitle: string) => {
                       Congratulations! Your Application Was Accepted
                     </h1>
                     <p style="color: #a0a0a0; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
-                      You've been accepted for the role of <strong style="color: #E91E63;">${roleTitle}</strong> on the project:
+                      You've been accepted for the role of <strong style="color: #E91E63;">${escapeHtml(roleTitle)}</strong> on the project:
                     </p>
                     <p style="color: #ffffff; font-size: 20px; font-weight: 600; margin: 0 0 30px;">
-                      ${projectTitle}
+                      ${escapeHtml(projectTitle)}
                     </p>
                     <a href="https://etherbylcove.com/projects" 
                        style="display: inline-block; background: #E91E63; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
@@ -86,16 +88,48 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { applicant_id, project_id, project_title, role_title }: NotifyApplicationAcceptedRequest = await req.json();
+    const body = await req.json() as Partial<NotifyApplicationAcceptedRequest>;
+    const requestedProjectId = typeof body.project_id === "string" ? body.project_id : "";
+    const requestedApplicantId = typeof body.applicant_id === "string" ? body.applicant_id : "";
+    const role = requestRole(req);
+    const callerId = role === "service_role" ? null : await getBearerUser(req.headers.get("Authorization"), supabase);
+
+    const { data: project } = requestedProjectId
+      ? await supabase.from("projects").select("id, creator_id, title, timeline_start, timeline_end, venue").eq("id", requestedProjectId).maybeSingle()
+      : { data: null };
+
+    let application: { applicant_id: string; project_id: string; status: string; role_name?: string | null } | null = null;
+    if (project && requestedApplicantId) {
+      const { data } = await supabase
+        .from("project_applications")
+        .select("applicant_id, project_id, role_id, status")
+        .eq("project_id", project.id)
+        .eq("applicant_id", requestedApplicantId)
+        .eq("status", "accepted")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        const { data: roleRow } = await supabase.from("project_roles").select("role_name").eq("id", data.role_id).maybeSingle();
+        application = { ...data, role_name: roleRow?.role_name };
+      }
+    }
+
+    const decision = authorizeApplicationAccepted({ callerId, role, project, application });
+    if (!decision.ok) {
+      return new Response(JSON.stringify({ error: decision.error }), {
+        status: decision.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const applicant_id = decision.applicantId;
+    const project_id = decision.projectId;
+    const project_title = decision.projectTitle;
+    const role_title = decision.roleTitle;
+    const projectData = project;
 
     console.log("Notifying user of application acceptance:", applicant_id, "for project:", project_title);
-
-    // Fetch project timeline data for calendar integration
-    const { data: projectData } = await supabase
-      .from("projects")
-      .select("timeline_start, timeline_end, venue")
-      .eq("id", project_id)
-      .single();
 
     // Get user data
     const { data: userData, error: userError } = await supabase.auth.admin.getUserById(applicant_id);
@@ -262,7 +296,7 @@ serve(async (req) => {
     console.error("Error in notify-application-accepted:", errorMessage);
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: httpStatusForError(error), headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

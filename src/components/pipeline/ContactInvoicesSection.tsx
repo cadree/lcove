@@ -12,6 +12,7 @@ import { useContactInvoices, ContactInvoice, InvoiceLineItem } from "@/hooks/use
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 
 interface ContactInvoicesSectionProps {
   pipelineItemId: string;
@@ -27,8 +28,7 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
   const [selectedInvoice, setSelectedInvoice] = useState<ContactInvoice | null>(null);
   const [sendVia, setSendVia] = useState<'email' | 'sms'>('email');
   const [sendRecipient, setSendRecipient] = useState('');
-  const [senderName, setSenderName] = useState('');
-  const [senderEmail, setSenderEmail] = useState('');
+  const [payLinkId, setPayLinkId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [newInvoice, setNewInvoice] = useState({
@@ -92,7 +92,7 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
       });
       toast.success("Image attached");
     } catch (error) {
-      toast.error("Failed to upload image");
+      toast.error(errorMessage(error, "Failed to upload image"));
     }
 
     if (fileInputRef.current) {
@@ -157,16 +157,34 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
         invoiceId: selectedInvoice.id,
         via: sendVia,
         recipient: sendRecipient.trim(),
-        senderName: senderName.trim() || undefined,
-        senderEmail: senderEmail.trim() || undefined,
       });
       setSendDialogOpen(false);
       setSelectedInvoice(null);
-      setSenderName('');
-      setSenderEmail('');
       toast.success(`Invoice sent via ${sendVia}`);
     } catch (error) {
       toast.error("Failed to send invoice");
+    }
+  };
+
+  const createPayLink = async (invoice: ContactInvoice) => {
+    setPayLinkId(invoice.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-invoice-checkout", {
+        body: { invoiceId: invoice.id },
+      });
+      if (error) throw error;
+      if (data?.needs_connect) {
+        toast.error(data.error || "Set up payouts in Wallet before sending a pay link");
+        return;
+      }
+      if (data?.error) throw new Error(data.error);
+      if (!data?.url) throw new Error("Stripe did not return a pay link");
+      await navigator.clipboard.writeText(data.url);
+      toast.success("Pay link copied. 10% of the payment goes to the community fund.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create a pay link");
+    } finally {
+      setPayLinkId(null);
     }
   };
 
@@ -462,15 +480,28 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
                     </Button>
                   )}
                   {invoice.status === 'sent' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => handleMarkPaid(invoice)}
-                      role="button"
-                    >
-                      <Check className="w-3 h-3 mr-1" /> Mark Paid
-                    </Button>
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        disabled={payLinkId === invoice.id}
+                        onClick={() => createPayLink(invoice)}
+                      >
+                        {payLinkId === invoice.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                        Pay link
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => handleMarkPaid(invoice)}
+                        role="button"
+                      >
+                        <Check className="w-3 h-3 mr-1" /> Mark Paid
+                      </Button>
+                    </>
                   )}
                   <Button
                     variant="ghost"
@@ -496,30 +527,9 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
             <DialogTitle>Send Invoice</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Sender Info */}
-            <div className="p-3 bg-muted/30 rounded-lg space-y-3">
-              <p className="text-xs text-muted-foreground font-medium">Your Information (appears on invoice)</p>
-              <div className="space-y-2">
-                <Label htmlFor="sender-name">Your Name / Business Name</Label>
-                <Input
-                  id="sender-name"
-                  value={senderName}
-                  onChange={(e) => setSenderName(e.target.value)}
-                  placeholder="e.g., John's Photography"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="sender-email">Your Email (for replies)</Label>
-                <Input
-                  id="sender-email"
-                  type="email"
-                  value={senderEmail}
-                  onChange={(e) => setSenderEmail(e.target.value)}
-                  placeholder="your@email.com"
-                />
-                <p className="text-xs text-muted-foreground">Clients will reply to this email address</p>
-              </div>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              The invoice is sent from your profile name. Replies go to the email on your account.
+            </p>
 
             <div className="space-y-2">
               <Label>Send via</Label>

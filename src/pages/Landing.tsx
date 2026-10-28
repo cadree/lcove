@@ -1,36 +1,29 @@
-import { useState } from "react";
+import { useLocation } from "react-router-dom";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingHero } from "@/components/landing/LandingHero";
-import { PersonaCards } from "@/components/landing/PersonaCards";
+import { FeaturePreview } from "@/components/landing/FeaturePreview";
 import { BenefitsCarousel } from "@/components/landing/BenefitsCarousel";
-import { TestimonialsSection } from "@/components/landing/TestimonialsSection";
-import { StatsRow } from "@/components/landing/StatsRow";
 import { TrustSection } from "@/components/landing/TrustSection";
 import { LandingFooter } from "@/components/landing/LandingFooter";
-import { CreatorApplicationDialog } from "@/components/landing/CreatorApplicationDialog";
+import { HERO_TAGLINE } from "@/content/copy";
+import { PageMeta } from "@/components/seo/PageMeta";
 
 const Landing = () => {
-  const [creatorDialogOpen, setCreatorDialogOpen] = useState(false);
+  const location = useLocation();
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
+      <PageMeta title="Ether" description={HERO_TAGLINE} />
       <LandingNav />
-      
+
       <main className="pt-20">
         <LandingHero />
-        <StatsRow />
-        <PersonaCards />
+        <FeaturePreview joinSearch={location.search} />
         <BenefitsCarousel />
-        <TestimonialsSection />
         <TrustSection />
       </main>
-      
+
       <LandingFooter />
-      
-      <CreatorApplicationDialog 
-        open={creatorDialogOpen} 
-        onOpenChange={setCreatorDialogOpen} 
-      />
     </div>
   );
 };

@@ -1,25 +1,21 @@
-import { ArrowLeft, FileText, Users, Shield, AlertTriangle, Scale, Ban, Globe, Mail } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { FileText, Users, Shield, AlertTriangle, Scale, Ban, Globe, Mail } from "lucide-react";
+import { Link } from "react-router-dom";
+import { BackButton } from "@/components/navigation/BackButton";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { LEGAL_EMAIL, SUPPORT_EMAIL } from "@/config/launch";
+import { PageMeta } from "@/components/seo/PageMeta";
+import { AI_CONTENT_RULE_ALLOWED, AI_CONTENT_RULE_FORBIDDEN } from "@/lib/aiContentRule";
 
 const Terms = () => {
-  const navigate = useNavigate();
-  const lastUpdated = "October 18, 2026";
+  const lastUpdated = "October 24, 2026";
 
   return (
     <div className="min-h-screen bg-background">
+      <PageMeta title="Terms · Ether" description="Terms of Service for Ether." />
       <div className="container max-w-3xl mx-auto px-4 py-8 safe-area-top safe-area-bottom">
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(-1)}
-            aria-label="Go back"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <BackButton label="Go back" className="mb-0" />
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
               <FileText className="h-5 w-5 text-primary" />
@@ -107,11 +103,9 @@ const Terms = () => {
                 We reserve the right to remove content and suspend or terminate accounts that violate these guidelines.
               </p>
               <div>
-                <h4 className="font-medium text-foreground mb-2">Generative AI</h4>
-                <p className="text-sm">
-                  Generative AI is not allowed on Ether except for tools that improve a creator's workflow.
-                  AI-generated people, fake profiles, and AI-made work presented as human-made can be reported and removed.
-                </p>
+                <h4 className="font-medium text-foreground mb-2">AI</h4>
+                <p className="text-sm">{AI_CONTENT_RULE_ALLOWED}</p>
+                <p className="text-sm">{AI_CONTENT_RULE_FORBIDDEN}</p>
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -154,6 +148,16 @@ const Terms = () => {
                   be able to take it with you.
                 </p>
               </div>
+              <div>
+                <h4 className="font-medium text-foreground mb-2">Copyright Complaints</h4>
+                <p className="text-sm">
+                  If you believe content on the Platform infringes your copyright, send a notice to {LEGAL_EMAIL} identifying
+                  the work, the infringing material and its location, your contact information, a statement of good-faith belief
+                  that the use is unauthorized, and a statement under penalty of perjury that your notice is accurate and that
+                  you are the owner or authorized to act for the owner, with your signature. We will remove infringing material
+                  and terminate the accounts of repeat infringers.
+                </p>
+              </div>
             </AccordionContent>
           </AccordionItem>
 
@@ -194,6 +198,28 @@ const Terms = () => {
                   availability. Contact support for specific inquiries.
                 </p>
               </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Prohibited Content and Monetization */}
+          <AccordionItem value="prohibited" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-3">
+                <Ban className="h-5 w-5 text-primary" />
+                <span className="font-medium">Prohibited Content and Monetization</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="text-muted-foreground space-y-4">
+              <p className="text-sm">
+                You may not post, sell, promote, or receive payment (including tips, gifts, ticket sales, store sales, or memberships)
+                for any of the following: (a) nudity, pornography, sexually explicit content, or sexual services; (b) content or goods
+                that infringe or misappropriate any copyright, trademark, trade secret, right of publicity, or other intellectual
+                property or proprietary right; (c) copies of music, film, video, images, text, software, or other works that you do not
+                own or have a license to use and distribute; (d) content that promotes, supports, or glorifies terrorism, violent
+                extremism, or organized violence, or that attacks or demeans people based on race, ethnicity, national origin, religion,
+                sex, gender identity, sexual orientation, disability, or serious disease. We may remove such content, cancel or refund
+                related transactions, withhold payouts, and suspend or terminate accounts that violate this section.
+              </p>
             </AccordionContent>
           </AccordionItem>
 
@@ -284,7 +310,7 @@ const Terms = () => {
               <div>
                 <h4 className="font-medium text-foreground mb-2">Informal Resolution</h4>
                 <p className="text-sm">
-                  Before filing any formal dispute, you agree to contact us at legal@ethercreative.co to 
+                  Before filing any formal dispute, you agree to contact us at {LEGAL_EMAIL} to 
                   attempt to resolve the matter informally within 60 days.
                 </p>
               </div>
@@ -379,8 +405,8 @@ const Terms = () => {
             <AccordionContent className="text-muted-foreground space-y-4">
               <p className="text-sm">For questions about these Terms, please contact us:</p>
               <div className="space-y-2 text-sm">
-                <p><strong>Email:</strong> legal@ethercreative.co</p>
-                <p><strong>Support:</strong> Available through the app's Settings page</p>
+                <p><strong>Email:</strong> {LEGAL_EMAIL}</p>
+                <p><strong>Support:</strong> {SUPPORT_EMAIL}</p>
               </div>
             </AccordionContent>
           </AccordionItem>

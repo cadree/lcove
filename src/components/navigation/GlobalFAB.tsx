@@ -23,7 +23,7 @@ export function GlobalFAB() {
       type="button"
       onClick={openCreate}
       aria-label="Create"
-      className="fixed z-40 bottom-24 right-4 flex h-14 w-14 items-center justify-center rounded-[2px] bg-primary text-primary-foreground"
+      className="fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-[14px] bg-gradient-to-br from-[#FFD6E8] to-[#FF9FC8] text-[#0A0A0A]"
     >
       <Plus className="h-6 w-6" />
     </button>

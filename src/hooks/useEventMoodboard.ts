@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { jpegStorageName } from "@/lib/heicImage";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
@@ -59,7 +60,7 @@ export async function uploadMoodboardFile(userId: string, eventId: string, file:
     throw new Error('Files must be 20MB or smaller');
   }
 
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const safeName = jpegStorageName(file.name, file.type).replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = `${userId}/event-moodboard/${eventId}/${Date.now()}-${safeName}`;
   const { error } = await supabase.storage.from('media').upload(path, file, {
     contentType: file.type || undefined,

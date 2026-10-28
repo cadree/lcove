@@ -168,13 +168,16 @@ const CalendarPage = () => {
 
   return (
     <PageLayout>
-      <div className="px-4 sm:px-6 pt-6 pb-24">
+      <div
+        className="px-4 sm:px-6 pt-6"
+        style={{ paddingBottom: "calc(84px + 2.5rem + env(safe-area-inset-bottom, 0px))" }}
+      >
         {/* Header */}
         <PageHeader
           title="Calendar"
           description="Community events, projects, and personal schedule"
-          icon={<CalendarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
-          backPath="/"
+          icon={<CalendarIcon className="w-5 h-5" />}
+          tile="cyan"
           actions={
             user && (
               <DropdownMenu>
@@ -253,7 +256,7 @@ const CalendarPage = () => {
             <Button variant="glass" size="sm" onClick={goToToday}>
               Today
             </Button>
-            <h2 className="font-display text-lg font-medium text-foreground min-w-[160px] text-center">
+            <h2 className="ether-title min-w-[160px] text-center text-lg text-foreground">
               {getNavigationLabel()}
             </h2>
             <Button variant="glass" size="icon" onClick={navigateNext}>
@@ -323,7 +326,7 @@ const CalendarPage = () => {
             <span>Events</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-accent" />
+            <div className="w-3 h-3 rounded bg-[hsl(var(--scan))]" />
             <span>Projects</span>
           </div>
           <div className="flex items-center gap-2">

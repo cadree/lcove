@@ -1,7 +1,14 @@
 import { useState, useEffect, DragEvent } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Users, Plus, Search, ArrowLeft, UserPlus, GripVertical, Pencil, Check, X, Sun } from "lucide-react";
+import { Users, Plus, Search, UserPlus, GripVertical, Pencil, Check, X, Sun } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { BackButton } from "@/components/navigation/BackButton";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +21,7 @@ import { usePipelines, Pipeline as PipelineType } from "@/hooks/usePipelines";
 import { PipelineItemDrawer } from "@/components/pipeline/PipelineItemDrawer";
 import { AddContactDialog, ContactFormData } from "@/components/pipeline/AddContactDialog";
 import { PipelineSelector } from "@/components/pipeline/PipelineSelector";
-import { PipelineItem } from "@/actions/pipelineActions";
+import { PipelineItem, PipelineStage } from "@/actions/pipelineActions";
 import { EnergyIndicator } from "@/components/energy";
 import { toast } from "sonner";
 
@@ -213,23 +220,18 @@ const PipelinePage = () => {
       <div className="min-h-screen bg-background">
         {/* Header */}
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
-          <div className="flex items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-3">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => navigate('/')}
-                className="shrink-0"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-primary" />
-                <PipelineSelector 
-                  currentPipeline={currentPipeline} 
-                  onPipelineChange={setCurrentPipeline} 
-                />
-                <span className="text-sm text-muted-foreground">({totalContacts})</span>
+          <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <BackButton className="shrink-0" />
+              <div className="flex min-w-0 items-center gap-2">
+                <Users className="w-5 h-5 shrink-0 text-primary" />
+                <div className="min-w-0">
+                  <PipelineSelector 
+                    currentPipeline={currentPipeline} 
+                    onPipelineChange={setCurrentPipeline} 
+                  />
+                </div>
+                <span className="shrink-0 text-sm text-muted-foreground">({totalContacts})</span>
               </div>
             </div>
             
@@ -247,7 +249,7 @@ const PipelinePage = () => {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex w-full shrink-0 items-center justify-end gap-2 sm:ml-auto sm:w-auto">
               <EnergyIndicator />
               <Button
                 variant="outline"
@@ -323,6 +325,8 @@ const PipelinePage = () => {
                       onEditingNameChange={setEditingStageName}
                       onSaveEditName={handleSaveStageName}
                       onCancelEditName={handleCancelEditStageName}
+                      stages={stages}
+                      onMove={handleMoveItem}
                     />
                   );
                 })}
@@ -356,6 +360,8 @@ const PipelinePage = () => {
                           onEditingNameChange={setEditingStageName}
                           onSaveEditName={handleSaveStageName}
                           onCancelEditName={handleCancelEditStageName}
+                          stages={stages}
+                          onMove={handleMoveItem}
                         />
                       </div>
                       );
@@ -436,6 +442,8 @@ interface PipelineColumnProps {
   onEditingNameChange: (name: string) => void;
   onSaveEditName: () => void;
   onCancelEditName: () => void;
+  stages: PipelineStage[];
+  onMove: (itemId: string, toStageId: string) => Promise<void>;
 }
 
 function PipelineColumn({ 
@@ -457,7 +465,9 @@ function PipelineColumn({
   onStartEditName,
   onEditingNameChange,
   onSaveEditName,
-  onCancelEditName
+  onCancelEditName,
+  stages,
+  onMove,
 }: PipelineColumnProps) {
   return (
     <Card 
@@ -531,6 +541,8 @@ function PipelineColumn({
                 onDragStart={onDragStart}
                 onDragEnd={onDragEnd}
                 isDragging={draggedItemId === item.id}
+                stages={stages}
+                onMove={onMove}
               />
             ))
           )}
@@ -577,9 +589,11 @@ interface PipelineContactCardProps {
   onDragStart: (e: DragEvent<HTMLDivElement>, itemId: string) => void;
   onDragEnd: () => void;
   isDragging: boolean;
+  stages: PipelineStage[];
+  onMove: (itemId: string, toStageId: string) => Promise<void>;
 }
 
-function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging }: PipelineContactCardProps) {
+function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging, stages, onMove }: PipelineContactCardProps) {
   // Generate initials from name
   const initials = item.name
     .split(' ')
@@ -661,6 +675,39 @@ function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging
               <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
             )}
           </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-11 shrink-0 px-3"
+                aria-label={`Move ${item.name}`}
+                draggable={false}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => event.stopPropagation()}
+              >
+                Move
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[10rem]">
+              {stages.map((stage) => (
+                <DropdownMenuItem
+                  key={stage.id}
+                  disabled={stage.id === item.stage_id}
+                  onSelect={() => {
+                    if (stage.id === item.stage_id) return;
+                    void onMove(item.id, stage.id).then(() => {
+                      toast.success(`Moved to ${stage.name}`);
+                    });
+                  }}
+                >
+                  {stage.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </Card>
     </motion.div>

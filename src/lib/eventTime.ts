@@ -1,6 +1,17 @@
+/** Event zone when one is saved, otherwise the viewer's zone. Never a silent UTC clock. */
+export function resolveTimeZone(timeZone?: string | null) {
+  const trimmed = timeZone?.trim();
+  if (trimmed) return trimmed;
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
 /** Wall-clock parts of an instant in a specific IANA timezone. */
 export function zonedParts(iso: string, timeZone: string | null | undefined) {
-  const zone = timeZone || "UTC";
+  const zone = resolveTimeZone(timeZone);
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: zone,
     hourCycle: "h23",
@@ -21,11 +32,26 @@ export function zonedParts(iso: string, timeZone: string | null | undefined) {
 }
 
 export function formatEventTime(iso: string, timeZone: string | null | undefined) {
-  const zone = timeZone || "UTC";
   return new Intl.DateTimeFormat("en-US", {
-    timeZone: zone,
+    timeZone: resolveTimeZone(timeZone),
     hour: "numeric",
     minute: "2-digit",
+  }).format(new Date(iso));
+}
+
+export function formatEventDate(
+  iso: string,
+  timeZone: string | null | undefined,
+  options: Intl.DateTimeFormatOptions = {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  },
+) {
+  return new Intl.DateTimeFormat("en-US", {
+    ...options,
+    timeZone: resolveTimeZone(timeZone),
   }).format(new Date(iso));
 }
 

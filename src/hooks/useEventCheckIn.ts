@@ -57,7 +57,7 @@ export function useCheckInAttendee(eventId?: string) {
   });
 }
 
-export function useEventCheckIns(eventId?: string) {
+export function useEventCheckIns(eventId?: string, enabled = true) {
   return useQuery({
     queryKey: ["event-check-ins", eventId],
     queryFn: async () => {
@@ -70,6 +70,6 @@ export function useEventCheckIns(eventId?: string) {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!eventId,
+    enabled: !!eventId && enabled,
   });
 }
