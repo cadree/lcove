@@ -34,7 +34,8 @@ export function validateEventDraft(draft: EventDraftInput): Record<string, strin
 
 export function guestlistLine(names: string[], total: number): string {
   const first = names.map((name) => name.trim()).filter(Boolean);
-  if (total <= 0 || first.length === 0) return "Be the first to go";
+  if (total <= 0) return "Be the first to go";
+  if (first.length === 0) return "RSVP to see who's going";
   if (total === 1) return `${first[0]} is going`;
   const others = Math.max(total - 1, 1);
   return `${first[0]} and ${others} ${others === 1 ? "other" : "others"} going`;

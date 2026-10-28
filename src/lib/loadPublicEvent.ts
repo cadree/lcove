@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { PUBLIC_EVENT_SELECT, publicRow } from "@/lib/consumerAccess";
+import { PUBLIC_EVENT_COLUMNS, publicRow } from "@/lib/consumerAccess";
 import { isEventUuid } from "../../functions/_shared/eventShare.js";
 
 export interface PublicEventRecord {
@@ -22,6 +22,7 @@ export interface PublicEventRecord {
   flyer_font?: string | null;
   page_theme?: string | null;
   hide_address?: boolean | null;
+  hide_host_notes?: boolean | null;
   absorb_fees?: boolean | null;
   password_protected?: boolean | null;
   is_public: boolean | null;
@@ -29,6 +30,7 @@ export interface PublicEventRecord {
 }
 
 const EXTRA = "flyer_font, page_theme, hide_address, absorb_fees, password_protected";
+const GUEST_COLUMNS = PUBLIC_EVENT_COLUMNS.filter((column) => column !== "address").join(", ");
 
 function missingSlug(message: string | undefined) {
   if (!message) return false;
@@ -37,8 +39,9 @@ function missingSlug(message: string | undefined) {
 
 export async function loadPublicEvent(ref: string): Promise<PublicEventRecord | null> {
   const id = isEventUuid(ref);
-  const withSlug = `${PUBLIC_EVENT_SELECT}, ${EXTRA}, slug`;
-  const withoutSlug = `${PUBLIC_EVENT_SELECT}, ${EXTRA}`;
+  const withSlug = `${GUEST_COLUMNS}, ${EXTRA}, hide_host_notes, slug`;
+  const withoutNotes = `${GUEST_COLUMNS}, ${EXTRA}, slug`;
+  const withoutSlug = `${GUEST_COLUMNS}, ${EXTRA}`;
   const run = (columns: string, key: "id" | "slug") =>
     supabase
       .from("events")
@@ -48,10 +51,14 @@ export async function loadPublicEvent(ref: string): Promise<PublicEventRecord | 
       .maybeSingle();
 
   let result = await run(withSlug, id ? "id" : "slug");
+  if (result.error && /hide_host_notes/i.test(result.error.message || "")) {
+    result = await run(withoutNotes, id ? "id" : "slug");
+  }
   if (result.error && missingSlug(result.error.message) && id) {
     result = await run(withoutSlug, "id");
   }
   if (result.error) throw result.error;
   if (!result.data) return null;
-  return publicRow<PublicEventRecord>(result.data);
+  const row = publicRow<PublicEventRecord>(result.data);
+  return { ...row, address: null };
 }

@@ -61,6 +61,8 @@ const form: EventFormValues = {
   features: "21+, live set",
   city: "New York",
   timezone: "America/New_York",
+  hostNotes: "Buzz 4. The door is unmarked.",
+  hideHostNotes: true,
 };
 
 const noop = () => undefined;

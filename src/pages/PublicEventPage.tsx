@@ -23,7 +23,7 @@ import { HostShareBar } from "@/components/events/HostShareBar";
 import { usePublicEvent } from "@/hooks/usePublicEvent";
 import { eventIsShareable, eventPublicPath, eventPublicUrl, eventShareDescription, flyerVersion } from "../../functions/_shared/eventShare.js";
 import { SHARE_BASE_URL } from "@/lib/shareLink";
-import { guestRsvpErrorMessage, rememberGuestRsvp } from "@/lib/guestRsvp";
+import { guestRsvpErrorMessage, rememberedGuestRsvp, rememberGuestRsvp } from "@/lib/guestRsvp";
 import { toast } from "sonner";
 
 const savedKey = "ether-saved-events";
@@ -73,17 +73,36 @@ export default function PublicEventPage() {
     },
   });
 
+  const rsvpHint = rememberedGuestRsvp(eventId);
   const { data: preview } = useQuery({
-    queryKey: ["public-event-guests", eventId],
+    queryKey: ["public-event-guests", eventId, user?.id, rsvpHint],
     enabled: !!eventId,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("public_event_guest_preview", { p_event_id: eventId });
-      if (error) return { names: [] as string[], avatars: [] as (string | null)[] };
-      const row = (data || {}) as { names?: unknown; avatars?: unknown };
+      const { data, error } = await supabase.rpc("public_event_guest_preview", {
+        p_event_id: eventId,
+        p_rsvp_id: rsvpHint || undefined,
+      });
+      if (error) return { names: [] as string[], avatars: [] as (string | null)[], locked: true };
+      const row = (data || {}) as { names?: unknown; avatars?: unknown; locked?: unknown };
+      const names = Array.isArray(row.names) ? row.names.filter((name): name is string => typeof name === "string") : [];
       return {
-        names: Array.isArray(row.names) ? row.names.filter((name): name is string => typeof name === "string") : [],
+        names,
         avatars: Array.isArray(row.avatars) ? row.avatars.map((item) => (typeof item === "string" ? item : null)) : [],
+        locked: row.locked === true,
       };
+    },
+  });
+
+  const { data: hostNotes } = useQuery({
+    queryKey: ["public-event-host-notes", eventId, user?.id, rsvpHint],
+    enabled: !!eventId,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("public_event_host_notes", {
+        p_event_id: eventId,
+        p_rsvp_id: rsvpHint || undefined,
+      });
+      if (error) return null;
+      return typeof data === "string" && data.trim() ? data : null;
     },
   });
 
@@ -156,15 +175,15 @@ export default function PublicEventPage() {
 
   const showLocation = async () => {
     if (!event) return;
-    if (!event.hide_address) {
-      const text = [event.venue, event.address, event.city, event.state].filter(Boolean).join(", ");
-      setLocation(text);
-      if (text) window.open(`https://maps.google.com/?q=${encodeURIComponent(text)}`, "_blank", "noopener");
-      return;
-    }
-    const { data } = await supabase.rpc("public_event_location", { p_event_id: event.id });
+    const { data } = await supabase.rpc("public_event_location", {
+      p_event_id: event.id,
+      p_rsvp_id: rememberedGuestRsvp(event.id) || undefined,
+    });
+    const area = [event.venue, event.city, event.state].filter(Boolean).join(", ");
     if (!data) {
-      toast.message("The address stays hidden until you RSVP.");
+      setLocation(area || null);
+      if (event.hide_address) toast.message("The address stays hidden until you RSVP.");
+      else if (area) window.open(`https://maps.google.com/?q=${encodeURIComponent(area)}`, "_blank", "noopener");
       return;
     }
     setLocation(data);
@@ -274,7 +293,19 @@ export default function PublicEventPage() {
         }}
         busy={rsvpBusy}
         reminder={model.past ? null : <EventReminderToggle eventId={event.id} />}
-        details={<EventMoodboardView eventId={event.id} />}
+        details={(
+          <div className="space-y-4">
+            <EventMoodboardView eventId={event.id} />
+            {hostNotes ? (
+              <div className="rounded-2xl border border-border/60 bg-card px-4 py-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">From the host</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm">{hostNotes}</p>
+              </div>
+            ) : event.hide_host_notes ? (
+              <p className="text-sm text-muted-foreground">Host notes unlock after you RSVP.</p>
+            ) : null}
+          </div>
+        )}
       />
       <GuestRsvpDialog
         open={rsvpOpen}
@@ -315,7 +346,9 @@ export default function PublicEventPage() {
           <DialogHeader><DialogTitle>Guestlist</DialogTitle></DialogHeader>
           <ul className="space-y-2 text-sm">
             {(preview?.names || []).map((name) => <li key={name}>{name}</li>)}
-            {(preview?.names || []).length === 0 && <li className="text-muted-foreground">No one yet.</li>}
+            {(preview?.names || []).length === 0 && (
+              <li className="text-muted-foreground">{preview?.locked ? "Names show up after you RSVP." : "No one yet."}</li>
+            )}
           </ul>
         </DialogContent>
       </Dialog>

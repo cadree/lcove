@@ -40,6 +40,7 @@ describe("event draft validation", () => {
 describe("guest list copy", () => {
   it("names the first guest and the rest", () => {
     assert.equal(guestlistLine([], 0), "Be the first to go");
+    assert.equal(guestlistLine([], 4), "RSVP to see who's going");
     assert.equal(guestlistLine(["Ada"], 1), "Ada is going");
     assert.equal(guestlistLine(["Ada", "Nico"], 4), "Ada and 3 others going");
     assert.equal(goingCountLabel(120), "99+ going");
