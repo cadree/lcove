@@ -13,10 +13,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { supabase } from "@/integrations/supabase/client";
-import { deliverFile, shareToChannel } from "@/lib/shareLink";
+import { EventShareActions } from "@/components/events/EventShareActions";
 import { eventPublicUrl } from "../../../functions/_shared/eventShare.js";
 import { attendanceLabel, attendanceSummary } from "@/lib/eventGuests";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import { formatEventDate, formatEventTime } from "@/lib/eventTime";
 import { 
   MapPin, 
@@ -30,9 +30,6 @@ import {
   Check,
   X,
   Share2,
-  Copy,
-  MessageCircle,
-  Twitter,
   ExternalLink,
   Loader2,
   Navigation,
@@ -42,18 +39,12 @@ import {
   Sun,
   CalendarCheck,
   UserPlus,
-  Download,
-  Send,
-  Image,
-  Facebook,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EventAttendeesDialog } from "./EventAttendeesDialog";
@@ -82,7 +73,6 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
   const [attendeesOpen, setAttendeesOpen] = useState(false);
   const [isAddingToMyDay, setIsAddingToMyDay] = useState(false);
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
-  const [isGeneratingFlyer, setIsGeneratingFlyer] = useState(false);
   const [isSendingReminder, setIsSendingReminder] = useState(false);
   const [reminderMessage, setReminderMessage] = useState("");
   const [reminderNotice, setReminderNotice] = useState<string | null>(null);
@@ -260,59 +250,6 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
       toast.error('Failed to purchase ticket');
     } finally {
       setIsPurchasing(false);
-    }
-  };
-
-  const shareUrl = eventPublicUrl(event);
-  const shareText = `Check out "${event.title}" on ${format(eventDate, 'MMMM d')}!`;
-
-  const handleShare = async (method: 'copy' | 'twitter' | 'native' | 'sms' | 'whatsapp' | 'facebook' | 'instagram' | 'email') => {
-    await shareToChannel(method, { title: event.title, text: shareText, url: shareUrl });
-  };
-
-  const reportFileShare = (result: "shared" | "cancelled" | "downloaded" | "unavailable", ready: string) => {
-    if (result === "cancelled") return;
-    if (result === "shared") return;
-    if (result === "downloaded") {
-      toast.success(ready);
-      return;
-    }
-    toast.error("This view could not share the file. The event link is still available from Copy Link.");
-  };
-
-  const handleInstagramFlyer = async () => {
-    setIsGeneratingFlyer(true);
-    try {
-      const { flyerPngFile } = await import('@/lib/eventFlyerFile');
-      const flyer = await flyerPngFile({ title: event.title, imageUrl: event.image_url });
-      const result = await deliverFile(flyer.file, { title: event.title, text: shareText, url: shareUrl });
-      if (!flyer.usedFlyerImage && result !== "cancelled") {
-        toast.message("The flyer image could not be fetched, so the shared file is a title card.");
-      }
-      if (result === "unavailable") {
-        await shareToChannel('instagram', { title: event.title, text: shareText, url: shareUrl });
-        return;
-      }
-      reportFileShare(result, "Flyer image ready. If Instagram did not open, share that image from your photos.");
-    } catch (error) {
-      console.error('Flyer share error:', error);
-      toast.error('Could not prepare the flyer image');
-    } finally {
-      setIsGeneratingFlyer(false);
-    }
-  };
-
-  const handleDownloadFlyer = async () => {
-    setIsGeneratingFlyer(true);
-    try {
-      const { generateEventPdf } = await import('@/lib/generateEventPdf');
-      const result = await generateEventPdf(event);
-      reportFileShare(result, "Event flyer ready");
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      toast.error('Failed to generate PDF');
-    } finally {
-      setIsGeneratingFlyer(false);
     }
   };
 
@@ -502,42 +439,13 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="glass-strong border-border/30">
-                    <DropdownMenuItem onClick={() => handleShare('sms')}>
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      Messages
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleShare('copy')}>
-                      <Copy className="w-4 h-4 mr-2" />
-                      Copy Link
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleShare('whatsapp')}>
-                      <Send className="w-4 h-4 mr-2" />
-                      WhatsApp
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => { void handleInstagramFlyer(); }} disabled={isGeneratingFlyer}>
-                      {isGeneratingFlyer ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Image className="w-4 h-4 mr-2" />}
-                      Instagram (with flyer)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleShare('facebook')}>
-                      <Facebook className="w-4 h-4 mr-2" />
-                      Facebook
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleShare('twitter')}>
-                      <Twitter className="w-4 h-4 mr-2" />
-                      Twitter / X
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleDownloadFlyer} disabled={isGeneratingFlyer}>
-                      {isGeneratingFlyer ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-                      Download Event Flyer
-                    </DropdownMenuItem>
-                    {navigator.share && (
-                      <DropdownMenuItem onClick={() => handleShare('native')}>
-                        <Share2 className="w-4 h-4 mr-2" />
-                        More...
-                      </DropdownMenuItem>
-                    )}
+                    <EventShareActions
+                      title={event.title}
+                      text={`Check out "${event.title}" on ${formatEventDate(event.start_date, event.timezone)}!`}
+                      url={eventPublicUrl(event)}
+                      imageUrl={event.image_url}
+                      pdfEvent={event}
+                    />
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

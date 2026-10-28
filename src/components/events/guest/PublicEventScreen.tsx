@@ -35,6 +35,7 @@ interface Props {
   onBack: () => void;
   onSave: () => void;
   onShare: () => void;
+  shareButton?: ReactNode;
   onLocation: () => void;
   onGuestlist: () => void;
   onFollow: () => void;
@@ -50,7 +51,7 @@ interface Props {
 }
 
 export function PublicEventScreen({
-  model, onBack, onSave, onShare, onLocation, onGuestlist, onFollow, following, onCalendar, onContact, onReport, onCta, reminder, hostShare, details, busy,
+  model, onBack, onSave, onShare, shareButton, onLocation, onGuestlist, onFollow, following, onCalendar, onContact, onReport, onCta, reminder, hostShare, details, busy,
 }: Props) {
   const ctaStyle = model.brandColor ? { backgroundColor: model.brandColor, color: "#1a1020" } : undefined;
   return (
@@ -68,7 +69,7 @@ export function PublicEventScreen({
             <IconButton label={model.saved ? "Saved" : "Save"} onClick={onSave}>
               <Bookmark className={`h-5 w-5 ${model.saved ? "fill-current" : ""}`} />
             </IconButton>
-            <IconButton label="Share" onClick={onShare}><Share2 className="h-5 w-5" /></IconButton>
+            {shareButton ?? <IconButton label="Share" onClick={onShare}><Share2 className="h-5 w-5" /></IconButton>}
           </div>
         </div>
       </div>

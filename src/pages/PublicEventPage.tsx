@@ -7,7 +7,8 @@ import { PublicEventScreen } from "@/components/events/guest/PublicEventScreen";
 import { ReportDialog } from "@/components/safety/ReportDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRSVP } from "@/hooks/useCalendar";
+import { useRSVP, type CalendarEvent } from "@/hooks/useCalendar";
+import { GuestShareButton } from "@/components/events/EventShareActions";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useConversations } from "@/hooks/useConversations";
 import { BackButton } from "@/components/navigation/BackButton";
@@ -212,6 +213,36 @@ export default function PublicEventPage() {
     );
   }
 
+  const pdfEvent: CalendarEvent = {
+    id: event.id,
+    creator_id: event.creator_id,
+    title: event.title,
+    description: event.description,
+    venue: event.venue,
+    address: null,
+    city: event.city || "",
+    state: event.state,
+    country: null,
+    start_date: event.start_date,
+    end_date: event.end_date,
+    image_url: event.image_url,
+    ticket_type: event.ticket_type || "free",
+    ticket_price: event.ticket_price ?? null,
+    credits_price: event.credits_price ?? null,
+    capacity: null,
+    is_public: event.is_public,
+    project_id: null,
+    external_url: null,
+    timezone: event.timezone,
+    recurrence: null,
+    status: event.status,
+    slug: event.slug ?? null,
+    created_at: event.start_date,
+    organizer: { display_name: model.hostName, avatar_url: model.hostAvatar },
+  };
+  const shareText = `Check out "${event.title}" on ${formatEventDate(event.start_date, event.timezone)}!`;
+  const shareUrl = eventPublicUrl(event);
+
   return (
     <>
       <PageMeta
@@ -231,7 +262,21 @@ export default function PublicEventPage() {
         hostShare={user && user.id === event.creator_id ? (
           <div className="rounded-2xl border border-border/70 bg-card/80 p-3">
             <p className="mb-2 text-xs text-muted-foreground">Share your event</p>
-            <HostShareBar title={event.title} url={eventPublicUrl(event)} />
+            <HostShareBar
+              title={event.title}
+              url={shareUrl}
+              share={(
+                <GuestShareButton
+                  variant="bar"
+                  theme={model.theme}
+                  title={event.title}
+                  text={shareText}
+                  url={shareUrl}
+                  imageUrl={event.image_url}
+                  pdfEvent={pdfEvent}
+                />
+              )}
+            />
           </div>
         ) : null}
         following={!!event.creator_id && isFavorite(event.creator_id)}
@@ -241,7 +286,17 @@ export default function PublicEventPage() {
           localStorage.setItem(savedKey, JSON.stringify(list));
           setSaved(readSaved(event.id));
         }}
-        onShare={() => shareEventLink({ title: event.title, text: event.title, url: eventPublicUrl(event) })}
+        onShare={() => shareEventLink({ title: event.title, text: shareText, url: shareUrl })}
+        shareButton={(
+          <GuestShareButton
+            theme={model.theme}
+            title={event.title}
+            text={shareText}
+            url={shareUrl}
+            imageUrl={event.image_url}
+            pdfEvent={pdfEvent}
+          />
+        )}
         onLocation={showLocation}
         onGuestlist={() => setGuestsOpen(true)}
         onFollow={() => {
