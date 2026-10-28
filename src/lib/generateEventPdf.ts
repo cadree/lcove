@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import type { CalendarEvent } from '@/hooks/useCalendar';
 import { eventPublicUrl } from '../../functions/_shared/eventShare.js';
+import { deliverFile } from '@/lib/shareLink';
 
 const PAGE_W = 210; // A4 mm
 const PAGE_H = 297;
@@ -35,7 +36,7 @@ async function loadImageAsDataUrl(url: string): Promise<{ data: string; w: numbe
  * Generate a single-page PDF flyer for an event and trigger download.
  * Pure client-side — no edge function or external service needed.
  */
-export async function generateEventPdf(event: CalendarEvent): Promise<void> {
+export async function buildEventPdf(event: CalendarEvent): Promise<{ blob: Blob; filename: string }> {
   const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
   let y = MARGIN;
 
@@ -149,6 +150,13 @@ export async function generateEventPdf(event: CalendarEvent): Promise<void> {
   pdf.text(shareUrl, MARGIN, PAGE_H - 10);
   pdf.text('etherbylcove.com', PAGE_W - MARGIN, PAGE_H - 10, { align: 'right' });
 
-  const filename = `${event.title.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '')}_event.pdf`;
-  pdf.save(filename);
+  const filename = `${event.title.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '') || 'event'}_event.pdf`;
+  return { blob: pdf.output('blob'), filename };
+}
+
+/** Share the PDF. pdf.save() does nothing inside the iOS WebView. */
+export async function generateEventPdf(event: CalendarEvent): Promise<"shared" | "cancelled" | "downloaded" | "unavailable"> {
+  const { blob, filename } = await buildEventPdf(event);
+  const file = new File([blob], filename, { type: 'application/pdf' });
+  return deliverFile(file, { title: event.title, text: event.title, url: eventPublicUrl(event) });
 }
