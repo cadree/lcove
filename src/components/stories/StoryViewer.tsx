@@ -310,11 +310,11 @@ const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryView
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-background/95 backdrop-blur-xl"
+      className="fixed inset-0 z-50 flex bg-background/95 backdrop-blur-xl pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]"
       onClick={onClose}
     >
       <div
-        className="absolute inset-0 flex items-center justify-center"
+        className="relative flex h-full w-full items-center justify-center"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Story Container */}
@@ -322,7 +322,7 @@ const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryView
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
-          className="relative w-full max-w-md h-[85vh] max-h-[900px] rounded-3xl overflow-hidden bg-card shadow-2xl"
+          className="relative h-[min(85vh,100%)] w-full max-h-[900px] max-w-md overflow-hidden rounded-3xl bg-card shadow-2xl"
         >
           {/* Progress Bars */}
           <div className="absolute top-4 left-4 right-4 z-20 flex gap-1">

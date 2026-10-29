@@ -468,7 +468,13 @@ const BoardEditor = () => {
         </div>
       </div>
       {inviteOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          style={{
+            paddingTop: "max(1rem, env(safe-area-inset-top, 0px))",
+            paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))",
+          }}
+        >
           <div className="bg-background rounded-lg p-4 w-full max-w-sm space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="font-medium">Invite by display name</h2>

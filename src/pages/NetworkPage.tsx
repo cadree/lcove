@@ -182,7 +182,7 @@ const NetworkPage = () => {
       </AnimatePresence>
 
       {/* Netflix-style Top Navigation */}
-      <header className="fixed top-0 left-0 right-0 z-30 bg-gradient-to-b from-background via-background/80 to-transparent">
+      <header className="fixed top-0 left-0 right-0 z-30 bg-gradient-to-b from-background via-background/80 to-transparent pt-[env(safe-area-inset-top,0px)]">
         <div className="flex items-center justify-between px-4 md:px-12 py-3">
           <div className="flex items-center gap-3 md:gap-6">
             <BackButton label="Back" fallback="/cinema" className="text-foreground hover:bg-background/20 -ml-2" />

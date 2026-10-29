@@ -282,7 +282,7 @@ export const VideoPlayer = ({
       <Button
         variant="ghost"
         size="icon"
-        className="absolute top-4 right-4 z-50 bg-black/50 hover:bg-black/70 text-white"
+        className="absolute right-[calc(1rem+env(safe-area-inset-right,0px))] top-[calc(1rem+env(safe-area-inset-top,0px))] z-50 bg-black/50 hover:bg-black/70 text-white"
         onClick={(e) => {
           e.stopPropagation();
           onClose();
@@ -293,7 +293,7 @@ export const VideoPlayer = ({
 
       {/* Preview Badge */}
       {isPreviewOnly && !showPaywall && (
-        <div className="absolute top-4 left-4 z-50 flex items-center gap-2 bg-primary/90 text-primary-foreground px-3 py-1.5 rounded-full text-sm font-medium">
+        <div className="absolute left-4 top-[calc(1rem+env(safe-area-inset-top,0px))] z-50 flex items-center gap-2 bg-primary/90 text-primary-foreground px-3 py-1.5 rounded-full text-sm font-medium">
           <Play className="w-3 h-3" />
           Preview: {formatTime(Math.max(0, previewDuration - currentTime))} remaining
         </div>
@@ -443,7 +443,7 @@ export const VideoPlayer = ({
               onClick={(e) => e.stopPropagation()}
             >
               {/* Top Bar - Title */}
-              <div className="absolute top-0 left-0 right-0 p-6">
+              <div className="absolute top-0 left-0 right-0 px-6 pb-6 pt-[calc(1.5rem+env(safe-area-inset-top,0px))]">
                 <h2 className="font-display text-2xl text-white">{content.title}</h2>
               </div>
 
@@ -461,7 +461,7 @@ export const VideoPlayer = ({
               </div>
 
               {/* Bottom Controls */}
-              <div className="absolute bottom-0 left-0 right-0 p-6 space-y-4">
+              <div className="absolute bottom-0 left-0 right-0 space-y-4 px-6 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
                 {/* Progress Bar */}
                 <div className="relative">
                   <Slider

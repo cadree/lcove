@@ -123,7 +123,7 @@ export function StreamChat({
   if (!user) return null;
 
   return (
-    <div data-testid="live-chat" className={`flex min-h-0 min-w-0 flex-col gap-2 border-t border-border/40 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${className}`}>
+    <div data-testid="live-chat" className={`flex min-h-0 min-w-0 flex-col gap-2 border-t border-border/40 px-4 py-3 ${className}`}>
       <div ref={listRef} className="min-h-0 flex-1 space-y-1 overflow-y-auto text-sm">
         {messages.length === 0 && <p className="text-muted-foreground">No chat yet.</p>}
         {messages.filter((message) => !blockedIds.includes(message.user_id)).map((message) => (

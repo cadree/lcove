@@ -65,9 +65,9 @@ export function ProfileLayoutEditor({ userId, open, onClose }: ProfileLayoutEdit
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]"
     >
-      <div className="flex flex-col h-full">
+      <div className="flex min-h-0 flex-1 flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div>

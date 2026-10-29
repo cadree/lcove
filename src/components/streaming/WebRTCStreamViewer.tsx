@@ -367,7 +367,7 @@ export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
         </Button>
       )}
 
-      <div className="absolute left-4 top-[max(0.75rem,env(safe-area-inset-top))] z-10 flex gap-2">
+      <div className="absolute left-4 top-3 z-10 flex gap-2">
         <Badge className="animate-pulse bg-red-500">
           <Radio className="mr-1 h-3 w-3" />
           LIVE

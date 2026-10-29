@@ -2,6 +2,7 @@ import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
+import { dialogFramePadding, fullscreenEdgePadding, closeButtonTop } from "@/lib/overlaySafeArea";
 import { cn } from "@/lib/utils";
 
 const Dialog = DialogPrimitive.Root;
@@ -51,10 +52,22 @@ const DialogContent = React.forwardRef<
 >(({ className, children, style, fullscreen = false, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
-    <div className={cn(
-      "fixed inset-0 z-50 flex overflow-hidden",
-      fullscreen ? "items-stretch justify-stretch p-0 pointer-events-auto" : "items-center justify-center p-4",
-    )}>
+    <div
+      className={cn(
+        "fixed inset-0 z-50 flex overflow-hidden",
+        fullscreen ? "pointer-events-auto items-stretch justify-stretch" : "items-center justify-center",
+      )}
+      style={
+        fullscreen
+          ? undefined
+          : {
+              paddingTop: dialogFramePadding("top"),
+              paddingRight: dialogFramePadding("right"),
+              paddingBottom: dialogFramePadding("bottom"),
+              paddingLeft: dialogFramePadding("left"),
+            }
+      }
+    >
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
@@ -72,11 +85,22 @@ const DialogContent = React.forwardRef<
           width: "100%",
           minWidth: 0,
           maxWidth: fullscreen ? "100%" : dialogMaxWidth(style?.maxWidth),
+          ...(fullscreen
+            ? {
+                paddingTop: fullscreenEdgePadding("top", style?.paddingTop),
+                paddingRight: fullscreenEdgePadding("right", style?.paddingRight),
+                paddingBottom: fullscreenEdgePadding("bottom", style?.paddingBottom),
+                paddingLeft: fullscreenEdgePadding("left", style?.paddingLeft),
+              }
+            : {}),
         }}
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-3 top-3 rounded-lg p-1.5 opacity-70 transition-all hover:opacity-100 hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring disabled:pointer-events-none z-10">
+        <DialogPrimitive.Close
+          className="absolute right-3 z-10 rounded-lg p-1.5 opacity-70 transition-all hover:opacity-100 hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring disabled:pointer-events-none"
+          style={{ top: closeButtonTop(fullscreen) }}
+        >
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>

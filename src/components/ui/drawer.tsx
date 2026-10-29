@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Drawer as DrawerPrimitive } from "vaul";
 
+import { SAFE_BOTTOM, SAFE_TOP } from "@/lib/overlaySafeArea";
 import { cn } from "@/lib/utils";
 
 const Drawer = ({ shouldScaleBackground = true, ...props }: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
@@ -35,7 +36,14 @@ const DrawerContent = React.forwardRef<
         "[&>*]:min-w-0 [&_input]:min-w-0 [&_input]:max-w-full [&_textarea]:min-w-0 [&_textarea]:max-w-full [&_select]:min-w-0 [&_select]:max-w-full [&_img]:min-w-0 [&_img]:max-w-full [&_button]:min-w-0 [&_button]:max-w-full [&_button]:whitespace-normal [&_label]:min-w-0 [&_label]:max-w-full",
         className,
       )}
-      style={{ ...style, boxSizing: "border-box", minWidth: 0, maxWidth: "100%" }}
+      style={{
+        ...style,
+        boxSizing: "border-box",
+        minWidth: 0,
+        maxWidth: "100%",
+        maxHeight: `calc(100dvh - ${SAFE_TOP})`,
+        paddingBottom: SAFE_BOTTOM,
+      }}
       {...props}
     >
       <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
