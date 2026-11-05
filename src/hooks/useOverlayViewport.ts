@@ -32,7 +32,7 @@ function observeViewport() {
     cancelAnimationFrame(frame);
     frame = requestAnimationFrame(() => {
       const focused = document.activeElement;
-      if (focused instanceof HTMLElement && focused.matches('input, textarea, select, [contenteditable="true"]') && focused.closest('[role="dialog"]')) {
+      if (focused instanceof HTMLElement && (focused.matches('input, textarea, select') || focused.isContentEditable) && focused.closest('[role="dialog"]')) {
         const rect = focused.getBoundingClientRect();
         if (rect.bottom > top + height - 32 || rect.top < top + 32) focused.scrollIntoView({ block: 'nearest' });
       }

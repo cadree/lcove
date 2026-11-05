@@ -104,14 +104,14 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md bg-card border-border">
+      <DialogContent className="sm:max-w-md bg-card border-border flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">
             {isGroup ? 'New Group Chat' : 'New Message'}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-h-0 flex-1 overflow-y-auto space-y-4">
           {/* Toggle between DM and Group */}
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button
@@ -249,9 +249,10 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
             <Button variant="ghost" disabled={page === 0 || isLoading} onClick={() => setPage(p => p - 1)}>Previous</Button>
             <Button variant="ghost" disabled={users.length < 50 || isLoading} onClick={() => setPage(p => p + 1)}>More people</Button>
           </div>
+        </div>
           {validation && <p role="alert" className="text-sm text-destructive">{validation}</p>}
           {/* Actions */}
-          <div className="sticky bottom-0 flex gap-2 bg-card py-2">
+          <div className="shrink-0 flex gap-2 bg-card py-2">
             <Button
               variant="outline"
               className="flex-1"
@@ -270,7 +271,6 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
               {isGroup ? 'Create Group' : 'Start Chat'}
             </Button>
           </div>
-        </div>
       </DialogContent>
     </Dialog>
   );

@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plus, FolderKanban, Filter, Rocket, Lightbulb, Lock } from 'lucide-react';
@@ -85,19 +86,32 @@ const Projects: React.FC = () => {
     }
   }, [searchParams, user, setSearchParams]);
 
-  // Handle open param from shared links
+  // Resolve shared links independently of discovery filters and list-query timing.
+  const openId = searchParams.get('open') || searchParams.get('id');
+  const linkedProject = useQuery({
+    queryKey: ['linked-project', openId, user?.id],
+    enabled: !!openId && !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('projects').select('*').eq('id', openId!).maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      const { data: roles, error: rolesError } = await supabase.from('project_roles').select('*').eq('project_id', data.id);
+      if (rolesError) throw rolesError;
+      return { ...data, total_budget: Number(data.total_budget), roles: (roles ?? []).map(role => ({
+        ...role, payout_amount: Number(role.payout_amount), credit_amount: Number(role.credit_amount ?? 0),
+      })) } as Project;
+    },
+  });
   useEffect(() => {
-    const openId = searchParams.get('open') || searchParams.get('id');
-    if (openId && !isLoading) {
-      const allProjects = [...projects, ...myProjects];
-      const found = allProjects.find(p => p.id === openId);
-      if (found) {
-        setSelectedProject(found);
-        setDetailOpen(true);
-      }
-      setSearchParams({}, { replace: true });
+    if (!openId || !user || linkedProject.isPending) return;
+    if (linkedProject.data) {
+      setSelectedProject(linkedProject.data);
+      setDetailOpen(true);
+    } else {
+      toast.error('This project is unavailable or you do not have access.');
     }
-  }, [searchParams, projects, myProjects, isLoading, setSearchParams]);
+    setSearchParams(previous => { const next = new URLSearchParams(previous); next.delete('open'); next.delete('id'); return next; }, { replace: true });
+  }, [openId, user, linkedProject.data, linkedProject.isPending, setSearchParams]);
 
   const handleProjectClick = (project: Project) => {
     setSelectedProject(project);

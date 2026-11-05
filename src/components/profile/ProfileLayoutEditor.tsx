@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useState, useEffect } from 'react';
 import { motion, Reorder, useDragControls } from 'framer-motion';
 import { GripVertical, X, Check } from 'lucide-react';
@@ -52,7 +53,7 @@ export function ProfileLayoutEditor({ userId, open, onClose }: ProfileLayoutEdit
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -106,7 +107,8 @@ export function ProfileLayoutEditor({ userId, open, onClose }: ProfileLayoutEdit
           </div>
         </div>
       </div>
-    </motion.div>
+    </motion.div>,
+    document.body,
   );
 }
 
@@ -117,12 +119,13 @@ function LayoutRow({ section, onSize, onToggle }: {
 }) {
   const controls = useDragControls();
   return <Reorder.Item value={section} dragListener={false} dragControls={controls}
-    className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3">
+    className="grid grid-cols-[44px_minmax(0,1fr)] items-center gap-2 rounded-xl border border-border bg-card p-3">
     <button type="button" aria-label={`Reorder ${section.label}`} className="flex h-11 w-11 touch-none items-center justify-center cursor-grab"
       onPointerDown={event => controls.start(event)}>
       <GripVertical className="h-5 w-5" />
     </button>
-    <span className="min-w-0 flex-1 font-medium">{section.label}</span>
+    <span className="min-w-0 break-words font-medium">{section.label}</span>
+    <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 pl-2">
     <label className="flex items-center gap-2 text-sm">
       <span className="sr-only">Size of {section.label}</span>
       <select aria-label={`Size of ${section.label}`} value={section.size}
@@ -135,5 +138,6 @@ function LayoutRow({ section, onSize, onToggle }: {
       <Switch aria-label={`Show ${section.label}`} checked={section.visible} onCheckedChange={() => onToggle(section.id)} />
       {section.visible ? 'Shown' : 'Hidden'}
     </label>
+    </div>
   </Reorder.Item>;
 }

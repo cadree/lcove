@@ -72,10 +72,13 @@ serve(async (req) => {
       if (!guest) throw new Error("name and email required");
       const { data: priced, error: priceError } = await supabaseAdmin
         .from("store_items")
-        .select("price, type, store:stores(flat_shipping_cents, tax_line_cents)")
+        .select("price, type, is_digital, store:stores(flat_shipping_cents, tax_line_cents)")
         .eq("id", itemId)
         .maybeSingle();
       if (priceError || !priced?.price) throw new Error("Item not found");
+      if (body.clientPlatform === 'ios' && (priced.is_digital === true || (priced.type !== 'rental' && priced.is_digital !== false))) {
+        throw new Error('This item is not available for purchase in the iOS app');
+      }
       const pricedStore = Array.isArray(priced.store) ? priced.store[0] : priced.store;
       const split = storeCashSplit(
         Math.round(Number(priced.price) * 100) * guest.quantity,
@@ -243,6 +246,10 @@ serve(async (req) => {
 
     if (itemError || !item) {
       throw new Error("Item not found");
+    }
+
+    if (body.clientPlatform === 'ios' && (item.is_digital === true || (item.type !== 'rental' && item.is_digital !== false))) {
+      throw new Error('This item is not available for purchase in the iOS app');
     }
 
     // Check inventory for products

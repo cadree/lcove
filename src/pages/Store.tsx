@@ -1,3 +1,5 @@
+import { digitalPurchasesEnabled, isIosApp } from "@/lib/platform";
+import { storePurchaseAllowed } from "@/lib/storePurchase";
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -203,7 +205,7 @@ const Store = () => {
     const matchesQuery = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = !categoryParam || item.category_id === categoryParam;
-    return matchesQuery && matchesCategory;
+    return matchesQuery && matchesCategory && (activeTab === 'my-store' || storePurchaseAllowed(item, digitalPurchasesEnabled()));
   }) || [];
 
   const handleItemClick = (item: StoreItem) => {
@@ -435,7 +437,7 @@ const Store = () => {
                             : searchQuery
                               ? 'Try adjusting your search to find what you need.'
                               : tabId === 'products'
-                                ? 'Physical and digital goods from creators will appear here.'
+                                ? (isIosApp() ? 'Physical goods from creators will appear here.' : 'Physical and digital goods from creators will appear here.')
                                 : tabId === 'services'
                                   ? 'Freelance services from community members will show up here.'
                                   : 'Studio spaces and equipment rentals will be listed here.'

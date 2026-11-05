@@ -1,3 +1,5 @@
+import { digitalPurchasesEnabled, isIosApp } from "@/lib/platform";
+import { storePurchaseAllowed } from "@/lib/storePurchase";
 import { NumberInput } from "@/components/ui/number-input";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
@@ -89,11 +91,13 @@ export default function PublicProductPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
+  const purchaseAllowed = !!data?.item && storePurchaseAllowed(data.item, digitalPurchasesEnabled());
   const shareUrl = buildShareUrl.product(itemId || "");
 
   const checkout = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!data?.item) return;
+    if (!storePurchaseAllowed(data.item, digitalPurchasesEnabled())) { toast.error('This item is not available for purchase in the iOS app.'); return; }
     if (!name.trim() || !email.trim()) {
       toast.error("Enter your name and email");
       return;
@@ -102,6 +106,7 @@ export default function PublicProductPage() {
     try {
       const { data: result, error } = await supabase.functions.invoke("purchase-store-item", {
         body: {
+          clientPlatform: isIosApp() ? 'ios' : 'web',
           itemId: data.item.id,
           paymentType: "cash",
           quantity,
@@ -183,7 +188,7 @@ export default function PublicProductPage() {
               </p>
             )}
             {notice && <p className="text-sm text-primary">{notice}</p>}
-            {item.external_url && (
+            {purchaseAllowed && item.external_url && (
               <Button asChild className="w-full">
                 <a href={item.external_url} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="mr-2 h-4 w-4" />
@@ -191,7 +196,7 @@ export default function PublicProductPage() {
                 </a>
               </Button>
             )}
-            {cash && !soldOut && (
+            {purchaseAllowed && cash && !soldOut && (
               <form onSubmit={checkout} className="space-y-3">
                 <p className="text-sm text-muted-foreground">No account needed. Pay with a card.</p>
                 <div>
@@ -224,9 +229,10 @@ export default function PublicProductPage() {
             {!cash && !item.external_url && (
               <p className="text-sm text-muted-foreground">Card checkout is not available for this item.</p>
             )}
-            <Button variant="outline" className="w-full" asChild>
+            <p className="text-sm text-muted-foreground">{!purchaseAllowed && "This item is not available for purchase in the iOS app."}</p>
+            {purchaseAllowed && <Button variant="outline" className="w-full" asChild>
               <Link to="/auth">Sign in to pay with credits</Link>
-            </Button>
+            </Button>}
           </CardContent>
         </Card>
       </div>
