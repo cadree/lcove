@@ -221,6 +221,16 @@ const Store = () => {
     setCreateDialogOpen(true);
   };
 
+  useEffect(() => {
+    if (searchParams.get('action') !== 'create' || !user || isLoadingStore) return;
+    setActiveTab('my-store');
+    if (!myStore) { setStoreSetupOpen(true); return; }
+    setStoreSetupOpen(false);
+    setEditItem(null);
+    setCreateDialogOpen(true);
+    setSearchParams(previous => { const next = new URLSearchParams(previous); next.delete('action'); next.set('tab', 'my-store'); return next; }, { replace: true });
+  }, [searchParams, setSearchParams, user, myStore, isLoadingStore]);
+
   const handleDeleteItem = (item: StoreItem) => {
     setItemToDelete(item);
     setDeleteDialogOpen(true);

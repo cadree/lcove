@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CalendarPlus,
@@ -15,8 +14,7 @@ import {
 } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { CreateShareFlow } from "@/components/create/CreateShareFlow";
-import StoryUpload from "@/components/stories/StoryUpload";
+import { useCreateFlow } from "@/components/create/CreateFlowContext";
 import { SquircleIcon, type IconFill } from "@/components/world/SquircleIcon";
 import { NoviPeek } from "@/components/novi/NoviPeek";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,8 +36,7 @@ interface CreateAction {
 export function CreateSheet({ open, onOpenChange }: CreateSheetProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [shareOpen, setShareOpen] = useState(false);
-  const [storyOpen, setStoryOpen] = useState(false);
+  const { openShare, openStory } = useCreateFlow();
 
   const go = (path: string) => {
     onOpenChange(false);
@@ -54,7 +51,7 @@ export function CreateSheet({ open, onOpenChange }: CreateSheetProps) {
       fill: "pink",
       run: () => {
         onOpenChange(false);
-        setShareOpen(true);
+        openShare();
       },
     },
     {
@@ -64,7 +61,7 @@ export function CreateSheet({ open, onOpenChange }: CreateSheetProps) {
       fill: "rose",
       run: () => {
         onOpenChange(false);
-        setStoryOpen(true);
+        openStory();
       },
     },
     { id: "live", label: "Go live", icon: Radio, fill: "red", run: () => go("/live?action=create") },
@@ -73,11 +70,11 @@ export function CreateSheet({ open, onOpenChange }: CreateSheetProps) {
 
   const more: CreateAction[] = [
     { id: "event", label: "Event", icon: CalendarPlus, fill: "cyan", run: () => go("/calendar?action=create") },
-    { id: "store", label: "Store item", icon: ShoppingBag, fill: "gold", run: () => go("/store") },
-    { id: "board", label: "Board", icon: LayoutDashboard, fill: "denim", run: () => go("/boards") },
+    { id: "store", label: "Store item", icon: ShoppingBag, fill: "gold", run: () => go("/store?tab=my-store&action=create") },
+    { id: "board", label: "Board", icon: LayoutDashboard, fill: "denim", run: () => go("/boards?action=create") },
     { id: "blog", label: "Blog", icon: NotebookPen, fill: "bone", run: () => go("/profile?action=create-blog") },
-    { id: "cinema", label: "Cinema", icon: Clapperboard, fill: "ink", run: () => go("/cinema") },
-    { id: "collective", label: "Collective", icon: Users, fill: "rose", run: () => go("/collectives") },
+    { id: "cinema", label: "Cinema", icon: Clapperboard, fill: "ink", run: () => go("/cinema?action=create") },
+    { id: "collective", label: "Collective", icon: Users, fill: "rose", run: () => go("/collectives?action=create") },
     { id: "message", label: "Message", icon: MessageCircle, fill: "violet", run: () => go("/messages?action=new") },
   ];
 
@@ -141,8 +138,7 @@ export function CreateSheet({ open, onOpenChange }: CreateSheetProps) {
         </SheetContent>
       </Sheet>
 
-      <CreateShareFlow open={shareOpen} onOpenChange={setShareOpen} />
-      <StoryUpload open={storyOpen} onOpenChange={setStoryOpen} />
+
     </>
   );
 }

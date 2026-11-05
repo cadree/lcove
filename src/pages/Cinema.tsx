@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useSearchParams } from "react-router-dom";
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { BackButton } from '@/components/navigation/BackButton';
 import { motion } from 'framer-motion';
@@ -30,6 +31,12 @@ import { SquircleIcon } from '@/components/world/SquircleIcon';
 
 const Cinema = () => {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('action') !== 'create' || !user) return;
+    setCreateDialogOpen(true);
+    setSearchParams(previous => { const next = new URLSearchParams(previous); next.delete('action'); return next; }, { replace: true });
+  }, [searchParams, setSearchParams, user]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState<string | undefined>();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
