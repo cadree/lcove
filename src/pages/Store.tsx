@@ -1,3 +1,5 @@
+import { digitalPurchasesEnabled, isIosApp } from "@/lib/platform";
+import { storePurchaseAllowed } from "@/lib/storePurchase";
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -51,7 +53,7 @@ const Store = () => {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const storeIdParam = searchParams.get('store');
-  
+
   const { data: myStore, isLoading: isLoadingStore } = useMyStore();
   const { data: myItems } = useMyStoreItems();
   const deleteItem = useDeleteStoreItem();
@@ -157,9 +159,9 @@ const Store = () => {
         .eq('id', storeIdParam)
         .eq('is_active', true)
         .maybeSingle();
-      
+
       if (error) throw error;
-      
+
       // Fetch owner profile
       if (data) {
         const { data: profile } = await supabase
@@ -167,7 +169,7 @@ const Store = () => {
           .select('display_name, avatar_url, city')
           .eq('user_id', data.user_id)
           .maybeSingle();
-        
+
         return { ...data, profile } as StoreType & { profile?: { display_name: string; avatar_url: string; city: string } };
       }
       return null;
@@ -186,7 +188,7 @@ const Store = () => {
   const currentType = activeTab === 'products' || activeTab === 'services' || activeTab === 'rentals'
     ? typeMap[activeTab]
     : undefined;
-  
+
   // When viewing a specific store, always filter by that store ID
   const effectiveStoreId = storeIdParam || undefined;
   const { data: items, isLoading } = useStoreItems(
@@ -203,7 +205,7 @@ const Store = () => {
     const matchesQuery = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = !categoryParam || item.category_id === categoryParam;
-    return matchesQuery && matchesCategory;
+    return matchesQuery && matchesCategory && (activeTab === 'my-store' || storePurchaseAllowed(item, digitalPurchasesEnabled()));
   }) || [];
 
   const handleItemClick = (item: StoreItem) => {
@@ -220,6 +222,16 @@ const Store = () => {
     setEditItem(null);
     setCreateDialogOpen(true);
   };
+
+  useEffect(() => {
+    if (searchParams.get('action') !== 'create' || !user || isLoadingStore) return;
+    setActiveTab('my-store');
+    if (!myStore) { setStoreSetupOpen(true); return; }
+    setStoreSetupOpen(false);
+    setEditItem(null);
+    setCreateDialogOpen(true);
+    setSearchParams(previous => { const next = new URLSearchParams(previous); next.delete('action'); next.set('tab', 'my-store'); return next; }, { replace: true });
+  }, [searchParams, setSearchParams, user, myStore, isLoadingStore]);
 
   const handleDeleteItem = (item: StoreItem) => {
     setItemToDelete(item);
@@ -261,7 +273,7 @@ const Store = () => {
     <PageLayout>
       <div className="min-h-screen overflow-x-hidden">
         {/* Header */}
-        <div className="sticky top-0 z-10 glass-strong border-b border-border/30">
+        <div className="safe-header sticky top-0 z-10 glass-strong border-b border-border/30">
           <div className="container mx-auto px-4 py-5">
             {/* Show store header when viewing a specific store */}
             {storeIdParam && viewingStore ? (
@@ -409,7 +421,7 @@ const Store = () => {
                       title={
                         storeIdParam && viewingStore
                           ? `No ${tabId === 'products' ? 'products' : tabId === 'services' ? 'services' : 'studios'} in this store`
-                          : tabId === 'my-store' 
+                          : tabId === 'my-store'
                             ? 'Your store is waiting'
                             : tabId === 'products'
                               ? 'No products yet'
@@ -425,7 +437,7 @@ const Store = () => {
                             : searchQuery
                               ? 'Try adjusting your search to find what you need.'
                               : tabId === 'products'
-                                ? 'Physical and digital goods from creators will appear here.'
+                                ? (isIosApp() ? 'Physical goods from creators will appear here.' : 'Physical and digital goods from creators will appear here.')
                                 : tabId === 'services'
                                   ? 'Freelance services from community members will show up here.'
                                   : 'Studio spaces and equipment rentals will be listed here.'

@@ -220,7 +220,7 @@ const OnboardingCity = ({ data, updateData, onNext, onBack }: Props) => {
         </motion.div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background to-transparent">
+      <div className="safe-footer fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background to-transparent">
         <div className="max-w-2xl mx-auto flex gap-4">
           <Button
             onClick={onBack}

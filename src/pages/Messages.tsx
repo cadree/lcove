@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useConversations } from "@/hooks/useConversations";
+import { toast } from "sonner";
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MessageCircle, ArrowLeft } from 'lucide-react';
@@ -13,10 +15,26 @@ import { Link } from 'react-router-dom';
 const Messages = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const chatParam = searchParams.get('chat');
+  const chatParam = searchParams.get('chat') || searchParams.get('conversation');
   const actionParam = searchParams.get('action');
   const [selectedConversation, setSelectedConversation] = useState<string | null>(chatParam);
   const [showNewChat, setShowNewChat] = useState(false);
+
+  const newUserId = searchParams.get('new');
+  const { createDirectConversation: { mutateAsync: createDirect } } = useConversations();
+  const pendingDirect = useRef<string | null>(null);
+  useEffect(() => {
+    if (!newUserId || !user || pendingDirect.current === newUserId) return;
+    pendingDirect.current = newUserId;
+    void createDirect(newUserId).then(conversation => {
+      setSelectedConversation(conversation.id);
+    }).catch(error => {
+      toast.error(error instanceof Error ? error.message : 'Could not open conversation');
+    }).finally(() => {
+      setSearchParams(previous => { const next = new URLSearchParams(previous); if (next.get('new') === newUserId) next.delete('new'); return next; }, { replace: true });
+      pendingDirect.current = null;
+    });
+  }, [newUserId, user, createDirect, setSearchParams]);
 
   // Handle chat query parameter to auto-select conversation
   useEffect(() => {

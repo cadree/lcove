@@ -1,3 +1,4 @@
+import { NumberInput } from "@/components/ui/number-input";
 import React, { useState } from 'react';
 import { DollarSign, Plus, Check, Clock, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,10 +20,10 @@ interface GroupFundingProps {
   isOwnerOrMod: boolean;
 }
 
-export const GroupFunding: React.FC<GroupFundingProps> = ({ 
-  conversationId, 
-  participants, 
-  isOwnerOrMod 
+export const GroupFunding: React.FC<GroupFundingProps> = ({
+  conversationId,
+  participants,
+  isOwnerOrMod
 }) => {
   const { user } = useAuth();
   const [createOpen, setCreateOpen] = useState(false);
@@ -136,8 +137,8 @@ export const GroupFunding: React.FC<GroupFundingProps> = ({
                     const isCurrentUser = contrib.user_id === user?.id;
 
                     return (
-                      <div 
-                        key={contrib.id} 
+                      <div
+                        key={contrib.id}
                         className="flex items-center justify-between py-2 border-b last:border-0"
                       >
                         <div className="flex items-center gap-2">
@@ -161,8 +162,8 @@ export const GroupFunding: React.FC<GroupFundingProps> = ({
                               <Check className="h-3 w-3" /> Paid
                             </Badge>
                           ) : isCurrentUser ? (
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               onClick={() => handleMarkPaid(contrib.id, Number(contrib.amount_owed))}
                             >
                               Mark Paid
@@ -208,10 +209,10 @@ export const GroupFunding: React.FC<GroupFundingProps> = ({
             </div>
             <div>
               <Label>Total Amount ($)</Label>
-              <Input
-                type="number"
+              <NumberInput min={0}
+
                 value={newExpense.total_amount || ''}
-                onChange={(e) => setNewExpense({ ...newExpense, total_amount: parseFloat(e.target.value) || 0 })}
+                onValueChange={value => setNewExpense({ ...newExpense, total_amount: value })}
                 placeholder="0.00"
               />
             </div>

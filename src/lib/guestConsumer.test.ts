@@ -62,7 +62,9 @@ describe("anon column grants", () => {
     assert.deepEqual(grant("events"), [...PUBLIC_EVENT_COLUMNS]);
     assert.deepEqual(grant("ticket_tiers"), [...PUBLIC_TICKET_TIER_COLUMNS]);
     assert.deepEqual(grant("stores"), [...PUBLIC_STORE_COLUMNS]);
-    assert.deepEqual(grant("store_items"), [...PUBLIC_STORE_ITEM_COLUMNS]);
+    const classificationSql = readFileSync("supabase/migrations/20261105121000_store_item_digital_classification.sql", "utf8");
+    assert.match(classificationSql, /GRANT SELECT \(is_digital\) ON public\.store_items TO anon;/);
+    assert.deepEqual(["is_digital", ...grant("store_items")], [...PUBLIC_STORE_ITEM_COLUMNS]);
     for (const column of ["contact_email", "contact_phone", "email", "phone", "rtmp_stream_key"]) {
       assert.equal(grant("store_items").includes(column), false, column);
       assert.equal(grant("events").includes(column), false, column);

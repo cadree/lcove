@@ -15,7 +15,7 @@ export function LandingNav() {
 
   return (
     <header
-      className="fixed top-0 left-0 right-0 z-40 border-b border-border/60 bg-[var(--bar)] backdrop-blur-[18px]"
+      className="safe-header fixed top-0 left-0 right-0 z-40 border-b border-border/60 bg-[var(--bar)] backdrop-blur-[18px]"
       style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
     >
       <div className="px-4 sm:px-6">

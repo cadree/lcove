@@ -70,7 +70,7 @@ const Today = () => {
   const [filter, setFilter] = useState<FilterType>("all");
   const [activeTab, setActiveTab] = useState<TabType>("all");
   const [showAddTask, setShowAddTask] = useState(false);
-  
+
   // Add task form state
   const [selectedContact, setSelectedContact] = useState<string>("");
   const [taskTitle, setTaskTitle] = useState("");
@@ -98,7 +98,7 @@ const Today = () => {
     // Apply search
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(t => 
+      result = result.filter(t =>
         t.title.toLowerCase().includes(query) ||
         t.pipeline_items.name.toLowerCase().includes(query) ||
         (t.pipeline_items.company?.toLowerCase().includes(query))
@@ -160,9 +160,9 @@ const Today = () => {
         .from('contact_tasks')
         .update({ is_done: true })
         .eq('id', task.id);
-      
+
       if (error) throw error;
-      
+
       queryClient.invalidateQueries({ queryKey: ['my-day-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['contact-tasks'] });
       toast.success("Task completed!");
@@ -186,7 +186,7 @@ const Today = () => {
 
   const handleAddTask = async () => {
     if (!selectedContact || !taskTitle.trim() || !user) return;
-    
+
     setIsCreating(true);
     try {
       const { error } = await supabase
@@ -197,9 +197,9 @@ const Today = () => {
           title: taskTitle.trim(),
           due_at: taskDueDate?.toISOString() || null,
         });
-      
+
       if (error) throw error;
-      
+
       queryClient.invalidateQueries({ queryKey: ['my-day-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['contact-tasks', selectedContact] });
       toast.success("Task added!");
@@ -227,7 +227,7 @@ const Today = () => {
     <PageLayout>
       <div className="min-h-screen bg-background">
         {/* Header */}
-        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
+        <div className="safe-header sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
               <BackButton className="shrink-0" />
@@ -241,8 +241,8 @@ const Today = () => {
                 )}
               </div>
             </div>
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               onClick={() => setShowAddTask(true)}
               className="gap-1.5"
             >
@@ -453,8 +453,8 @@ const Today = () => {
               <Button variant="outline" onClick={() => setShowAddTask(false)}>
                 Cancel
               </Button>
-              <Button 
-                onClick={handleAddTask} 
+              <Button
+                onClick={handleAddTask}
                 disabled={!selectedContact || !taskTitle.trim() || isCreating}
               >
                 {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : "Add Task"}
@@ -511,7 +511,7 @@ function TaskSection({ title, icon, tasks, onToggle, onNavigate, formatDueDate, 
                 <Circle className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
               )}
             </button>
-            
+
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{task.title}</p>
               <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">

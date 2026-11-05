@@ -47,6 +47,7 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
   const updateItem = useUpdateStoreItem();
 
   const [type, setType] = useState<'product' | 'service' | 'rental'>(defaultType || 'product');
+  const [isDigital, setIsDigital] = useState<boolean | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -66,6 +67,7 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
   const resetForm = useCallback(() => {
     setType(defaultType || 'product');
     setTitle('');
+    setIsDigital(null);
     setDescription('');
     setPrice('');
     setCreditsPrice('');
@@ -83,6 +85,7 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
 
   useEffect(() => {
     if (editItem) {
+      setIsDigital(editItem.is_digital ?? null);
       setType(editItem.type);
       setTitle(editItem.title);
       setDescription(editItem.description || '');
@@ -169,7 +172,10 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
       return;
     }
 
+    if (type !== 'rental' && isDigital === null) { toast.error('Choose physical goods / real-world service or digital content.'); return; }
+
     const itemData = {
+      is_digital: type === 'rental' ? false : isDigital,
       store_id: store.id,
       type,
       title: title.trim(),
@@ -271,6 +277,17 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
               </SelectContent>
             </Select>
           </div>
+
+          {type !== 'rental' && <div className="space-y-2">
+              <Label htmlFor="delivery-kind">Delivery</Label>
+              <select id="delivery-kind" required value={isDigital === null ? '' : String(isDigital)}
+                onChange={e => setIsDigital(e.target.value === '' ? null : e.target.value === 'true')}
+                className="h-11 w-full rounded-md border border-border bg-background px-3">
+                <option value="">Choose delivery type</option>
+                <option value="false">Physical goods / real-world service</option>
+                <option value="true">Digital content</option>
+              </select>
+          </div>}
 
           {/* Pricing */}
           <div className="grid grid-cols-2 gap-4">

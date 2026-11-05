@@ -148,8 +148,8 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
   };
 
   const togglePostSelection = (postId: string) => {
-    setSelectedPosts(prev => 
-      prev.includes(postId) 
+    setSelectedPosts(prev =>
+      prev.includes(postId)
         ? prev.filter(id => id !== postId)
         : [...prev, postId]
     );
@@ -172,7 +172,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
       toast.error('Please enter a URL');
       return;
     }
-    
+
     await addPortfolioItem.mutateAsync({
       folder_id: folder.id,
       title: linkForm.title || 'External Work',
@@ -180,7 +180,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
       thumbnail_url: linkForm.thumbnailUrl || undefined,
       media_type: 'link',
     });
-    
+
     setLinkForm({ title: '', url: '', thumbnailUrl: '' });
     setShowAddLinkDialog(false);
     refetchFolderPosts();
@@ -197,7 +197,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
   return (
     <div className="min-h-[400px]">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50">
+      <div className="safe-header sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50">
         <div className="flex items-center gap-3 px-5 py-4">
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="w-5 h-5" />
@@ -259,8 +259,8 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
               "border border-dashed border-border hover:border-primary/50 transition-colors"
             )}>
               {folder.cover_image_url ? (
-                <img 
-                  src={folder.cover_image_url} 
+                <img
+                  src={folder.cover_image_url}
                   alt={folder.name}
                   className="w-full h-full object-cover"
                 />
@@ -282,10 +282,10 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
                 </div>
               )}
             </div>
-            <input 
-              type="file" 
-              accept="image/*" 
-              className="hidden" 
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
               onChange={handleCoverUpload}
               disabled={isUploadingCover}
             />
@@ -382,7 +382,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
                   loading="lazy"
                 />
               )}
-              
+
               {isOwner && item.source === 'portfolio_item' && (
                 <button
                   type="button"
@@ -404,7 +404,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
           <DialogHeader>
             <DialogTitle className="font-display">Add to {folder.name}</DialogTitle>
           </DialogHeader>
-          
+
           {availablePosts.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">
               <ImageIcon className="w-12 h-12 mx-auto mb-3 opacity-40" />
@@ -452,7 +452,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
                           className="w-full h-full object-cover"
                         />
                       )}
-                      
+
                       {selectedPosts.includes(post.id) && (
                         <div className="absolute inset-0 bg-primary/30 flex items-center justify-center">
                           <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
@@ -464,12 +464,12 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
                   ))}
                 </div>
               </ScrollArea>
-              
+
               <div className="flex justify-between items-center pt-4 border-t">
                 <span className="text-sm text-muted-foreground">
                   {selectedPosts.length} selected
                 </span>
-                <Button 
+                <Button
                   onClick={handleAddSelectedPosts}
                   disabled={selectedPosts.length === 0 || assignPostToFolder.isPending}
                 >
@@ -525,7 +525,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
             <Button variant="outline" onClick={() => setShowAddLinkDialog(false)}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleAddLink}
               disabled={!linkForm.url.trim() || addPortfolioItem.isPending}
             >

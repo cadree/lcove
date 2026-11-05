@@ -241,7 +241,7 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto p-0">
-        <div className="px-6 pt-6 pb-4 border-b border-border/40 sticky top-0 bg-background z-10">
+        <div className="px-6 pt-6 pb-4 border-b border-border/40 safe-header sticky top-0 bg-background z-10">
           <DialogHeader>
             <DialogTitle className="text-xl">Invite audience</DialogTitle>
             <p className="text-xs text-muted-foreground mt-1">Pick who → see them → send.</p>
@@ -709,7 +709,7 @@ export function InviteAudienceDialog({ open, onOpenChange, eventId, eventName, e
           </section>
         </div>
 
-        <DialogFooter className="px-6 py-4 border-t border-border/40 sticky bottom-0 bg-background">
+        <DialogFooter className="px-6 py-4 border-t border-border/40 safe-footer sticky bottom-0 bg-background">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSend} disabled={sending || (mode !== "external" && !push && !email) || effectiveReach === 0}>
             {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}

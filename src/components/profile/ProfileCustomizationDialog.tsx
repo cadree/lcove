@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { 
-  Palette, 
-  Music, 
+import {
+  Palette,
+  Music,
   Sparkles,
   Loader2,
 } from "lucide-react";
@@ -111,7 +111,7 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
       });
     }
   }, [open, customization, customizationLoading, layout, layoutLoading]);
-  
+
   // Reset initialized flag when dialog closes
   useEffect(() => {
     if (!open) {
@@ -189,6 +189,7 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
 
   const handleMusicChange = (data: MusicData | null) => {
     setMusicData(data);
+    setProfileMusicEnabled(!!data);
   };
 
   const handleSave = async () => {
@@ -288,6 +289,7 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
               {/* Music Source Selector */}
               <div className="space-y-3">
                 <Label className="text-sm font-medium">Your Profile Song</Label>
+                <p role="status" className="rounded-lg border border-primary/40 bg-primary/10 p-3 text-sm">Press Save Changes below to publish your song, artwork, and music settings to your profile. Closing without saving discards these changes.</p>
                 <ProfileMusicSourceSelector
                   initialData={musicData || undefined}
                   onMusicChange={handleMusicChange}
@@ -301,8 +303,8 @@ export const ProfileCustomizationDialog = ({ open, onOpenChange }: ProfileCustom
           <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button 
-            className="flex-1" 
+          <Button
+            className="flex-1"
             onClick={handleSave}
             disabled={!ready || saveCustomization.isPending || customizationLoading || layoutLoading}
           >

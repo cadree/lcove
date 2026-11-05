@@ -1,8 +1,9 @@
+import { createPortal } from 'react-dom';
 import { useState, useEffect } from 'react';
-import { motion, Reorder } from 'framer-motion';
-import { GripVertical, Eye, EyeOff, Maximize2, Minimize2, Square, X, Check } from 'lucide-react';
+import { motion, Reorder, useDragControls } from 'framer-motion';
+import { GripVertical, X, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
 import { ProfileSection, useProfileLayout } from '@/hooks/useProfileLayout';
 
 interface ProfileLayoutEditorProps {
@@ -27,22 +28,14 @@ export function ProfileLayoutEditor({ userId, open, onClose }: ProfileLayoutEdit
   };
 
   const toggleVisibility = (id: string) => {
-    setSections(prev => 
+    setSections(prev =>
       prev.map(s => s.id === id ? { ...s, visible: !s.visible } : s)
     );
     setHasChanges(true);
   };
 
-  const cycleSize = (id: string) => {
-    const sizes: ('small' | 'medium' | 'large')[] = ['small', 'medium', 'large'];
-    setSections(prev => 
-      prev.map(s => {
-        if (s.id !== id) return s;
-        const currentIndex = sizes.indexOf(s.size);
-        const nextIndex = (currentIndex + 1) % sizes.length;
-        return { ...s, size: sizes[nextIndex] };
-      })
-    );
+  const setSize = (id: string, size: ProfileSection['size']) => {
+    setSections(prev => prev.map(section => section.id === id ? { ...section, size } : section));
     setHasChanges(true);
   };
 
@@ -60,7 +53,7 @@ export function ProfileLayoutEditor({ userId, open, onClose }: ProfileLayoutEdit
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -69,18 +62,18 @@ export function ProfileLayoutEditor({ userId, open, onClose }: ProfileLayoutEdit
     >
       <div className="flex flex-col h-full">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <div className="safe-header flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-border">
           <div>
             <h2 className="font-display text-xl font-semibold text-foreground">Edit Layout</h2>
-            <p className="text-sm text-muted-foreground">Drag to reorder, tap icons to toggle</p>
+            <p className="text-sm text-muted-foreground">Use the grip to reorder. Choose a size and visibility.</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={handleCancel}>
+            <Button variant="ghost" size="sm" className="min-h-11" onClick={handleCancel}>
               <X className="w-4 h-4 mr-1" />
               Cancel
             </Button>
-            <Button 
-              size="sm" 
+            <Button
+              size="sm" className="min-h-11"
               onClick={handleSave}
               disabled={!hasChanges || saveLayout.isPending}
             >
@@ -91,61 +84,15 @@ export function ProfileLayoutEditor({ userId, open, onClose }: ProfileLayoutEdit
         </div>
 
         {/* Reorderable List */}
-        <div className="flex-1 overflow-y-auto p-5">
-          <Reorder.Group 
-            axis="y" 
-            values={sections} 
+        <div className="safe-footer flex-1 min-h-0 overflow-y-auto p-5">
+          <Reorder.Group
+            axis="y"
+            values={sections}
             onReorder={handleReorder}
             className="space-y-2"
           >
             {sections.map((section) => (
-              <Reorder.Item
-                key={section.id}
-                value={section}
-                className={cn(
-                  "flex items-center gap-3 p-4 rounded-xl cursor-grab active:cursor-grabbing",
-                  "bg-card border border-border",
-                  !section.visible && "opacity-50"
-                )}
-              >
-                {/* Drag Handle */}
-                <GripVertical className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-
-                {/* Section Label */}
-                <span className={cn(
-                  "flex-1 font-medium",
-                  section.visible ? "text-foreground" : "text-muted-foreground line-through"
-                )}>
-                  {section.label}
-                </span>
-
-                {/* Size Indicator */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="w-8 h-8"
-                  onClick={(e) => { e.stopPropagation(); cycleSize(section.id); }}
-                  title={`Size: ${section.size}`}
-                >
-                  {section.size === 'small' && <Minimize2 className="w-4 h-4 text-muted-foreground" />}
-                  {section.size === 'medium' && <Square className="w-4 h-4 text-muted-foreground" />}
-                  {section.size === 'large' && <Maximize2 className="w-4 h-4 text-muted-foreground" />}
-                </Button>
-
-                {/* Visibility Toggle */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="w-8 h-8"
-                  onClick={(e) => { e.stopPropagation(); toggleVisibility(section.id); }}
-                >
-                  {section.visible ? (
-                    <Eye className="w-4 h-4 text-primary" />
-                  ) : (
-                    <EyeOff className="w-4 h-4 text-muted-foreground" />
-                  )}
-                </Button>
-              </Reorder.Item>
+              <LayoutRow key={section.id} section={section} onSize={setSize} onToggle={toggleVisibility} />
             ))}
           </Reorder.Group>
 
@@ -153,13 +100,44 @@ export function ProfileLayoutEditor({ userId, open, onClose }: ProfileLayoutEdit
           <div className="mt-6 p-4 rounded-xl bg-muted/50 text-sm text-muted-foreground">
             <p className="font-medium mb-2">Tips:</p>
             <ul className="space-y-1 list-disc list-inside">
-              <li>Drag items to change order</li>
-              <li>Tap eye icon to show/hide sections</li>
-              <li>Tap size icon to cycle between small/medium/large</li>
+              <li>Drag the grip to change order</li>
+              <li>Use the visibility switch to show or hide sections</li>
+              <li>Choose Small, Medium, or Large from the size control</li>
             </ul>
           </div>
         </div>
       </div>
-    </motion.div>
+    </motion.div>,
+    document.body,
   );
+}
+
+function LayoutRow({ section, onSize, onToggle }: {
+  section: ProfileSection;
+  onSize: (id: string, size: ProfileSection['size']) => void;
+  onToggle: (id: string) => void;
+}) {
+  const controls = useDragControls();
+  return <Reorder.Item value={section} dragListener={false} dragControls={controls}
+    className="grid grid-cols-[44px_minmax(0,1fr)] items-center gap-2 rounded-xl border border-border bg-card p-3">
+    <button type="button" aria-label={`Reorder ${section.label}`} className="flex h-11 w-11 touch-none items-center justify-center cursor-grab"
+      onPointerDown={event => controls.start(event)}>
+      <GripVertical className="h-5 w-5" />
+    </button>
+    <span className="min-w-0 break-words font-medium">{section.label}</span>
+    <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 pl-2">
+    <label className="flex items-center gap-2 text-sm">
+      <span className="sr-only">Size of {section.label}</span>
+      <select aria-label={`Size of ${section.label}`} value={section.size}
+        onChange={event => onSize(section.id, event.target.value as ProfileSection['size'])}
+        className="min-h-11 rounded-md border border-border bg-background px-2">
+        <option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option>
+      </select>
+    </label>
+    <label className="flex min-h-11 items-center gap-2 px-2 text-sm">
+      <Switch aria-label={`Show ${section.label}`} checked={section.visible} onCheckedChange={() => onToggle(section.id)} />
+      {section.visible ? 'Shown' : 'Hidden'}
+    </label>
+    </div>
+  </Reorder.Item>;
 }

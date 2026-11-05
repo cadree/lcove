@@ -105,7 +105,7 @@ export const VideoPlayer = ({
   // Save progress periodically (only if not preview mode)
   useEffect(() => {
     if (isPreviewOnly) return;
-    
+
     const interval = setInterval(() => {
       if (currentTime > 0 && duration > 0) {
         saveWatchProgress({
@@ -154,7 +154,7 @@ export const VideoPlayer = ({
       setShowPaywall(true);
       return;
     }
-    
+
     if (videoRef.current) {
       if (isPlaying) {
         videoRef.current.pause();
@@ -180,12 +180,12 @@ export const VideoPlayer = ({
   const seek = useCallback((seconds: number) => {
     if (videoRef.current) {
       let newTime = videoRef.current.currentTime + seconds;
-      
+
       // In preview mode, don't allow seeking past preview duration
       if (isPreviewOnly) {
         newTime = Math.min(newTime, previewDuration);
       }
-      
+
       videoRef.current.currentTime = Math.max(0, Math.min(duration, newTime));
     }
   }, [isPreviewOnly, previewDuration, duration]);
@@ -194,7 +194,7 @@ export const VideoPlayer = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (showPaywall) return;
-      
+
       switch (e.key) {
         case ' ':
         case 'k':
@@ -230,12 +230,12 @@ export const VideoPlayer = ({
   const handleSeek = (value: number[]) => {
     if (videoRef.current) {
       let newTime = value[0];
-      
+
       // In preview mode, don't allow seeking past preview duration
       if (isPreviewOnly) {
         newTime = Math.min(newTime, previewDuration);
       }
-      
+
       videoRef.current.currentTime = newTime;
       setCurrentTime(newTime);
     }
@@ -254,7 +254,7 @@ export const VideoPlayer = ({
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
-    
+
     if (hrs > 0) {
       return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
@@ -264,8 +264,8 @@ export const VideoPlayer = ({
   // Embeds use the playback URL. Public selects do not include video_url.
 
   // Calculate preview progress percentage
-  const previewProgress = isPreviewOnly 
-    ? Math.min((currentTime / previewDuration) * 100, 100) 
+  const previewProgress = isPreviewOnly
+    ? Math.min((currentTime / previewDuration) * 100, 100)
     : 0;
 
   return (
@@ -282,7 +282,7 @@ export const VideoPlayer = ({
       <Button
         variant="ghost"
         size="icon"
-        className="absolute top-4 right-4 z-50 bg-black/50 hover:bg-black/70 text-white"
+        className="absolute top-[calc(1rem+env(safe-area-inset-top,0px))] right-4 z-50 bg-black/50 hover:bg-black/70 text-white"
         onClick={(e) => {
           e.stopPropagation();
           onClose();
@@ -293,7 +293,7 @@ export const VideoPlayer = ({
 
       {/* Preview Badge */}
       {isPreviewOnly && !showPaywall && (
-        <div className="absolute top-4 left-4 z-50 flex items-center gap-2 bg-primary/90 text-primary-foreground px-3 py-1.5 rounded-full text-sm font-medium">
+        <div className="absolute top-[calc(1rem+env(safe-area-inset-top,0px))] left-4 z-50 flex items-center gap-2 bg-primary/90 text-primary-foreground px-3 py-1.5 rounded-full text-sm font-medium">
           <Play className="w-3 h-3" />
           Preview: {formatTime(Math.max(0, previewDuration - currentTime))} remaining
         </div>
@@ -382,11 +382,11 @@ export const VideoPlayer = ({
                 <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-primary/20 flex items-center justify-center">
                   <Lock className="w-10 h-10 text-primary" />
                 </div>
-                
+
                 <h2 className="text-2xl font-display font-bold text-white mb-2">
                   Preview Ended
                 </h2>
-                
+
                 <p className="text-white/70 mb-6">
                   {!digitalPurchasesEnabled()
                     ? "The rest of this network isn't available to purchase in the iOS app."
@@ -419,7 +419,7 @@ export const VideoPlayer = ({
                     Subscribe Now
                   </Button>
                   )}
-                  
+
                   <Button
                     variant="ghost"
                     size="lg"
@@ -443,7 +443,7 @@ export const VideoPlayer = ({
               onClick={(e) => e.stopPropagation()}
             >
               {/* Top Bar - Title */}
-              <div className="absolute top-0 left-0 right-0 p-6">
+              <div className="safe-header absolute top-0 left-0 right-0 p-6">
                 <h2 className="font-display text-2xl text-white">{content.title}</h2>
               </div>
 
@@ -461,7 +461,7 @@ export const VideoPlayer = ({
               </div>
 
               {/* Bottom Controls */}
-              <div className="absolute bottom-0 left-0 right-0 p-6 space-y-4">
+              <div className="safe-footer absolute bottom-0 left-0 right-0 p-6 space-y-4">
                 {/* Progress Bar */}
                 <div className="relative">
                   <Slider
@@ -474,9 +474,9 @@ export const VideoPlayer = ({
                   />
                   {/* Preview limit indicator */}
                   {isPreviewOnly && duration > 0 && (
-                    <div 
+                    <div
                       className="absolute top-0 h-full bg-primary/30 pointer-events-none rounded"
-                      style={{ 
+                      style={{
                         width: `${(previewDuration / duration) * 100}%`,
                         maxWidth: '100%'
                       }}

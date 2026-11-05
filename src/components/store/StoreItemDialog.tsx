@@ -1,3 +1,5 @@
+import { digitalPurchasesEnabled, isIosApp } from "@/lib/platform";
+import { storePurchaseAllowed } from "@/lib/storePurchase";
 import { useState } from 'react';
 import { StoreItem, useCreateRentalInquiry } from '@/hooks/useStore';
 import { useCredits } from '@/hooks/useCredits';
@@ -63,6 +65,7 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
 
   if (!item) return null;
 
+  const purchaseAllowed = storePurchaseAllowed(item, digitalPurchasesEnabled());
   const TypeIcon = typeIcons[item.type];
   const store = item.store as StoreItem['store'];
   const profile = store?.profile;
@@ -70,6 +73,7 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
   const canPayWithCredits = item.credits_price > 0 && balance >= item.credits_price;
 
   const handlePurchase = async () => {
+    if (!purchaseAllowed) { toast.error('This item is not available for purchase in the iOS app.'); return; }
     if (!user) {
       toast.error('Please sign in to make a purchase');
       return;
@@ -80,7 +84,7 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
       if (paymentType === 'credits') {
         // Handle credit payment via edge function
         const { data, error } = await supabase.functions.invoke('purchase-store-item', {
-          body: { itemId: item.id, paymentType: 'credits' },
+          body: { clientPlatform: isIosApp() ? 'ios' : 'web', itemId: item.id, paymentType: 'credits' },
         });
 
         if (error) throw error;
@@ -89,7 +93,7 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
       } else {
         // Handle cash payment via Stripe
         const { data, error } = await supabase.functions.invoke('purchase-store-item', {
-          body: { itemId: item.id, paymentType: 'cash' },
+          body: { clientPlatform: isIosApp() ? 'ios' : 'web', itemId: item.id, paymentType: 'cash' },
         });
 
         if (error) throw error;
@@ -251,7 +255,7 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
           )}
 
           {/* Contact Info for Rentals */}
-          {item.type === 'rental' && (item.contact_email || item.contact_phone) && (
+          {purchaseAllowed && item.type === 'rental' && (item.contact_email || item.contact_phone) && (
             <div className="space-y-2">
               <h4 className="font-medium">Contact</h4>
               {item.contact_email && (
@@ -294,7 +298,8 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
             </div>
 
             {/* Purchase Options for Products/Services */}
-            {item.type !== 'rental' && (
+            {!purchaseAllowed && <p className="text-sm text-muted-foreground">This item is not available for purchase in the iOS app.</p>}
+            {purchaseAllowed && item.type !== 'rental' && (
               <div className="space-y-3 pt-3 border-t border-border">
                 {item.external_url ? (
                   <div className="space-y-2">
@@ -367,7 +372,7 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
             )}
 
             {/* Inquiry Form for Rentals */}
-            {item.type === 'rental' && (
+            {purchaseAllowed && item.type === 'rental' && (
               <div className="space-y-3 pt-3 border-t border-border">
                 {/* Check if external store is configured - show as primary action */}
                 {store?.peerspace_url ? (
@@ -458,13 +463,13 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
           </div>
 
           {/* Reviews Section for Rentals */}
-          {item.type === 'rental' && (
+          {purchaseAllowed && item.type === 'rental' && (
             <StudioReviews itemId={item.id} />
           )}
         </div>
 
         {/* Booking Dialog */}
-        {item.type === 'rental' && (
+        {purchaseAllowed && item.type === 'rental' && (
           <StudioBookingDialog
             item={item}
             open={showBooking}
