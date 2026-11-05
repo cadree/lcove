@@ -27,16 +27,16 @@ const OnboardingSkills = ({ data, updateData, onNext, onBack }: Props) => {
   const fetchSkills = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       console.log('[OnboardingSkills] Fetching skills from Supabase...');
       console.log('[OnboardingSkills] Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
-      
+
       const { data: skillsData, error: fetchError } = await supabase
         .from('skills')
         .select('id, name, category')
         .order('category', { ascending: true });
-      
+
       if (fetchError) {
         console.error('[OnboardingSkills] Supabase error:', fetchError);
         setError(`Failed to load skills: ${fetchError.message}`);
@@ -189,7 +189,7 @@ const OnboardingSkills = ({ data, updateData, onNext, onBack }: Props) => {
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background to-transparent">
+      <div className="safe-footer fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background to-transparent">
         <div className="max-w-2xl mx-auto flex gap-3">
           <Button
             onClick={onBack}

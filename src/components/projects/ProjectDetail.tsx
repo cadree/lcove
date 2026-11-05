@@ -393,7 +393,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
     <>
       <Sheet open={open} onOpenChange={onClose}>
         <SheetContent side="right" className="w-full sm:max-w-xl p-0 overflow-y-auto pb-safe touch-manipulation">
-          <SheetHeader className="p-6 pb-4 border-b border-border sticky top-0 bg-background z-10">
+          <SheetHeader className="p-6 pb-4 border-b border-border safe-header sticky top-0 bg-background z-10">
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-2">

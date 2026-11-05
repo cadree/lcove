@@ -1,3 +1,4 @@
+import { useOverlayViewport } from "@/hooks/useOverlayViewport";
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
@@ -48,19 +49,21 @@ type DialogContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
->(({ className, children, style, fullscreen = false, ...props }, ref) => (
+>(({ className, children, style, fullscreen = false, ...props }, ref) => {
+  useOverlayViewport();
+  return (
   <DialogPortal>
     <DialogOverlay />
     <div className={cn(
       "fixed inset-0 z-50 flex overflow-hidden",
       fullscreen ? "items-stretch justify-stretch p-0 pointer-events-auto" : "items-center justify-center p-4",
-    )}>
+    )} style={{ top: "var(--overlay-top, 0px)", height: "var(--overlay-height, 100dvh)", bottom: "auto" }}>
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
           "relative z-50 w-full min-w-0",
           fullscreen
-            ? "flex h-[100dvh] max-h-[100dvh] max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 bg-background p-0 shadow-none"
+            ? "overlay-safe-area flex h-full max-h-full max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 bg-background p-0 shadow-none"
             : "grid max-w-lg gap-4 rounded-[16px] border border-border bg-card p-6 shadow-elevated max-h-[85vh] overflow-x-hidden overflow-y-auto scrollbar-thin",
           !fullscreen && dialogContain,
           "data-[state=open]:animate-scale-in data-[state=closed]:animate-scale-out",
@@ -68,6 +71,7 @@ const DialogContent = React.forwardRef<
         )}
         style={{
           ...style,
+          maxHeight: fullscreen ? "100%" : "calc(var(--overlay-height, 100dvh) - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))",
           boxSizing: "border-box",
           width: "100%",
           minWidth: 0,
@@ -76,14 +80,14 @@ const DialogContent = React.forwardRef<
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-3 top-3 rounded-lg p-1.5 opacity-70 transition-all hover:opacity-100 hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring disabled:pointer-events-none z-10">
+        <DialogPrimitive.Close style={{ top: fullscreen ? "calc(env(safe-area-inset-top, 0px) + 0.75rem)" : undefined }} className="absolute right-3 top-3 min-h-11 min-w-11 flex items-center justify-center rounded-lg p-1.5 opacity-70 transition-all hover:opacity-100 hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring disabled:pointer-events-none z-10">
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </div>
   </DialogPortal>
-));
+); });
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (

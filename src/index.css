@@ -1519,3 +1519,14 @@ body.ether-id-page {
   .ether-id-back,
   .ether-id-sheen { display: none !important; }
 }
+
+/* Overlay bounds follow the visible viewport, including the iOS software keyboard. */
+.overlay-safe-area {
+  padding-top: max(1rem, env(safe-area-inset-top, 0px)) !important;
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px)) !important;
+}
+.safe-header { padding-top: calc(1rem + env(safe-area-inset-top, 0px)) !important; }
+.safe-footer { padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important; }
+[role="dialog"] input, [role="dialog"] textarea, [role="dialog"] select {
+  scroll-margin-block: 4rem;
+}

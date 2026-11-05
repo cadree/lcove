@@ -51,7 +51,7 @@ const Store = () => {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const storeIdParam = searchParams.get('store');
-  
+
   const { data: myStore, isLoading: isLoadingStore } = useMyStore();
   const { data: myItems } = useMyStoreItems();
   const deleteItem = useDeleteStoreItem();
@@ -157,9 +157,9 @@ const Store = () => {
         .eq('id', storeIdParam)
         .eq('is_active', true)
         .maybeSingle();
-      
+
       if (error) throw error;
-      
+
       // Fetch owner profile
       if (data) {
         const { data: profile } = await supabase
@@ -167,7 +167,7 @@ const Store = () => {
           .select('display_name, avatar_url, city')
           .eq('user_id', data.user_id)
           .maybeSingle();
-        
+
         return { ...data, profile } as StoreType & { profile?: { display_name: string; avatar_url: string; city: string } };
       }
       return null;
@@ -186,7 +186,7 @@ const Store = () => {
   const currentType = activeTab === 'products' || activeTab === 'services' || activeTab === 'rentals'
     ? typeMap[activeTab]
     : undefined;
-  
+
   // When viewing a specific store, always filter by that store ID
   const effectiveStoreId = storeIdParam || undefined;
   const { data: items, isLoading } = useStoreItems(
@@ -271,7 +271,7 @@ const Store = () => {
     <PageLayout>
       <div className="min-h-screen overflow-x-hidden">
         {/* Header */}
-        <div className="sticky top-0 z-10 glass-strong border-b border-border/30">
+        <div className="safe-header sticky top-0 z-10 glass-strong border-b border-border/30">
           <div className="container mx-auto px-4 py-5">
             {/* Show store header when viewing a specific store */}
             {storeIdParam && viewingStore ? (
@@ -419,7 +419,7 @@ const Store = () => {
                       title={
                         storeIdParam && viewingStore
                           ? `No ${tabId === 'products' ? 'products' : tabId === 'services' ? 'services' : 'studios'} in this store`
-                          : tabId === 'my-store' 
+                          : tabId === 'my-store'
                             ? 'Your store is waiting'
                             : tabId === 'products'
                               ? 'No products yet'

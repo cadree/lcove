@@ -1,19 +1,19 @@
+import { NumberInput } from "@/components/ui/number-input";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Heart, 
-  Crown, 
-  Check, 
-  Sparkles, 
-  Gift, 
-  Calendar, 
+import {
+  Heart,
+  Crown,
+  Check,
+  Sparkles,
+  Gift,
+  Calendar,
   Award,
   Users,
   Loader2,
@@ -217,11 +217,11 @@ const Membership = () => {
                       </label>
                       <div className="flex items-center gap-3">
                         <span className="text-2xl font-display text-foreground">$</span>
-                        <Input
-                          type="number"
+                        <NumberInput
+                          integer
                           min={5}
                           value={communityAmount}
-                          onChange={(e) => setCommunityAmount(Math.max(5, parseInt(e.target.value) || 5))}
+                          onValueChange={value => setCommunityAmount(value)}
                           className="w-24 text-xl font-medium text-center"
                         />
                         <span className="text-muted-foreground">/month</span>
@@ -256,8 +256,8 @@ const Membership = () => {
                     hideCheckout ? (
                       <IosDigitalGoodsNotice />
                     ) : (
-                    <Button 
-                      className="w-full" 
+                    <Button
+                      className="w-full"
                       onClick={handleCommunityJoin}
                       disabled={isCheckingOut || !user}
                     >
@@ -298,8 +298,8 @@ const Membership = () => {
             >
               <Card className={cn(
                 "h-full relative overflow-hidden transition-all",
-                membership?.tier === "elite" 
-                  ? "border-amber-500 ring-2 ring-amber-500/20" 
+                membership?.tier === "elite"
+                  ? "border-amber-500 ring-2 ring-amber-500/20"
                   : "border-amber-500/30"
               )}>
                 <div className={cn(
@@ -348,7 +348,7 @@ const Membership = () => {
                     hideCheckout ? (
                       <IosDigitalGoodsNotice />
                     ) : (
-                    <Button 
+                    <Button
                       className="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white border-0"
                       onClick={handleEliteJoin}
                       disabled={isCheckingOut || !user}
@@ -377,7 +377,7 @@ const Membership = () => {
                   ) : hideCheckout ? (
                     <IosDigitalGoodsNotice />
                   ) : (
-                    <Button 
+                    <Button
                       className="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white border-0"
                       onClick={handleEliteJoin}
                       disabled={isCheckingOut}

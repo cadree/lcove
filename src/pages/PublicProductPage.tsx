@@ -1,3 +1,4 @@
+import { NumberInput } from "@/components/ui/number-input";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -204,13 +205,13 @@ export default function PublicProductPage() {
                 {item.type === "product" && (
                   <div>
                     <Label htmlFor="guest-qty">Quantity</Label>
-                    <Input
+                    <NumberInput
                       id="guest-qty"
-                      type="number"
+                      integer
                       min={1}
                       max={Math.min(10, item.inventory_count ?? 10)}
                       value={quantity}
-                      onChange={(event) => setQuantity(Number(event.target.value))}
+                      onValueChange={value => setQuantity(value)}
                     />
                   </div>
                 )}

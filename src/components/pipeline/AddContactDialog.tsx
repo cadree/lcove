@@ -56,7 +56,7 @@ function Section({ icon, title, children }: SectionProps) {
 // Simple debounce hook
 function useDebounceValue(value: string, delay: number = 300) {
   const [debouncedValue, setDebouncedValue] = useState(value);
-  
+
   useState(() => {
     const handler = setTimeout(() => {
       setDebouncedValue(value);
@@ -96,7 +96,7 @@ export function AddContactDialog({
   const [tagsInput, setTagsInput] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [linkedUserId, setLinkedUserId] = useState<string | null>(null);
-  
+
   // User search state
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [showUserSearch, setShowUserSearch] = useState(false);
@@ -136,7 +136,7 @@ export function AddContactDialog({
     setAvatarUrl(user.avatar_url || "");
     setLinkedUserId(user.user_id);
     // Phone is not exposed in user search for privacy - user must enter manually
-    
+
     // Fill social links if available
     if (user.social_links) {
       setInstagramUrl(user.social_links.instagram || "");
@@ -145,7 +145,7 @@ export function AddContactDialog({
       setTiktokUrl(user.social_links.tiktok || "");
       setWebsiteUrl(user.social_links.website || "");
     }
-    
+
     // Close search
     setShowUserSearch(false);
     setUserSearchQuery("");
@@ -154,13 +154,13 @@ export function AddContactDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    
+
     // Parse tags from comma-separated input
     const tags = tagsInput
       .split(',')
       .map(t => t.trim())
       .filter(t => t.length > 0);
-    
+
     await onSubmit({
       name: name.trim(),
       email: email.trim() || undefined,
@@ -178,7 +178,7 @@ export function AddContactDialog({
       avatarUrl: avatarUrl.trim() || undefined,
       linkedUserId: linkedUserId || undefined
     });
-    
+
     resetForm();
   };
 
@@ -190,7 +190,7 @@ export function AddContactDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden bg-card border-border max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="relative px-6 pt-6 pb-4 sticky top-0 bg-card z-10 border-b border-border/50">
+        <div className="relative px-6 pt-6 pb-4 safe-header sticky top-0 bg-card z-10 border-b border-border/50">
           <button
             onClick={() => handleOpenChange(false)}
             className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none"
@@ -219,7 +219,7 @@ export function AddContactDialog({
                   className="pl-9 bg-muted/30 border-border/50"
                 />
               </div>
-              
+
               {/* Search Results */}
               {showUserSearch && userSearchQuery.length >= 2 && (
                 <div className="border border-border rounded-lg bg-background max-h-48 overflow-y-auto">
@@ -260,7 +260,7 @@ export function AddContactDialog({
                   )}
                 </div>
               )}
-              
+
               {linkedUserId && (
                 <div className="flex items-center gap-2 text-xs text-green-500">
                   <span>✓ Linked to Ether user</span>
@@ -471,7 +471,7 @@ export function AddContactDialog({
           </Section>
 
           {/* Submit */}
-          <div className="pt-2 sticky bottom-0 bg-card pb-1">
+          <div className="pt-2 safe-footer sticky bottom-0 bg-card pb-1">
             <Button
               type="submit"
               className="w-full"
