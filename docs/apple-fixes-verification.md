@@ -44,3 +44,11 @@ To reproduce browser checks, run Vite with dummy `VITE_SUPABASE_URL=https://appl
 - On an iPhone: keyboard opening/closing and rotation in music/project/dialog/sheet fields; notch/home-indicator clearance; grip dragging versus taps; real HEIC and audio upload; Save Changes then reload the profile to verify music and cover art; digital checkout blocked and physical purchase still available. Test the reviewer’s group-chat flow with real users and an iPad-width layout.
 - Exercise `?conversation=`, `?new=<userId>` and `?id=` with authorized backend records; browser mocks do not prove real conversation creation, RLS or project access.
 - Build/archive in Xcode, inspect the archive privacy report and included app manifest, verify export compliance and privacy metadata, and submit through App Store Connect. No native binary/archive was built or submitted here.
+
+## November 10 native follow-up
+
+Xcode 26.2 successfully produced `/tmp/lcove-staging-unsigned.xcarchive` using `CODE_SIGNING_ALLOWED=NO` after a staging web build and Capacitor sync. The archive's actual Info.plist reports version 1.0.1 (2), UIDeviceFamily [1], the expected bundle identifier, and ITSAppUsesNonExemptEncryption false. The app-level PrivacyInfo.xcprivacy is present; three privacy manifests were found including frameworks. Bundled JavaScript contains the staging project reference and no dummy project URL; capacitor.config.json has no remote server.url. This proves local native compilation/resource inclusion, not signing, installability, App Store acceptance, or runtime behavior. The archive must not be submitted as a production release.
+
+Sync added the installed Capacitor Share plugin to Package.swift; Package.resolved pins Capacitor 8.0.1. A first package-resolution attempt failed, then a clean cache retry succeeded.
+
+Read-only staging checks: ether-staging is active, but store_items.is_digital is absent and neither process-email-queue nor purchase-store-item is installed. No database migrations/functions were applied or deployed. Follow [the current walkthrough](iphone-app-store-walkthrough.md) for prerequisites, iPhone steps and App Store Connect actions. Its instructions supersede historical conflicting sections of ios-release.md.
