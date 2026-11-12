@@ -1,3 +1,4 @@
+import { NumberInput } from "@/components/ui/number-input";
 import React, { useState, useEffect } from 'react';
 import { Pencil, Plus, Trash2, Target, MapPin, Wrench, Calendar, Lock, Globe, Users2 } from 'lucide-react';
 import { Project, useProjects } from '@/hooks/useProjects';
@@ -429,15 +430,15 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
                 <div className="grid grid-cols-3 gap-2">
                   <div>
                     <Label className="text-xs text-muted-foreground">Pay</Label>
-                    <Input type="number" value={role.payout_amount} onChange={e => updateRole(i, 'payout_amount', parseFloat(e.target.value) || 0)} min="0" />
+                    <NumberInput  value={role.payout_amount} onValueChange={value => updateRole(i, 'payout_amount', value)} min="0" />
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground">XP</Label>
-                    <Input type="number" value={role.credit_amount} onChange={e => updateRole(i, 'credit_amount', parseFloat(e.target.value) || 0)} min="0" />
+                    <NumberInput  value={role.credit_amount} onValueChange={value => updateRole(i, 'credit_amount', value)} min="0" />
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground">Slots</Label>
-                    <Input type="number" value={role.slots_available} onChange={e => updateRole(i, 'slots_available', parseInt(e.target.value) || 1)} min="1" />
+                    <NumberInput integer value={role.slots_available} onValueChange={value => updateRole(i, 'slots_available', value)} min="1" />
                   </div>
                 </div>
               </div>

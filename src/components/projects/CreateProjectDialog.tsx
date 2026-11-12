@@ -1,3 +1,4 @@
+import { NumberInput } from "@/components/ui/number-input";
 import React, { useState, useCallback } from 'react';
 import { Plus, Trash2, DollarSign, Coins, Upload, X, Image, Link, FileText, Film, Package, Calendar, MapPin, Wrench, Users2, Target, Milestone, Lock, FolderKanban } from 'lucide-react';
 import { useProjects } from '@/hooks/useProjects';
@@ -63,15 +64,15 @@ interface CreateProjectDialogProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({ 
-  children, 
+export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
+  children,
   open: controlledOpen,
-  onOpenChange: controlledOnOpenChange 
+  onOpenChange: controlledOnOpenChange
 }) => {
   const { createProject, isCreating } = useProjects();
   const { user } = useAuth();
   const [internalOpen, setInternalOpen] = useState(false);
-  
+
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
   const setOpen = isControlled ? controlledOnOpenChange! : setInternalOpen;
@@ -127,7 +128,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
 
   // Handlers
   const toggleOutcome = (outcome: string) => {
-    setSelectedOutcomes(prev => 
+    setSelectedOutcomes(prev =>
       prev.includes(outcome) ? prev.filter(o => o !== outcome) : [...prev, outcome]
     );
   };
@@ -184,7 +185,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     if (url.includes('youtube.com') || url.includes('youtu.be')) { type = 'video'; name = 'YouTube Reference'; }
     else if (url.includes('figma.com')) { type = 'link'; name = 'Figma Design'; }
     else if (url.includes('drive.google.com')) { type = 'link'; name = 'Google Drive'; }
-    
+
     setAttachments(prev => [...prev, { url, name, type }]);
     setLinkUrl('');
   };
@@ -199,7 +200,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     e.preventDefault();
     const files = e.dataTransfer.files;
     if (!files.length) return;
-    
+
     const newAttachments: AttachmentInput[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -231,7 +232,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     // Upload attachment files first
     let coverImageUrl: string | undefined;
     const uploadedAttachments: { file_url: string; file_name: string; file_type: string; file_size: number | null }[] = [];
-    
+
     if (attachments.length > 0) {
       setIsUploadingFiles(true);
       try {
@@ -340,7 +341,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
 
   const roleCredits = roles.reduce((sum, role) => sum + roleCreditAmount(role.credit_amount), 0);
   const canSubmit = title.trim() && (
-    projectType === 'volunteer' || 
+    projectType === 'volunteer' ||
     (projectType === 'paid' && budgetNum > 0) ||
     (projectType === 'hybrid' && (budgetNum > 0 || roleCredits > 0))
   );
@@ -360,7 +361,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {children && <DialogTrigger asChild>{children}</DialogTrigger>}
-      <DialogContent 
+      <DialogContent
         className="max-w-2xl max-h-[85vh] overflow-y-auto pb-24 sm:pb-8"
         aria-describedby="create-project-description"
       >
@@ -729,15 +730,15 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
                       <Label className="text-xs text-muted-foreground">Pay (USD)</Label>
                       <div className="relative">
                         <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input type="number" value={role.payout_amount || ''} onChange={(e) => updateRole(index, 'payout_amount', parseFloat(e.target.value) || 0)} placeholder="0" className="pl-9" min={0} />
+                        <NumberInput  value={role.payout_amount || ''} onValueChange={value => updateRole(index, 'payout_amount', value)} placeholder="0" className="pl-9" min={0} />
                       </div>
                     </div>
                     <div>
                       <Label className="text-xs text-muted-foreground">XP / barter credit</Label>
-                      <Input type="number" value={role.credit_amount || ''} onChange={(e) => updateRole(index, 'credit_amount', parseFloat(e.target.value) || 0)} placeholder="0" min={0} />
+                      <NumberInput  value={role.credit_amount || ''} onValueChange={value => updateRole(index, 'credit_amount', value)} placeholder="0" min={0} />
                     </div>
                     <div>
-                      <Input type="number" value={role.slots_available} onChange={(e) => updateRole(index, 'slots_available', parseInt(e.target.value) || 1)} placeholder="Slots" min={1} />
+                      <NumberInput integer value={role.slots_available} onValueChange={value => updateRole(index, 'slots_available', value)} placeholder="Slots" min={1} />
                       <span className="text-xs text-muted-foreground">slots available</span>
                     </div>
                   </div>

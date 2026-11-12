@@ -7,6 +7,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
     return (
       <input
         type={type}
+        inputMode={type === "number" ? (props.step && props.step !== 1 && props.step !== "1" ? "decimal" : "numeric") : undefined}
         className={cn(
           "flex h-11 w-full min-w-0 max-w-full box-border rounded-[14px] border border-border bg-input px-4 py-2.5",
           "text-base text-foreground placeholder:text-muted-foreground",

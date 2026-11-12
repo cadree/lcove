@@ -6386,6 +6386,7 @@ export type Database = {
           id: string
           images: string[] | null
           inventory_count: number | null
+          is_digital: boolean | null
           is_active: boolean | null
           location: string | null
           price: number
@@ -6412,6 +6413,7 @@ export type Database = {
           id?: string
           images?: string[] | null
           inventory_count?: number | null
+          is_digital?: boolean | null
           is_active?: boolean | null
           location?: string | null
           price?: number
@@ -6438,6 +6440,7 @@ export type Database = {
           id?: string
           images?: string[] | null
           inventory_count?: number | null
+          is_digital?: boolean | null
           is_active?: boolean | null
           location?: string | null
           price?: number

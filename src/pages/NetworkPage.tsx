@@ -182,11 +182,11 @@ const NetworkPage = () => {
       </AnimatePresence>
 
       {/* Netflix-style Top Navigation */}
-      <header className="fixed top-0 left-0 right-0 z-30 bg-gradient-to-b from-background via-background/80 to-transparent">
+      <header className="safe-header fixed top-0 left-0 right-0 z-30 bg-gradient-to-b from-background via-background/80 to-transparent">
         <div className="flex items-center justify-between px-4 md:px-12 py-3">
           <div className="flex items-center gap-3 md:gap-6">
             <BackButton label="Back" fallback="/cinema" className="text-foreground hover:bg-background/20 -ml-2" />
-            
+
             {/* Network Logo/Name - mobile shows just logo */}
             <div className="flex items-center gap-2">
               {network.logo_url ? (
@@ -228,12 +228,12 @@ const NetworkPage = () => {
               </DropdownMenu>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-1 md:gap-2">
             {/* Search */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setSearchOpen(true)}
               className="hover:bg-background/20"
             >
@@ -247,10 +247,10 @@ const NetworkPage = () => {
 
             {/* Submit content - if user */}
             {user && !isOwner && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setSubmitDialogOpen(true)} 
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSubmitDialogOpen(true)}
                 className="hover:bg-background/20"
               >
                 <Send className="w-5 h-5" />
@@ -258,9 +258,9 @@ const NetworkPage = () => {
             )}
 
             {/* Menu */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setMenuOpen(true)}
               className="hover:bg-background/20"
             >
@@ -387,7 +387,7 @@ const NetworkPage = () => {
                   Play
                 </Button>
               )}
-              
+
               <Button
                 size="lg"
                 variant="secondary"
@@ -627,21 +627,21 @@ const NetworkPage = () => {
 };
 
 // Filter Pill Component
-const FilterPill = ({ 
-  children, 
-  active, 
-  onClick 
-}: { 
-  children: React.ReactNode; 
-  active: boolean; 
+const FilterPill = ({
+  children,
+  active,
+  onClick
+}: {
+  children: React.ReactNode;
+  active: boolean;
   onClick: () => void;
 }) => (
   <button
     onClick={onClick}
     className={cn(
       "px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap flex items-center",
-      active 
-        ? "bg-foreground text-background" 
+      active
+        ? "bg-foreground text-background"
         : "border border-border/50 text-foreground hover:border-foreground/50"
     )}
   >
@@ -672,8 +672,8 @@ const ContinueWatchingRow = ({
     <ScrollArea className="w-full -mx-4 px-4 md:-mx-12 md:px-12">
       <div className="flex gap-2 md:gap-3 pb-4">
         {items.map((item) => {
-          const progress = item.watchProgress.duration_seconds 
-            ? (item.watchProgress.progress_seconds / item.watchProgress.duration_seconds) * 100 
+          const progress = item.watchProgress.duration_seconds
+            ? (item.watchProgress.progress_seconds / item.watchProgress.duration_seconds) * 100
             : 0;
           return (
             <div
@@ -693,7 +693,7 @@ const ContinueWatchingRow = ({
                     <Film className="w-8 h-8 text-muted-foreground" />
                   </div>
                 )}
-                
+
                 {/* Play overlay */}
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <Button
@@ -710,7 +710,7 @@ const ContinueWatchingRow = ({
 
                 {/* Progress bar */}
                 <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted-foreground/30">
-                  <div 
+                  <div
                     className="h-full bg-primary"
                     style={{ width: `${Math.min(progress, 100)}%` }}
                   />
@@ -764,16 +764,16 @@ const Top10Row = ({
             onClick={() => onSelect(item)}
           >
             {/* Large Number */}
-            <span 
+            <span
               className="absolute -left-8 md:-left-10 bottom-0 font-display text-[80px] md:text-[100px] font-black leading-none text-foreground/20 z-0 select-none"
-              style={{ 
+              style={{
                 WebkitTextStroke: '2px rgba(var(--foreground), 0.3)',
                 WebkitTextFillColor: 'transparent',
               }}
             >
               {index + 1}
             </span>
-            
+
             {/* Card */}
             <div className="relative w-[100px] md:w-[130px] z-10 ml-4">
               <div className="aspect-[2/3] rounded-md overflow-hidden bg-muted">
@@ -940,7 +940,7 @@ const ContentCard = ({
           Recently Added
         </Badge>
       )}
-      
+
       {content.is_featured && badgeType !== 'new' && (
         <div className="absolute top-2 right-2 bg-primary/90 rounded p-0.5">
           <span className="text-[8px] font-bold text-primary-foreground px-1">TOP 10</span>

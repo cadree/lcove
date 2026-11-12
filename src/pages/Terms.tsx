@@ -7,7 +7,7 @@ import { PageMeta } from "@/components/seo/PageMeta";
 import { AI_CONTENT_RULE_ALLOWED, AI_CONTENT_RULE_FORBIDDEN } from "@/lib/aiContentRule";
 
 const Terms = () => {
-  const lastUpdated = "October 24, 2026";
+  const lastUpdated = "November 5, 2026";
 
   return (
     <div className="min-h-screen bg-background">
@@ -40,6 +40,14 @@ const Terms = () => {
           </p>
         </div>
 
+        <section className="mb-8 space-y-3" aria-labelledby="content-safety">
+          <h2 id="content-safety" className="text-lg font-semibold">Zero tolerance for objectionable content and abuse</h2>
+          <p className="text-sm text-muted-foreground">
+            Ether has zero tolerance for objectionable content or abusive users. Content is filtered,
+            and you can report content or users and block users in the app. We review reports within
+            24 hours, remove offending content, and eject users who violate these rules.
+          </p>
+        </section>
         {/* Sections */}
         <Accordion type="single" collapsible className="space-y-2">
           {/* Eligibility */}

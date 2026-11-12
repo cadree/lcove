@@ -125,6 +125,7 @@ export interface StoreItemCategory {
 }
 
 export interface StoreItem {
+  is_digital?: boolean | null;
   id: string;
   store_id: string;
   category_id: string | null;
@@ -447,6 +448,7 @@ export const useCreateStoreItem = () => {
       const insertData = {
         store_id: data.store_id!,
         type: data.type!,
+        is_digital: data.is_digital ?? null,
         title: data.title!,
         description: data.description || null,
         price: data.price || 0,

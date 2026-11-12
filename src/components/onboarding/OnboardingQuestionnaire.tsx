@@ -79,7 +79,7 @@ const OnboardingQuestionnaire = ({ data, updateData, onComplete, onBack }: Props
             <p className="text-base leading-relaxed text-foreground">{QUIZ_INTRO_COPY.body}</p>
           </div>
         </div>
-        <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background to-transparent">
+        <div className="safe-footer fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background to-transparent">
           <div className="max-w-2xl mx-auto flex gap-4">
             <Button onClick={onBack} variant="outline" className="h-12 px-6">
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -170,7 +170,7 @@ const OnboardingQuestionnaire = ({ data, updateData, onComplete, onBack }: Props
         </AnimatePresence>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background to-transparent">
+      <div className="safe-footer fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background to-transparent">
         <div className="max-w-2xl mx-auto flex gap-4">
           <Button onClick={handlePrev} variant="outline" className="h-12 px-6">
             <ArrowLeft className="mr-2 h-4 w-4" />

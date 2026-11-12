@@ -30,14 +30,14 @@ const PipelinePage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { pipelines, isLoading: pipelinesLoading } = usePipelines();
   const [currentPipeline, setCurrentPipeline] = useState<PipelineType | null>(null);
-  
+
   // Set initial pipeline
   useEffect(() => {
     if (pipelines.length > 0 && !currentPipeline) {
       setCurrentPipeline(pipelines[0]);
     }
   }, [pipelines, currentPipeline]);
-  
+
   const { stages, items, isLoading, error, getItemsByStage, getEventsForItem, createItem, updateItem, moveItem, deleteItem, updateStageName, isCreating, isMoving } = usePipeline(currentPipeline?.id);
   const [selectedItem, setSelectedItem] = useState<PipelineItem | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -67,7 +67,7 @@ const PipelinePage = () => {
     if (!searchQuery.trim()) return stageItems;
     const query = searchQuery.toLowerCase();
     return stageItems.filter(
-      item => item.name.toLowerCase().includes(query) || 
+      item => item.name.toLowerCase().includes(query) ||
               item.company?.toLowerCase().includes(query) ||
               item.email?.toLowerCase().includes(query)
     );
@@ -78,8 +78,8 @@ const PipelinePage = () => {
     if (!stageId) return;
 
     try {
-      await createItem({ 
-        stageId, 
+      await createItem({
+        stageId,
         name: data.name,
         email: data.email,
         phone: data.phone,
@@ -102,7 +102,7 @@ const PipelinePage = () => {
       toast.error("Failed to add contact");
     }
   };
-  
+
   const openAddDialog = (stageId?: string) => {
     setAddToStageId(stageId || null);
     setShowAddDialog(true);
@@ -122,10 +122,10 @@ const PipelinePage = () => {
 
   const handleMoveItem = async (itemId: string, toStageId: string) => {
     const targetItems = getItemsByStage(toStageId);
-    const newSortOrder = targetItems.length > 0 
-      ? Math.max(...targetItems.map(i => i.sort_order)) + 1 
+    const newSortOrder = targetItems.length > 0
+      ? Math.max(...targetItems.map(i => i.sort_order)) + 1
       : 0;
-    
+
     try {
       await moveItem({ itemId, toStageId, newSortOrder });
       if (selectedItem && selectedItem.id === itemId) {
@@ -158,7 +158,7 @@ const PipelinePage = () => {
       setEditingStageId(null);
       return;
     }
-    
+
     try {
       await updateStageName({ stageId: editingStageId, name: editingStageName.trim() });
       toast.success("Stage renamed");
@@ -200,7 +200,7 @@ const PipelinePage = () => {
   const handleDrop = async (e: DragEvent<HTMLDivElement>, toStageId: string) => {
     e.preventDefault();
     const itemId = e.dataTransfer.getData('text/plain');
-    
+
     if (itemId && draggedItemId) {
       const item = items.find(i => i.id === itemId);
       if (item && item.stage_id !== toStageId) {
@@ -208,7 +208,7 @@ const PipelinePage = () => {
         toast.success("Contact moved");
       }
     }
-    
+
     setDraggedItemId(null);
     setDragOverStageId(null);
   };
@@ -219,22 +219,22 @@ const PipelinePage = () => {
     <PageLayout>
       <div className="min-h-screen bg-background">
         {/* Header */}
-        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
+        <div className="safe-header sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
           <div className="flex flex-wrap items-center gap-2 px-4 py-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <BackButton className="shrink-0" />
               <div className="flex min-w-0 items-center gap-2">
                 <Users className="w-5 h-5 shrink-0 text-primary" />
                 <div className="min-w-0">
-                  <PipelineSelector 
-                    currentPipeline={currentPipeline} 
-                    onPipelineChange={setCurrentPipeline} 
+                  <PipelineSelector
+                    currentPipeline={currentPipeline}
+                    onPipelineChange={setCurrentPipeline}
                   />
                 </div>
                 <span className="shrink-0 text-sm text-muted-foreground">({totalContacts})</span>
               </div>
             </div>
-            
+
             {/* Search */}
             <div className="hidden sm:flex items-center gap-2 flex-1 max-w-md mx-4">
               <div className="relative flex-1">
@@ -446,12 +446,12 @@ interface PipelineColumnProps {
   onMove: (itemId: string, toStageId: string) => Promise<void>;
 }
 
-function PipelineColumn({ 
-  stageId, 
-  name, 
-  color, 
-  items, 
-  onItemClick, 
+function PipelineColumn({
+  stageId,
+  name,
+  color,
+  items,
+  onItemClick,
   onAddClick,
   isDragOver,
   onDragOver,
@@ -470,7 +470,7 @@ function PipelineColumn({
   onMove,
 }: PipelineColumnProps) {
   return (
-    <Card 
+    <Card
       className={`bg-muted/20 border-border/40 overflow-hidden flex flex-col h-[calc(100vh-200px)] transition-all duration-200 ${
         isDragOver ? 'ring-2 ring-primary bg-primary/5' : ''
       }`}
@@ -481,9 +481,9 @@ function PipelineColumn({
       {/* Column Header */}
       <div className="px-4 py-3 border-b border-border/50 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div 
-            className="w-3 h-3 rounded-full shrink-0" 
-            style={{ backgroundColor: color || 'hsl(var(--primary))' }} 
+          <div
+            className="w-3 h-3 rounded-full shrink-0"
+            style={{ backgroundColor: color || 'hsl(var(--primary))' }}
           />
           {isEditingName ? (
             <div className="flex items-center gap-1 flex-1">
@@ -555,7 +555,7 @@ function PipelineColumn({
 // Empty state
 function PipelineEmptyState({ onAddClick, isDragOver }: { onAddClick: () => void; isDragOver?: boolean }) {
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className={`flex flex-col items-center justify-center py-8 px-4 text-center rounded-lg border-2 border-dashed transition-colors ${
@@ -649,7 +649,7 @@ function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging
           <div className="text-muted-foreground/40 hover:text-muted-foreground shrink-0">
             <GripVertical className="w-4 h-4" />
           </div>
-          
+
           {/* Avatar */}
           <div className="relative shrink-0">
             <Avatar className="w-10 h-10">
@@ -667,7 +667,7 @@ function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging
               </div>
             )}
           </div>
-          
+
           {/* Info */}
           <div className="flex-1 min-w-0">
             <p className="font-medium text-sm text-foreground truncate">{item.name}</p>

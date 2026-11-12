@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
@@ -21,6 +22,12 @@ import { formatDistanceToNow } from "date-fns";
 const Boards = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('action') !== 'create' || !user) return;
+    setShowCreateDialog(true);
+    setSearchParams(previous => { const next = new URLSearchParams(previous); next.delete('action'); return next; }, { replace: true });
+  }, [searchParams, setSearchParams, user]);
   const { boards, isLoading, deleteBoard } = useBoards();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 

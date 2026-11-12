@@ -137,6 +137,7 @@ const Auth = () => {
   );
 
   const { signIn, signUp, user, resetPassword, updatePassword } = useAuth();
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -313,6 +314,7 @@ const Auth = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (mode === 'signup' && !termsAccepted) return;
     if (!validateForm()) return;
 
     // Check online status before attempting auth
@@ -722,9 +724,19 @@ const Auth = () => {
                 </div>
               )}
 
+              {mode === 'signup' && (
+                <div className="flex items-start gap-3 text-sm">
+                  <input id="terms-accepted" type="checkbox" required checked={termsAccepted}
+                    onChange={e => setTermsAccepted(e.target.checked)} className="mt-1 h-5 w-5" />
+                  <label htmlFor="terms-accepted">
+                    I agree to the <Link to="/terms" target="_blank" className="text-primary underline">Terms (EULA)</Link>
+                    {" "}and <Link to="/privacy" target="_blank" className="text-primary underline">Privacy Policy</Link>.
+                  </label>
+                </div>
+              )}
               <Button
                 type="submit"
-                disabled={isLoading || !isOnline}
+                disabled={isLoading || !isOnline || (mode === 'signup' && !termsAccepted)}
                 className="w-full h-12 font-medium"
               >
                 {isLoading ? (

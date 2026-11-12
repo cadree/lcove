@@ -1,5 +1,7 @@
 # Ether iOS release checklist
 
+> Historical checklist: several statements below predate the Apple fixes. For current device family, encryption flag, safety flows, build-number handling and submission steps, use [iphone-app-store-walkthrough.md](iphone-app-store-walkthrough.md).
+
 This is the work that can be done without a paid Apple Developer account. Signing, push, TestFlight, and App Store upload need a Mac with Xcode and a paid account ($99/year). Nothing in this file asks anyone to buy that account.
 
 Bundle id: `app.lovable.e07d9c457fd949f78f3cc7d5998be668` (`src/config/nativeIds.ts`). This is the existing App Store Connect app **ETHER by LCOVE**, Apple ID 6758372010, team 926NTNU4M7. Do not register a new app or change the bundle id. Marketing version is 1.0.1 and the build number is 2, because 1.0 (1) is already uploaded.

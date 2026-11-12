@@ -1,5 +1,5 @@
 // Columns the anon role may read. Keep these lists equal to the GRANT
-// statements in supabase/migrations/20261024130000_anon_consumer_access.sql.
+// statements in 20261024130000_anon_consumer_access.sql and subsequent column grants.
 
 import type { Database } from "@/integrations/supabase/types";
 
@@ -58,6 +58,7 @@ export const PUBLIC_STORE_COLUMNS = [
 ] as const;
 
 export const PUBLIC_STORE_ITEM_COLUMNS = [
+  "is_digital",
   "id",
   "store_id",
   "category_id",

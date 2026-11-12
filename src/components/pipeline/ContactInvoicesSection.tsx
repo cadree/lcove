@@ -1,3 +1,4 @@
+import { NumberInput } from "@/components/ui/number-input";
 import { useState, useRef } from "react";
 import { format } from "date-fns";
 import { FileText, Plus, Trash2, Send, Loader2, Image, X, Mail, Phone, Check, Clock } from "lucide-react";
@@ -44,12 +45,12 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
   const updateLineItem = (index: number, field: keyof InvoiceLineItem, value: string | number) => {
     const updated = [...newInvoice.line_items];
     updated[index] = { ...updated[index], [field]: value };
-    
+
     // Recalculate total
     if (field === 'quantity' || field === 'unit_price') {
       updated[index].total = Number(updated[index].quantity) * Number(updated[index].unit_price);
     }
-    
+
     setNewInvoice({ ...newInvoice, line_items: updated });
   };
 
@@ -75,11 +76,11 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/invoices/${Date.now()}.${fileExt}`;
-      
+
       const { error: uploadError } = await supabase.storage
         .from('contact-media')
         .upload(fileName, file);
-      
+
       if (uploadError) throw uploadError;
 
       const { data: urlData } = supabase.storage
@@ -279,22 +280,22 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
                       <div className="grid grid-cols-3 gap-2">
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">Quantity</Label>
-                          <Input
-                            type="number"
+                          <NumberInput
+
                             min="1"
                             value={item.quantity}
-                            onChange={(e) => updateLineItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                            onValueChange={value => updateLineItem(index, 'quantity', value)}
                           />
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">Unit Price ($)</Label>
-                          <Input
-                            type="number"
+                          <NumberInput
+
                             min="0"
                             step="0.01"
                             placeholder="0.00"
                             value={item.unit_price || ''}
-                            onChange={(e) => updateLineItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                            onValueChange={value => updateLineItem(index, 'unit_price', value)}
                           />
                         </div>
                         <div className="space-y-1">
@@ -326,11 +327,11 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="tax-rate">Tax Rate (%)</Label>
-                  <Input
+                  <NumberInput min={0}
                     id="tax-rate"
-                    type="number"
+
                     value={newInvoice.tax_rate}
-                    onChange={(e) => setNewInvoice({ ...newInvoice, tax_rate: parseFloat(e.target.value) || 0 })}
+                    onValueChange={value => setNewInvoice({ ...newInvoice, tax_rate: value })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -429,7 +430,7 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
           <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
         </div>
       ) : invoices.length === 0 ? (
-        <div 
+        <div
           className="text-center py-6 bg-muted/30 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
           onClick={() => setIsDialogOpen(true)}
           role="button"
@@ -533,8 +534,8 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
 
             <div className="space-y-2">
               <Label>Send via</Label>
-              <Select 
-                value={sendVia} 
+              <Select
+                value={sendVia}
                 onValueChange={(v) => {
                   const method = v as 'email' | 'sms';
                   setSendVia(method);
