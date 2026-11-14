@@ -197,7 +197,25 @@ export default function Directory() {
           </div>
           <p className="mb-3 text-xs text-white/60">
             Chosen cities, not live locations. Only members who turn on
-            discovery appear.
+            discovery appear. Map data:{" "}
+            <a
+              className="underline"
+              href="https://www.geonames.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              GeoNames
+            </a>{" "}
+            and{" "}
+            <a
+              className="underline"
+              href="https://www.naturalearthdata.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Natural Earth
+            </a>
+            .
           </p>
           <div
             className="flex snap-x gap-3 overflow-x-auto pb-4"

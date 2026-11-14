@@ -89,6 +89,7 @@
     "slugifies",
     "pgcrypto",
     "apns",
-    "unmatch"
+    "unmatch",
+    "GeoNames"
   ]
 }
