@@ -645,6 +645,24 @@ function TripDetail({ trip, onLeave }: { trip: Trip; onLeave: () => void }) {
           )}
         </div>
       )}
+      {closed && me && (
+        <div className="flex flex-wrap gap-3">
+          <Button
+            variant="outline"
+            disabled={mutation.isPending}
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Leave this trip’s group chat? The trip record stays for the other travelers."
+                )
+              )
+                act("leave");
+            }}
+          >
+            Leave trip chat
+          </Button>
+        </div>
+      )}
       <details className="file-panel p-4">
         <summary className="min-h-11 cursor-pointer">Activity history</summary>
         <ul className="space-y-2 text-sm text-muted-foreground">

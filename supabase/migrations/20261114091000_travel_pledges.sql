@@ -101,7 +101,15 @@ BEGIN
  END IF;
  SELECT * INTO t FROM public.creative_trips WHERE id=tid FOR UPDATE;
  IF NOT FOUND THEN RAISE EXCEPTION 'Trip not found'; END IF;
- IF t.status IN('cancelled','completed') THEN RAISE EXCEPTION 'This trip is closed'; END IF;
+ IF t.status IN('cancelled','completed') THEN
+  -- A closed trip keeps its budget record, but members can still leave its chat.
+  IF p_action='leave' AND EXISTS(SELECT 1 FROM public.creative_trip_members WHERE trip_id=tid AND user_id=me) THEN
+   DELETE FROM public.conversation_participants WHERE conversation_id=t.conversation_id AND user_id=me;
+   INSERT INTO public.creative_trip_audit(trip_id,actor_id,action,revision) VALUES(tid,me,'left_closed_chat',t.revision);
+   RETURN jsonb_build_object('left',true);
+  END IF;
+  RAISE EXCEPTION 'This trip is closed';
+ END IF;
  SELECT EXISTS(SELECT 1 FROM public.creative_trip_items WHERE trip_id=tid AND receipt_url IS NOT NULL) INTO booked;
  IF p_action='join' THEN
   IF EXISTS(SELECT 1 FROM public.creative_trip_members WHERE trip_id=tid AND user_id=me) THEN RETURN public.creative_trip_snapshot(tid); END IF;
@@ -189,14 +197,17 @@ END $$;
 
 -- A trip membership is the sole authority for joining its conversation.
 CREATE FUNCTION public.enforce_creative_trip_chat() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE tid uuid;
+DECLARE tid uuid; closed boolean;
 BEGIN
- SELECT id INTO tid FROM public.creative_trips WHERE conversation_id=coalesce(NEW.conversation_id,OLD.conversation_id);
+ SELECT id,status IN('cancelled','completed') INTO tid,closed FROM public.creative_trips WHERE conversation_id=coalesce(NEW.conversation_id,OLD.conversation_id);
  IF tid IS NULL THEN RETURN coalesce(NEW,OLD); END IF;
  IF TG_OP='DELETE' THEN
+  -- Leaving the chat of a cancelled or completed trip is always allowed.
+  IF closed THEN RETURN OLD; END IF;
   IF EXISTS(SELECT 1 FROM public.creative_trip_members WHERE trip_id=tid AND user_id=OLD.user_id) THEN RAISE EXCEPTION 'Leave from the trip planner so the budget can be updated'; END IF;
   RETURN OLD;
  END IF;
+ IF TG_OP='INSERT' AND closed THEN RAISE EXCEPTION 'This trip is closed'; END IF;
  IF NOT EXISTS(SELECT 1 FROM public.creative_trip_members WHERE trip_id=tid AND user_id=NEW.user_id) THEN RAISE EXCEPTION 'Join through the trip planner'; END IF;
  RETURN NEW;
 END $$;

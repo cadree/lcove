@@ -33,9 +33,17 @@ CREATE FUNCTION public.creative_matched(a uuid,b uuid) RETURNS boolean LANGUAGE 
  SELECT EXISTS(SELECT 1 FROM public.creative_matches WHERE first_id=least(a,b) AND second_id=greatest(a,b) AND active)
  AND NOT public.either_blocked(a,b);
 $$;
+-- A collab invite is consent from both sides: the sender asked, and the recipient
+-- accepted (or is accepting it right now through respond_collab_invite).
+CREATE FUNCTION public.creative_collab_consented(a uuid,b uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT EXISTS(SELECT 1 FROM public.collab_invites i
+ WHERE ((i.sender_id=a AND i.recipient_id=b) OR (i.sender_id=b AND i.recipient_id=a))
+ AND (i.status='accepted' OR (i.status='pending' AND i.recipient_id=auth.uid())));
+$$;
 CREATE FUNCTION public.creative_dm_allowed(a uuid,b uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
  SELECT a IS NOT NULL AND b IS NOT NULL AND NOT public.either_blocked(a,b)
- AND (NOT EXISTS(SELECT 1 FROM public.discovery_preferences WHERE user_id=b AND matches_only) OR public.creative_matched(a,b));
+ AND (NOT EXISTS(SELECT 1 FROM public.discovery_preferences WHERE user_id=b AND matches_only)
+ OR public.creative_matched(a,b) OR public.creative_collab_consented(a,b));
 $$;
 CREATE FUNCTION public.discovery_settings(p_discoverable boolean DEFAULT NULL,p_matches_only boolean DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
@@ -72,7 +80,9 @@ BEGIN
  RETURN result;
 END $$;
 
--- Guard all routes that create/add participants, including legacy direct inserts.
+-- Matches-only applies to personal 1:1 chats only (type direct, no project).
+-- Group, collective, event, project and client chats are never gated, and the
+-- trusted server path (service role, auth.uid() IS NULL) is not gated either.
 CREATE FUNCTION public.enforce_creative_participant() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE conv public.conversations%ROWTYPE; peer record;
 BEGIN
@@ -81,29 +91,30 @@ BEGIN
  END IF;
  IF TG_OP='UPDATE' THEN RETURN NEW; END IF;
  SELECT * INTO conv FROM public.conversations WHERE id=NEW.conversation_id FOR UPDATE;
- IF conv.type='direct' THEN
+ IF conv.type='direct' AND conv.project_id IS NULL THEN
   IF (SELECT count(*) FROM public.conversation_participants WHERE conversation_id=NEW.conversation_id AND user_id<>NEW.user_id)>=2 THEN RAISE EXCEPTION 'Direct chats have exactly two participants'; END IF;
+  IF auth.uid() IS NULL THEN RETURN NEW; END IF;
   FOR peer IN SELECT user_id FROM public.conversation_participants WHERE conversation_id=NEW.conversation_id AND user_id<>NEW.user_id LOOP
    IF NOT public.creative_dm_allowed(peer.user_id,NEW.user_id) OR NOT public.creative_dm_allowed(NEW.user_id,peer.user_id) THEN
     RAISE EXCEPTION 'This person accepts DMs from mutual matches only. Match in Discover first.' USING ERRCODE='42501';
    END IF;
   END LOOP;
- ELSIF NEW.user_id IS DISTINCT FROM auth.uid() AND conv.project_id IS NULL
-  AND NOT public.creative_dm_allowed(auth.uid(),NEW.user_id) THEN
-  RAISE EXCEPTION 'This person must match with you or join the group themselves' USING ERRCODE='42501';
  END IF;
  RETURN NEW;
 END $$;
 CREATE TRIGGER creative_participant_privacy BEFORE INSERT OR UPDATE ON public.conversation_participants FOR EACH ROW EXECUTE FUNCTION public.enforce_creative_participant();
+-- The lock is two-way: if either person has matches-only on and they are not
+-- matched, neither can send in their personal 1:1 chat.
 CREATE FUNCTION public.enforce_creative_message() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 BEGIN
  IF TG_OP='UPDATE' AND (NEW.sender_id<>OLD.sender_id OR NEW.conversation_id<>OLD.conversation_id) THEN RAISE EXCEPTION 'Message identity cannot be changed'; END IF;
  -- Permit deletion/redaction, even after an unmatch.
  IF TG_OP='UPDATE' AND NEW.deleted_at IS NOT NULL THEN RETURN NEW; END IF;
+ IF auth.uid() IS NULL THEN RETURN NEW; END IF;
  IF EXISTS(SELECT 1 FROM public.conversations c JOIN public.conversation_participants p ON p.conversation_id=c.id
- WHERE c.id=NEW.conversation_id AND c.type='direct' AND p.user_id<>NEW.sender_id
- AND NOT public.creative_dm_allowed(NEW.sender_id,p.user_id)) THEN
- RAISE EXCEPTION 'This person accepts DMs from mutual matches only. Match in Discover first.' USING ERRCODE='42501'; END IF;
+ WHERE c.id=NEW.conversation_id AND c.type='direct' AND c.project_id IS NULL AND p.user_id<>NEW.sender_id
+ AND (NOT public.creative_dm_allowed(NEW.sender_id,p.user_id) OR NOT public.creative_dm_allowed(p.user_id,NEW.sender_id))) THEN
+ RAISE EXCEPTION 'One of you accepts DMs from mutual matches only. Match in Discover first.' USING ERRCODE='42501'; END IF;
  RETURN NEW;
 END $$;
 CREATE TRIGGER creative_message_privacy BEFORE INSERT OR UPDATE ON public.messages FOR EACH ROW EXECUTE FUNCTION public.enforce_creative_message();
@@ -152,7 +163,7 @@ BEGIN
  RETURN NEW;
 END $$;
 CREATE TRIGGER creative_block AFTER INSERT ON public.user_blocks FOR EACH ROW EXECUTE FUNCTION public.creative_block_match();
-REVOKE ALL ON FUNCTION public.creative_matched(uuid,uuid),public.creative_dm_allowed(uuid,uuid),public.enforce_creative_participant(),public.enforce_creative_message(),public.creative_block_match() FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.creative_matched(uuid,uuid),public.creative_collab_consented(uuid,uuid),public.creative_dm_allowed(uuid,uuid),public.enforce_creative_participant(),public.enforce_creative_message(),public.creative_block_match() FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.discovery_settings(boolean,boolean),public.discovery_people(text,text,integer),public.creative_swipe(uuid,boolean),public.creative_unmatch(uuid),public.creative_match_list() FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.discovery_settings(boolean,boolean),public.discovery_people(text,text,integer),public.creative_swipe(uuid,boolean),public.creative_unmatch(uuid),public.creative_match_list() TO authenticated;
 CREATE OR REPLACE FUNCTION public.get_or_create_direct_conversation(p_other uuid)

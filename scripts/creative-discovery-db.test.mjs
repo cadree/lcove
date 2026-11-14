@@ -15,6 +15,7 @@ await db.exec(`
  CREATE TABLE public.messages(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),conversation_id uuid,sender_id uuid,content text,deleted_at timestamptz);
  CREATE FUNCTION public.purge_user_personal_data(target uuid) RETURNS void LANGUAGE plpgsql AS $$ BEGIN DELETE FROM public.conversation_participants WHERE user_id=target; END $$;
  CREATE TABLE public.user_blocks(blocker_id uuid,blocked_id uuid);
+ CREATE TABLE public.collab_invites(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),sender_id uuid NOT NULL,recipient_id uuid NOT NULL,status text NOT NULL DEFAULT 'pending',conversation_id uuid);
  CREATE FUNCTION public.either_blocked(a uuid,b uuid) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT EXISTS(SELECT 1 FROM public.user_blocks WHERE (blocker_id=a AND blocked_id=b) OR (blocker_id=b AND blocked_id=a)) $$;
  CREATE FUNCTION public.has_blocked(a uuid,b uuid) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT EXISTS(SELECT 1 FROM public.user_blocks WHERE blocker_id=a AND blocked_id=b) $$;
  GRANT SELECT,INSERT,UPDATE,DELETE ON public.conversations,public.conversation_participants,public.messages TO authenticated;
@@ -306,14 +307,26 @@ await as(ids[3]);
 const beforeCount = (
   await db.query("SELECT count(*)::int n FROM public.conversations")
 ).rows[0].n;
+assert.ok(
+  await rpc("create_group_with_privacy", ["Private group", [ids[0], ids[1]]])
+);
+check("matches-only never blocks being added to a group chat");
+const afterGroup = (
+  await db.query("SELECT count(*)::int n FROM public.conversations")
+).rows[0].n;
+assert.equal(afterGroup, beforeCount + 1);
 await fails(
-  () => rpc("create_group_with_privacy", ["Private group", [ids[0], ids[1]]]),
-  /must match/
+  () =>
+    rpc("create_group_with_privacy", [
+      "Private group",
+      [ids[0], "00000000-0000-0000-0000-0000000000ff"],
+    ]),
+  /Profile unavailable/
 );
 assert.equal(
   (await db.query("SELECT count(*)::int n FROM public.conversations")).rows[0]
     .n,
-  beforeCount
+  afterGroup
 );
 check("failed private group invitation rolls back the entire group");
 await as(ids[0]);
@@ -467,5 +480,119 @@ check("trip text uses the existing server moderation filter");
 await fails(()=>rpc('create_group_with_privacy',[null,[ids[1],ids[2]]]),/Add a group name/);
 await fails(()=>rpc('create_group_with_privacy',['Named group',null]),/Add a group name/);
 check('raw group creation rejects null names and participant arrays');
+
+// ---- PR #87 review fixes: items 2-5 ----
+const more = Array.from({ length: 4 }, (_, i) => `00000000-0000-0000-0000-0000000001${i}0`);
+for (const id of more) {
+  await db.query(`INSERT INTO auth.users VALUES($1);`, [id]);
+  await db.query(
+    `INSERT INTO public.profiles(user_id,display_name,city,city_key) VALUES($1,'Member','Atlanta, GA','atlanta|ga')`,
+    [id]
+  );
+}
+const [host, locked, open, other] = more;
+await as(locked);
+await rpc("discovery_settings", [false, true]);
+await as(open);
+await rpc("discovery_settings", [false, false]);
+const sql = (q, p = []) => db.query(q, p);
+const newConv = async (type, by, projectId = null) =>
+  (
+    await sql(
+      "INSERT INTO public.conversations(type,created_by,project_id) VALUES($1,$2,$3) RETURNING id",
+      [type, by, projectId]
+    )
+  ).rows[0].id;
+// Item 2: groups are never gated by matches-only.
+await as(host);
+let chat = await newConv("group", host);
+await sql(
+  "INSERT INTO public.conversation_participants(conversation_id,user_id) VALUES($1,$2),($1,$3),($1,$4)",
+  [chat, host, locked, open]
+);
+check("event host can start an attendee group chat that includes a matches-only member");
+chat = await newConv("group", host);
+await sql("INSERT INTO public.conversation_participants(conversation_id,user_id) VALUES($1,$2)", [chat, host]);
+await sql("INSERT INTO public.conversation_participants(conversation_id,user_id) VALUES($1,$2)", [chat, locked]);
+await sql("INSERT INTO public.messages(conversation_id,sender_id,content) VALUES($1,$2,'welcome')", [chat, host]);
+check("collective owner can approve a matches-only member's join request and message the group");
+await as("");
+chat = await newConv("group", host);
+await sql(
+  "INSERT INTO public.conversation_participants(conversation_id,user_id) VALUES($1,$2),($1,$3)",
+  [chat, host, locked]
+);
+check("server-side adds (no auth.uid) are not gated");
+await as(host);
+await fails(() => rpc("get_or_create_direct_conversation", [locked]), /mutual matches/);
+check("matches-only still blocks a new personal DM");
+await sql(
+  "INSERT INTO public.collab_invites(sender_id,recipient_id) VALUES($1,$2)",
+  [host, locked]
+);
+await as(locked);
+chat = await newConv("direct", locked);
+await sql(
+  "INSERT INTO public.conversation_participants(conversation_id,user_id) VALUES($1,$2),($1,$3)",
+  [chat, locked, host]
+);
+await sql("UPDATE public.collab_invites SET status='accepted',conversation_id=$1 WHERE sender_id=$2", [chat, host]);
+await as(host);
+await sql("INSERT INTO public.messages(conversation_id,sender_id,content) VALUES($1,$2,'thanks for accepting')", [chat, host]);
+check("accepting a collab invite opens and keeps a DM with a matches-only member");
+// Item 3: project client chats are not personal DMs.
+await as(host);
+chat = await newConv("direct", host, "00000000-0000-0000-0000-00000000a001");
+await sql(
+  "INSERT INTO public.conversation_participants(conversation_id,user_id) VALUES($1,$2),($1,$3)",
+  [chat, host, locked]
+);
+await sql("INSERT INTO public.messages(conversation_id,sender_id,content) VALUES($1,$2,'project update')", [chat, host]);
+check("project client chat adds and messages a matches-only client");
+// Item 5: the personal DM lock is two-way.
+await as("");
+chat = await newConv("direct", locked);
+await sql(
+  "INSERT INTO public.conversation_participants(conversation_id,user_id) VALUES($1,$2),($1,$3)",
+  [chat, locked, open]
+);
+await as(locked);
+await fails(
+  () => sql("INSERT INTO public.messages(conversation_id,sender_id,content) VALUES($1,$2,'one way')", [chat, locked]),
+  /mutual matches/
+);
+await as(open);
+await fails(
+  () => sql("INSERT INTO public.messages(conversation_id,sender_id,content) VALUES($1,$2,'reply')", [chat, open]),
+  /mutual matches/
+);
+check("a matches-only member cannot keep messaging an unmatched DM partner who cannot reply");
+// Item 4: members can leave the chat of a cancelled or completed trip.
+await as(host);
+const closedTrip = await rpc("creative_trip_action", [
+  "create",
+  null,
+  { title: "Closed trip", city_key: "atlanta|ga", city_label: "Atlanta, GA", starts_on: "2099-03-01", ends_on: "2099-03-03", capacity: 4 },
+]);
+await as(open);
+await rpc("creative_trip_action", ["join", closedTrip.id, {}]);
+await as(other);
+await rpc("creative_trip_action", ["join", closedTrip.id, {}]);
+await as(host);
+await rpc("creative_trip_action", ["cancel", closedTrip.id, {}]);
+await as(open);
+assert.deepEqual(await rpc("creative_trip_action", ["leave", closedTrip.id, {}]), { left: true });
+const inChat = async (id) =>
+  (await sql("SELECT count(*)::int n FROM public.conversation_participants WHERE conversation_id=$1 AND user_id=$2", [closedTrip.conversation_id, id])).rows[0].n;
+assert.equal(await inChat(open), 0);
+await fails(
+  () => sql("INSERT INTO public.conversation_participants(conversation_id,user_id) VALUES($1,$2)", [closedTrip.conversation_id, open]),
+  /closed/
+);
+await as(other);
+await sql("DELETE FROM public.conversation_participants WHERE conversation_id=$1 AND user_id=$2", [closedTrip.conversation_id, other]);
+assert.equal(await inChat(other), 0);
+await fails(() => rpc("creative_trip_action", ["report_paid", closedTrip.id, { cents: 1 }]), /closed/);
+check("members can leave a cancelled trip's chat (planner or chat), cannot rejoin, and the trip stays closed");
 await db.close();
 console.log(`${checks} database checks passed`);

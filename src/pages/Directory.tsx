@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   useInfiniteQuery,
@@ -15,7 +15,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
-import { CreativeGlobe } from "@/components/discovery/CreativeGlobe";
+import { MemberDirectory } from "@/components/discovery/MemberDirectory";
 import { CreativeCard } from "@/components/discovery/CreativeCard";
 import { DiscoveryPreferences } from "@/components/discovery/DiscoveryPreferences";
 import { discovery } from "@/lib/creativeDiscovery";
@@ -24,6 +24,13 @@ import { resolveCity } from "@/lib/cities";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+
+// The globe ships ~275 KB of map data, so it loads after the page renders.
+const CreativeGlobe = lazy(() =>
+  import("@/components/discovery/CreativeGlobe").then((m) => ({
+    default: m.CreativeGlobe,
+  }))
+);
 
 export default function Directory() {
   const { user } = useAuth();
@@ -153,11 +160,21 @@ export default function Directory() {
               <Plane size={17} /> Let’s travel
             </Link>
           </div>
-          <CreativeGlobe
-            cities={cities}
-            selected={city}
-            onSelect={chooseCity}
-          />
+          <Suspense
+            fallback={
+              <div
+                className="mx-auto my-4 aspect-square w-full max-w-md rounded-full bg-white/5"
+                role="status"
+                aria-label="Loading globe"
+              />
+            }
+          >
+            <CreativeGlobe
+              cities={cities}
+              selected={city}
+              onSelect={chooseCity}
+            />
+          </Suspense>
           <div className="mb-4 flex w-fit rounded-full bg-white/10 p-1">
             <button
               className={`min-h-11 rounded-full px-5 text-sm ${
@@ -197,7 +214,8 @@ export default function Directory() {
           </div>
           <p className="mb-3 text-xs text-white/60">
             Chosen cities, not live locations. Only members who turn on
-            discovery appear. Map data:{" "}
+            discovery appear on the globe and in the swipe deck. Everyone is
+            listed under All members below. Map data:{" "}
             <a
               className="underline"
               href="https://www.geonames.org/"
@@ -349,6 +367,7 @@ export default function Directory() {
               )}
             </div>
           </section>
+          <MemberDirectory />
           {!!matches.data?.length && (
             <section className="mt-6">
               <h2 className="mb-2 font-display text-2xl">Your matches</h2>
