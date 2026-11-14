@@ -45,9 +45,7 @@ const PostCreator = ({
     setLinkUrl('');
     setEmbed(null);
     setIsExpanded(true);
-    const reader = new FileReader();
-    reader.onload = () => setPreview(reader.result as string);
-    reader.readAsDataURL(file);
+    setPreview(URL.createObjectURL(file));
 
     // Reset input value so the same file can be selected again
     e.target.value = '';

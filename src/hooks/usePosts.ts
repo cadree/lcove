@@ -10,6 +10,8 @@ import { isQueryablePostId } from '@/lib/postId';
 import { assertCleanText } from '@/lib/objectionableText';
 import { mergePostsAndReposts, repostQueryMissingCaption, type RepostRow } from '@/lib/sharing';
 import { refreshXp } from '@/lib/xpRefresh';
+import { queueMedia, usePendingUploads } from '@/lib/queuedMedia';
+import { withPending } from '@/lib/pendingUploads';
 import { embedColumnMissing, embedColumnsForInsert, videoEmbedMigrationMessage, type EmbedDraft, type StoredEmbedFields } from '@/lib/videoEmbed';
 import { FEED_POST_LIMIT } from '@/lib/feedWindow';
 import { abortAfter } from '@/lib/requestDeadline';
@@ -36,6 +38,8 @@ interface Post extends StoredEmbedFields {
   user_reaction?: string | null;
   feed_key?: string;
   repost?: RepostRow | null;
+  /** Set on a placeholder while its media is still uploading. */
+  upload_job_id?: string;
 }
 
 export function usePosts() {
@@ -176,23 +180,32 @@ export function usePosts() {
         return;
       }
 
-      let mediaUrl: string | null = null;
-
       if (file && mediaType !== 'text') {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('media')
-          .upload(fileName, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('media')
-          .getPublicUrl(fileName);
-
-        mediaUrl = publicUrl;
+        // Media goes up in the background. The dialog closes now and the pill tracks it.
+        queueMedia({
+          queryClient,
+          userId: user.id,
+          kind: 'post',
+          label: mediaType === 'video' ? 'Video post' : 'Photo post',
+          files: [file],
+          mediaType: mediaType === 'video' ? 'video' : 'photo',
+          content: content || null,
+          insert: async ([mediaUrl]) => {
+            const { error: insertError } = await supabase
+              .from('posts')
+              .insert({
+                user_id: user.id,
+                content: content || null,
+                media_url: mediaUrl,
+                media_type: mediaType || 'photo',
+              });
+            if (insertError) throw insertError;
+            refreshXp(queryClient);
+          },
+          invalidate: [['posts'], ['profile-posts']],
+          successMessage: 'Post shared',
+        });
+        return { queued: true as const };
       }
 
       const { data: inserted, error: insertError } = await supabase
@@ -200,43 +213,23 @@ export function usePosts() {
         .insert({
           user_id: user.id,
           content: content || null,
-          media_url: mediaUrl,
-          media_type: mediaType || 'text',
+          media_url: null,
+          media_type: 'text',
         })
         .select('id, created_at')
         .single();
 
       if (insertError) throw insertError;
-      return { id: inserted.id, created_at: inserted.created_at, mediaUrl };
+      return { id: inserted.id, created_at: inserted.created_at };
     },
-    onMutate: async ({ content, file, mediaType }) => {
-      if (!user) return;
-      await queryClient.cancelQueries({ queryKey: ['posts'] });
-      const previous = queryClient.getQueryData<Post[]>(['posts']);
-      const preview = file ? URL.createObjectURL(file) : null;
-      const optimistic: Post = {
-        id: `optimistic-${Date.now()}`,
-        user_id: user.id,
-        content: content || null,
-        media_url: preview,
-        media_type: mediaType || 'text',
-        post_type: 'regular',
-        created_at: new Date().toISOString(),
-        reactions: [],
-        user_reaction: null,
-      };
-      queryClient.setQueryData<Post[]>(['posts'], (current) => [optimistic, ...(current ?? [])]);
-      return { previous, preview };
-    },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (result && 'queued' in result) return;
       queryClient.invalidateQueries({ queryKey: ['posts'] });
       queryClient.invalidateQueries({ queryKey: ['profile-posts'] });
       refreshXp(queryClient);
       toast.success('Post created!');
     },
-    onError: (error, vars, context) => {
-      if (context?.previous) queryClient.setQueryData(['posts'], context.previous);
-      if (context?.preview) URL.revokeObjectURL(context.preview);
+    onError: (error, vars) => {
       if (vars.inlineError) return;
       toast.error(embedColumnMissing(error)
         ? videoEmbedMigrationMessage()
@@ -335,9 +328,28 @@ export function usePosts() {
     },
   });
 
+  const pending = usePendingUploads();
   const visiblePosts = useMemo(
-    () => posts.filter((post) => !blockedIds.includes(post.user_id) && !blockedIds.includes(post.repost?.user_id ?? '')),
-    [posts, blockedIds],
+    () => withPending(
+      posts.filter((post) => !blockedIds.includes(post.user_id) && !blockedIds.includes(post.repost?.user_id ?? '')),
+      pending,
+      'post',
+      (item): Post => ({
+        id: item.id,
+        user_id: item.userId,
+        content: item.content,
+        media_url: item.mediaUrl,
+        media_type: item.mediaType,
+        post_type: 'regular',
+        created_at: item.createdAt,
+        profile: posts.find((post) => post.user_id === item.userId && post.profile)?.profile
+          ?? { display_name: 'You', avatar_url: null, city: null, city_display: null },
+        reactions: [],
+        user_reaction: null,
+        upload_job_id: item.jobId,
+      }),
+    ),
+    [posts, blockedIds, pending],
   );
 
   return {
