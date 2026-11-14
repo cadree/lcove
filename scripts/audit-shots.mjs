@@ -35,7 +35,19 @@ const day = (d, h) => { const x = new Date(); x.setDate(d); x.setHours(h, 0, 0, 
 const events = [[12, 19, "Gallery night", "Atlanta", true], [12, 20, "Darkroom social", "Atlanta"], [12, 21, "Film club", "Charlotte"], [12, 22, "Late set", "Atlanta"], [18, 18, "Portfolio review", "Charlotte", true], [24, 12, "Location scout", "Raleigh"]]
   .map(([d, h, title, city, img], i) => ({ id: `00000000-0000-4000-8000-0000000e000${i}`, creator_id: "00000000-0000-4000-8000-0000000c0001", title, description: null, venue: "Studio", address: null, city, state: "GA", country: "US", start_date: day(d, h), end_date: null, image_url: img ? media("product.jpg") : null, ticket_type: "free", ticket_price: null, credits_price: null, capacity: null, is_public: true, project_id: null, external_url: null, timezone: null, recurrence: null, status: "published", created_at: now }));
 
+const tripId = "00000000-0000-4000-8000-0000000d0009";
+const snapshot = { ...tripList[0], id: tripId, organizer_id: me, joined: true, revision: 3, total_cents: 120000, conversation_id: "00000000-0000-4000-8000-0000000d00c1",
+  members: [{ user_id: me, display_name: "Maya Cole", share_cents: 60000, pledge_cents: 60000, approved_revision: 3, reported_paid_cents: 0 }, { user_id: members[0].user_id, display_name: "Member 1", share_cents: 60000, pledge_cents: 0, approved_revision: null, reported_paid_cents: 0 }],
+  items: [{ id: "00000000-0000-4000-8000-0000000d00a1", label: "Flat, 5 nights", estimate_cents: 90000, quote_url: "", receipt_url: null, actual_cents: null, purchased_by: null, votes: [] }, { id: "00000000-0000-4000-8000-0000000d00a2", label: "Van", estimate_cents: 30000, quote_url: "", receipt_url: null, actual_cents: null, purchased_by: null, votes: [] }], audit: [] };
+const boardRows = [
+  { id: "b1", trip_id: tripId, kind: "stop", title: "Alfama rooftop shoot", detail: "Miradouro de Santa Luzia", day: "2099-04-29", at_time: "18:30:00", image_url: null, done: false, created_by: me, created_at: now },
+  { id: "b2", trip_id: tripId, kind: "stop", title: "Breakfast + shot list", detail: "", day: "2099-04-29", at_time: "08:00:00", image_url: null, done: false, created_by: me, created_at: now },
+  { id: "b3", trip_id: tripId, kind: "stop", title: "Film lab drop-off", detail: "Baixa", day: "2099-04-30", at_time: null, image_url: null, done: false, created_by: me, created_at: now },
+];
+const tripMock = { creative_trip_snapshot: () => ({ body: snapshot }), creative_trip_board: () => ({ body: boardRows }), creative_trip_requests: () => ({ body: [{ trip_id: tripId, user_id: members[2].user_id, note: "I shoot medium format, can bring a reflector and split the van.", status: "pending", created_at: now, display_name: "Member 3", avatar_url: null }] }) };
+
 const scenes = [
+  { name: "trip-board", path: `/travel?trip=${tripId}`, widths: [390], full: true, mock: tripMock },
   { name: "message-request", path: "/explore?section=people", widths: [390], mock: people, run: async (page) => {
     await page.getByRole("button", { name: /^Message Member/ }).first().click({ timeout: 8000 });
     await page.getByRole("textbox", { name: /Message to/ }).fill("Love your set work. Want to shoot in Charlotte next month?");

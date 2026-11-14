@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { readNumber } from "@/lib/numberField";
 import { TripJoinButton } from "@/components/travel/TripJoinButton";
 import { TripRequestsPanel } from "@/components/travel/TripRequestsPanel";
+import { TripBoard } from "@/components/travel/TripBoard";
 import { canComplete, todayIso, tripDatesError, tripRange, tripStatus } from "@/lib/tripDates";
 
 export default function Travel() {
@@ -394,6 +395,8 @@ function TripDetail({ trip, onLeave }: { trip: Trip; onLeave: () => void }) {
           <MessageCircle size={18} /> Open group chat
         </Link>
       </section>
+      {!closed && me && <TripRequestsPanel tripId={trip.id} organizer={organizer} />}
+      {me && <TripBoard trip={trip} organizer={organizer} closed={closed} />}
       <section className="file-panel space-y-4 p-5">
         <div className="flex flex-wrap justify-between gap-3">
           <div>
@@ -587,7 +590,6 @@ function TripDetail({ trip, onLeave }: { trip: Trip; onLeave: () => void }) {
           </p>
         )}
       </section>
-      {!closed && me && <TripRequestsPanel tripId={trip.id} organizer={organizer} />}
       {!closed && (
         <div className="flex flex-wrap gap-3">
           {organizer ? (

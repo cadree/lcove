@@ -277,7 +277,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
         </div>
 
         <div className="flex gap-1">
-          {travelTripId && <Button variant="outline" className="min-h-11" onClick={() => navigate(`/travel?trip=${travelTripId}`)}>Trip budget</Button>}
+          {travelTripId && <Button variant="outline" className="min-h-11" onClick={() => navigate(`/travel?trip=${travelTripId}`)}>Trip plan & budget</Button>}
           {isProjectChat && (
             <Button 
               variant="ghost" 

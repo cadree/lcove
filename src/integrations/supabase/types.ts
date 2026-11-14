@@ -5296,6 +5296,48 @@ export type Database = {
           },
         ]
       }
+      creative_trip_board: {
+        Row: {
+          at_time: string | null
+          created_at: string
+          created_by: string | null
+          day: string | null
+          detail: string
+          done: boolean
+          id: string
+          image_url: string | null
+          kind: string
+          title: string
+          trip_id: string
+        }
+        Insert: {
+          at_time?: string | null
+          created_at?: string
+          created_by?: string | null
+          day?: string | null
+          detail?: string
+          done?: boolean
+          id?: string
+          image_url?: string | null
+          kind: string
+          title: string
+          trip_id: string
+        }
+        Update: {
+          at_time?: string | null
+          created_at?: string
+          created_by?: string | null
+          day?: string | null
+          detail?: string
+          done?: boolean
+          id?: string
+          image_url?: string | null
+          kind?: string
+          title?: string
+          trip_id?: string
+        }
+        Relationships: []
+      }
       post_drafts: {
         Row: {
           content: string | null

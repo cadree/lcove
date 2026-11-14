@@ -212,5 +212,46 @@ await db.exec(await readFile("supabase/rollbacks/20261114171000_trip_join_reques
 const after = await act(org, "create", null, { ...base, title: "After rollback" });
 assert.equal((await act(cy, "join", after.id)).members.length, 2);
 check("join requests: rollback restores direct joins");
+// Trip board (20261114172000).
+await db.exec(await readFile("supabase/migrations/20261114172000_trip_board.sql", "utf8"));
+await db.query("INSERT INTO public.ether_schema_migrations VALUES('20261114172000_trip_board.sql')");
+// Production members cannot call objectionable_text directly; mirror that.
+await db.exec("GRANT USAGE ON SCHEMA public TO authenticated; REVOKE ALL ON FUNCTION public.objectionable_text(text) FROM PUBLIC,authenticated");
+const board = await act(org, "create", null, { ...base, title: "Board trip" });
+await act(cy, "join", board.id);
+const asMember = async (who, text, args = []) => {
+  await as(who);
+  await db.exec("SET ROLE authenticated");
+  try {
+    return (await db.query(text, args)).rows;
+  } finally {
+    await db.exec("RESET ROLE");
+  }
+};
+await asMember(org, "INSERT INTO public.creative_trip_board(trip_id,kind,title,day,at_time) VALUES($1,'stop','Golden hour at the bridge','2099-05-02','18:30')", [board.id]);
+await asMember(cy, "INSERT INTO public.creative_trip_board(trip_id,kind,title,image_url) VALUES($1,'photo','Mood','https://img.example/a.jpg')", [board.id]);
+await asMember(cy, "INSERT INTO public.creative_trip_board(trip_id,kind,title) VALUES($1,'packing','Reflector')", [board.id]);
+await asMember(org, "UPDATE public.creative_trip_board SET done=true WHERE kind='packing'");
+const rows = await asMember(cy, "SELECT kind,title,done FROM public.creative_trip_board ORDER BY kind");
+assert.deepEqual(rows.map((r) => [r.kind, r.done]), [["packing", true], ["photo", false], ["stop", false]]);
+check("board: travelers add stops, photos and checklist items, and tick each other's items");
+assert.equal((await asMember(dan, "SELECT count(*)::int n FROM public.creative_trip_board"))[0].n, 0);
+await fails(() => asMember(dan, "INSERT INTO public.creative_trip_board(trip_id,kind,title) VALUES($1,'packing','x')", [board.id]), /row-level security/);
+await fails(() => asMember(cy, "INSERT INTO public.creative_trip_board(trip_id,kind,title,image_url) VALUES($1,'photo','x','http://insecure')", [board.id]), /check/i);
+await fails(() => asMember(cy, "INSERT INTO public.creative_trip_board(trip_id,kind,title,created_by) VALUES($1,'packing','x',$2)", [board.id, org]), /row-level security/);
+await fails(() => asMember(cy, "UPDATE public.creative_trip_board SET trip_id=$1", [rome.id]), /permission denied/);
+check("board: outsiders see nothing and can't add; no http images, no posing as someone else, no moving items between trips");
+await asMember(cy, "DELETE FROM public.creative_trip_board WHERE kind='stop'");
+assert.equal((await asMember(org, "SELECT count(*)::int n FROM public.creative_trip_board WHERE kind='stop'"))[0].n, 1);
+await asMember(org, "DELETE FROM public.creative_trip_board WHERE kind='photo'");
+assert.equal((await asMember(org, "SELECT count(*)::int n FROM public.creative_trip_board WHERE kind='photo'"))[0].n, 0);
+check("board: you remove your own items; the organizer can remove any");
+await act(org, "cancel", board.id);
+await fails(() => asMember(cy, "INSERT INTO public.creative_trip_board(trip_id,kind,title) VALUES($1,'shopping','late')", [board.id]), /row-level security/);
+assert.equal((await asMember(cy, "SELECT count(*)::int n FROM public.creative_trip_board"))[0].n, 2);
+check("board: a closed trip's board stays readable but frozen");
+await db.exec(await readFile("supabase/rollbacks/20261114172000_trip_board.down.sql", "utf8"));
+assert.equal((await db.query("SELECT to_regclass('public.creative_trip_board') r")).rows[0].r, null);
+check("board: rollback removes it");
 await db.close();
 console.log(`${checks} trip scenario checks passed`);
