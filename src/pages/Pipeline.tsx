@@ -589,8 +589,9 @@ function ContactCardFace({ item, lifted = false, move }: { item: PipelineItem; l
           <GripVertical className="w-4 h-4" />
         </div>
         <div className="relative shrink-0">
-          <Avatar className="w-10 h-10">
-            <AvatarImage src={item.avatar_url || undefined} />
+          {/* The photo must not start an iOS image drag or callout instead of the card drag. */}
+          <Avatar className="pointer-events-none w-10 h-10">
+            <AvatarImage src={item.avatar_url || undefined} draggable={false} style={{ WebkitUserDrag: "none" } as CSSProperties} />
             <AvatarFallback className={`${avatarColor} text-white text-sm font-semibold`}>
               {initials}
             </AvatarFallback>
@@ -641,7 +642,8 @@ function PipelineContactCard({ item, onClick, stages, onMove }: PipelineContactC
     WebkitUserSelect: "none",
     userSelect: "none",
     touchAction: "manipulation",
-  };
+    WebkitUserDrag: "none",
+  } as CSSProperties;
 
   return (
     <div

@@ -120,7 +120,9 @@ function LayoutRow({ section, onSize, onToggle }: {
   const controls = useDragControls();
   return <Reorder.Item value={section} dragListener={false} dragControls={controls}
     className="grid grid-cols-[44px_minmax(0,1fr)] items-center gap-2 rounded-xl border border-border bg-card p-3">
-    <button type="button" aria-label={`Reorder ${section.label}`} className="flex h-11 w-11 touch-none items-center justify-center cursor-grab"
+    <button type="button" aria-label={`Reorder ${section.label}`} className="flex h-11 w-11 touch-none select-none items-center justify-center cursor-grab"
+      style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
+      onContextMenu={event => event.preventDefault()}
       onPointerDown={event => controls.start(event)}>
       <GripVertical className="h-5 w-5" />
     </button>
