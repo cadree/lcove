@@ -23,7 +23,22 @@ const stores = [
 ];
 const items = [1, 2, 3].map((i) => ({ id: `00000000-0000-4000-8000-000000000b0${i}`, store_id: stores[0].id, images: [media("product.jpg") + `?v=${i}`], title: `Print ${i}`, price: 40, is_active: true, created_at: now }));
 
+const cityOf = ["charlotte|nc", "charlotte|nc", "charlotte|nc", "charlotte|nc", "raleigh|nc", "raleigh|nc", "durham|nc", "atlanta|ga", "atlanta|ga", "atlanta|ga", "los angeles|ca"];
+const label = { "charlotte|nc": "Charlotte, NC", "raleigh|nc": "Raleigh, NC", "durham|nc": "Durham, NC", "atlanta|ga": "Atlanta, GA", "los angeles|ca": "Los Angeles, CA" };
+const members = cityOf.map((key, i) => ({ user_id: `00000000-0000-4000-8000-0000000c${String(i).padStart(4, "0")}`, display_name: `Member ${i + 1}`, avatar_url: i % 3 === 2 ? null : media("product.jpg") + `?m=${i}`, city: label[key], city_display: label[key], city_key: key, bio: "Director", created_at: now }));
+const signals = members.map((m) => ({ user_id: m.user_id, live_city_key: null, live_until: null, trip: null, liked: null }));
+const people = { profiles: (req, url) => (url.pathname.endsWith("/profiles_public") && url.searchParams.get("select")?.includes("city_key") ? { body: members } : { body: [profile] }), profiles_public: (req) => (new URL(req.url()).searchParams.get("select")?.includes("city_key") ? { body: members } : { body: [profile] }), discovery_globe: () => ({ body: signals }), discovery_settings: () => ({ body: { discoverable: true, live_city_key: null } }) };
+
 const scenes = [
+  { name: "globe", path: "/explore?section=people", widths: [390], mock: people, run: async (page) => { await page.evaluate(() => window.scrollTo(0, 0)); } },
+  { name: "globe-selected", path: "/explore?section=people", widths: [390], mock: people, run: async (page) => {
+    await page.waitForTimeout(Number(process.env.PRE || 1000));
+    await page.locator('[data-city-marker][aria-label*="nearby"]').first().click();
+    await page.waitForTimeout(700);
+    if (process.env.DEBUG) console.log(await page.locator("[data-city-marker]").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label"))));
+    await page.locator('[data-city-marker][aria-label^="Atlanta"]').first().click({ timeout: 8000 });
+    await page.waitForTimeout(900);
+  } },
   { name: "profile", path: "/profile", widths: [390], full: true },
   { name: "explore-mall", path: "/explore?section=mall", widths: [390, 1280] },
   { name: "explore-for-you", path: "/explore", widths: [390], full: true },
@@ -50,6 +65,7 @@ for (const scene of scenes) {
       posts: (req) => (req.method() === "GET" ? { body: posts } : null),
       stores: () => ({ body: stores }),
       store_items: () => ({ body: items }),
+      ...(scene.mock || {}),
     });
     await page.route("**/storage/v1/object/public/media/**", (route) => {
       const name = new URL(route.request().url()).pathname.split("/").pop();
