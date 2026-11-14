@@ -7,7 +7,7 @@ import { WAITLIST_PRIVACY_NOTE } from "@/content/copy";
 import { PageMeta } from "@/components/seo/PageMeta";
 
 const Privacy = () => {
-  const lastUpdated = "October 18, 2026";
+  const lastUpdated = "November 14, 2026";
 
   return (
     <div className="min-h-screen bg-background">
@@ -86,6 +86,18 @@ const Privacy = () => {
                   <li>Transaction history for purchases and payouts</li>
                 </ul>
               </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="discovery-travel" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-3"><Globe className="h-5 w-5 text-primary" /><span className="font-medium">Creative Discovery & Trip Planning</span></div>
+            </AccordionTrigger>
+            <AccordionContent className="text-muted-foreground space-y-4 text-sm">
+              <p>Globe discovery is optional. When you enable it, signed-in members can see your chosen profile city, bio, public work and profile image. The globe uses city centers, not your precise or live device location. Turning discovery off removes you from the globe; your existing public profile follows its own visibility settings.</p>
+              <p>We store swipe decisions to recognize mutual matches. Other members cannot read your individual swipe history. A mutual match opens a direct chat. Matches-only DMs can be enabled in Settings; group chats you choose to join remain available.</p>
+              <p>Trip listings share the destination, dates, plan and traveler names with eligible signed-in members so they can decide whether to join. Only trip members can read its shared budget, pledges, reported payment amounts, receipt links and approval history. A pledge is not a payment: Ether does not collect, hold, transfer or spend money for these trips, and does not verify externally reported payments or make reservations.</p>
+              <p>Do not include addresses, booking codes, card numbers or unredacted personal details in public trip descriptions or receipt links. Third-party receipt and booking sites have their own privacy practices. Deleting your account cancels affected active trip plans and removes or anonymizes your travel records; a planning pledge does not prevent account deletion.</p>
             </AccordionContent>
           </AccordionItem>
 

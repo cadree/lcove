@@ -38,6 +38,7 @@ const Landing = lazy(() => import("./pages/Landing"));
 const Waitlist = lazy(() => import("./pages/Waitlist"));
 const Feed = lazy(loadFeed);
 const Explore = lazy(loadExplore);
+const Travel = lazy(() => import("./pages/Travel"));
 const Directory = lazy(() => import("./pages/Directory"));
 const Projects = lazy(() => import("./pages/Projects"));
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
@@ -189,6 +190,7 @@ const App = () => (
                 <Route path="/feed" element={<Feed />} />
                 <Route path="/explore" element={<Explore />} />
                 <Route path="/directory" element={<Directory />} />
+                <Route path="/travel" element={<Travel />} />
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/events" element={<Navigate to="/calendar" replace />} />
