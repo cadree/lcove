@@ -5296,6 +5296,42 @@ export type Database = {
           },
         ]
       }
+      post_drafts: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          media_type: string
+          media_url: string | null
+          post_type: string
+          thumbnail_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          media_type?: string
+          media_url?: string | null
+          post_type?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          media_type?: string
+          media_url?: string | null
+          post_type?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       posts: {
         Row: {
           alt_text: string | null
@@ -5314,6 +5350,7 @@ export type Database = {
           media_type: string | null
           media_url: string | null
           post_type: string
+          thumbnail_url: string | null
           user_id: string
         }
         Insert: {
@@ -5333,6 +5370,7 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           post_type?: string
+          thumbnail_url?: string | null
           user_id: string
         }
         Update: {
@@ -5352,6 +5390,7 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           post_type?: string
+          thumbnail_url?: string | null
           user_id?: string
         }
         Relationships: [

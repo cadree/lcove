@@ -26,4 +26,6 @@ test("feed videos drop their source off screen and get an iOS first-frame hint",
   assert.equal(feedVideoSource("blob:abc", true), "blob:abc");
   assert.equal(feedVideoSource("https://cdn/v.mp4#t=2", true), "https://cdn/v.mp4#t=2");
   assert.equal(feedVideoSource(null, true), undefined);
+  // Grid tiles without a saved cover show a frame 1s in (frame 0 is often black).
+  assert.equal(feedVideoSource("https://cdn/v.mp4", true, 1), "https://cdn/v.mp4#t=1");
 });

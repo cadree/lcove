@@ -22,6 +22,8 @@ interface QueueMedia {
   insert(urls: string[]): Promise<void>;
   invalidate: QueryKey[];
   successMessage: string;
+  /** Show a placeholder in the feed/story tray while it uploads. Off for drafts. */
+  placeholder?: boolean;
 }
 
 /**
@@ -54,6 +56,7 @@ export function queueMedia(input: QueueMedia): string {
     },
     onAbandon: cleanup,
   });
+  if (input.placeholder === false) return jobId;
   pendingUploads.add({
     id: pendingId,
     jobId,

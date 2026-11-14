@@ -6,6 +6,8 @@ export interface ProfilePost extends StoredEmbedFields {
   content: string | null;
   media_url: string | null;
   media_type: string | null;
+  /** Cover for a video post. */
+  thumbnail_url?: string | null;
   created_at: string;
   location: string | null;
   collaborators: string[] | null;

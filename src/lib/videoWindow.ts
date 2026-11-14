@@ -6,8 +6,8 @@ export const VIDEO_KEEP_MARGIN_PX = 800;
  * the decoder and buffered frames. "#t=0.001" makes iOS paint the first frame
  * as a poster without downloading the whole file.
  */
-export function feedVideoSource(src: string | null | undefined, near: boolean): string | undefined {
+export function feedVideoSource(src: string | null | undefined, near: boolean, frameAt = 0.001): string | undefined {
   if (!src || !near) return undefined;
   if (src.startsWith("blob:") || src.includes("#")) return src;
-  return `${src}#t=0.001`;
+  return `${src}#t=${frameAt}`;
 }

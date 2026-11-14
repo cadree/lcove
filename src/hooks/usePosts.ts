@@ -16,6 +16,8 @@ import { embedColumnMissing, embedColumnsForInsert, videoEmbedMigrationMessage, 
 import { FEED_POST_LIMIT } from '@/lib/feedWindow';
 import { abortAfter } from '@/lib/requestDeadline';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { insertPostRow } from '@/lib/postRows';
+import { autoCover } from '@/lib/videoCover';
 
 let postsFeedListeners = 0;
 let postsFeedChannel: RealtimeChannel | null = null;
@@ -26,6 +28,8 @@ interface Post extends StoredEmbedFields {
   content: string | null;
   media_url: string | null;
   media_type: 'photo' | 'video' | 'text' | null;
+  /** Cover for a video post. */
+  thumbnail_url?: string | null;
   post_type: 'regular' | 'portfolio';
   created_at: string;
   profile?: {
@@ -163,7 +167,7 @@ export function usePosts() {
   });
 
   const createPost = useMutation({
-    mutationFn: async ({ content, file, mediaType, embed }: { content?: string; file?: File; mediaType?: 'photo' | 'video' | 'text'; embed?: EmbedDraft; inlineError?: boolean }) => {
+    mutationFn: async ({ content, file, mediaType, embed, cover }: { content?: string; file?: File; mediaType?: 'photo' | 'video' | 'text'; embed?: EmbedDraft; inlineError?: boolean; cover?: File | null }) => {
       if (!user) throw new Error('Must be logged in');
       assertCleanText(content);
 
@@ -181,24 +185,25 @@ export function usePosts() {
       }
 
       if (file && mediaType !== 'text') {
+        // Every video gets a cover: the one picked, else a frame about 1s in.
+        const coverFile = mediaType === 'video' ? cover ?? await autoCover(file, 4000) : null;
         // Media goes up in the background. The dialog closes now and the pill tracks it.
         queueMedia({
           queryClient,
           userId: user.id,
           kind: 'post',
           label: mediaType === 'video' ? 'Video post' : 'Photo post',
-          files: [file],
+          files: coverFile ? [file, coverFile] : [file],
           mediaType: mediaType === 'video' ? 'video' : 'photo',
           content: content || null,
-          insert: async ([mediaUrl]) => {
-            const { error: insertError } = await supabase
-              .from('posts')
-              .insert({
-                user_id: user.id,
-                content: content || null,
-                media_url: mediaUrl,
-                media_type: mediaType || 'photo',
-              });
+          insert: async ([mediaUrl, coverUrl]) => {
+            const { error: insertError } = await insertPostRow({
+              user_id: user.id,
+              content: content || null,
+              media_url: mediaUrl,
+              media_type: mediaType || 'photo',
+              ...(coverUrl ? { thumbnail_url: coverUrl } : {}),
+            });
             if (insertError) throw insertError;
             refreshXp(queryClient);
           },

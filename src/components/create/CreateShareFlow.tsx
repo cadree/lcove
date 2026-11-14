@@ -11,6 +11,8 @@ import { InlineError } from "@/components/ui/inline-error";
 import { writeError } from "@/lib/writeError";
 import { assertCleanText, OBJECTIONABLE_MESSAGE } from "@/lib/objectionableText";
 import type { EmbedDraft } from "@/lib/videoEmbed";
+import { VideoCoverPicker, type CoverChoice } from "@/components/media/VideoCoverPicker";
+import { usePostDrafts, type PostDraft } from "@/hooks/usePostDrafts";
 
 type Step = "pick" | "crop" | "caption" | "share";
 
@@ -54,6 +56,8 @@ async function bakeSquareCrop(src: string, scale: number, offsetX: number, offse
 export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
   const { user } = useAuth();
   const { createPost } = usePosts();
+  const { drafts, save: saveDraft, remove: removeDraft, publish: publishDraft } = usePostDrafts();
+  const [editingDraft, setEditingDraft] = useState<PostDraft | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
 
@@ -70,6 +74,11 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
   const [kind, setKind] = useState<"photo" | "video" | "text">("text");
   const [linkUrl, setLinkUrl] = useState("");
   const [embed, setEmbed] = useState<EmbedDraft | null>(null);
+  const [cover, setCover] = useState<CoverChoice | null>(null);
+  const chooseCover = (next: CoverChoice | null) => {
+    if (cover) URL.revokeObjectURL(cover.url);
+    setCover(next);
+  };
 
   const reset = () => {
     setStep("pick");
@@ -84,6 +93,33 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
     setKind("text");
     setLinkUrl("");
     setEmbed(null);
+    chooseCover(null);
+    setEditingDraft(null);
+  };
+
+  const openDraft = (draft: PostDraft) => {
+    reset();
+    setEditingDraft(draft);
+    setCaption(draft.content ?? "");
+    setKind(draft.media_type);
+    setCroppedUrl(draft.media_url);
+    setStep("caption");
+  };
+
+  const keepDraft = async () => {
+    try {
+      setError(null);
+      await saveDraft.mutateAsync({
+        id: editingDraft?.id,
+        content: caption,
+        file: croppedFile,
+        cover: kind === "video" ? cover?.file ?? null : null,
+        mediaType: kind,
+      });
+      handleOpenChange(false);
+    } catch (err) {
+      setError(writeError(err, "Could not save the draft"));
+    }
   };
 
   const chooseFile = (accept: string) => {
@@ -151,15 +187,21 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
   };
 
   const share = async () => {
-    if (!caption.trim() && !croppedFile && !embed) return;
+    if (!caption.trim() && !croppedFile && !embed && !editingDraft) return;
     try {
       setError(null);
       assertCleanText(caption);
+      if (editingDraft) {
+        await publishDraft.mutateAsync({ draft: editingDraft, content: caption });
+        handleOpenChange(false);
+        return;
+      }
       await createPost.mutateAsync({
         content: caption.trim() || undefined,
         file: embed ? undefined : croppedFile || undefined,
         mediaType: embed ? "video" : kind === "video" ? "video" : croppedFile ? "photo" : "text",
         embed: embed ?? undefined,
+        cover: kind === "video" ? cover?.file ?? null : null,
         inlineError: true,
       });
       handleOpenChange(false);
@@ -206,6 +248,15 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
                 </Button>
               )}
               {error && <p className="text-sm text-destructive">{error}</p>}
+              {drafts.length > 0 && (
+                <DraftList
+                  drafts={drafts}
+                  onEdit={openDraft}
+                  onPublish={(draft) => publishDraft.mutate({ draft }, { onError: (err) => setError(writeError(err, "Could not share that draft")) })}
+                  onDelete={(draft) => removeDraft.mutate(draft.id)}
+                  busy={publishDraft.isPending || removeDraft.isPending}
+                />
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -284,7 +335,10 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
               {embed ? (
                 <EmbedPlayer embed={embed} title={embed.title} />
               ) : kind === "video" && croppedUrl ? (
-                <video src={croppedUrl} className="max-h-[min(52vh,420px)] w-full rounded-[14px] bg-black object-contain" controls playsInline />
+                <>
+                  <video src={croppedUrl} poster={editingDraft?.thumbnail_url ?? undefined} preload="metadata" className="max-h-[min(40vh,360px)] w-full rounded-[14px] bg-black object-contain" controls playsInline />
+                  {croppedFile && <VideoCoverPicker videoUrl={croppedUrl} cover={cover} onChange={chooseCover} />}
+                </>
               ) : croppedUrl ? (
                 <img src={croppedUrl} alt="" className="aspect-[4/5] max-h-[min(52vh,420px)] w-full rounded-[14px] bg-muted object-contain" />
               ) : null}
@@ -312,12 +366,22 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
                 </Button>
                 <Button
                   className="min-h-11 flex-1"
-                  disabled={!caption.trim() && !croppedFile && !embed}
+                  disabled={!caption.trim() && !croppedFile && !embed && !editingDraft?.media_url}
                   onClick={() => setStep("share")}
                 >
                   Next
                 </Button>
               </div>
+              {!embed && (
+                <Button
+                  variant="ghost"
+                  className="mono-label min-h-11 w-full text-[11px] text-muted-foreground"
+                  disabled={saveDraft.isPending || (!caption.trim() && !croppedFile && !editingDraft)}
+                  onClick={keepDraft}
+                >
+                  {saveDraft.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : editingDraft ? "Save draft changes" : "Save as draft"}
+                </Button>
+              )}
             </div>
           )}
 
@@ -329,7 +393,7 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
                   {embed.title && <p className="text-sm text-foreground">{embed.title}</p>}
                 </div>
               ) : kind === "video" && croppedUrl ? (
-                <video src={croppedUrl} className="max-h-[min(52vh,420px)] w-full rounded-[14px] bg-black object-contain" controls playsInline />
+                <video src={croppedUrl} poster={cover?.url} preload="metadata" className="max-h-[min(52vh,420px)] w-full rounded-[14px] bg-black object-contain" controls playsInline />
               ) : croppedUrl ? (
                 <img src={croppedUrl} alt="" className="aspect-[4/5] max-h-[min(52vh,420px)] w-full rounded-[14px] bg-muted object-contain" />
               ) : null}
@@ -339,8 +403,8 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
                 <Button variant="outline" className="min-h-11 flex-1" onClick={() => setStep("caption")}>
                   Back
                 </Button>
-                <Button className="min-h-11 flex-1" onClick={share} disabled={createPost.isPending}>
-                  {createPost.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Share"}
+                <Button className="min-h-11 flex-1" onClick={share} disabled={createPost.isPending || publishDraft.isPending}>
+                  {createPost.isPending || publishDraft.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Share"}
                 </Button>
               </div>
             </div>
@@ -348,5 +412,41 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function DraftList({ drafts, onEdit, onPublish, onDelete, busy }: {
+  drafts: PostDraft[];
+  onEdit: (draft: PostDraft) => void;
+  onPublish: (draft: PostDraft) => void;
+  onDelete: (draft: PostDraft) => void;
+  busy: boolean;
+}) {
+  return (
+    <section aria-label="Drafts" className="space-y-2 border-t border-border pt-4">
+      <p className="mono-label text-[10px] text-muted-foreground">Drafts · only you can see these</p>
+      <ul className="space-y-2">
+        {drafts.map((draft) => {
+          const still = draft.media_type === "video" ? draft.thumbnail_url : draft.media_url;
+          return (
+            <li key={draft.id} className="flex items-center gap-3 rounded-[14px] border border-border bg-card/60 p-2">
+              <button type="button" onClick={() => onEdit(draft)} className="flex min-h-11 min-w-0 flex-1 items-center gap-3 text-left" aria-label={`Edit draft ${draft.content || draft.media_type}`}>
+                <span className="h-12 w-12 shrink-0 overflow-hidden rounded-[10px] bg-muted">
+                  {still ? <img src={still} alt="" className="h-full w-full object-cover" loading="lazy" /> : (
+                    <span className="mono-label flex h-full w-full items-center justify-center text-[8px] text-muted-foreground">{draft.media_type === "video" ? "Video" : "Text"}</span>
+                  )}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm text-foreground">{draft.content || (draft.media_type === "video" ? "Untitled video" : draft.media_type === "photo" ? "Untitled photo" : "Empty draft")}</span>
+                  <span className="mono-label block text-[9px] text-muted-foreground">Saved {new Date(draft.updated_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+                </span>
+              </button>
+              <Button size="sm" className="min-h-11 shrink-0" disabled={busy} onClick={() => onPublish(draft)}>Post</Button>
+              <Button size="sm" variant="ghost" className="min-h-11 shrink-0 text-muted-foreground" disabled={busy} onClick={() => onDelete(draft)} aria-label="Delete draft">Delete</Button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

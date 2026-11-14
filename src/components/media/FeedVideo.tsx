@@ -5,6 +5,8 @@ type Props = Omit<VideoHTMLAttributes<HTMLVideoElement>, "src" | "autoPlay"> & {
   src: string | null | undefined;
   /** Play only while most of it is on screen (reels). Only one plays at a time that way. */
   playWhenVisible?: boolean;
+  /** Seconds in for the still frame when there is no poster. Use 1 for tiles that don't play. */
+  frameAt?: number;
 };
 
 let observer: IntersectionObserver | null = null;
@@ -47,7 +49,7 @@ function watch(element: Element, onChange: (near: boolean) => void) {
  * A muted feed video that only holds its source near the screen. Scrolling far
  * past it releases the media, which is what kept Safari's memory climbing.
  */
-export function FeedVideo({ src, preload = "metadata", muted = true, playsInline = true, loop = true, playWhenVisible = false, ...props }: Props) {
+export function FeedVideo({ src, preload = "metadata", muted = true, playsInline = true, loop = true, playWhenVisible = false, frameAt, ...props }: Props) {
   const ref = useRef<HTMLVideoElement>(null);
   const [near, setNear] = useState(false);
 
@@ -77,6 +79,6 @@ export function FeedVideo({ src, preload = "metadata", muted = true, playsInline
     }
   }, [near]);
 
-  const source = feedVideoSource(src, near);
+  const source = feedVideoSource(src, near, props.poster ? 0.001 : frameAt);
   return <video ref={ref} {...props} src={source} preload={near ? preload : "none"} muted={muted} playsInline={playsInline} loop={loop} />;
 }

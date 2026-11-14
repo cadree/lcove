@@ -49,6 +49,7 @@ interface Post extends StoredEmbedFields {
   content: string | null;
   media_url: string | null;
   media_type: 'photo' | 'video' | 'text' | null;
+  thumbnail_url?: string | null;
   created_at: string;
   profile?: {
     display_name: string | null;
@@ -253,6 +254,8 @@ const FeedPost = ({ post }: { post: Post }) => {
               {post.media_type === 'video' ? (
                 <FeedVideo
                   src={post.media_url}
+                  poster={post.thumbnail_url ?? undefined}
+                  frameAt={1}
                   className="absolute inset-0 h-full w-full object-contain"
                 />
               ) : (
