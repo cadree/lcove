@@ -46,6 +46,10 @@ const scenes = [
     await page.waitForTimeout(400);
   } },
   { name: "onboarding", path: "/onboarding", widths: [390], init: () => localStorage.setItem("ether-shot-onboarding", "1") },
+  { name: "travel-section", path: "/explore?section=people&welcome=1", widths: [390], mock: { ...people, creative_trip_requests: () => ({ body: [] }), creative_trip_list: () => ({ body: [{ ...tripList[0], id: "00000000-0000-4000-8000-0000000d0002", city_key: "charlotte|nc", city_label: "Charlotte, NC", title: "Charlotte lookbook days" }] }), profiles: (req, url) => (url.pathname.endsWith("/profiles_public") && url.searchParams.get("select")?.includes("city_key") ? { body: [...members, { ...members[0], user_id: me, display_name: "Maya Cole", avatar_url: null }] } : { body: [profile] }) }, run: async (page) => {
+    await page.getByRole("region", { name: /Members traveling to/ }).scrollIntoViewIfNeeded({ timeout: 8000 });
+    await page.waitForTimeout(500);
+  } },
   { name: "first-run", path: "/explore?section=people&welcome=1", widths: [390], mock: { ...people, profiles: (req, url) => (url.pathname.endsWith("/profiles_public") && url.searchParams.get("select")?.includes("city_key") ? { body: [...members, { ...members[0], user_id: me, display_name: "Maya Cole", avatar_url: null }] } : { body: [profile] }) } },
   { name: "calendar", path: "/calendar", widths: [390, 1280], mock: { events: () => ({ body: events }) } },
   { name: "travel", path: "/travel", widths: [390], mock: { creative_trip_list: () => ({ body: tripList }) } },

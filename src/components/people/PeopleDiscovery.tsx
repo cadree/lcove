@@ -17,6 +17,7 @@ import {
 import { safeWebLink } from "@/lib/tripMoney";
 import { MemberGrid } from "./MemberGrid";
 import { SwipeDeck } from "./SwipeDeck";
+import { TravelingToCity } from "./TravelingToCity";
 import { supabase } from "@/integrations/supabase/client";
 
 // The globe and its city coordinates (~300 KB) load after the deck renders.
@@ -299,6 +300,7 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
                   });
               }}
             />
+            {city && !city.startsWith("region:") && cityLabel && <TravelingToCity cityKey={city} label={cityLabel} />}
             </>
           ) : (
             <div className="rounded-[28px] border border-dashed border-white/15 px-6 py-10 text-center">

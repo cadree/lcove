@@ -22,6 +22,8 @@ import { resolveCity } from "@/lib/cities";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { readNumber } from "@/lib/numberField";
+import { TripJoinButton } from "@/components/travel/TripJoinButton";
+import { TripRequestsPanel } from "@/components/travel/TripRequestsPanel";
 import { canComplete, todayIso, tripDatesError, tripRange, tripStatus } from "@/lib/tripDates";
 
 export default function Travel() {
@@ -49,15 +51,6 @@ export default function Travel() {
     queryFn: () => discovery.trip(selected!),
     enabled: !!selected && !!user,
     refetchInterval: 15000,
-  });
-  const join = useMutation({
-    mutationFn: (id: string) => discovery.tripAction("join", id),
-    onSuccess: async (data) => {
-      await cache.invalidateQueries({ queryKey: ["trips"] });
-      await cache.invalidateQueries({ queryKey: ["conversations"] });
-      setParams({ trip: data.id });
-    },
-    onError: (e: Error) => toast.error(e.message),
   });
   return (
     <PageLayout>
@@ -179,25 +172,7 @@ export default function Travel() {
                       Report organizer
                     </button>
                   )}
-                  {t.joined ? (
-                    <Button onClick={() => setParams({ trip: t.id })}>
-                      Open trip & budget
-                    </Button>
-                  ) : (
-                    <Button
-                      disabled={join.isPending || t.member_count >= t.capacity}
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            "Join this trip and its group chat? The listed travelers will see your profile and budget pledges. Joining does not unlock private DMs."
-                          )
-                        )
-                          join.mutate(t.id);
-                      }}
-                    >
-                      Join trip & group chat
-                    </Button>
-                  )}
+                  <TripJoinButton trip={t} onOpen={() => setParams({ trip: t.id })} />
                 </article>
               ))
             )}
@@ -612,6 +587,7 @@ function TripDetail({ trip, onLeave }: { trip: Trip; onLeave: () => void }) {
           </p>
         )}
       </section>
+      {!closed && me && <TripRequestsPanel tripId={trip.id} organizer={organizer} />}
       {!closed && (
         <div className="flex flex-wrap gap-3">
           {organizer ? (

@@ -75,7 +75,7 @@ export function ProfileCard({ person, near }: { person: Person; near: boolean })
               </Link>
             );
           })}
-          {!work.isLoading && !work.data?.length && <span className="self-center text-xs text-white/50">No work previews yet</span>}
+          {!work.isLoading && !work.data?.length && <span className="min-w-0 self-center truncate text-xs text-white/50">No work yet</span>}
         </div>
         <button
           type="button"
