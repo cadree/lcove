@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,6 +63,10 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
 
   const [step, setStep] = useState<Step>("pick");
   const [preview, setPreview] = useState<string | null>(null);
+  // Release the previous photo's object URL whenever it is replaced or the flow closes.
+  useEffect(() => () => {
+    if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
+  }, [preview]);
   const [croppedFile, setCroppedFile] = useState<File | null>(null);
   const [croppedUrl, setCroppedUrl] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
@@ -154,20 +158,18 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
       return;
     }
     setKind("photo");
-    const reader = new FileReader();
-    reader.onload = () => {
-      const src = reader.result as string;
-      const img = new Image();
-      img.onload = () => {
-        setNatural({ w: img.naturalWidth, h: img.naturalHeight });
-        setPreview(src);
-        setScale(1);
-        setOffset({ x: 0, y: 0 });
-        setStep("crop");
-      };
-      img.src = src;
+    // An object URL points at the file instead of copying it into a base64 string (a 12 MB photo would be ~16 MB of JS string).
+    const src = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      setNatural({ w: img.naturalWidth, h: img.naturalHeight });
+      setPreview(src);
+      setScale(1);
+      setOffset({ x: 0, y: 0 });
+      setStep("crop");
     };
-    reader.readAsDataURL(file);
+    img.onerror = () => URL.revokeObjectURL(src);
+    img.src = src;
   };
 
   const goToCaption = async () => {

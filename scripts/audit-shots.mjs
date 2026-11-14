@@ -77,6 +77,16 @@ const scenes = [
   { name: "profile", path: "/profile", widths: [390], full: true },
   { name: "explore-mall", path: "/explore?section=mall", widths: [390, 1280] },
   { name: "explore-for-you", path: "/explore", widths: [390], full: true },
+  { name: "create-photo-crop", path: "/feed", widths: [390], run: async (page) => {
+    await page.getByRole("button", { name: /create/i }).last().click();
+    await page.getByRole("button", { name: /^post$/i }).first().click();
+    const chooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: /choose a photo|photo/i }).first().click();
+    await (await chooser).setFiles("/workspace/audit-nov14/fixtures/product.jpg");
+    await page.waitForTimeout(1200);
+    await page.getByRole("button", { name: /^next$/i }).click();
+    await page.waitForTimeout(1200);
+  } },
   { name: "create-video", path: "/feed", widths: [390], run: async (page) => {
     await page.getByRole("button", { name: /create/i }).last().click();
     await page.getByRole("button", { name: /^post$/i }).first().click();
