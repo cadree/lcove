@@ -718,5 +718,46 @@ await db.exec(await readFile("supabase/rollbacks/20261114160000_connect_match_no
 await fails(() => rpc("creative_swipe", [ana, true]), /Show yourself in discovery to like/);
 assert.equal((await sql("SELECT count(*)::int n FROM public.ether_schema_migrations")).rows[0].n, 0);
 check("connect: rollback restores the previous creative_swipe");
+// Deck order (20261114161000): incoming connects lean to the top, nothing reveals them.
+await db.exec(await readFile("supabase/migrations/20261114161000_deck_incoming_first.sql", "utf8"));
+await sql("INSERT INTO public.ether_schema_migrations VALUES('20261114161000_deck_incoming_first.sql')");
+const pool = Array.from({ length: 24 }, (_, i) => `00000000-0000-4000-a000-${String(i).padStart(12, "0")}`);
+const viewer = pool[0];
+for (const [i, id] of pool.entries()) {
+  await sql("INSERT INTO auth.users VALUES($1)", [id]);
+  await sql("INSERT INTO public.profiles(user_id,display_name,city,city_key) VALUES($1,$2,'Denver, CO','denver|co')", [id, `Deck ${i}`]);
+}
+const fans = pool.slice(1, 6);
+for (const fan of fans) {
+  await as(fan);
+  await rpc("creative_swipe", [viewer, true]);
+}
+await as(pool[6]);
+await rpc("creative_swipe", [viewer, true]);
+await sql("INSERT INTO public.user_blocks(blocker_id,blocked_id) VALUES($1,$2)", [viewer, pool[6]]);
+await as(pool[7]);
+await rpc("creative_swipe", [viewer, true]);
+await rpc("discovery_settings", [false, null]);
+await as(viewer);
+const deckRows = (await rpc("discovery_globe")).filter((r) => pool.includes(r.user_id));
+assert.equal(deckRows.some((r) => r.user_id === pool[6] || r.user_id === pool[7]), false);
+assert.ok(deckRows.every((r) => Number.isInteger(r.deck)));
+assert.deepEqual(Object.keys(deckRows[0]).sort(), ["deck", "liked", "live_city_key", "live_until", "trip", "user_id"]);
+const avg = (rows) => rows.reduce((n, r) => n + r.deck, 0) / rows.length;
+const fanRows = deckRows.filter((r) => fans.includes(r.user_id));
+const rest = deckRows.filter((r) => r.user_id !== viewer && !fans.includes(r.user_id));
+assert.equal(fanRows.length, 5);
+assert.ok(avg(fanRows) < avg(rest));
+assert.ok(Math.max(...fanRows.map((r) => r.deck)) < Math.max(...rest.map((r) => r.deck)));
+check("deck: people who connected with me lean to the top; blocked and hidden fans stay out; no field names them");
+await as(pool[1]);
+assert.equal((await rpc("discovery_globe")).find((r) => r.user_id === viewer).liked, true);
+await as(pool[2]);
+assert.equal((await rpc("discovery_globe")).find((r) => r.user_id === pool[1]).liked, null);
+check("deck: one-sided connects stay private to the person who sent them");
+await db.exec(await readFile("supabase/rollbacks/20261114161000_deck_incoming_first.down.sql", "utf8"));
+await as(viewer);
+assert.equal("deck" in (await rpc("discovery_globe"))[0], false);
+check("deck: rollback restores the previous discovery_globe");
 await db.close();
 console.log(`${checks} database checks passed`);
