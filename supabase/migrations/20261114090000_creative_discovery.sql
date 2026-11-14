@@ -223,7 +223,7 @@ GRANT EXECUTE ON FUNCTION public.get_or_create_direct_conversation(uuid) TO auth
 CREATE FUNCTION public.create_group_with_privacy(p_name text,p_members uuid[]) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE me uuid:=auth.uid(); chat uuid; member uuid;
 BEGIN
- IF me IS NULL OR length(trim(p_name)) NOT BETWEEN 1 AND 100 OR cardinality(p_members) NOT BETWEEN 2 AND 50 THEN RAISE EXCEPTION 'Add a group name and 2 to 50 people'; END IF;
+ IF me IS NULL OR coalesce(length(trim(p_name)),0) NOT BETWEEN 1 AND 100 OR coalesce(cardinality(p_members),0) NOT BETWEEN 2 AND 50 THEN RAISE EXCEPTION 'Add a group name and 2 to 50 people'; END IF;
  IF (SELECT count(DISTINCT x) FROM unnest(p_members) x WHERE x IS NOT NULL AND x<>me)<>cardinality(p_members) THEN RAISE EXCEPTION 'Choose distinct people other than yourself'; END IF;
  INSERT INTO public.conversations(type,name,created_by) VALUES('group',trim(p_name),me) RETURNING id INTO chat;
  INSERT INTO public.conversation_participants(conversation_id,user_id) VALUES(chat,me);

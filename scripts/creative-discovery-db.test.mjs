@@ -464,5 +464,8 @@ await fails(
   /not allowed/
 );
 check("trip text uses the existing server moderation filter");
+await fails(()=>rpc('create_group_with_privacy',[null,[ids[1],ids[2]]]),/Add a group name/);
+await fails(()=>rpc('create_group_with_privacy',['Named group',null]),/Add a group name/);
+check('raw group creation rejects null names and participant arrays');
 await db.close();
 console.log(`${checks} database checks passed`);
