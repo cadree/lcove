@@ -79,7 +79,7 @@ export function FinalCTA({ onOpenCreatorApplication }: FinalCTAProps) {
               Start your creative home on <span className="text-gradient-pink">Ether</span>
             </h2>
             <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
-              Join thousands of creators building meaningful connections and launching incredible projects.
+              Join creators building meaningful connections and launching incredible projects.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">

@@ -1,5 +1,5 @@
 import { FeedVideo } from "@/components/media/FeedVideo";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import FeedPost from "@/components/feed/FeedPost";
@@ -16,7 +16,8 @@ const lanes: { id: Lane; label: string }[] = [
   { id: "portfolios", label: "Portfolios" },
 ];
 
-export function ExploreBrowse({ query }: { query: string }) {
+/** With `heading` (Explore > For you) the whole block hides when there is nothing to browse. */
+export function ExploreBrowse({ query, heading }: { query: string; heading?: ReactNode }) {
   const [lane, setLane] = useState<Lane>("reels");
   const [visible, setVisible] = useState(PAGE);
   const sentinel = useRef<HTMLDivElement>(null);
@@ -55,9 +56,12 @@ export function ExploreBrowse({ query }: { query: string }) {
   }, [total, lane, visible]);
 
   const loading = postsLoading;
+  const empty = !loading && reels.length === 0 && browsePosts(posts, "posts").length === 0 && browsePosts(posts, "portfolios").length === 0;
+  if (heading !== undefined && empty) return null;
 
   return (
     <section aria-label="Browse" className="min-w-0">
+      {heading}
       <div className="mb-3 flex gap-2 overflow-x-auto scrollbar-hide">
         {lanes.map((item) => {
           const active = lane === item.id;

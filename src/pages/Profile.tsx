@@ -57,6 +57,7 @@ import {
   withProfilePostColumns,
   type ProfilePostRow,
 } from "@/lib/profilePosts";
+import { featureOn } from "@/config/features";
 
 const Profile = () => {
   const { userId: urlUserId } = useParams<{ userId?: string }>();
@@ -101,7 +102,7 @@ const Profile = () => {
   const hasCreatorRoles = creatorRoles.length > 0;
 
   useEffect(() => {
-    if (searchParams.get("action") === "create-blog" && isOwnProfile) {
+    if (searchParams.get("action") === "create-blog" && isOwnProfile && featureOn("profileBlogs")) {
       setShowCreateBlogDialog(true);
       setSearchParams({}, { replace: true });
     }
@@ -333,6 +334,7 @@ const Profile = () => {
             transition={{ delay: 0.55 }}
             className="px-5 py-4"
           >
+            {featureOn("profileBlogs") || featureOn("profileSavedTab") ? (
             <Tabs defaultValue="posts" className="w-full">
               <TabsList className="w-full justify-center border-b border-border rounded-none bg-transparent h-auto py-0 px-0">
                 <TabsTrigger 
@@ -341,18 +343,18 @@ const Profile = () => {
                 >
                   Posts
                 </TabsTrigger>
-                <TabsTrigger 
+                {featureOn("profileBlogs") && <TabsTrigger 
                   value="blogs" 
                   className="min-h-11 flex-1 rounded-none border-b-2 border-transparent px-2 font-mono text-[10px] uppercase tracking-[0.14em] data-[state=active]:border-primary data-[state=active]:bg-transparent"
                 >
                   Blogs
-                </TabsTrigger>
-                <TabsTrigger 
+                </TabsTrigger>}
+                {featureOn("profileSavedTab") && <TabsTrigger 
                   value="saved" 
                   className="min-h-11 flex-1 rounded-none border-b-2 border-transparent px-2 font-mono text-[10px] uppercase tracking-[0.14em] data-[state=active]:border-primary data-[state=active]:bg-transparent"
                 >
                   Saved
-                </TabsTrigger>
+                </TabsTrigger>}
               </TabsList>
               <TabsContent value="posts" className="mt-4">
                 <ProfilePostsGrid 
@@ -362,7 +364,7 @@ const Profile = () => {
                   isOwner={isOwnProfile}
                 />
               </TabsContent>
-              <TabsContent value="blogs" className="mt-4">
+              {featureOn("profileBlogs") && <TabsContent value="blogs" className="mt-4">
                 {isOwnProfile && (
                   <Button
                     variant="outline"
@@ -379,8 +381,8 @@ const Profile = () => {
                   isLoading={blogsLoading}
                   isOwner={isOwnProfile}
                 />
-              </TabsContent>
-              <TabsContent value="saved" className="mt-4">
+              </TabsContent>}
+              {featureOn("profileSavedTab") && <TabsContent value="saved" className="mt-4">
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <div className="w-16 h-16 rounded-full border-2 border-muted-foreground/20 flex items-center justify-center mb-4">
                     <Bookmark className="w-8 h-8 text-muted-foreground/40" />
@@ -390,8 +392,19 @@ const Profile = () => {
                     Save content you want to see again.
                   </p>
                 </div>
-              </TabsContent>
+              </TabsContent>}
             </Tabs>
+            ) : (
+              // One tab left: show the grid without a lone tab bar.
+              <>
+                  <ProfilePostsGrid 
+                    posts={displayPosts}
+                    onPostClick={(post) => setSelectedPost(post)}
+                    isLoading={postsLoading && displayPosts.length === 0}
+                    isOwner={isOwnProfile}
+                  />
+              </>
+            )}
           </motion.div>
         );
       case 'reviews':

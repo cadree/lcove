@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { filmEmbedSrc, isDirectFilm } from "@/lib/filmEmbed";
 import { fromUntyped } from "@/lib/safetyTables";
+import { featureOn } from "@/config/features";
 
 interface ProfileFilm {
   id: string;
@@ -80,6 +81,9 @@ export function ProfileFilms({ ownerId, isOwner }: { ownerId: string; isOwner: b
   };
 
   const rows = films.data ?? [];
+  const canAdd = isOwner && featureOn("profileFilmForm");
+  // Without the add form, a profile with no film links shows nothing here.
+  if (!canAdd && (films.isLoading || films.isError || rows.length === 0)) return null;
 
   return (
     <section className="px-4 pt-4">
@@ -117,7 +121,7 @@ export function ProfileFilms({ ownerId, isOwner }: { ownerId: string; isOwner: b
             </article>
           ))}
         </div>
-        {isOwner && (
+        {canAdd && (
           <div className="mt-4 space-y-2 border-t border-border pt-4">
             <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Film title" aria-label="Film title" />
             <Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="YouTube, Vimeo, or video link" aria-label="Film link" />
