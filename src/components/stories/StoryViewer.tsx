@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ShareSheet } from '@/components/share/ShareSheet';
 import { toast } from 'sonner';
+import { useNativeKeyboardInset } from '@/hooks/useNativeKeyboardInset';
 
 interface Story {
   id: string;
@@ -58,6 +59,7 @@ interface StoryViewerProps {
 const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryViewerProps) => {
   const [currentIndex, setCurrentIndex] = useState(() => storyStartIndex(stories, initialStoryId));
   const [progress, setProgress] = useState(0);
+  const keyboardInset = useNativeKeyboardInset();
   const [viewCount, setViewCount] = useState(0);
   const [paused, setPaused] = useState(false);
   const [reply, setReply] = useState('');
@@ -315,6 +317,8 @@ const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryView
     >
       <div
         className="absolute inset-0 flex items-center justify-center"
+        // With the keyboard open the story shrinks into the space above it, so the reply box stays visible.
+        style={keyboardInset ? { bottom: keyboardInset } : undefined}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Story Container */}
@@ -323,6 +327,7 @@ const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryView
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
           className="relative w-full max-w-md h-[85vh] max-h-[900px] rounded-3xl overflow-hidden bg-card shadow-2xl"
+          style={keyboardInset ? { height: "calc(100% - 1rem)" } : undefined}
         >
           {/* Progress Bars */}
           <div className="absolute top-4 left-4 right-4 z-20 flex gap-1">

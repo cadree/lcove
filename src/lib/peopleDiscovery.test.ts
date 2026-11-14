@@ -74,3 +74,12 @@ test("the picker offers cities and their states or countries", () => {
   assert.deepEqual(people.filter((p) => inCity(p, "region:nc|NC")).map((p) => p.user_id), ["a", "b"]);
   assert.deepEqual(people.filter((p) => inCity(p, "region:ca|Canada")).map((p) => p.user_id), ["t"]);
 });
+
+test("the deck follows the server's deck order among undecided people and never exposes why", () => {
+  const people = buildPeople(
+    [member("a", "A", "Miami"), member("b", "B", "Miami"), member("c", "C", "Miami"), member("d", "D", "Miami")],
+    [signal("a", { deck: 3 }), signal("b", { deck: 1 }), signal("c", { liked: true, deck: 0 }), signal("d")],
+  );
+  assert.deepEqual(deckFor(people, undefined, null, "").map((p) => p.user_id), ["b", "a", "d", "c"]);
+  assert.equal(Object.keys(people[1]).some((k) => /incoming|connected_me|liked_me/i.test(k)), false);
+});

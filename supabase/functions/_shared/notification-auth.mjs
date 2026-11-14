@@ -148,6 +148,19 @@ export function authorizeUserNotification({ callerId, recipientId, notificationT
     return deny(400, "post_id or story_id is required");
   }
 
+  if (notificationType === "match") {
+    // Only a live mutual connection between caller and recipient can send this.
+    if (!facts?.match?.active) return deny(403, "Forbidden");
+    const next = {};
+    if (isUuid(facts.match.conversationId)) next.conversation_id = facts.match.conversationId;
+    return {
+      ok: true,
+      title: "It's a match",
+      body: `You and ${name} connected. Say hello.`,
+      data: next,
+    };
+  }
+
   if (notificationType === "comment") {
     if (!isUuid(payload.post_id)) return deny(400, "post_id is required");
     if (!facts?.comment || facts.comment.ownerId !== recipientId) return deny(403, "Forbidden");
@@ -220,6 +233,13 @@ export async function loadUserNotificationFacts(supabase, { callerId, recipientI
     ]);
     const post = comment ? await one(supabase, "posts", [["id", payload.post_id]]) : null;
     facts.comment = comment && post ? { ownerId: post.user_id } : null;
+  } else if (notificationType === "match" && isUuid(recipientId)) {
+    const [first, second] = [callerId, recipientId].sort();
+    const match = await one(supabase, "creative_matches", [
+      ["first_id", first],
+      ["second_id", second],
+    ]);
+    facts.match = match ? { active: Boolean(match.active), conversationId: match.conversation_id ?? null } : null;
   } else if (notificationType === "live_stream" && isUuid(payload.stream_id)) {
     const stream = await one(supabase, "live_streams", [["id", payload.stream_id]]);
     const fan = await one(supabase, "favorite_friends", [

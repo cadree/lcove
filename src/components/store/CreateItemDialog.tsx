@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { errorMessage } from '@/lib/errorMessage';
 import { Plus, X, Upload, Package, Wrench, Building2 } from 'lucide-react';
 import { STORE_PLATFORM_FEE_PERCENT } from '@/lib/fees';
+import { readNumber } from "@/lib/numberField";
 
 interface CreateItemDialogProps {
   open: boolean;
@@ -174,19 +175,28 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
 
     if (type !== 'rental' && isDigital === null) { toast.error('Choose physical goods / real-world service or digital content.'); return; }
 
+    const priceRead = readNumber(price, { label: 'Price', min: 0, decimals: 2, optional: true });
+    const creditsRead = readNumber(creditsPrice, { label: 'Credits price', min: 0, integer: true, optional: true });
+    const stockRead = readNumber(inventoryCount, { label: 'Stock', min: 0, integer: true, optional: true });
+    const durationRead = readNumber(durationMinutes, { label: 'Duration', min: 1, integer: true, optional: true });
+    for (const read of [priceRead, creditsRead, type === 'product' ? stockRead : null, type === 'service' ? durationRead : null]) {
+      if (read?.error) { toast.error(read.error); return; }
+    }
+    const valueOf = (read: typeof priceRead) => read.value;
+
     const itemData = {
       is_digital: type === 'rental' ? false : isDigital,
       store_id: store.id,
       type,
       title: title.trim(),
       description: description.trim() || null,
-      price: parseFloat(price) || 0,
-      credits_price: parseInt(creditsPrice) || 0,
+      price: valueOf(priceRead) ?? 0,
+      credits_price: valueOf(creditsRead) ?? 0,
       category_id: categoryId || null,
       images,
       is_active: isActive,
-      inventory_count: type === 'product' ? (parseInt(inventoryCount) || null) : null,
-      duration_minutes: type === 'service' ? (parseInt(durationMinutes) || null) : null,
+      inventory_count: type === 'product' ? valueOf(stockRead) : null,
+      duration_minutes: type === 'service' ? valueOf(durationRead) : null,
       location: type === 'rental' ? (location.trim() || null) : null,
       amenities: type === 'rental' ? amenities : null,
       contact_email: type === 'rental' ? (contactEmail.trim() || null) : null,

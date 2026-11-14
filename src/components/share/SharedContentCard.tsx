@@ -1,3 +1,4 @@
+import { FeedVideo } from "@/components/media/FeedVideo";
 import { useNavigate } from 'react-router-dom';
 import type { MessageSharePreview } from '@/lib/sharing';
 
@@ -7,7 +8,7 @@ export function SharedContentCard({ share, compact = false }: { share: MessageSh
     <>
       {share.mediaUrl && (
         share.mediaType === 'video' ? (
-          <video src={share.mediaUrl} className={compact ? 'h-11 w-11 object-cover' : 'aspect-square w-full object-cover'} muted playsInline />
+          <FeedVideo loop={false} src={share.mediaUrl} className={compact ? 'h-11 w-11 object-cover' : 'aspect-square w-full object-cover'} />
         ) : (
           <img src={share.mediaUrl} alt="" className={compact ? 'h-11 w-11 object-cover' : 'aspect-square w-full object-cover'} />
         )

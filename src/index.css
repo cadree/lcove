@@ -1530,3 +1530,8 @@ body.ether-id-page {
 [role="dialog"] input, [role="dialog"] textarea, [role="dialog"] select {
   scroll-margin-block: 4rem;
 }
+
+/* While the keyboard is open, give the page room to scroll its last field above it. */
+html[data-keyboard-pad] body {
+  padding-bottom: var(--keyboard-inset, 0px);
+}

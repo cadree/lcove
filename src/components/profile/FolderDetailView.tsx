@@ -1,3 +1,4 @@
+import { FeedVideo } from "@/components/media/FeedVideo";
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Paintbrush, Plus, ImageIcon, Camera, Play, Check, Upload, Link, ExternalLink, Trash2 } from 'lucide-react';
@@ -364,10 +365,9 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
                 </>
               ) : item.media_type === 'video' ? (
                 <>
-                  <video
+                  <FeedVideo loop={false}
                     src={item.media_url || undefined}
                     className="w-full h-full object-cover"
-                    muted
                     preload="metadata"
                   />
                   <div className="absolute top-2 right-2">
@@ -435,10 +435,9 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
                         />
                       ) : post.media_type === 'video' ? (
                         <>
-                          <video
+                          <FeedVideo loop={false}
                             src={post.media_url || undefined}
                             className="w-full h-full object-cover"
-                            muted
                             preload="metadata"
                           />
                           <div className="absolute top-1 right-1">

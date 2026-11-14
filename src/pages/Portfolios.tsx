@@ -1,4 +1,6 @@
+import { FeedVideo } from "@/components/media/FeedVideo";
 import { useState } from "react";
+import { queueMedia } from "@/lib/queuedMedia";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
@@ -70,7 +72,6 @@ const Portfolios = () => {
       if (error) throw error;
 
       const userIds = [...new Set(portfolioPosts?.map((p) => p.user_id) || [])];
-      
       if (userIds.length === 0) return [];
 
       // Use profiles_public view to protect sensitive fields (phone)
@@ -133,41 +134,37 @@ const Portfolios = () => {
         return;
       }
 
-      let mediaUrl: string | null = null;
-
-      if (file && mediaType !== 'text') {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('media')
-          .upload(fileName, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('media')
-          .getPublicUrl(fileName);
-
-        mediaUrl = publicUrl;
+      const upload = mediaType === 'collage' ? files?.[0] : mediaType !== 'text' ? file : undefined;
+      if (upload) {
+        queueMedia({
+          queryClient,
+          userId: user.id,
+          kind: 'portfolio',
+          label: mediaType === 'video' ? 'Portfolio video' : 'Portfolio work',
+          files: [upload],
+          mediaType: mediaType === 'video' ? 'video' : 'photo',
+          content: content || null,
+          insert: async ([mediaUrl]) => {
+            const { error: insertError } = await supabase
+              .from('posts')
+              .insert({
+                user_id: user.id,
+                content: content || null,
+                media_url: mediaUrl,
+                media_type: mediaType === 'video' ? 'video' : 'photo',
+                post_type: 'portfolio',
+                location: location || null,
+                alt_text: altText || null,
+                comments_enabled: commentsEnabled,
+              });
+            if (insertError) throw insertError;
+          },
+          invalidate: [["community-portfolio-posts"], ['posts']],
+          successMessage: 'Portfolio work shared!',
+        });
+        return { queued: true as const };
       }
-
-      if (files && files.length > 0 && mediaType === 'collage') {
-        const fileExt = files[0].name.split('.').pop();
-        const fileName = `${user.id}/${Date.now()}_0.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('media')
-          .upload(fileName, files[0]);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('media')
-          .getPublicUrl(fileName);
-
-        mediaUrl = publicUrl;
-      }
+      const mediaUrl: string | null = null;
 
       const dbMediaType = mediaType === 'collage' ? 'photo' : (mediaType || 'text');
 
@@ -186,10 +183,11 @@ const Portfolios = () => {
 
       if (insertError) throw insertError;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      setShowCreateDialog(false);
+      if (result && 'queued' in result) return;
       queryClient.invalidateQueries({ queryKey: ["community-portfolio-posts"] });
       toast.success('Portfolio work shared!');
-      setShowCreateDialog(false);
     },
     onError: (error, variables) => {
       if (variables.inlineError) return;
@@ -256,10 +254,9 @@ const Portfolios = () => {
                       ) : post.media_url ? (
                         post.media_type === "video" ? (
                           <>
-                            <video
+                            <FeedVideo loop={false}
                               src={post.media_url}
                               className="absolute inset-0 w-full h-full object-cover"
-                              muted
                             />
                             <div className="absolute inset-0 flex items-center justify-center">
                               <div className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">

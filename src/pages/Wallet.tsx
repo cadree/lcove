@@ -26,6 +26,7 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { readNumber } from '@/lib/numberField';
 
 const statusColors: Record<string, string> = {
   pending: 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
@@ -81,7 +82,8 @@ const WalletPage: React.FC = () => {
   }, [searchParams, setSearchParams, toast, refetchConnect]);
 
   const handleRequestPayout = () => {
-    const amount = parseFloat(payoutAmount);
+    const read = readNumber(payoutAmount, { label: 'Amount', min: 1, decimals: 2 });
+    const amount = read.value ?? 0;
     if (!amount || amount <= 0) {
       toast({ title: 'Invalid amount', description: 'Please enter a valid amount', variant: 'destructive' });
       return;
@@ -223,6 +225,8 @@ const WalletPage: React.FC = () => {
                     placeholder="0"
                     min={1}
                     max={earnedBalance}
+                    step="0.01"
+                    inputMode="decimal"
                   />
                 </div>
 

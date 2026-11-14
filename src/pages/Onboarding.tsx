@@ -15,6 +15,8 @@ import { assertCleanText } from '@/lib/objectionableText';
 import { scoreRedFlags, clearQuizSeed, type ChoiceId } from '@/lib/onboardingQuiz';
 import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from '@/lib/onboardingDraft';
 import { takeEventReturn } from '../../functions/_shared/eventShare.js';
+import { uploadAvatar } from '@/lib/avatarUpload';
+import { FIRST_RUN_PATH } from '@/lib/firstRun';
 
 export interface OnboardingData {
   displayName: string;
@@ -36,6 +38,18 @@ const Onboarding = () => {
   const { toast } = useToast();
 
   const [currentStep, setCurrentStep] = useState(0);
+  // The photo stays in memory (drafts are text only) and uploads when onboarding finishes.
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(avatarFile);
+    setAvatarPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [avatarFile]);
   const [initialized, setInitialized] = useState(false);
   const [data, setData] = useState<OnboardingData>({
     displayName: '',
@@ -185,7 +199,16 @@ const Onboarding = () => {
       // Finishing onboarding always grants access. passed_exam records
       // whether the red-flag count stayed under the threshold.
       assertCleanText(data.memberOf);
+      let avatarUrl: string | null = null;
+      if (avatarFile) {
+        try {
+          avatarUrl = await uploadAvatar(user.id, avatarFile);
+        } catch {
+          toast({ title: 'Photo not saved', description: 'You can add one from your profile.' });
+        }
+      }
       await updateProfile({
+        ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
         display_name: data.displayName.trim(),
         member_of: normalizeMemberOf(data.memberOf),
         city: data.city,
@@ -201,7 +224,8 @@ const Onboarding = () => {
         passed_exam: passedExam,
       });
 
-      navigate(takeEventReturn() || '/feed', { replace: true });
+      // First run lands on the people deck so a new creative meets real members right away.
+      navigate(takeEventReturn() || FIRST_RUN_PATH, { replace: true });
     } catch (error) {
       console.error('Error saving onboarding data:', error);
       toast({
@@ -239,6 +263,8 @@ const Onboarding = () => {
       updateName={(name) => updateData({ displayName: name })}
       updateMemberOf={(memberOf) => updateData({ memberOf })}
       onNext={nextStep}
+      avatarPreview={avatarPreview}
+      onAvatar={setAvatarFile}
     />,
     <OnboardingPassions key="passions" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingCity key="city" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,

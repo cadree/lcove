@@ -32,9 +32,10 @@ const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
     setSelectedFile(file);
 
     // Create preview
-    const reader = new FileReader();
-    reader.onload = () => setPreview(reader.result as string);
-    reader.readAsDataURL(file);
+    setPreview((previous) => {
+      if (previous?.startsWith('blob:')) URL.revokeObjectURL(previous);
+      return URL.createObjectURL(file);
+    });
     
     // Reset input value so the same file can be selected again
     e.target.value = '';
@@ -43,12 +44,18 @@ const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
   const handleUpload = async () => {
     if (!selectedFile) return;
 
-    await uploadStory.mutateAsync({ file: selectedFile, mediaType });
-    handleClose();
+    try {
+      // Returns once the upload is queued; progress shows in the pill at the top.
+      await uploadStory.mutateAsync({ file: selectedFile, mediaType });
+      handleClose();
+    } catch {
+      // useStories already showed the error.
+    }
   };
 
   const handleClose = () => {
     setSelectedFile(null);
+    if (preview?.startsWith('blob:')) URL.revokeObjectURL(preview);
     setPreview(null);
     onOpenChange(false);
   };
@@ -163,7 +170,7 @@ const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
                     {uploadStory.isPending ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Uploading...
+                        Sharing...
                       </>
                     ) : (
                       'Share Story'

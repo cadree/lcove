@@ -11,7 +11,8 @@ type Props = Omit<ComponentProps<typeof Input>, 'value' | 'onChange' | 'type'> &
 /** Keep the draft verbatim until blur. Clicking Save blurs before its click handler. */
 export function NumberInput({ value, onValueChange, integer = false, min, max, onBlur, onKeyDown, ...props }: Props) {
   const [draft, setDraft] = useState<string | null>(null);
-  return <Input {...props} type="number"  min={min} max={max}
+  // Money fields need cents: without step="any" a form refuses 12.50 as "not a valid value".
+  return <Input step={integer ? 1 : 'any'} {...props} type="number"  min={min} max={max}
     inputMode={integer ? 'numeric' : 'decimal'}
     value={draft ?? value}
     onChange={event => setDraft(event.target.value)}

@@ -10,12 +10,56 @@ import land from "@/data/globeLand.json";
 import coordinates from "@/data/cityCoordinates.json";
 import { safeWebLink } from "@/lib/tripMoney";
 import { globeCities, type Person } from "@/lib/peopleDiscovery";
+import { MAX_ZOOM, clusterMarkers, fanOffsets, stackDepth, zoomToSplit } from "@/lib/globeMarkers";
 
 const POINTS = coordinates as Record<string, number[]>;
 
 /** Initials for a marker without photos. */
 function monogram(label: string) {
   return label.split(",")[0].slice(0, 2).toUpperCase();
+}
+
+/** One round face on the globe: a photo when there is a safe one, otherwise initials. */
+function Face({ clip, href, label, x = 0, y = 0, r, dim }: { clip: string; href?: string; label: string; x?: number; y?: number; r: number; dim?: boolean }) {
+  const photo = safeWebLink(href);
+  return (
+    <g transform={`translate(${x},${y})`} opacity={dim ? 0.92 : 1} pointerEvents="none">
+      <circle r={r + 1.5} fill="#0b0b12" />
+      <circle r={r} fill={dim ? "#433a48" : "#5d5262"} />
+      {photo ? (
+        <image href={photo} x={-r} y={-r} width={r * 2} height={r * 2} preserveAspectRatio="xMidYMid slice" clipPath={`url(#${clip})`} />
+      ) : (
+        !dim && (
+          <text y={r * 0.27} textAnchor="middle" fill="#faf4ed" fontSize={r * 0.67} fontWeight="700">
+            {monogram(label)}
+          </text>
+        )
+      )}
+    </g>
+  );
+}
+
+/** The selected group fans its faces out above the marker so it is obvious several people are there. */
+function Fan({ clip, faces, total, label }: { clip: string; faces: string[]; total: number; label: string }) {
+  const shown = faces.slice(0, 4);
+  const extra = total - shown.length;
+  const slots = fanOffsets(shown.length + (extra > 0 ? 1 : 0), 40);
+  return (
+    <g pointerEvents="none" aria-hidden>
+      {shown.map((face, i) => (
+        <Face key={face} clip={clip} href={face} label={label} x={slots[i][0]} y={slots[i][1]} r={10} />
+      ))}
+      {extra > 0 && (
+        <g transform={`translate(${slots[shown.length][0]},${slots[shown.length][1]})`}>
+          <circle r="11.5" fill="#0b0b12" />
+          <circle r="10" fill="#ff9fc8" />
+          <text y="3" textAnchor="middle" fill="#1b1520" fontSize="8" fontWeight="700">
+            +{extra > 99 ? "99" : extra}
+          </text>
+        </g>
+      )}
+    </g>
+  );
 }
 
 export function CreativeGlobe({
@@ -37,12 +81,15 @@ export function CreativeGlobe({
     me ? [-me.point[0], -me.point[1] * 0.6] : [80, -25]
   );
   const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
   const chosen = cities.find((city) => city.key === selected)?.point;
   const chosenLon = chosen?.[0];
   const chosenLat = chosen?.[1];
   useEffect(() => {
     if (chosenLon !== undefined && chosenLat !== undefined)
-      setRotation([-chosenLon, -chosenLat * 0.8]);
+      // Tilt a little on the whole globe for context; when zoomed in, centre exactly so the city stays in view.
+      setRotation([-chosenLon, -chosenLat * (zoomRef.current > 1.5 ? 1 : 0.8)]);
   }, [chosenLon, chosenLat]);
   const drag = useRef<{ x: number; y: number; rotation: [number, number] } | null>(null);
   const id = useId().replace(/:/g, "");
@@ -64,19 +111,13 @@ export function CreativeGlobe({
     return xy ? [{ ...city, xy }] : [];
   });
   // Nearby cities that would overlap fold into the biggest one; tapping a cluster zooms in.
-  type Marker = (typeof visible)[number] & { cities: number; total: number; liveTotal: number };
-  const markers: Marker[] = [];
-  for (const city of [...visible].sort((a, b) => Number(b.key === selected) - Number(a.key === selected) || b.count - a.count)) {
-    const near = markers.find((m) => Math.hypot(m.xy[0] - city.xy[0], m.xy[1] - city.xy[1]) < 36);
-    if (near) {
-      near.cities++;
-      near.total += city.count;
-      near.liveTotal += city.live;
-    } else markers.push({ ...city, cities: 1, total: city.count, liveTotal: city.live });
-  }
-  const zoomTo = (point: [number, number]) => {
-    setRotation([-point[0], -point[1]]);
-    setZoom((z) => (z < 2 ? 2.6 : z < 5 ? 6 : z));
+  const markers = clusterMarkers(visible, selected);
+  // A cluster zooms in far enough to split; at full zoom it opens its biggest city and fans its faces out.
+  const open = (marker: { key: string; cities: number; point: [number, number]; points: [number, number][] }) => {
+    if (marker.cities > 1 && zoom < MAX_ZOOM) {
+      setRotation([-marker.point[0], -marker.point[1]]);
+      setZoom(zoomToSplit(marker.points, zoom));
+    } else onSelect(marker.key);
   };
   const dot = me && facing(me.point) ? projection(me.point) : null;
   return (
@@ -113,11 +154,9 @@ export function CreativeGlobe({
             <stop offset=".9" stopColor="#79c3cf" stopOpacity=".16" />
             <stop offset="1" stopColor="#79c3cf" stopOpacity="0" />
           </radialGradient>
-          {markers.map((city) => (
-            <clipPath key={city.key} id={`${id}-${city.key.replace(/[^a-z0-9]/g, "")}`}>
-              <circle r="15" />
-            </clipPath>
-          ))}
+          <clipPath id={`${id}-face`} clipPathUnits="objectBoundingBox">
+            <circle cx=".5" cy=".5" r=".5" />
+          </clipPath>
         </defs>
         <circle cx="200" cy="200" r="200" fill={`url(#${id}-halo)`} />
         <path d={path({ type: "Sphere" }) || ""} fill={`url(#${id}-sea)`} stroke="#8c858e" strokeOpacity=".25" />
@@ -136,7 +175,6 @@ export function CreativeGlobe({
         )}
         {markers.map((city) => {
           const active = selected === city.key;
-          const photo = safeWebLink(city.avatars[0]);
           return (
             <g
               key={city.key}
@@ -150,12 +188,11 @@ export function CreativeGlobe({
                   ? `${city.label} and ${city.cities - 1} nearby ${city.cities === 2 ? "city" : "cities"}: ${city.total} members. Zoom in`
                   : `${city.label}: ${city.count} ${city.count === 1 ? "member" : "members"}${city.live ? `, ${city.live} here live` : ""}`
               }
-              onClick={() => (city.cities > 1 ? zoomTo(city.point) : onSelect(city.key))}
+              onClick={() => open(city)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  if (city.cities > 1) zoomTo(city.point);
-                  else onSelect(city.key);
+                  open(city);
                 }
               }}
               className="cursor-pointer outline-none"
@@ -167,23 +204,21 @@ export function CreativeGlobe({
                   <animate attributeName="opacity" values="1;0;1" dur="2.4s" repeatCount="indefinite" />
                 </circle>
               )}
+              {/* A group reads as a group: up to two faces stacked behind the front one. */}
+              {[2, 1].filter((n) => n <= stackDepth(city.total)).map((n) => (
+                <Face key={n} clip={`${id}-face`} href={city.faces[n]} label={city.label} x={n === 1 ? -13 : 13} y={4} r={11.5} dim />
+              ))}
               <circle r="17" fill={active ? "#ff9fc8" : "#faf4ed"} />
-              <circle r="15" fill="#5d5262" />
-              {photo ? (
-                <image
-                  href={photo}
-                  x="-15"
-                  y="-15"
-                  width="30"
-                  height="30"
-                  preserveAspectRatio="xMidYMid slice"
-                  clipPath={`url(#${id}-${city.key.replace(/[^a-z0-9]/g, "")})`}
-                />
-              ) : (
-                <text y="4" textAnchor="middle" fill="#faf4ed" fontSize="10" fontWeight="700">
-                  {monogram(city.label)}
-                </text>
+              <Face clip={`${id}-face`} href={city.faces[0]} label={city.label} r={15} />
+              {city.cities > 1 && (
+                <g transform="translate(0,26)">
+                  <rect x="-22" y="-7" width="44" height="13" rx="6.5" fill="#0b0b12" fillOpacity=".8" stroke="#faf4ed" strokeOpacity=".35" strokeWidth=".6" />
+                  <text y="2.6" textAnchor="middle" fill="#faf4ed" fontSize="7.5" fontWeight="600">
+                    {city.cities} cities
+                  </text>
+                </g>
               )}
+              {active && city.total > 1 && <Fan clip={`${id}-face`} faces={city.faces} total={city.total} label={city.label} />}
               <g transform="translate(13,-13)">
                 <circle r="8.5" fill="#ff9fc8" stroke="#0b0b12" strokeWidth="1.2" />
                 <text y="3" textAnchor="middle" fill="#1b1520" fontSize="8.5" fontWeight="700">
@@ -198,7 +233,7 @@ export function CreativeGlobe({
         {[
           ["Rotate globe west", "←", () => setRotation((r) => [r[0] - 35, r[1]])],
           ["Rotate globe east", "→", () => setRotation((r) => [r[0] + 35, r[1]])],
-          ["Zoom in", "+", () => setZoom((z) => Math.min(6, z * 1.6))],
+          ["Zoom in", "+", () => setZoom((z) => Math.min(MAX_ZOOM, z * 1.6))],
           ["Zoom out", "−", () => setZoom((z) => Math.max(1, z / 1.6))],
         ].map(([label, glyph, run]) => (
           <button

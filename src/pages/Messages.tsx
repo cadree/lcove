@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { MessageCircle, ArrowLeft } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import ConversationList from '@/components/messages/ConversationList';
+import { MessageRequests } from '@/components/messages/MessageRequests';
 import ChatView from '@/components/messages/ChatView';
 import NewChatDialog from '@/components/messages/NewChatDialog';
 import { useAuth } from '@/contexts/AuthContext';
@@ -98,6 +99,7 @@ const Messages = () => {
             onSelect={setSelectedConversation}
             onNewChat={() => setShowNewChat(true)}
             onDeleteConversation={() => setSelectedConversation(null)}
+            beforeChats={<MessageRequests onOpenChat={setSelectedConversation} />}
           />
         </motion.div>
 

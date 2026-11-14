@@ -1,4 +1,22 @@
-import { useState, useEffect, DragEvent } from "react";
+import { useState, useEffect, useRef, type CSSProperties } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
+import { Capacitor } from "@capacitor/core";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { dropStage, endOfStage, MOUSE_DRAG_DISTANCE_PX, TOUCH_HOLD_MS, TOUCH_TOLERANCE_PX } from "@/lib/pipelineDrag";
+import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Users, Plus, Search, UserPlus, GripVertical, Pencil, Check, X, Sun } from "lucide-react";
@@ -12,7 +30,7 @@ import { BackButton } from "@/components/navigation/BackButton";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import PageLayout from "@/components/layout/PageLayout";
@@ -43,8 +61,8 @@ const PipelinePage = () => {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addToStageId, setAddToStageId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
-  const [dragOverStageId, setDragOverStageId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const isMobile = useIsMobile();
   const [editingStageId, setEditingStageId] = useState<string | null>(null);
   const [editingStageName, setEditingStageName] = useState("");
 
@@ -121,10 +139,7 @@ const PipelinePage = () => {
   };
 
   const handleMoveItem = async (itemId: string, toStageId: string) => {
-    const targetItems = getItemsByStage(toStageId);
-    const newSortOrder = targetItems.length > 0
-      ? Math.max(...targetItems.map(i => i.sort_order)) + 1
-      : 0;
+    const newSortOrder = endOfStage(items, toStageId);
 
     try {
       await moveItem({ itemId, toStageId, newSortOrder });
@@ -175,43 +190,33 @@ const PipelinePage = () => {
     setEditingStageName("");
   };
 
-  // Drag and drop handlers
-  const handleDragStart = (e: DragEvent<HTMLDivElement>, itemId: string) => {
-    setDraggedItemId(itemId);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', itemId);
+  // Press-and-hold on phones, a short drag with a mouse, arrow keys from the keyboard.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: MOUSE_DRAG_DISTANCE_PX } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: TOUCH_HOLD_MS, tolerance: TOUCH_TOLERANCE_PX } }),
+    // Space picks a card up so Enter can keep opening it.
+    useSensor(KeyboardSensor, { keyboardCodes: { start: ['Space'], cancel: ['Escape'], end: ['Space', 'Enter'] } }),
+  );
+
+  const handleDragStart = ({ active }: DragStartEvent) => {
+    setActiveId(String(active.id));
+    if (Capacitor.isNativePlatform()) void Haptics.impact({ style: ImpactStyle.Light }).catch(() => undefined);
+    else navigator.vibrate?.(10);
   };
 
-  const handleDragEnd = () => {
-    setDraggedItemId(null);
-    setDragOverStageId(null);
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    setActiveId(null);
+    const itemId = String(active.id);
+    const toStageId = dropStage(itemId, over ? String(over.id) : null, items, stages.map((stage) => stage.id));
+    if (!toStageId) return;
+    const stageName = stages.find((stage) => stage.id === toStageId)?.name;
+    void handleMoveItem(itemId, toStageId).then(
+      () => toast.success(stageName ? `Moved to ${stageName}` : "Contact moved"),
+      () => undefined,
+    );
   };
 
-  const handleDragOver = (e: DragEvent<HTMLDivElement>, stageId: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverStageId(stageId);
-  };
-
-  const handleDragLeave = () => {
-    setDragOverStageId(null);
-  };
-
-  const handleDrop = async (e: DragEvent<HTMLDivElement>, toStageId: string) => {
-    e.preventDefault();
-    const itemId = e.dataTransfer.getData('text/plain');
-
-    if (itemId && draggedItemId) {
-      const item = items.find(i => i.id === itemId);
-      if (item && item.stage_id !== toStageId) {
-        await handleMoveItem(itemId, toStageId);
-        toast.success("Contact moved");
-      }
-    }
-
-    setDraggedItemId(null);
-    setDragOverStageId(null);
-  };
+  const activeItem = activeId ? items.find((item) => item.id === activeId) ?? null : null;
 
   const totalContacts = items.length;
 
@@ -299,77 +304,55 @@ const PipelinePage = () => {
             </Card>
           ) : (
             <>
-              {/* Desktop: Full width columns */}
-              <div className="hidden md:grid gap-4" style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(280px, 1fr))` }}>
-                {stages.map((stage) => {
-                  const stageItems = filterItems(getItemsByStage(stage.id));
-                  return (
-                    <PipelineColumn
-                      key={stage.id}
-                      stageId={stage.id}
-                      name={stage.name}
-                      color={stage.color}
-                      items={stageItems}
-                      onItemClick={setSelectedItem}
-                      onAddClick={() => openAddDialog(stage.id)}
-                      isDragOver={dragOverStageId === stage.id}
-                      onDragOver={(e) => handleDragOver(e, stage.id)}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => handleDrop(e, stage.id)}
-                      onDragStart={handleDragStart}
-                      onDragEnd={handleDragEnd}
-                      draggedItemId={draggedItemId}
-                      isEditingName={editingStageId === stage.id}
-                      editingName={editingStageName}
-                      onStartEditName={() => handleStartEditStageName(stage.id, stage.name)}
-                      onEditingNameChange={setEditingStageName}
-                      onSaveEditName={handleSaveStageName}
-                      onCancelEditName={handleCancelEditStageName}
-                      stages={stages}
-                      onMove={handleMoveItem}
-                    />
-                  );
-                })}
-              </div>
-
-              {/* Mobile: Horizontal scroll */}
-              <div className="md:hidden">
-                <ScrollArea className="w-full whitespace-nowrap">
-                  <div className="flex gap-4 pb-4">
-                    {stages.map((stage) => {
-                      const stageItems = filterItems(getItemsByStage(stage.id));
-                      return (
-                        <div key={stage.id} className="w-[300px] flex-shrink-0">
-                        <PipelineColumn
-                          stageId={stage.id}
-                          name={stage.name}
-                          color={stage.color}
-                          items={stageItems}
-                          onItemClick={setSelectedItem}
-                          onAddClick={() => openAddDialog(stage.id)}
-                          isDragOver={dragOverStageId === stage.id}
-                          onDragOver={(e) => handleDragOver(e, stage.id)}
-                          onDragLeave={handleDragLeave}
-                          onDrop={(e) => handleDrop(e, stage.id)}
-                          onDragStart={handleDragStart}
-                          onDragEnd={handleDragEnd}
-                          draggedItemId={draggedItemId}
-                          isEditingName={editingStageId === stage.id}
-                          editingName={editingStageName}
-                          onStartEditName={() => handleStartEditStageName(stage.id, stage.name)}
-                          onEditingNameChange={setEditingStageName}
-                          onSaveEditName={handleSaveStageName}
-                          onCancelEditName={handleCancelEditStageName}
-                          stages={stages}
-                          onMove={handleMoveItem}
-                        />
-                      </div>
-                      );
-                    })}
-                  </div>
-                  <ScrollBar orientation="horizontal" />
-                </ScrollArea>
-              </div>
+              <DndContext
+                sensors={sensors}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDragCancel={() => setActiveId(null)}
+                autoScroll={{ threshold: { x: 0.18, y: 0.12 }, acceleration: 8 }}
+              >
+                <div
+                  className={cn(
+                    isMobile
+                      ? "-mx-4 flex gap-3 overflow-x-auto overscroll-x-contain px-4 pb-4 scroll-px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                      : "grid gap-4",
+                    // Snap fights auto-scroll, so it is off while a card is held.
+                    isMobile && !activeId && "snap-x snap-mandatory",
+                  )}
+                  style={isMobile ? undefined : { gridTemplateColumns: `repeat(${stages.length}, minmax(260px, 1fr))` }}
+                  data-pipeline-board=""
+                >
+                  {stages.map((stage) => (
+                    <div key={stage.id} className={isMobile ? "w-[82vw] max-w-[320px] shrink-0 snap-start" : "min-w-0"}>
+                      <PipelineColumn
+                        stageId={stage.id}
+                        name={stage.name}
+                        color={stage.color}
+                        items={filterItems(getItemsByStage(stage.id))}
+                        onItemClick={setSelectedItem}
+                        onAddClick={() => openAddDialog(stage.id)}
+                        dragging={activeId !== null}
+                        activeId={activeId}
+                        isEditingName={editingStageId === stage.id}
+                        editingName={editingStageName}
+                        onStartEditName={() => handleStartEditStageName(stage.id, stage.name)}
+                        onEditingNameChange={setEditingStageName}
+                        onSaveEditName={handleSaveStageName}
+                        onCancelEditName={handleCancelEditStageName}
+                        stages={stages}
+                        onMove={handleMoveItem}
+                        mobile={isMobile}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>
+                  {activeItem ? <ContactCardFace item={activeItem} lifted /> : null}
+                </DragOverlay>
+              </DndContext>
+              {isMobile && stages.length > 1 && (
+                <p className="mt-1 text-center text-[11px] text-muted-foreground">Hold a contact to drag it to another column, or tap Move.</p>
+              )}
             </>
           )}
         </div>
@@ -429,13 +412,8 @@ interface PipelineColumnProps {
   items: PipelineItem[];
   onItemClick: (item: PipelineItem) => void;
   onAddClick: () => void;
-  isDragOver: boolean;
-  onDragOver: (e: DragEvent<HTMLDivElement>) => void;
-  onDragLeave: () => void;
-  onDrop: (e: DragEvent<HTMLDivElement>) => void;
-  onDragStart: (e: DragEvent<HTMLDivElement>, itemId: string) => void;
-  onDragEnd: () => void;
-  draggedItemId: string | null;
+  dragging: boolean;
+  activeId: string | null;
   isEditingName: boolean;
   editingName: string;
   onStartEditName: () => void;
@@ -444,6 +422,7 @@ interface PipelineColumnProps {
   onCancelEditName: () => void;
   stages: PipelineStage[];
   onMove: (itemId: string, toStageId: string) => Promise<void>;
+  mobile: boolean;
 }
 
 function PipelineColumn({
@@ -453,13 +432,8 @@ function PipelineColumn({
   items,
   onItemClick,
   onAddClick,
-  isDragOver,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onDragStart,
-  onDragEnd,
-  draggedItemId,
+  dragging,
+  activeId,
   isEditingName,
   editingName,
   onStartEditName,
@@ -468,15 +442,20 @@ function PipelineColumn({
   onCancelEditName,
   stages,
   onMove,
+  mobile,
 }: PipelineColumnProps) {
+  const { setNodeRef, isOver } = useDroppable({ id: stageId });
+  const isDragOver = isOver && !items.some((item) => item.id === activeId);
   return (
     <Card
-      className={`bg-muted/20 border-border/40 overflow-hidden flex flex-col h-[calc(100vh-200px)] transition-all duration-200 ${
-        isDragOver ? 'ring-2 ring-primary bg-primary/5' : ''
-      }`}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
+      ref={setNodeRef}
+      data-stage-column={name}
+      className={cn(
+        "flex flex-col overflow-hidden border-border/40 bg-muted/20 transition-[box-shadow,background-color] duration-200",
+        mobile ? "h-[calc(100dvh-16.5rem-env(safe-area-inset-bottom,0px))] min-h-[22rem]" : "h-[calc(100vh-200px)]",
+        isDragOver && "bg-primary/5 ring-2 ring-primary",
+        dragging && !isDragOver && "ring-1 ring-border/60",
+      )}
     >
       {/* Column Header */}
       <div className="px-4 py-3 border-b border-border/50 flex items-center justify-between shrink-0">
@@ -494,14 +473,15 @@ function PipelineColumn({
                   if (e.key === 'Enter') onSaveEditName();
                   if (e.key === 'Escape') onCancelEditName();
                 }}
-                className="h-7 text-sm px-2"
+                className="h-9 text-sm px-2"
+                aria-label="Stage name"
                 autoFocus
               />
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onSaveEditName}>
-                <Check className="w-3 h-3" />
+              <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Save stage name" onClick={onSaveEditName}>
+                <Check className="w-4 h-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onCancelEditName}>
-                <X className="w-3 h-3" />
+              <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Cancel" onClick={onCancelEditName}>
+                <X className="w-4 h-4" />
               </Button>
             </div>
           ) : (
@@ -520,7 +500,8 @@ function PipelineColumn({
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 hover:bg-primary/10 hover:text-primary shrink-0"
+          className="h-9 w-9 hover:bg-primary/10 hover:text-primary shrink-0"
+          aria-label={`Add contact to ${name}`}
           onClick={onAddClick}
         >
           <Plus className="w-4 h-4" />
@@ -531,20 +512,20 @@ function PipelineColumn({
       <ScrollArea className="flex-1">
         <div className="p-3 space-y-2">
           {items.length === 0 ? (
-            <PipelineEmptyState onAddClick={onAddClick} isDragOver={isDragOver} />
+            <PipelineEmptyState onAddClick={onAddClick} isDragOver={isDragOver} dragging={dragging} />
           ) : (
             items.map((item) => (
               <PipelineContactCard
                 key={item.id}
                 item={item}
                 onClick={() => onItemClick(item)}
-                onDragStart={onDragStart}
-                onDragEnd={onDragEnd}
-                isDragging={draggedItemId === item.id}
                 stages={stages}
                 onMove={onMove}
               />
             ))
+          )}
+          {items.length > 0 && isDragOver && (
+            <div className="rounded-lg border-2 border-dashed border-primary/60 bg-primary/5 py-4 text-center text-xs text-primary">Drop here</div>
           )}
         </div>
       </ScrollArea>
@@ -553,22 +534,23 @@ function PipelineColumn({
 }
 
 // Empty state
-function PipelineEmptyState({ onAddClick, isDragOver }: { onAddClick: () => void; isDragOver?: boolean }) {
+function PipelineEmptyState({ onAddClick, isDragOver, dragging }: { onAddClick: () => void; isDragOver?: boolean; dragging?: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className={`flex flex-col items-center justify-center py-8 px-4 text-center rounded-lg border-2 border-dashed transition-colors ${
-        isDragOver ? 'border-primary bg-primary/5' : 'border-transparent'
-      }`}
+      className={cn(
+        "flex flex-col items-center justify-center rounded-lg border-2 border-dashed py-8 px-4 text-center transition-colors",
+        isDragOver ? "border-primary bg-primary/5" : dragging ? "border-border/70" : "border-transparent",
+      )}
     >
       <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-3">
         <UserPlus className="w-6 h-6 text-muted-foreground/60" />
       </div>
       <p className="text-sm text-muted-foreground mb-3">
-        {isDragOver ? 'Drop here to move' : 'No contacts yet'}
+        {isDragOver ? 'Drop here to move' : dragging ? 'Drop a contact here' : 'No contacts yet'}
       </p>
-      {!isDragOver && (
+      {!dragging && (
         <Button
           variant="outline"
           size="sm"
@@ -583,99 +565,109 @@ function PipelineEmptyState({ onAddClick, isDragOver }: { onAddClick: () => void
   );
 }
 
-interface PipelineContactCardProps {
-  item: PipelineItem;
-  onClick: () => void;
-  onDragStart: (e: DragEvent<HTMLDivElement>, itemId: string) => void;
-  onDragEnd: () => void;
-  isDragging: boolean;
-  stages: PipelineStage[];
-  onMove: (itemId: string, toStageId: string) => Promise<void>;
-}
+const AVATAR_COLORS = ['bg-primary', 'bg-blue-500', 'bg-green-500', 'bg-amber-500', 'bg-purple-500', 'bg-rose-500', 'bg-cyan-500'];
+const PRIORITY_COLORS = { high: 'bg-red-500', medium: 'bg-amber-500', low: 'bg-green-500' };
 
-function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging, stages, onMove }: PipelineContactCardProps) {
-  // Generate initials from name
-  const initials = item.name
-    .split(' ')
-    .map(word => word[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-
-  // Generate a consistent color based on the name
-  const colors = [
-    'bg-primary',
-    'bg-blue-500',
-    'bg-green-500',
-    'bg-amber-500',
-    'bg-purple-500',
-    'bg-rose-500',
-    'bg-cyan-500',
-  ];
-  const colorIndex = item.name.charCodeAt(0) % colors.length;
-  const avatarColor = colors[colorIndex];
-
-  // Build subtitle from available info
+/** The visible card, shared by the column and the lifted copy under the finger. */
+function ContactCardFace({ item, lifted = false, move }: { item: PipelineItem; lifted?: boolean; move?: React.ReactNode }) {
+  const initials = item.name.split(' ').map((word) => word[0]).slice(0, 2).join('').toUpperCase();
+  const avatarColor = AVATAR_COLORS[item.name.charCodeAt(0) % AVATAR_COLORS.length];
   const subtitleParts = [];
   if (item.role) subtitleParts.push(item.role);
   if (item.company) subtitleParts.push(item.company);
   if (!item.role && !item.company && item.email) subtitleParts.push(item.email);
   const subtitle = subtitleParts.join(' • ');
+  return (
+    <Card
+      className={cn(
+        "p-3 border-border/50 bg-background/80 transition-all duration-200",
+        lifted ? "rotate-[1.5deg] scale-[1.03] border-primary/50 shadow-[0_18px_40px_-12px_rgba(0,0,0,0.6)]" : "hover:bg-accent/30 hover:border-primary/30",
+      )}
+    >
+      <div className="flex items-center gap-3">
+        <div className="text-muted-foreground/40 shrink-0" aria-hidden>
+          <GripVertical className="w-4 h-4" />
+        </div>
+        <div className="relative shrink-0">
+          <Avatar className="w-10 h-10">
+            <AvatarImage src={item.avatar_url || undefined} />
+            <AvatarFallback className={`${avatarColor} text-white text-sm font-semibold`}>
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          {item.priority && (
+            <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${PRIORITY_COLORS[item.priority]} border-2 border-background`} />
+          )}
+          {item.linked_user_id && (
+            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
+              <Check className="w-2 h-2 text-white" />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-sm text-foreground truncate">{item.name}</p>
+          {subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
+        </div>
+        {move}
+      </div>
+    </Card>
+  );
+}
 
-  // Priority indicator color
-  const priorityColors = {
-    high: 'bg-red-500',
-    medium: 'bg-amber-500',
-    low: 'bg-green-500'
+interface PipelineContactCardProps {
+  item: PipelineItem;
+  onClick: () => void;
+  stages: PipelineStage[];
+  onMove: (itemId: string, toStageId: string) => Promise<void>;
+}
+
+const stopDrag = {
+  onPointerDown: (event: React.SyntheticEvent) => event.stopPropagation(),
+  onMouseDown: (event: React.SyntheticEvent) => event.stopPropagation(),
+  onTouchStart: (event: React.SyntheticEvent) => event.stopPropagation(),
+  onKeyDown: (event: React.KeyboardEvent) => event.stopPropagation(),
+};
+
+function PipelineContactCard({ item, onClick, stages, onMove }: PipelineContactCardProps) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id });
+  // A finished drag also ends with a click; that click must not open the contact.
+  const wasDragging = useRef(false);
+  useEffect(() => {
+    if (isDragging) wasDragging.current = true;
+  }, [isDragging]);
+  const style: CSSProperties = {
+    // Long-press must not open the iOS callout or select text.
+    WebkitTouchCallout: "none",
+    WebkitUserSelect: "none",
+    userSelect: "none",
+    touchAction: "manipulation",
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: isDragging ? 0.5 : 1, y: 0 }}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      draggable
-      onDragStart={(e) => onDragStart(e as unknown as DragEvent<HTMLDivElement>, item.id)}
-      onDragEnd={onDragEnd}
-      className={`cursor-grab active:cursor-grabbing ${isDragging ? 'opacity-50' : ''}`}
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      aria-roledescription="Draggable contact"
+      aria-label={`${item.name}. Hold and drag to move, or use the Move button.`}
+      data-contact-card={item.name}
+      style={style}
+      className={cn("cursor-grab rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary active:cursor-grabbing", isDragging && "opacity-30")}
+      onClick={() => {
+        if (wasDragging.current) {
+          wasDragging.current = false;
+          return;
+        }
+        onClick();
+      }}
+      onKeyDown={(event) => {
+        listeners?.onKeyDown?.(event);
+        if (event.key === 'Enter' && !event.defaultPrevented) onClick();
+      }}
     >
-      <Card
-        className="p-3 bg-background/80 hover:bg-accent/30 transition-all duration-200 border-border/50 hover:border-primary/30"
-        onClick={onClick}
-      >
-        <div className="flex items-center gap-3">
-          {/* Drag Handle */}
-          <div className="text-muted-foreground/40 hover:text-muted-foreground shrink-0">
-            <GripVertical className="w-4 h-4" />
-          </div>
-
-          {/* Avatar */}
-          <div className="relative shrink-0">
-            <Avatar className="w-10 h-10">
-              <AvatarImage src={item.avatar_url || undefined} />
-              <AvatarFallback className={`${avatarColor} text-white text-sm font-semibold`}>
-                {initials}
-              </AvatarFallback>
-            </Avatar>
-            {item.priority && (
-              <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${priorityColors[item.priority]} border-2 border-background`} />
-            )}
-            {item.linked_user_id && (
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
-                <Check className="w-2 h-2 text-white" />
-              </div>
-            )}
-          </div>
-
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm text-foreground truncate">{item.name}</p>
-            {subtitle && (
-              <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
-            )}
-          </div>
-
+      <ContactCardFace
+        item={item}
+        move={(
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -684,8 +676,7 @@ function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging
                 size="sm"
                 className="h-11 shrink-0 px-3"
                 aria-label={`Move ${item.name}`}
-                draggable={false}
-                onPointerDown={(event) => event.stopPropagation()}
+                {...stopDrag}
                 onClick={(event) => event.stopPropagation()}
               >
                 Move
@@ -700,7 +691,7 @@ function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging
                     if (stage.id === item.stage_id) return;
                     void onMove(item.id, stage.id).then(() => {
                       toast.success(`Moved to ${stage.name}`);
-                    });
+                    }, () => undefined);
                   }}
                 >
                   {stage.name}
@@ -708,9 +699,9 @@ function PipelineContactCard({ item, onClick, onDragStart, onDragEnd, isDragging
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
-      </Card>
-    </motion.div>
+        )}
+      />
+    </div>
   );
 }
 

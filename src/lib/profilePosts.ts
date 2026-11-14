@@ -11,6 +11,9 @@ export const PROFILE_POST_COLUMNS_BASE =
 export const PROFILE_POST_COLUMNS =
   `${PROFILE_POST_COLUMNS_BASE}, embed_provider, embed_video_id, embed_hash, embed_thumbnail_url, embed_title`;
 
+/** With the video cover column from 20261114150000. */
+export const PROFILE_POST_COLUMNS_COVER = `${PROFILE_POST_COLUMNS}, thumbnail_url`;
+
 export interface ProfilePostRow extends StoredEmbedFields {
   id: string;
   user_id: string;
@@ -23,6 +26,7 @@ export interface ProfilePostRow extends StoredEmbedFields {
   alt_text?: string | null;
   comments_enabled?: boolean | null;
   folder_id?: string | null;
+  thumbnail_url?: string | null;
 }
 
 /** Profile posts include caption-only posts and video-link posts. media_url is not required. */
@@ -81,6 +85,7 @@ export function profilePostFromRow(
     embed_hash: post.embed_hash ?? null,
     embed_thumbnail_url: post.embed_thumbnail_url ?? null,
     embed_title: post.embed_title ?? null,
+    thumbnail_url: post.thumbnail_url ?? null,
     profile: author ?? { display_name: null, avatar_url: null },
     grid_key: post.id,
     repost: null as null,
@@ -96,6 +101,8 @@ type ProfileColumnResult<T> = {
 export async function withProfilePostColumns<T>(
   run: (columns: string) => PromiseLike<ProfileColumnResult<T>>,
 ): Promise<ProfileColumnResult<T>> {
+  const withCover = await run(PROFILE_POST_COLUMNS_COVER);
+  if (!withCover.error || !/thumbnail_url/.test(withCover.error.message ?? "")) return withCover;
   const full = await run(PROFILE_POST_COLUMNS);
   if (!full.error || !embedColumnMissing(full.error)) return full;
   return run(PROFILE_POST_COLUMNS_BASE);

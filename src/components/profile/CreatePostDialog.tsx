@@ -102,12 +102,8 @@ export function CreatePostDialog({
     setLinkUrl("");
     setEmbed(null);
     
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setMediaPreviews([reader.result as string]);
-      setCurrentStep('preview');
-    };
-    reader.readAsDataURL(file);
+    setMediaPreviews([URL.createObjectURL(file)]);
+    setCurrentStep('preview');
   };
 
   const handleMultiFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -117,21 +113,8 @@ export function CreatePostDialog({
     setSelectedFiles(files);
     setMediaType(files.length > 1 ? 'collage' : 'photo');
 
-    const previews: string[] = [];
-    let loadedCount = 0;
-
-    files.forEach((file, index) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        previews[index] = reader.result as string;
-        loadedCount++;
-        if (loadedCount === files.length) {
-          setMediaPreviews(previews);
-          setCurrentStep('preview');
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    setMediaPreviews(files.map((file) => URL.createObjectURL(file)));
+    setCurrentStep('preview');
   };
 
   const handleAddMoreImages = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,13 +125,7 @@ export function CreatePostDialog({
 
     const newFilesToAdd = totalFiles.slice(selectedFiles.length);
     
-    newFilesToAdd.forEach((file) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setMediaPreviews(prev => [...prev, reader.result as string].slice(0, MAX_COLLAGE_IMAGES));
-      };
-      reader.readAsDataURL(file);
-    });
+    setMediaPreviews(prev => [...prev, ...newFilesToAdd.map((file) => URL.createObjectURL(file))].slice(0, MAX_COLLAGE_IMAGES));
 
     setSelectedFiles(totalFiles);
     if (totalFiles.length > 1) {

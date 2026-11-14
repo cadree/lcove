@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { FeedVideo } from "@/components/media/FeedVideo";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import FeedPost from "@/components/feed/FeedPost";
 import { usePosts } from "@/hooks/usePosts";
-import { useStories } from "@/hooks/useStories";
+import { FeedEngagementProvider } from "@/hooks/useFeedEngagement";
 import { browsePosts, collectReels, growVisibleCount, matchesBrowseQuery } from "@/lib/exploreBrowse";
 
 const PAGE = 4;
@@ -15,16 +16,17 @@ const lanes: { id: Lane; label: string }[] = [
   { id: "portfolios", label: "Portfolios" },
 ];
 
-export function ExploreBrowse({ query }: { query: string }) {
+/** With `heading` (Explore > For you) the whole block hides when there is nothing to browse. */
+export function ExploreBrowse({ query, heading }: { query: string; heading?: ReactNode }) {
   const [lane, setLane] = useState<Lane>("reels");
   const [visible, setVisible] = useState(PAGE);
   const sentinel = useRef<HTMLDivElement>(null);
   const { posts, isLoading: postsLoading } = usePosts();
-  const { stories, isLoading: storiesLoading } = useStories();
 
+  // Reels are video posts. Stories stay in the story tray and expire there.
   const reels = useMemo(() => {
-    return collectReels(stories, posts).filter((reel) => matchesBrowseQuery(reel.name, "", query));
-  }, [stories, posts, query]);
+    return collectReels(posts).filter((reel) => matchesBrowseQuery(reel.name, "", query));
+  }, [posts, query]);
 
   const lanePosts = useMemo(() => {
     const selected = browsePosts(posts, lane === "portfolios" ? "portfolios" : "posts");
@@ -53,10 +55,13 @@ export function ExploreBrowse({ query }: { query: string }) {
     return () => observer.disconnect();
   }, [total, lane, visible]);
 
-  const loading = postsLoading || storiesLoading;
+  const loading = postsLoading;
+  const empty = !loading && reels.length === 0 && browsePosts(posts, "posts").length === 0 && browsePosts(posts, "portfolios").length === 0;
+  if (heading !== undefined && empty) return null;
 
   return (
     <section aria-label="Browse" className="min-w-0">
+      {heading}
       <div className="mb-3 flex gap-2 overflow-x-auto scrollbar-hide">
         {lanes.map((item) => {
           const active = lane === item.id;
@@ -82,18 +87,16 @@ export function ExploreBrowse({ query }: { query: string }) {
         </div>
       ) : lane === "reels" ? (
         reels.length === 0 ? (
-          <EmptyCopy title="No reels yet" detail="Video stories and video posts from other people show up here." />
+          <EmptyCopy title="No reels yet" detail="Video posts from other people show up here." />
         ) : (
           <div className="h-[calc(100dvh-13.5rem)] min-h-[28rem] snap-y snap-mandatory overflow-y-auto rounded-[18px] bg-black">
             {shownReels.map((reel) => (
               <article key={reel.key} className="relative h-full min-h-full snap-start">
-                <video
+                <FeedVideo
                   src={reel.mediaUrl}
                   className="h-full w-full object-contain"
-                  playsInline
-                  muted
-                  loop
-                  autoPlay
+                  preload="auto"
+                  playWhenVisible
                 />
                 <Link
                   to={`/profile/${reel.userId}`}
@@ -113,6 +116,8 @@ export function ExploreBrowse({ query }: { query: string }) {
           detail={lane === "portfolios" ? "Portfolio posts open the creator's profile." : "Posts from the feed open the creator's profile."}
         />
       ) : (
+        // FeedPost reads likes and saves from this provider; without it the lane threw.
+        <FeedEngagementProvider postIds={shownPosts.map((post) => post.id)}>
         <div className="space-y-4">
           {shownPosts.map((post) => (
             <div key={post.id}>
@@ -127,6 +132,7 @@ export function ExploreBrowse({ query }: { query: string }) {
           ))}
           <div ref={sentinel} className="h-1" />
         </div>
+        </FeedEngagementProvider>
       )}
     </section>
   );

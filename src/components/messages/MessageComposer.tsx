@@ -34,9 +34,8 @@ const MessageComposer = ({ onSend, onTyping, isSending }: MessageComposerProps) 
     setSelectedFile(file);
 
     if (type !== 'audio') {
-      const reader = new FileReader();
-      reader.onload = () => setPreview(reader.result as string);
-      reader.readAsDataURL(file);
+      // A blob URL points at the file; a data URL would copy a whole video into memory.
+      setPreview(URL.createObjectURL(file));
     } else {
       setPreview(file.name);
     }

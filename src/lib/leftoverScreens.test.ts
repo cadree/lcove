@@ -38,6 +38,7 @@ describe("leftover screens", () => {
     const pipeline = source("pages/Pipeline.tsx");
     assert.match(pipeline, /aria-label=\{`Move \$\{item\.name\}`\}/);
     assert.match(pipeline, /DropdownMenuItem/);
-    assert.match(pipeline, /\bdraggable\b/);
+    assert.match(pipeline, /useDraggable/);
+    assert.match(pipeline, /TouchSensor/);
   });
 });

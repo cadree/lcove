@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useContactQuotes, ContactQuote } from "@/hooks/useContactQuotes";
 import { toast } from "sonner";
+import { readNumber } from "@/lib/numberField";
 
 interface ContactQuotesSectionProps {
   pipelineItemId: string;
@@ -31,11 +32,17 @@ export function ContactQuotesSection({ pipelineItemId }: ContactQuotesSectionPro
       return;
     }
 
+    const amount = readNumber(newQuote.amount, { label: "Amount", min: 0, decimals: 2 });
+    if (amount.error || amount.value === null) {
+      toast.error(amount.error ?? "Enter amount");
+      return;
+    }
+
     try {
       await createQuote({
         title: newQuote.title.trim(),
         description: newQuote.description.trim() || undefined,
-        amount: parseFloat(newQuote.amount),
+        amount: amount.value,
         currency: newQuote.currency,
       });
       setIsDialogOpen(false);
@@ -130,6 +137,9 @@ export function ContactQuotesSection({ pipelineItemId }: ContactQuotesSectionPro
                   <Input
                     id="quote-amount"
                     type="number"
+                    step="0.01"
+                    min="0"
+                    inputMode="decimal"
                     value={newQuote.amount}
                     onChange={(e) => setNewQuote({ ...newQuote, amount: e.target.value })}
                     placeholder="0.00"

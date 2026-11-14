@@ -163,7 +163,7 @@ describe("image check wiring", () => {
     assert.match(client, /retractFlaggedImage/);
     assert.match(source("../App.tsx"), /ether-image-removed/);
     const reviewAt = client.indexOf("const reviewPromise = reviewImageUpload");
-    const uploadAt = client.indexOf("const result = await originalUpload");
+    const uploadAt = client.indexOf("const result = await send(body, options)");
     assert.ok(reviewAt > 0 && reviewAt < uploadAt);
   });
 });

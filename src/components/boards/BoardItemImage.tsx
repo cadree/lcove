@@ -122,7 +122,7 @@ export function BoardItemImage({ content, onChange }: BoardItemImageProps) {
         {url ? (
           <div className="relative group" data-expand-media>
             {mediaType === 'video' ? (
-              <video
+              <video preload="metadata"
                 src={url}
                 controls
                 className="w-full h-auto rounded-md object-contain max-h-48"
@@ -217,7 +217,7 @@ export function BoardItemImage({ content, onChange }: BoardItemImageProps) {
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-2 sm:p-4 bg-black/95 border-white/10">
           <div className="flex items-center justify-center w-full h-full">
             {mediaType === 'video' ? (
-              <video
+              <video preload="metadata"
                 src={url}
                 controls
                 autoPlay

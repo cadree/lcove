@@ -1,3 +1,4 @@
+import { FeedVideo } from "@/components/media/FeedVideo";
 import { motion } from "framer-motion";
 import { Play, ImageIcon, Repeat2, Eye } from "lucide-react";
 import { ProfilePost } from "@/types/post";
@@ -6,6 +7,7 @@ import { useOwnPostViewCounts } from "@/hooks/usePostViews";
 import { gridViewCount } from "@/lib/sharing";
 import { EmbedThumbnail } from "@/components/feed/EmbedPlayer";
 import { embedFromPost } from "@/lib/videoEmbed";
+import { useCoverBackfill } from "@/hooks/useCoverBackfill";
 
 interface ProfilePostsGridProps {
   posts: ProfilePost[];
@@ -72,12 +74,7 @@ export function ProfilePostsGrid({ posts, onPostClick, isLoading, isOwner = fals
             </>
           ) : post.media_url && post.media_type === 'video' ? (
             <>
-              <video
-                src={post.media_url}
-                className="w-full h-full object-cover"
-                muted
-                preload="metadata"
-              />
+              <VideoTile post={post} ownerId={isOwner ? post.user_id : undefined} />
               <div className="absolute top-2 right-2">
                 <Play className="w-4 h-4 text-white drop-shadow-lg" fill="white" />
               </div>
@@ -110,4 +107,12 @@ export function ProfilePostsGrid({ posts, onPostClick, isLoading, isOwner = fals
       })}
     </div>
   );
+}
+
+/** Saved cover when there is one; otherwise a frame 1s in (frame 0 is often black). */
+function VideoTile({ post, ownerId }: { post: ProfilePost; ownerId?: string }) {
+  const backfilled = useCoverBackfill(post, post.repost ? undefined : ownerId);
+  const cover = post.thumbnail_url || backfilled;
+  if (cover) return <img src={cover} alt={post.content || "Video"} className="h-full w-full object-cover" loading="lazy" />;
+  return <FeedVideo src={post.media_url} className="h-full w-full object-cover" loop={false} frameAt={1} />;
 }

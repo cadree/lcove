@@ -28,6 +28,8 @@ export interface DiscoverySignal {
   live_city_key: string | null;
   live_until: string | null;
   trip: TripBadge | null;
+  /** Server-chosen deck position (lower first). Never shown; older servers omit it. */
+  deck?: number | null;
 }
 
 export interface Place {
@@ -44,6 +46,7 @@ export interface Person extends Member {
   /** On the globe and in the swipe deck. False for members who hid themselves. */
   discoverable: boolean;
   liked: boolean | null;
+  deck?: number | null;
 }
 
 export interface GlobeCity extends Place {
@@ -86,6 +89,7 @@ export function buildPeople(members: Member[], signals: DiscoverySignal[] | unde
       trip: signal?.trip || null,
       discoverable: !!signal,
       liked: signal?.liked ?? null,
+      deck: signal?.deck ?? null,
     });
   }
   return people;
@@ -173,12 +177,14 @@ export function globeCities(people: Person[], coordinates: Record<string, number
   return [...cities.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
-/** Swipe deck: discoverable people other than me, ones I have not decided on first. */
+const deckPos = (p: Person) => p.deck ?? Number.MAX_SAFE_INTEGER;
+
+/** Swipe deck: discoverable people other than me, ones I have not decided on first, then the server's deck order. */
 export function deckFor(people: Person[], me: string | undefined, city: string | null, query: string): Person[] {
   const rank = (p: Person) => (p.liked === null ? 0 : p.liked ? 1 : 2);
   return people
     .filter((p) => p.discoverable && p.user_id !== me && inCity(p, city) && matchesQuery(p, query))
-    .sort((a, b) => rank(a) - rank(b) || Number(!!b.live) - Number(!!a.live));
+    .sort((a, b) => rank(a) - rank(b) || deckPos(a) - deckPos(b) || Number(!!b.live) - Number(!!a.live));
 }
 
 /** The member list: everyone, including members hidden from the globe. */

@@ -13,6 +13,7 @@ import { isUsStorefront } from "@/lib/iosStorefront";
 import { errorMessage } from "@/lib/errorMessage";
 import { ETHER_WEB_ORIGIN, isIosApp } from "@/lib/platform";
 import { supportCadenceLabel, supportCheckoutLabel } from "@/lib/supportCopy";
+import { readNumber } from "@/lib/numberField";
 
 const PRESET_AMOUNTS = [5, 10, 25, 50];
 
@@ -25,7 +26,8 @@ export function DonateDialog({ children }: { children: React.ReactNode }) {
   const [isCustom, setIsCustom] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const effectiveAmount = isCustom ? Number(customAmount) : amount;
+  const customRead = readNumber(customAmount, { label: "Amount", decimals: 2, optional: true });
+  const effectiveAmount = isCustom ? (customRead.value ?? 0) : amount;
 
   const handleDonate = async () => {
     const ios = isIosApp();
@@ -134,6 +136,8 @@ export function DonateDialog({ children }: { children: React.ReactNode }) {
               <Input
                 type="number"
                 min={1}
+                step="0.01"
+                inputMode="decimal"
                 placeholder="Custom amount"
                 className="pl-7"
                 value={customAmount}

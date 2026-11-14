@@ -24,6 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { errorMessage } from '@/lib/errorMessage';
+import { readNumber } from '@/lib/numberField';
 
 interface CreateNetworkDialogProps {
   open: boolean;
@@ -67,6 +68,12 @@ export const CreateNetworkDialog = ({ open, onOpenChange }: CreateNetworkDialogP
       return;
     }
 
+    const subscription = readNumber(subscriptionPrice, { label: 'Subscription price', min: 0.99, decimals: 2 });
+    if (isPaid && subscription.error) {
+      toast.error(subscription.error);
+      return;
+    }
+
     setUploading(true);
 
     try {
@@ -85,7 +92,7 @@ export const CreateNetworkDialog = ({ open, onOpenChange }: CreateNetworkDialogP
         description: description.trim() || null,
         genre: genre || null,
         is_paid: isPaid,
-        subscription_price: isPaid ? parseFloat(subscriptionPrice) : 0,
+        subscription_price: isPaid ? (subscription.value ?? 0) : 0,
         banner_url: bannerUrl,
         logo_url: logoUrl,
         is_public: true,

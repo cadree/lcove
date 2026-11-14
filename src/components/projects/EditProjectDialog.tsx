@@ -330,7 +330,7 @@ export const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, o
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Total Budget</Label>
-                <Input type="number" value={totalBudget} onChange={e => setTotalBudget(e.target.value)} min="0" step="1" />
+                <Input type="number" value={totalBudget} onChange={e => setTotalBudget(e.target.value)} min="0" step="0.01" inputMode="decimal" />
               </div>
               <div>
                 <Label>Currency</Label>

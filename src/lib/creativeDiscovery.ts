@@ -44,6 +44,15 @@ export interface TripSummary {
   member_count: number;
   roster: { user_id: string; display_name: string }[];
 }
+export interface TripJoinRequest {
+  trip_id: string;
+  user_id: string;
+  note: string;
+  status: "pending" | "approved" | "declined";
+  created_at: string;
+  display_name: string;
+  avatar_url: string | null;
+}
 export interface TripMember {
   user_id: string;
   display_name: string;
@@ -76,6 +85,19 @@ export interface Trip extends TripSummary {
     created_at: string;
   }[];
 }
+export interface MessageRequest {
+  id: string;
+  user_id: string;
+  body: string;
+  sent_at: string;
+  display_name?: string;
+  avatar_url?: string | null;
+  city?: string | null;
+}
+export interface MessageRequestInbox {
+  incoming: MessageRequest[];
+  outgoing: MessageRequest[];
+}
 export const discovery = {
   settings: (
     values: { p_discoverable?: boolean; p_matches_only?: boolean } = {}
@@ -96,6 +118,11 @@ export const discovery = {
       { p_target: target, p_liked: liked }
     ),
   matches: () => callRpc<CreativeMatch[]>("creative_match_list"),
+  /** Write to someone you have not matched with: it waits quietly in their Requests. */
+  requestMessage: (recipient: string, body: string) =>
+    callRpc<{ status: "sent" | "matched"; conversation_id: string | null }>("send_message_request", { p_recipient: recipient, p_body: body }),
+  requests: () => callRpc<MessageRequestInbox>("message_request_inbox"),
+  ignoreRequest: (id: string) => callRpc<void>("ignore_message_request", { p_id: id }),
   unmatch: (target: string) =>
     callRpc<void>("creative_unmatch", { p_target: target }),
   trips: (
@@ -109,6 +136,13 @@ export const discovery = {
       p_end: end,
     }),
   trip: (id: string) => callRpc<Trip>("creative_trip_snapshot", { p_trip: id }),
+  /** Ask to join a trip, with an optional note the group sees. The organizer approves. */
+  tripRequest: (trip: string, note: string) =>
+    callRpc<{ status: "pending" | "declined" | "member" }>("creative_trip_request", { p_trip: trip, p_note: note }),
+  tripAnswer: (trip: string, user: string, approve: boolean) =>
+    callRpc<Trip>("creative_trip_answer", { p_trip: trip, p_user: user, p_approve: approve }),
+  /** My requests everywhere (no trip), or a trip's pending requests for its members. */
+  tripRequests: (trip: string | null = null) => callRpc<TripJoinRequest[]>("creative_trip_requests", { p_trip: trip }),
   tripAction: (
     action: string,
     trip: string | null,

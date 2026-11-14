@@ -1,3 +1,4 @@
+import { FeedVideo } from "@/components/media/FeedVideo";
 import { Link } from "react-router-dom";
 import type { ShareCard } from "@/lib/shareCard";
 
@@ -17,7 +18,7 @@ export function ShareCardBubble({ card }: { card: ShareCard }) {
     >
       {card.mediaUrl && (
         video ? (
-          <video src={card.mediaUrl} className="aspect-[4/5] max-h-64 w-full bg-black object-contain" muted playsInline />
+          <FeedVideo loop={false} src={card.mediaUrl} className="aspect-[4/5] max-h-64 w-full bg-black object-contain" />
         ) : (
           <img src={card.mediaUrl} alt="" className="aspect-[4/5] max-h-64 w-full bg-muted object-contain" />
         )

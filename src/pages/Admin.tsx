@@ -58,6 +58,8 @@ import { ContentModerationTab } from '@/components/admin/ContentModerationTab';
 import { AdminStats } from '@/components/admin/AdminStats';
 import { NuanceInterestTab } from '@/components/admin/NuanceInterestTab';
 import { CinemaReviewTab } from '@/components/admin/CinemaReviewTab';
+import { readNumber } from '@/lib/numberField';
+import { toast } from 'sonner';
 
 type UserAccessStatus = 'active' | 'banned';
 type MessageAudience = 'all' | 'mindset_level' | 'city';
@@ -201,10 +203,11 @@ const Admin: React.FC = () => {
   };
 
   const handleAdjustCredits = () => {
-    if (creditDialog && creditAmount && creditReason) {
+    const credits = readNumber(creditAmount, { label: 'Amount', integer: true });
+    if (creditDialog && !credits.error && credits.value && creditReason) {
       adjustCredits.mutate({
         userId: creditDialog.userId,
-        amount: parseInt(creditAmount),
+        amount: credits.value,
         reason: creditReason,
       });
       setCreditDialog(null);
@@ -214,7 +217,12 @@ const Admin: React.FC = () => {
   };
 
   const handleBulkAward = () => {
-    if (creditAmount && creditReason && adminUserData) {
+    const award = readNumber(creditAmount, { label: 'Amount', min: 1, integer: true });
+    if (award.error || award.value === null) {
+      toast.error(award.error ?? 'Enter amount');
+      return;
+    }
+    if (creditReason && adminUserData) {
       // Filter users based on target audience
       let targetUserIds: string[] = [];
       if (messageTarget === 'all') {
@@ -227,7 +235,7 @@ const Admin: React.FC = () => {
       
       bulkAwardCredits.mutate({
         userIds: targetUserIds,
-        amount: parseInt(creditAmount),
+        amount: award.value,
         reason: creditReason,
       });
       setBulkCreditDialog(false);
@@ -1080,9 +1088,11 @@ const Admin: React.FC = () => {
             <div>
               <Label>Amount (positive to add, negative to deduct)</Label>
               <Input
-                type="number"
+                type="text"
+                inputMode="text"
+                pattern="-?[0-9]*"
                 value={creditAmount}
-                onChange={(e) => setCreditAmount(e.target.value)}
+                onChange={(e) => setCreditAmount(e.target.value.replace(/[^0-9-]/g, '').replace(/(?!^)-/g, ''))}
                 placeholder="e.g., 100 or -50"
               />
             </div>
@@ -1161,6 +1171,7 @@ const Admin: React.FC = () => {
                 onChange={(e) => setCreditAmount(e.target.value)}
                 placeholder="Credits to award"
                 min="1"
+                step="1"
               />
             </div>
             <div>

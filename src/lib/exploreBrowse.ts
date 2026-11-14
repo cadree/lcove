@@ -3,15 +3,6 @@ export interface BrowseReel {
   userId: string;
   name: string;
   mediaUrl: string;
-  source: "story" | "post";
-}
-
-interface StoryLike {
-  id: string;
-  user_id: string;
-  media_url: string;
-  media_type: string;
-  profile?: { display_name?: string | null } | null;
 }
 
 interface PostLike {
@@ -22,28 +13,19 @@ interface PostLike {
   post_type?: string | null;
   content?: string | null;
   profile?: { display_name?: string | null } | null;
+  upload_job_id?: string | null;
 }
 
-export function collectReels(stories: StoryLike[], posts: PostLike[]): BrowseReel[] {
-  const fromStories = stories
-    .filter((story) => story.media_type === "video" && story.media_url)
-    .map((story) => ({
-      id: `story-${story.id}`,
-      userId: story.user_id,
-      name: story.profile?.display_name || "Member",
-      mediaUrl: story.media_url,
-      source: "story" as const,
-    }));
-  const fromPosts = posts
-    .filter((post) => post.media_type === "video" && post.media_url)
+/** Video posts only. Stories are 24-hour moments and never appear as reels. */
+export function collectReels(posts: PostLike[]): BrowseReel[] {
+  return posts
+    .filter((post) => post.media_type === "video" && post.media_url && !post.upload_job_id)
     .map((post) => ({
       id: `post-${post.id}`,
       userId: post.user_id,
       name: post.profile?.display_name || "Member",
       mediaUrl: post.media_url as string,
-      source: "post" as const,
     }));
-  return [...fromStories, ...fromPosts];
 }
 
 export function browsePosts<T extends { post_type?: string | null }>(posts: T[], lane: "posts" | "portfolios") {

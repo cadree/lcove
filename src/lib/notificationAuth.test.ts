@@ -397,3 +397,42 @@ function stubDb(tables: Record<string, Array<Record<string, unknown>>>) {
     },
   };
 }
+
+describe("match notifications", () => {
+  it("only a live mutual connection can notify, and the copy says match", () => {
+    const allowed = authorizeUserNotification({
+      callerId: caller,
+      recipientId: recipient,
+      notificationType: "match",
+      data: {},
+      facts: { callerName: "Rezza", match: { active: true, conversationId: conversation } },
+    });
+    assert.deepEqual(allowed, { ok: true, title: "It's a match", body: "You and Rezza connected. Say hello.", data: { conversation_id: conversation } });
+    for (const match of [null, { active: false, conversationId: conversation }]) {
+      const denied = authorizeUserNotification({ callerId: caller, recipientId: recipient, notificationType: "match", data: {}, facts: { callerName: "Rezza", match } });
+      assert.equal(denied.ok, false);
+    }
+  });
+
+  it("looks the match up by the sorted pair", async () => {
+    const seen = [];
+    const supabase = {
+      from(table) {
+        const filters = [];
+        const query = {
+          select: () => query,
+          eq: (column, value) => { filters.push([column, value]); return query; },
+          maybeSingle: async () => {
+            seen.push([table, filters]);
+            if (table === "creative_matches") return { data: { active: true, conversation_id: conversation } };
+            return { data: { display_name: "Rezza" } };
+          },
+        };
+        return query;
+      },
+    };
+    const facts = await loadUserNotificationFacts(supabase, { callerId: recipient, recipientId: caller, notificationType: "match", data: {} });
+    assert.deepEqual(facts.match, { active: true, conversationId: conversation });
+    assert.deepEqual(seen.find(([table]) => table === "creative_matches")[1], [["first_id", caller], ["second_id", recipient]]);
+  });
+});

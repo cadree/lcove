@@ -4,6 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
+import { queueMedia, usePendingUploads } from '@/lib/queuedMedia';
+import { withPending } from '@/lib/pendingUploads';
+import { isQueryablePostId } from '@/lib/postId';
 import { errorMessage } from '@/lib/errorMessage';
 import { shotContentThin, shotSessionEnabled, shotStories } from '@/lib/shotSession';
 import { storyViewShouldRefresh } from '@/lib/feedWindow';
@@ -166,65 +169,29 @@ export function useStories() {
   const uploadStory = useMutation({
     mutationFn: async ({ file, mediaType }: { file: File; mediaType: 'photo' | 'video' }) => {
       if (!user) throw new Error('Must be logged in');
-
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('media')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('media')
-        .getPublicUrl(fileName);
-
-      const { error: insertError } = await supabase
-        .from('stories')
-        .insert({
-          user_id: user.id,
-          media_url: publicUrl,
-          media_type: mediaType,
-        });
-
-      if (insertError) throw insertError;
-      return { mediaUrl: publicUrl };
-    },
-    onMutate: async ({ file, mediaType }) => {
-      if (!user) return;
-      await queryClient.cancelQueries({ queryKey: ['stories'] });
-      const previous = queryClient.getQueryData(['stories']);
-      const preview = URL.createObjectURL(file);
-      const optimistic = {
-        id: `optimistic-${Date.now()}`,
-        user_id: user.id,
-        media_url: preview,
-        media_type: mediaType,
-        is_live: false,
-        created_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        profile: { display_name: 'You', avatar_url: null },
-        view_count: 0,
-        has_viewed: true,
-      };
-      queryClient.setQueryData(['stories'], (current: { stories?: StoryWithProfile[]; grouped?: Record<string, StoryWithProfile[]> } | undefined) => {
-        const stories = [optimistic, ...(current?.stories ?? [])];
-        const grouped = {
-          ...(current?.grouped ?? {}),
-          [user.id]: [optimistic, ...(current?.grouped?.[user.id] ?? [])],
-        };
-        return { stories, grouped };
+      // The story uploads in the background; the tray shows it right away.
+      queueMedia({
+        queryClient,
+        userId: user.id,
+        kind: 'story',
+        label: mediaType === 'video' ? 'Video story' : 'Story',
+        files: [file],
+        mediaType,
+        insert: async ([publicUrl]) => {
+          const { error: insertError } = await supabase
+            .from('stories')
+            .insert({
+              user_id: user.id,
+              media_url: publicUrl,
+              media_type: mediaType,
+            });
+          if (insertError) throw insertError;
+        },
+        invalidate: [['stories']],
+        successMessage: 'Story posted',
       });
-      return { previous, preview };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stories'] });
-      toast.success('Story posted');
-    },
-    onError: (error, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(['stories'], context.previous);
-      if (context?.preview) URL.revokeObjectURL(context.preview);
+    onError: (error) => {
       toast.error(errorMessage(error, 'Failed to upload story'));
       console.error(error);
     },
@@ -232,7 +199,7 @@ export function useStories() {
 
   const recordView = useMutation({
     mutationFn: async (storyId: string) => {
-      if (!user) return;
+      if (!user || !isQueryablePostId(storyId)) return;
       
       // Use insert with onConflict to handle duplicates
       const { error } = await supabase
@@ -277,14 +244,27 @@ export function useStories() {
     },
   });
 
+  const pending = usePendingUploads();
   const stories = useMemo(() => {
     const rows = (data?.stories || []) as StoryWithProfile[];
-    return rows.filter((story) => {
+    const visible = rows.filter((story) => {
       if (blockedIds.includes(story.user_id)) return false;
       if (story.credit_user_id && blockedIds.includes(story.credit_user_id)) return false;
       return true;
     });
-  }, [data?.stories, blockedIds]);
+    return withPending(visible, pending, 'story', (item) => ({
+      id: item.id,
+      user_id: item.userId,
+      media_url: item.mediaUrl ?? '',
+      media_type: item.mediaType === 'video' ? 'video' : 'photo',
+      is_live: false,
+      created_at: item.createdAt,
+      expires_at: new Date(Date.parse(item.createdAt) + 24 * 60 * 60 * 1000).toISOString(),
+      profile: { display_name: 'You', avatar_url: null },
+      view_count: 0,
+      has_viewed: true,
+    }) as StoryWithProfile);
+  }, [data?.stories, blockedIds, pending]);
 
   const groupedStories = useMemo(() => {
     return stories.reduce((acc, story) => {

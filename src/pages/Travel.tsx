@@ -21,6 +21,11 @@ import { money, parseCents, safeWebLink } from "@/lib/tripMoney";
 import { resolveCity } from "@/lib/cities";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { readNumber } from "@/lib/numberField";
+import { TripJoinButton } from "@/components/travel/TripJoinButton";
+import { TripRequestsPanel } from "@/components/travel/TripRequestsPanel";
+import { TripBoard } from "@/components/travel/TripBoard";
+import { canComplete, todayIso, tripDatesError, tripRange, tripStatus } from "@/lib/tripDates";
 
 export default function Travel() {
   const { user } = useAuth();
@@ -48,15 +53,6 @@ export default function Travel() {
     enabled: !!selected && !!user,
     refetchInterval: 15000,
   });
-  const join = useMutation({
-    mutationFn: (id: string) => discovery.tripAction("join", id),
-    onSuccess: async (data) => {
-      await cache.invalidateQueries({ queryKey: ["trips"] });
-      await cache.invalidateQueries({ queryKey: ["conversations"] });
-      setParams({ trip: data.id });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
   return (
     <PageLayout>
       <div className="mx-auto max-w-3xl space-y-5 px-4 py-5">
@@ -64,7 +60,7 @@ export default function Travel() {
           <div>
             <Link
               className="inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground"
-              to="/directory"
+              to="/explore?section=people"
             >
               <ArrowLeft size={16} /> Discover
             </Link>
@@ -101,8 +97,8 @@ export default function Travel() {
           </>
         ) : (
           <>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="col-span-2 sm:col-span-1">
                 <Label htmlFor="travel-city">Destination</Label>
                 <CityInput
                   id="travel-city"
@@ -160,8 +156,8 @@ export default function Travel() {
                     <Plane size={20} />
                   </div>
                   <p className="text-sm">
-                    {t.starts_on} – {t.ends_on} · {t.member_count}/{t.capacity}{" "}
-                    travelers · {t.status}
+                    {tripRange(t.starts_on, t.ends_on)} · {t.member_count}/{t.capacity}{" "}
+                    travelers · {tripStatus(t.status)}
                   </p>
                   <p className="whitespace-pre-wrap text-sm text-muted-foreground">
                     {t.notes}
@@ -177,25 +173,7 @@ export default function Travel() {
                       Report organizer
                     </button>
                   )}
-                  {t.joined ? (
-                    <Button onClick={() => setParams({ trip: t.id })}>
-                      Open trip & budget
-                    </Button>
-                  ) : (
-                    <Button
-                      disabled={join.isPending || t.member_count >= t.capacity}
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            "Join this trip and its group chat? The listed travelers will see your profile and budget pledges. Joining does not unlock private DMs."
-                          )
-                        )
-                          join.mutate(t.id);
-                      }}
-                    >
-                      Join trip & group chat
-                    </Button>
-                  )}
+                  <TripJoinButton trip={t} onOpen={() => setParams({ trip: t.id })} />
                 </article>
               ))
             )}
@@ -235,6 +213,7 @@ function CreateTrip({
 }) {
   const cache = useQueryClient();
   const [city, setCity] = useState(initialCity);
+  const [start, setStart] = useState("");
   const requestId = useRef(crypto.randomUUID());
   useEffect(() => {
     if (open) setCity(initialCity);
@@ -274,13 +253,23 @@ function CreateTrip({
               toast.error("Choose a destination from the city suggestions.");
               return;
             }
+            const datesError = tripDatesError(String(data.get("start") ?? ""), String(data.get("end") ?? ""));
+            if (datesError) {
+              toast.error(datesError);
+              return;
+            }
+            const capacity = readNumber(String(data.get("capacity") ?? ""), { label: "Maximum travelers", min: 2, max: 20, integer: true });
+            if (capacity.error) {
+              toast.error(capacity.error);
+              return;
+            }
             mutation.mutate({
               title: data.get("title"),
               city_key: resolved.city_key,
               city_label: resolved.city_display,
               starts_on: data.get("start"),
               ends_on: data.get("end"),
-              capacity: Number(data.get("capacity")),
+              capacity: capacity.value,
               notes: data.get("notes"),
             });
           }}
@@ -303,11 +292,11 @@ function CreateTrip({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="trip-start">Arrival</Label>
-              <Input id="trip-start" name="start" type="date" required />
+              <Input id="trip-start" name="start" type="date" min={todayIso()} value={start} onChange={(e) => setStart(e.target.value)} required />
             </div>
             <div>
               <Label htmlFor="trip-end">Departure</Label>
-              <Input id="trip-end" name="end" type="date" required />
+              <Input id="trip-end" name="end" type="date" min={start || todayIso()} required />
             </div>
           </div>
           <div>
@@ -320,6 +309,7 @@ function CreateTrip({
               type="number"
               min={2}
               max={20}
+              step={1}
               defaultValue={4}
               required
             />
@@ -389,11 +379,11 @@ function TripDetail({ trip, onLeave }: { trip: Trip; onLeave: () => void }) {
     <div className="space-y-5">
       <section className="file-panel space-y-3 p-5">
         <p className="text-xs uppercase tracking-widest text-muted-foreground">
-          {trip.city_label} · {trip.status}
+          {trip.city_label} · {tripStatus(trip.status)}
         </p>
         <h2 className="ether-title text-2xl">{trip.title}</h2>
         <p>
-          {trip.starts_on} – {trip.ends_on}
+          {tripRange(trip.starts_on, trip.ends_on)}
         </p>
         <p className="whitespace-pre-wrap text-sm text-muted-foreground">
           {trip.notes}
@@ -405,6 +395,8 @@ function TripDetail({ trip, onLeave }: { trip: Trip; onLeave: () => void }) {
           <MessageCircle size={18} /> Open group chat
         </Link>
       </section>
+      {!closed && me && <TripRequestsPanel tripId={trip.id} organizer={organizer} />}
+      {me && <TripBoard trip={trip} organizer={organizer} closed={closed} />}
       <section className="file-panel space-y-4 p-5">
         <div className="flex flex-wrap justify-between gap-3">
           <div>
@@ -616,14 +608,19 @@ function TripDetail({ trip, onLeave }: { trip: Trip; onLeave: () => void }) {
               >
                 Cancel trip
               </Button>
-              {trip.status === "booked" && (
-                <Button
-                  disabled={mutation.isPending}
-                  onClick={() => act("complete")}
-                >
-                  Mark trip completed
-                </Button>
-              )}
+              {trip.status === "booked" &&
+                (canComplete(trip) ? (
+                  <Button
+                    disabled={mutation.isPending}
+                    onClick={() => act("complete")}
+                  >
+                    Mark trip completed
+                  </Button>
+                ) : (
+                  <p className="self-center text-sm text-muted-foreground">
+                    You can mark it completed from {tripRange(trip.ends_on, trip.ends_on)}.
+                  </p>
+                ))}
             </>
           ) : (
             !frozen && (

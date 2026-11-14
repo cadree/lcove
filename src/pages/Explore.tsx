@@ -93,13 +93,17 @@ const Explore = () => {
         {section === "for-you" && openQuest && <div className="mt-6"><QuestCard quest={openQuest} /></div>}
 
         {section === "for-you" && (
-          <section aria-labelledby="browse-title" className="mt-8">
-            <div className="mb-2 flex items-end justify-between">
-              <h2 id="browse-title" className="ether-title text-[22px]">Reels & posts</h2>
-              <button type="button" onClick={() => choose("browse")} className="mono-label min-h-11 text-[10px] text-muted-foreground">See all</button>
-            </div>
-            <ExploreBrowse query={query} />
-          </section>
+          <div className="mt-8">
+            <ExploreBrowse
+              query={query}
+              heading={
+                <div className="mb-2 flex items-end justify-between">
+                  <h2 className="ether-title text-[22px]">Reels & posts</h2>
+                  <button type="button" onClick={() => choose("browse")} className="mono-label min-h-11 text-[10px] text-muted-foreground">See all</button>
+                </div>
+              }
+            />
+          </div>
         )}
         {section === "browse" && <ExploreBrowse query={query} />}
 

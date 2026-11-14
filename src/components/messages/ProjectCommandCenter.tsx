@@ -418,7 +418,7 @@ const AttachmentThumbnail = ({ attachment }: { attachment: ProjectChatData['atta
   if (attachment.file_type === 'video') {
     return (
       <div className="aspect-video rounded-lg overflow-hidden bg-muted">
-        <video src={attachment.file_url} controls className="w-full h-full object-cover" />
+        <video preload="metadata" src={attachment.file_url} controls className="w-full h-full object-cover" />
       </div>
     );
   }

@@ -27,6 +27,8 @@ interface ConversationListProps {
   onSelect: (id: string) => void;
   onNewChat: () => void;
   onDeleteConversation?: (id: string) => void;
+  /** Shown above the chats, e.g. quiet message requests. */
+  beforeChats?: React.ReactNode;
 }
 
 function profilesOnConversations(
@@ -45,7 +47,7 @@ function profilesOnConversations(
   return rows;
 }
 
-const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversation }: ConversationListProps) => {
+const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversation, beforeChats }: ConversationListProps) => {
   const { user } = useAuth();
   const { conversations, isLoading, toggleMute, deleteConversation, createDirectConversation } = useConversations();
   const { onlineUsers, isOnline: presenceOnline } = usePresence();
@@ -219,6 +221,7 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        {beforeChats}
         <p className="kicker px-4 pt-3">// Chats</p>
         {isLoading ? (
           <div className="p-4 space-y-4">
