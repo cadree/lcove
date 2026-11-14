@@ -16,6 +16,8 @@ import {
 } from "@/actions/pipelineActions";
 import { updateStageName } from "@/actions/pipelineStageActions";
 
+import { moveLocally } from '@/lib/pipelineDrag';
+
 export function usePipeline(pipelineId?: string) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -49,7 +51,23 @@ export function usePipeline(pipelineId?: string) {
   const moveItemMutation = useMutation({
     mutationFn: ({ itemId, toStageId, newSortOrder }: { itemId: string; toStageId: string; newSortOrder: number }) =>
       movePipelineItem(itemId, toStageId, newSortOrder),
-    onSuccess: () => {
+    // The card lands in its new column at once; a failure puts it back.
+    onMutate: async ({ itemId, toStageId, newSortOrder }) => {
+      const key = ['pipeline', user?.id, pipelineId];
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<typeof data>(key);
+      if (previous) {
+        queryClient.setQueryData<typeof data>(key, {
+          ...previous,
+          items: moveLocally(previous.items, itemId, toStageId, newSortOrder),
+        });
+      }
+      return { previous };
+    },
+    onError: (_error, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(['pipeline', user?.id, pipelineId], context.previous);
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['pipeline', user?.id, pipelineId] });
     },
   });
