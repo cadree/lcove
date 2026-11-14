@@ -1,4 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { ALL_CITIES, cityOptions, filterCalendar, initialCalendarView } from "@/lib/calendarView";
+import { discovery } from "@/lib/creativeDiscovery";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
@@ -49,21 +52,18 @@ const US_STATES = [
   'West Virginia', 'Wisconsin', 'Wyoming'
 ];
 
-const CITIES = [
-  'All Cities', 'Los Angeles', 'New York', 'Chicago', 'Houston', 'Phoenix',
-  'Philadelphia', 'San Antonio', 'San Diego', 'Dallas', 'Austin', 'San Jose',
-  'Jacksonville', 'Fort Worth', 'Columbus', 'Charlotte', 'Indianapolis',
-  'San Francisco', 'Seattle', 'Denver', 'Nashville', 'Portland', 'Las Vegas',
-  'Detroit', 'Memphis', 'Boston', 'Baltimore', 'Miami', 'Atlanta'
-];
 
 const CalendarPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<ViewType>('month');
-  const [selectedCity, setSelectedCity] = useState('All Cities');
+  const [view, setView] = useState<ViewType>(() =>
+    typeof window === 'undefined' ? 'month' : initialCalendarView(window.innerWidth),
+  );
+  const [selectedCity, setSelectedCity] = useState(ALL_CITIES);
+  const [connectionsOnly, setConnectionsOnly] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedState, setSelectedState] = useState('All States');
   const [selectedTypes, setSelectedTypes] = useState(['events', 'projects', 'personal']);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -110,11 +110,22 @@ const CalendarPage = () => {
     }
   }, [searchParams, user, setSearchParams]);
 
-  const calendarItems = useCalendarItems({
-    city: selectedCity,
+  const allItems = useCalendarItems({
+    city: ALL_CITIES,
     state: selectedState,
     types: selectedTypes,
   });
+  const matches = useQuery({
+    queryKey: ['creative-matches', user?.id],
+    queryFn: discovery.matches,
+    enabled: !!user && connectionsOnly,
+  });
+  const connections = useMemo(() => new Set((matches.data || []).map((m) => m.user_id)), [matches.data]);
+  const cities = useMemo(() => [ALL_CITIES, ...cityOptions(allItems).map((c) => c.city)], [allItems]);
+  const calendarItems = filterCalendar(allItems, { city: selectedCity, connectionsOnly, connections, me: user?.id });
+  const dayItems = selectedDay
+    ? calendarItems.filter((item) => new Date(item.start_date).toDateString() === selectedDay.toDateString())
+    : [];
 
   const navigatePrevious = () => {
     if (view === 'month' || view === 'agenda') {
@@ -149,13 +160,14 @@ const CalendarPage = () => {
     }
   };
 
-  const handleDateClick = (date: Date) => {
+  // Tapping a day shows everything on it; adding a reminder is one more tap from there.
+  const handleDateClick = (date: Date) => setSelectedDay(date);
+  const addReminderOn = (date: Date) => {
     if (!user) {
       toast.error('Please log in to add events');
       return;
     }
     setSelectedDateForNew(date);
-    // Default to personal event on date click
     setPersonalEventOpen(true);
   };
 
@@ -276,7 +288,9 @@ const CalendarPage = () => {
             selectedCity={selectedCity}
             selectedState={selectedState}
             selectedTypes={selectedTypes}
-            cities={CITIES}
+            cities={cities}
+            connectionsOnly={connectionsOnly}
+            onConnectionsOnlyChange={user ? setConnectionsOnly : undefined}
             states={US_STATES}
             onCityChange={setSelectedCity}
             onStateChange={setSelectedState}
@@ -291,12 +305,44 @@ const CalendarPage = () => {
           transition={{ delay: 0.3 }}
         >
           {view === 'month' && (
-            <CalendarMonthView
-              currentDate={currentDate}
-              items={calendarItems}
-              onItemClick={handleItemClick}
-              onDateClick={handleDateClick}
-            />
+            <>
+              <CalendarMonthView
+                currentDate={currentDate}
+                selectedDate={selectedDay}
+                items={calendarItems}
+                onItemClick={handleItemClick}
+                onDateClick={handleDateClick}
+              />
+              {selectedDay && (
+                <section className="file-panel mt-3 space-y-2 p-4" aria-label={`Plans on ${format(selectedDay, 'EEEE, MMMM d')}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="font-display text-lg">{format(selectedDay, 'EEEE, MMM d')}</h3>
+                    {user && (
+                      <Button size="sm" variant="glass" onClick={() => addReminderOn(selectedDay)}>
+                        <Plus className="mr-1 h-4 w-4" /> Reminder
+                      </Button>
+                    )}
+                  </div>
+                  {dayItems.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nothing on this day.</p>
+                  ) : (
+                    <ul className="divide-y divide-border/30">
+                      {dayItems.map((item) => (
+                        <li key={item.id}>
+                          <button type="button" className="flex min-h-11 w-full items-center justify-between gap-3 py-2 text-left" onClick={() => handleItemClick(item)}>
+                            <span className="min-w-0 truncate">{item.title}</span>
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              {format(new Date(item.start_date), 'h:mm a')}
+                              {item.city ? ` · ${item.city}` : ''}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              )}
+            </>
           )}
           {view === 'week' && (
             <CalendarWeekView

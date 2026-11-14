@@ -31,7 +31,12 @@ const people = { profiles: (req, url) => (url.pathname.endsWith("/profiles_publi
 
 const tripList = [{ id: "00000000-0000-4000-8000-0000000d0001", city_key: "lisbon|pt", city_label: "Lisbon, Portugal", title: "Lisbon shoot week", starts_on: "2099-04-28", ends_on: "2099-05-03", capacity: 4, notes: "Two-bed flat near Alfama, shared van for location days.", status: "planning", organizer_id: "00000000-0000-4000-8000-0000000c0001", conversation_id: null, joined: false, member_count: 2, roster: [{ user_id: "00000000-0000-4000-8000-0000000c0001", display_name: "Member 1" }, { user_id: me, display_name: "Maya Cole" }] }];
 
+const day = (d, h) => { const x = new Date(); x.setDate(d); x.setHours(h, 0, 0, 0); return x.toISOString(); };
+const events = [[12, 19, "Gallery night", "Atlanta", true], [12, 20, "Darkroom social", "Atlanta"], [12, 21, "Film club", "Charlotte"], [12, 22, "Late set", "Atlanta"], [18, 18, "Portfolio review", "Charlotte", true], [24, 12, "Location scout", "Raleigh"]]
+  .map(([d, h, title, city, img], i) => ({ id: `00000000-0000-4000-8000-0000000e000${i}`, creator_id: "00000000-0000-4000-8000-0000000c0001", title, description: null, venue: "Studio", address: null, city, state: "GA", country: "US", start_date: day(d, h), end_date: null, image_url: img ? media("product.jpg") : null, ticket_type: "free", ticket_price: null, credits_price: null, capacity: null, is_public: true, project_id: null, external_url: null, timezone: null, recurrence: null, status: "published", created_at: now }));
+
 const scenes = [
+  { name: "calendar", path: "/calendar", widths: [390, 1280], mock: { events: () => ({ body: events }) } },
   { name: "travel", path: "/travel", widths: [390], mock: { creative_trip_list: () => ({ body: tripList }) } },
   { name: "globe", path: "/explore?section=people", widths: [390], mock: people, run: async (page) => { await page.evaluate(() => window.scrollTo(0, 0)); } },
   { name: "globe-selected", path: "/explore?section=people", widths: [390], mock: people, run: async (page) => {
