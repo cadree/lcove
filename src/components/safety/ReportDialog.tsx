@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { fromUntyped } from "@/lib/safetyTables";
+import { AI_CONTENT_RULE_ALLOWED, AI_CONTENT_RULE_FORBIDDEN } from "@/lib/aiContentRule";
 import { REPORT_REASONS, type ReportReason, type ReportTargetType } from "@/lib/reportReasons";
 
 interface ReportDialogProps {
@@ -75,7 +76,7 @@ export function ReportDialog({ open, onOpenChange, targetType, targetId }: Repor
         <DialogHeader>
           <DialogTitle>Report</DialogTitle>
           <DialogDescription>
-            Reports go to admins. AI-generated people, fake profiles, and AI-made work presented as human-made can be reported.
+            Reports go to admins. {AI_CONTENT_RULE_ALLOWED} {AI_CONTENT_RULE_FORBIDDEN}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">

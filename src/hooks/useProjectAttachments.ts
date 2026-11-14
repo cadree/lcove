@@ -89,6 +89,7 @@ export function useProjectAttachments(projectId?: string) {
     mutationFn: async ({ projectId, url, name }: { projectId: string; url: string; name: string }) => {
       if (!user?.id) throw new Error('Not authenticated');
 
+      const isYoutube = /(?:youtu\.be\/|youtube\.com\/)/i.test(url);
       const { data, error } = await supabase
         .from('project_attachments')
         .insert({
@@ -96,7 +97,7 @@ export function useProjectAttachments(projectId?: string) {
           uploaded_by: user.id,
           file_url: url,
           file_name: name,
-          file_type: 'link',
+          file_type: isYoutube ? 'video' : 'link',
           file_size: null,
         })
         .select()

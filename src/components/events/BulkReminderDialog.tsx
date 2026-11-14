@@ -22,10 +22,9 @@ export function BulkReminderDialog({ open, onOpenChange, eventId, tiers }: Props
   const [title, setTitle] = useState("Reminder: {event_name}");
   const [body, setBody] = useState("Hey {first_name}, just a reminder — {event_name} is coming up on {event_time}.");
   const [tierIds, setTierIds] = useState<string[]>([]);
-  const [statuses, setStatuses] = useState<string[]>(["confirmed"]);
+  const [statuses, setStatuses] = useState<string[]>(["registered", "approved"]);
   const [push, setPush] = useState(true);
   const [email, setEmail] = useState(true);
-  const [sms, setSms] = useState(false);
   const [sending, setSending] = useState(false);
 
   const toggle = (arr: string[], setArr: (a: string[]) => void, v: string) =>
@@ -36,7 +35,7 @@ export function BulkReminderDialog({ open, onOpenChange, eventId, tiers }: Props
     try {
       const res = await sendBulkReminder({
         eventId, title, body,
-        channels: { push, email, sms },
+        channels: { push, email, sms: false },
         filter: { tierIds: tierIds.length ? tierIds : undefined, status: statuses },
       });
       toast.success(`Reminder queued for ${res.recipientCount} attendees`);
@@ -81,12 +80,16 @@ export function BulkReminderDialog({ open, onOpenChange, eventId, tiers }: Props
           <div>
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Status</Label>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {["confirmed", "checked_in"].map(s => (
-                <Badge key={s}
-                  variant={statuses.includes(s) ? "default" : "outline"}
+              {[
+                { value: "registered", label: "Going" },
+                { value: "approved", label: "Approved" },
+                { value: "waitlisted", label: "Waitlist" },
+              ].map(s => (
+                <Badge key={s.value}
+                  variant={statuses.includes(s.value) ? "default" : "outline"}
                   className="cursor-pointer"
-                  onClick={() => toggle(statuses, setStatuses, s)}>
-                  {s.replace("_", " ")}
+                  onClick={() => toggle(statuses, setStatuses, s.value)}>
+                  {s.label}
                 </Badge>
               ))}
             </div>
@@ -102,16 +105,12 @@ export function BulkReminderDialog({ open, onOpenChange, eventId, tiers }: Props
               <span className="text-sm">Email</span>
               <Switch checked={email} onCheckedChange={setEmail} />
             </div>
-            <div className="flex items-center justify-between rounded-lg border border-border/40 p-2.5">
-              <span className="text-sm">SMS</span>
-              <Switch checked={sms} onCheckedChange={setSms} />
-            </div>
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSend} disabled={sending || (!push && !email && !sms)}>
+          <Button onClick={handleSend} disabled={sending || (!push && !email)}>
             {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
             Send
           </Button>

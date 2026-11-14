@@ -2,15 +2,21 @@
 // Always sends through the verified platform domain — never spoofs host mailboxes.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import {
+  HOST_EVENT_FROM_ADDRESS,
+  PLATFORM_FALLBACK_REPLY_TO,
+  eventReplyTo,
+  hostFromHeader,
+  hostViaEtherName,
+} from "./host-email-address.mjs";
 
-export const HOST_EVENT_FROM_ADDRESS = "events@notifications.etherbylcove.com";
-export const PLATFORM_FALLBACK_REPLY_TO = "support@notify.etherbylcove.com";
+export { HOST_EVENT_FROM_ADDRESS, PLATFORM_FALLBACK_REPLY_TO };
 
 export interface HostIdentity {
   fromName: string;
   fromHeader: string; // RFC 5322 ready: "Name via Ether" <events@...>
   fromAddress: string;
-  replyTo: string;
+  replyTo: string | null;
   replyToVerified: boolean;
   organizerName: string;
   hostDisplayName: string;
@@ -19,15 +25,6 @@ export interface HostIdentity {
   brandColor: string;
   signature: string | null;
   personalNote: string | null;
-}
-
-// Strip CR/LF and quotes — prevents header injection in display name.
-function sanitizeDisplayName(name: string): string {
-  return (name || "")
-    .replace(/[\r\n"]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 80);
 }
 
 interface EventIdentityRow {
@@ -87,21 +84,16 @@ export async function resolveHostIdentity(
     }
   }
 
-  const fromNameRaw =
-    branding?.from_name_override ||
-    `${hostDisplayName} via Ether`;
-  const fromName = sanitizeDisplayName(fromNameRaw);
+  const fromName = hostViaEtherName(branding?.from_name_override || hostDisplayName);
 
   const replyToVerified = Boolean(
     branding?.reply_to_email && branding?.reply_to_verified_at
   );
-  const replyTo = replyToVerified
-    ? branding.reply_to_email
-    : PLATFORM_FALLBACK_REPLY_TO;
+  const replyTo = eventReplyTo(replyToVerified ? branding.reply_to_email : null);
 
   return {
     fromName,
-    fromHeader: `${fromName} <${HOST_EVENT_FROM_ADDRESS}>`,
+    fromHeader: hostFromHeader(fromName),
     fromAddress: HOST_EVENT_FROM_ADDRESS,
     replyTo,
     replyToVerified,

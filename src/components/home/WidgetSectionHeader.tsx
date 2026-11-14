@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { revealMotion } from "@/lib/reveal";
 import { ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -11,10 +12,7 @@ interface WidgetSectionHeaderProps {
 const WidgetSectionHeader = ({ title, link, linkText = "See all" }: WidgetSectionHeaderProps) => {
   return (
     <motion.div
-      initial={{ opacity: 0, x: -8 }}
-      whileInView={{ opacity: 1, x: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.3 }}
+      {...revealMotion({ x: -8, duration: 0.3 })}
       className="flex items-center justify-between px-4 mb-3"
     >
       <h2 className="font-display text-base font-semibold text-foreground">

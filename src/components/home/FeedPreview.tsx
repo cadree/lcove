@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { revealMotion } from "@/lib/reveal";
 import FeedCard from "@/components/feed/FeedCard";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
@@ -40,10 +41,7 @@ const FeedPreview = () => {
       <div className="max-w-6xl mx-auto">
         {/* Section Header */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+          {...revealMotion({ y: 20, duration: 0.6 })}
           className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-12"
         >
           <div>
@@ -67,10 +65,7 @@ const FeedPreview = () => {
           {sampleFeed.map((item, index) => (
             <motion.div
               key={item.title}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.15 }}
+              {...revealMotion({ y: 30, delay: index * 0.15 })}
             >
               <FeedCard {...item} />
             </motion.div>

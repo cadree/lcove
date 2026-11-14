@@ -1,3 +1,4 @@
+import { useOverlayViewport } from "@/hooks/useOverlayViewport";
 import * as SheetPrimitive from "@radix-ui/react-dialog";
 import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
@@ -12,11 +13,14 @@ const SheetOverlay = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Ove
   ...props
 }, ref) => <SheetPrimitive.Overlay className={cn("fixed inset-0 z-50 bg-background/80 backdrop-blur-md", "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out", className)} {...props} ref={ref} />);
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
+const sheetContain =
+  "box-border min-w-0 overflow-x-hidden break-words [&>*]:min-w-0 [&_input]:min-w-0 [&_input]:max-w-full [&_textarea]:min-w-0 [&_textarea]:max-w-full [&_select]:min-w-0 [&_select]:max-w-full [&_img]:min-w-0 [&_img]:max-w-full [&_button]:min-w-0 [&_button]:max-w-full [&_button]:whitespace-normal [&_label]:min-w-0 [&_label]:max-w-full";
+
 const sheetVariants = cva("fixed z-50 gap-4 bg-card border-border/50 p-6 shadow-elevated transition-all ease-smooth data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-400", {
   variants: {
     side: {
       top: "inset-x-0 top-0 border-b rounded-b-2xl data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
-      bottom: "inset-x-0 bottom-0 border-t rounded-t-2xl data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+      bottom: "inset-x-0 bottom-0 border-t rounded-t-[28px] data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
       left: "inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-md",
       right: "inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-md"
     }
@@ -25,21 +29,47 @@ const sheetVariants = cva("fixed z-50 gap-4 bg-card border-border/50 p-6 shadow-
     side: "right"
   }
 });
-interface SheetContentProps extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>, VariantProps<typeof sheetVariants> {}
+interface SheetContentProps extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>, VariantProps<typeof sheetVariants> {
+  overlayClassName?: string;
+  overlayStyle?: React.CSSProperties;
+  /** Set when the content renders its own close or back control, so the sheet never shows two. */
+  hideClose?: boolean;
+}
 const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Content>, SheetContentProps>(({
   side = "right",
   className,
   children,
+  overlayClassName,
+  overlayStyle,
+  style,
+  hideClose = false,
   ...props
-}, ref) => <SheetPortal>
-      <SheetOverlay />
+}, ref) => {
+  useOverlayViewport();
+  return <SheetPortal>
+      <SheetOverlay className={overlayClassName} style={overlayStyle} />
       <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({
     side
-  }), "scrollbar-thin overflow-y-auto", className)} {...props}>
+  }), "overlay-safe-area scrollbar-thin overflow-y-auto", sheetContain, className)} style={{
+    ...style,
+    maxHeight: "var(--overlay-height, 100dvh)",
+    top: side === 'bottom' ? 'auto' : 'var(--overlay-top, 0px)',
+    bottom: side === 'bottom' ? 'calc(100dvh - var(--overlay-top, 0px) - var(--overlay-height, 100dvh))' : 'auto',
+    height: side === 'left' || side === 'right' ? 'var(--overlay-height, 100dvh)' : style?.height,
+    boxSizing: "border-box",
+    minWidth: 0,
+  }} {...props}>
+        {!hideClose && <SheetPrimitive.Close
+          data-overlay-close=""
+          className="absolute right-3 top-3 z-20 inline-flex !min-h-11 !min-w-11 items-center justify-center rounded-md text-foreground hover:bg-muted"
+          style={{ top: "calc(env(safe-area-inset-top, 0px) + 0.75rem)" }}
+          aria-label="Close"
+        >
+          <X className="h-5 w-5" />
+        </SheetPrimitive.Close>}
         {children}
-        
       </SheetPrimitive.Content>
-    </SheetPortal>);
+    </SheetPortal>; });
 SheetContent.displayName = SheetPrimitive.Content.displayName;
 const SheetHeader = ({
   className,

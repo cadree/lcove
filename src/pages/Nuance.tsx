@@ -1,43 +1,28 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
+import { BackButton } from "@/components/navigation/BackButton";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
 import { GoldInterestForm } from "@/components/nuance/GoldInterestForm";
 import { useAuth } from "@/contexts/AuthContext";
 import { NUANCE_BRAND_LINE, NUANCE_STORE_URL, nuanceProducts, type NuanceProduct } from "@/data/nuance";
+import { PageMeta } from "@/components/seo/PageMeta";
 
 const Nuance = () => {
-  const navigate = useNavigate();
   const { user } = useAuth();
-
-  const goBack = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
-      return;
-    }
-    navigate(user ? "/feed" : "/");
-  };
 
   return (
     <PageLayout>
+      <PageMeta title="Nuance · Ether" description="Nuance on Ether." />
       <div className="mx-auto max-w-5xl px-4 py-8">
         <motion.header
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={goBack}
-            className="mb-4"
-            aria-label="Go back"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <p className="text-xs font-medium uppercase tracking-[0.22em] text-[#F5A6CF]">
+          <BackButton label="Go back" fallback={user ? "/feed" : "/"} className="mb-4" />
+          <p className="text-xs font-medium uppercase tracking-[0.22em] text-primary">
             Nuance by LCOVE
           </p>
           <h1 className="font-display text-4xl sm:text-5xl mt-2">Nuance</h1>
@@ -114,7 +99,7 @@ function ProductCard({ product, index }: { product: NuanceProduct; index: number
           <div className="space-y-4">
             <p className="text-sm leading-relaxed">
               Sold out. Everyone who joins the interest list gets{" "}
-              <span className="text-[#F5A6CF] font-medium">40% off</span> when pre-orders open.
+              <span className="text-[#F5A6CF] font-medium">40% off</span>. This offer is valid during pre-orders only.
             </p>
             <GoldInterestForm />
           </div>

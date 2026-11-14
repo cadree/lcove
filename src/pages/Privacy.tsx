@@ -1,25 +1,21 @@
-import { ArrowLeft, Shield, Database, Users, Lock, Eye, Trash2, Globe, Bell, CreditCard, Mail } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { Shield, Database, Users, Lock, Eye, Trash2, Globe, Bell, CreditCard, Mail } from "lucide-react";
+import { Link } from "react-router-dom";
+import { BackButton } from "@/components/navigation/BackButton";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { PRIVACY_EMAIL, SUPPORT_EMAIL } from "@/config/launch";
+import { WAITLIST_PRIVACY_NOTE } from "@/content/copy";
+import { PageMeta } from "@/components/seo/PageMeta";
 
 const Privacy = () => {
-  const navigate = useNavigate();
-  const lastUpdated = "October 18, 2026";
+  const lastUpdated = "November 14, 2026";
 
   return (
     <div className="min-h-screen bg-background">
+      <PageMeta title="Privacy · Ether" description="Privacy Policy for Ether." />
       <div className="container max-w-3xl mx-auto px-4 py-8 safe-area-top safe-area-bottom">
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(-1)}
-            aria-label="Go back"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <BackButton label="Go back" />
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
               <Shield className="h-5 w-5 text-primary" />
@@ -90,6 +86,18 @@ const Privacy = () => {
                   <li>Transaction history for purchases and payouts</li>
                 </ul>
               </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="discovery-travel" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-3"><Globe className="h-5 w-5 text-primary" /><span className="font-medium">Creative Discovery & Trip Planning</span></div>
+            </AccordionTrigger>
+            <AccordionContent className="text-muted-foreground space-y-4 text-sm">
+              <p>Globe discovery is optional. When you enable it, signed-in members can see your chosen profile city, bio, public work and profile image. The globe uses city centers, not your precise or live device location. Turning discovery off removes you from the globe; your existing public profile follows its own visibility settings.</p>
+              <p>We store swipe decisions to recognize mutual matches. Other members cannot read your individual swipe history. A mutual match opens a direct chat. Matches-only DMs can be enabled in Settings; group chats you choose to join remain available.</p>
+              <p>Trip listings share the destination, dates, plan and traveler names with eligible signed-in members so they can decide whether to join. Only trip members can read its shared budget, pledges, reported payment amounts, receipt links and approval history. A pledge is not a payment: Ether does not collect, hold, transfer or spend money for these trips, and does not verify externally reported payments or make reservations.</p>
+              <p>Do not include addresses, booking codes, card numbers or sensitive personal details in public trip descriptions or receipt links. Third-party receipt and booking sites have their own privacy practices. Deleting your account cancels affected active trip plans and removes or anonymizes your travel records; a planning pledge does not prevent account deletion.</p>
             </AccordionContent>
           </AccordionItem>
 
@@ -188,7 +196,7 @@ const Privacy = () => {
                 <li><strong>Opt-Out:</strong> Unsubscribe from marketing communications</li>
                 <li><strong>Restrict Processing:</strong> Request limitations on how we use your data</li>
               </ul>
-              <p className="text-sm">To ask for a copy of your data or another request, email privacy@ethercreative.co. Account deletion is in Settings.</p>
+              <p className="text-sm">To ask for a copy of your data or another request, email privacy@etherbylcove.com. Account deletion is in Settings.</p>
               <div>
                 <h4 className="font-medium text-foreground mb-2">Account Deletion</h4>
                 <p className="text-sm">Settings has Delete my account. Confirming it deletes your login and the personal data tied to it, including your profile, posts, comments, and messages. If a payout or other payment is still pending, deletion is refused until that money is settled. Records required for payments or the law can stay, without your profile attached.</p>
@@ -214,7 +222,7 @@ const Privacy = () => {
                 we will take steps to delete that information as quickly as possible.
               </p>
               <p className="text-sm">
-                If you believe a child has provided us with personal information, please contact us at privacy@ethercreative.co.
+                If you believe a child has provided us with personal information, please contact us at privacy@etherbylcove.com.
               </p>
             </AccordionContent>
           </AccordionItem>
@@ -303,6 +311,21 @@ const Privacy = () => {
             </AccordionContent>
           </AccordionItem>
 
+          <AccordionItem value="waitlist" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-3">
+                <Mail className="h-5 w-5 text-primary" />
+                <span className="font-medium">Waitlist</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="text-muted-foreground space-y-4">
+              <p className="text-sm font-medium text-foreground">{WAITLIST_PRIVACY_NOTE}</p>
+              <p className="text-sm">
+                People who join the pre-launch waitlist give their name and email. They may also give an Instagram handle and a short note about what they make. If they check the box, Ether emails them when it opens. Ether stores the link source (src), an invite code (ref), whether the row is from the pre-launch list, and the time they joined. The list is not shown on the site.
+              </p>
+            </AccordionContent>
+          </AccordionItem>
+
           {/* Contact */}
           <AccordionItem value="contact" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline">
@@ -314,8 +337,8 @@ const Privacy = () => {
             <AccordionContent className="text-muted-foreground space-y-4">
               <p className="text-sm">If you have questions about this Privacy Policy or our practices, please contact us:</p>
               <div className="space-y-2 text-sm">
-                <p><strong>Email:</strong> privacy@ethercreative.co</p>
-                <p><strong>Support:</strong> Available through the app's Settings page</p>
+                <p><strong>Email:</strong> {PRIVACY_EMAIL}</p>
+                <p><strong>Support:</strong> {SUPPORT_EMAIL}</p>
               </div>
               <p className="text-sm">
                 We will respond to your inquiry within 30 days.

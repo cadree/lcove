@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -85,8 +86,9 @@ serve(async (req) => {
       profiles = (audienceRows || []) as typeof profiles;
     }
 
-    const channels = body.channels || { push: true, email: true, sms: false };
+    const channels = { push: body.channels?.push !== false, email: body.channels?.email !== false };
     const resendKey = Deno.env.get("RESEND_API_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const eventUrl = body.eventId ? `https://etherbylcove.com/event/${body.eventId}` : "https://etherbylcove.com";
 
     const { data: campaign } = await admin.from("notification_campaigns").insert({
@@ -133,24 +135,46 @@ serve(async (req) => {
         } catch (e) { await logRow("push", "failed", String(e)); }
       }
 
-      // Email
+      // Email. The pixel and the click redirect are how opens and clicks get recorded.
       if (channels.email && resendKey) {
         const { data: u } = await admin.auth.admin.getUserById(p.user_id);
         const email = u?.user?.email;
         if (email) {
+          const trackToken = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+          const destination = campaign?.id && body.eventId ? `${eventUrl}?invite=${campaign.id}` : eventUrl;
+          const clickUrl = `${supabaseUrl}/functions/v1/campaign-track?k=${encodeURIComponent(trackToken)}&e=click&u=${encodeURIComponent(destination)}`;
+          const pixelUrl = `${supabaseUrl}/functions/v1/campaign-track?k=${encodeURIComponent(trackToken)}&e=open`;
           try {
             const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
               <h1 style="color:#1a1a2e;">${finalTitle}</h1>
               <p style="color:#555;line-height:1.6;">${finalBody.replace(/\n/g, "<br/>")}</p>
-              <a href="${eventUrl}" style="display:inline-block;background:#e91e8c;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin-top:16px;">Check it out</a>
+              <a href="${clickUrl}" style="display:inline-block;background:#e91e8c;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin-top:16px;">Check it out</a>
+              <img src="${pixelUrl}" width="1" height="1" alt="" style="display:none" />
             </div>`;
             const r = await fetch("https://api.resend.com/emails", {
               method: "POST",
               headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
               body: JSON.stringify({ from: "notifications@etherbylcove.com", to: [email], subject: finalTitle, html }),
             });
-            if (r.ok) { await logRow("email", "sent"); sentCount++; }
-            else await logRow("email", "failed", `${r.status}`);
+            const resendBody = await r.json().catch(() => ({}));
+            if (r.ok) {
+              await admin.from("notification_logs").insert({
+                campaign_id: campaign?.id || null,
+                host_user_id: user.id,
+                user_id: p.user_id,
+                recipient_email: email,
+                event_id: body.eventId || null,
+                type: "invite",
+                channel: "email",
+                status: "sent",
+                sent_at: new Date().toISOString(),
+                track_token: trackToken,
+                metadata: { resend_id: resendBody?.id || null, destination },
+              });
+              sentCount++;
+            } else {
+              await logRow("email", "failed", `${r.status}`);
+            }
           } catch (e) { await logRow("email", "failed", String(e)); }
         }
       }
@@ -170,7 +194,7 @@ serve(async (req) => {
     const msg = err instanceof Error ? err.message : String(err);
     log("ERROR", { msg });
     return new Response(JSON.stringify({ error: msg }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: httpStatusForError(err), headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

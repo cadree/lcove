@@ -27,8 +27,8 @@ export interface ProfileCustomization {
   effect_holographic: boolean;
   effect_motion_gradient: boolean;
   // Layout
-  section_order: string[];
-  show_top_friends: boolean;
+  section_order: string[] | null;
+  show_top_friends: boolean | null;
   // Music
   profile_music_url: string | null;
   profile_music_enabled: boolean;
@@ -61,8 +61,8 @@ export const DEFAULT_CUSTOMIZATION: Partial<ProfileCustomization> = {
   effect_motion_gradient: false,
   custom_font: null,
   accent_color_override: null,
-  section_order: ['about', 'music', 'stats', 'links'],
-  show_top_friends: false,
+  section_order: null,
+  show_top_friends: null,
   profile_music_enabled: false,
   profile_music_volume: 0.5,
   music_visualizer_enabled: false,

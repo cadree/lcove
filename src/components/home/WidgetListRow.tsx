@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { revealMotion } from "@/lib/reveal";
 import { ChevronRight, LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -13,10 +14,7 @@ interface WidgetListRowProps {
 const WidgetListRow = ({ title, subtitle, icon: Icon, link, index = 0 }: WidgetListRowProps) => {
   return (
     <motion.div
-      initial={{ opacity: 0, x: -8 }}
-      whileInView={{ opacity: 1, x: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.3, delay: index * 0.04 }}
+      {...revealMotion({ x: -8, duration: 0.3, delay: index * 0.04 })}
     >
       <Link to={link}>
         <motion.div 

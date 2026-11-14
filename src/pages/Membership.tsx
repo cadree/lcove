@@ -1,19 +1,19 @@
+import { NumberInput } from "@/components/ui/number-input";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Heart, 
-  Crown, 
-  Check, 
-  Sparkles, 
-  Gift, 
-  Calendar, 
+import {
+  Heart,
+  Crown,
+  Check,
+  Sparkles,
+  Gift,
+  Calendar,
   Award,
   Users,
   Loader2,
@@ -23,7 +23,8 @@ import {
 import { useMembership } from "@/hooks/useMembership";
 import { useAuth } from "@/contexts/AuthContext";
 import { IosDigitalGoodsNotice } from "@/components/ios/IosDigitalGoodsNotice";
-import { isIosApp } from "@/lib/platform";
+import { useIosExternalCheckout } from "@/hooks/useIosExternalCheckout";
+import { digitalPurchasesEnabled } from "@/lib/platform";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -48,19 +49,34 @@ const ELITE_PERKS = [
 
 const Membership = () => {
   const { user } = useAuth();
-  const iosApp = isIosApp();
+  const { linkOut } = useIosExternalCheckout();
+  const hideCheckout = !digitalPurchasesEnabled() && !linkOut;
   const { membership, isLoading, isCheckingOut, checkMembership, startCheckout, openCustomerPortal } = useMembership();
   const [searchParams] = useSearchParams();
   const [communityAmount, setCommunityAmount] = useState<number>(5);
 
   // Handle success/cancel redirects
   useEffect(() => {
-    if (searchParams.get("success") === "true") {
-      toast.success("Welcome to the community! Your membership is now active.");
-      checkMembership();
-    } else if (searchParams.get("cancelled") === "true") {
-      toast.info("Checkout was cancelled");
-    }
+    const success = searchParams.get("success") === "true";
+    const cancelled = searchParams.get("cancelled") === "true";
+    if (!success && !cancelled) return;
+    let ignore = false;
+    (async () => {
+      if (cancelled) {
+        toast.info("Checkout was cancelled");
+        return;
+      }
+      const status = await checkMembership();
+      if (ignore) return;
+      if (status?.subscribed) {
+        toast.success("Welcome to the community! Your membership is now active.");
+      } else {
+        toast.message("Checkout returned. Membership shows here after Stripe confirms the test payment.");
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
   }, [searchParams, checkMembership]);
 
   const handleCommunityJoin = () => {
@@ -92,7 +108,8 @@ const Membership = () => {
                 : "Become a Member"
             }
             description="Support the creative community and unlock exclusive benefits. Every contribution goes directly into community grants, events, and education."
-            icon={<Heart className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+            icon={<Heart className="w-5 h-5" />}
+            tile="gold"
             className="mb-12 text-center"
           />
 
@@ -142,14 +159,14 @@ const Membership = () => {
                           <RefreshCw className="w-4 h-4 mr-2" />
                           Refresh
                         </Button>
-                        {!iosApp && (
+                        {!hideCheckout && (
                           <Button variant="outline" size="sm" onClick={openCustomerPortal}>
                             <ExternalLink className="w-4 h-4 mr-2" />
-                            Manage
+                            {linkOut ? "Manage in Safari" : "Manage"}
                           </Button>
                         )}
                       </div>
-                      <IosDigitalGoodsNotice kind="billing" />
+                      {hideCheckout && <IosDigitalGoodsNotice kind="billing" />}
                     </div>
                   </div>
                 </CardContent>
@@ -193,18 +210,18 @@ const Membership = () => {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Price Selector */}
-                  {!membership?.subscribed && !iosApp && (
+                  {!membership?.subscribed && !hideCheckout && (
                     <div className="space-y-3">
                       <label className="text-sm font-medium text-foreground">
                         Choose your contribution
                       </label>
                       <div className="flex items-center gap-3">
                         <span className="text-2xl font-display text-foreground">$</span>
-                        <Input
-                          type="number"
+                        <NumberInput
+                          integer
                           min={5}
                           value={communityAmount}
-                          onChange={(e) => setCommunityAmount(Math.max(5, parseInt(e.target.value) || 5))}
+                          onValueChange={value => setCommunityAmount(value)}
                           className="w-24 text-xl font-medium text-center"
                         />
                         <span className="text-muted-foreground">/month</span>
@@ -236,11 +253,11 @@ const Membership = () => {
 
                   {/* CTA */}
                   {!membership?.subscribed ? (
-                    iosApp ? (
+                    hideCheckout ? (
                       <IosDigitalGoodsNotice />
                     ) : (
-                    <Button 
-                      className="w-full" 
+                    <Button
+                      className="w-full"
                       onClick={handleCommunityJoin}
                       disabled={isCheckingOut || !user}
                     >
@@ -252,7 +269,7 @@ const Membership = () => {
                       ) : (
                         <>
                           <Heart className="w-4 h-4 mr-2" />
-                          Join for ${communityAmount}/month
+                          {linkOut ? `Join for $${communityAmount}/month in Safari` : `Join for $${communityAmount}/month`}
                         </>
                       )}
                     </Button>
@@ -262,11 +279,11 @@ const Membership = () => {
                       <Check className="w-4 h-4 mr-2" />
                       Included in Elite
                     </Button>
-                  ) : iosApp ? (
+                  ) : hideCheckout ? (
                     <IosDigitalGoodsNotice kind="billing" />
                   ) : (
                     <Button variant="outline" className="w-full" onClick={openCustomerPortal}>
-                      Manage Subscription
+                      {linkOut ? "Manage Subscription in Safari" : "Manage Subscription"}
                     </Button>
                   )}
                 </CardContent>
@@ -281,8 +298,8 @@ const Membership = () => {
             >
               <Card className={cn(
                 "h-full relative overflow-hidden transition-all",
-                membership?.tier === "elite" 
-                  ? "border-amber-500 ring-2 ring-amber-500/20" 
+                membership?.tier === "elite"
+                  ? "border-amber-500 ring-2 ring-amber-500/20"
                   : "border-amber-500/30"
               )}>
                 <div className={cn(
@@ -307,12 +324,14 @@ const Membership = () => {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Price */}
+                  {!hideCheckout && (
                   <div>
                     <div className="flex items-baseline gap-1">
                       <span className="text-4xl font-display font-medium text-foreground">$25</span>
                       <span className="text-muted-foreground">/month</span>
                     </div>
                   </div>
+                  )}
 
                   {/* Perks */}
                   <ul className="space-y-3">
@@ -326,10 +345,10 @@ const Membership = () => {
 
                   {/* CTA */}
                   {!membership?.subscribed ? (
-                    iosApp ? (
+                    hideCheckout ? (
                       <IosDigitalGoodsNotice />
                     ) : (
-                    <Button 
+                    <Button
                       className="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white border-0"
                       onClick={handleEliteJoin}
                       disabled={isCheckingOut || !user}
@@ -342,28 +361,28 @@ const Membership = () => {
                       ) : (
                         <>
                           <Crown className="w-4 h-4 mr-2" />
-                          Become Elite
+                          {linkOut ? "Become Elite in Safari" : "Become Elite"}
                         </>
                       )}
                     </Button>
                     )
                   ) : membership?.tier === "elite" ? (
-                    iosApp ? (
+                    hideCheckout ? (
                       <IosDigitalGoodsNotice kind="billing" />
                     ) : (
                     <Button variant="outline" className="w-full" onClick={openCustomerPortal}>
-                      Manage Subscription
+                      {linkOut ? "Manage Subscription in Safari" : "Manage Subscription"}
                     </Button>
                     )
-                  ) : iosApp ? (
+                  ) : hideCheckout ? (
                     <IosDigitalGoodsNotice />
                   ) : (
-                    <Button 
+                    <Button
                       className="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white border-0"
                       onClick={handleEliteJoin}
                       disabled={isCheckingOut}
                     >
-                      Upgrade to Elite
+                      {linkOut ? "Upgrade to Elite in Safari" : "Upgrade to Elite"}
                     </Button>
                   )}
                 </CardContent>

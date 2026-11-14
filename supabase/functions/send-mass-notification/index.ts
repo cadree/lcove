@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
@@ -338,7 +339,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ error: errorMessage }),
       { 
-        status: errorMessage === "Unauthorized" ? 401 : 400,
+        status: httpStatusForError(error),
         headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );

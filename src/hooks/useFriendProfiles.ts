@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { abortAfter } from '@/lib/requestDeadline';
+import { shotPeople, shotSessionEnabled } from '@/lib/shotSession';
 
 interface FriendProfile {
   user_id: string;
@@ -14,20 +16,20 @@ export function useFriendProfiles(friendIds: string[]) {
     queryKey: ['friend-profiles', friendIds],
     queryFn: async () => {
       if (friendIds.length === 0) return [];
-
-      console.log('[useFriendProfiles] Fetching profiles for', friendIds.length, 'friends');
+      if (shotSessionEnabled()) {
+        const wanted = new Set(friendIds);
+        return shotPeople
+          .filter((person) => wanted.has(person.user_id))
+          .map((person) => ({ ...person, bio: null })) as FriendProfile[];
+      }
 
       const { data, error } = await supabase
         .from('profiles_public')
         .select('user_id, display_name, avatar_url, city, bio')
-        .in('user_id', friendIds);
+        .in('user_id', friendIds)
+        .abortSignal(abortAfter());
 
-      if (error) {
-        console.error('[useFriendProfiles] Error fetching profiles:', error);
-        throw error;
-      }
-      
-      console.log('[useFriendProfiles] Successfully fetched', data?.length || 0, 'profiles');
+      if (error) throw error;
       return (data || []) as FriendProfile[];
     },
     enabled: friendIds.length > 0,

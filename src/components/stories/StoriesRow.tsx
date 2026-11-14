@@ -53,33 +53,13 @@ const StoriesRow = () => {
     await refetch();
   };
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="flex gap-3 overflow-x-auto py-4 px-1 scrollbar-hide">
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className="w-16 h-16 rounded-full bg-muted animate-pulse shrink-0" />
-        ))}
-      </div>
-    );
-  }
-
-  // Error state
   if (storiesError) {
     console.error('[StoriesRow] Error loading stories:', storiesError);
-    return (
-      <div className="flex items-center justify-center gap-2 py-4 px-4">
-        <AlertCircle className="w-4 h-4 text-destructive" />
-        <span className="text-sm text-muted-foreground">Failed to load stories</span>
-        <Button variant="ghost" size="sm" onClick={handleRetry} className="h-7 px-2">
-          <RefreshCw className="w-3.5 h-3.5 mr-1" />
-          Retry
-        </Button>
-      </div>
-    );
   }
+
   return <>
-      <div className="flex items-center gap-2 px-1 pt-2">
+      <div className="flex items-center justify-between gap-2 px-1 pt-2">
+        <p className="kicker">Stories</p>
         {user && favorites.length > 0 && <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className={`h-8 gap-1.5 text-xs ${showFavoritesOnly ? 'text-primary' : 'text-muted-foreground'}`}>
@@ -99,6 +79,17 @@ const StoriesRow = () => {
           </DropdownMenu>}
       </div>
 
+      {storiesError && (
+        <div className="flex items-center gap-2 px-1 pb-1">
+          <AlertCircle className="h-4 w-4 text-destructive" />
+          <span className="text-sm text-muted-foreground">Stories did not load</span>
+          <Button variant="ghost" size="sm" onClick={handleRetry} className="h-7 px-2">
+            <RefreshCw className="mr-1 h-3.5 w-3.5" />
+            Retry
+          </Button>
+        </div>
+      )}
+
       <motion.div initial={{
       opacity: 0,
       y: -10
@@ -107,24 +98,51 @@ const StoriesRow = () => {
       y: 0
     }} className="flex gap-3 overflow-x-auto py-4 px-1 scrollbar-hide">
         {/* Add Story Button / Your Story */}
-        {user && <motion.button whileTap={{
+        {user && <motion.div role="button" tabIndex={0} whileTap={{
         scale: 0.95
-      }} onClick={() => userStories.length > 0 ? handleOpenStory(user.id) : setShowUpload(true)} className="relative shrink-0 group">
-            <div className="w-16 h-16 rounded-full relative">
+      }} onClick={() => userStories.length > 0 ? handleOpenStory(user.id) : setShowUpload(true)} onKeyDown={(event) => {
+        if (event.key !== "Enter") return;
+        if (userStories.length > 0) handleOpenStory(user.id);
+        else setShowUpload(true);
+      }} className="relative shrink-0 group">
+            <div className="w-20 h-20 rounded-full relative">
               {/* Glass ring */}
-              <div className={`absolute inset-0 rounded-full ${userStories.length > 0 ? 'bg-gradient-to-br from-primary to-primary/60 p-[2px]' : 'bg-gradient-to-br from-muted-foreground/30 to-muted-foreground/10 p-[2px]'}`}>
+              <div className="absolute inset-0 rounded-full bg-[conic-gradient(from_120deg,#C4142D,#FF9FC8,#C4142D)] p-[2px]">
                 <div className="w-full h-full rounded-full bg-card p-[2px]">
                   <div className="w-full h-full rounded-full overflow-hidden bg-muted flex items-center justify-center">
-                    {userStories.length > 0 && userStories[0].profile?.avatar_url ? <img src={userStories[0].profile.avatar_url} alt="Your story" className="w-full h-full object-cover" /> : <Plus className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />}
+                    {userStories.length > 0 && userStories[0].media_url ? <img src={userStories[0].media_url} alt="Your story" className="w-full h-full object-cover" /> : <Plus className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />}
                   </div>
                 </div>
               </div>
+              {userStories.length > 0 && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Add another story"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setShowUpload(true);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.stopPropagation();
+                      setShowUpload(true);
+                    }
+                  }}
+                  className="absolute bottom-0 right-0 z-[1] flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-foreground"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </span>
+              )}
             </div>
-            <span className="text-[10px] text-muted-foreground mt-1.5 block text-center truncate w-16">
-              {userStories.length > 0 ? 'Your Story' : 'Add'}
+            <span className="text-[10px] text-foreground mt-1.5 block text-center truncate w-20 font-body">
+              Your story
             </span>
-            {userStories.length === 0}
-          </motion.button>}
+          </motion.div>}
+
+        {isLoading && [0, 1, 2, 3].map((slot) => (
+          <div key={slot} className="h-20 w-20 shrink-0 animate-pulse rounded-full bg-muted" />
+        ))}
 
         {/* Other Users' Stories */}
         <AnimatePresence mode="popLayout">
@@ -145,7 +163,7 @@ const StoriesRow = () => {
 
       {/* Story Viewer Modal */}
       <AnimatePresence>
-        {selectedUserId && groupedStories[selectedUserId] && <StoryViewer stories={groupedStories[selectedUserId]} onClose={handleCloseStory} onNextUser={handleNextUser} />}
+        {selectedUserId && groupedStories[selectedUserId] && <StoryViewer key={selectedUserId} stories={groupedStories[selectedUserId]} onClose={handleCloseStory} onNextUser={handleNextUser} />}
       </AnimatePresence>
 
       {/* Upload Dialog */}

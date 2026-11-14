@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { 
   Sparkles, 
   Palette, 
@@ -8,6 +8,9 @@ import {
   RotateCcw,
   Check,
   Music,
+  Upload,
+  Loader2,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -47,6 +50,9 @@ interface ProfileThemeCustomizerProps {
   onChange: (state: Partial<CustomizationState>) => void;
   onReset: () => void;
   onPreview: () => void;
+  onBackgroundFile?: (file: File) => void;
+  backgroundUploading?: boolean;
+  backgroundPreviewUrl?: string | null;
 }
 
 type TabId = 'themes' | 'background' | 'effects' | 'style' | 'layout';
@@ -97,8 +103,12 @@ export const ProfileThemeCustomizer = ({
   onChange,
   onReset,
   onPreview,
+  onBackgroundFile,
+  backgroundUploading = false,
+  backgroundPreviewUrl = null,
 }: ProfileThemeCustomizerProps) => {
   const [activeTab, setActiveTab] = useState<TabId>('themes');
+  const backgroundScrollRef = useRef<HTMLDivElement>(null);
 
   const handleThemeSelect = (preset: ThemePreset) => {
     console.log('Theme selected:', preset); // Debug log
@@ -140,7 +150,7 @@ export const ProfileThemeCustomizer = ({
       </div>
 
       {/* Content Area */}
-      <div className="h-[350px] overflow-y-auto pr-2 scrollbar-thin">
+      <div ref={backgroundScrollRef} className="h-[350px] overflow-y-auto pr-2 scrollbar-thin">
         {/* THEMES TAB */}
         {activeTab === 'themes' && (
           <div className="space-y-3">
@@ -206,7 +216,10 @@ export const ProfileThemeCustomizer = ({
                   <button
                     key={type}
                     type="button"
-                    onClick={() => onChange({ backgroundType: type })}
+                    onClick={() => {
+                      onChange({ backgroundType: type });
+                      if (type === "image") backgroundScrollRef.current?.scrollTo({ top: 0 });
+                    }}
                     className={cn(
                       "p-3 rounded-lg border text-sm capitalize transition-all",
                       state.backgroundType === type
@@ -265,6 +278,47 @@ export const ProfileThemeCustomizer = ({
                     />
                   ))}
                 </div>
+              </div>
+            )}
+
+            {state.backgroundType === 'image' && (
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Cover photo</Label>
+                <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium">
+                  {backgroundUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  {backgroundUploading ? "Uploading" : "Upload photo"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    disabled={backgroundUploading}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      if (file) onBackgroundFile?.(file);
+                    }}
+                  />
+                </label>
+                {(backgroundPreviewUrl || state.backgroundValue?.startsWith("http")) && (
+                  <div className="relative h-32 overflow-hidden rounded-lg bg-muted">
+                    <img
+                      src={backgroundPreviewUrl || state.backgroundValue}
+                      alt="Cover preview"
+                      className="h-full w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onChange({
+                        backgroundType: "gradient",
+                        backgroundValue: "from-primary/30 via-background to-accent/20",
+                      })}
+                      className="absolute right-2 top-2 rounded-full bg-background/80 p-1"
+                      aria-label="Remove cover photo"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

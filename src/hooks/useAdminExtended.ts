@@ -36,6 +36,9 @@ export interface AdminUserData {
   mindset_level: number | null;
   access_status: string | null;
   created_at: string | null;
+  is_suspended: boolean;
+  suspension_reason: string | null;
+  deleted_at: string | null;
   skills: string[];
   passions: string[];
   creative_roles: string[];
@@ -149,6 +152,9 @@ export function useAdminUserData() {
         mindset_level: u.mindset_level,
         access_status: u.access_status,
         created_at: u.created_at,
+        is_suspended: u.is_suspended ?? false,
+        suspension_reason: u.suspension_reason,
+        deleted_at: u.deleted_at,
         skills: skillsMap.get(u.user_id) || [],
         passions: passionsMap.get(u.user_id) || [],
         creative_roles: rolesMap.get(u.user_id) || [],
@@ -433,13 +439,25 @@ export function useSendIndividualMessage() {
       sendEmail: boolean;
       sendSms: boolean;
     }) => {
+      if (data.sendDm) {
+        await callRpc("admin_message_user", {
+          p_user_id: data.userId,
+          p_title: data.title,
+          p_body: data.message,
+        });
+      }
+
+      if (!data.sendEmail && !data.sendSms) {
+        return { dm: data.sendDm };
+      }
+
       const { data: result, error } = await supabase.functions.invoke("send-individual-message", {
         body: {
           target_user_id: data.userId,
           title: data.title,
           message: data.message,
           delivery_methods: {
-            dm: data.sendDm,
+            dm: false,
             email: data.sendEmail,
             sms: data.sendSms,
           },
@@ -477,13 +495,25 @@ export function useSendMultiUserMessage() {
     }) => {
       const results = await Promise.allSettled(
         data.userIds.map(async (userId) => {
+          if (data.sendDm) {
+            await callRpc("admin_message_user", {
+              p_user_id: userId,
+              p_title: data.title,
+              p_body: data.message,
+            });
+          }
+
+          if (!data.sendEmail && !data.sendSms) {
+            return { userId };
+          }
+
           const { data: result, error } = await supabase.functions.invoke("send-individual-message", {
             body: {
               target_user_id: userId,
               title: data.title,
               message: data.message,
               delivery_methods: {
-                dm: data.sendDm,
+                dm: false,
                 email: data.sendEmail,
                 sms: data.sendSms,
               },

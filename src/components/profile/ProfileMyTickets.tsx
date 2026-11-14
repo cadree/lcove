@@ -8,8 +8,9 @@ import { format, isPast } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useMyTicketOrders, type MyTicketOrder } from "@/hooks/useMyTicketOrders";
+import { EventReminderToggle } from "@/components/events/EventReminderToggle";
 
-export function ProfileMyTickets() {
+export function ProfileMyTickets({ showEmpty = false }: { showEmpty?: boolean }) {
   const { data: orders = [], isLoading } = useMyTicketOrders();
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -26,7 +27,18 @@ export function ProfileMyTickets() {
     return { upcoming, past };
   }, [orders]);
 
-  if (isLoading || orders.length === 0) return null;
+  if (isLoading) {
+    return showEmpty ? <p className="px-1 text-sm text-muted-foreground">Loading tickets…</p> : null;
+  }
+  if (orders.length === 0) {
+    return showEmpty ? (
+      <Card className="border-border bg-card p-6 text-center">
+        <Ticket className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+        <p className="font-body text-base font-extrabold text-foreground">No tickets yet</p>
+        <p className="mt-1 text-sm text-muted-foreground">Tickets you buy for community events show up here.</p>
+      </Card>
+    ) : null;
+  }
 
   const renderOrder = (o: MyTicketOrder) => {
     if (!o.event) return null;
@@ -77,6 +89,7 @@ export function ProfileMyTickets() {
               {o.attendees.length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-3">No tickets attached.</p>
               )}
+              <EventReminderToggle eventId={o.event.id} />
               {o.attendees.map(a => (
                 <div key={a.id} className="flex items-center gap-3 p-2 rounded-md bg-muted/40">
                   <div className="bg-white p-1.5 rounded shrink-0">

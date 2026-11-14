@@ -82,9 +82,10 @@ jobs:
           GOOGLE_WALLET_ISSUER_ID: ${{ secrets.GOOGLE_WALLET_ISSUER_ID }}
           GOOGLE_WALLET_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_WALLET_SERVICE_ACCOUNT_KEY }}
           INTERNAL_FUNCTION_SECRET: ${{ secrets.INTERNAL_FUNCTION_SECRET }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
+          LIVEKIT_URL: ${{ secrets.LIVEKIT_URL }}
           LOVABLE_API_KEY: ${{ secrets.LOVABLE_API_KEY }}
-          MUX_TOKEN_ID: ${{ secrets.MUX_TOKEN_ID }}
-          MUX_TOKEN_SECRET: ${{ secrets.MUX_TOKEN_SECRET }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           SITE_URL: ${{ secrets.SITE_URL }}
           STRIPE_PRICE_COMMUNITY: ${{ secrets.STRIPE_PRICE_COMMUNITY }}

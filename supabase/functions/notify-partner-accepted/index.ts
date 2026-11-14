@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 import { requireUserOrService } from "../_shared/require-caller.ts";
+import { authorizePartnerAccepted, escapeHtml } from "../_shared/notification-auth.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -61,14 +63,25 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    const { applicationId, email, businessName }: PartnerAcceptedRequest = await req.json();
-
-    console.log(`Sending partner acceptance email to ${email} for ${businessName}`);
-
-    // Validate required fields
-    if (!email || !businessName) {
-      throw new Error("Missing required fields: email and businessName");
+    const { applicationId } = await req.json() as Partial<PartnerAcceptedRequest>;
+    const { data: application } = applicationId
+      ? await supabase
+        .from("partner_applications")
+        .select("id, status, contact_email, business_name")
+        .eq("id", applicationId)
+        .maybeSingle()
+      : { data: null };
+    const decision = authorizePartnerAccepted({ callerIsAdmin: true, application });
+    if (!decision.ok) {
+      return new Response(JSON.stringify({ error: decision.error }), {
+        status: decision.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
+    const email = decision.email;
+    const businessName = decision.businessName;
+
+    console.log(`Sending partner acceptance email for application ${applicationId}`);
 
     const appUrl = Deno.env.get("SITE_URL") || "https://etherbylcove.com";
     const partnerPortalUrl = `${appUrl}/partner-portal`;
@@ -92,7 +105,7 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
           
           <div style="background: #ffffff; border-radius: 12px; padding: 32px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-            <p style="font-size: 18px; margin: 0 0 16px 0;">Dear <strong>${businessName}</strong>,</p>
+            <p style="font-size: 18px; margin: 0 0 16px 0;">Dear <strong>${escapeHtml(businessName)}</strong>,</p>
             
             <p style="margin: 0 0 16px 0;">We're thrilled to welcome you to the <strong>Ether Partner Network</strong>! Your application to join our creative community as a brand partner has been approved.</p>
             
@@ -143,7 +156,7 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(
       JSON.stringify({ error: errorMessage(error) }),
       {
-        status: 500,
+        status: httpStatusForError(error),
         headers: { "Content-Type": "application/json", ...corsHeaders },
       }
     );

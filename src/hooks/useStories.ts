@@ -1,8 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
+import { queueMedia, usePendingUploads } from '@/lib/queuedMedia';
+import { withPending } from '@/lib/pendingUploads';
+import { isQueryablePostId } from '@/lib/postId';
+import { errorMessage } from '@/lib/errorMessage';
+import { shotContentThin, shotSessionEnabled, shotStories } from '@/lib/shotSession';
+import { storyViewShouldRefresh } from '@/lib/feedWindow';
 
 interface Story {
   id: string;
@@ -18,6 +25,12 @@ interface Story {
   };
   view_count?: number;
   has_viewed?: boolean;
+  source_post_id?: string | null;
+  credit_user_id?: string | null;
+  credit_profile?: {
+    display_name: string | null;
+    avatar_url: string | null;
+  } | null;
 }
 
 interface StoryWithProfile extends Story {
@@ -29,11 +42,13 @@ interface StoryWithProfile extends Story {
 
 export function useStories() {
   const { user } = useAuth();
+  const { blockedIds } = useUserBlocks();
   const queryClient = useQueryClient();
 
   const { data, isLoading, refetch, error } = useQuery({
     queryKey: ['stories'],
     queryFn: async () => {
+      if (shotSessionEnabled()) return shotContentThin() ? { stories: [], grouped: {} } : shotStories();
       console.log('[useStories] Fetching stories...');
       
       // Get all non-expired stories
@@ -55,7 +70,10 @@ export function useStories() {
       }
 
       // Get profiles for story creators
-      const userIds = [...new Set(storiesData.map(s => s.user_id))];
+      const userIds = [...new Set([
+        ...storiesData.map(s => s.user_id),
+        ...storiesData.flatMap(s => s.credit_user_id ? [s.credit_user_id] : []),
+      ])];
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles_public')
         .select('user_id, display_name, avatar_url')
@@ -70,41 +88,38 @@ export function useStories() {
 
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
 
-      // Get view counts for each story (only for own stories)
-      const storiesWithProfiles = await Promise.all(
-        storiesData.map(async (story) => {
-          let viewCount = 0;
-          let hasViewed = false;
+      // One lookup for "have I seen this" and one for the owner's counts.
+      // A query per story was an N+1 on every feed load.
+      const viewedIds = new Set<string>();
+      const viewCounts = new Map<string, number>();
+      if (user && storiesData.length) {
+        const storyIds = storiesData.map((story) => story.id);
+        const { data: viewed } = await supabase
+          .from('story_views')
+          .select('story_id')
+          .eq('viewer_id', user.id)
+          .in('story_id', storyIds);
+        for (const row of viewed ?? []) viewedIds.add(row.story_id);
 
-          if (user) {
-            // Check if current user has viewed this story
-            const { data: viewData } = await supabase
-              .from('story_views')
-              .select('id')
-              .eq('story_id', story.id)
-              .eq('viewer_id', user.id)
-              .maybeSingle();
-            
-            hasViewed = !!viewData;
-
-            // Get view count only if user owns this story
-            if (story.user_id === user.id) {
-              const { count } = await supabase
-                .from('story_views')
-                .select('*', { count: 'exact', head: true })
-                .eq('story_id', story.id);
-              viewCount = count || 0;
-            }
+        const ownIds = storiesData.filter((story) => story.user_id === user.id).map((story) => story.id);
+        if (ownIds.length) {
+          const { data: ownViews } = await supabase
+            .from('story_views')
+            .select('story_id')
+            .in('story_id', ownIds);
+          for (const row of ownViews ?? []) {
+            viewCounts.set(row.story_id, (viewCounts.get(row.story_id) ?? 0) + 1);
           }
+        }
+      }
 
-          return {
-            ...story,
-            profile: profileMap.get(story.user_id) || { display_name: 'Private profile', avatar_url: null },
-            view_count: viewCount,
-            has_viewed: hasViewed,
-          } as StoryWithProfile;
-        })
-      );
+      const storiesWithProfiles = storiesData.map((story) => ({
+        ...story,
+        profile: profileMap.get(story.user_id) || { display_name: 'Private profile', avatar_url: null },
+        credit_profile: story.credit_user_id ? profileMap.get(story.credit_user_id) || null : null,
+        view_count: viewCounts.get(story.id) ?? 0,
+        has_viewed: viewedIds.has(story.id),
+      })) as StoryWithProfile[];
 
       // Group stories by user
       const groupedByUser = storiesWithProfiles.reduce((acc, story) => {
@@ -135,7 +150,12 @@ export function useStories() {
           table: 'story_views',
         },
         (payload) => {
-          // Invalidate stories query to refresh view counts
+          const row = (payload.new ?? null) as { story_id?: string } | null;
+          const cached = queryClient.getQueryData<{ stories?: { id: string; user_id: string }[] }>(['stories']);
+          const owned = new Set(
+            (cached?.stories ?? []).filter((story) => story.user_id === user.id).map((story) => story.id),
+          );
+          if (!storyViewShouldRefresh(row?.story_id, owned)) return;
           queryClient.invalidateQueries({ queryKey: ['stories'] });
         }
       )
@@ -149,43 +169,37 @@ export function useStories() {
   const uploadStory = useMutation({
     mutationFn: async ({ file, mediaType }: { file: File; mediaType: 'photo' | 'video' }) => {
       if (!user) throw new Error('Must be logged in');
-
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('media')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('media')
-        .getPublicUrl(fileName);
-
-      const { error: insertError } = await supabase
-        .from('stories')
-        .insert({
-          user_id: user.id,
-          media_url: publicUrl,
-          media_type: mediaType,
-        });
-
-      if (insertError) throw insertError;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stories'] });
-      toast.success('Story uploaded!');
+      // The story uploads in the background; the tray shows it right away.
+      queueMedia({
+        queryClient,
+        userId: user.id,
+        kind: 'story',
+        label: mediaType === 'video' ? 'Video story' : 'Story',
+        files: [file],
+        mediaType,
+        insert: async ([publicUrl]) => {
+          const { error: insertError } = await supabase
+            .from('stories')
+            .insert({
+              user_id: user.id,
+              media_url: publicUrl,
+              media_type: mediaType,
+            });
+          if (insertError) throw insertError;
+        },
+        invalidate: [['stories']],
+        successMessage: 'Story posted',
+      });
     },
     onError: (error) => {
-      toast.error('Failed to upload story');
+      toast.error(errorMessage(error, 'Failed to upload story'));
       console.error(error);
     },
   });
 
   const recordView = useMutation({
     mutationFn: async (storyId: string) => {
-      if (!user) return;
+      if (!user || !isQueryablePostId(storyId)) return;
       
       // Use insert with onConflict to handle duplicates
       const { error } = await supabase
@@ -230,9 +244,39 @@ export function useStories() {
     },
   });
 
+  const pending = usePendingUploads();
+  const stories = useMemo(() => {
+    const rows = (data?.stories || []) as StoryWithProfile[];
+    const visible = rows.filter((story) => {
+      if (blockedIds.includes(story.user_id)) return false;
+      if (story.credit_user_id && blockedIds.includes(story.credit_user_id)) return false;
+      return true;
+    });
+    return withPending(visible, pending, 'story', (item) => ({
+      id: item.id,
+      user_id: item.userId,
+      media_url: item.mediaUrl ?? '',
+      media_type: item.mediaType === 'video' ? 'video' : 'photo',
+      is_live: false,
+      created_at: item.createdAt,
+      expires_at: new Date(Date.parse(item.createdAt) + 24 * 60 * 60 * 1000).toISOString(),
+      profile: { display_name: 'You', avatar_url: null },
+      view_count: 0,
+      has_viewed: true,
+    }) as StoryWithProfile);
+  }, [data?.stories, blockedIds, pending]);
+
+  const groupedStories = useMemo(() => {
+    return stories.reduce((acc, story) => {
+      if (!acc[story.user_id]) acc[story.user_id] = [];
+      acc[story.user_id].push(story);
+      return acc;
+    }, {} as Record<string, StoryWithProfile[]>);
+  }, [stories]);
+
   return {
-    stories: data?.stories || [],
-    groupedStories: data?.grouped || {},
+    stories,
+    groupedStories,
     isLoading,
     error,
     uploadStory,

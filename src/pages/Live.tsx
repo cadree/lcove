@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { BackButton } from '@/components/navigation/BackButton';
 import PageLayout from '@/components/layout/PageLayout';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
@@ -9,12 +10,13 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { 
-  Radio, Plus, Users, Mic, ArrowLeft, Play, Pencil, 
+  Radio, Plus, Users, Mic, Play, Pencil, 
   Clock, Eye, Coins, PlayCircle, Video, Headphones, Search 
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLiveStreams, useEndStream, LiveStream } from '@/hooks/useLiveStreams';
 import { LiveStreamCard } from '@/components/streaming/LiveStreamCard';
+import { DeleteStreamButton } from '@/components/streaming/DeleteStreamButton';
 import { StreamViewer } from '@/components/streaming/StreamViewer';
 import { CreateStreamDialog } from '@/components/streaming/CreateStreamDialog';
 import { EditStreamDialog } from '@/components/streaming/EditStreamDialog';
@@ -28,7 +30,8 @@ const MyStreamCard: React.FC<{
   onWatch: () => void;
   onEdit: () => void;
   onGoLive: () => void;
-}> = ({ stream, onWatch, onEdit, onGoLive }) => {
+  deleteSuppressed?: boolean;
+}> = ({ stream, onWatch, onEdit, onGoLive, deleteSuppressed = false }) => {
   const { profile } = useProfile(stream.host_id);
   const endStream = useEndStream();
   
@@ -121,6 +124,9 @@ const MyStreamCard: React.FC<{
               Edit
             </Button>
             
+            {status === 'ended' && (
+              <DeleteStreamButton streamId={stream.id} suppressed={deleteSuppressed} />
+            )}
             {status === 'live' ? (
               <Button 
                 size="sm" 
@@ -240,16 +246,52 @@ const FeaturedLiveCard: React.FC<{
 };
 
 const Live = () => {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { streams: liveStreams, isLoading: loadingLive } = useLiveStreams(true);
   const { streams: allStreams, isLoading: loadingAll } = useLiveStreams(false);
 
   const [showCreate, setShowCreate] = useState(false);
+  const [queuedStreamId, setQueuedStreamId] = useState<string | null>(null);
   const [selectedStreamId, setSelectedStreamId] = useState<string | null>(null);
   const [editingStream, setEditingStream] = useState<LiveStream | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  // history.back() from the sheet returns to the same ?stream= URL. Remember
+  // the id we just closed so that entry cannot open the room again.
+  const dismissedStream = useRef<string | null>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const sheetOpen = Boolean(selectedStreamId);
+
+  useEffect(() => {
+    const node = pageRef.current;
+    if (!node) return;
+    if (sheetOpen) node.setAttribute("inert", "");
+    else node.removeAttribute("inert");
+  }, [sheetOpen]);
+
+  const openStream = (streamId: string) => {
+    if (dismissedStream.current === streamId) dismissedStream.current = null;
+    setSelectedStreamId(streamId);
+  };
+
+  useEffect(() => {
+    const streamId = searchParams.get("stream");
+    if (!streamId || dismissedStream.current === streamId) return;
+    setSelectedStreamId(streamId);
+  }, [searchParams]);
+
+  // Open the host room after Setup stream has finished closing. Opening it in
+  // the same turn lets that dialog's dismiss land on the new viewer and drop
+  // the Go Live screen.
+  useEffect(() => {
+    if (showCreate || !queuedStreamId) return;
+    const streamId = queuedStreamId;
+    const timer = window.setTimeout(() => {
+      setSelectedStreamId(streamId);
+      setQueuedStreamId(null);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [showCreate, queuedStreamId]);
 
   // Handle action param from FAB
   useEffect(() => {
@@ -260,11 +302,12 @@ const Live = () => {
   }, [searchParams, user, setSearchParams]);
 
   const myStreams = allStreams.filter(s => s.host_id === user?.id);
-  const otherStreams = allStreams.filter(s => s.host_id !== user?.id);
-  
+
   // Filter streams by search query
   const filteredBrowseStreams = useMemo(() => {
-    const streams = user ? otherStreams : allStreams;
+    const streams = user
+      ? allStreams.filter((stream) => stream.host_id !== user.id || (!stream.is_live && stream.started_at && stream.ended_at))
+      : allStreams;
     if (!searchQuery.trim()) return streams;
     
     const query = searchQuery.toLowerCase();
@@ -272,7 +315,7 @@ const Live = () => {
       s.title.toLowerCase().includes(query) || 
       (s.description && s.description.toLowerCase().includes(query))
     );
-  }, [searchQuery, otherStreams, allStreams, user]);
+  }, [searchQuery, allStreams, user]);
 
   const filteredReplays = useMemo(() => {
     const replays = allStreams.filter(s => s.replay_available && s.replay_url);
@@ -291,30 +334,28 @@ const Live = () => {
 
   return (
     <PageLayout>
-      <div className="min-h-screen">
+      <div ref={pageRef} className={cn("min-h-screen", sheetOpen && "pointer-events-none")}>
         {/* Hero Section */}
         <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-background to-background">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0">
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2.5 bg-primary/20 rounded-xl">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                <BackButton className="shrink-0" />
+                <div className="min-w-0">
+                  <div className="mb-2 flex items-center gap-3">
+                    <div className="shrink-0 rounded-xl bg-primary/20 p-2.5">
                       <Radio className="h-6 w-6 text-primary" />
                     </div>
-                    <h1 className="text-2xl sm:text-3xl font-bold">Live Streams</h1>
+                    <h1 className="min-w-0 text-2xl font-bold sm:text-3xl">Live Streams</h1>
                   </div>
-                  <p className="text-muted-foreground text-sm sm:text-base">
+                  <p className="text-sm text-muted-foreground sm:text-base">
                     Stream live DJ sets or watch the community
                   </p>
                 </div>
               </div>
               
               {user && (
-                <Button onClick={() => setShowCreate(true)} className="shrink-0">
+                <Button onClick={() => setShowCreate(true)} className="w-full shrink-0 sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   <span className="hidden sm:inline">Start Streaming</span>
                   <span className="sm:hidden">Stream</span>
@@ -363,7 +404,7 @@ const Live = () => {
                 <div className="max-w-xl">
                   <FeaturedLiveCard 
                     stream={liveStreams[0]}
-                    onClick={() => setSelectedStreamId(liveStreams[0].id)}
+                    onClick={() => openStream(liveStreams[0].id)}
                   />
                 </div>
               ) : (
@@ -372,7 +413,7 @@ const Live = () => {
                     <LiveStreamCard 
                       key={stream.id} 
                       stream={stream}
-                      onClick={() => setSelectedStreamId(stream.id)}
+                      onClick={() => openStream(stream.id)}
                     />
                   ))}
                 </div>
@@ -397,9 +438,10 @@ const Live = () => {
                       <MyStreamCard
                         key={stream.id}
                         stream={stream}
-                        onWatch={() => setSelectedStreamId(stream.id)}
+                        onWatch={() => openStream(stream.id)}
                         onEdit={() => setEditingStream(stream)}
-                        onGoLive={() => setSelectedStreamId(stream.id)}
+                        onGoLive={() => openStream(stream.id)}
+                        deleteSuppressed={sheetOpen}
                       />
                     ))}
                   </div>
@@ -442,7 +484,9 @@ const Live = () => {
                     <LiveStreamCard 
                       key={stream.id} 
                       stream={stream}
-                      onClick={() => setSelectedStreamId(stream.id)}
+                      canDelete={!!user && stream.host_id === user.id && !stream.is_live}
+                      deleteSuppressed={sheetOpen}
+                      onClick={() => openStream(stream.id)}
                     />
                   ))}
                 </div>
@@ -483,7 +527,9 @@ const Live = () => {
                     <LiveStreamCard 
                       key={stream.id} 
                       stream={stream}
-                      onClick={() => setSelectedStreamId(stream.id)}
+                      canDelete={!!user && stream.host_id === user.id && !stream.is_live}
+                      deleteSuppressed={sheetOpen}
+                      onClick={() => openStream(stream.id)}
                     />
                   ))}
                 </div>
@@ -503,28 +549,35 @@ const Live = () => {
             </TabsContent>
           </Tabs>
         </div>
-
-        {/* Dialogs */}
-        <CreateStreamDialog 
-          open={showCreate} 
-          onClose={() => setShowCreate(false)} 
-          onStreamCreated={(streamId) => setSelectedStreamId(streamId)}
-        />
-
-        <EditStreamDialog
-          stream={editingStream}
-          open={!!editingStream}
-          onClose={() => setEditingStream(null)}
-        />
-
-        {selectedStreamId && (
-          <StreamViewer
-            streamId={selectedStreamId}
-            open={!!selectedStreamId}
-            onClose={() => setSelectedStreamId(null)}
-          />
-        )}
       </div>
+
+      <CreateStreamDialog 
+        open={showCreate} 
+        onClose={() => setShowCreate(false)} 
+        onStreamCreated={(streamId) => setQueuedStreamId(streamId)}
+      />
+
+      <EditStreamDialog
+        stream={editingStream}
+        open={!!editingStream}
+        onClose={() => setEditingStream(null)}
+      />
+
+      {selectedStreamId && (
+        <StreamViewer
+          streamId={selectedStreamId}
+          open={!!selectedStreamId}
+          onClose={() => {
+            dismissedStream.current = selectedStreamId;
+            setSelectedStreamId(null);
+            if (searchParams.get("stream")) {
+              const next = new URLSearchParams(searchParams);
+              next.delete("stream");
+              setSearchParams(next, { replace: true });
+            }
+          }}
+        />
+      )}
     </PageLayout>
   );
 };

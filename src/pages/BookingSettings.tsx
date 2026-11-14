@@ -181,7 +181,7 @@ const BookingSettings = () => {
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
           <h2 className="font-display text-2xl text-foreground">Sign in to manage booking pages</h2>
           <Button asChild>
-            <Link to="/auth">Sign In</Link>
+            <Link to="/auth">Sign in</Link>
           </Button>
         </div>
       </PageLayout>
@@ -194,8 +194,8 @@ const BookingSettings = () => {
         <PageHeader
           title="Booking Pages"
           description="Let others book time with you"
-          icon={<Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
-          backPath="/settings"
+          icon={<Calendar className="w-5 h-5" />}
+          tile="cyan"
           actions={
             !isCreating && (
               <Button onClick={() => setIsCreating(true)}>
@@ -372,6 +372,7 @@ const BookingSettings = () => {
                     Cancel
                   </Button>
                   <Button 
+                    type="button"
                     onClick={handleSave}
                     disabled={createBookingPage.isPending || updateBookingPage.isPending}
                   >

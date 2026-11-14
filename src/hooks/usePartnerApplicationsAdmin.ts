@@ -100,11 +100,7 @@ export function useAcceptPartnerApplication() {
 
       // Send acceptance email via edge function
       const { error: emailError } = await supabase.functions.invoke('notify-partner-accepted', {
-        body: {
-          applicationId,
-          email: application.contact_email,
-          businessName: application.business_name,
-        },
+        body: { applicationId },
       });
 
       if (emailError) {

@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plus, FolderKanban, Filter, Rocket, Lightbulb, Lock } from 'lucide-react';
@@ -21,7 +22,7 @@ const Projects: React.FC = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState('all');
-  const { projects, myProjects, isLoading } = useProjects(statusFilter);
+  const { projects, myProjects, joinedProjects, isLoading } = useProjects(statusFilter);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -85,19 +86,32 @@ const Projects: React.FC = () => {
     }
   }, [searchParams, user, setSearchParams]);
 
-  // Handle open param from shared links
+  // Resolve shared links independently of discovery filters and list-query timing.
+  const openId = searchParams.get('open') || searchParams.get('id');
+  const linkedProject = useQuery({
+    queryKey: ['linked-project', openId, user?.id],
+    enabled: !!openId && !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('projects').select('*').eq('id', openId!).maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      const { data: roles, error: rolesError } = await supabase.from('project_roles').select('*').eq('project_id', data.id);
+      if (rolesError) throw rolesError;
+      return { ...data, total_budget: Number(data.total_budget), roles: (roles ?? []).map(role => ({
+        ...role, payout_amount: Number(role.payout_amount), credit_amount: Number(role.credit_amount ?? 0),
+      })) } as Project;
+    },
+  });
   useEffect(() => {
-    const openId = searchParams.get('open');
-    if (openId && !isLoading) {
-      const allProjects = [...projects, ...myProjects];
-      const found = allProjects.find(p => p.id === openId);
-      if (found) {
-        setSelectedProject(found);
-        setDetailOpen(true);
-      }
-      setSearchParams({}, { replace: true });
+    if (!openId || !user || linkedProject.isPending) return;
+    if (linkedProject.data) {
+      setSelectedProject(linkedProject.data);
+      setDetailOpen(true);
+    } else {
+      toast.error('This project is unavailable or you do not have access.');
     }
-  }, [searchParams, projects, myProjects, isLoading, setSearchParams]);
+    setSearchParams(previous => { const next = new URLSearchParams(previous); next.delete('open'); next.delete('id'); return next; }, { replace: true });
+  }, [openId, user, linkedProject.data, linkedProject.isPending, setSearchParams]);
 
   const handleProjectClick = (project: Project) => {
     setSelectedProject(project);
@@ -111,8 +125,8 @@ const Projects: React.FC = () => {
         <PageHeader
           title="Projects"
           description="Find collaborators, share budgets transparently"
-          icon={<FolderKanban className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
-          backPath="/"
+          icon={<FolderKanban className="w-5 h-5" />}
+          tile="cyan"
           actions={
             user && (
               <CreateProjectDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
@@ -199,7 +213,7 @@ const Projects: React.FC = () => {
 
             {user && (
               <TabsContent value="my-projects">
-                {myProjects.length === 0 ? (
+                {myProjects.length === 0 && joinedProjects.length === 0 ? (
                   <EmptyState
                     icon={Lightbulb}
                     title="Your creative journey awaits"
@@ -210,20 +224,38 @@ const Projects: React.FC = () => {
                     }}
                   />
                 ) : (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {myProjects.map((project, index) => (
-                      <motion.div
-                        key={project.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                      >
-                        <ProjectCard
-                          project={project}
-                          onClick={() => handleProjectClick(project)}
-                        />
-                      </motion.div>
-                    ))}
+                  <div className="space-y-8">
+                    {myProjects.length > 0 && (
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {myProjects.map((project, index) => (
+                          <motion.div
+                            key={project.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                          >
+                            <ProjectCard
+                              project={project}
+                              onClick={() => handleProjectClick(project)}
+                            />
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+                    {joinedProjects.some((project) => project.creator_id !== user.id) && (
+                      <div>
+                        <h3 className="mono-label mb-3 text-[10px] text-muted-foreground">Collaborating</h3>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          {joinedProjects.filter((project) => project.creator_id !== user.id).map((project) => (
+                            <ProjectCard
+                              key={project.id}
+                              project={project}
+                              onClick={() => handleProjectClick(project)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </TabsContent>

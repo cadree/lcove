@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Crown, Star, Heart, Plus, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,9 @@ export function ProfileAboutSection({
   onEditClick,
 }: ProfileAboutSectionProps) {
   const hasDetails = creativeRoles.length > 0 || skills.length > 0 || passions.length > 0;
+  const hasBio = bio.trim().length > 0;
+
+  if (!hasBio && !hasDetails && !isOwner) return null;
 
   return (
     <motion.div
@@ -29,8 +33,13 @@ export function ProfileAboutSection({
       transition={{ delay: 0.4 }}
       className="px-5 py-4"
     >
-      {/* Bio */}
-      <p className="text-muted-foreground leading-relaxed text-sm">{bio}</p>
+      {hasBio ? (
+        <p className="text-muted-foreground leading-relaxed text-sm">{bio}</p>
+      ) : isOwner ? (
+        <Link to="/settings" className="text-sm text-muted-foreground hover:text-foreground">
+          Add a bio in Settings
+        </Link>
+      ) : null}
 
       {/* Details Section */}
       {(hasDetails || isOwner) && (

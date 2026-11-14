@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { revealMotion } from "@/lib/reveal";
 import { ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -12,10 +13,7 @@ interface HomeSectionHeaderProps {
 const HomeSectionHeader = ({ title, subtitle, link, linkText = "View all" }: HomeSectionHeaderProps) => {
   return (
     <motion.div
-      initial={{ opacity: 0, x: -10 }}
-      whileInView={{ opacity: 1, x: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.4 }}
+      {...revealMotion({ x: -10, duration: 0.4 })}
       className="flex items-end justify-between px-4 mb-3"
     >
       <div className="space-y-0.5">

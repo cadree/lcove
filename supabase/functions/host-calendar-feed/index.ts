@@ -1,5 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { format } from "https://esm.sh/date-fns@3.6.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,7 +15,7 @@ function escapeICSText(text: string): string {
 }
 
 function formatICSDate(date: Date): string {
-  return format(date, "yyyyMMdd'T'HHmmss'Z'");
+  return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
 }
 
 Deno.serve(async (req) => {
@@ -102,11 +101,13 @@ Deno.serve(async (req) => {
     const icsLines = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//Lcove//Host Calendar Feed//EN',
+      'PRODID:-//Ether//Host Calendar Feed//EN',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       `X-WR-CALNAME:${escapeICSText(calendarName)}`,
       'X-WR-TIMEZONE:UTC',
+      'X-PUBLISHED-TTL:PT15M',
+      'REFRESH-INTERVAL;VALUE=DURATION:PT15M',
     ];
 
     for (const event of events || []) {
@@ -157,7 +158,8 @@ Deno.serve(async (req) => {
     return new Response(icsContent, {
       headers: {
         ...corsHeaders,
-        'Content-Disposition': 'attachment; filename="hosted-events.ics"',
+        'Content-Disposition': 'inline; filename="ether-events.ics"',
+        'Cache-Control': 'public, max-age=900',
       },
     });
 

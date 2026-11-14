@@ -27,6 +27,7 @@ import { useUserSearch } from "@/hooks/useUserSearch";
 import { Camera, X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
+import { readNumber } from "@/lib/numberField";
 
 interface CreateCollectiveDialogProps {
   open: boolean;
@@ -100,13 +101,15 @@ export function CreateCollectiveDialog({
   };
 
   const handleCreate = () => {
+    const members = readNumber(maxMembers, { label: "Max members", min: 2, max: 1000, integer: true });
+    if (members.error) { toast.error(members.error); return; }
     createMutation.mutate(
       {
         name,
         description,
         topic,
         visibility,
-        maxMembers: parseInt(maxMembers),
+        maxMembers: members.value ?? 100,
         avatarUrl,
         coverImageUrl,
         inviteUserIds: selectedUsers.map((u) => u.id),
@@ -262,6 +265,7 @@ export function CreateCollectiveDialog({
                 type="number"
                 min="2"
                 max="1000"
+                step="1"
                 value={maxMembers}
                 onChange={(e) => setMaxMembers(e.target.value)}
               />

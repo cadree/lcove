@@ -4,7 +4,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import {
-  ArrowLeft,
   Calendar,
   MapPin,
   Users,
@@ -12,12 +11,10 @@ import {
   DollarSign,
   Megaphone,
   UserCog,
-  Share2,
   MoreHorizontal,
   Edit,
   Trash2,
   ExternalLink,
-  Copy,
   Mail,
   Search,
   Download,
@@ -32,7 +29,9 @@ import {
   QrCode,
   ScanLine,
 } from "lucide-react";
+import { SquircleIcon } from "@/components/world/SquircleIcon";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/navigation/BackButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -60,10 +59,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsAdmin } from "@/hooks/useAdmin";
+import { formatEventDate, formatEventTime } from "@/lib/eventTime";
 import BottomNav from "@/components/navigation/BottomNav";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { shareLink, buildShareUrl } from "@/lib/shareLink";
+import { HostShareBar } from "@/components/events/HostShareBar";
+import { eventPublicPath, eventPublicUrl } from "../../functions/_shared/eventShare.js";
 import { useEventTicketingData, type TicketOrder, type EventAttendee } from "@/hooks/useEventTicketingData";
 import { useEventCheckIns } from "@/hooks/useEventCheckIn";
 import { CheckInScanner } from "@/components/events/CheckInScanner";
@@ -116,6 +118,7 @@ export default function EventDetail() {
   const navigate = useNavigate();
   const { eventId } = useParams();
   const { user } = useAuth();
+  const { isAdmin, isLoading: adminLoading } = useIsAdmin();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("orders");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -138,6 +141,10 @@ export default function EventDetail() {
     enabled: !!eventId,
   });
 
+  const isHost = !!user && event?.creator_id === user.id;
+  const canManage = isHost || isAdmin;
+  const accessPending = eventLoading || (!isHost && adminLoading);
+
   // Fetch RSVPs (includes orders/attendees)
   const { data: rsvps, isLoading: rsvpsLoading } = useQuery({
     queryKey: ["event-rsvps", eventId],
@@ -151,7 +158,7 @@ export default function EventDetail() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!eventId,
+    enabled: !!eventId && canManage,
   });
 
   // Fetch attendee profiles
@@ -183,7 +190,7 @@ export default function EventDetail() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!event?.organization_id,
+    enabled: !!event?.organization_id && canManage,
   });
 
   // Fetch team member profiles
@@ -203,8 +210,8 @@ export default function EventDetail() {
   });
 
   // NEW: Phase-3 ticketing data (orders, attendees, tiers) and check-ins
-  const { orders: v2Orders, attendees: v2Attendees, tiers: v2Tiers, isLoading: v2Loading } = useEventTicketingData(eventId);
-  const { data: v2CheckIns = [] } = useEventCheckIns(eventId);
+  const { orders: v2Orders, attendees: v2Attendees, tiers: v2Tiers, isLoading: v2Loading } = useEventTicketingData(eventId, canManage);
+  const { data: v2CheckIns = [] } = useEventCheckIns(eventId, canManage);
 
   // Build profile map for v2 attendees (registered users)
   const { data: v2AttendeeProfiles } = useQuery({
@@ -217,20 +224,6 @@ export default function EventDetail() {
     },
     enabled: v2Attendees.length > 0,
   });
-
-  const handleShare = async () => {
-    if (!eventId) return;
-    await shareLink({
-      title: event?.title,
-      text: `Check out this event: ${event?.title}`,
-      url: buildShareUrl.event(eventId),
-    });
-  };
-
-  const handleCopyLink = async () => {
-    if (!eventId) return;
-    await shareLink({ url: buildShareUrl.event(eventId) });
-  };
 
   const handleDelete = async () => {
     if (!eventId) return;
@@ -253,6 +246,28 @@ export default function EventDetail() {
   if (!user) {
     navigate("/auth");
     return null;
+  }
+
+  if (accessPending) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center pb-24">
+        <p className="text-sm text-muted-foreground">Loading event…</p>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  if (event && !canManage) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 px-6 text-center pb-24">
+        <h1 className="font-display text-2xl">Host only</h1>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          Orders, attendees, check-in, and marketing are visible to this event's host.
+        </p>
+        <Button onClick={() => navigate("/dashboard/events")}>Back to events</Button>
+        <BottomNav />
+      </div>
+    );
   }
 
   const isLoading = eventLoading;
@@ -282,23 +297,8 @@ export default function EventDetail() {
         >
           {/* Top bar */}
           <div className="flex items-center justify-between px-4 h-12">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/dashboard/events")}
-              className="h-9 w-9"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <BackButton label="Back" fallback="/dashboard/events" className="h-11 w-11" />
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleCopyLink} className="gap-1.5">
-                <Copy className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Copy Link</span>
-              </Button>
-              <Button variant="default" size="sm" onClick={handleShare} className="gap-1.5">
-                <Share2 className="h-3.5 w-3.5" />
-                Share
-              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-9 w-9">
@@ -306,7 +306,7 @@ export default function EventDetail() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => navigate(`/event/${eventId}`)}>
+                  <DropdownMenuItem onClick={() => navigate(event ? eventPublicPath(event) : `/event/${eventId}`)}>
                     <ExternalLink className="h-4 w-4 mr-2" />
                     View Public Page
                   </DropdownMenuItem>
@@ -345,12 +345,12 @@ export default function EventDetail() {
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      {format(new Date(event.start_date), "EEE, MMM d")}
+                      {formatEventDate(event.start_date, event.timezone, { weekday: "short", month: "short", day: "numeric" })}
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {format(new Date(event.start_date), "h:mm a")}
-                      {event.end_date && ` - ${format(new Date(event.end_date), "h:mm a")}`}
+                      {formatEventTime(event.start_date, event.timezone)}
+                      {event.end_date && ` - ${formatEventTime(event.end_date, event.timezone)}`}
                     </span>
                     {(event.venue || event.city) && (
                       <span className="flex items-center gap-1">
@@ -360,6 +360,9 @@ export default function EventDetail() {
                     )}
                   </div>
                 </div>
+              </div>
+              <div className="mt-3">
+                <HostShareBar title={event.title} url={eventPublicUrl(event)} />
               </div>
             </div>
           ) : null}
@@ -423,6 +426,7 @@ export default function EventDetail() {
                   attendeeProfiles={v2AttendeeProfiles || {}}
                   isLoading={v2Loading}
                   eventTitle={event?.title || "Event"}
+                  capacity={event?.capacity ?? null}
                   onSelectAttendee={(key, name) => setSelectedAttendee({ key, name })}
                 />
               </TabsContent>
@@ -747,7 +751,7 @@ function AttendeesTab({ attendees, attendeeProfiles, isLoading, eventTitle }: At
     }
   };
 
-  // Bulk: send email blast (and SMS where possible) to selected attendees
+  // Bulk: email the selected attendees. Text is not sent.
   const handleBulkEmail = async () => {
     if (selectedIds.size === 0 || !eventId) return;
     setSending(true);
@@ -1196,9 +1200,7 @@ function FinanceTab({ orders, event, totalRevenue, totalCredits }: FinanceTabPro
         <CardContent>
           {totalRevenue > 0 ? (
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-                <Clock className="h-5 w-5 text-amber-500" />
-              </div>
+              <SquircleIcon icon={Clock} fill="gold" size={40} />
               <div>
                 <p className="font-medium text-sm">Pending</p>
                 <p className="text-xs text-muted-foreground">
@@ -1373,7 +1375,7 @@ function OrdersTabV2({
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState icon={Ticket} title="No orders yet" description="Orders will appear when people purchase tickets." />
+        <EmptyState icon={Ticket} title="No orders yet" description="Ticket purchases show up here. Free RSVPs are on the Attendees tab." />
       ) : (
         <div className="space-y-2">
           {filtered.map(order => {
@@ -1442,6 +1444,7 @@ function AttendeesTabV2({
   attendeeProfiles,
   isLoading,
   eventTitle,
+  capacity,
   onSelectAttendee,
 }: {
   attendees: EventAttendee[];
@@ -1450,10 +1453,11 @@ function AttendeesTabV2({
   attendeeProfiles: ProfileMap;
   isLoading: boolean;
   eventTitle: string;
+  capacity?: number | null;
   onSelectAttendee?: (key: AttendeeKey, name: string | null) => void;
 }) {
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "checked_in" | "not_checked_in" | "guests">("all");
+  const [filter, setFilter] = useState<"all" | "going" | "waitlist" | "checked_in" | "guests">("all");
 
   const tierMap = Object.fromEntries(tiers.map(t => [t.id, t]));
   const checkedInIds = new Set(checkIns.map((c) => c.attendee_id));
@@ -1470,17 +1474,22 @@ function AttendeesTabV2({
       (a.attendee_email || "").toLowerCase().includes(search.toLowerCase()) ||
       a.ticket_number.toLowerCase().includes(search.toLowerCase());
     if (!matchesSearch) return false;
+    if (a.status === "cancelled" || a.status === "refunded") return false;
+    if (filter === "going") return a.status === "registered" || a.status === "approved";
+    if (filter === "waitlist") return a.status === "waitlisted";
     if (filter === "checked_in") return checkedInIds.has(a.id);
-    if (filter === "not_checked_in") return !checkedInIds.has(a.id);
     if (filter === "guests") return !a.attendee_user_id;
     return true;
   });
 
+  const activeAttendees = attendees.filter(a => a.status !== "cancelled" && a.status !== "refunded");
+  const goingCount = activeAttendees.filter(a => a.status === "registered" || a.status === "approved").length;
   const stats = {
-    total: attendees.length,
+    total: activeAttendees.length,
+    going: goingCount,
+    waitlist: activeAttendees.filter(a => a.status === "waitlisted").length,
     checkedIn: attendees.filter(a => checkedInIds.has(a.id)).length,
-    notCheckedIn: attendees.filter(a => !checkedInIds.has(a.id)).length,
-    guests: attendees.filter(a => !a.attendee_user_id).length,
+    guests: activeAttendees.filter(a => !a.attendee_user_id).length,
   };
 
   const handleDownloadCSV = () => {
@@ -1514,14 +1523,20 @@ function AttendeesTabV2({
 
   const filterChips: Array<{ key: typeof filter; label: string; count: number }> = [
     { key: "all", label: "All", count: stats.total },
-    { key: "checked_in", label: "Checked In", count: stats.checkedIn },
-    { key: "not_checked_in", label: "Not Yet", count: stats.notCheckedIn },
+    { key: "going", label: "Going", count: stats.going },
+    { key: "waitlist", label: "Waitlist", count: stats.waitlist },
+    { key: "checked_in", label: "Checked", count: stats.checkedIn },
     { key: "guests", label: "Guests", count: stats.guests },
   ];
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-2">
+      {capacity != null && goingCount > capacity && (
+        <p className="text-xs text-amber-600">
+          {goingCount} people are going and the capacity is {capacity}. They keep their seats. New RSVPs join the waitlist.
+        </p>
+      )}
+      <div className="grid grid-cols-5 gap-2">
         {filterChips.map(chip => (
           <button
             key={chip.key}
@@ -1548,7 +1563,7 @@ function AttendeesTabV2({
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState icon={Users} title="No attendees" description="Attendees appear here once tickets are issued." />
+        <EmptyState icon={Users} title="No attendees" description="People who RSVP or buy a ticket show up here." />
       ) : (
         <div className="space-y-2">
           {filtered.map(a => {
@@ -1746,9 +1761,7 @@ function FinanceTabV2({
         <CardContent>
           {grossCents > 0 ? (
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-                <Clock className="h-5 w-5 text-amber-500" />
-              </div>
+              <SquircleIcon icon={Clock} fill="gold" size={40} />
               <div>
                 <p className="font-medium text-sm">Pending</p>
                 <p className="text-xs text-muted-foreground">Payouts processed after the event ends</p>

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { callRpc } from '@/lib/rpc';
 
 function relationName(relation: unknown): string | undefined {
   const row = Array.isArray(relation) ? relation[0] : relation;
@@ -129,33 +130,14 @@ export function useAdminActions() {
 
 export function useSuspendUser() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (data: { userId: string; reason: string }) => {
-      // Update profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          is_suspended: true,
-          suspended_at: new Date().toISOString(),
-          suspension_reason: data.reason,
-        })
-        .eq('user_id', data.userId);
-
-      if (profileError) throw profileError;
-
-      // Log action
-      const { error: actionError } = await supabase
-        .from('admin_actions')
-        .insert({
-          admin_id: user?.id,
-          action_type: 'suspend',
-          target_user_id: data.userId,
-          reason: data.reason,
-        });
-
-      if (actionError) throw actionError;
+      await callRpc('admin_set_user_access', {
+        p_user_id: data.userId,
+        p_action: 'suspend',
+        p_reason: data.reason,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
@@ -172,30 +154,14 @@ export function useSuspendUser() {
 
 export function useUnsuspendUser() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (userId: string) => {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          is_suspended: false,
-          suspended_at: null,
-          suspension_reason: null,
-        })
-        .eq('user_id', userId);
-
-      if (profileError) throw profileError;
-
-      const { error: actionError } = await supabase
-        .from('admin_actions')
-        .insert({
-          admin_id: user?.id,
-          action_type: 'unsuspend',
-          target_user_id: userId,
-        });
-
-      if (actionError) throw actionError;
+      await callRpc('admin_set_user_access', {
+        p_user_id: userId,
+        p_action: 'unsuspend',
+        p_reason: null,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
@@ -258,31 +224,15 @@ export function useApproveOnboarding() {
 
 export function useChangeAccessStatus() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (data: { userId: string; status: 'active' | 'pending' | 'banned'; reason?: string }) => {
-      const status = data.status === ('denied' as string) ? 'active' : data.status;
-      // Use type assertion for new column not yet in generated types
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          access_status: status,
-        } as Record<string, unknown>)
-        .eq('user_id', data.userId);
-
-      if (profileError) throw profileError;
-
-      const { error: actionError } = await supabase
-        .from('admin_actions')
-        .insert({
-          admin_id: user?.id,
-          action_type: `change_status_${status}`,
-          target_user_id: data.userId,
-          reason: data.reason || null,
-        });
-
-      if (actionError) throw actionError;
+      const action = data.status === 'banned' ? 'ban' : 'unban';
+      await callRpc('admin_set_user_access', {
+        p_user_id: data.userId,
+        p_action: action,
+        p_reason: data.reason ?? null,
+      });
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
@@ -413,34 +363,15 @@ export function useAllUsersWithDetails() {
 
 export function useDeleteUser() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (data: { userId: string; reason?: string }) => {
-      // First, update profile to mark as deleted/banned
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          access_status: 'banned',
-          is_suspended: true,
-          suspended_at: new Date().toISOString(),
-          suspension_reason: data.reason || 'Account removed by admin',
-        } as Record<string, unknown>)
-        .eq('user_id', data.userId);
-
-      if (profileError) throw profileError;
-
-      // Log the action
-      const { error: actionError } = await supabase
-        .from('admin_actions')
-        .insert({
-          admin_id: user?.id,
-          action_type: 'remove_user',
-          target_user_id: data.userId,
-          reason: data.reason || 'Removed by admin',
-        });
-
-      if (actionError) throw actionError;
+      await callRpc('admin_remove_user', {
+        p_user_id: data.userId,
+        p_reason: data.reason ?? null,
+        p_hard: false,
+        p_confirm: null,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
@@ -449,8 +380,56 @@ export function useDeleteUser() {
       queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
       toast.success('User removed from the app');
     },
-    onError: () => {
-      toast.error('Failed to remove user');
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to remove user');
+    },
+  });
+}
+
+export function useRestoreUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { userId: string; reason?: string }) => {
+      await callRpc('admin_restore_user', {
+        p_user_id: data.userId,
+        p_reason: data.reason ?? null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-user-data'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-users-detailed'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
+      toast.success('Account restored');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to restore user');
+    },
+  });
+}
+
+export function useHardDeleteUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { userId: string; confirm: string; reason?: string }) => {
+      await callRpc('admin_remove_user', {
+        p_user_id: data.userId,
+        p_reason: data.reason ?? null,
+        p_hard: true,
+        p_confirm: data.confirm,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-user-data'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-users-detailed'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
+      toast.success('Account permanently deleted');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to delete user');
     },
   });
 }

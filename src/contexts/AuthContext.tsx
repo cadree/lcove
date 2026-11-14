@@ -3,13 +3,14 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { getAuthRedirectUrl, clearAllAuthStorage } from '@/lib/capacitorStorage';
 import { logAuthEvent, logAuthError, logSessionState } from '@/lib/authDebug';
-import { applyPendingSignupProfile } from '@/lib/pendingSignup';
+import { applyPendingSignupProfile, inviteTokenFromMetadata, WAITLIST_INVITE_METADATA_KEY } from '@/lib/pendingSignup';
+import { SHOT_USER_ID, shotSessionEnabled } from '@/lib/shotSession';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null; session: Session | null }>;
+  signUp: (email: string, password: string, inviteToken?: string) => Promise<{ error: Error | null; session: Session | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
@@ -24,6 +25,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (shotSessionEnabled()) {
+      setUser({
+        id: SHOT_USER_ID,
+        email: "maya@ether.test",
+        app_metadata: {},
+        user_metadata: {},
+        aud: "authenticated",
+        created_at: "2026-10-01T00:00:00.000Z",
+      } as User);
+      setLoading(false);
+      return;
+    }
     logAuthEvent('AuthProvider initializing');
 
     // Set up auth state listener FIRST
@@ -35,7 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         
         if (session?.user) {
-          void applyPendingSignupProfile(session.user.id);
+          void applyPendingSignupProfile(session.user.id, inviteTokenFromMetadata(session.user.user_metadata));
         }
         setSession(session);
         setUser(session?.user ?? null);
@@ -76,8 +89,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signUp = async (email: string, password: string) => {
-    const redirectUrl = getAuthRedirectUrl('/auth?confirmed=1');
+  const signUp = async (email: string, password: string, inviteToken?: string) => {
+    const token = inviteToken?.trim() ?? '';
+    const redirectPath = token
+      ? `/auth?confirmed=1&invite=${encodeURIComponent(token)}`
+      : '/auth?confirmed=1';
+    const redirectUrl = getAuthRedirectUrl(redirectPath);
     logAuthEvent('Sign up attempt', { 
       email: email.replace(/(.{2}).*(@.*)/, '$1***$2'),
       redirectUrl 
@@ -87,7 +104,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email,
       password,
       options: {
-        emailRedirectTo: redirectUrl
+        emailRedirectTo: redirectUrl,
+        data: token ? { [WAITLIST_INVITE_METADATA_KEY]: token } : undefined,
       }
     });
     

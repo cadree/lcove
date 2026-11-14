@@ -1,0 +1,41 @@
+/**
+ * Public Join actions open /auth?tab=join while this is false.
+ * The waitlist table, page, and invite claims stay for rows already collected.
+ */
+export const WAITLIST_MODE = false;
+
+/**
+ * Set when the App Store listing exists. Empty keeps the smart banner off
+ * and shows "on the web now, iPhone app coming" instead of a link.
+ */
+export const APP_STORE_URL = "";
+
+/**
+ * Numeric App Store id for `<meta name="apple-itunes-app">`.
+ * Leave empty until the listing exists. The smart banner stays off without it.
+ */
+export const APP_STORE_APPLE_ID = "";
+
+/**
+ * Apple Team ID. The universal-link appID is written in
+ * public/.well-known/apple-app-site-association as this team plus the Lovable bundle.
+ */
+export const APPLE_TEAM_ID = "926NTNU4M7";
+
+export const NATIVE_BUNDLE_ID = "com.etherbylcove.app";
+
+/** Hidden when empty. */
+export const INSTAGRAM_URL = "https://www.instagram.com/_familcy/";
+
+/**
+ * Slack invite. Expires around 3 Nov 2026. This is the only copy of the URL.
+ * Set it to "" to hide the link.
+ */
+export const SLACK_URL =
+  "https://join.slack.com/t/nuancebylcove/shared_invite/zt-4c0bpdec1-2p6u4pNi00oVRxQCza98MQ";
+
+export const PRIVACY_EMAIL = "privacy@etherbylcove.com";
+export const LEGAL_EMAIL = "legal@etherbylcove.com";
+export const SUPPORT_EMAIL = "support@etherbylcove.com";
+
+export const SITE_ORIGIN = "https://etherbylcove.com";

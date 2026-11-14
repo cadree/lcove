@@ -34,9 +34,11 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [groupName, setGroupName] = useState('');
   const [isGroup, setIsGroup] = useState(false);
+  const [page, setPage] = useState(0);
+  const [validation, setValidation] = useState('');
 
-  const { data: users = [], isLoading } = useQuery({
-    queryKey: ['all-users', search],
+  const { data: users = [], isLoading, isError } = useQuery({
+    queryKey: ['all-users', user?.id, search, page, blockedIds],
     queryFn: async () => {
       if (!user) return [];
 
@@ -45,7 +47,8 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
         .from('profiles_public')
         .select('user_id, display_name, avatar_url')
         .neq('user_id', user.id)
-        .limit(20);
+        .order('display_name').order('user_id')
+        .range(page * 50, page * 50 + 49);
 
       if (search) {
         query = query.ilike('display_name', `%${search}%`);
@@ -53,7 +56,7 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []).filter((person) => !blockedIds.includes(person.user_id));
+      return data || [];
     },
     enabled: open && !!user,
   });
@@ -68,7 +71,15 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
   };
 
   const handleCreate = async () => {
-    if (selectedUsers.length === 0) return;
+    const missing = [];
+    const required = isGroup ? 2 : 1;
+    if (selectedUsers.length < required) missing.push(`Pick ${required - selectedUsers.length} more ${required - selectedUsers.length === 1 ? 'person' : 'people'}`);
+    if (isGroup && !groupName.trim()) missing.push('Add a group name');
+    if (missing.length) {
+      setValidation(missing.join('. '));
+      return;
+    }
+    setValidation('');
 
     try {
       if (selectedUsers.length === 1 && !isGroup) {
@@ -76,7 +87,7 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
         onConversationCreated(conv.id);
       } else {
         const conv = await createGroupConversation.mutateAsync({
-          name: groupName || 'New Group',
+          name: groupName.trim() || 'New Group',
           participantIds: selectedUsers,
         });
         onConversationCreated(conv.id);
@@ -93,20 +104,20 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md bg-card border-border">
+      <DialogContent className="sm:max-w-md bg-card border-border flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">
             {isGroup ? 'New Group Chat' : 'New Message'}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-h-0 flex-1 overflow-y-auto space-y-4">
           {/* Toggle between DM and Group */}
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               variant={!isGroup ? 'default' : 'outline'}
               size="sm"
-              className="flex-1"
+              className="w-full sm:flex-1"
               onClick={() => {
                 setIsGroup(false);
                 if (selectedUsers.length > 1) {
@@ -119,7 +130,7 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
             <Button
               variant={isGroup ? 'default' : 'outline'}
               size="sm"
-              className="flex-1 gap-2"
+              className="w-full gap-2 sm:flex-1"
               onClick={() => setIsGroup(true)}
             >
               <Users className="w-4 h-4" />
@@ -143,7 +154,7 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
             <Input
               placeholder="Search users..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(0); }}
               className="pl-10 bg-muted/30 border-border/50"
             />
           </div>
@@ -181,6 +192,8 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
           <div className="max-h-[300px] overflow-y-auto space-y-1">
             {isLoading ? (
               <div className="py-8 text-center text-muted-foreground">Loading...</div>
+            ) : isError ? (
+              <p role="alert">Could not load people. Please try again.</p>
             ) : visibleUsers.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground">
                 {search ? 'No users found' : 'No users available'}
@@ -232,8 +245,14 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
             )}
           </div>
 
+          <div className="flex justify-between">
+            <Button variant="ghost" disabled={page === 0 || isLoading} onClick={() => setPage(p => p - 1)}>Previous</Button>
+            <Button variant="ghost" disabled={users.length < 50 || isLoading} onClick={() => setPage(p => p + 1)}>More people</Button>
+          </div>
+        </div>
+          {validation && <p role="alert" className="text-sm text-destructive">{validation}</p>}
           {/* Actions */}
-          <div className="flex gap-2">
+          <div className="shrink-0 flex gap-2 bg-card py-2">
             <Button
               variant="outline"
               className="flex-1"
@@ -245,8 +264,6 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
               className="flex-1"
               onClick={handleCreate}
               disabled={
-                selectedUsers.length === 0 || 
-                (isGroup && (selectedUsers.length < 2 || !groupName.trim())) ||
                 createDirectConversation.isPending || 
                 createGroupConversation.isPending
               }
@@ -254,7 +271,6 @@ const NewChatDialog = ({ open, onOpenChange, onConversationCreated }: NewChatDia
               {isGroup ? 'Create Group' : 'Start Chat'}
             </Button>
           </div>
-        </div>
       </DialogContent>
     </Dialog>
   );

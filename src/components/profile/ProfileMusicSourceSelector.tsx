@@ -1,3 +1,4 @@
+import { heicToJpeg, isHeicImage, jpegStorageName } from "@/lib/heicImage";
 import { useState, useRef, forwardRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,17 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
+import {
+  AUDIO_FILE_ACCEPT,
+  AUDIO_UPLOAD_ACTION,
+  AUDIO_UPLOAD_DETAIL,
+  AUDIO_UPLOAD_HINT,
+  AUDIO_UPLOAD_REJECTED,
+  AUDIO_UPLOAD_SUBTITLE,
+  audioContentType,
+  isAudioUpload,
+} from "@/lib/audioFiles";
 import { cn } from "@/lib/utils";
 
 // Icons for music services - wrapped with forwardRef to prevent ref warnings
@@ -65,7 +77,7 @@ export const ProfileMusicSourceSelector = ({
   const [musicData, setMusicData] = useState<MusicData | null>(
     initialData?.url ? (initialData as MusicData) : null
   );
-  
+
   const audioInputRef = useRef<HTMLInputElement>(null);
   const artworkInputRef = useRef<HTMLInputElement>(null);
 
@@ -103,7 +115,7 @@ export const ProfileMusicSourceSelector = ({
   const handleSpotifyLink = async () => {
     setError(null);
     const { trackId } = parseSpotifyUrl(linkUrl);
-    
+
     if (!trackId) {
       setError("Invalid Spotify URL. Please paste a valid Spotify track link.");
       return;
@@ -113,7 +125,7 @@ export const ProfileMusicSourceSelector = ({
     try {
       // Use Spotify embed API to get basic info
       const embedUrl = `https://open.spotify.com/embed/track/${trackId}`;
-      
+
       const data: MusicData = {
         source: 'spotify',
         url: linkUrl,
@@ -138,7 +150,7 @@ export const ProfileMusicSourceSelector = ({
   const handleAppleMusicLink = async () => {
     setError(null);
     const { trackId, albumId } = parseAppleMusicUrl(linkUrl);
-    
+
     if (!albumId) {
       setError("Invalid Apple Music URL. Please paste a valid Apple Music track link.");
       return;
@@ -148,7 +160,7 @@ export const ProfileMusicSourceSelector = ({
     try {
       // Apple Music embed URL
       const embedUrl = `https://embed.music.apple.com/us/album/${albumId}${trackId ? `?i=${trackId}` : ''}`;
-      
+
       const data: MusicData = {
         source: 'apple_music',
         url: linkUrl,
@@ -174,9 +186,8 @@ export const ProfileMusicSourceSelector = ({
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    const validTypes = ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/x-m4a', 'audio/m4a'];
-    if (!validTypes.some(type => file.type.includes(type.split('/')[1]))) {
-      setError("Please upload an MP3, WAV, or M4A file.");
+    if (!isAudioUpload(file)) {
+      setError(AUDIO_UPLOAD_REJECTED);
       return;
     }
 
@@ -194,7 +205,7 @@ export const ProfileMusicSourceSelector = ({
 
       const { error: uploadError } = await supabase.storage
         .from('media')
-        .upload(fileName, file, { upsert: true });
+        .upload(fileName, file, { upsert: true, contentType: audioContentType(file) });
 
       if (uploadError) throw uploadError;
 
@@ -215,10 +226,10 @@ export const ProfileMusicSourceSelector = ({
 
       setMusicData(data);
       onMusicChange(data);
-      toast.success("Music uploaded successfully!");
+      toast.success("Music uploaded. Press Save Changes to publish it.");
     } catch (err) {
       console.error('Upload error:', err);
-      setError("Failed to upload audio file.");
+      setError(errorMessage(err, "Failed to upload audio file."));
     } finally {
       setIsProcessing(false);
     }
@@ -228,7 +239,7 @@ export const ProfileMusicSourceSelector = ({
     const file = e.target.files?.[0];
     if (!file || !user || !musicData) return;
 
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith('image/') && !isHeicImage(file.name, file.type)) {
       toast.error("Please upload an image file.");
       return;
     }
@@ -236,11 +247,12 @@ export const ProfileMusicSourceSelector = ({
     setIsProcessing(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/profile-music-art-${Date.now()}.${fileExt}`;
+      const fileName = jpegStorageName(`${user.id}/profile-music-art-${Date.now()}.${fileExt}`, file.type);
+      const artwork = isHeicImage(file.name, file.type) ? await heicToJpeg(file, fileName.split("/").pop()!) : file;
 
       const { error: uploadError } = await supabase.storage
         .from('media')
-        .upload(fileName, file, { upsert: true });
+        .upload(fileName, artwork, { upsert: true, contentType: artwork.type || "image/jpeg" });
 
       if (uploadError) throw uploadError;
 
@@ -251,9 +263,9 @@ export const ProfileMusicSourceSelector = ({
       const updatedData = { ...musicData, albumArtUrl: publicUrl };
       setMusicData(updatedData);
       onMusicChange(updatedData);
-      toast.success("Album art uploaded!");
+      toast.success("Artwork uploaded. Press Save Changes to publish it.");
     } catch (err) {
-      toast.error("Failed to upload artwork.");
+      toast.error(errorMessage(err, "Failed to upload artwork."));
     } finally {
       setIsProcessing(false);
     }
@@ -297,7 +309,7 @@ export const ProfileMusicSourceSelector = ({
       icon: Upload,
       color: 'text-primary',
       bgColor: 'bg-primary/10 hover:bg-primary/20',
-      description: 'Upload MP3, WAV, or M4A',
+      description: AUDIO_UPLOAD_SUBTITLE,
     },
   ];
 
@@ -313,12 +325,12 @@ export const ProfileMusicSourceSelector = ({
         <div className="relative p-4 rounded-xl bg-muted/30 border border-border/50 overflow-hidden">
           {/* Album Art Background Blur */}
           {musicData.albumArtUrl && (
-            <div 
+            <div
               className="absolute inset-0 opacity-20 blur-2xl"
               style={{ backgroundImage: `url(${musicData.albumArtUrl})`, backgroundSize: 'cover' }}
             />
           )}
-          
+
           <div className="relative flex gap-4">
             {/* Album Art */}
             <div className="relative group">
@@ -327,28 +339,30 @@ export const ProfileMusicSourceSelector = ({
                 musicData.albumArtUrl ? "" : "bg-primary/20"
               )}>
                 {musicData.albumArtUrl ? (
-                  <img 
-                    src={musicData.albumArtUrl} 
-                    alt="Album art" 
+                  <img
+                    src={musicData.albumArtUrl}
+                    alt="Album art"
                     className="w-full h-full object-cover"
                   />
                 ) : (
                   <Music className="w-8 h-8 text-primary" />
                 )}
               </div>
-              
+
               {/* Allow artwork upload for all sources */}
               <>
                 <button
                   onClick={() => artworkInputRef.current?.click()}
-                  className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg"
+                  aria-label="Upload album artwork"
+                  disabled={isProcessing}
+                  className="absolute bottom-0 right-0 min-h-11 min-w-11 flex items-center justify-center bg-black/70 rounded-lg"
                 >
                   <ImageIcon className="w-5 h-5 text-white" />
                 </button>
                 <input
                   ref={artworkInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.heic,.heif"
                   onChange={handleArtworkUpload}
                   className="hidden"
                 />
@@ -363,7 +377,7 @@ export const ProfileMusicSourceSelector = ({
                 {musicData.source === 'upload' && <Music className="w-4 h-4 text-primary" />}
                 <CheckCircle2 className="w-4 h-4 text-green-500" />
               </div>
-              
+
               <p className="font-medium text-sm truncate">{musicData.title || 'Untitled Track'}</p>
               <p className="text-xs text-muted-foreground truncate">
                 {musicData.artist || 'Unknown Artist'}
@@ -394,7 +408,7 @@ export const ProfileMusicSourceSelector = ({
               className="h-9"
             />
           </div>
-          
+
           <div className="space-y-1.5">
             <Label className="text-xs">Artist Name</Label>
             <Input
@@ -574,12 +588,12 @@ export const ProfileMusicSourceSelector = ({
                   <span className="font-medium">Upload Audio File</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Upload an MP3, WAV, or M4A file (max 20MB). Full playback for visitors.
+                  {AUDIO_UPLOAD_DETAIL}
                 </p>
-                <div
-                  onClick={() => audioInputRef.current?.click()}
+                <label
+                  htmlFor="profile-audio-file"
                   className={cn(
-                    "border-2 border-dashed border-border/50 rounded-xl p-8 text-center cursor-pointer transition-colors",
+                    "relative block border-2 border-dashed border-border/50 rounded-xl p-8 text-center cursor-pointer transition-colors",
                     "hover:border-primary/50 hover:bg-primary/5"
                   )}
                 >
@@ -588,20 +602,21 @@ export const ProfileMusicSourceSelector = ({
                   ) : (
                     <>
                       <Music className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                      <p className="text-sm font-medium">Click to upload</p>
+                      <p className="text-sm font-medium">{AUDIO_UPLOAD_ACTION}</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        MP3, WAV, M4A • Max 20MB
+                        {AUDIO_UPLOAD_HINT}
                       </p>
                     </>
                   )}
-                </div>
-                <input
-                  ref={audioInputRef}
-                  type="file"
-                  accept=".mp3,.wav,.m4a,audio/mpeg,audio/wav,audio/mp4,audio/x-m4a"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
+                  <input
+                    id="profile-audio-file"
+                    ref={audioInputRef}
+                    type="file"
+                    accept={AUDIO_FILE_ACCEPT}
+                    onChange={handleFileUpload}
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  />
+                </label>
               </div>
             )}
 

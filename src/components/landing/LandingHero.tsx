@@ -1,42 +1,31 @@
+import { useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { EtherWordmark } from "@/components/brand/EtherWordmark";
+import { HERO_TAGLINE } from "@/content/copy";
+import { captureSignupAttribution } from "@/lib/signupAttribution";
+import { publicJoinPath } from "@/lib/publicJoin";
 
 export function LandingHero() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    captureSignupAttribution(location.search, location.pathname, window.localStorage);
+  }, [location.pathname, location.search]);
 
   return (
-    <section className="relative min-h-[80vh] flex items-center">
-      <div className="container relative px-4 sm:px-6 lg:px-8 py-16 md:py-24">
-        <div className="max-w-xl">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-center lg:text-left"
-          >
-            <p className="eyebrow mb-4">Ether</p>
-            <h1 className="ether-title text-5xl sm:text-6xl lg:text-7xl mb-4">
-              The creative community OS
-            </h1>
-            <span className="mx-auto lg:mx-0 mb-6 block h-px w-16 bg-[hsl(var(--ether-pink))]" aria-hidden="true" />
-            <p className="text-lg text-foreground mb-8">Free to join.</p>
-
-            <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
-              <Button size="lg" className="min-h-11" onClick={() => navigate("/auth")}>
-                Join
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                className="min-h-11"
-                onClick={() => navigate("/community")}
-              >
-                Community updates
-              </Button>
-            </div>
-          </motion.div>
-        </div>
+    <section className="relative pb-10 pt-8">
+      <div className="mx-auto flex max-w-md flex-col items-center px-4 text-center sm:px-6 lg:max-w-lg">
+        <p className="kicker mb-8">Familcy access // Lcove signal</p>
+        <h1 className="mb-6">
+          <EtherWordmark className="w-[18rem] max-w-full" />
+        </h1>
+        <p className="lore mb-8 text-[22px] text-foreground">{HERO_TAGLINE}</p>
+        <Button className="w-full" onClick={() => navigate(publicJoinPath(location.search))}>
+          Join
+        </Button>
+        <p className="mono-label mt-6 text-[9px] text-muted-foreground">Year 2096 // Creativity preserved</p>
       </div>
     </section>
   );

@@ -1,19 +1,20 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useSearchParams } from "react-router-dom";
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { BackButton } from '@/components/navigation/BackButton';
 import { motion } from 'framer-motion';
-import { 
-  Film, 
-  Play, 
-  Plus, 
-  Search, 
-  TrendingUp, 
+import {
+  Film,
+  Play,
+  Plus,
+  Search,
+  TrendingUp,
   Star,
   Tv,
   Clapperboard,
   ChevronLeft,
   ChevronRight,
   Users,
-  ArrowLeft,
   Info
 } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
@@ -24,17 +25,23 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useNetworks, useMyNetworks, useContentGenres, Network } from '@/hooks/useCinema';
 import { useAuth } from '@/contexts/AuthContext';
 import { CreateNetworkDialog } from '@/components/cinema/CreateNetworkDialog';
-import { isIosApp } from '@/lib/platform';
+import { digitalPurchasesEnabled } from '@/lib/platform';
 import { cn } from '@/lib/utils';
+import { SquircleIcon } from '@/components/world/SquircleIcon';
 
 const Cinema = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('action') !== 'create' || !user) return;
+    setCreateDialogOpen(true);
+    setSearchParams(previous => { const next = new URLSearchParams(previous); next.delete('action'); return next; }, { replace: true });
+  }, [searchParams, setSearchParams, user]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState<string | undefined>();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [featuredIndex, setFeaturedIndex] = useState(0);
-  
+
   const { data: networks = [], isLoading } = useNetworks(selectedGenre);
   const { data: myNetworks = [] } = useMyNetworks();
   const { data: genres = [] } = useContentGenres();
@@ -46,7 +53,7 @@ const Cinema = () => {
 
   const featuredNetworks = filteredNetworks.filter(n => n.subscriber_count > 0).slice(0, 5);
   const trendingNetworks = [...filteredNetworks].sort((a, b) => b.total_views - a.total_views).slice(0, 10);
-  const newNetworks = [...filteredNetworks].sort((a, b) => 
+  const newNetworks = [...filteredNetworks].sort((a, b) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   ).slice(0, 10);
 
@@ -67,6 +74,20 @@ const Cinema = () => {
   return (
     <PageLayout>
       <div className="min-h-screen bg-background">
+        {!currentFeatured && (
+          <div className="flex items-center justify-between gap-3 px-4 py-4">
+            <div className="flex min-w-0 items-center gap-2">
+              <BackButton />
+              <h1 className="ether-title truncate text-2xl text-foreground">Cinema</h1>
+            </div>
+            {user && (
+              <Button onClick={() => setCreateDialogOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Create Network</span>
+              </Button>
+            )}
+          </div>
+        )}
         {/* Netflix-style Hero Section */}
         {currentFeatured && (
           <div className="relative h-[70vh] md:h-[85vh] w-full overflow-hidden">
@@ -91,15 +112,13 @@ const Cinema = () => {
             <div className="absolute top-0 left-0 right-0 z-20">
               <div className="flex items-center justify-between px-4 md:px-12 py-4">
                 <div className="flex items-center gap-4">
-                  <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="text-foreground hover:bg-background/20">
-                    <ArrowLeft className="w-5 h-5" />
-                  </Button>
+                  <BackButton className="text-foreground hover:bg-background/20" />
                   <div className="flex items-center gap-2">
-                    <Film className="w-8 h-8 text-primary" />
-                    <span className="font-display text-2xl font-bold text-foreground">LC Cinema</span>
+                    <SquircleIcon icon={Film} fill="ink" size={40} />
+                    <h1 className="ether-title text-2xl text-foreground">Cinema</h1>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-3">
                   {/* Search Toggle */}
                   <div className="relative hidden md:block">
@@ -111,7 +130,7 @@ const Cinema = () => {
                       className="pl-9 w-[200px] bg-background/50 backdrop-blur-sm border-border/30 focus:w-[300px] transition-all"
                     />
                   </div>
-                  
+
                   {user && (
                     <Button onClick={() => setCreateDialogOpen(true)} className="gap-2">
                       <Plus className="w-4 h-4" />
@@ -132,22 +151,22 @@ const Cinema = () => {
                 className="max-w-2xl"
               >
                 {currentFeatured.logo_url && (
-                  <img 
-                    src={currentFeatured.logo_url} 
-                    alt="" 
+                  <img
+                    src={currentFeatured.logo_url}
+                    alt=""
                     className="w-14 h-14 md:w-20 md:h-20 rounded-xl mb-4 object-cover shadow-lg"
                   />
                 )}
                 <Badge variant="secondary" className="mb-3 bg-primary/20 text-primary border-primary/30">
                   Featured Network
                 </Badge>
-                <h1 className="font-display text-4xl md:text-6xl font-bold text-foreground mb-3 leading-tight">
+                <h1 className="ether-title mb-3 text-4xl leading-tight text-foreground md:text-6xl">
                   {currentFeatured.name}
                 </h1>
                 <p className="text-muted-foreground text-base md:text-lg line-clamp-2 md:line-clamp-3 mb-4 max-w-xl">
                   {currentFeatured.description}
                 </p>
-                
+
                 <div className="flex items-center gap-2 mb-6 flex-wrap">
                   {currentFeatured.genre && (
                     <Badge variant="outline" className="text-foreground border-foreground/30">
@@ -158,7 +177,7 @@ const Cinema = () => {
                     <Users className="w-4 h-4" />
                     {currentFeatured.subscriber_count} subscribers
                   </span>
-                  {currentFeatured.is_paid && !isIosApp() && (
+                  {currentFeatured.is_paid && digitalPurchasesEnabled() && (
                     <Badge className="bg-primary/20 text-primary border-primary/30">
                       ${currentFeatured.subscription_price}/mo
                     </Badge>
@@ -184,7 +203,7 @@ const Cinema = () => {
               {/* Featured Navigation Dots */}
               {featuredNetworks.length > 1 && (
                 <div className="flex items-center gap-4 mt-6">
-                  <Button variant="ghost" size="icon" onClick={prevFeatured} className="w-8 h-8 rounded-full bg-background/30 hover:bg-background/50">
+                  <Button variant="ghost" size="icon" onClick={prevFeatured} className="h-11 w-11 rounded-[14px] bg-background/40 hover:bg-background/70">
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
                   <div className="flex gap-2">
@@ -199,7 +218,7 @@ const Cinema = () => {
                       />
                     ))}
                   </div>
-                  <Button variant="ghost" size="icon" onClick={nextFeatured} className="w-8 h-8 rounded-full bg-background/30 hover:bg-background/50">
+                  <Button variant="ghost" size="icon" onClick={nextFeatured} className="h-11 w-11 rounded-[14px] bg-background/40 hover:bg-background/70">
                     <ChevronRight className="w-4 h-4" />
                   </Button>
                 </div>
@@ -209,7 +228,7 @@ const Cinema = () => {
         )}
 
         {/* Mobile Search */}
-        <div className="md:hidden px-4 py-3 sticky top-0 z-30 bg-background/95 backdrop-blur-sm">
+        <div className="md:hidden px-4 py-3 safe-header sticky top-0 z-30 bg-background/95 backdrop-blur-sm">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -269,7 +288,7 @@ const Cinema = () => {
           {trendingNetworks.length > 0 && (
             <NetworkRow
               title="Trending Now"
-              icon={<TrendingUp className="w-5 h-5 text-primary" />}
+              icon={<SquircleIcon icon={TrendingUp} fill="rose" size={28} />}
               networks={trendingNetworks}
             />
           )}
@@ -278,18 +297,18 @@ const Cinema = () => {
           {newNetworks.length > 0 && (
             <NetworkRow
               title="New Arrivals"
-              icon={<Star className="w-5 h-5 text-primary" />}
+              icon={<SquircleIcon icon={Star} fill="gold" size={28} />}
               networks={newNetworks}
             />
           )}
 
           {/* All Networks Grid */}
           <div>
-            <h2 className="font-display text-xl font-semibold mb-4 flex items-center gap-2">
-              <Tv className="w-5 h-5" />
+            <h2 className="ether-title mb-4 flex items-center gap-2 text-xl">
+              <SquircleIcon icon={Tv} fill="cyan" size={28} />
               Browse All Networks
             </h2>
-            
+
             {isLoading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
                 {[...Array(12)].map((_, i) => (
@@ -326,26 +345,26 @@ const Cinema = () => {
 };
 
 // Netflix-style Network Row
-const NetworkRow = ({ 
-  title, 
-  icon, 
+const NetworkRow = ({
+  title,
+  icon,
   networks,
   showManage = false
-}: { 
-  title: string; 
+}: {
+  title: string;
   icon: React.ReactNode;
   networks: Network[];
   showManage?: boolean;
 }) => (
   <div className="group/row">
     <div className="flex items-center justify-between mb-3">
-      <h2 className="font-display text-lg md:text-xl font-semibold flex items-center gap-2">
+      <h2 className="ether-title flex items-center gap-2 text-lg md:text-xl">
         {icon}
         {title}
       </h2>
       <ChevronRight className="w-5 h-5 text-muted-foreground group-hover/row:text-foreground transition-colors" />
     </div>
-    
+
     <ScrollArea className="w-full whitespace-nowrap -mx-4 px-4 md:-mx-12 md:px-12">
       <div className="flex gap-2 md:gap-3 pb-4">
         {networks.map((network) => (
@@ -359,7 +378,7 @@ const NetworkRow = ({
 
 // Netflix-style Network Card
 const NetworkCard = ({ network, showManage = false, isRow = false }: { network: Network; showManage?: boolean; isRow?: boolean }) => (
-  <Link 
+  <Link
     to={showManage ? `/cinema/manage/${network.id}` : `/cinema/network/${network.id}`}
     className={cn(
       "flex-shrink-0 group",
@@ -382,7 +401,7 @@ const NetworkCard = ({ network, showManage = false, isRow = false }: { network: 
           <Film className="w-10 h-10 text-muted-foreground" />
         </div>
       )}
-      
+
       {/* Hover Overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3">
         <h3 className="font-semibold text-foreground text-sm line-clamp-1">{network.name}</h3>
@@ -396,7 +415,7 @@ const NetworkCard = ({ network, showManage = false, isRow = false }: { network: 
       </div>
 
       {/* Price Badge */}
-      {network.is_paid && !isIosApp() && (
+      {network.is_paid && digitalPurchasesEnabled() && (
         <Badge className="absolute top-2 right-2 text-[10px] px-1.5 py-0.5 bg-primary/90 text-primary-foreground">
           ${network.subscription_price}/mo
         </Badge>
@@ -409,7 +428,7 @@ const NetworkCard = ({ network, showManage = false, isRow = false }: { network: 
         </div>
       )}
     </motion.div>
-    
+
     {/* Title below card (mobile friendly) */}
     <div className="mt-2 px-0.5 group-hover:hidden md:hidden">
       <h3 className="font-medium text-foreground text-sm truncate">{network.name}</h3>

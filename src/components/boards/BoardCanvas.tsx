@@ -5,6 +5,7 @@ import { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 
 type ItemType = 'note' | 'todo' | 'link' | 'image' | 'column' | 'board_ref' | 'line' | 'connector';
 
@@ -292,7 +293,7 @@ export const BoardCanvas = memo(function BoardCanvas({
         toast.success(`${isVideo ? 'Video' : 'Image'} added to board`);
       } catch (error) {
         console.error('Upload error:', error);
-        toast.error(`Failed to upload ${file.name}`);
+        toast.error(errorMessage(error, `Failed to upload ${file.name}`));
       }
     }
   }, [offset, onCreateItem, user]);

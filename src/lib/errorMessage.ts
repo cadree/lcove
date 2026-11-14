@@ -4,12 +4,14 @@ function recordMessage(error: object): string | undefined {
   return typeof message === "string" && message.length > 0 ? message : undefined;
 }
 
+const GENERIC_FUNCTION_ERROR = /non-2xx|Edge Function/i;
+
 export function errorMessage(error: unknown, fallback = "Something went wrong"): string {
-  if (typeof error === "string" && error.length > 0) return error;
-  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string" && error.length > 0 && !GENERIC_FUNCTION_ERROR.test(error)) return error;
+  if (error instanceof Error && error.message && !GENERIC_FUNCTION_ERROR.test(error.message)) return error.message;
   if (typeof error === "object" && error !== null) {
     const message = recordMessage(error);
-    if (message) return message;
+    if (message && !GENERIC_FUNCTION_ERROR.test(message)) return message;
   }
   return fallback;
 }

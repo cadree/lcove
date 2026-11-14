@@ -30,7 +30,7 @@ export function AIProjectMatches({ onViewProject, className }: AIProjectMatchesP
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
-            AI Recommendations
+            Recommended for you
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -54,7 +54,7 @@ export function AIProjectMatches({ onViewProject, className }: AIProjectMatchesP
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
-            AI Recommendations
+            Recommended for you
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -81,7 +81,7 @@ export function AIProjectMatches({ onViewProject, className }: AIProjectMatchesP
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
-            AI Recommendations
+            Recommended for you
           </CardTitle>
         </CardHeader>
         <CardContent className="text-center py-8">
@@ -106,7 +106,7 @@ export function AIProjectMatches({ onViewProject, className }: AIProjectMatchesP
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-primary" />
-          AI Recommendations
+          Recommended for you
         </CardTitle>
         <Button
           variant="ghost"

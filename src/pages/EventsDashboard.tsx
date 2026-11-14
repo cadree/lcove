@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, parseISO } from "date-fns";
+import { formatEventDate } from "@/lib/eventTime";
 import {
-  ArrowLeft,
   Calendar,
   List,
   ChevronLeft,
@@ -18,6 +18,7 @@ import {
   Rss,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/navigation/BackButton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -40,16 +41,21 @@ import BottomNav from "@/components/navigation/BottomNav";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { shareLink, buildShareUrl } from "@/lib/shareLink";
+import { shareEventLink, copyEventLink } from "@/lib/shareLink";
+import { HostShareBar } from "@/components/events/HostShareBar";
+import { eventPublicUrl } from "../../functions/_shared/eventShare.js";
 
 interface EventWithStats {
   id: string;
   title: string;
   start_date: string;
   end_date: string | null;
+  timezone: string | null;
   image_url: string | null;
   ticket_type: string;
   status: string | null;
+  is_public?: boolean | null;
+  slug?: string | null;
   city: string;
   rsvpCount?: number;
   ticketCount?: number;
@@ -59,7 +65,7 @@ export default function EventsDashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { events, rsvps, isLoading } = useEventDashboard();
+  const { events, rsvps, seatCounts, isLoading } = useEventDashboard();
   const [view, setView] = useState<"calendar" | "list" | "settings">("calendar");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -70,11 +76,12 @@ export default function EventsDashboard() {
       const eventRsvps = rsvps?.filter(r => r.event_id === event.id) || [];
       return {
         ...event,
-        rsvpCount: eventRsvps.filter(r => r.status === 'going' || r.status === 'interested').length,
+        rsvpCount: seatCounts?.find((seat) => seat.event_id === event.id)?.going
+          ?? eventRsvps.filter(r => r.status === 'going').length,
         ticketCount: eventRsvps.filter(r => r.ticket_purchased).length,
       };
     });
-  }, [events, rsvps]);
+  }, [events, rsvps, seatCounts]);
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -103,10 +110,10 @@ export default function EventsDashboard() {
   }, [eventsWithStats]);
 
   const handleShare = async (event: EventWithStats) => {
-    await shareLink({
+    await shareEventLink({
       title: event.title,
-      text: `Check out this event: ${event.title}`,
-      url: buildShareUrl.event(event.id),
+      text: event.title,
+      url: eventPublicUrl(event),
     });
   };
 
@@ -153,16 +160,9 @@ export default function EventsDashboard() {
       >
         <div className="flex items-center justify-between px-4 h-14">
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/dashboard")}
-              className="h-9 w-9"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <BackButton label="Back" fallback="/dashboard" className="h-11 w-11" />
             <div>
-              <h1 className="text-lg font-display font-semibold">My Events</h1>
+              <h1 className="ether-title text-lg">My Events</h1>
               <p className="text-xs text-muted-foreground">{events?.length || 0} events</p>
             </div>
           </div>
@@ -379,7 +379,7 @@ interface EventBlockProps {
 
 function EventBlock({ event, onClick, onEdit, onShare, onDuplicate }: EventBlockProps) {
   const status = getEventDisplayStatus(event);
-  const totalCount = (event.rsvpCount || 0) + (event.ticketCount || 0);
+  const totalCount = event.rsvpCount || 0;
 
   return (
     <Popover>
@@ -424,7 +424,7 @@ function EventBlock({ event, onClick, onEdit, onShare, onDuplicate }: EventBlock
             {totalCount > 0 && (
               <span className="flex items-center gap-1">
                 <Users className="h-3 w-3" />
-                {event.ticketCount || 0} tickets · {event.rsvpCount || 0} RSVPs
+                {event.rsvpCount || 0} going
               </span>
             )}
           </div>
@@ -441,6 +441,13 @@ function EventBlock({ event, onClick, onEdit, onShare, onDuplicate }: EventBlock
           >
             <Edit className="h-3.5 w-3.5" />
             Edit
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); copyEventLink(eventPublicUrl(event)); }}
+            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Copy link
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onShare(); }}
@@ -478,7 +485,7 @@ function ListView({ events, onEventClick, onEdit, onShare, onDuplicate }: ListVi
 
   const EventCard = ({ event }: { event: EventWithStats }) => {
     const status = getEventDisplayStatus(event);
-    const totalCount = (event.rsvpCount || 0) + (event.ticketCount || 0);
+    const totalCount = event.rsvpCount || 0;
 
     return (
       <div className="relative p-3 rounded-xl border border-border/40 bg-card/60 backdrop-blur-sm">
@@ -501,7 +508,7 @@ function ListView({ events, onEventClick, onEdit, onShare, onDuplicate }: ListVi
             <div className="flex-1 min-w-0 pr-8">
               <h3 className="font-medium text-sm truncate">{event.title}</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {format(new Date(event.start_date), "EEE, MMM d · h:mm a")}
+                {formatEventDate(event.start_date, event.timezone, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
               </p>
               <p className="text-xs text-muted-foreground">{event.city}</p>
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -514,13 +521,17 @@ function ListView({ events, onEventClick, onEdit, onShare, onDuplicate }: ListVi
                 {totalCount > 0 && (
                   <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                     <Users className="h-3 w-3" />
-                    {event.ticketCount || 0} tickets · {event.rsvpCount || 0} RSVPs
+                    {event.rsvpCount || 0} going
                   </span>
                 )}
               </div>
             </div>
           </div>
         </button>
+
+        <div className="mt-3">
+          <HostShareBar title={event.title} url={eventPublicUrl(event)} />
+        </div>
 
         {/* Quick Actions */}
         <DropdownMenu>

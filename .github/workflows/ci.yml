@@ -28,6 +28,15 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Spellcheck
+        run: npm run lint:spell
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Discovery and trip database checks
+        run: npm run test:discovery-db
+
       - name: Stripe webhook fixtures
         run: npm run test:webhook
 

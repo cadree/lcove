@@ -11,13 +11,20 @@ import { FriendsDrawer } from "@/components/friends/FriendsDrawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import FirstRunEmpty from "@/components/onboarding/FirstRunEmpty";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Filter, Shuffle, Loader2, Sparkles, Users, User, Bell } from "lucide-react";
-import { MoreMenuButton } from "@/components/navigation/MoreMenu";
+import { Bell, Filter, Loader2, Shuffle, Sparkles, Users } from "lucide-react";
+import { ToolsSheet } from "@/components/navigation/ToolsSheet";
 import { usePosts } from "@/hooks/usePosts";
+import { FeedEngagementProvider } from "@/hooks/useFeedEngagement";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
+import { useFavorites } from "@/hooks/useFavorites";
+import { QuestCard } from "@/components/novi/QuestCard";
+import { useNoviQuests } from "@/hooks/useNoviQuests";
+import { homeQuestCard } from "@/lib/noviQuests";
+import { FEED_RENDER_PAGE, nextRenderedCount } from "@/lib/feedWindow";
+import bearLogo from "@/assets/ether-bear-logo.webp";
+import { SupportEtherButton } from "@/components/fund/SupportEtherButton";
 const Feed = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeCategory, setActiveCategory] = useState("All");
@@ -25,7 +32,13 @@ const Feed = () => {
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
   const [shuffledPosts, setShuffledPosts] = useState<typeof posts>([]);
   const [isShuffled, setIsShuffled] = useState(false);
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
+  const matchCity = useRef<((city: string | null | undefined, key: string | null) => boolean) | null>(null);
+  const [lane, setLane] = useState<"for-you" | "friends" | "city" | "live">("for-you");
+  const [studioOpen, setStudioOpen] = useState(false);
+  const { favorites } = useFavorites();
+  const { quests } = useNoviQuests();
+  const openQuest = homeQuestCard(quests);
   const {
     user
   } = useAuth();
@@ -34,11 +47,22 @@ const Feed = () => {
   } = useProfile(user?.id);
   const {
     posts,
-    isLoading
+    isLoading,
+    isError,
+    refetch,
   } = usePosts();
+  const [shown, setShown] = useState(FEED_RENDER_PAGE);
   const postCreatorRef = useRef<HTMLTextAreaElement>(null);
 
   // Handle action params from FAB
+  useEffect(() => {
+    if (searchParams.get("studio") !== "1") return;
+    setStudioOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("studio");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   useEffect(() => {
     if (searchParams.get('action') === 'create-post' && user) {
       // Focus the post creator after a brief delay
@@ -64,16 +88,17 @@ const Feed = () => {
     data: availableRegions = []
   } = useQuery({
     queryKey: ["all-regions"],
+    enabled: showFilters,
     queryFn: async () => {
       const {
         data,
         error
-      } = await supabase.from("profiles_public").select("city_display").not("city_display", "is", null).neq("city_display", "");
+      } = await supabase.from("profiles_public").select("city, city_display");
       if (error) throw error;
+      const { cityFilterOptions, cityMatchesFilter } = await import("@/lib/cityNormalization");
+      matchCity.current = cityMatchesFilter;
 
-      // Get unique cities
-      const uniqueCities = [...new Set(data?.map(p => p.city_display).filter(Boolean) as string[])];
-      return uniqueCities.sort();
+      return cityFilterOptions((data || []).flatMap((profile) => [profile.city, profile.city_display]));
     }
   });
   const handleShuffle = () => {
@@ -86,7 +111,8 @@ const Feed = () => {
     // Media type filter
     let matchesCategory = activeCategory === "All";
     if (!matchesCategory) {
-      if (activeCategory === "Photo") matchesCategory = post.media_type === 'photo';else if (activeCategory === "Video") matchesCategory = post.media_type === 'video';else if (activeCategory === "Text") matchesCategory = post.media_type === 'text' || !post.media_url && !!post.content;
+      const linkedVideo = post.embed_provider === 'youtube' || post.embed_provider === 'vimeo';
+      if (activeCategory === "Photo") matchesCategory = post.media_type === 'photo';else if (activeCategory === "Video") matchesCategory = post.media_type === 'video' || linkedVideo;else if (activeCategory === "Text") matchesCategory = !linkedVideo && (post.media_type === 'text' || !post.media_url && !!post.content);
     }
 
     // Post type filter
@@ -98,58 +124,78 @@ const Feed = () => {
     // Region filter - check both city and city_display for compatibility
     let matchesRegion = regionFilter === null;
     if (!matchesRegion) {
-      const postCity = post.profile?.city_display || post.profile?.city;
-      matchesRegion = postCity === regionFilter;
+      const match = matchCity.current;
+      matchesRegion = match
+        ? match(post.profile?.city, regionFilter) || match(post.profile?.city_display, regionFilter)
+        : true;
     }
     return matchesCategory && matchesPostType && matchesRegion;
   });
+  const favoriteIds = new Set(favorites);
+  useEffect(() => {
+    setShown(FEED_RENDER_PAGE);
+  }, [lane, activeCategory, postTypeFilter, regionFilter, isShuffled]);
+  const lanePosts = filteredPosts.filter((post) => {
+    if (lane === "friends") return favoriteIds.has(post.user_id);
+    if (lane === "city") return !!profile?.city && (post.profile?.city === profile.city || post.profile?.city_display === profile.city_display);
+    if (lane === "live") return false;
+    return true;
+  });
+  const visiblePosts = lanePosts.slice(0, shown);
   return <PageLayout>
-      <div className="px-4 sm:px-6 pt-4">
-        {/* Compact Header with Profile + Actions */}
-        <motion.header initial={{
-        y: -10,
-        opacity: 0
-      }} animate={{
-        y: 0,
-        opacity: 1
-      }} className="flex items-start justify-between gap-3 mb-4 pb-4 border-b border-border">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link to="/profile" aria-label="View my profile" className="shrink-0">
-              <Avatar className="w-11 h-11 rounded-[2px]">
-                <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || "My profile"} className="rounded-[2px]" />
-                <AvatarFallback className="rounded-[2px] bg-muted text-foreground">
-                  <User className="w-5 h-5" />
-                </AvatarFallback>
-              </Avatar>
+      <div className="px-4 sm:px-6 pt-3">
+        <header className="mb-3 flex min-h-11 flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <Link to="/feed" className="inline-flex min-h-11 shrink-0 items-center" aria-label="Ether home">
+              <img src={bearLogo} alt="" className="h-14 w-auto" />
             </Link>
-            <div>
-              <p className="eyebrow">Home</p>
-              <h1 className="ether-title text-3xl">Feed</h1>
-            </div>
+            <SupportEtherButton />
           </div>
-
-          <div className="flex items-center gap-1">
-            <MoreMenuButton />
-            <Link to="/notifications" aria-label="Notifications">
+          <div className="ml-auto flex items-center">
+            <Button variant="ghost" className="font-body font-extrabold" onClick={() => setStudioOpen(true)} aria-label="Studio">
+              Studio
+            </Button>
+            <FriendsDrawer>
+              <Button variant="ghost" size="icon" aria-label="Friends">
+                <Users className="h-5 w-5" />
+              </Button>
+            </FriendsDrawer>
+            <Link to="/notifications" aria-label="Notifications" className="inline-flex">
               <Button variant="ghost" size="icon" aria-label="Notifications">
-                <Bell className="w-4 h-4" />
+                <Bell className="h-5 w-5" />
               </Button>
             </Link>
           </div>
-        </motion.header>
+        </header>
+        <ToolsSheet open={studioOpen} onOpenChange={setStudioOpen} />
 
-        {/* Stories Row */}
         <StoriesRow />
 
-        {/* Action Bar */}
-        <div className="flex items-center justify-between mt-4 mb-4">
-          <FriendsDrawer>
-            <Button variant="glass" size="sm" className="gap-2 min-h-11">
-              <Users className="w-4 h-4" />
-              <span className="text-xs">Friends</span>
-            </Button>
-          </FriendsDrawer>
-          
+        <div className="mb-3 flex gap-2 overflow-x-auto scrollbar-hide" role="tablist" aria-label="Feed">
+          {([
+            ["for-you", "For you"],
+            ["friends", "Friends"],
+            ["city", "City"],
+            ["live", "Live"],
+          ] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={lane === id}
+              onClick={() => setLane(id)}
+              className={`mono-label inline-flex h-11 shrink-0 items-center border-b-2 px-2 text-[11px] ${
+                lane === id ? "border-[hsl(var(--bubble))] text-foreground" : "border-transparent text-muted-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {openQuest && <div className="mb-4"><QuestCard quest={openQuest} /></div>}
+
+        <div className="mb-4 mt-2 flex items-center justify-end gap-2">
           <div className="flex gap-2">
             <Button variant={isShuffled ? "default" : "outline"} size="icon" onClick={handleShuffle} title="Shuffle feed" aria-label="Shuffle feed">
               <Shuffle className="w-4 h-4" />
@@ -193,24 +239,38 @@ const Feed = () => {
         </AnimatePresence>
 
         {/* Feed */}
-        {isLoading ? <div className="flex items-center justify-center py-20">
+        {lane === "live" && (
+          <Link to="/live" className="file-panel mb-4 flex min-h-11 items-center justify-between px-4">
+            <span>
+              <span className="mono-label block text-[8px] text-[hsl(var(--brand))]">Live</span>
+              <span className="font-body text-[15px] font-extrabold">Open the live room</span>
+            </span>
+            <span className="mono-label rounded-full bg-[hsl(var(--brand))] px-2 py-1 text-[8px] text-[#0A0A0A]">Live</span>
+          </Link>
+        )}
+        {isLoading ? <div className="flex items-center justify-center py-20" role="status">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <span className="sr-only">Loading the feed</span>
+          </div> : isError ? <div className="py-16 text-center">
+            <p className="text-sm text-muted-foreground">The feed did not load.</p>
+            <Button type="button" variant="outline" className="mt-3 min-h-11" onClick={() => void refetch()}>Try again</Button>
           </div> : <div className="space-y-5 pb-32">
-            <AnimatePresence mode="popLayout">
-              {filteredPosts.map((post, index) => <motion.div key={post.id} initial={{
-            opacity: 0,
-            y: 20
-          }} animate={{
-            opacity: 1,
-            y: 0
-          }} transition={{
-            delay: index * 0.05
-          }}>
+            <FeedEngagementProvider postIds={visiblePosts.map((post) => post.id)}>
+            <div className="space-y-5">
+              {visiblePosts.map((post) => (
+                <div key={post.feed_key ?? post.id} className="[content-visibility:auto] [contain-intrinsic-size:auto_480px]">
                   <FeedPost post={post} />
-                </motion.div>)}
-            </AnimatePresence>
+                </div>
+              ))}
+            </div>
+            {shown < lanePosts.length && (
+              <Button type="button" variant="outline" className="min-h-11 w-full" onClick={() => setShown((count) => nextRenderedCount(count, lanePosts.length))}>
+                Show more
+              </Button>
+            )}
+            </FeedEngagementProvider>
 
-            {filteredPosts.length === 0 && posts.length === 0 && user && <FirstRunEmpty title="Your feed is empty" description="Start with a post, look through the directory, or read community updates." actions={[{
+            {lanePosts.length === 0 && posts.length === 0 && user && lane !== "live" && <FirstRunEmpty title="Your feed is empty" description="Start with a post, look through the directory, or read community updates." actions={[{
           label: "Share something",
           onClick: () => document.querySelector<HTMLTextAreaElement>('[placeholder*="mind"]')?.focus()
         }, {
@@ -221,7 +281,7 @@ const Feed = () => {
           to: "/community"
         }]} />}
 
-            {filteredPosts.length === 0 && !(posts.length === 0 && user) && <EmptyState icon={Sparkles} title={activeCategory === "All" ? "The feed is waiting for you" : `No ${activeCategory.toLowerCase()} posts yet`} description="This is your space to share what you're creating, thinking, or discovering. Your voice matters here." action={user ? {
+            {lanePosts.length === 0 && !(posts.length === 0 && user) && lane !== "live" && <EmptyState icon={Sparkles} title={lane === "for-you" && activeCategory === "All" ? "The feed is waiting for you" : `No ${lane === "for-you" ? activeCategory.toLowerCase() : lane} posts yet`} description="This is your space to share what you're creating, thinking, or discovering. Your voice matters here." action={user ? {
           label: "Share Something",
           onClick: () => document.querySelector<HTMLTextAreaElement>('[placeholder*="mind"]')?.focus()
         } : undefined} />}

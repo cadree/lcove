@@ -5,6 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { notifyPostComment, notifyPostLike } from '@/lib/notifications';
+import { isQueryablePostId } from '@/lib/postId';
+import { assertCleanText } from '@/lib/objectionableText';
 
 interface Comment {
   id: string;
@@ -20,38 +22,38 @@ interface Comment {
   replies?: Comment[];
 }
 
-export function usePostInteractions(postId: string) {
+export function usePostInteractions(postId: string, options?: { loadComments?: boolean; threadOnly?: boolean }) {
+  const loadComments = options?.threadOnly ? options.loadComments === true : options?.loadComments !== false;
+  const loadCard = !options?.threadOnly;
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { blockedIds } = useUserBlocks();
+  const canQuery = isQueryablePostId(postId);
 
   // Fetch likes count and user's like status
   const { data: likesData, refetch: refetchLikes } = useQuery({
     queryKey: ['post-likes', postId],
+    enabled: canQuery && loadCard,
     queryFn: async () => {
-      const { count } = await supabase
+      // A HEAD count with select=* returns 416 when a post has no likes.
+      // One column list covers the count and this viewer's heart.
+      const { data, error } = await supabase
         .from('post_likes')
-        .select('*', { count: 'exact', head: true })
+        .select('user_id')
         .eq('post_id', postId);
-
-      let hasLiked = false;
-      if (user) {
-        const { data } = await supabase
-          .from('post_likes')
-          .select('id')
-          .eq('post_id', postId)
-          .eq('user_id', user.id)
-          .maybeSingle();
-        hasLiked = !!data;
-      }
-
-      return { count: count || 0, hasLiked };
+      if (error) throw error;
+      const rows = data ?? [];
+      return {
+        count: rows.length,
+        hasLiked: !!user && rows.some((row) => row.user_id === user.id),
+      };
     },
   });
 
   // Fetch comments with profiles
   const { data: comments = [], refetch: refetchComments } = useQuery({
     queryKey: ['post-comments', postId],
+    enabled: canQuery && loadComments,
     queryFn: async () => {
       const { data: commentsData, error } = await supabase
         .from('post_comments')
@@ -62,13 +64,17 @@ export function usePostInteractions(postId: string) {
       if (error) throw error;
 
       // Get profiles for commenters
-      const userIds = [...new Set(commentsData?.map(c => c.user_id) || [])];
-      const { data: profiles } = await supabase
-        .from('profiles_public')
-        .select('user_id, display_name, avatar_url')
-        .in('user_id', userIds);
+      const userIds = [...new Set(commentsData?.map(c => c.user_id) || [])].filter(isQueryablePostId);
+      let profiles: { user_id: string; display_name: string | null; avatar_url: string | null }[] = [];
+      if (userIds.length) {
+        const { data } = await supabase
+          .from('profiles_public')
+          .select('user_id, display_name, avatar_url')
+          .in('user_id', userIds);
+        profiles = data ?? [];
+      }
 
-      const profileMap = new Map(profiles?.map(p => [p.user_id, p]));
+      const profileMap = new Map(profiles.map(p => [p.user_id, p]));
 
       // Add profiles to comments. A missing row is a private profile.
       const commentsWithProfiles = (commentsData || []).map(c => ({
@@ -101,16 +107,16 @@ export function usePostInteractions(postId: string) {
   const { data: isSaved = false, refetch: refetchSaved } = useQuery({
     queryKey: ['post-saved', postId, user?.id],
     queryFn: async () => {
-      if (!user) return false;
+      if (!user || !isQueryablePostId(user.id)) return false;
       const { data } = await supabase
         .from('saved_posts')
         .select('id')
         .eq('post_id', postId)
         .eq('user_id', user.id)
-        .maybeSingle();
-      return !!data;
+        .limit(1);
+      return !!data?.length;
     },
-    enabled: !!user,
+    enabled: canQuery && loadCard && !!user,
   });
 
   // Like mutation
@@ -133,7 +139,7 @@ export function usePostInteractions(postId: string) {
 
         const { data: post } = await supabase
           .from('posts')
-          .select('user_id')
+          .select('user_id, content, media_url, media_type')
           .eq('id', postId)
           .maybeSingle();
         if (post && post.user_id !== user.id) {
@@ -142,7 +148,11 @@ export function usePostInteractions(postId: string) {
             .select('display_name')
             .eq('user_id', user.id)
             .maybeSingle();
-          notifyPostLike(post.user_id, profile?.display_name || 'Someone', postId).catch(() => undefined);
+          notifyPostLike(post.user_id, profile?.display_name || 'Someone', postId, {
+            caption: post.content,
+            mediaUrl: post.media_url,
+            mediaType: post.media_type,
+          }).catch(() => undefined);
         }
       }
     },
@@ -155,6 +165,7 @@ export function usePostInteractions(postId: string) {
   const commentMutation = useMutation({
     mutationFn: async ({ content, parentId }: { content: string; parentId?: string }) => {
       if (!user) throw new Error('Must be logged in');
+      assertCleanText(content);
 
       const { error } = await supabase
         .from('post_comments')
@@ -184,9 +195,6 @@ export function usePostInteractions(postId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['post-comments', postId] });
       toast.success('Comment added');
-    },
-    onError: () => {
-      toast.error('Failed to add comment');
     },
   });
 
@@ -232,31 +240,37 @@ export function usePostInteractions(postId: string) {
     },
   });
 
-  // Real-time subscriptions
+  // Real-time subscriptions. The feed does not use this path.
   useEffect(() => {
-    const likesChannel = supabase
-      .channel(`post-likes-${postId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'post_likes', filter: `post_id=eq.${postId}` },
-        () => refetchLikes()
-      )
-      .subscribe();
+    if (!canQuery || (!loadCard && !loadComments)) return;
 
-    const commentsChannel = supabase
-      .channel(`post-comments-${postId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'post_comments', filter: `post_id=eq.${postId}` },
-        () => refetchComments()
-      )
-      .subscribe();
+    const likesChannel = loadCard
+      ? supabase
+          .channel(`post-likes-${postId}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'post_likes', filter: `post_id=eq.${postId}` },
+            () => refetchLikes()
+          )
+          .subscribe()
+      : null;
+
+    const commentsChannel = loadComments
+      ? supabase
+          .channel(`post-comments-${postId}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'post_comments', filter: `post_id=eq.${postId}` },
+            () => refetchComments()
+          )
+          .subscribe()
+      : null;
 
     return () => {
-      supabase.removeChannel(likesChannel);
-      supabase.removeChannel(commentsChannel);
+      if (likesChannel) supabase.removeChannel(likesChannel);
+      if (commentsChannel) supabase.removeChannel(commentsChannel);
     };
-  }, [postId, refetchLikes, refetchComments]);
+  }, [canQuery, loadCard, loadComments, postId, refetchLikes, refetchComments]);
 
   const visibleComments = useMemo(
     () => hideBlockedComments(comments, new Set(blockedIds)),
@@ -270,7 +284,7 @@ export function usePostInteractions(postId: string) {
     commentsCount: countComments(visibleComments),
     isSaved,
     toggleLike: () => likeMutation.mutate(),
-    addComment: (content: string, parentId?: string) => commentMutation.mutate({ content, parentId }),
+    addComment: (content: string, parentId?: string) => commentMutation.mutateAsync({ content, parentId }),
     deleteComment: (commentId: string) => deleteCommentMutation.mutate(commentId),
     toggleSave: () => saveMutation.mutate(),
     isLiking: likeMutation.isPending,

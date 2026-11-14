@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,7 +45,7 @@ serve(async (req) => {
     const user = userData.user;
     if (!user) throw new Error("Not authenticated");
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+    const stripe = new Stripe(assertStripeTestKey(Deno.env.get("STRIPE_SECRET_KEY")), {
       apiVersion: "2025-08-27.basil",
     });
 
@@ -96,7 +98,7 @@ serve(async (req) => {
     log("ERROR", { msg });
     return new Response(JSON.stringify({ ok: false, error: msg }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
+      status: httpStatusForError(error),
     });
   }
 });

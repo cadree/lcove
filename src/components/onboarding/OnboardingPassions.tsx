@@ -37,7 +37,7 @@ const OnboardingPassions = ({ data, updateData, onNext, onBack }: Props) => {
         .from('passions')
         .select('*')
         .order('category', { ascending: true });
-      
+
       if (passionsData) {
         setSuggestions(passionsData);
       }
@@ -93,7 +93,7 @@ const OnboardingPassions = ({ data, updateData, onNext, onBack }: Props) => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-6"
         >
-          <p className="text-primary text-sm font-medium mb-2">Step 1 of 4</p>
+          <p className="text-primary text-sm font-medium mb-2">Step 2 of 4</p>
           <h1 className="font-display text-3xl md:text-5xl text-foreground mb-3">
             What are you passionate about?
           </h1>
@@ -139,7 +139,7 @@ const OnboardingPassions = ({ data, updateData, onNext, onBack }: Props) => {
               </button>
             )}
           </div>
-          
+
           <div className="flex justify-between items-center mt-2">
             <p className="text-xs text-muted-foreground">
               Add as many as you like (up to {MAX_PASSIONS})
@@ -215,7 +215,7 @@ const OnboardingPassions = ({ data, updateData, onNext, onBack }: Props) => {
               <Sparkles className="w-4 h-4" />
               <p className="text-sm">Suggestions (optional) — tap to add</p>
             </div>
-            
+
             <div className="flex flex-wrap gap-2">
               {suggestions.slice(0, 20).map((suggestion, index) => {
                 const isSelected = isSuggestionSelected(suggestion.name);
@@ -273,7 +273,7 @@ const OnboardingPassions = ({ data, updateData, onNext, onBack }: Props) => {
       </div>
 
       {/* Fixed Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-background via-background/95 to-transparent">
+      <div className="safe-footer fixed bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-background via-background/95 to-transparent">
         <div className="max-w-2xl mx-auto flex gap-3 md:gap-4">
           <Button
             onClick={onBack}

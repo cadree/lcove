@@ -72,7 +72,7 @@ export function EventMoodboardView({ eventId }: Props) {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {visuals.map((item) => (
               <div key={item.id} className="relative aspect-square rounded-lg overflow-hidden border border-border/50">
-                <img src={item.media_url!} alt={item.title || 'Moodboard image'} className="w-full h-full object-cover" />
+                <img src={item.media_url!} alt={item.title || 'Moodboard image'} loading="lazy" decoding="async" fetchPriority="low" className="w-full h-full object-cover" />
                 {item.title && (
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/90 to-transparent p-2">
                     <p className="text-xs text-foreground font-medium truncate">{item.title}</p>

@@ -39,7 +39,7 @@ export interface EventAttendee {
 }
 
 /** Fetch new-schema orders + attendees for an event. */
-export function useEventTicketingData(eventId?: string) {
+export function useEventTicketingData(eventId?: string, enabled = true) {
   const ordersQ = useQuery({
     queryKey: ["event-orders-v2", eventId],
     queryFn: async (): Promise<TicketOrder[]> => {
@@ -52,7 +52,7 @@ export function useEventTicketingData(eventId?: string) {
       if (error) throw error;
       return (data as TicketOrder[]) || [];
     },
-    enabled: !!eventId,
+    enabled: !!eventId && enabled,
   });
 
   const attendeesQ = useQuery({
@@ -67,7 +67,8 @@ export function useEventTicketingData(eventId?: string) {
       if (error) throw error;
       return (data as EventAttendee[]) || [];
     },
-    enabled: !!eventId,
+    enabled: !!eventId && enabled,
+    refetchInterval: enabled ? 15000 : false,
   });
 
   const tiersQ = useQuery({
@@ -82,7 +83,7 @@ export function useEventTicketingData(eventId?: string) {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!eventId,
+    enabled: !!eventId && enabled,
   });
 
   return {

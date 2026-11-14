@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { format, isToday, isTomorrow, isPast, parseISO, addDays, startOfDay, endOfDay, isWithinInterval } from "date-fns";
-import { ArrowLeft, Sun, AlertCircle, Calendar, Circle, ChevronRight, Loader2, Plus, Search, Filter, Inbox, Clock, CalendarDays, Users } from "lucide-react";
+import { Sun, AlertCircle, Calendar, Circle, ChevronRight, Loader2, Plus, Search, Filter, Inbox, Clock, CalendarDays, Users } from "lucide-react";
+import { BackButton } from "@/components/navigation/BackButton";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -69,7 +70,7 @@ const Today = () => {
   const [filter, setFilter] = useState<FilterType>("all");
   const [activeTab, setActiveTab] = useState<TabType>("all");
   const [showAddTask, setShowAddTask] = useState(false);
-  
+
   // Add task form state
   const [selectedContact, setSelectedContact] = useState<string>("");
   const [taskTitle, setTaskTitle] = useState("");
@@ -77,7 +78,7 @@ const Today = () => {
   const [isCreating, setIsCreating] = useState(false);
 
   const isLoading = contactLoading || calendarLoading;
-  const tasks = contactTasks; // For backwards compatibility
+  const tasks = contactTasks;
 
   const now = new Date();
   const todayStart = startOfDay(now);
@@ -97,7 +98,7 @@ const Today = () => {
     // Apply search
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(t => 
+      result = result.filter(t =>
         t.title.toLowerCase().includes(query) ||
         t.pipeline_items.name.toLowerCase().includes(query) ||
         (t.pipeline_items.company?.toLowerCase().includes(query))
@@ -159,9 +160,9 @@ const Today = () => {
         .from('contact_tasks')
         .update({ is_done: true })
         .eq('id', task.id);
-      
+
       if (error) throw error;
-      
+
       queryClient.invalidateQueries({ queryKey: ['my-day-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['contact-tasks'] });
       toast.success("Task completed!");
@@ -185,7 +186,7 @@ const Today = () => {
 
   const handleAddTask = async () => {
     if (!selectedContact || !taskTitle.trim() || !user) return;
-    
+
     setIsCreating(true);
     try {
       const { error } = await supabase
@@ -196,9 +197,9 @@ const Today = () => {
           title: taskTitle.trim(),
           due_at: taskDueDate?.toISOString() || null,
         });
-      
+
       if (error) throw error;
-      
+
       queryClient.invalidateQueries({ queryKey: ['my-day-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['contact-tasks', selectedContact] });
       toast.success("Task added!");
@@ -213,25 +214,23 @@ const Today = () => {
     }
   };
 
-  const totalTasks = tasks.length;
+  const visibleCalendar = calendarTasks.filter((task) => {
+    const needle = searchQuery.trim().toLowerCase();
+    if (!needle) return true;
+    return task.title.toLowerCase().includes(needle);
+  });
+  const totalTasks = tasks.length + calendarTasks.length;
   const hasNoTasks = totalTasks === 0;
-  const hasNoFilteredTasks = filteredTasks.length === 0 && !hasNoTasks;
+  const hasNoFilteredTasks = filteredTasks.length === 0 && visibleCalendar.length === 0 && !hasNoTasks;
 
   return (
-    <PageLayout hideNav>
+    <PageLayout>
       <div className="min-h-screen bg-background">
         {/* Header */}
-        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
+        <div className="safe-header sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => navigate(-1)}
-                className="shrink-0"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
+              <BackButton className="shrink-0" />
               <div className="flex items-center gap-2">
                 <Sun className="w-5 h-5 text-amber-500" />
                 <h1 className="font-display text-xl font-semibold text-foreground">My Day</h1>
@@ -242,8 +241,8 @@ const Today = () => {
                 )}
               </div>
             </div>
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               onClick={() => setShowAddTask(true)}
               className="gap-1.5"
             >
@@ -293,15 +292,11 @@ const Today = () => {
               <Sun className="w-12 h-12 text-amber-500/50 mx-auto mb-4" />
               <h2 className="text-lg font-medium mb-2">All caught up!</h2>
               <p className="text-muted-foreground text-sm mb-4">
-                Add a task to a contact to see it here.
+                Tasks, events, and projects you add to My Day show up here.
               </p>
-              <div className="flex flex-col sm:flex-row gap-2 justify-center">
+              <div className="flex justify-center">
                 <Button variant="outline" onClick={() => navigate('/pipeline')}>
                   Go to Pipeline
-                </Button>
-                <Button onClick={() => setShowAddTask(true)} className="gap-1.5">
-                  <Plus className="w-4 h-4" />
-                  Add Task
                 </Button>
               </div>
             </Card>
@@ -318,6 +313,29 @@ const Today = () => {
             </Card>
           ) : (
             <>
+              {visibleCalendar.length > 0 && (
+                <section className="space-y-2">
+                  <h3 className="flex items-center gap-2 text-sm font-medium">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    On your day
+                  </h3>
+                  {visibleCalendar.map((task) => (
+                    <button
+                      key={task.id}
+                      type="button"
+                      onClick={() => {
+                        if (task.project_id) navigate(`/project/${task.project_id}`);
+                        else if (task.event_id) navigate(`/event/${task.event_id}`);
+                        else navigate("/calendar");
+                      }}
+                      className="flex min-h-11 w-full items-center justify-between rounded-xl border border-border bg-card px-3 text-left"
+                    >
+                      <span className="truncate text-sm font-medium text-foreground">{task.title}</span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    </button>
+                  ))}
+                </section>
+              )}
               {/* Overdue Section */}
               {categorizedTasks.overdue.length > 0 && (
                 <TaskSection
@@ -435,8 +453,8 @@ const Today = () => {
               <Button variant="outline" onClick={() => setShowAddTask(false)}>
                 Cancel
               </Button>
-              <Button 
-                onClick={handleAddTask} 
+              <Button
+                onClick={handleAddTask}
                 disabled={!selectedContact || !taskTitle.trim() || isCreating}
               >
                 {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : "Add Task"}
@@ -493,7 +511,7 @@ function TaskSection({ title, icon, tasks, onToggle, onNavigate, formatDueDate, 
                 <Circle className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
               )}
             </button>
-            
+
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{task.title}</p>
               <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">

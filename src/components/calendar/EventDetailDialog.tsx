@@ -13,8 +13,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { supabase } from "@/integrations/supabase/client";
-import { shareLink, shareToChannel, buildShareUrl } from "@/lib/shareLink";
-import { format, formatDistanceToNow } from "date-fns";
+import { EventShareActions } from "@/components/events/EventShareActions";
+import { eventPublicUrl } from "../../../functions/_shared/eventShare.js";
+import { attendanceLabel, attendanceSummary } from "@/lib/eventGuests";
+import { formatDistanceToNow } from "date-fns";
+import { formatEventDate, formatEventTime } from "@/lib/eventTime";
 import { 
   MapPin, 
   Calendar, 
@@ -27,8 +30,6 @@ import {
   Check,
   X,
   Share2,
-  Copy,
-  Twitter,
   ExternalLink,
   Loader2,
   Navigation,
@@ -38,20 +39,12 @@ import {
   Sun,
   CalendarCheck,
   UserPlus,
-  MessageSquare,
-  Download,
-  Send,
-  Image,
-  Facebook,
-  Phone
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EventAttendeesDialog } from "./EventAttendeesDialog";
@@ -80,9 +73,9 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
   const [attendeesOpen, setAttendeesOpen] = useState(false);
   const [isAddingToMyDay, setIsAddingToMyDay] = useState(false);
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
-  const [isGeneratingFlyer, setIsGeneratingFlyer] = useState(false);
   const [isSendingReminder, setIsSendingReminder] = useState(false);
   const [reminderMessage, setReminderMessage] = useState("");
+  const [reminderNotice, setReminderNotice] = useState<string | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [tierManagerOpen, setTierManagerOpen] = useState(false);
 
@@ -100,8 +93,9 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
     );
   }
 
-  const spotsLeft = event.capacity ? event.capacity - (event.rsvp_count || 0) : null;
-  const isSoldOut = spotsLeft !== null && spotsLeft <= 0;
+  const attendance = attendanceSummary(event.capacity, event.rsvp_count || 0);
+  const spotsLeft = attendance.spotsLeft;
+  const isSoldOut = attendance.soldOut;
   const eventDate = new Date(event.start_date);
   const isUpcoming = eventDate > new Date();
   const timeUntilEvent = isUpcoming ? formatDistanceToNow(eventDate, { addSuffix: true }) : null;
@@ -259,42 +253,31 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
     }
   };
 
-  const handleShare = async (method: 'copy' | 'twitter' | 'native' | 'sms' | 'whatsapp' | 'facebook' | 'instagram' | 'email') => {
-    const shareUrl = buildShareUrl.event(event.id);
-    const shareText = `Check out "${event.title}" on ${format(eventDate, 'MMMM d')}!`;
-    await shareToChannel(method, { title: event.title, text: shareText, url: shareUrl });
-  };
-
-  const handleDownloadFlyer = async () => {
-    setIsGeneratingFlyer(true);
-    try {
-      const { generateEventPdf } = await import('@/lib/generateEventPdf');
-      await generateEventPdf(event);
-      toast.success('Event PDF downloaded');
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      toast.error('Failed to generate PDF');
-    } finally {
-      setIsGeneratingFlyer(false);
-    }
-  };
-
-  const handleSendReminder = async (includeSms = false) => {
+  const handleSendReminder = async () => {
     setIsSendingReminder(true);
+    setReminderNotice(null);
     try {
       const { data, error } = await supabase.functions.invoke('send-event-reminder', {
-        body: { eventId: event.id, message: reminderMessage || undefined, sendSms: includeSms },
+        body: { eventId: event.id, message: reminderMessage || undefined },
       });
       if (error) throw error;
-      const parts = [];
-      if (data?.sentCount > 0) parts.push(`${data.sentCount} emails`);
-      if (data?.smsSentCount > 0) parts.push(`${data.smsSentCount} texts`);
-      if (data?.pushSentCount > 0) parts.push(`${data.pushSentCount} push notifications`);
-      toast.success(parts.length > 0 ? `Sent: ${parts.join(', ')}` : 'No attendees to notify');
-      setReminderMessage("");
+      const notice = typeof data?.message === "string"
+        ? data.message
+        : data?.sentCount > 0
+          ? `Queued email for ${data.sentCount} guest${data.sentCount === 1 ? "" : "s"}.`
+          : "No guests to email.";
+      setReminderNotice(notice);
+      if (data?.sentCount > 0) {
+        toast.success(notice);
+        setReminderMessage("");
+      } else {
+        toast.error(notice);
+      }
     } catch (error) {
       console.error('Reminder error:', error);
-      toast.error('Failed to send reminder');
+      const notice = "Could not queue the reminder email.";
+      setReminderNotice(notice);
+      toast.error(notice);
     } finally {
       setIsSendingReminder(false);
     }
@@ -401,7 +384,7 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="glass-strong border-border/30 max-w-lg max-h-[90vh] overflow-y-auto p-0">
+      <DialogContent className="event-dialog glass-strong max-h-[90vh] min-w-0 overflow-x-hidden overflow-y-auto border-border/30 p-0">
         {/* Event Image */}
         {event.image_url && (
           <div 
@@ -426,15 +409,13 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
           </div>
         )}
 
-        <div className="p-6 space-y-5">
-          <DialogHeader className="space-y-2">
-            <div className="flex items-start justify-between gap-4">
-              <DialogTitle className="font-display text-2xl leading-tight">
-                {event.title}
-              </DialogTitle>
-              
-              {/* Quick Actions */}
-              <div className="flex gap-1 shrink-0">
+        <div className="min-w-0 max-w-full space-y-5 overflow-x-hidden p-6">
+          <DialogHeader className="min-w-0 space-y-3">
+            <DialogTitle className="break-words pr-8 text-left font-display text-2xl leading-tight">
+              {event.title}
+            </DialogTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap gap-1">
                 {/* Add to Calendar - using the compact variant */}
                 <AddToCalendarButtons
                   event={{
@@ -453,47 +434,18 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
                 {/* Share */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Button variant="ghost" size="icon" data-icon className="h-8 w-8">
                       <Share2 className="w-4 h-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="glass-strong border-border/30">
-                    <DropdownMenuItem onClick={() => handleShare('copy')}>
-                      <Copy className="w-4 h-4 mr-2" />
-                      Copy Link
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleShare('sms')}>
-                      <MessageSquare className="w-4 h-4 mr-2" />
-                      iMessage / SMS
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleShare('whatsapp')}>
-                      <Send className="w-4 h-4 mr-2" />
-                      WhatsApp
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => handleShare('instagram')} disabled={isGeneratingFlyer}>
-                      {isGeneratingFlyer ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Image className="w-4 h-4 mr-2" />}
-                      Instagram (with flyer)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleShare('facebook')}>
-                      <Facebook className="w-4 h-4 mr-2" />
-                      Facebook
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleShare('twitter')}>
-                      <Twitter className="w-4 h-4 mr-2" />
-                      Twitter / X
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleDownloadFlyer} disabled={isGeneratingFlyer}>
-                      {isGeneratingFlyer ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-                      Download Event Flyer
-                    </DropdownMenuItem>
-                    {navigator.share && (
-                      <DropdownMenuItem onClick={() => handleShare('native')}>
-                        <Share2 className="w-4 h-4 mr-2" />
-                        More...
-                      </DropdownMenuItem>
-                    )}
+                    <EventShareActions
+                      title={event.title}
+                      text={`Check out "${event.title}" on ${formatEventDate(event.start_date, event.timezone)}!`}
+                      url={eventPublicUrl(event)}
+                      imageUrl={event.image_url}
+                      pdfEvent={event}
+                    />
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -527,11 +479,11 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
               </div>
               <div>
                 <p className="text-foreground font-medium">
-                  {format(eventDate, 'EEEE, MMMM d, yyyy')}
+                  {formatEventDate(event.start_date, event.timezone)}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {format(eventDate, 'h:mm a')}
-                  {event.end_date && ` - ${format(new Date(event.end_date), 'h:mm a')}`}
+                  {formatEventTime(event.start_date, event.timezone)}
+                  {event.end_date && ` - ${formatEventTime(event.end_date, event.timezone)}`}
                 </p>
               </div>
             </div>
@@ -541,9 +493,9 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
               <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
                 <MapPin className="w-5 h-5 text-primary" />
               </div>
-              <div className="flex-1">
-                <p className="text-foreground font-medium">{event.venue || 'Location TBA'}</p>
-                <p className="text-sm text-muted-foreground">
+              <div className="min-w-0 flex-1">
+                <p className="break-words font-medium text-foreground">{event.venue || 'Location TBA'}</p>
+                <p className="break-words text-sm text-muted-foreground">
                   {event.city}{event.state ? `, ${event.state}` : ''}
                 </p>
                 {event.venue && (
@@ -576,7 +528,7 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
               </div>
               <div className="flex-1">
                 <p className="text-foreground font-medium">
-                  {event.rsvp_count} attending
+                  {attendanceLabel(event.capacity, event.rsvp_count || 0)}
                 </p>
                 {spotsLeft !== null && (
                   <p className={cn(
@@ -606,7 +558,7 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
               <InviteGuestsDialog eventId={event.id} eventTitle={event.title}>
                 <Button variant="outline" size="sm" className="w-full gap-2">
                   <UserPlus className="h-4 w-4" />
-                  Invite Guests via Email / SMS
+                  Invite guests by email
                 </Button>
               </InviteGuestsDialog>
             )}
@@ -621,36 +573,23 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
                   onChange={(e) => setReminderMessage(e.target.value)}
                   className="text-sm"
                 />
-                <div className="flex gap-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => handleSendReminder(false)}
-                    disabled={isSendingReminder}
-                    className="flex-1"
-                  >
-                    {isSendingReminder ? (
-                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                    ) : (
-                      <Bell className="w-3 h-3 mr-1" />
-                    )}
-                    Email All
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleSendReminder(true)}
-                    disabled={isSendingReminder}
-                    className="flex-1"
-                  >
-                    {isSendingReminder ? (
-                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                    ) : (
-                      <Phone className="w-3 h-3 mr-1" />
-                    )}
-                    Email + Text
-                  </Button>
-                </div>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => handleSendReminder()}
+                  disabled={isSendingReminder}
+                  className="w-full"
+                >
+                  {isSendingReminder ? (
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  ) : (
+                    <Bell className="w-3 h-3 mr-1" />
+                  )}
+                  Email guests
+                </Button>
+                {reminderNotice && (
+                  <p className="text-xs text-foreground" role="status">{reminderNotice}</p>
+                )}
               </div>
             )}
 
@@ -706,8 +645,12 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
               <Button
                 variant={event.user_rsvp?.status === 'going' ? 'glass' : 'default'}
                 size="lg"
-                onClick={() => handleRSVP(event.user_rsvp?.status === 'going' ? 'cancelled' : 'going')}
-                disabled={isRsvping || isSoldOut}
+                onClick={() => handleRSVP(
+                  event.user_rsvp?.status === 'going' || event.user_rsvp?.status === 'waitlist'
+                    ? 'cancelled'
+                    : 'going'
+                )}
+                disabled={isRsvping}
                 className="w-full"
               >
                 {isRsvping ? (
@@ -716,6 +659,16 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
                   <>
                     <X className="w-4 h-4 mr-2" />
                     Cancel RSVP
+                  </>
+                ) : event.user_rsvp?.status === 'waitlist' ? (
+                  <>
+                    <X className="w-4 h-4 mr-2" />
+                    Leave waitlist
+                  </>
+                ) : isSoldOut ? (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Join waitlist
                   </>
                 ) : (
                   <>
@@ -906,14 +859,14 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
             )}
 
             {/* Quick Actions Row */}
-            <div className="flex gap-2 pt-2">
+            <div className="grid min-w-0 grid-cols-1 gap-2 pt-2">
               {/* Add to My Day */}
               <Button
                 variant={isEventInMyDay ? "default" : "glass"}
                 size="sm"
                 onClick={handleAddToMyDay}
                 disabled={isAddingToMyDay}
-                className="flex-1"
+                className="w-full"
                 role="button"
                 aria-label={isEventInMyDay ? "Remove from My Day" : "Add to My Day"}
               >
@@ -931,7 +884,7 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
                 size="sm"
                 onClick={handleAddToPersonalCalendar}
                 disabled={isAddingToCalendar}
-                className="flex-1"
+                className="w-full"
                 role="button"
                 aria-label="Save to personal calendar"
               >

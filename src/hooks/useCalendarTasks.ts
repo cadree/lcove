@@ -76,6 +76,7 @@ export function useCalendarTasks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['my-day-calendar-tasks'] });
     },
   });
 
@@ -100,6 +101,7 @@ export function useCalendarTasks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['my-day-calendar-tasks'] });
     },
   });
 
@@ -124,6 +126,7 @@ export function useCalendarTasks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['my-day-calendar-tasks'] });
     },
   });
 
@@ -142,6 +145,7 @@ export function useCalendarTasks() {
     },
     onSuccess: async ({ data, isDone }) => {
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['my-day-calendar-tasks'] });
       
       // Award energy points when completing a task
       if (isDone) {
@@ -171,6 +175,7 @@ export function useCalendarTasks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['my-day-calendar-tasks'] });
     },
   });
 
@@ -194,6 +199,7 @@ export function useCalendarTasks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['my-day-calendar-tasks'] });
     },
   });
 

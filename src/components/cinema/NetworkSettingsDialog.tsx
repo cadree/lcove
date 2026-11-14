@@ -37,6 +37,7 @@ import { errorMessage } from '@/lib/errorMessage';
 import { COMMUNITY_FUND_FEE_PERCENT } from '@/lib/fees';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { readNumber } from '@/lib/numberField';
 
 interface NetworkSettingsDialogProps {
   open: boolean;
@@ -137,6 +138,12 @@ export const NetworkSettingsDialog = ({
       return;
     }
 
+    const subscription = readNumber(subscriptionPrice, { label: 'Subscription price', min: 0.99, decimals: 2 });
+    if (isPaid && subscription.error) {
+      toast.error(subscription.error);
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -148,7 +155,7 @@ export const NetworkSettingsDialog = ({
           genre: genre || null,
           is_public: isPublic,
           is_paid: isPaid,
-          subscription_price: isPaid ? parseFloat(subscriptionPrice) : 0,
+          subscription_price: isPaid ? (subscription.value ?? 0) : 0,
         })
         .eq('id', network.id);
 

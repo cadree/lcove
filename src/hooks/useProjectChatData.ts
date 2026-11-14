@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { SHOT_USER_ID, shotSessionEnabled } from '@/lib/shotSession';
 
 export interface ProjectDeliverable {
   type?: string;
@@ -55,6 +56,32 @@ export function useProjectChatData(projectId?: string | null) {
     queryKey: ['project-chat-data', projectId],
     queryFn: async (): Promise<ProjectChatData | null> => {
       if (!projectId) return null;
+      if (shotSessionEnabled()) {
+        return {
+          id: projectId,
+          title: "Open Studio",
+          description: null,
+          cover_image_url: null,
+          status: "open",
+          timeline_start: null,
+          timeline_end: null,
+          total_budget: 0,
+          budget_range: null,
+          currency: "USD",
+          venue: null,
+          equipment_needed: null,
+          props_needed: null,
+          vendors_needed: false,
+          sponsorship_needed: false,
+          deliverables: null,
+          expected_outcome: null,
+          creator_id: SHOT_USER_ID,
+          progress_percent: 0,
+          roles: [],
+          milestones: [],
+          attachments: [],
+        };
+      }
 
       // Fetch project, roles, milestones, and attachments in parallel
       const [projectRes, rolesRes, milestonesRes, attachmentsRes] = await Promise.all([

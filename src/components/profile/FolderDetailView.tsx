@@ -1,6 +1,7 @@
+import { FeedVideo } from "@/components/media/FeedVideo";
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Paintbrush, Plus, ImageIcon, Camera, Play, Check, Upload, Link, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Paintbrush, Plus, ImageIcon, Camera, Play, Check, Upload, Link, ExternalLink, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,13 +19,26 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { PortfolioFolder, useFolderPosts, usePortfolioFolders, useAddPortfolioItem, PortfolioItem } from '@/hooks/usePortfolioFolders';
+import { PortfolioFolder, useFolderPosts, usePortfolioFolders, useAddPortfolioItem, useDeletePortfolioItem, PortfolioItem } from '@/hooks/usePortfolioFolders';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useProfilePosts } from '@/hooks/useProfilePosts';
 import { ProfilePost } from '@/types/post';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import { useAuth } from '@/contexts/AuthContext';
+import { embedFromPost } from '@/lib/videoEmbed';
+import { EmbedThumbnail } from '@/components/feed/EmbedPlayer';
 
 interface FolderDetailViewProps {
   folder: PortfolioFolder;
@@ -40,6 +54,8 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
   const { posts: allPosts, refetch: refetchAllPosts } = useProfilePosts(userId);
   const { updateFolder, assignPostToFolder } = usePortfolioFolders(userId);
   const addPortfolioItem = useAddPortfolioItem(userId);
+  const deletePortfolioItem = useDeletePortfolioItem(userId);
+  const [itemToDelete, setItemToDelete] = useState<PortfolioItem | null>(null);
   const [showAddPostsDialog, setShowAddPostsDialog] = useState(false);
   const [showAddLinkDialog, setShowAddLinkDialog] = useState(false);
   const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
@@ -50,7 +66,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
 
   // Filter posts that aren't already in this folder
   const availablePosts = allPosts.filter(
-    post => post.media_url && post.folder_id !== folder.id
+    post => (post.media_url || embedFromPost(post)) && post.folder_id !== folder.id
   );
 
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,7 +139,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
       refetchAllPosts();
     } catch (error) {
       console.error('Error uploading media:', error);
-      toast.error('Failed to upload media');
+      toast.error(errorMessage(error, 'Failed to upload media'));
     } finally {
       setIsUploadingMedia(false);
       if (mediaInputRef.current) {
@@ -133,8 +149,8 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
   };
 
   const togglePostSelection = (postId: string) => {
-    setSelectedPosts(prev => 
-      prev.includes(postId) 
+    setSelectedPosts(prev =>
+      prev.includes(postId)
         ? prev.filter(id => id !== postId)
         : [...prev, postId]
     );
@@ -157,7 +173,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
       toast.error('Please enter a URL');
       return;
     }
-    
+
     await addPortfolioItem.mutateAsync({
       folder_id: folder.id,
       title: linkForm.title || 'External Work',
@@ -165,7 +181,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
       thumbnail_url: linkForm.thumbnailUrl || undefined,
       media_type: 'link',
     });
-    
+
     setLinkForm({ title: '', url: '', thumbnailUrl: '' });
     setShowAddLinkDialog(false);
     refetchFolderPosts();
@@ -182,7 +198,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
   return (
     <div className="min-h-[400px]">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50">
+      <div className="safe-header sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50">
         <div className="flex items-center gap-3 px-5 py-4">
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="w-5 h-5" />
@@ -244,8 +260,8 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
               "border border-dashed border-border hover:border-primary/50 transition-colors"
             )}>
               {folder.cover_image_url ? (
-                <img 
-                  src={folder.cover_image_url} 
+                <img
+                  src={folder.cover_image_url}
                   alt={folder.name}
                   className="w-full h-full object-cover"
                 />
@@ -267,10 +283,10 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
                 </div>
               )}
             </div>
-            <input 
-              type="file" 
-              accept="image/*" 
-              className="hidden" 
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
               onChange={handleCoverUpload}
               disabled={isUploadingCover}
             />
@@ -304,14 +320,14 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
       ) : (
         <div className="grid grid-cols-3 gap-0.5 sm:gap-1">
           {folderPosts?.map((item, index) => (
-            <motion.button
+            <motion.div
               key={item.id}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: index * 0.02 }}
               className="aspect-square relative group overflow-hidden bg-muted"
-              onClick={() => handleItemClick(item)}
             >
+              <button type="button" className="absolute inset-0" aria-label={item.title || item.content || "Open item"} onClick={() => handleItemClick(item)} />
               {/* External Link Item */}
               {item.external_url ? (
                 <>
@@ -336,12 +352,22 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
                     </div>
                   )}
                 </>
+              ) : embedFromPost(item) ? (
+                <>
+                  <EmbedThumbnail
+                    embed={embedFromPost(item)!}
+                    thumbnailUrl={item.embed_thumbnail_url}
+                    title={item.embed_title || item.content}
+                  />
+                  <div className="absolute top-2 right-2">
+                    <Play className="w-4 h-4 text-white drop-shadow-lg" fill="white" />
+                  </div>
+                </>
               ) : item.media_type === 'video' ? (
                 <>
-                  <video
+                  <FeedVideo loop={false}
                     src={item.media_url || undefined}
                     className="w-full h-full object-cover"
-                    muted
                     preload="metadata"
                   />
                   <div className="absolute top-2 right-2">
@@ -356,14 +382,18 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
                   loading="lazy"
                 />
               )}
-              
-              {/* Hover overlay */}
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="text-white text-xs">
-                  {item.external_url ? 'Open Link' : 'View'}
-                </span>
-              </div>
-            </motion.button>
+
+              {isOwner && item.source === 'portfolio_item' && (
+                <button
+                  type="button"
+                  className="absolute left-1 top-1 z-[2] flex h-11 w-11 items-center justify-center rounded-full bg-background/85 text-destructive"
+                  aria-label={`Delete ${item.title || "item"}`}
+                  onClick={() => setItemToDelete(item)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </motion.div>
           ))}
         </div>
       )}
@@ -374,7 +404,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
           <DialogHeader>
             <DialogTitle className="font-display">Add to {folder.name}</DialogTitle>
           </DialogHeader>
-          
+
           {availablePosts.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">
               <ImageIcon className="w-12 h-12 mx-auto mb-3 opacity-40" />
@@ -397,12 +427,17 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
                           : "ring-transparent hover:ring-primary/50"
                       )}
                     >
-                      {post.media_type === 'video' ? (
+                      {embedFromPost(post) ? (
+                        <EmbedThumbnail
+                          embed={embedFromPost(post)!}
+                          thumbnailUrl={post.embed_thumbnail_url}
+                          title={post.embed_title || post.content}
+                        />
+                      ) : post.media_type === 'video' ? (
                         <>
-                          <video
+                          <FeedVideo loop={false}
                             src={post.media_url || undefined}
                             className="w-full h-full object-cover"
-                            muted
                             preload="metadata"
                           />
                           <div className="absolute top-1 right-1">
@@ -416,7 +451,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
                           className="w-full h-full object-cover"
                         />
                       )}
-                      
+
                       {selectedPosts.includes(post.id) && (
                         <div className="absolute inset-0 bg-primary/30 flex items-center justify-center">
                           <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
@@ -428,12 +463,12 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
                   ))}
                 </div>
               </ScrollArea>
-              
+
               <div className="flex justify-between items-center pt-4 border-t">
                 <span className="text-sm text-muted-foreground">
                   {selectedPosts.length} selected
                 </span>
-                <Button 
+                <Button
                   onClick={handleAddSelectedPosts}
                   disabled={selectedPosts.length === 0 || assignPostToFolder.isPending}
                 >
@@ -489,7 +524,7 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
             <Button variant="outline" onClick={() => setShowAddLinkDialog(false)}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleAddLink}
               disabled={!linkForm.url.trim() || addPortfolioItem.isPending}
             >
@@ -498,6 +533,29 @@ export function FolderDetailView({ folder, userId, isOwner, onBack, onPostClick 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <AlertDialog open={!!itemToDelete} onOpenChange={(open) => { if (!open) setItemToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this item?</AlertDialogTitle>
+            <AlertDialogDescription>This removes it from your portfolio. This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deletePortfolioItem.isPending}
+              onClick={() => {
+                if (!itemToDelete) return;
+                deletePortfolioItem.mutate(
+                  { id: itemToDelete.id, folderId: folder.id },
+                  { onSettled: () => setItemToDelete(null) },
+                );
+              }}
+            >
+              {deletePortfolioItem.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

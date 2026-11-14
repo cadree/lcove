@@ -1,7 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { ApplicationServer, importVapidKeys, Urgency, type ExportedVapidKeys } from "jsr:@negrel/webpush";
-import { requireUserOrService } from "../_shared/require-caller.ts";
+import { getBearerUser, requestRole, requireUserOrService } from "../_shared/require-caller.ts";
+import { noticeForUser } from "../_shared/notification-auth.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
+import { IOS_APP_TOPIC, classifyPushSubscription, sendApnsAlert, signApnsJwt } from "../_shared/apns.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -62,6 +65,86 @@ function logStep(step: string, details?: Record<string, unknown>) {
   console.log(`[${timestamp}] ${step}`, details ? JSON.stringify(details) : "");
 }
 
+type PushResult = { endpoint: string; status: string; error?: string };
+
+async function loadApnsJwt(subscriptions: { platform?: string; endpoint?: string }[]) {
+  const needsApns = subscriptions.some((sub) => {
+    const decision = classifyPushSubscription(sub.platform, sub.endpoint);
+    return decision.channel === "apns" && decision.action === "send";
+  });
+  if (!needsApns) return "";
+  const p8 = Deno.env.get("APPLE_APNS_KEY_P8") ?? "";
+  const keyId = (Deno.env.get("APPLE_APNS_KEY_ID") ?? "").trim();
+  const teamId = (Deno.env.get("APPLE_TEAM_ID") ?? "").trim();
+  if (!p8.trim() || !keyId || !teamId) {
+    logStep("APNs push failed", { reason: "not_configured" });
+    return "";
+  }
+  try {
+    return await signApnsJwt({
+      p8,
+      keyId,
+      teamId,
+      nowSeconds: Math.floor(Date.now() / 1000),
+    });
+  } catch {
+    logStep("APNs push failed", { reason: "auth_failed" });
+    return "";
+  }
+}
+
+async function sendApnsSubscription(input: {
+  decision: { action: string; token?: string };
+  endpoint: string;
+  jwt: string;
+  title: string;
+  body: string;
+  url?: string;
+  data?: Record<string, unknown>;
+  notificationType: string;
+  results: PushResult[];
+  expiredEndpoints: string[];
+}) {
+  const { decision, endpoint, jwt, title, body, url, data, notificationType, results, expiredEndpoints } = input;
+  if (decision.action === "drop" || !decision.token) {
+    if (endpoint) expiredEndpoints.push(endpoint);
+    results.push({ endpoint: "apns", status: "expired" });
+    logStep("APNs subscription dropped", { reason: "invalid" });
+    return;
+  }
+  if (!jwt) {
+    results.push({ endpoint: "apns", status: "failed", error: "APNs is not configured" });
+    return;
+  }
+  try {
+    const result = await sendApnsAlert({
+      jwt,
+      deviceToken: decision.token,
+      topic: IOS_APP_TOPIC,
+      title,
+      body,
+      url,
+      data,
+      notificationType,
+    });
+    if (result.drop) {
+      if (endpoint) expiredEndpoints.push(endpoint);
+      results.push({ endpoint: "apns", status: "expired" });
+      logStep("APNs subscription dropped", { status: result.status, reason: result.reason || "rejected" });
+      return;
+    }
+    if (result.ok) {
+      results.push({ endpoint: "apns", status: "sent" });
+      return;
+    }
+    logStep("APNs push failed", { status: result.status, reason: result.reason || "unknown" });
+    results.push({ endpoint: "apns", status: "failed", error: result.reason || "APNs request failed" });
+  } catch {
+    logStep("APNs push failed", { reason: "request_failed" });
+    results.push({ endpoint: "apns", status: "failed", error: "APNs request failed" });
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -71,6 +154,45 @@ serve(async (req) => {
   if (denied) return denied;
 
   try {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
+
+    const requestBody: PushNotificationRequest = await req.json();
+    const { user_id, notification_type } = requestBody;
+    let { title, body, url, data, icon, badge } = requestBody;
+
+    const role = requestRole(req);
+    if (role !== "service_role") {
+      const callerId = await getBearerUser(req.headers.get("Authorization"), supabase);
+      const notice = await noticeForUser(supabase, {
+        callerId,
+        recipientId: user_id,
+        notificationType: notification_type,
+        data,
+      });
+      if (!notice.ok) {
+        return new Response(JSON.stringify({ error: notice.error }), {
+          status: notice.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      title = notice.title;
+      body = notice.body;
+      data = notice.data;
+      url = undefined;
+      icon = undefined;
+      badge = undefined;
+    }
+
+    if (!user_id || !title) {
+      return new Response(JSON.stringify({ error: "user_id and title are required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY");
     const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY");
     const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:push@ether.local";
@@ -88,14 +210,6 @@ serve(async (req) => {
       contactInformation: VAPID_SUBJECT,
       vapidKeys,
     });
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
-
-    const requestBody: PushNotificationRequest = await req.json();
-    const { user_id, title, body, url, data, icon, badge, notification_type } = requestBody;
 
     logStep("Processing push notification", { user_id, title, notification_type });
 
@@ -167,11 +281,27 @@ serve(async (req) => {
 
     const results: { endpoint: string; status: string; error?: string }[] = [];
     const expiredEndpoints: string[] = [];
+    const apnsJwt = await loadApnsJwt(subscriptions);
 
     for (const sub of subscriptions) {
       const endpoint = String(sub.endpoint ?? "");
-      const platform = String(sub.platform ?? "web");
-      if (platform === "apns" || !endpoint.startsWith("https://")) {
+      const decision = classifyPushSubscription(sub.platform, endpoint);
+      if (decision.channel === "apns") {
+        await sendApnsSubscription({
+          decision,
+          endpoint,
+          jwt: apnsJwt,
+          title,
+          body: body || "",
+          url,
+          data,
+          notificationType,
+          results,
+          expiredEndpoints,
+        });
+        continue;
+      }
+      if (decision.action === "skip" || !endpoint.startsWith("https://")) {
         results.push({ endpoint, status: "skipped" });
         continue;
       }
@@ -215,7 +345,7 @@ serve(async (req) => {
     logStep("ERROR in send-push-notification", { error: errorMessage });
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: httpStatusForError(error), headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });

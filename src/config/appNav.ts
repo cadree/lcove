@@ -11,12 +11,16 @@ import {
   Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { visibleMoreItems } from "@/lib/appNavVisibility";
+
+export { visibleMoreItems };
 
 export interface AppNavItem {
   id: string;
   label: string;
   path: string;
   icon: LucideIcon;
+  iosHidden?: boolean;
 }
 
 /** Destinations that used to compete for the bottom bar. They live in More. */
@@ -27,7 +31,7 @@ export const moreNavItems: AppNavItem[] = [
   { id: "mall", label: "Mall", path: "/mall", icon: ShoppingBag },
   { id: "wallet", label: "Wallet", path: "/wallet", icon: Wallet },
   { id: "fund", label: "Fund", path: "/fund", icon: Heart },
-  { id: "membership", label: "Membership", path: "/membership", icon: Crown },
+  { id: "membership", label: "Membership", path: "/membership", icon: Crown, iosHidden: true },
   { id: "live", label: "Live", path: "/live", icon: Video },
   { id: "cinema", label: "Cinema", path: "/cinema", icon: Radio },
   { id: "nuance", label: "Nuance", path: "/nuance", icon: Shirt },

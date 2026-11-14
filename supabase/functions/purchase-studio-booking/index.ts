@@ -3,6 +3,9 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { ledgerBalances } from "../_shared/credit-balances.ts";
 import { COMMUNITY_FUND_FEE_PERCENT } from "../_shared/fees.mjs";
+import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
+import { verifiedDestination } from "../_shared/creator-connect.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -82,7 +85,9 @@ serve(async (req) => {
       .select("stripe_connect_account_id")
       .eq("store_id", store.id)
       .maybeSingle();
-    const connectAccountId = storeSecrets?.stripe_connect_account_id ?? null;
+    const profileDestination = await verifiedDestination(supabaseAdmin, store.user_id);
+    const connectAccountId = profileDestination
+      || (store.payout_enabled ? storeSecrets?.stripe_connect_account_id ?? null : null);
 
     const totalPrice = booking.total_price || (item.price * (booking.duration_hours || 1));
     const totalCredits = booking.credits_spent || (item.credits_price ? item.credits_price * (booking.duration_hours || 1) : 0);
@@ -177,7 +182,7 @@ serve(async (req) => {
         throw new Error("This item does not have a cash price");
       }
 
-      const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+      const stripe = new Stripe(assertStripeTestKey(Deno.env.get("STRIPE_SECRET_KEY")), {
         apiVersion: "2025-08-27.basil",
       });
 
@@ -222,7 +227,7 @@ serve(async (req) => {
       };
 
       // If seller has Stripe Connect enabled, use application fee
-      if (connectAccountId && store.payout_enabled) {
+      if (connectAccountId) {
         sessionConfig.payment_intent_data = {
           application_fee_amount: platformFeeAmount,
           transfer_data: {
@@ -247,7 +252,7 @@ serve(async (req) => {
           payment_type: "cash",
           seller_amount: sellerAmount / 100,
           platform_fee: platformFeeAmount / 100,
-          seller_payout_status: store.payout_enabled ? "processing" : "pending_setup",
+          seller_payout_status: connectAccountId ? "processing" : "pending_setup",
         })
         .eq("id", bookingId);
 
@@ -268,7 +273,7 @@ serve(async (req) => {
     logStep("ERROR", { message });
     return new Response(
       JSON.stringify({ error: message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: httpStatusForError(error) }
     );
   }
 });

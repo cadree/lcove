@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { digitalPurchasesEnabled, isIosApp } from "@/lib/platform";
+import { storePurchaseAllowed } from "@/lib/storePurchase";
+import { useState } from 'react';
 import { StoreItem, useCreateRentalInquiry } from '@/hooks/useStore';
 import { useCredits } from '@/hooks/useCredits';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { errorMessage } from '@/lib/errorMessage';
+import { shareLink, buildShareUrl } from "@/lib/shareLink";
 import {
   Package,
   Wrench,
@@ -36,8 +39,6 @@ import {
 } from 'lucide-react';
 import { StudioBookingDialog } from '@/components/studio/StudioBookingDialog';
 import { StudioReviews } from '@/components/studio/StudioReviews';
-import { isIosApp, ETHER_WEB_ORIGIN } from '@/lib/platform';
-import { IosDigitalGoodsNotice } from '@/components/ios/IosDigitalGoodsNotice';
 
 interface StoreItemDialogProps {
   item: StoreItem | null;
@@ -62,12 +63,9 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [showBooking, setShowBooking] = useState(false);
 
-  useEffect(() => {
-    if (isIosApp()) setPaymentType('credits');
-  }, [item?.id]);
-
   if (!item) return null;
 
+  const purchaseAllowed = storePurchaseAllowed(item, digitalPurchasesEnabled());
   const TypeIcon = typeIcons[item.type];
   const store = item.store as StoreItem['store'];
   const profile = store?.profile;
@@ -75,13 +73,9 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
   const canPayWithCredits = item.credits_price > 0 && balance >= item.credits_price;
 
   const handlePurchase = async () => {
+    if (!purchaseAllowed) { toast.error('This item is not available for purchase in the iOS app.'); return; }
     if (!user) {
       toast.error('Please sign in to make a purchase');
-      return;
-    }
-
-    if (isIosApp() && paymentType === 'cash') {
-      toast.error("Card checkout isn't available in the iOS app.");
       return;
     }
 
@@ -90,7 +84,7 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
       if (paymentType === 'credits') {
         // Handle credit payment via edge function
         const { data, error } = await supabase.functions.invoke('purchase-store-item', {
-          body: { itemId: item.id, paymentType: 'credits' },
+          body: { clientPlatform: isIosApp() ? 'ios' : 'web', itemId: item.id, paymentType: 'credits' },
         });
 
         if (error) throw error;
@@ -99,7 +93,7 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
       } else {
         // Handle cash payment via Stripe
         const { data, error } = await supabase.functions.invoke('purchase-store-item', {
-          body: { itemId: item.id, paymentType: 'cash' },
+          body: { clientPlatform: isIosApp() ? 'ios' : 'web', itemId: item.id, paymentType: 'cash' },
         });
 
         if (error) throw error;
@@ -138,6 +132,15 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
           <DialogTitle className="flex items-center gap-2">
             <TypeIcon className="w-5 h-5 text-primary" />
             {item.title}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="ml-auto h-8 w-8"
+              onClick={() => shareLink({ title: item.title, url: buildShareUrl.product(item.id) })}
+            >
+              <ExternalLink className="h-4 w-4" />
+            </Button>
           </DialogTitle>
         </DialogHeader>
 
@@ -252,7 +255,7 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
           )}
 
           {/* Contact Info for Rentals */}
-          {item.type === 'rental' && (item.contact_email || item.contact_phone) && (
+          {purchaseAllowed && item.type === 'rental' && (item.contact_email || item.contact_phone) && (
             <div className="space-y-2">
               <h4 className="font-medium">Contact</h4>
               {item.contact_email && (
@@ -295,7 +298,8 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
             </div>
 
             {/* Purchase Options for Products/Services */}
-            {item.type !== 'rental' && (
+            {!purchaseAllowed && <p className="text-sm text-muted-foreground">This item is not available for purchase in the iOS app.</p>}
+            {purchaseAllowed && item.type !== 'rental' && (
               <div className="space-y-3 pt-3 border-t border-border">
                 {item.external_url ? (
                   <div className="space-y-2">
@@ -328,25 +332,8 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
                   </Button>
                 ) : (item.price > 0 || item.credits_price > 0) ? (
                   <>
-                    {isIosApp() && item.price > 0 && item.type === 'product' && (
-                      <p className="text-sm text-muted-foreground">
-                        Card checkout isn't available in the iOS app.{' '}
-                        <a
-                          href={`${ETHER_WEB_ORIGIN}/store`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline"
-                        >
-                          Buy this item on the Ether website
-                        </a>
-                        .
-                      </p>
-                    )}
-                    {isIosApp() && item.price > 0 && item.type !== 'product' && (
-                      <IosDigitalGoodsNotice />
-                    )}
                     <div className="flex gap-2">
-                      {item.price > 0 && !isIosApp() && (
+                      {item.price > 0 && (
                         <Button
                           variant={paymentType === 'cash' ? 'default' : 'outline'}
                           className="flex-1"
@@ -369,7 +356,7 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
                         </Button>
                       )}
                     </div>
-                    {(!isIosApp() || item.credits_price > 0) && (
+                    {(item.price > 0 || item.credits_price > 0) && (
                       <Button
                         className="w-full"
                         size="lg"
@@ -385,7 +372,7 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
             )}
 
             {/* Inquiry Form for Rentals */}
-            {item.type === 'rental' && (
+            {purchaseAllowed && item.type === 'rental' && (
               <div className="space-y-3 pt-3 border-t border-border">
                 {/* Check if external store is configured - show as primary action */}
                 {store?.peerspace_url ? (
@@ -476,13 +463,13 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
           </div>
 
           {/* Reviews Section for Rentals */}
-          {item.type === 'rental' && (
+          {purchaseAllowed && item.type === 'rental' && (
             <StudioReviews itemId={item.id} />
           )}
         </div>
 
         {/* Booking Dialog */}
-        {item.type === 'rental' && (
+        {purchaseAllowed && item.type === 'rental' && (
           <StudioBookingDialog
             item={item}
             open={showBooking}

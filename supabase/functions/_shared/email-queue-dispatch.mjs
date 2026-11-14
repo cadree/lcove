@@ -1,7 +1,16 @@
 // Queue dispatcher for auth_emails and transactional_emails.
 // Sends with Resend. Callers pass sendEmail so tests can mock the HTTP call.
 
-export const DEFAULT_EMAIL_FROM = "notifications@notifications.etherbylcove.com";
+import { PLATFORM_QUEUE_FROM, isVerifiedSender, rewriteSenderAddress } from "./host-email-address.mjs";
+
+export const DEFAULT_EMAIL_FROM = PLATFORM_QUEUE_FROM;
+
+export function resolveQueueFrom(fallback, payloadFrom) {
+  const candidate = rewriteSenderAddress(typeof payloadFrom === "string" ? payloadFrom.trim() : "");
+  if (isVerifiedSender(candidate)) return candidate;
+  const fallbackValue = rewriteSenderAddress(typeof fallback === "string" ? fallback.trim() : "");
+  return fallbackValue || DEFAULT_EMAIL_FROM;
+}
 
 const MAX_RETRIES = 5;
 const DEFAULT_BATCH_SIZE = 10;
@@ -272,7 +281,7 @@ export async function runEmailQueue(deps) {
 
         if (isForbidden(error)) {
           await moveToDlq(supabase, queue, msg, "Emails disabled for this project");
-          return json({ processed: totalProcessed, stopped: "emails_disabled" });
+          continue;
         }
 
         await supabase.from("email_send_log").insert({
@@ -297,7 +306,7 @@ export async function runEmailQueue(deps) {
 }
 
 export async function sendWithResend(apiKey, emailFrom, payload, fetchImpl = fetch) {
-  const from = emailFrom || DEFAULT_EMAIL_FROM;
+  const from = resolveQueueFrom(emailFrom, payload?.from);
   const headers = {
     Authorization: `Bearer ${apiKey}`,
     "Content-Type": "application/json",

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-src https://www.youtube-nocookie.com https://player.vimeo.com; base-uri 'none'; form-action 'none'">
+<title>Ether video</title>
+<style>html,body{margin:0;height:100%;background:#000}iframe{position:absolute;inset:0;border:0;width:100%;height:100%}</style>
+</head>
+<body>
+<script>
+(function () {
+  var YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
+  var VIMEO_ID = /^[0-9]{6,12}$/;
+  var VIMEO_HASH = /^[A-Za-z0-9]{4,64}$/;
+  var page = new URLSearchParams(window.location.search);
+  var provider = page.get("provider");
+  var id = page.get("id") || "";
+  var hash = page.get("h");
+  var src = "";
+  var title = "YouTube video";
+  if (provider === "youtube" && YOUTUBE_ID.test(id) && !hash) {
+    var youtube = new URLSearchParams({ rel: "0", playsinline: "1" });
+    if (window.location.protocol === "https:") youtube.set("origin", window.location.origin);
+    src = "https://www.youtube-nocookie.com/embed/" + id + "?" + youtube.toString();
+  } else if (provider === "vimeo" && VIMEO_ID.test(id) && (!hash || VIMEO_HASH.test(hash))) {
+    title = "Vimeo video";
+    var vimeo = new URLSearchParams({ dnt: "1", playsinline: "1", title: "0", byline: "0", portrait: "0" });
+    if (hash) vimeo.set("h", hash);
+    src = "https://player.vimeo.com/video/" + id + "?" + vimeo.toString();
+  }
+  if (!src) return;
+  var frame = document.createElement("iframe");
+  frame.src = src;
+  frame.title = title;
+  frame.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen";
+  frame.allowFullscreen = true;
+  frame.referrerPolicy = "strict-origin-when-cross-origin";
+  frame.setAttribute("allowfullscreen", "");
+  document.body.appendChild(frame);
+})();
+</script>
+</body>
+</html>

@@ -32,7 +32,7 @@ Vite inlines every `VITE_` variable when it builds. A hosted build reads them fr
 npm run dev         # local app
 npm run typecheck   # tsc -b
 npm run lint        # eslint
-npm run build       # production build into dist/
+npm run build       # refuses a Cloudflare preview pointed at ether-prod, then builds dist/
 npm run preview     # serve dist/
 ```
 
@@ -84,6 +84,7 @@ GitHub Actions runs typecheck, lint, and build on pull requests (`.github/workfl
 ## More
 
 - Hosting without a platform lock-in: `docs/hosting-without-lovable.md`
+- Cloudflare preview builds and a free staging database: `docs/preview-staging.md`
 - Moving the database to a Supabase project you own: `docs/supabase-migration.md`
 - Production database steps that are already written: `docs/go-live-checklist.md`
 - iOS: `docs/ios-release.md`

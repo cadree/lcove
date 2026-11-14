@@ -1,5 +1,6 @@
 import React, { useState, KeyboardEvent, useEffect } from 'react';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
+import { BackButton } from '@/components/navigation/BackButton';
 import { Shield, ArrowLeft, Search, User, RefreshCw, Save, X, Plus, Sparkles } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -58,7 +59,6 @@ function toUserProfile(user: AdminListUser): UserProfile | null {
 }
 
 const AdminOnboarding: React.FC = () => {
-  const navigate = useNavigate();
   const { userId } = useParams<{ userId?: string }>();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -284,9 +284,7 @@ const AdminOnboarding: React.FC = () => {
         {/* Header */}
         <div className="bg-gradient-to-b from-primary/10 to-background px-4 pt-6 pb-8">
           <div className="flex items-center gap-3 mb-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/admin')}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <BackButton label="Back" />
             <Shield className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold">Onboarding Review</h1>
           </div>

@@ -15,6 +15,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
+import { calendarSubscribeLinks } from "@/lib/eventGuests";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -122,16 +123,7 @@ export function CalendarFeedSettings() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const getCalendarSubscribeUrl = (type: 'google' | 'apple') => {
-    const feedUrl = getFeedUrl();
-    // Both Google and Apple Calendar work best with webcal:// protocol
-    const webcalUrl = feedUrl.replace('https://', 'webcal://');
-    if (type === 'google') {
-      return `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalUrl)}`;
-    }
-    // Apple Calendar uses webcal:// protocol
-    return webcalUrl;
-  };
+  const subscribeLinks = feed ? calendarSubscribeLinks(getFeedUrl()) : null;
 
   if (!user) return null;
 
@@ -140,10 +132,11 @@ export function CalendarFeedSettings() {
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <Calendar className="h-5 w-5 text-primary" />
-          <CardTitle className="text-base">Calendar Feed</CardTitle>
+          <CardTitle className="text-base">Add your Ether events to a calendar</CardTitle>
         </div>
         <CardDescription>
-          Subscribe to your hosted events in Apple Calendar, Google Calendar, or any calendar app.
+          This sends the events you host on Ether to Google Calendar, Apple Calendar, or Outlook.
+          It does not show your Google Calendar inside Ether.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -155,7 +148,7 @@ export function CalendarFeedSettings() {
           <>
             {/* Feed URL */}
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">Private Feed URL</label>
+              <label className="text-xs font-medium text-muted-foreground">Private subscribe link</label>
               <div className="flex gap-2">
                 <Input
                   value={getFeedUrl()}
@@ -179,7 +172,7 @@ export function CalendarFeedSettings() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open(getCalendarSubscribeUrl('google'), '_blank')}
+                  onClick={() => window.open(subscribeLinks!.google, '_blank', 'noopener')}
                   className="gap-2"
                 >
                   <GoogleCalendarIcon className="h-4 w-4" />
@@ -189,21 +182,35 @@ export function CalendarFeedSettings() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.location.href = getCalendarSubscribeUrl('apple')}
+                  onClick={() => { window.location.href = subscribeLinks!.apple; }}
                   className="gap-2"
                 >
                   <AppleIcon className="h-4 w-4" />
                   Apple Calendar
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(subscribeLinks!.outlook, '_blank', 'noopener')}
+                  className="gap-2"
+                >
+                  Outlook
+                  <ExternalLink className="h-3 w-3" />
+                </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Google, Apple, and Outlook fetch this link on their own schedule and add your Ether events there.
+              </p>
             </div>
 
-            {/* Last accessed info */}
-            {feed.last_accessed_at && (
-              <p className="text-xs text-muted-foreground">
-                Last synced: {new Date(feed.last_accessed_at).toLocaleString()}
-              </p>
-            )}
+            <p className="text-xs text-muted-foreground">
+              {feed.last_accessed_at
+                ? `Last fetched by a calendar app: ${new Date(feed.last_accessed_at).toLocaleString()}`
+                : "No calendar app has fetched this link yet."}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Bringing your Google Calendar into Ether needs Google’s calendar permission review. That is not in this release.
+            </p>
 
             {/* Regenerate */}
             <div className="pt-2 border-t border-border/30">
@@ -245,7 +252,7 @@ export function CalendarFeedSettings() {
         ) : (
           <div className="text-center py-4 space-y-3">
             <p className="text-sm text-muted-foreground">
-              Create a private calendar feed to sync your hosted events with your calendar app.
+              Create a private subscribe link. It adds the events you host on Ether to Google, Apple, or Outlook. It does not import your Google Calendar.
             </p>
             <Button
               onClick={() => createFeedMutation.mutate()}
