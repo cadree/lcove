@@ -170,7 +170,7 @@ export function PostDetailModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[90vh] w-full max-w-4xl gap-0 overflow-hidden border-border bg-card p-0">
+        <DialogContent hideClose className="max-h-[90vh] w-full max-w-4xl gap-0 overflow-hidden border-border bg-card p-0">
           <VisuallyHidden>
             <DialogTitle>Post by {displayName}</DialogTitle>
           </VisuallyHidden>

@@ -43,7 +43,7 @@ export function NoviGuide({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      {open && <SheetContent
+      {open && <SheetContent hideClose
         side={wide ? "right" : "bottom"}
         className={wide ? "border-border bg-card px-4 pb-8" : "max-h-[85vh] border-border bg-card px-4 pb-8"}
         style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}

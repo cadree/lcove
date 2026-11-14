@@ -925,7 +925,7 @@ const Settings = () => {
           </div>
         </motion.section>
 
-        <div className="mb-6"><DiscoveryPreferences /></div>
+        <section className="file-panel mb-6 space-y-4 p-5" aria-labelledby="discovery-settings-title"><h2 id="discovery-settings-title" className="ether-title text-xl">Discovery, live city & DMs</h2><DiscoveryPreferences /></section>
 
         {/* Blocked Users Section */}
         <motion.section
