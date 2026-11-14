@@ -24,7 +24,7 @@ const stores = [
 const items = [1, 2, 3].map((i) => ({ id: `00000000-0000-4000-8000-000000000b0${i}`, store_id: stores[0].id, images: [media("product.jpg") + `?v=${i}`], title: `Print ${i}`, price: 40, is_active: true, created_at: now }));
 
 const scenes = [
-  { name: "profile", path: "/profile", widths: [390] },
+  { name: "profile", path: "/profile", widths: [390], full: true },
   { name: "explore-mall", path: "/explore?section=mall", widths: [390, 1280] },
   { name: "explore-for-you", path: "/explore", widths: [390], full: true },
   { name: "create-video", path: "/feed", widths: [390], run: async (page) => {

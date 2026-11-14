@@ -16,6 +16,7 @@ import {
 import { safeWebLink } from "@/lib/tripMoney";
 import { MemberGrid } from "./MemberGrid";
 import { SwipeDeck } from "./SwipeDeck";
+import { supabase } from "@/integrations/supabase/client";
 
 // The globe and its city coordinates (~300 KB) load after the deck renders.
 const CreativeGlobe = lazy(() => import("@/components/discovery/CreativeGlobe").then((m) => ({ default: m.CreativeGlobe })));
@@ -71,10 +72,14 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
       );
       await cache.invalidateQueries({ queryKey: ["creative-matches"] });
       if (data.matched && data.conversation_id) {
-        toast.success(`You and ${person.name} matched. Your chat is ready.`, {
+        // Both people get an in-app notice from the database; this pushes it to the other phone.
+        void supabase.functions.invoke("send-push-notification", {
+          body: { user_id: person.user_id, notification_type: "match", title: "It's a match", data: { conversation_id: data.conversation_id } },
+        }).catch(() => undefined);
+        toast.success(`It's a match with ${person.name}. Your chat is ready.`, {
           action: { label: "Open chat", onClick: () => navigate(`/messages?conversation=${data.conversation_id}`) },
         });
-      } else if (liked) toast.success(`Liked ${person.name}. They only find out if they like you too.`);
+      } else if (liked) toast.success(`Connect sent to ${person.name}. They only find out if they connect back.`);
     },
     onError: (e: Error) => {
       toast.error(e.message);
@@ -279,7 +284,7 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
                     disabled={unmatch.isPending}
                     className="min-h-11 text-xs text-white/50"
                     onClick={() => {
-                      if (window.confirm("Unmatch? You will both need to like each other again to unlock matches-only DMs.")) unmatch.mutate(m.user_id);
+                      if (window.confirm("Unmatch? You will both need to connect again to unlock matches-only DMs.")) unmatch.mutate(m.user_id);
                     }}
                   >
                     Unmatch

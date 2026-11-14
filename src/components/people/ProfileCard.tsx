@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUpRight, Heart, Plane, Radio } from "lucide-react";
+import { ArrowUpRight, Plane, Radio, UserCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { tripBadge, type Person } from "@/lib/peopleDiscovery";
 import { safeWebLink } from "@/lib/tripMoney";
@@ -51,7 +51,7 @@ export function ProfileCard({ person, near }: { person: Person; near: boolean })
           )}
           {person.liked && (
             <span className="inline-flex items-center gap-1 rounded-full bg-[#ff9fc8] px-2.5 py-1 text-[11px] font-semibold text-[#2c1320]">
-              <Heart size={12} fill="currentColor" /> Liked
+              <UserCheck size={12} /> Connected
             </span>
           )}
         </div>

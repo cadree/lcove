@@ -680,5 +680,43 @@ await as(eli);
 assert.equal((await rpc("creative_swipe", [ana, true])).matched, true);
 assert.equal((await seen(ana, eli)).liked, true);
 check("v2: default-visible members can match without opting in first");
+// Connect + Match notices (20261114160000).
+await db.exec(`CREATE TABLE IF NOT EXISTS public.notifications(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid NOT NULL,type text NOT NULL,title text NOT NULL,body text,data jsonb DEFAULT '{}',read_at timestamptz,created_at timestamptz NOT NULL DEFAULT now());
+ CREATE TABLE IF NOT EXISTS public.ether_schema_migrations(version text PRIMARY KEY);`);
+await db.exec(await readFile("supabase/migrations/20261114160000_connect_match_notices.sql", "utf8"));
+await sql("INSERT INTO public.ether_schema_migrations VALUES('20261114160000_connect_match_notices.sql')");
+const notices = async () => (await sql("SELECT user_id,type,title,body,data FROM public.notifications ORDER BY body")).rows;
+await as(ben);
+await rpc("discovery_settings", [true, null]);
+assert.equal((await rpc("creative_swipe", [cai, true])).matched, false);
+assert.equal((await notices()).length, 0);
+await as(cai);
+const matchNow = await rpc("creative_swipe", [ben, true]);
+assert.equal(matchNow.matched, true);
+const sent = await notices();
+assert.deepEqual(sent.map((n) => [n.user_id, n.type, n.title, n.body]).sort(), [
+  [ben, "match", "It's a match", "You and V2 2 connected. Say hello."],
+  [cai, "match", "It's a match", "You and V2 1 connected. Say hello."],
+].sort());
+assert.ok(sent.every((n) => n.data.conversation_id === matchNow.conversation_id));
+await rpc("creative_swipe", [ben, true]);
+assert.equal((await notices()).length, 2);
+check("connect: a new mutual connect notifies both people once; repeats stay quiet");
+await rpc("creative_unmatch", [ben]);
+await as(ben);
+await rpc("creative_swipe", [cai, true]);
+await as(cai);
+assert.equal((await rpc("creative_swipe", [ben, true])).matched, true);
+assert.equal((await notices()).length, 4);
+check("connect: a renewed match after unmatch notifies again");
+await as(dee);
+await sql("DELETE FROM public.user_blocks WHERE blocker_id=$1", [dee]);
+await rpc("discovery_settings", [false, null]);
+await fails(() => rpc("creative_swipe", [ana, true]), /Show yourself in discovery to connect/);
+check("connect: copy says connect, not like");
+await db.exec(await readFile("supabase/rollbacks/20261114160000_connect_match_notices.down.sql", "utf8"));
+await fails(() => rpc("creative_swipe", [ana, true]), /Show yourself in discovery to like/);
+assert.equal((await sql("SELECT count(*)::int n FROM public.ether_schema_migrations")).rows[0].n, 0);
+check("connect: rollback restores the previous creative_swipe");
 await db.close();
 console.log(`${checks} database checks passed`);

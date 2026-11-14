@@ -2,7 +2,7 @@ import { FeedVideo } from "@/components/media/FeedVideo";
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Handshake, X, type LucideIcon } from 'lucide-react';
+import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Handshake, Sparkles, X, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Notification, NotificationType } from '@/hooks/useNotifications';
@@ -29,6 +29,7 @@ const notificationMark: Record<NotificationType, { icon: LucideIcon; fill: IconF
   event_reminder: { icon: Calendar, fill: 'gold' },
   live_stream: { icon: Radio, fill: 'red' },
   collab_invite: { icon: Handshake, fill: 'denim' },
+  match: { icon: Sparkles, fill: 'pink' },
 };
 
 export const NotificationItem: React.FC<NotificationItemProps> = ({
@@ -70,6 +71,13 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
     if (notification.type === 'project_invite' && onProjectInviteTap) {
       onProjectInviteTap(notification);
       return;
+    }
+    if (notification.type === 'match') {
+      const chat = notification.data?.conversation_id;
+      if (typeof chat === 'string' && /^[0-9a-f-]{36}$/i.test(chat)) {
+        navigate(`/messages?chat=${chat}`);
+        return;
+      }
     }
     if (notification.type === 'event_reminder') {
       const path = notification.data?.path;

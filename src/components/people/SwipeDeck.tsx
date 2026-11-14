@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Heart, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, UserCheck, UserPlus } from "lucide-react";
 import type { Person } from "@/lib/peopleDiscovery";
 import { ProfileCard } from "./ProfileCard";
 
 /**
  * Big profile cards in a horizontal swipe. Swiping (or the arrows) moves between
- * people; Pass and Like decide on the card in front and move to the next one.
+ * people; Pass and Connect decide on the card in front and move to the next one.
  */
 export function SwipeDeck({
   people,
@@ -130,9 +130,9 @@ export function SwipeDeck({
           disabled={pending}
           onClick={() => void decide(true)}
           className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-[#ff9fc8] text-[#2c1320] shadow-[0_10px_30px_-8px_rgba(255,159,200,.7)] transition active:scale-95 disabled:opacity-40"
-          aria-label={`Like ${current?.name}`}
+          aria-label={current?.liked ? `Connected with ${current?.name}` : `Connect with ${current?.name}`}
         >
-          <Heart size={30} fill={current?.liked ? "currentColor" : "none"} />
+          {current?.liked ? <UserCheck size={30} /> : <UserPlus size={30} />}
         </button>
         <button
           type="button"
@@ -145,7 +145,7 @@ export function SwipeDeck({
         </button>
       </div>
       <p className="mt-2 text-center text-xs text-white/60">
-        {active + 1} of {people.length} · Swipe to browse. A mutual like opens a chat.
+        {active + 1} of {people.length} · Swipe to browse. Connect both ways to match and open a chat.
       </p>
       {current && (
         <div className="mt-1 flex justify-center gap-4 text-xs text-white/50">
