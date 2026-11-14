@@ -5,6 +5,8 @@ import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { WorldLayer } from "@/components/world/WorldLayer";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import { UploadQueuePill } from "@/components/uploads/UploadQueuePill";
+import { KeyboardAvoider } from "@/components/system/KeyboardAvoider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
@@ -176,6 +178,8 @@ const App = () => (
                 <StoreListingMeta />
                 <Toaster />
               <Sonner />
+              <UploadQueuePill />
+              <KeyboardAvoider />
               <MotionRoot>
               <Suspense fallback={<RouteFallback />}>
               <Routes>

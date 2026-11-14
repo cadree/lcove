@@ -2,15 +2,34 @@ import { useEffect, useState } from "react";
 import { Capacitor, type PluginListenerHandle } from "@capacitor/core";
 import { Keyboard } from "@capacitor/keyboard";
 import { liveKeyboardInset } from "@/lib/liveKeyboard";
+import { webKeyboardInset } from "@/lib/keyboardViewport";
 
-/** Native keyboard height. Web and a closed keyboard stay at 0. */
+/**
+ * Keyboard height for a fixed, full-height screen with a bottom composer.
+ * The iOS app reads it from the Keyboard plugin; iPhone Safari from the
+ * visual viewport. A closed keyboard is 0.
+ */
 export function useNativeKeyboardInset(active = true): number {
   const [inset, setInset] = useState(0);
 
   useEffect(() => {
-    if (!active || !Capacitor.isNativePlatform()) {
+    if (!active) {
       setInset(0);
       return;
+    }
+
+    if (!Capacitor.isNativePlatform()) {
+      const viewport = window.visualViewport;
+      if (!viewport) return;
+      const update = () => setInset(webKeyboardInset(window.innerHeight, viewport.height, viewport.offsetTop));
+      viewport.addEventListener("resize", update);
+      viewport.addEventListener("scroll", update);
+      update();
+      return () => {
+        viewport.removeEventListener("resize", update);
+        viewport.removeEventListener("scroll", update);
+        setInset(0);
+      };
     }
 
     const handles: PluginListenerHandle[] = [];
