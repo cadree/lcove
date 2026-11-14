@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { cropPinch, type CropPinchStart } from "@/lib/cropGesture";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -59,7 +60,12 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
   const { drafts, save: saveDraft, remove: removeDraft, publish: publishDraft } = usePostDrafts();
   const [editingDraft, setEditingDraft] = useState<PostDraft | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+  // Crop gestures: one finger moves the photo, two fingers pinch it around their midpoint.
+  const cropPointers = useRef(new Map<number, { x: number; y: number }>());
+  const cropGestureRef = useRef<
+    { kind: "drag"; x: number; y: number; ox: number; oy: number } | { kind: "pinch"; start: CropPinchStart } | null
+  >(null);
+  const cropView = useRef({ scale: 1, offset: { x: 0, y: 0 } });
 
   const [step, setStep] = useState<Step>("pick");
   const [preview, setPreview] = useState<string | null>(null);
@@ -72,6 +78,22 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
   const [caption, setCaption] = useState("");
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  cropView.current = { scale, offset };
+  const startCropGesture = () => {
+    const points = [...cropPointers.current.values()];
+    const { scale: s, offset: o } = cropView.current;
+    if (points.length >= 2) {
+      const [a, b] = points;
+      cropGestureRef.current = { kind: "pinch", start: { scale: s, offset: o, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, distance: Math.hypot(a.x - b.x, a.y - b.y) } };
+    } else if (points.length === 1) {
+      cropGestureRef.current = { kind: "drag", x: points[0].x, y: points[0].y, ox: o.x, oy: o.y };
+    } else cropGestureRef.current = null;
+  };
+  const endCropPointer = (event: React.PointerEvent) => {
+    if (!cropPointers.current.delete(event.pointerId)) return;
+    // The finger left on the photo carries on from where the photo is now, without a jump.
+    startCropGesture();
+  };
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const captionErrorId = useId();
@@ -275,22 +297,38 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
           {user && step === "crop" && preview && (
             <div className="space-y-4">
               <div
-                className="relative mx-auto overflow-hidden bg-muted touch-none"
-                style={{ width: FRAME, maxWidth: "100%", height: FRAME }}
+                className="relative mx-auto overflow-hidden bg-muted touch-none select-none"
+                style={{ width: FRAME, maxWidth: "100%", height: FRAME, WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
+                data-crop-frame
+                data-scale={scale.toFixed(3)}
+                data-offset={`${offset.x.toFixed(1)},${offset.y.toFixed(1)}`}
+                onContextMenu={(event) => event.preventDefault()}
                 onPointerDown={(event) => {
-                  dragRef.current = { x: event.clientX, y: event.clientY, ox: offset.x, oy: offset.y };
+                  const box = event.currentTarget.getBoundingClientRect();
+                  cropPointers.current.set(event.pointerId, { x: event.clientX - box.left - box.width / 2, y: event.clientY - box.top - box.height / 2 });
                   (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+                  startCropGesture();
                 }}
                 onPointerMove={(event) => {
-                  const drag = dragRef.current;
-                  if (!drag) return;
-                  setOffset({
-                    x: drag.ox + event.clientX - drag.x,
-                    y: drag.oy + event.clientY - drag.y,
-                  });
+                  if (!cropPointers.current.has(event.pointerId)) return;
+                  const box = event.currentTarget.getBoundingClientRect();
+                  cropPointers.current.set(event.pointerId, { x: event.clientX - box.left - box.width / 2, y: event.clientY - box.top - box.height / 2 });
+                  const gesture = cropGestureRef.current;
+                  const points = [...cropPointers.current.values()];
+                  if (gesture?.kind === "pinch" && points.length >= 2) {
+                    const next = cropPinch(gesture.start, { x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 }, Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y));
+                    setScale(next.scale);
+                    setOffset(next.offset);
+                  } else if (gesture?.kind === "drag" && points.length === 1) {
+                    setOffset({ x: gesture.ox + points[0].x - gesture.x, y: gesture.oy + points[0].y - gesture.y });
+                  }
                 }}
-                onPointerUp={() => {
-                  dragRef.current = null;
+                onPointerUp={endCropPointer}
+                onPointerCancel={endCropPointer}
+                // Moving a finger's implicit capture from the photo to the frame fires
+                // lostpointercapture on the photo, and it bubbles; only the frame's own loss counts.
+                onLostPointerCapture={(event) => {
+                  if (event.target === event.currentTarget) endCropPointer(event);
                 }}
               >
                 {natural && (
@@ -300,6 +338,9 @@ export function CreateShareFlow({ open, onOpenChange }: CreateShareFlowProps) {
                     draggable={false}
                     className="absolute max-w-none select-none"
                     style={{
+                      // Inline, because the sheet's [&_img]:max-w-full beats max-w-none and squashed
+                      // the zoomed photo to the frame width (it only grew taller).
+                      maxWidth: "none",
                       width: natural.w * Math.max(FRAME / natural.w, FRAME / natural.h) * scale,
                       height: natural.h * Math.max(FRAME / natural.w, FRAME / natural.h) * scale,
                       left: (FRAME - natural.w * Math.max(FRAME / natural.w, FRAME / natural.h) * scale) / 2 + offset.x,
