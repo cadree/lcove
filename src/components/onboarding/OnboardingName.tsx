@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowRight, ArrowLeft, User } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Camera, User } from 'lucide-react';
 import { displayNameError } from '@/lib/displayName';
 import { MEMBER_OF_HINT, MEMBER_OF_LIMIT, memberOfError, normalizeMemberOf } from '@/lib/etherId';
 
@@ -14,9 +14,12 @@ interface Props {
   updateMemberOf: (memberOf: string) => void;
   onNext: () => void;
   onBack?: () => void;
+  /** Optional photo, uploaded when onboarding finishes. */
+  avatarPreview?: string | null;
+  onAvatar?: (file: File | null) => void;
 }
 
-const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onNext, onBack }: Props) => {
+const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onNext, onBack, avatarPreview, onAvatar }: Props) => {
   const [name, setName] = useState(displayName);
   const [member, setMember] = useState(memberOf);
   const [error, setError] = useState('');
@@ -72,6 +75,33 @@ const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onN
           transition={{ delay: 0.2 }}
           className="glass-strong rounded-2xl p-8 space-y-6 mb-8"
         >
+          {onAvatar && (
+            <div className="flex items-center gap-4">
+              <label className="relative flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-border bg-background/60">
+                {avatarPreview ? (
+                  <img src={avatarPreview} alt="Your photo" className="h-full w-full object-cover" />
+                ) : (
+                  <Camera className="h-7 w-7 text-muted-foreground" />
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  aria-label="Add a profile photo"
+                  onChange={(e) => onAvatar(e.target.files?.[0] ?? null)}
+                />
+              </label>
+              <div className="min-w-0 text-sm">
+                <p className="font-medium text-foreground">Add a photo</p>
+                <p className="text-muted-foreground">Optional. People connect with faces.</p>
+                {avatarPreview && (
+                  <button type="button" className="mt-1 text-xs underline" onClick={() => onAvatar(null)}>
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           <div className="space-y-3">
             <Label htmlFor="displayName" className="text-base">
               Display Name
@@ -90,7 +120,7 @@ const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onN
               }}
               className="h-14 text-lg bg-background/50"
               maxLength={50}
-              autoFocus
+              autoFocus={!onAvatar}
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? 'displayName-error' : 'displayName-hint'}
             />

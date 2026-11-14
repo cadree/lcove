@@ -1,7 +1,8 @@
-import { Suspense, lazy, useDeferredValue, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Suspense, lazy, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Globe2, MapPin, Plane, SlidersHorizontal, Users } from "lucide-react";
+import { Globe2, MapPin, Plane, SlidersHorizontal, UserPlus, Users } from "lucide-react";
+import { markConnectHintSeen, showConnectHint } from "@/lib/firstRun";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DiscoveryPreferences } from "@/components/discovery/DiscoveryPreferences";
@@ -35,6 +36,22 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
   const [focus, setFocus] = useState<{ id: string; at: number } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reporting, setReporting] = useState<Person | null>(null);
+  const location = useLocation();
+  // First run (arriving from onboarding): open on my city if anyone is there, and show one Connect hint.
+  const [hint, setHint] = useState(() => showConnectHint(window.localStorage, user?.id, location.search));
+  const dismissHint = () => {
+    markConnectHintSeen(window.localStorage, user?.id);
+    setHint(false);
+  };
+  const openedHome = useRef(false);
+  // Bring the deck into view once on first run; the globe sits above it.
+  const hintRef = useRef<HTMLDivElement | null>(null);
+  const scrolledToHint = useRef(false);
+  useEffect(() => {
+    if (!hint || scrolledToHint.current || !hintRef.current) return;
+    scrolledToHint.current = true;
+    hintRef.current.scrollIntoView({ block: "start", behavior: "smooth" });
+  });
 
   const me = people.find((p) => p.user_id === user?.id);
   const myLive = placeForKey(settings.data?.live_city_key);
@@ -54,6 +71,13 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
   }, [deckOrder, people]);
   const list = useMemo(() => listFor(people, city, search), [people, city, search]);
   const here = useMemo(() => people.filter((p) => p.discoverable && inCity(p, city)), [people, city]);
+  useEffect(() => {
+    if (!hint || openedHome.current || !myPlace || city) return;
+    if (people.some((p) => p.user_id !== user?.id && p.discoverable && inCity(p, myPlace.key))) {
+      openedHome.current = true;
+      setCity(myPlace.key);
+    }
+  }, [hint, myPlace, city, people, user?.id]);
   const cityLabel = city
     ? options.cities.find((c) => c.key === city)?.label || options.regions.find((r) => r.key === city)?.label || placeForKey(city)?.label || "This city"
     : null;
@@ -246,11 +270,26 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
               <button type="button" className="min-h-11 underline" onClick={() => { void members.refetch(); void signals.refetch(); }}>Try again</button>
             </div>
           ) : deck.length ? (
+            <>
+            {hint && (
+              <div ref={hintRef} role="note" className="mb-3 flex max-w-[380px] items-start gap-3 rounded-2xl border border-[#ff9fc8]/40 bg-[#ff9fc8]/10 p-3 text-sm">
+                <UserPlus size={18} className="mt-0.5 shrink-0 text-[#ff9fc8]" aria-hidden />
+                <p className="min-w-0 flex-1">
+                  These are real members{cityLabel ? ` in ${cityLabel}` : ""}. Tap <strong>Connect</strong> on anyone you'd make something with. If they connect back, it's a match and a chat opens.
+                </p>
+                <button type="button" className="min-h-11 shrink-0 px-2 text-xs underline" onClick={dismissHint}>
+                  Got it
+                </button>
+              </div>
+            )}
             <SwipeDeck
               people={deck}
               focus={focus}
               pending={swipe.isPending}
-              onDecide={(person, liked) => swipe.mutateAsync({ person, liked }).catch(() => undefined)}
+              onDecide={(person, liked) => {
+                if (hint) dismissHint();
+                return swipe.mutateAsync({ person, liked }).catch(() => undefined);
+              }}
               onReport={setReporting}
               onBlock={(person) => {
                 if (window.confirm(`Block ${person.name}? They disappear from discovery and any match is removed.`))
@@ -260,6 +299,7 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
                   });
               }}
             />
+            </>
           ) : (
             <div className="rounded-[28px] border border-dashed border-white/15 px-6 py-10 text-center">
               <p className="font-display text-xl">{search ? `Nobody on the globe matches “${search}”` : cityLabel ? `No one on the globe in ${cityLabel} yet` : "No one else on the globe yet"}</p>

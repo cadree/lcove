@@ -36,6 +36,8 @@ const events = [[12, 19, "Gallery night", "Atlanta", true], [12, 20, "Darkroom s
   .map(([d, h, title, city, img], i) => ({ id: `00000000-0000-4000-8000-0000000e000${i}`, creator_id: "00000000-0000-4000-8000-0000000c0001", title, description: null, venue: "Studio", address: null, city, state: "GA", country: "US", start_date: day(d, h), end_date: null, image_url: img ? media("product.jpg") : null, ticket_type: "free", ticket_price: null, credits_price: null, capacity: null, is_public: true, project_id: null, external_url: null, timezone: null, recurrence: null, status: "published", created_at: now }));
 
 const scenes = [
+  { name: "onboarding", path: "/onboarding", widths: [390], init: () => localStorage.setItem("ether-shot-onboarding", "1") },
+  { name: "first-run", path: "/explore?section=people&welcome=1", widths: [390], mock: { ...people, profiles: (req, url) => (url.pathname.endsWith("/profiles_public") && url.searchParams.get("select")?.includes("city_key") ? { body: [...members, { ...members[0], user_id: me, display_name: "Maya Cole", avatar_url: null }] } : { body: [profile] }) } },
   { name: "calendar", path: "/calendar", widths: [390, 1280], mock: { events: () => ({ body: events }) } },
   { name: "travel", path: "/travel", widths: [390], mock: { creative_trip_list: () => ({ body: tripList }) } },
   { name: "globe", path: "/explore?section=people", widths: [390], mock: people, run: async (page) => { await page.evaluate(() => window.scrollTo(0, 0)); } },
@@ -66,6 +68,7 @@ for (const scene of scenes) {
   for (const width of scene.widths) {
     const context = await browser.newContext({ colorScheme: "dark", viewport: { width, height: width < 600 ? 844 : 900 }, deviceScaleFactor: width < 600 ? 2 : 1, hasTouch: width < 600, isMobile: width < 600 });
     await signedIn(context);
+    if (scene.init) await context.addInitScript(scene.init);
     const page = await context.newPage();
     await mockSupabase(page, {
       profiles: () => ({ body: [profile] }),
