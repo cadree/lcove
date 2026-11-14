@@ -1,16 +1,11 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import {
-  geoDistance,
-  geoGraticule10,
-  geoOrthographic,
-  geoPath,
-  type GeoPermissibleObjects,
-} from "d3-geo";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { geoDistance, geoGraticule10, geoPath, type GeoPermissibleObjects } from "d3-geo";
 import land from "@/data/globeLand.json";
 import coordinates from "@/data/cityCoordinates.json";
 import { safeWebLink } from "@/lib/tripMoney";
 import { globeCities, type Person } from "@/lib/peopleDiscovery";
-import { MAX_ZOOM, clusterMarkers, fanOffsets, stackDepth, zoomToSplit } from "@/lib/globeMarkers";
+import { MAX_ZOOM, clusterMarkers, fanOffsets, isDoubleTap, pinchZoom, stackDepth, zoomToSplit, type GlobeMarker } from "@/lib/globeMarkers";
+import { GLOBE_SIZE, anchorRotation, globeProjection, pointAt, screenPoint, type Rotation } from "@/lib/globeView";
 
 const POINTS = coordinates as Record<string, number[]>;
 
@@ -43,7 +38,7 @@ function Face({ clip, href, label, x = 0, y = 0, r, dim }: { clip: string; href?
 function Fan({ clip, faces, total, label }: { clip: string; faces: string[]; total: number; label: string }) {
   const shown = faces.slice(0, 4);
   const extra = total - shown.length;
-  const slots = fanOffsets(shown.length + (extra > 0 ? 1 : 0), 40);
+  const slots = fanOffsets(shown.length + (extra > 0 ? 1 : 0));
   return (
     <g pointerEvents="none" aria-hidden>
       {shown.map((face, i) => (
@@ -77,43 +72,166 @@ export function CreativeGlobe({
   const cities = useMemo(() => globeCities(people, POINTS), [people]);
   const myPoint = mine ? POINTS[mine.key] : undefined;
   const me = mine && myPoint?.length === 2 ? { ...mine, point: [myPoint[0], myPoint[1]] as [number, number] } : null;
-  const [rotation, setRotation] = useState<[number, number]>(() =>
+  const [rotation, setRotation] = useState<Rotation>(() =>
     me ? [-me.point[0], -me.point[1] * 0.6] : [80, -25]
   );
   const [zoom, setZoom] = useState(1);
-  const zoomRef = useRef(zoom);
-  zoomRef.current = zoom;
+  const view = useRef({ rotation, zoom });
+  view.current = { rotation, zoom };
   const chosen = cities.find((city) => city.key === selected)?.point;
   const chosenLon = chosen?.[0];
   const chosenLat = chosen?.[1];
   useEffect(() => {
     if (chosenLon !== undefined && chosenLat !== undefined)
       // Tilt a little on the whole globe for context; when zoomed in, centre exactly so the city stays in view.
-      setRotation([-chosenLon, -chosenLat * (zoomRef.current > 1.5 ? 1 : 0.8)]);
+      setRotation([-chosenLon, -chosenLat * (view.current.zoom > 1.5 ? 1 : 0.8)]);
   }, [chosenLon, chosenLat]);
-  const drag = useRef<{ x: number; y: number; rotation: [number, number] } | null>(null);
   const id = useId().replace(/:/g, "");
-  const projection = useMemo(
-    () =>
-      geoOrthographic()
-        .rotate(rotation)
-        .scale(178 * zoom)
-        .translate([200, 200])
-        .clipAngle(90),
-    [rotation, zoom]
-  );
+  const svgRef = useRef<SVGSVGElement>(null);
+  const projection = useMemo(() => globeProjection(rotation, zoom), [rotation, zoom]);
   const path = geoPath(projection);
   const facing = (point: [number, number]) =>
     geoDistance(point, [-rotation[0], -rotation[1]]) <= Math.PI / 2;
+
+  // Gestures. Every finger is tracked; one finger grabs and turns the globe, two fingers pinch
+  // around their midpoint. State changes are batched to one per animation frame, and markers
+  // only regroup when the gesture ends so they never jump around under the fingers.
+  const pointers = useRef(new Map<number, [number, number]>());
+  const gesture = useRef<
+    | { kind: "pending"; start: [number, number]; at: number; onMarker: boolean }
+    | { kind: "pan"; anchor: [number, number] | null; start: [number, number]; rotation: Rotation }
+    | { kind: "pinch"; distance: number; zoom: number; anchor: [number, number] | null; rotation: Rotation }
+    | null
+  >(null);
+  const [moving, setMoving] = useState(false);
+  const suppressClick = useRef(false);
+  const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
+  const frame = useRef<number | null>(null);
+  const next = useRef<{ rotation: Rotation; zoom: number } | null>(null);
+  const commit = useCallback((rotationNext: Rotation, zoomNext: number) => {
+    next.current = { rotation: rotationNext, zoom: zoomNext };
+    if (frame.current !== null) return;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = null;
+      const v = next.current;
+      next.current = null;
+      if (!v) return;
+      view.current = v;
+      setRotation(v.rotation);
+      setZoom(v.zoom);
+    });
+  }, []);
+  useEffect(() => () => {
+    if (frame.current !== null) cancelAnimationFrame(frame.current);
+  }, []);
+  const local = (clientX: number, clientY: number): [number, number] => {
+    const box = svgRef.current?.getBoundingClientRect();
+    if (!box || !box.width) return [clientX, clientY];
+    return [((clientX - box.left) * GLOBE_SIZE) / box.width, ((clientY - box.top) * GLOBE_SIZE) / box.height];
+  };
+  const current = () => next.current ?? view.current;
+  // Capture only once a drag or pinch starts, so a plain tap still lands on the marker under it.
+  // Captured fingers keep steering the globe when they slide off its edge.
+  const capture = () => {
+    for (const pointerId of pointers.current.keys()) {
+      try {
+        svgRef.current?.setPointerCapture(pointerId);
+      } catch {
+        /* that finger is already gone */
+      }
+    }
+  };
+  const startPinch = () => {
+    const [a, b] = [...pointers.current.values()];
+    const mid: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const v = current();
+    gesture.current = { kind: "pinch", distance: Math.hypot(a[0] - b[0], a[1] - b[1]), zoom: v.zoom, anchor: pointAt(v.rotation, v.zoom, mid), rotation: v.rotation };
+    suppressClick.current = true;
+    capture();
+    setMoving(true);
+  };
+  const startPan = (at: [number, number]) => {
+    const v = current();
+    gesture.current = { kind: "pan", anchor: pointAt(v.rotation, v.zoom, at), start: at, rotation: v.rotation };
+    suppressClick.current = true;
+    capture();
+    setMoving(true);
+  };
+  /** Zoom by a factor around a point of the frame, for double-tap, ctrl+wheel and the buttons. */
+  const zoomAround = useCallback(
+    (factor: number, at: [number, number]) => {
+      const v = next.current ?? view.current;
+      const z = Math.min(MAX_ZOOM, Math.max(1, v.zoom * factor));
+      const anchor = pointAt(v.rotation, v.zoom, at);
+      commit(anchor ? anchorRotation(anchor, at, z, v.rotation) : v.rotation, z);
+    },
+    [commit]
+  );
+  // iOS Safari and the Capacitor WebView pinch-zoom the whole page through their own gesture
+  // events and non-cancelled touch moves; touch-action alone is not always enough there.
+  // cspell:words gesturestart gesturechange
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const stop = (e: Event) => e.preventDefault();
+    const touchMove = (e: TouchEvent) => {
+      if (e.cancelable) e.preventDefault();
+    };
+    const wheel = (e: WheelEvent) => {
+      // A touchpad pinch arrives as ctrl+wheel. A plain wheel still scrolls the page.
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const box = svg.getBoundingClientRect();
+      zoomAround(Math.exp(-e.deltaY * 0.01), [((e.clientX - box.left) * GLOBE_SIZE) / box.width, ((e.clientY - box.top) * GLOBE_SIZE) / box.height]);
+    };
+    svg.addEventListener("gesturestart", stop, { passive: false });
+    svg.addEventListener("gesturechange", stop, { passive: false });
+    svg.addEventListener("touchmove", touchMove, { passive: false });
+    svg.addEventListener("wheel", wheel, { passive: false });
+    return () => {
+      svg.removeEventListener("gesturestart", stop);
+      svg.removeEventListener("gesturechange", stop);
+      svg.removeEventListener("touchmove", touchMove);
+      svg.removeEventListener("wheel", wheel);
+    };
+  }, [zoomAround]);
+  const endPointer = (e: React.PointerEvent<SVGSVGElement>) => {
+    const g = gesture.current;
+    pointers.current.delete(e.pointerId);
+    if (g?.kind === "pending" && e.type === "pointerup") {
+      const at = local(e.clientX, e.clientY);
+      const tap = { t: e.timeStamp, x: at[0], y: at[1] };
+      if (!g.onMarker && isDoubleTap(lastTap.current, tap)) {
+        lastTap.current = null;
+        zoomAround(2, at);
+      } else lastTap.current = g.onMarker ? null : tap;
+    }
+    if (pointers.current.size === 2) startPinch();
+    else if (pointers.current.size === 1) startPan([...pointers.current.values()][0]);
+    else {
+      gesture.current = null;
+      setMoving(false);
+    }
+  };
+
   const visible = cities.flatMap((city) => {
     if (!facing(city.point)) return [];
     const xy = projection(city.point);
     return xy ? [{ ...city, xy }] : [];
   });
   // Nearby cities that would overlap fold into the biggest one; tapping a cluster zooms in.
-  const markers = clusterMarkers(visible, selected);
+  // While a gesture runs, the groups from its start just follow the globe (no regrouping).
+  const settled = useRef<GlobeMarker[]>([]);
+  const markers: GlobeMarker[] = moving
+    ? settled.current.flatMap((m) => {
+        const xy = screenPoint(rotation, zoom, m.point);
+        return xy ? [{ ...m, xy }] : [];
+      })
+    : clusterMarkers(visible, selected);
+  if (!moving) settled.current = markers;
   // A cluster zooms in far enough to split; at full zoom it opens its biggest city and fans its faces out.
   const open = (marker: { key: string; cities: number; point: [number, number]; points: [number, number][] }) => {
+    if (suppressClick.current) return;
     if (marker.cities > 1 && zoom < MAX_ZOOM) {
       setRotation([-marker.point[0], -marker.point[1]]);
       setZoom(zoomToSplit(marker.points, zoom));
@@ -123,25 +241,65 @@ export function CreativeGlobe({
   return (
     <div className="relative" aria-label="People globe">
       <svg
+        ref={svgRef}
         viewBox="0 0 400 400"
-        className="mx-auto block w-full max-w-[520px] touch-pan-y select-none"
+        className="mx-auto block w-full max-w-[520px] select-none"
+        // The globe owns every touch on it: no page pinch-zoom, no page scroll, no callout.
+        style={{ touchAction: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
+        data-zoom={zoom.toFixed(3)}
+        data-rotation={`${rotation[0].toFixed(3)},${rotation[1].toFixed(3)}`}
+        data-gesture={moving ? "active" : "idle"}
         role="img"
         aria-label={`Globe of members by city. ${cities.length} cities shown. Use the city picker to choose one.`}
+        onContextMenu={(e) => e.preventDefault()}
         onPointerDown={(e) => {
-          if ((e.target as Element).closest("[data-city-marker]")) return;
-          drag.current = { x: e.clientX, y: e.clientY, rotation };
-          e.currentTarget.setPointerCapture(e.pointerId);
+          if (e.pointerType === "mouse" && e.button !== 0) return;
+          const at = local(e.clientX, e.clientY);
+          pointers.current.set(e.pointerId, at);
+          if (pointers.current.size === 1) {
+            suppressClick.current = false;
+            gesture.current = { kind: "pending", start: at, at: e.timeStamp, onMarker: !!(e.target as Element).closest("[data-city-marker]") };
+          } else if (pointers.current.size === 2) startPinch();
         }}
         onPointerMove={(e) => {
-          if (!drag.current) return;
-          const scale = 400 / e.currentTarget.getBoundingClientRect().width;
-          setRotation([
-            drag.current.rotation[0] + (e.clientX - drag.current.x) * scale * 0.4,
-            Math.max(-70, Math.min(70, drag.current.rotation[1] - (e.clientY - drag.current.y) * scale * 0.2)),
-          ]);
+          if (!pointers.current.has(e.pointerId)) return;
+          const at = local(e.clientX, e.clientY);
+          pointers.current.set(e.pointerId, at);
+          const g = gesture.current;
+          if (!g) return;
+          if (g.kind === "pending") {
+            // A few pixels of finger wobble is still a tap.
+            if (Math.hypot(at[0] - g.start[0], at[1] - g.start[1]) > 6) startPan(g.start);
+            else return;
+          }
+          const active = gesture.current;
+          if (active?.kind === "pan") {
+            if (active.anchor) commit(anchorRotation(active.anchor, at, current().zoom, current().rotation), current().zoom);
+            else {
+              const z = current().zoom;
+              commit(
+                [
+                  active.rotation[0] + ((at[0] - active.start[0]) * 0.4) / z,
+                  Math.max(-80, Math.min(80, active.rotation[1] - ((at[1] - active.start[1]) * 0.4) / z)),
+                ],
+                z
+              );
+            }
+          } else if (active?.kind === "pinch" && pointers.current.size >= 2) {
+            const [a, b] = [...pointers.current.values()];
+            const mid: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+            const z = pinchZoom(active.zoom, active.distance, Math.hypot(a[0] - b[0], a[1] - b[1]));
+            commit(active.anchor ? anchorRotation(active.anchor, mid, z, current().rotation) : current().rotation, z);
+          }
         }}
-        onPointerUp={() => (drag.current = null)}
-        onPointerCancel={() => (drag.current = null)}
+        onPointerUp={endPointer}
+        onPointerCancel={endPointer}
+        onLostPointerCapture={(e) => {
+          // Touch pointers start implicitly captured by the child under the finger (a land path, a
+          // marker). Moving that capture to the svg fires lostpointercapture on the child, and it
+          // bubbles here; only the svg itself losing a finger ends it.
+          if (e.target === e.currentTarget && pointers.current.has(e.pointerId)) endPointer(e);
+        }}
       >
         <defs>
           <radialGradient id={`${id}-sea`} cx="38%" cy="32%">
@@ -205,7 +363,7 @@ export function CreativeGlobe({
                 </circle>
               )}
               {/* A group reads as a group: up to two faces stacked behind the front one. */}
-              {[2, 1].filter((n) => n <= stackDepth(city.total)).map((n) => (
+              {!(active && city.total > 1) && [2, 1].filter((n) => n <= stackDepth(city.total)).map((n) => (
                 <Face key={n} clip={`${id}-face`} href={city.faces[n]} label={city.label} x={n === 1 ? -13 : 13} y={4} r={11.5} dim />
               ))}
               <circle r="17" fill={active ? "#ff9fc8" : "#faf4ed"} />
@@ -233,8 +391,8 @@ export function CreativeGlobe({
         {[
           ["Rotate globe west", "←", () => setRotation((r) => [r[0] - 35, r[1]])],
           ["Rotate globe east", "→", () => setRotation((r) => [r[0] + 35, r[1]])],
-          ["Zoom in", "+", () => setZoom((z) => Math.min(MAX_ZOOM, z * 1.6))],
-          ["Zoom out", "−", () => setZoom((z) => Math.max(1, z / 1.6))],
+          ["Zoom in", "+", () => zoomAround(1.6, [GLOBE_SIZE / 2, GLOBE_SIZE / 2])],
+          ["Zoom out", "−", () => zoomAround(1 / 1.6, [GLOBE_SIZE / 2, GLOBE_SIZE / 2])],
         ].map(([label, glyph, run]) => (
           <button
             key={label as string}

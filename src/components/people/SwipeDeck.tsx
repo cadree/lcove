@@ -3,6 +3,9 @@ import { ChevronLeft, ChevronRight, X, UserCheck, UserPlus } from "lucide-react"
 import type { Person } from "@/lib/peopleDiscovery";
 import { ProfileCard } from "./ProfileCard";
 
+/** A horizontal swipe at least this long always moves exactly one card. */
+const SWIPE_PX = 48;
+
 /**
  * Big profile cards in a horizontal swipe. Swiping (or the arrows) moves between
  * people; Pass and Connect decide on the card in front and move to the next one.
@@ -38,6 +41,7 @@ export function SwipeDeck({
 
   // While a programmatic scroll runs, scroll events report positions in between.
   const target = useRef<number | null>(null);
+  const swipe = useRef<{ left: number; index: number } | null>(null);
   const go = useCallback((index: number, jump = false) => {
     if (!track.current) return;
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -90,6 +94,21 @@ export function SwipeDeck({
         ref={track}
         onScroll={onScroll}
         onPointerDown={() => (target.current = null)}
+        // Native snapping alone decides by speed and distance, so a deliberate but slow swipe of
+        // a third of a card could spring back. A swipe past SWIPE_PX always moves one card.
+        onTouchStart={() => {
+          target.current = null;
+          swipe.current = { left: track.current?.scrollLeft ?? 0, index: active };
+        }}
+        onTouchEnd={(e) => {
+          const from = swipe.current;
+          if (!from || e.touches.length || !track.current) return;
+          swipe.current = null;
+          const moved = track.current.scrollLeft - from.left;
+          if (Math.abs(moved) < SWIPE_PX) return;
+          const next = Math.max(0, Math.min(people.length - 1, from.index + Math.sign(moved)));
+          if (next !== from.index) go(next);
+        }}
         onWheel={() => (target.current = null)}
         className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-2 scrollbar-hide"
         style={{ overscrollBehaviorX: "contain" }}
@@ -97,7 +116,7 @@ export function SwipeDeck({
         {people.map((person, index) => (
           <div
             key={person.user_id}
-            className="h-[min(560px,68dvh)] w-[86%] max-w-[380px] shrink-0 snap-start sm:w-[340px] lg:w-[328px]"
+            className="h-[min(560px,68dvh)] w-[86%] max-w-[380px] shrink-0 snap-start snap-always sm:w-[340px] lg:w-[328px]"
             aria-hidden={index !== active}
             aria-roledescription="slide"
             aria-label={`${index + 1} of ${people.length}`}

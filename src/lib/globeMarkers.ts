@@ -38,13 +38,18 @@ export function zoomToSplit(points: [number, number][], current: number, gap = 3
 
 export const MAX_FACES = 5;
 
-export function clusterMarkers(visible: PlacedCity[], selected: string | null, gap = 36): GlobeMarker[] {
+/** How far a selected marker's fan reaches; nothing else may sit inside it. */
+export const FAN_RADIUS = 44;
+export const FAN_CLEARANCE = FAN_RADIUS + 22;
+
+export function clusterMarkers(visible: PlacedCity[], selected: string | null, gap = 36, selectedGap = FAN_CLEARANCE): GlobeMarker[] {
   const markers: GlobeMarker[] = [];
   const order = [...visible].sort(
     (a, b) => Number(b.key === selected) - Number(a.key === selected) || b.count - a.count || a.key.localeCompare(b.key)
   );
   for (const city of order) {
-    const near = markers.find((m) => Math.hypot(m.xy[0] - city.xy[0], m.xy[1] - city.xy[1]) < gap);
+    // The selected marker fans its faces out, so it claims a wider circle than a plain marker.
+    const near = markers.find((m) => Math.hypot(m.xy[0] - city.xy[0], m.xy[1] - city.xy[1]) < (m.key === selected ? selectedGap : gap));
     if (near) {
       near.cities++;
       near.total += city.count;
@@ -63,11 +68,27 @@ export function stackDepth(total: number): number {
 }
 
 /** Positions for a fanned-out group: an arc above the marker, n slots. */
-export function fanOffsets(n: number, radius = 36): [number, number][] {
+export function fanOffsets(n: number, radius = FAN_RADIUS): [number, number][] {
   if (n <= 0) return [];
   const spread = Math.min(Math.PI * 0.9, (n - 1) * 0.5);
   return Array.from({ length: n }, (_, i) => {
     const angle = -Math.PI / 2 + (n === 1 ? 0 : -spread / 2 + (spread * i) / (n - 1));
     return [Math.round(Math.cos(angle) * radius * 10) / 10, Math.round(Math.sin(angle) * radius * 10) / 10];
   });
+}
+
+/** Pinch: the new zoom from the finger spread, clamped to the globe's range. */
+export function pinchZoom(startZoom: number, startDistance: number, distance: number, min = 1, max = MAX_ZOOM): number {
+  if (!(startDistance > 0) || !(distance > 0)) return startZoom;
+  return Math.min(max, Math.max(min, startZoom * (distance / startDistance)));
+}
+
+/** Two taps close together in time and place. */
+export function isDoubleTap(
+  previous: { t: number; x: number; y: number } | null,
+  next: { t: number; x: number; y: number },
+  ms = 320,
+  px = 30
+): boolean {
+  return !!previous && next.t - previous.t <= ms && Math.hypot(next.x - previous.x, next.y - previous.y) <= px;
 }

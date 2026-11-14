@@ -408,7 +408,10 @@ const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryView
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="absolute inset-0"
+              // A long press on the photo must not pop the iOS save-image callout or select it.
+              className="absolute inset-0 select-none"
+              style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
+              onContextMenu={(event) => event.preventDefault()}
             >
               {storyMediaFit(currentStory.source_post_id) === 'contain' ? (
                 <div className="absolute inset-0 bg-[#111]">

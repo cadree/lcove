@@ -268,22 +268,39 @@ export function useMessages(conversationId: string | null) {
     typingTimeoutRef.current = setTimeout(clearTypingIndicator, 3000);
   }, [user, conversationId, clearTypingIndicator]);
 
-  // Delete message
+  // cspell:words unsend unsent
+  // Unsend your own message. The database empties it and keeps a tombstone the chat can
+  // see, so the update succeeds and realtime tells the other side, whose list drops it.
   const deleteMessage = useMutation({
     mutationFn: async (messageId: string) => {
       if (!user) throw new Error('Must be logged in');
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
         .update({ deleted_at: new Date().toISOString() })
         .eq('id', messageId)
-        .eq('sender_id', user.id);
+        .eq('sender_id', user.id)
+        .select('id');
 
       if (error) throw error;
+      // Zero rows: not your message (or already gone). Say so instead of a false "deleted".
+      if (!data?.length) throw new Error('You can only unsend your own messages');
+    },
+    onMutate: async (messageId: string) => {
+      await queryClient.cancelQueries({ queryKey: ['messages', conversationId] });
+      const previous = queryClient.getQueryData<Message[]>(['messages', conversationId]);
+      queryClient.setQueryData<Message[]>(['messages', conversationId], (list) => list?.filter((m) => m.id !== messageId));
+      return { previous };
+    },
+    onError: (error, _id, context) => {
+      if (context?.previous) queryClient.setQueryData(['messages', conversationId], context.previous);
+      toast.error(error instanceof Error ? error.message : 'Could not unsend the message');
     },
     onSuccess: () => {
+      toast.success('Message unsent');
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
-      toast.success('Message deleted');
     },
   });
 
