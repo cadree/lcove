@@ -1,328 +1,370 @@
-import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import {
+  Plane,
+  SlidersHorizontal,
+  Search,
+  MapPin,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Search, Users, Loader2, Heart } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useUserBlocks } from "@/hooks/useUserBlocks";
-import { FriendsDrawer } from "@/components/friends/FriendsDrawer";
-import { cityFilterOptions, cityMatchesFilter, cityMatchesQuery } from "@/lib/cityNormalization";
-import { dedupeProfilesByUserId } from "@/lib/directoryProfiles";
-import { DIRECTORY_RENDER_PAGE, listEnterDelay, nextRenderedCount } from "@/lib/feedWindow";
-import { abortAfter } from "@/lib/requestDeadline";
+import { CreativeGlobe } from "@/components/discovery/CreativeGlobe";
+import { CreativeCard } from "@/components/discovery/CreativeCard";
+import { DiscoveryPreferences } from "@/components/discovery/DiscoveryPreferences";
+import { discovery } from "@/lib/creativeDiscovery";
+import { safeWebLink } from "@/lib/tripMoney";
+import { resolveCity } from "@/lib/cities";
+import { useProfile } from "@/hooks/useProfile";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
-interface Profile {
-  id: string;
-  user_id: string;
-  display_name: string | null;
-  avatar_url: string | null;
-  city: string | null;
-  city_display: string | null;
-  city_key: string | null;
-  bio: string | null;
-  created_at: string | null;
-  passions?: string[];
-  skills?: string[];
-}
-
-interface CityOption {
-  key: string;
-  display: string;
-}
-
-interface UserPassion {
-  user_id: string;
-  custom_name: string | null;
-  passions: { name: string } | { name: string }[] | null;
-}
-
-interface UserSkill {
-  user_id: string;
-  skills: { name: string } | null;
-}
-
-function passionLabel(row: UserPassion): string | null {
-  const custom = row.custom_name?.trim();
-  if (custom) return custom;
-  const related = Array.isArray(row.passions) ? row.passions[0] : row.passions;
-  const name = related?.name?.trim();
-  return name || null;
-}
-
-const Directory = () => {
+export default function Directory() {
+  const { user } = useAuth();
+  const { profile } = useProfile();
   const navigate = useNavigate();
-  const { blockedIds } = useUserBlocks();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCityKey, setSelectedCityKey] = useState<string | null>(null); // null = All Cities
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [shown, setShown] = useState(DIRECTORY_RENDER_PAGE);
-
+  const cache = useQueryClient();
+  const [city, setCity] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [search, setSearch] = useState("");
+  const [index, setIndex] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => {
-    void fetchProfiles();
-  }, []);
-
-  useEffect(() => {
-    setShown(DIRECTORY_RENDER_PAGE);
-  }, [searchQuery, selectedCityKey]);
-
-  const fetchProfiles = async () => {
-    setLoading(true);
-    setLoadError(false);
-    const signal = abortAfter();
-    
-    // Fetch profiles using profiles_public view to protect sensitive fields
-    const { data: profilesData, error: profilesError } = await supabase
-      .from('profiles_public')
-      .select('id, user_id, display_name, avatar_url, city, city_display, city_key, bio, created_at')
-      .eq('onboarding_completed', true)
-      .order('created_at', { ascending: false })
-      .abortSignal(signal);
-
-    if (profilesError || !profilesData) {
-      setLoadError(true);
-      setLoading(false);
-      return;
-    }
-    
-    // Fetch user passions with passion names
-    const { data: passionsData } = await supabase
-      .from('user_passions')
-      .select('user_id, custom_name, passions(name)')
-      .abortSignal(signal);
-    
-    // Fetch user skills with skill names
-    const { data: skillsData } = await supabase
-      .from('user_skills')
-      .select('user_id, skills(name)')
-      .abortSignal(signal);
-    
-    // Group passions by user_id
-    const passionsByUser = new Map<string, string[]>();
-    if (passionsData) {
-      (passionsData as UserPassion[]).forEach(up => {
-        const name = passionLabel(up);
-        if (!name) return;
-        const existing = passionsByUser.get(up.user_id) || [];
-        existing.push(name);
-        passionsByUser.set(up.user_id, existing);
-      });
-    }
-    
-    // Group skills by user_id
-    const skillsByUser = new Map<string, string[]>();
-    if (skillsData) {
-      (skillsData as UserSkill[]).forEach(us => {
-        if (us.skills?.name) {
-          const existing = skillsByUser.get(us.user_id) || [];
-          existing.push(us.skills.name);
-          skillsByUser.set(us.user_id, existing);
-        }
-      });
-    }
-    
-    // Merge passions and skills into profiles
-    const profilesWithDetails = profilesData.map(profile => ({
-      ...profile,
-      passions: passionsByUser.get(profile.user_id) || [],
-      skills: skillsByUser.get(profile.user_id) || []
-    }));
-    
-    setProfiles(dedupeProfilesByUserId(profilesWithDetails as Profile[]));
-    setLoading(false);
-  };
-
-  // Group filter chips from the strings already stored. "Charlotte" and
-  // "Charlotte, NC" share a chip. Stored city fields are left unchanged.
-  const cityOptions = useMemo<CityOption[]>(() => {
-    return cityFilterOptions(profiles.flatMap((profile) => [profile.city_display, profile.city]));
-  }, [profiles]);
-
-  const profileMatchesSelectedCity = (profile: Profile): boolean => {
-    if (selectedCityKey === null) return true;
-    return [profile.city_display, profile.city].some((value) => cityMatchesFilter(value, selectedCityKey));
-  };
-
-  // Get the display value for a profile's city
-  const getProfileCityDisplay = (profile: Profile): string => {
-    return profile.city || profile.city_display || '';
-  };
-
-  const filteredProfiles = profiles.filter((profile) => {
-    if (blockedIds.includes(profile.user_id)) return false;
-    const searchLower = searchQuery.toLowerCase();
-    const matchesSearch = 
-      profile.display_name?.toLowerCase().includes(searchLower) ||
-      profile.bio?.toLowerCase().includes(searchLower) ||
-      cityMatchesQuery(profile.city, searchQuery) ||
-      cityMatchesQuery(profile.city_display, searchQuery) ||
-      profile.passions?.some(passion => passion.toLowerCase().includes(searchLower)) ||
-      profile.skills?.some(skill => skill.toLowerCase().includes(searchLower));
-    
-    const matchesCity = profileMatchesSelectedCity(profile);
-    
-    return matchesSearch && matchesCity;
+    const timer = setTimeout(() => setSearch(query), 250);
+    return () => clearTimeout(timer);
+  }, [query]);
+  const result = useInfiniteQuery({
+    queryKey: ["discovery", user?.id, city, search],
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) => discovery.people(city, search, pageParam),
+    getNextPageParam: (last, pages) =>
+      last.people.length === 30 ? pages.length * 30 : undefined,
+    enabled: !!user,
   });
-  const visibleProfiles = filteredProfiles.slice(0, shown);
-
-  const handleProfileClick = (userId: string) => {
-    navigate(`/profile/${userId}`);
+  const matches = useQuery({
+    queryKey: ["creative-matches", user?.id],
+    queryFn: discovery.matches,
+    refetchInterval: 15000,
+    enabled: !!user,
+  });
+  const cities = result.data?.pages[0]?.cities || [];
+  const people = result.data?.pages.flatMap((p) => p.people) || [];
+  const selected = cities.find((c) => c.city_key === city);
+  const railCities =
+    selected && !cities.slice(0, 24).includes(selected)
+      ? [selected, ...cities.slice(0, 23)]
+      : cities.slice(0, 24);
+  const chooseCity = (key: string | null) => {
+    setCity(key);
+    setIndex(0);
   };
-
+  const swipe = useMutation({
+    mutationFn: ({ target, liked }: { target: string; liked: boolean }) =>
+      discovery.swipe(target, liked),
+    onSuccess: async (data) => {
+      setIndex((i) => i + 1);
+      await cache.invalidateQueries({ queryKey: ["creative-matches"] });
+      if (data.matched && data.conversation_id) {
+        toast.success("You matched! Your chat is ready.", {
+          action: {
+            label: "Open chat",
+            onClick: () =>
+              navigate(`/messages?conversation=${data.conversation_id}`),
+          },
+        });
+      } else
+        toast.success(
+          "Saved. Your choice stays private until you both connect."
+        );
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const unmatch = useMutation({
+    mutationFn: discovery.unmatch,
+    onSuccess: () =>
+      cache.invalidateQueries({ queryKey: ["creative-matches"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
   return (
     <PageLayout>
-      <div className="px-6 pt-6 pb-24">
-        {/* Header */}
-        <PageHeader
-          eyebrow="People"
-          title="Directory"
-          description="Find creatives by name, city, or interests"
-          className="mb-4"
-          actions={
-            <FriendsDrawer>
-              <Button variant="outline" size="icon" title="Friends" aria-label="Friends">
-                <Heart className="w-4 h-4" />
-              </Button>
-            </FriendsDrawer>
-          }
-        />
-
-        <div className="relative mb-3">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="SEARCH NAME, CITY, CRAFT"
-            aria-label="Search by name, city, passions, or skills"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-11 w-full rounded-[14px] border border-border bg-input pl-10 pr-4 font-mono text-[11px] uppercase tracking-[0.14em] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(var(--scan))]"
-          />
-        </div>
-
-        <div className="mb-5 flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          <button
-            type="button"
-            onClick={() => setSelectedCityKey(null)}
-            aria-pressed={selectedCityKey === null}
-            className={`mono-label inline-flex h-11 shrink-0 items-center rounded-full border px-3 text-[11px] ${
-              selectedCityKey === null
-                ? "border-[hsl(var(--scan))] text-foreground shadow-[inset_0_0_12px_rgba(121,195,207,0.35)]"
-                : "border-border text-muted-foreground"
-            }`}
-          >
-            All cities
-          </button>
-          {cityOptions.map((cityOption) => (
-            <button
-              key={cityOption.key}
-              type="button"
-              onClick={() => setSelectedCityKey(cityOption.key)}
-              aria-pressed={selectedCityKey === cityOption.key}
-              className={`mono-label inline-flex h-11 shrink-0 items-center rounded-full border px-3 text-[11px] ${
-                selectedCityKey === cityOption.key
-                  ? "border-[hsl(var(--scan))] text-foreground shadow-[inset_0_0_12px_rgba(121,195,207,0.35)]"
-                  : "border-border text-muted-foreground"
-              }`}
-            >
-              {cityOption.display}
-            </button>
-          ))}
-        </div>
-
-        {/* Loading State */}
-        {loading && (
-          <div className="flex items-center justify-center py-12" role="status">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            <span className="sr-only">Loading directory</span>
-          </div>
-        )}
-
-        {!loading && loadError && (
-          <div className="py-12 text-center">
-            <p className="text-sm text-muted-foreground">The directory did not load.</p>
-            <Button type="button" variant="outline" className="mt-3 min-h-11" onClick={() => void fetchProfiles()}>
-              Try again
-            </Button>
-          </div>
-        )}
-
-        {/* Results Grid */}
-        {!loading && !loadError && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {visibleProfiles.map((profile, index) => (
-              <motion.div
-                key={profile.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, delay: listEnterDelay(index) }}
-                onClick={() => handleProfileClick(profile.user_id)}
-                className="file-panel group cursor-pointer p-4"
+      <div className="min-h-screen bg-[#24212a] text-[#faf5f0]">
+        <div className="mx-auto max-w-4xl px-4 pb-8 pt-4">
+          <header className="flex items-center justify-between gap-3">
+            <div>
+              <Link
+                to="/explore"
+                className="inline-flex min-h-11 items-center text-xs uppercase tracking-[.2em] text-white/60"
               >
-                <div className="flex items-start gap-3">
-                  <span className="rounded-full bg-[conic-gradient(from_120deg,#FF9FC8,#79C3CF,#FF9FC8)] p-[2px]">
-                    <Avatar className="h-14 w-14 rounded-full border-2 border-card">
-                      <AvatarImage src={profile.avatar_url || undefined} className="rounded-full" />
-                      <AvatarFallback className="rounded-full bg-card font-body text-lg font-extrabold text-foreground">
-                        {profile.display_name?.charAt(0).toUpperCase() || '?'}
-                      </AvatarFallback>
-                    </Avatar>
-                  </span>
-
-                  <div className="min-w-0 flex-1">
-                    <p className="mono-label text-[8px] text-[hsl(var(--scan))]">// Profile</p>
-                    <div className="flex min-w-0 items-center gap-2">
-                    <h3 className="truncate font-body text-[15px] font-extrabold text-foreground">
-                      {profile.display_name || 'Anonymous'}
-                    </h3>
-                    {profile.created_at && Date.now() - new Date(profile.created_at).getTime() < 14 * 24 * 60 * 60 * 1000 && (
-                      <span className="mono-label shrink-0 text-[8px] text-[hsl(var(--brand))]">New</span>
-                    )}
-                  </div>
-                    <p className="mono-label mt-1 text-[8px] text-muted-foreground">
-                      {getProfileCityDisplay(profile) || "City open"}
-                    </p>
-                    {profile.bio && (
-                      <p className="mt-1 line-clamp-2 font-body text-xs text-muted-foreground">
-                        {profile.bio}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
+                Ether / Discover
+              </Link>
+              <h1 className="font-display text-3xl">Find your people.</h1>
+            </div>
+            <button
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10"
+              aria-label="Discovery settings"
+              aria-expanded={settingsOpen}
+              onClick={() => setSettingsOpen((v) => !v)}
+            >
+              <SlidersHorizontal size={20} />
+            </button>
+          </header>
+          {settingsOpen && (
+            <div className="my-4 rounded-2xl bg-background text-foreground">
+              <DiscoveryPreferences />
+            </div>
+          )}
+          <div className="relative z-10 mt-5 flex items-center justify-between gap-3">
+            <label className="flex min-h-11 min-w-0 max-w-[55%] items-center gap-2 rounded-full bg-white/15 px-3">
+              <MapPin size={16} />
+              <select
+                aria-label="Select a city or state"
+                value={city || ""}
+                onChange={(e) => chooseCity(e.target.value || null)}
+                className="h-11 min-w-0 bg-transparent text-sm"
+              >
+                <option className="bg-[#24212a]" value="">
+                  All cities
+                </option>
+                {cities.map((c) => (
+                  <option
+                    className="bg-[#24212a]"
+                    value={c.city_key}
+                    key={c.city_key}
+                  >
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Link
+              to={
+                selected
+                  ? `/travel?city=${encodeURIComponent(selected.label)}`
+                  : "/travel"
+              }
+              className="flex min-h-11 shrink-0 items-center gap-2 rounded-full bg-[#ded0bd] px-4 text-sm font-medium text-[#352d31]"
+            >
+              <Plane size={17} /> Let’s travel
+            </Link>
+          </div>
+          <CreativeGlobe
+            cities={cities}
+            selected={city}
+            onSelect={chooseCity}
+          />
+          <div className="mb-4 flex w-fit rounded-full bg-white/10 p-1">
+            <button
+              className={`min-h-11 rounded-full px-5 text-sm ${
+                city ? "bg-white/20" : ""
+              }`}
+              onClick={() => {
+                const label = profile?.city_display || profile?.city;
+                if (!label) {
+                  toast.info(
+                    "Add your city in Settings to browse creatives nearby."
+                  );
+                  setSettingsOpen(true);
+                  return;
+                }
+                const key = resolveCity(label).city_key;
+                const found = cities.find(
+                  (c) =>
+                    c.city_key === key || resolveCity(c.label).city_key === key
+                );
+                if (!found) {
+                  toast.info("No discoverable creatives in your city yet.");
+                  return;
+                }
+                chooseCity(found.city_key);
+              }}
+            >
+              My city
+            </button>
+            <button
+              className={`min-h-11 rounded-full px-5 text-sm ${
+                !city ? "bg-white/20" : ""
+              }`}
+              onClick={() => chooseCity(null)}
+            >
+              Global
+            </button>
+          </div>
+          <p className="mb-3 text-xs text-white/60">
+            Chosen cities, not live locations. Only members who turn on
+            discovery appear.
+          </p>
+          <div
+            className="flex snap-x gap-3 overflow-x-auto pb-4"
+            aria-label="Cities and states"
+          >
+            {railCities.map((c) => (
+              <button
+                key={c.city_key}
+                aria-pressed={city === c.city_key}
+                onClick={() => chooseCity(c.city_key)}
+                className={`relative flex h-48 w-36 shrink-0 snap-start flex-col justify-end overflow-hidden rounded-2xl bg-gradient-to-br from-[#8b7779] to-[#423b4a] p-3 text-left sm:h-56 sm:w-44 ${
+                  city === c.city_key ? "ring-2 ring-[#d8eee4] ring-inset" : ""
+                }`}
+              >
+                {safeWebLink(c.image) && (
+                  <img
+                    src={safeWebLink(c.image)}
+                    alt=""
+                    loading="lazy"
+                    className="absolute inset-0 h-full w-full object-cover opacity-60"
+                  />
+                )}
+                <span className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                <span className="relative break-words font-display text-xl leading-tight">
+                  {c.label.split(",")[0]}
+                </span>
+                <span className="relative mt-1 text-xs text-white/80">
+                  {c.label.split(",").slice(1).join(",").trim()}
+                </span>
+                <span className="relative mt-2 text-xs">
+                  {c.count} creatives
+                </span>
+              </button>
             ))}
           </div>
-        )}
-        {!loading && !loadError && shown < filteredProfiles.length && (
-          <Button type="button" variant="outline" className="mt-4 min-h-11 w-full" onClick={() => setShown((count) => nextRenderedCount(count, filteredProfiles.length, DIRECTORY_RENDER_PAGE))}>
-            Show more
-          </Button>
-        )}
-
-        {/* Empty State */}
-        {!loading && !loadError && filteredProfiles.length === 0 && (
-          <EmptyState
-            icon={Users}
-            title="No creatives found"
-            description={searchQuery 
-              ? "Try adjusting your search or exploring a different city. The right connection might be just around the corner."
-              : "Be the first to join this creative community in your city."}
-            secondaryAction={searchQuery ? {
-              label: "Clear Search",
-              onClick: () => {
-                setSearchQuery("");
-                setSelectedCityKey(null);
-              }
-            } : undefined}
-          />
-        )}
+          <section className="mt-2 rounded-[30px] bg-[#eee8e0] p-4 text-[#342e37] sm:p-6">
+            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[#bfb5bc]" />
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="font-display text-2xl">
+                {selected?.label || "Creatives around the world"}
+              </h2>
+              <span className="text-xs">
+                {people.length
+                  ? `${Math.min(index + 1, people.length)} / ${people.length}${
+                      result.hasNextPage ? "+" : ""
+                    }`
+                  : ""}
+              </span>
+            </div>
+            <label className="mb-5 flex items-center gap-2 rounded-xl bg-white/60 px-3">
+              <Search size={18} />
+              <input
+                className="h-11 w-full bg-transparent text-sm outline-none"
+                aria-label="Search creatives or cities"
+                placeholder="Search name, city or bio"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setIndex(0);
+                }}
+              />
+            </label>
+            {!user ? (
+              <Link to="/auth" className="underline">
+                Sign in to discover creatives
+              </Link>
+            ) : result.isError ? (
+              <div role="alert">
+                <p>Discovery is unavailable right now.</p>
+                <button
+                  className="min-h-11 underline"
+                  onClick={() => result.refetch()}
+                >
+                  Try again
+                </button>
+              </div>
+            ) : result.isPending ? (
+              <p role="status">Finding creatives…</p>
+            ) : people[index] ? (
+              <div className="mx-auto max-w-lg">
+                <CreativeCard
+                  person={people[index]}
+                  pending={swipe.isPending}
+                  onSwipe={(liked) =>
+                    swipe.mutate({ target: people[index].user_id, liked })
+                  }
+                />
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <p>
+                  {people.length
+                    ? "You’ve reached the end of these profiles."
+                    : "No discoverable creatives here yet."}
+                </p>
+                <button
+                  className="min-h-11 underline"
+                  onClick={() => setSettingsOpen(true)}
+                >
+                  Manage your discovery visibility
+                </button>
+              </div>
+            )}
+            <div className="mt-4 flex justify-between gap-2">
+              <button
+                className="flex min-h-11 items-center gap-1 disabled:opacity-30"
+                disabled={index === 0 || swipe.isPending}
+                onClick={() => setIndex((i) => i - 1)}
+              >
+                <ChevronLeft size={18} /> Previous
+              </button>
+              {index + 1 < people.length ? (
+                <button
+                  className="flex min-h-11 items-center gap-1"
+                  onClick={() => setIndex((i) => i + 1)}
+                >
+                  Browse next <ChevronRight size={18} />
+                </button>
+              ) : (
+                result.hasNextPage && (
+                  <button
+                    className="min-h-11"
+                    disabled={result.isFetchingNextPage}
+                    onClick={() => result.fetchNextPage()}
+                  >
+                    {result.isFetchingNextPage
+                      ? "Loading…"
+                      : "Load more creatives"}
+                  </button>
+                )
+              )}
+            </div>
+          </section>
+          {!!matches.data?.length && (
+            <section className="mt-6">
+              <h2 className="mb-2 font-display text-2xl">Your matches</h2>
+              {matches.data.map((m) => (
+                <div
+                  className="flex items-center justify-between gap-3 border-b border-white/10 py-2"
+                  key={m.user_id}
+                >
+                  <Link
+                    className="flex min-h-11 items-center"
+                    to={`/messages?conversation=${m.conversation_id}`}
+                  >
+                    {m.display_name || "Creative"} · Open chat
+                  </Link>
+                  <button
+                    disabled={unmatch.isPending}
+                    className="min-h-11 text-sm text-white/60"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          "Unmatch? You will both need to connect again to unlock matches-only DMs."
+                        )
+                      )
+                        unmatch.mutate(m.user_id);
+                    }}
+                  >
+                    Unmatch
+                  </button>
+                </div>
+              ))}
+            </section>
+          )}
+        </div>
       </div>
     </PageLayout>
   );
-};
-
-export default Directory;
+}

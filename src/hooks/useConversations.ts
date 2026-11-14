@@ -1,3 +1,4 @@
+import { callRpc } from '@/lib/rpc';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -181,55 +182,9 @@ export function useConversations() {
     mutationFn: async (otherUserId: string) => {
       if (!user) throw new Error('Must be logged in');
 
-      // Check if conversation already exists
-      const { data: existingParticipations } = await supabase
-        .from('conversation_participants')
-        .select('conversation_id')
-        .eq('user_id', user.id);
-
-      const myConvIds = existingParticipations?.map(p => p.conversation_id) || [];
-
-      if (myConvIds.length > 0) {
-        const { data: otherParticipations } = await supabase
-          .from('conversation_participants')
-          .select('conversation_id')
-          .eq('user_id', otherUserId)
-          .in('conversation_id', myConvIds);
-
-        if (otherParticipations?.length) {
-          // Check if it's a direct conversation
-          for (const op of otherParticipations) {
-            const { data: conv } = await supabase
-              .from('conversations')
-              .select('*')
-              .eq('id', op.conversation_id)
-              .eq('type', 'direct')
-              .maybeSingle();
-            
-            if (conv) return conv;
-          }
-        }
-      }
-
-      // Create new conversation
-      const { data: conv, error: convError } = await supabase
-        .from('conversations')
-        .insert({ type: 'direct', created_by: user.id })
-        .select()
-        .single();
-
-      if (convError) throw convError;
-
-      // Add participants
-      const { error: partError } = await supabase
-        .from('conversation_participants')
-        .insert([
-          { conversation_id: conv.id, user_id: user.id },
-          { conversation_id: conv.id, user_id: otherUserId },
-        ]);
-
-      if (partError) throw partError;
-
+      const id = await callRpc<string>('get_or_create_direct_conversation', { p_other: otherUserId });
+      const { data: conv, error } = await supabase.from('conversations').select('*').eq('id', id).single();
+      if (error) throw error;
       return conv;
     },
     onSuccess: () => {
@@ -242,25 +197,9 @@ export function useConversations() {
     mutationFn: async ({ name, participantIds }: { name: string; participantIds: string[] }) => {
       if (!user) throw new Error('Must be logged in');
 
-      const { data: conv, error: convError } = await supabase
-        .from('conversations')
-        .insert({ type: 'group', name, created_by: user.id })
-        .select()
-        .single();
-
-      if (convError) throw convError;
-
-      const participants = [user.id, ...participantIds].map(uid => ({
-        conversation_id: conv.id,
-        user_id: uid,
-      }));
-
-      const { error: partError } = await supabase
-        .from('conversation_participants')
-        .insert(participants);
-
-      if (partError) throw partError;
-
+      const id = await callRpc<string>('create_group_with_privacy', { p_name: name, p_members: participantIds });
+      const { data: conv, error } = await supabase.from('conversations').select('*').eq('id', id).single();
+      if (error) throw error;
       return conv;
     },
     onSuccess: () => {

@@ -12,7 +12,8 @@
     "typecheck": "tsc -b --pretty false",
     "preview": "vite preview",
     "test:webhook": "node scripts/stripe-webhook-fixtures.test.mjs",
-    "test:unit": "node --experimental-strip-types --test \"src/**/*.test.ts\""
+    "test:unit": "node --experimental-strip-types --test \"src/**/*.test.ts\"",
+    "test:discovery-db": "node scripts/creative-discovery-db.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.1",
@@ -72,6 +73,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "d3-geo": "^3.1.2",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.6.0",
     "fast-png": "^6.4.0",
@@ -106,8 +108,10 @@
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
+    "@electric-sql/pglite": "^0.5.16",
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
+    "@types/d3-geo": "^3.1.1",
     "@types/node": "^22.16.5",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
