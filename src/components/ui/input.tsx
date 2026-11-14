@@ -3,10 +3,15 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, ...props }, ref) => {
+  ({ className, type, onWheel, ...props }, ref) => {
     return (
       <input
         type={type}
+        onWheel={(event) => {
+          // A scroll over a focused number field would silently change its value.
+          if (type === "number" && document.activeElement === event.currentTarget) event.currentTarget.blur();
+          onWheel?.(event);
+        }}
         inputMode={type === "number" ? (props.step && props.step !== 1 && props.step !== "1" ? "decimal" : "numeric") : undefined}
         className={cn(
           "flex h-11 w-full min-w-0 max-w-full box-border rounded-[14px] border border-border bg-input px-4 py-2.5",

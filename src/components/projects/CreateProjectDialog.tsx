@@ -570,7 +570,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
                 <Label htmlFor="budget">Total Budget (USD)</Label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input id="budget" type="number" value={totalBudget} onChange={(e) => setTotalBudget(e.target.value)} placeholder="5000" className="pl-9" min={0} step={100} />
+                  <Input id="budget" type="number" value={totalBudget} onChange={(e) => setTotalBudget(e.target.value)} placeholder="5000" className="pl-9" min={0} step="0.01" inputMode="decimal" />
                 </div>
               </div>
               {budgetNum > 0 && (

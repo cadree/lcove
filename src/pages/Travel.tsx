@@ -21,6 +21,7 @@ import { money, parseCents, safeWebLink } from "@/lib/tripMoney";
 import { resolveCity } from "@/lib/cities";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { readNumber } from "@/lib/numberField";
 
 export default function Travel() {
   const { user } = useAuth();
@@ -274,13 +275,18 @@ function CreateTrip({
               toast.error("Choose a destination from the city suggestions.");
               return;
             }
+            const capacity = readNumber(String(data.get("capacity") ?? ""), { label: "Maximum travelers", min: 2, max: 20, integer: true });
+            if (capacity.error) {
+              toast.error(capacity.error);
+              return;
+            }
             mutation.mutate({
               title: data.get("title"),
               city_key: resolved.city_key,
               city_label: resolved.city_display,
               starts_on: data.get("start"),
               ends_on: data.get("end"),
-              capacity: Number(data.get("capacity")),
+              capacity: capacity.value,
               notes: data.get("notes"),
             });
           }}
@@ -320,6 +326,7 @@ function CreateTrip({
               type="number"
               min={2}
               max={20}
+              step={1}
               defaultValue={4}
               required
             />
