@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import FeedPost from "@/components/feed/FeedPost";
 import { usePosts } from "@/hooks/usePosts";
-import { useStories } from "@/hooks/useStories";
+import { FeedEngagementProvider } from "@/hooks/useFeedEngagement";
 import { browsePosts, collectReels, growVisibleCount, matchesBrowseQuery } from "@/lib/exploreBrowse";
 
 const PAGE = 4;
@@ -21,11 +21,11 @@ export function ExploreBrowse({ query }: { query: string }) {
   const [visible, setVisible] = useState(PAGE);
   const sentinel = useRef<HTMLDivElement>(null);
   const { posts, isLoading: postsLoading } = usePosts();
-  const { stories, isLoading: storiesLoading } = useStories();
 
+  // Reels are video posts. Stories stay in the story tray and expire there.
   const reels = useMemo(() => {
-    return collectReels(stories, posts).filter((reel) => matchesBrowseQuery(reel.name, "", query));
-  }, [stories, posts, query]);
+    return collectReels(posts).filter((reel) => matchesBrowseQuery(reel.name, "", query));
+  }, [posts, query]);
 
   const lanePosts = useMemo(() => {
     const selected = browsePosts(posts, lane === "portfolios" ? "portfolios" : "posts");
@@ -54,7 +54,7 @@ export function ExploreBrowse({ query }: { query: string }) {
     return () => observer.disconnect();
   }, [total, lane, visible]);
 
-  const loading = postsLoading || storiesLoading;
+  const loading = postsLoading;
 
   return (
     <section aria-label="Browse" className="min-w-0">
@@ -83,7 +83,7 @@ export function ExploreBrowse({ query }: { query: string }) {
         </div>
       ) : lane === "reels" ? (
         reels.length === 0 ? (
-          <EmptyCopy title="No reels yet" detail="Video stories and video posts from other people show up here." />
+          <EmptyCopy title="No reels yet" detail="Video posts from other people show up here." />
         ) : (
           <div className="h-[calc(100dvh-13.5rem)] min-h-[28rem] snap-y snap-mandatory overflow-y-auto rounded-[18px] bg-black">
             {shownReels.map((reel) => (
@@ -112,6 +112,8 @@ export function ExploreBrowse({ query }: { query: string }) {
           detail={lane === "portfolios" ? "Portfolio posts open the creator's profile." : "Posts from the feed open the creator's profile."}
         />
       ) : (
+        // FeedPost reads likes and saves from this provider; without it the lane threw.
+        <FeedEngagementProvider postIds={shownPosts.map((post) => post.id)}>
         <div className="space-y-4">
           {shownPosts.map((post) => (
             <div key={post.id}>
@@ -126,6 +128,7 @@ export function ExploreBrowse({ query }: { query: string }) {
           ))}
           <div ref={sentinel} className="h-1" />
         </div>
+        </FeedEngagementProvider>
       )}
     </section>
   );

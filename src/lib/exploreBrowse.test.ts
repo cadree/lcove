@@ -2,19 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { browsePosts, collectReels, growVisibleCount, matchesBrowseQuery } from "./exploreBrowse.ts";
 
-test("reels are video stories and video posts", () => {
-  const reels = collectReels(
-    [
-      { id: "s1", user_id: "u1", media_url: "s.mp4", media_type: "video", profile: { display_name: "Ada" } },
-      { id: "s2", user_id: "u2", media_url: "s.jpg", media_type: "photo", profile: { display_name: "Bea" } },
-    ],
-    [
-      { id: "p1", user_id: "u3", media_url: "p.mp4", media_type: "video", profile: { display_name: "Cy" } },
-      { id: "p2", user_id: "u4", media_url: "p.jpg", media_type: "photo", profile: { display_name: "Dee" } },
-    ],
-  );
-  assert.deepEqual(reels.map((reel) => reel.id), ["story-s1", "post-p1"]);
-  assert.equal(reels[0].userId, "u1");
+test("reels are video posts only, never stories or uploads still in flight", () => {
+  const reels = collectReels([
+    { id: "p1", user_id: "u3", media_url: "p.mp4", media_type: "video", profile: { display_name: "Cy" } },
+    { id: "p2", user_id: "u4", media_url: "p.jpg", media_type: "photo", profile: { display_name: "Dee" } },
+    { id: "optimistic-1", user_id: "u5", media_url: "blob:x", media_type: "video", upload_job_id: "upload-1" },
+  ]);
+  assert.deepEqual(reels.map((reel) => reel.id), ["post-p1"]);
+  assert.equal(reels[0].userId, "u3");
 });
 
 test("posts and portfolios stay on their own lanes", () => {
