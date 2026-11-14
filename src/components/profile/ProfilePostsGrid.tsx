@@ -1,3 +1,4 @@
+import { FeedVideo } from "@/components/media/FeedVideo";
 import { motion } from "framer-motion";
 import { Play, ImageIcon, Repeat2, Eye } from "lucide-react";
 import { ProfilePost } from "@/types/post";
@@ -72,11 +73,10 @@ export function ProfilePostsGrid({ posts, onPostClick, isLoading, isOwner = fals
             </>
           ) : post.media_url && post.media_type === 'video' ? (
             <>
-              <video
+              <FeedVideo
                 src={post.media_url}
                 className="w-full h-full object-cover"
-                muted
-                preload="metadata"
+                loop={false}
               />
               <div className="absolute top-2 right-2">
                 <Play className="w-4 h-4 text-white drop-shadow-lg" fill="white" />

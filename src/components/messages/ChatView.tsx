@@ -514,7 +514,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                                 />
                               )}
                               {msg.media_type === 'video' && (
-                                <video
+                                <video preload="metadata"
                                   src={msg.media_url}
                                   controls
                                   playsInline

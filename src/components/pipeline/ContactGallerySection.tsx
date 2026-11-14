@@ -273,7 +273,7 @@ export function ContactGallerySection({ pipelineItemId }: ContactGallerySectionP
           {selectedMedia && (
             <div className="space-y-4">
               {selectedMedia.media_type === 'video' ? (
-                <video
+                <video preload="metadata"
                   src={selectedMedia.media_url}
                   controls
                   className="w-full rounded-lg"

@@ -1,3 +1,4 @@
+import { FeedVideo } from "@/components/media/FeedVideo";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Loader2 } from "lucide-react";
@@ -87,13 +88,11 @@ export function ExploreBrowse({ query }: { query: string }) {
           <div className="h-[calc(100dvh-13.5rem)] min-h-[28rem] snap-y snap-mandatory overflow-y-auto rounded-[18px] bg-black">
             {shownReels.map((reel) => (
               <article key={reel.key} className="relative h-full min-h-full snap-start">
-                <video
+                <FeedVideo
                   src={reel.mediaUrl}
                   className="h-full w-full object-contain"
-                  playsInline
-                  muted
-                  loop
-                  autoPlay
+                  preload="auto"
+                  playWhenVisible
                 />
                 <Link
                   to={`/profile/${reel.userId}`}

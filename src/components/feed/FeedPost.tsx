@@ -40,6 +40,8 @@ import { useMyReposts, useSharingActions } from '@/hooks/useSharing';
 import { canRepostMedia, ownerOnlyInsight, repostedByLabel } from '@/lib/sharing';
 import { EmbedPlayer } from '@/components/feed/EmbedPlayer';
 import { embedFromPost, type StoredEmbedFields } from '@/lib/videoEmbed';
+import { FeedVideo } from '@/components/media/FeedVideo';
+import { UploadingBadge } from '@/components/uploads/UploadingBadge';
 
 interface Post extends StoredEmbedFields {
   id: string;
@@ -59,6 +61,7 @@ interface Post extends StoredEmbedFields {
     caption?: string | null;
     profile?: { display_name: string | null; avatar_url: string | null } | null;
   } | null;
+  upload_job_id?: string;
 }
 
 const FeedPost = ({ post }: { post: Post }) => {
@@ -246,13 +249,11 @@ const FeedPost = ({ post }: { post: Post }) => {
               {fileCode(post.id)}
             </span>
             <span className="relative mx-auto block aspect-[4/5] w-full overflow-hidden bg-black">
+              {post.upload_job_id && <UploadingBadge jobId={post.upload_job_id} />}
               {post.media_type === 'video' ? (
-                <video
+                <FeedVideo
                   src={post.media_url}
                   className="absolute inset-0 h-full w-full object-contain"
-                  playsInline
-                  muted
-                  loop
                 />
               ) : (
                 <img
@@ -269,7 +270,7 @@ const FeedPost = ({ post }: { post: Post }) => {
               <DialogTitle className="sr-only">Full size media</DialogTitle>
               <DialogDescription className="sr-only">The post photo or video at full size</DialogDescription>
               {post.media_type === 'video' ? (
-                <video src={post.media_url} className="max-h-[80vh] w-full object-contain" controls playsInline onClick={toggleVideo} />
+                <video src={post.media_url} className="max-h-[80vh] w-full object-contain" controls playsInline autoPlay onClick={toggleVideo} />
               ) : (
                 <img src={post.media_url} alt="" className="max-h-[80vh] w-full object-contain" />
               )}

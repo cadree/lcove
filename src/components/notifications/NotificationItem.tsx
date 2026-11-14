@@ -1,3 +1,4 @@
+import { FeedVideo } from "@/components/media/FeedVideo";
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
@@ -144,10 +145,8 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
 
       {display.thumbUrl && (
         display.thumbIsVideo ? (
-          <video
+          <FeedVideo loop={false}
             src={display.thumbUrl}
-            muted
-            playsInline
             preload="metadata"
             aria-hidden
             className="h-11 w-11 shrink-0 rounded-[2px] object-cover"
