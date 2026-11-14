@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { assertCleanText } from '@/lib/objectionableText';
 import {
   excludeBlocked,
-  pickDirectConversation,
   repostCaption,
   shareMessageInsert,
   storyReplyInsert,
@@ -18,56 +17,11 @@ import {
 
 const directChatLocks = new Map<string, Promise<string>>();
 
-function missingDirectChatRpc(error: { code?: string; message?: string }) {
-  return error.code === 'PGRST202' || /get_or_create_direct_conversation/i.test(error.message ?? '');
-}
-
-async function createDirectConversation(userId: string, otherUserId: string) {
-  const { data: rpcId, error: rpcError } = await supabase.rpc('get_or_create_direct_conversation', {
-    p_other: otherUserId,
-  });
-  if (!rpcError && rpcId) return rpcId;
-  if (rpcError && !missingDirectChatRpc(rpcError)) throw rpcError;
-
-  const { data: mine, error: mineError } = await supabase
-    .from('conversation_participants')
-    .select('conversation_id')
-    .eq('user_id', userId);
-  if (mineError) throw mineError;
-
-  const myIds = mine?.map((row) => row.conversation_id) ?? [];
-  if (myIds.length > 0) {
-    const { data: theirs, error: theirsError } = await supabase
-      .from('conversation_participants')
-      .select('conversation_id')
-      .eq('user_id', otherUserId)
-      .in('conversation_id', myIds);
-    if (theirsError) throw theirsError;
-    const sharedIds = [...new Set((theirs ?? []).map((row) => row.conversation_id))];
-    if (sharedIds.length > 0) {
-      const { data: convs, error: convError } = await supabase
-        .from('conversations')
-        .select('id, type, project_id, created_at')
-        .in('id', sharedIds);
-      if (convError) throw convError;
-      const existing = pickDirectConversation(convs ?? []);
-      if (existing) return existing;
-    }
-  }
-
-  const { data: created, error: createError } = await supabase
-    .from('conversations')
-    .insert({ type: 'direct', created_by: userId })
-    .select('id')
-    .single();
-  if (createError) throw createError;
-
-  const { error: partError } = await supabase.from('conversation_participants').insert([
-    { conversation_id: created.id, user_id: userId },
-    { conversation_id: created.id, user_id: otherUserId },
-  ]);
-  if (partError) throw partError;
-  return created.id;
+async function createDirectConversation(_userId: string, otherUserId: string) {
+  const { data, error } = await supabase.rpc('get_or_create_direct_conversation', { p_other: otherUserId });
+  if (error) throw error;
+  if (!data) throw new Error('Could not open this conversation');
+  return data;
 }
 
 function findOrCreateDirectConversation(userId: string, otherUserId: string) {

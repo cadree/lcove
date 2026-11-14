@@ -88,6 +88,8 @@
     "wasm",
     "slugifies",
     "pgcrypto",
-    "apns"
+    "apns",
+    "unmatch",
+    "GeoNames"
   ]
 }

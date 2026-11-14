@@ -1,3 +1,4 @@
+import { callRpc } from '@/lib/rpc';
 import { useState, useRef, useEffect } from 'react';
 import { keyboardPaddingStyle, pinMessageListToEnd } from '@/lib/liveKeyboard';
 import { useNativeKeyboardInset } from '@/hooks/useNativeKeyboardInset';
@@ -59,6 +60,11 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
   const { isOnline } = usePresence();
   
   const conversation = conversations.find(c => c.id === conversationId);
+  const { data: travelTripId } = useQuery({
+    queryKey: ['trip-for-chat', conversationId, user?.id],
+    queryFn: () => callRpc<string | null>('creative_trip_for_chat', { p_chat: conversationId }),
+    enabled: !!user && conversation?.type === 'group',
+  });
   const projectId = conversation?.project_id ?? null;
   const isProjectChat = !!projectId;
   const { data: projectChatData } = useProjectChatData(projectId);
@@ -271,6 +277,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
         </div>
 
         <div className="flex gap-1">
+          {travelTripId && <Button variant="outline" className="min-h-11" onClick={() => navigate(`/travel?trip=${travelTripId}`)}>Trip budget</Button>}
           {isProjectChat && (
             <Button 
               variant="ghost" 

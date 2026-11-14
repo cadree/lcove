@@ -90,6 +90,9 @@ export function useUserBlocks() {
 }
 
 function invalidateBlockViews(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ['discovery'] });
+  queryClient.invalidateQueries({ queryKey: ['creative-matches'] });
+  queryClient.invalidateQueries({ queryKey: ['trips'] });
   queryClient.invalidateQueries({ queryKey: ['blocked-users'] });
   queryClient.invalidateQueries({ queryKey: ['posts'] });
   queryClient.invalidateQueries({ queryKey: ['post-comments'] });
