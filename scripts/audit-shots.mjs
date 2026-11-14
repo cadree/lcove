@@ -29,7 +29,10 @@ const members = cityOf.map((key, i) => ({ user_id: `00000000-0000-4000-8000-0000
 const signals = members.map((m) => ({ user_id: m.user_id, live_city_key: null, live_until: null, trip: null, liked: null }));
 const people = { profiles: (req, url) => (url.pathname.endsWith("/profiles_public") && url.searchParams.get("select")?.includes("city_key") ? { body: members } : { body: [profile] }), profiles_public: (req) => (new URL(req.url()).searchParams.get("select")?.includes("city_key") ? { body: members } : { body: [profile] }), discovery_globe: () => ({ body: signals }), discovery_settings: () => ({ body: { discoverable: true, live_city_key: null } }) };
 
+const tripList = [{ id: "00000000-0000-4000-8000-0000000d0001", city_key: "lisbon|pt", city_label: "Lisbon, Portugal", title: "Lisbon shoot week", starts_on: "2099-04-28", ends_on: "2099-05-03", capacity: 4, notes: "Two-bed flat near Alfama, shared van for location days.", status: "planning", organizer_id: "00000000-0000-4000-8000-0000000c0001", conversation_id: null, joined: false, member_count: 2, roster: [{ user_id: "00000000-0000-4000-8000-0000000c0001", display_name: "Member 1" }, { user_id: me, display_name: "Maya Cole" }] }];
+
 const scenes = [
+  { name: "travel", path: "/travel", widths: [390], mock: { creative_trip_list: () => ({ body: tripList }) } },
   { name: "globe", path: "/explore?section=people", widths: [390], mock: people, run: async (page) => { await page.evaluate(() => window.scrollTo(0, 0)); } },
   { name: "globe-selected", path: "/explore?section=people", widths: [390], mock: people, run: async (page) => {
     await page.waitForTimeout(Number(process.env.PRE || 1000));
