@@ -1,12 +1,15 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUpRight, Plane, Radio, UserCheck } from "lucide-react";
+import { useState } from "react";
+import { ArrowUpRight, MessageCircle, Plane, Radio, UserCheck } from "lucide-react";
+import { MessageRequestDialog } from "@/components/messages/MessageRequestDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { tripBadge, type Person } from "@/lib/peopleDiscovery";
 import { safeWebLink } from "@/lib/tripMoney";
 
 /** A large swipe-deck profile card. Work previews load only for cards near the screen. */
 export function ProfileCard({ person, near }: { person: Person; near: boolean }) {
+  const [messaging, setMessaging] = useState(false);
   const work = useQuery({
     queryKey: ["discovery-work", person.user_id],
     enabled: near,
@@ -74,9 +77,18 @@ export function ProfileCard({ person, near }: { person: Person; near: boolean })
           })}
           {!work.isLoading && !work.data?.length && <span className="self-center text-xs text-white/50">No work previews yet</span>}
         </div>
+        <button
+          type="button"
+          onClick={() => setMessaging(true)}
+          className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full px-3 text-sm text-white/85 hover:bg-white/10"
+          aria-label={`Message ${person.name}`}
+        >
+          <MessageCircle size={16} /> Message
+        </button>
         <Link to={`/profile/${person.user_id}`} className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full px-3 text-sm text-white/85 hover:bg-white/10">
           Profile <ArrowUpRight size={16} />
         </Link>
+        {messaging && <MessageRequestDialog person={person} open={messaging} onOpenChange={setMessaging} />}
       </div>
     </article>
   );

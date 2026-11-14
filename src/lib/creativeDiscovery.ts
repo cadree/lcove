@@ -76,6 +76,19 @@ export interface Trip extends TripSummary {
     created_at: string;
   }[];
 }
+export interface MessageRequest {
+  id: string;
+  user_id: string;
+  body: string;
+  sent_at: string;
+  display_name?: string;
+  avatar_url?: string | null;
+  city?: string | null;
+}
+export interface MessageRequestInbox {
+  incoming: MessageRequest[];
+  outgoing: MessageRequest[];
+}
 export const discovery = {
   settings: (
     values: { p_discoverable?: boolean; p_matches_only?: boolean } = {}
@@ -96,6 +109,11 @@ export const discovery = {
       { p_target: target, p_liked: liked }
     ),
   matches: () => callRpc<CreativeMatch[]>("creative_match_list"),
+  /** Write to someone you have not matched with: it waits quietly in their Requests. */
+  requestMessage: (recipient: string, body: string) =>
+    callRpc<{ status: "sent" | "matched"; conversation_id: string | null }>("send_message_request", { p_recipient: recipient, p_body: body }),
+  requests: () => callRpc<MessageRequestInbox>("message_request_inbox"),
+  ignoreRequest: (id: string) => callRpc<void>("ignore_message_request", { p_id: id }),
   unmatch: (target: string) =>
     callRpc<void>("creative_unmatch", { p_target: target }),
   trips: (

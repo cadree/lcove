@@ -36,6 +36,15 @@ const events = [[12, 19, "Gallery night", "Atlanta", true], [12, 20, "Darkroom s
   .map(([d, h, title, city, img], i) => ({ id: `00000000-0000-4000-8000-0000000e000${i}`, creator_id: "00000000-0000-4000-8000-0000000c0001", title, description: null, venue: "Studio", address: null, city, state: "GA", country: "US", start_date: day(d, h), end_date: null, image_url: img ? media("product.jpg") : null, ticket_type: "free", ticket_price: null, credits_price: null, capacity: null, is_public: true, project_id: null, external_url: null, timezone: null, recurrence: null, status: "published", created_at: now }));
 
 const scenes = [
+  { name: "message-request", path: "/explore?section=people", widths: [390], mock: people, run: async (page) => {
+    await page.getByRole("button", { name: /^Message Member/ }).first().click({ timeout: 8000 });
+    await page.getByRole("textbox", { name: /Message to/ }).fill("Love your set work. Want to shoot in Charlotte next month?");
+    await page.waitForTimeout(400);
+  } },
+  { name: "requests-inbox", path: "/messages", widths: [390], mock: { message_request_inbox: () => ({ body: { incoming: [{ id: "00000000-0000-4000-8000-0000000f0001", user_id: members[1].user_id, body: "Love your lighting work. Want to collab on a shoot next week?", sent_at: now, display_name: "Member 2", avatar_url: members[1].avatar_url, city: "Charlotte, NC" }], outgoing: [] } }) }, run: async (page) => {
+    await page.getByRole("button", { name: /Requests/ }).click({ timeout: 8000 });
+    await page.waitForTimeout(400);
+  } },
   { name: "onboarding", path: "/onboarding", widths: [390], init: () => localStorage.setItem("ether-shot-onboarding", "1") },
   { name: "first-run", path: "/explore?section=people&welcome=1", widths: [390], mock: { ...people, profiles: (req, url) => (url.pathname.endsWith("/profiles_public") && url.searchParams.get("select")?.includes("city_key") ? { body: [...members, { ...members[0], user_id: me, display_name: "Maya Cole", avatar_url: null }] } : { body: [profile] }) } },
   { name: "calendar", path: "/calendar", widths: [390, 1280], mock: { events: () => ({ body: events }) } },
