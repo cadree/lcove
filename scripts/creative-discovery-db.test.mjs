@@ -46,6 +46,7 @@ await db.exec(
 for (const file of [
   "20261114090000_creative_discovery.sql",
   "20261114091000_travel_pledges.sql",
+  "20261114120000_people_discovery_v2.sql",
 ])
   await db.exec(await readFile(`supabase/migrations/${file}`, "utf8"));
 const ids = Array.from(
@@ -77,8 +78,9 @@ const check = (label) => {
   console.log(`ok ${checks} - ${label}`);
 };
 await as(ids[0]);
-assert.deepEqual((await rpc("discovery_people")).people, []);
-check("discovery is opt-in");
+assert.equal((await rpc("discovery_people")).people.length, ids.length - 1);
+assert.equal((await rpc("discovery_globe")).length, ids.length);
+check("every eligible member is discoverable at their profile city by default");
 for (const id of ids) {
   await as(id);
   await rpc("discovery_settings", [true, true]);
@@ -594,5 +596,89 @@ await sql("DELETE FROM public.conversation_participants WHERE conversation_id=$1
 assert.equal(await inChat(other), 0);
 await fails(() => rpc("creative_trip_action", ["report_paid", closedTrip.id, { cents: 1 }]), /closed/);
 check("members can leave a cancelled trip's chat (planner or chat), cannot rejoin, and the trip stays closed");
+
+// People discovery v2: default-visible profile cities, opt-out, live city, travel badges.
+const v2 = Array.from({ length: 5 }, (_, i) => `00000000-0000-4000-9000-00000000000${i + 1}`);
+const [ana, ben, cai, dee, eli] = v2;
+for (const [i, id] of v2.entries()) {
+  await sql("INSERT INTO auth.users VALUES($1)", [id]);
+  await sql("INSERT INTO public.profiles(user_id,display_name,city,city_key) VALUES($1,$2,'Charlotte, NC','charlotte|nc')", [id, `V2 ${i}`]);
+}
+const globe = async (viewer) => { await as(viewer); return rpc("discovery_globe"); };
+const seen = async (viewer, id) => (await globe(viewer)).find((p) => p.user_id === id);
+assert.ok(await seen(ana, ben));
+assert.equal((await sql("SELECT count(*)::int n FROM public.discovery_preferences WHERE user_id=$1", [ben])).rows[0].n, 0);
+check("v2: a member with no preference row is on the globe");
+await as(ben);
+assert.equal((await rpc("discovery_settings", [false, null])).discoverable, false);
+assert.equal(await seen(ana, ben), undefined);
+await as(ana);
+assert.equal((await rpc("discovery_people", [null, "V2 1", 0])).people.length, 0);
+await fails(() => rpc("creative_swipe", [ben, true]), /unavailable/);
+await as(ben);
+await fails(() => rpc("creative_swipe", [ana, true]), /Show yourself in discovery/);
+await fails(() => rpc("discovery_live_city", ["charlotte|nc", 24]), /Show yourself in discovery/);
+check("v2: the hide-me opt-out removes a member from globe, deck and old discovery, and blocks their swipes");
+await as(cai);
+let me = await rpc("discovery_live_city", ["miami|fl", 24]);
+assert.equal(me.live_city_key, "miami|fl");
+const live = await seen(ana, cai);
+assert.equal(live.live_city_key, "miami|fl");
+assert.ok(new Date(live.live_until) > new Date(Date.now() + 23 * 3600e3));
+assert.equal(Object.keys(live).some((k) => /lat|lon|coord/i.test(k)), false);
+check("v2: an opted-in live city is visible to others as a city key with an expiry, never coordinates");
+for (const [key, hours, pattern] of [["miami|fl", 0, /1 hour to 7 days/], ["miami|fl", 169, /1 hour to 7 days/], ["Miami, FL", 4, /Choose a city/], ["miami|florida", 4, /Choose a city/], ["x|fl'; drop", 4, /Choose a city/]])
+  await fails(() => rpc("discovery_live_city", [key, hours]), pattern);
+check("v2: live city rejects bad durations and anything that is not a city key");
+await sql("UPDATE public.discovery_live_cities SET expires_at=now()-interval '1 minute' WHERE user_id=$1", [cai]);
+assert.equal((await seen(ana, cai)).live_city_key, null);
+await as(cai);
+assert.equal((await rpc("discovery_settings")).live_city_key, null);
+await rpc("discovery_live_city", ["miami|fl", 2]);
+assert.equal((await seen(ana, cai)).live_city_key, "miami|fl");
+await as(cai);
+assert.equal((await rpc("discovery_live_city", [null, null])).live_city_key, null);
+assert.equal((await seen(ana, cai)).live_city_key, null);
+await as(cai);
+await rpc("discovery_live_city", ["miami|fl", 2]);
+await rpc("discovery_settings", [false, null]);
+assert.equal((await sql("SELECT count(*)::int n FROM public.discovery_live_cities WHERE user_id=$1", [cai])).rows[0].n, 0);
+await rpc("discovery_settings", [true, null]);
+check("v2: live city expires, turns off in one call, and is deleted when the member hides");
+await db.exec("SET ROLE authenticated");
+await as(dee);
+await fails(() => sql("INSERT INTO public.discovery_live_cities(user_id,city_key,expires_at) VALUES($1,'miami|fl',now()+interval '1 year')", [dee]), /permission denied/);
+await fails(() => sql("UPDATE public.discovery_live_cities SET expires_at=now()+interval '1 year'"), /permission denied/);
+await fails(() => sql("SELECT public.discovery_hidden($1)", [ben]), /permission denied/);
+assert.equal((await sql("SELECT count(*)::int n FROM public.discovery_live_cities")).rows[0].n, 0);
+await db.exec("RESET ROLE");
+await db.exec("SET ROLE anon");
+await fails(() => sql("SELECT public.discovery_globe()"), /permission denied/);
+await fails(() => sql("SELECT public.discovery_live_city('miami|fl',1)"), /permission denied/);
+await db.exec("RESET ROLE");
+check("v2: clients cannot write live cities, read others' rows, call helpers, or use discovery signed out");
+await sql("INSERT INTO public.user_blocks(blocker_id,blocked_id) VALUES($1,$2)", [dee, ana]);
+assert.equal(await seen(ana, dee), undefined);
+assert.equal(await seen(dee, ana), undefined);
+await sql("UPDATE public.profiles SET is_suspended=true WHERE user_id=$1", [eli]);
+assert.equal(await seen(ana, eli), undefined);
+await sql("UPDATE public.profiles SET is_suspended=false WHERE user_id=$1", [eli]);
+check("v2: blocked (both directions) and suspended members stay off the globe");
+await as(eli);
+const miami = await rpc("creative_trip_action", ["create", null, { title: "Miami week", city_key: "miami|fl", city_label: "Miami, FL", starts_on: "2099-11-19", ends_on: "2099-11-23", capacity: 4 }]);
+assert.deepEqual((await seen(ana, eli)).trip, { city_key: "miami|fl", city_label: "Miami, FL", starts_on: "2099-11-19", ends_on: "2099-11-23" });
+await sql("UPDATE public.creative_trips SET status='booked' WHERE id=$1", [miami.id]);
+assert.equal((await seen(ana, eli)).trip, null);
+await sql("INSERT INTO public.creative_trip_members(trip_id,user_id) VALUES($1,$2)", [miami.id, ana]);
+assert.equal((await seen(ana, eli)).trip.city_key, "miami|fl");
+await sql("UPDATE public.creative_trips SET status='cancelled' WHERE id=$1", [miami.id]);
+assert.equal((await seen(ana, eli)).trip, null);
+check("v2: travel badges show only trips the viewer could already see, and never cancelled ones");
+await as(ana);
+assert.equal((await rpc("creative_swipe", [eli, true])).matched, false);
+await as(eli);
+assert.equal((await rpc("creative_swipe", [ana, true])).matched, true);
+assert.equal((await seen(ana, eli)).liked, true);
+check("v2: default-visible members can match without opting in first");
 await db.close();
 console.log(`${checks} database checks passed`);

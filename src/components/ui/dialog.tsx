@@ -44,12 +44,14 @@ function dialogMaxWidth(caller: React.CSSProperties["maxWidth"] | undefined) {
 
 type DialogContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
   fullscreen?: boolean;
+  /** Set when the content renders its own close or back control, so the dialog never shows two. */
+  hideClose?: boolean;
 };
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
->(({ className, children, style, fullscreen = false, ...props }, ref) => {
+>(({ className, children, style, fullscreen = false, hideClose = false, ...props }, ref) => {
   useOverlayViewport();
   return (
   <DialogPortal>
@@ -80,10 +82,10 @@ const DialogContent = React.forwardRef<
         {...props}
       >
         {children}
-        <DialogPrimitive.Close style={{ top: fullscreen ? "calc(env(safe-area-inset-top, 0px) + 0.75rem)" : undefined }} className="absolute right-3 top-3 min-h-11 min-w-11 flex items-center justify-center rounded-lg p-1.5 opacity-70 transition-all hover:opacity-100 hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring disabled:pointer-events-none z-10">
+        {!hideClose && <DialogPrimitive.Close data-overlay-close="" style={{ top: fullscreen ? "calc(env(safe-area-inset-top, 0px) + 0.75rem)" : undefined }} className="absolute right-3 top-3 min-h-11 min-w-11 flex items-center justify-center rounded-lg p-1.5 opacity-70 transition-all hover:opacity-100 hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring disabled:pointer-events-none z-10">
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
+        </DialogPrimitive.Close>}
       </DialogPrimitive.Content>
     </div>
   </DialogPortal>

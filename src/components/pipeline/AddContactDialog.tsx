@@ -188,7 +188,7 @@ export function AddContactDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden bg-card border-border max-h-[90vh] overflow-y-auto">
+      <DialogContent hideClose className="sm:max-w-lg p-0 gap-0 overflow-hidden bg-card border-border max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="relative px-6 pt-6 pb-4 safe-header sticky top-0 bg-card z-10 border-b border-border/50">
           <button

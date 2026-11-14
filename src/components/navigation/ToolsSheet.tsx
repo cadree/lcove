@@ -133,7 +133,7 @@ export function ToolsSheet({ open, onOpenChange }: ToolsSheetProps) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
+      <SheetContent hideClose
         side="bottom"
         className="max-h-[88dvh] rounded-t-[28px] border-border bg-card/95 px-4 pb-8 backdrop-blur-xl"
         style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}

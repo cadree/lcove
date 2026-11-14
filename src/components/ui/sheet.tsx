@@ -32,6 +32,8 @@ const sheetVariants = cva("fixed z-50 gap-4 bg-card border-border/50 p-6 shadow-
 interface SheetContentProps extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>, VariantProps<typeof sheetVariants> {
   overlayClassName?: string;
   overlayStyle?: React.CSSProperties;
+  /** Set when the content renders its own close or back control, so the sheet never shows two. */
+  hideClose?: boolean;
 }
 const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Content>, SheetContentProps>(({
   side = "right",
@@ -40,6 +42,7 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
   overlayClassName,
   overlayStyle,
   style,
+  hideClose = false,
   ...props
 }, ref) => {
   useOverlayViewport();
@@ -56,13 +59,14 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
     boxSizing: "border-box",
     minWidth: 0,
   }} {...props}>
-        <SheetPrimitive.Close
+        {!hideClose && <SheetPrimitive.Close
+          data-overlay-close=""
           className="absolute right-3 top-3 z-20 inline-flex !min-h-11 !min-w-11 items-center justify-center rounded-md text-foreground hover:bg-muted"
           style={{ top: "calc(env(safe-area-inset-top, 0px) + 0.75rem)" }}
           aria-label="Close"
         >
           <X className="h-5 w-5" />
-        </SheetPrimitive.Close>
+        </SheetPrimitive.Close>}
         {children}
       </SheetPrimitive.Content>
     </SheetPortal>; });

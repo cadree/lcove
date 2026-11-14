@@ -8,83 +8,84 @@ import {
 } from "d3-geo";
 import land from "@/data/globeLand.json";
 import coordinates from "@/data/cityCoordinates.json";
-import { resolveCity } from "@/lib/cities";
 import { safeWebLink } from "@/lib/tripMoney";
-import type { DiscoveryCity } from "@/lib/creativeDiscovery";
+import { globeCities, type Person } from "@/lib/peopleDiscovery";
 
-function cityCoordinates(city: DiscoveryCity): [number, number] | undefined {
-  const points = coordinates as Record<string, number[]>;
-  const point =
-    points[city.city_key] || points[resolveCity(city.label).city_key];
-  return point?.length === 2 ? [point[0], point[1]] : undefined;
+const POINTS = coordinates as Record<string, number[]>;
+
+/** Initials for a marker without photos. */
+function monogram(label: string) {
+  return label.split(",")[0].slice(0, 2).toUpperCase();
 }
+
 export function CreativeGlobe({
-  cities,
+  people,
   onSelect,
   selected,
+  me: mine,
 }: {
-  cities: DiscoveryCity[];
+  people: Person[];
   onSelect: (key: string) => void;
   selected: string | null;
+  /** The viewer's own city. Live means they opted in to sharing a live city. */
+  me?: { key: string; live: boolean; label: string } | null;
 }) {
-  const [rotation, setRotation] = useState<[number, number]>([90, -20]);
+  const cities = useMemo(() => globeCities(people, POINTS), [people]);
+  const myPoint = mine ? POINTS[mine.key] : undefined;
+  const me = mine && myPoint?.length === 2 ? { ...mine, point: [myPoint[0], myPoint[1]] as [number, number] } : null;
+  const [rotation, setRotation] = useState<[number, number]>(() =>
+    me ? [-me.point[0], -me.point[1] * 0.6] : [80, -25]
+  );
   const [zoom, setZoom] = useState(1);
-  const chosenCity = cities.find((city) => city.city_key === selected);
-  const chosenPoint = chosenCity ? cityCoordinates(chosenCity) : undefined;
-  const chosenLongitude = chosenPoint?.[0];
-  const chosenLatitude = chosenPoint?.[1];
+  const chosen = cities.find((city) => city.key === selected)?.point;
+  const chosenLon = chosen?.[0];
+  const chosenLat = chosen?.[1];
   useEffect(() => {
-    if (chosenLongitude !== undefined && chosenLatitude !== undefined)
-      setRotation([-chosenLongitude, -chosenLatitude]);
-  }, [chosenLongitude, chosenLatitude]);
-  const drag = useRef<{
-    x: number;
-    y: number;
-    rotation: [number, number];
-  } | null>(null);
+    if (chosenLon !== undefined && chosenLat !== undefined)
+      setRotation([-chosenLon, -chosenLat * 0.8]);
+  }, [chosenLon, chosenLat]);
+  const drag = useRef<{ x: number; y: number; rotation: [number, number] } | null>(null);
   const id = useId().replace(/:/g, "");
   const projection = useMemo(
     () =>
       geoOrthographic()
         .rotate(rotation)
-        .scale(173 * zoom)
-        .translate([200, 198])
+        .scale(178 * zoom)
+        .translate([200, 200])
         .clipAngle(90),
     [rotation, zoom]
   );
   const path = geoPath(projection);
+  const facing = (point: [number, number]) =>
+    geoDistance(point, [-rotation[0], -rotation[1]]) <= Math.PI / 2;
   const visible = cities.flatMap((city) => {
-    const point = cityCoordinates(city);
-    if (
-      !point ||
-      geoDistance(point, [-rotation[0], -rotation[1]]) > Math.PI / 2
-    )
-      return [];
-    const xy = projection(point);
+    if (!facing(city.point)) return [];
+    const xy = projection(city.point);
     return xy ? [{ ...city, xy }] : [];
   });
-  // Keep marker hit areas apart; the complete list remains in the city rail.
-  const occupied: number[][] = [];
-  const markers = visible.filter((city) => {
-    if (
-      occupied.some(
-        (p) => Math.hypot(p[0] - city.xy[0], p[1] - city.xy[1]) < 44
-      )
-    )
-      return false;
-    occupied.push(city.xy);
-    return true;
-  });
+  // Nearby cities that would overlap fold into the biggest one; tapping a cluster zooms in.
+  type Marker = (typeof visible)[number] & { cities: number; total: number; liveTotal: number };
+  const markers: Marker[] = [];
+  for (const city of [...visible].sort((a, b) => Number(b.key === selected) - Number(a.key === selected) || b.count - a.count)) {
+    const near = markers.find((m) => Math.hypot(m.xy[0] - city.xy[0], m.xy[1] - city.xy[1]) < 36);
+    if (near) {
+      near.cities++;
+      near.total += city.count;
+      near.liveTotal += city.live;
+    } else markers.push({ ...city, cities: 1, total: city.count, liveTotal: city.live });
+  }
+  const zoomTo = (point: [number, number]) => {
+    setRotation([-point[0], -point[1]]);
+    setZoom((z) => (z < 2 ? 2.6 : z < 5 ? 6 : z));
+  };
+  const dot = me && facing(me.point) ? projection(me.point) : null;
   return (
-    <div
-      className="relative -mx-4 overflow-hidden"
-      aria-label="City discovery globe"
-    >
+    <div className="relative" aria-label="People globe">
       <svg
         viewBox="0 0 400 400"
-        className="mx-auto block w-full max-w-[620px] touch-pan-y"
+        className="mx-auto block w-full max-w-[520px] touch-pan-y select-none"
         role="img"
-        aria-label="Rotatable globe showing opted-in creatives by city. Use the city cards below to select a location."
+        aria-label={`Globe of members by city. ${cities.length} cities shown. Use the city picker to choose one.`}
         onPointerDown={(e) => {
           if ((e.target as Element).closest("[data-city-marker]")) return;
           drag.current = { x: e.clientX, y: e.clientY, rotation };
@@ -94,146 +95,122 @@ export function CreativeGlobe({
           if (!drag.current) return;
           const scale = 400 / e.currentTarget.getBoundingClientRect().width;
           setRotation([
-            drag.current.rotation[0] +
-              (e.clientX - drag.current.x) * scale * 0.4,
-            Math.max(
-              -70,
-              Math.min(
-                70,
-                drag.current.rotation[1] -
-                  (e.clientY - drag.current.y) * scale * 0.2
-              )
-            ),
+            drag.current.rotation[0] + (e.clientX - drag.current.x) * scale * 0.4,
+            Math.max(-70, Math.min(70, drag.current.rotation[1] - (e.clientY - drag.current.y) * scale * 0.2)),
           ]);
         }}
-        onPointerUp={() => {
-          drag.current = null;
-        }}
-        onPointerCancel={() => {
-          drag.current = null;
-        }}
+        onPointerUp={() => (drag.current = null)}
+        onPointerCancel={() => (drag.current = null)}
       >
         <defs>
-          <radialGradient id={`${id}-sea`} cx="35%" cy="30%">
-            <stop stopColor="#3d3940" />
-            <stop offset=".8" stopColor="#191a23" />
-            <stop offset="1" stopColor="#080b14" />
+          <radialGradient id={`${id}-sea`} cx="38%" cy="32%">
+            <stop stopColor="#3b3542" />
+            <stop offset=".75" stopColor="#1a1822" />
+            <stop offset="1" stopColor="#0b0b12" />
           </radialGradient>
           <radialGradient id={`${id}-halo`}>
-            <stop offset=".7" stopColor="#b1a6b0" stopOpacity="0" />
-            <stop offset=".87" stopColor="#b1a6b0" stopOpacity=".15" />
-            <stop offset="1" stopColor="#b1a6b0" stopOpacity="0" />
+            <stop offset=".78" stopColor="#ff9fc8" stopOpacity="0" />
+            <stop offset=".9" stopColor="#79c3cf" stopOpacity=".16" />
+            <stop offset="1" stopColor="#79c3cf" stopOpacity="0" />
           </radialGradient>
+          {markers.map((city) => (
+            <clipPath key={city.key} id={`${id}-${city.key.replace(/[^a-z0-9]/g, "")}`}>
+              <circle r="15" />
+            </clipPath>
+          ))}
         </defs>
-        <circle cx="200" cy="198" r="198" fill={`url(#${id}-halo)`} />
-        <path
-          d={path({ type: "Sphere" }) || ""}
-          fill={`url(#${id}-sea)`}
-          stroke="#8c858e"
-          strokeOpacity=".25"
-        />
-        <path
-          d={path(land as GeoPermissibleObjects) || ""}
-          fill="#89828c"
-          fillOpacity=".6"
-          stroke="#b5aeb8"
-          strokeWidth=".3"
-        />
-        <path
-          d={path(geoGraticule10()) || ""}
-          fill="none"
-          stroke="#a29baa"
-          strokeOpacity=".09"
-          strokeWidth=".5"
-        />
-        {markers.map((city) => (
-          <g
-            key={city.city_key}
-            data-city-marker
-            transform={`translate(${city.xy[0]},${city.xy[1]})`}
-            role="button"
-            tabIndex={0}
-            aria-label={`${city.label}, ${city.count} creatives`}
-            onClick={() => onSelect(city.city_key)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onSelect(city.city_key);
-              }
-            }}
-            className="cursor-pointer outline-none focus:opacity-70"
-          >
-            <rect
-              x="-23"
-              y="-36"
-              width="46"
-              height="53"
-              rx="9"
-              fill="transparent"
-            />
-            <path d="M-5,10 L0,18 L5,10" fill="#e5d9d1" />
-            <rect
-              x="-17"
-              y="-33"
-              width="34"
-              height="44"
-              rx="7"
-              fill={selected === city.city_key ? "#b8e6e7" : "#d7c4b5"}
-              stroke="#fff"
-              strokeWidth="1.5"
-            />
-            {safeWebLink(city.image) ? (
-              <image
-                href={safeWebLink(city.image)}
-                x="-14"
-                y="-30"
-                width="28"
-                height="38"
-                preserveAspectRatio="xMidYMid slice"
-              />
-            ) : (
-              <text y="-8" textAnchor="middle" fill="#3d3434" fontSize="13">
-                {city.label.slice(0, 2).toUpperCase()}
-              </text>
+        <circle cx="200" cy="200" r="200" fill={`url(#${id}-halo)`} />
+        <path d={path({ type: "Sphere" }) || ""} fill={`url(#${id}-sea)`} stroke="#8c858e" strokeOpacity=".25" />
+        <path d={path(land as GeoPermissibleObjects) || ""} fill="#8b8390" fillOpacity=".55" stroke="#b5aeb8" strokeWidth=".3" />
+        <path d={path(geoGraticule10()) || ""} fill="none" stroke="#a29baa" strokeOpacity=".08" strokeWidth=".5" />
+        {dot && (
+          <g transform={`translate(${dot[0]},${dot[1]})`} aria-label={me?.live ? `You, live in ${me.label}` : `You, ${me?.label}`}>
+            {me?.live && (
+              <circle r="9" fill="#79c3cf" opacity=".35">
+                <animate attributeName="r" values="6;16;6" dur="2.4s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values=".5;0;.5" dur="2.4s" repeatCount="indefinite" />
+              </circle>
             )}
-            <circle cx="16" cy="-31" r="12" fill="#faf4ed" />
-            <text
-              x="16"
-              y="-27"
-              fill="#504751"
-              textAnchor="middle"
-              fontSize="9"
-            >
-              {city.count > 99 ? "99+" : city.count}
-            </text>
+            <circle r="5" fill={me?.live ? "#79c3cf" : "#faf4ed"} stroke="#0b0b12" strokeWidth="1.5" />
           </g>
-        ))}
+        )}
+        {markers.map((city) => {
+          const active = selected === city.key;
+          const photo = safeWebLink(city.avatars[0]);
+          return (
+            <g
+              key={city.key}
+              data-city-marker
+              transform={`translate(${city.xy[0]},${city.xy[1]})`}
+              role="button"
+              tabIndex={0}
+              aria-pressed={active}
+              aria-label={
+                city.cities > 1
+                  ? `${city.label} and ${city.cities - 1} nearby ${city.cities === 2 ? "city" : "cities"}: ${city.total} members. Zoom in`
+                  : `${city.label}: ${city.count} ${city.count === 1 ? "member" : "members"}${city.live ? `, ${city.live} here live` : ""}`
+              }
+              onClick={() => (city.cities > 1 ? zoomTo(city.point) : onSelect(city.key))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  if (city.cities > 1) zoomTo(city.point);
+                  else onSelect(city.key);
+                }
+              }}
+              className="cursor-pointer outline-none"
+            >
+              <circle r="22" fill="transparent" />
+              {city.liveTotal > 0 && (
+                <circle r="18" fill="none" stroke="#79c3cf" strokeWidth="2">
+                  <animate attributeName="r" values="17;23;17" dur="2.4s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="1;0;1" dur="2.4s" repeatCount="indefinite" />
+                </circle>
+              )}
+              <circle r="17" fill={active ? "#ff9fc8" : "#faf4ed"} />
+              <circle r="15" fill="#5d5262" />
+              {photo ? (
+                <image
+                  href={photo}
+                  x="-15"
+                  y="-15"
+                  width="30"
+                  height="30"
+                  preserveAspectRatio="xMidYMid slice"
+                  clipPath={`url(#${id}-${city.key.replace(/[^a-z0-9]/g, "")})`}
+                />
+              ) : (
+                <text y="4" textAnchor="middle" fill="#faf4ed" fontSize="10" fontWeight="700">
+                  {monogram(city.label)}
+                </text>
+              )}
+              <g transform="translate(13,-13)">
+                <circle r="8.5" fill="#ff9fc8" stroke="#0b0b12" strokeWidth="1.2" />
+                <text y="3" textAnchor="middle" fill="#1b1520" fontSize="8.5" fontWeight="700">
+                  {city.total > 99 ? "99+" : city.total}
+                </text>
+              </g>
+            </g>
+          );
+        })}
       </svg>
-      <div
-        className="absolute bottom-2 right-4 flex gap-1"
-        aria-label="Globe controls"
-      >
-        <button
-          className="h-11 w-11 rounded-full bg-white/10"
-          aria-label="Rotate globe west"
-          onClick={() => setRotation((r) => [r[0] - 35, r[1]])}
-        >
-          ←
-        </button>
-        <button
-          className="h-11 w-11 rounded-full bg-white/10"
-          aria-label="Rotate globe east"
-          onClick={() => setRotation((r) => [r[0] + 35, r[1]])}
-        >
-          →
-        </button>
-        <button
-          className="h-11 w-11 rounded-full bg-white/10"
-          aria-label={zoom === 1 ? "Zoom in" : "Zoom out"}
-          onClick={() => setZoom((z) => (z === 1 ? 1.5 : 1))}
-        >
-          {zoom === 1 ? "+" : "−"}
-        </button>
+      <div className="absolute bottom-1 right-1 flex gap-1" aria-label="Globe controls">
+        {[
+          ["Rotate globe west", "←", () => setRotation((r) => [r[0] - 35, r[1]])],
+          ["Rotate globe east", "→", () => setRotation((r) => [r[0] + 35, r[1]])],
+          ["Zoom in", "+", () => setZoom((z) => Math.min(6, z * 1.6))],
+          ["Zoom out", "−", () => setZoom((z) => Math.max(1, z / 1.6))],
+        ].map(([label, glyph, run]) => (
+          <button
+            key={label as string}
+            type="button"
+            className="h-11 w-11 rounded-full bg-white/10 text-white backdrop-blur hover:bg-white/20"
+            aria-label={label as string}
+            onClick={run as () => void}
+          >
+            {glyph as string}
+          </button>
+        ))}
       </div>
     </div>
   );

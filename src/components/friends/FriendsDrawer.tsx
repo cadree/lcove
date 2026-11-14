@@ -44,7 +44,7 @@ export function FriendsDrawer({ children }: FriendsDrawerProps) {
       <SheetTrigger asChild>
         {children}
       </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:w-96 p-0">
+      <SheetContent hideClose side="right" className="w-full sm:w-96 p-0">
         <SheetHeader className="p-4 pb-4 border-b border-border">
           <div className="flex items-center gap-2">
             <SheetClose asChild>

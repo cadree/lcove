@@ -163,7 +163,7 @@ export function PipelineItemDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-md">
+      <SheetContent hideClose className="w-full sm:max-w-md">
         <SheetHeader className="pb-4">
           {/* Back Button for iOS */}
           <Button

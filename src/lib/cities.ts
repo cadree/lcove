@@ -364,3 +364,11 @@ export function suggestCities(raw: string, limit = 8): CityRecord[] {
 export function cityGroupKey(raw: string | null | undefined): string {
   return resolveCity(raw).city_key;
 }
+
+const BY_KEY = new Map<string, CityRecord>();
+for (const city of CITIES) if (!BY_KEY.has(city.key)) BY_KEY.set(city.key, city);
+
+/** The GeoNames city for a canonical key such as "miami|fl", if the app knows it. */
+export function cityByKey(key: string | null | undefined): CityRecord | null {
+  return (key && BY_KEY.get(key)) || null;
+}

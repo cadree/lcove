@@ -65,7 +65,7 @@ export const ContentDetailDialog = ({
 
   return (
     <Sheet open={!!content} onOpenChange={() => onClose()}>
-      <SheetContent 
+      <SheetContent hideClose
         side="bottom" 
         className="h-[90vh] md:h-[85vh] rounded-t-2xl p-0 border-t border-border/50"
       >

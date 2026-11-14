@@ -316,9 +316,8 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
   return (
     <>
       <Dialog open={open} onOpenChange={(next) => { if (!next) requestClose(); }}>
-        <DialogContent
+        <DialogContent hideClose
           fullscreen
-          className="[&>button]:hidden"
           style={keyboardPaddingStyle(keyboardInset)}
           onPointerDownOutside={(event) => event.preventDefault()}
           onInteractOutside={(event) => event.preventDefault()}

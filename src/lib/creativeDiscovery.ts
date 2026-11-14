@@ -1,4 +1,5 @@
 import { callRpc } from "@/lib/rpc";
+import type { DiscoverySignal } from "@/lib/peopleDiscovery";
 
 export interface DiscoveryCity {
   city_key: string;
@@ -18,6 +19,9 @@ export interface CreativePerson {
 export interface DiscoverySettings {
   discoverable: boolean;
   matches_only: boolean;
+  /** Opt-in live city, city level only. Null when off or expired. */
+  live_city_key?: string | null;
+  live_until?: string | null;
 }
 export interface CreativeMatch {
   user_id: string;
@@ -81,6 +85,11 @@ export const discovery = {
       "discovery_people",
       { p_city: city, p_query: query, p_offset: offset }
     ),
+  /** Everyone the viewer can discover, with likes, live cities and travel badges. */
+  globe: () => callRpc<DiscoverySignal[]>("discovery_globe"),
+  /** Share a live city for 1-168 hours, or pass null to turn it off. */
+  liveCity: (cityKey: string | null, hours: number | null) =>
+    callRpc<DiscoverySettings>("discovery_live_city", { p_city_key: cityKey, p_hours: hours }),
   swipe: (target: string, liked: boolean) =>
     callRpc<{ matched: boolean; conversation_id: string | null }>(
       "creative_swipe",

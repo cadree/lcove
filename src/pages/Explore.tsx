@@ -1,111 +1,60 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { CommunityMall } from "@/components/explore/CommunityMall";
 import { ExploreBrowse } from "@/components/explore/ExploreBrowse";
-import { PeopleMatchCard } from "@/components/explore/PeopleMatchCard";
-import { useAuth } from "@/contexts/AuthContext";
-import { listSentCollabInvites, sendCollabInvite } from "@/lib/collabInvite";
+import { PeopleDiscovery } from "@/components/people/PeopleDiscovery";
 import { QuestCard } from "@/components/novi/QuestCard";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
 import { useNoviQuests } from "@/hooks/useNoviQuests";
 import { homeQuestCard } from "@/lib/noviQuests";
-import { shotPeople, shotSessionEnabled } from "@/lib/shotSession";
 
-const segments = [
+const sections = [
   { id: "for-you", label: "For you" },
-  { id: "browse", label: "Browse" },
   { id: "people", label: "People" },
-  { id: "portfolios", label: "Portfolios" },
-  { id: "events", label: "Events" },
-  { id: "community", label: "Community" },
-  { id: "live", label: "Live" },
-  { id: "cinema", label: "Cinema" },
+  { id: "browse", label: "Reels & posts" },
   { id: "mall", label: "Mall" },
 ] as const;
+type SectionId = (typeof sections)[number]["id"];
 
-type SegmentId = (typeof segments)[number]["id"];
+const elsewhere = [
+  { label: "Events", to: "/calendar" },
+  { label: "Live", to: "/live" },
+  { label: "Community", to: "/community" },
+  { label: "Collectives", to: "/collectives" },
+  { label: "Cinema", to: "/cinema" },
+  { label: "Portfolios", to: "/portfolios" },
+  { label: "Travel", to: "/travel" },
+];
 
-const destinations: Record<Exclude<SegmentId, "for-you" | "mall" | "browse">, { title: string; detail: string; to: string; extra?: { title: string; detail: string; to: string } }> = {
-  people: {
-    title: "Directory",
-    detail: "Profiles you can open",
-    to: "/directory",
-  },
-  portfolios: {
-    title: "Portfolios",
-    detail: "Portfolio folders",
-    to: "/portfolios",
-  },
-  events: {
-    title: "Events",
-    detail: "Community events and the calendar",
-    to: "/calendar",
-  },
-  community: {
-    title: "Community",
-    detail: "Public updates",
-    to: "/community",
-    extra: { title: "Collectives", detail: "Groups you can join or start", to: "/collectives" },
-  },
-  live: {
-    title: "Live",
-    detail: "Streams happening now",
-    to: "/live",
-  },
-  cinema: {
-    title: "Cinema",
-    detail: "Networks and screenings",
-    to: "/cinema",
-  },
-};
+function isSection(value: string | null): value is SectionId {
+  return sections.some((s) => s.id === value);
+}
 
 const Explore = () => {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const [segment, setSegment] = useState<SegmentId>("for-you");
-  const [query, setQuery] = useState("");
+  const [params, setParams] = useSearchParams();
+  const section: SectionId = isSection(params.get("section")) ? (params.get("section") as SectionId) : "for-you";
+  const [query, setQuery] = useState(params.get("q") || "");
   const { quests } = useNoviQuests();
   const openQuest = homeQuestCard(quests);
-  const { data: sentMatches = [] } = useQuery({
-    queryKey: ["sent-matches", user?.id],
-    enabled: !!user && !shotSessionEnabled(),
-    queryFn: () => listSentCollabInvites(user!.id),
-  });
-  const sentByPerson = new Map(sentMatches.map((row) => [row.recipient_id, row.status]));
-  const sendMatch = async (recipientId: string) => {
-    if (!user) throw new Error("Sign in to send a match");
-    if (recipientId === user.id) return;
-    await sendCollabInvite(recipientId);
-    await queryClient.invalidateQueries({ queryKey: ["sent-matches", user.id] });
+  const choose = (id: SectionId) => {
+    const next = new URLSearchParams(params);
+    if (id === "for-you") next.delete("section");
+    else next.set("section", id);
+    setParams(next, { replace: true });
+    window.scrollTo({ top: 0 });
   };
-  const { data: people = [] } = useQuery({
-    queryKey: ["explore-people", query, user?.id],
-    queryFn: async () => {
-      if (shotSessionEnabled()) {
-        const self = user
-          ? [{ user_id: user.id, display_name: "Shot Member", city_display: "Charlotte, NC", avatar_url: null }]
-          : [];
-        return [...self, ...shotPeople];
-      }
-      const request = supabase
-        .from("profiles_public")
-        .select("user_id, display_name, city_display, avatar_url")
-        .limit(8);
-      const { data, error } = query.trim()
-        ? await request.ilike("display_name", `%${query.trim()}%`)
-        : await request;
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+  const chip = (active: boolean) =>
+    `mono-label inline-flex h-11 shrink-0 items-center rounded-full border px-3 text-[11px] ${
+      active
+        ? "border-[hsl(var(--scan))] text-foreground shadow-[inset_0_0_12px_rgba(121,195,207,0.35)]"
+        : "border-border text-muted-foreground"
+    }`;
 
   return (
     <PageLayout>
-      <div className="mx-auto max-w-3xl px-4 pb-8 pt-4 sm:px-6">
+      <div className="mx-auto max-w-3xl px-4 pb-8 pt-4 sm:px-6 lg:max-w-5xl">
         <header className="pb-3">
           <p className="kicker">In the archive</p>
           <h1 className="ether-title text-[34px]">Explore</h1>
@@ -114,6 +63,7 @@ const Explore = () => {
         <div className="relative mb-3">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="SEARCH PEOPLE, CITIES, STORES"
@@ -122,76 +72,42 @@ const Explore = () => {
           />
         </div>
 
-        <div className="mb-5 flex gap-2 overflow-x-auto scrollbar-hide">
-          {segments.map((item) => {
-            const active = segment === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setSegment(item.id)}
-                className={`mono-label inline-flex h-11 shrink-0 items-center rounded-full border px-3 text-[11px] ${
-                  active
-                    ? "border-[hsl(var(--scan))] text-foreground shadow-[inset_0_0_12px_rgba(121,195,207,0.35)]"
-                    : "border-border text-muted-foreground"
-                }`}
-                aria-pressed={active}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
+        <nav aria-label="Explore sections" className="mb-5 flex gap-2 overflow-x-auto scrollbar-hide">
+          {sections.map((item) => (
+            <button key={item.id} type="button" onClick={() => choose(item.id)} className={chip(section === item.id)} aria-pressed={section === item.id}>
+              {item.label}
+            </button>
+          ))}
+          <span className="mx-1 w-px shrink-0 self-stretch bg-border" aria-hidden="true" />
+          {elsewhere.map((item) => (
+            <Link key={item.to} to={item.to} className={chip(false)}>
+              {item.label}
+            </Link>
+          ))}
+        </nav>
 
-        {segment === "browse" && <ExploreBrowse query={query} />}
+        {(section === "for-you" || section === "people") && (
+          <PeopleDiscovery query={query} full={section === "people"} />
+        )}
 
-        {(segment === "for-you" || segment === "people") && (
-          <section className="mb-6">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="ether-title text-[15px]">Find your people</h2>
-              <Link to="/directory" className="mono-label text-[9px] text-muted-foreground">Directory</Link>
+        {section === "for-you" && openQuest && <div className="mt-6"><QuestCard quest={openQuest} /></div>}
+
+        {section === "for-you" && (
+          <section aria-labelledby="browse-title" className="mt-8">
+            <div className="mb-2 flex items-end justify-between">
+              <h2 id="browse-title" className="ether-title text-[22px]">Reels & posts</h2>
+              <button type="button" onClick={() => choose("browse")} className="mono-label min-h-11 text-[10px] text-muted-foreground">See all</button>
             </div>
-            <div
-              data-match-row
-              className="flex w-full min-w-0 touch-pan-x snap-x gap-3 overflow-x-auto overscroll-x-contain pb-1 scrollbar-hide"
-            >
-              {people.map((person) => (
-                <PeopleMatchCard
-                  key={person.user_id}
-                  person={person}
-                  isSelf={person.user_id === user?.id}
-                  inviteStatus={sentByPerson.get(person.user_id) ?? null}
-                  onInvite={sendMatch}
-                />
-              ))}
-            </div>
-            {openQuest && segment === "for-you" && <div className="mt-4"><QuestCard quest={openQuest} /></div>}
+            <ExploreBrowse query={query} />
           </section>
         )}
+        {section === "browse" && <ExploreBrowse query={query} />}
 
-        {segment !== "for-you" && segment !== "mall" && segment !== "people" && segment !== "browse" && (
-          <div className="mb-6 space-y-3">
-            <Link to={destinations[segment].to} className="file-panel flex min-h-11 flex-col justify-center px-4 py-4">
-              <span className="ether-title text-[22px]">{destinations[segment].title}</span>
-              <span className="text-sm text-muted-foreground">{destinations[segment].detail}</span>
-            </Link>
-            {destinations[segment].extra && (
-              <Link to={destinations[segment].extra.to} className="file-panel flex min-h-11 flex-col justify-center px-4 py-4">
-                <span className="ether-title text-[22px]">{destinations[segment].extra.title}</span>
-                <span className="text-sm text-muted-foreground">{destinations[segment].extra.detail}</span>
-              </Link>
-            )}
+        {(section === "for-you" || section === "mall") && (
+          <div className="mt-8">
+            <CommunityMall query={query} />
           </div>
         )}
-
-        {segment === "people" && (
-          <Link to="/directory" className="file-panel mb-6 flex min-h-11 items-center justify-between px-4">
-            <span className="font-body text-sm font-bold">Open the full directory</span>
-            <span className="mono-label text-[10px] text-muted-foreground">People</span>
-          </Link>
-        )}
-
-        {(segment === "for-you" || segment === "mall") && <CommunityMall query={query} />}
       </div>
     </PageLayout>
   );
