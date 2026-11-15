@@ -2,7 +2,7 @@ import { FeedVideo } from "@/components/media/FeedVideo";
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Handshake, Sparkles, Send, X, type LucideIcon } from 'lucide-react';
+import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Handshake, Sparkles, Send, X, Award, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Notification, NotificationType } from '@/hooks/useNotifications';
@@ -12,6 +12,7 @@ import { itemInviteNotice, joinLabel } from '@/lib/itemInvite';
 import { respondItemInvite } from '@/lib/itemInviteApi';
 import { useQueryClient } from '@tanstack/react-query';
 import { notificationDisplay, type PostLikePreview } from '@/lib/likeNotice';
+import { noticePath } from '@/lib/noticePath';
 
 interface NotificationItemProps {
   notification: Notification;
@@ -33,6 +34,7 @@ const notificationMark: Record<NotificationType, { icon: LucideIcon; fill: IconF
   collab_invite: { icon: Handshake, fill: 'denim' },
   match: { icon: Sparkles, fill: 'pink' },
   item_invite: { icon: Send, fill: 'cyan' },
+  credit: { icon: Award, fill: 'gold' },
 };
 
 export const NotificationItem: React.FC<NotificationItemProps> = ({
@@ -89,8 +91,9 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
     if (isUnread) {
       onRead(notification.id);
     }
-    if (itemInvite) {
-      navigate(itemInvite.path);
+    const path = itemInvite?.path || noticePath(notification);
+    if (path) {
+      navigate(path);
       return;
     }
     if (notification.type === 'project_invite' && onProjectInviteTap) {

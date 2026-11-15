@@ -16,6 +16,7 @@ import { PostDetailModal } from "@/components/profile/PostDetailModal";
 import { CreateBlogDialog } from "@/components/profile/CreateBlogDialog";
 import { ProfileBlogsGrid } from "@/components/profile/ProfileBlogsGrid";
 import { UserReviews } from "@/components/profile/UserReviews";
+import { ProfileCredits } from "@/components/credits/ProfileCredits";
 import { CreatorModuleTabs } from "@/components/profile/CreatorModuleTabs";
 import { EditProfileDetailsDialog } from "@/components/profile/EditProfileDetailsDialog";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
@@ -107,6 +108,19 @@ const Profile = () => {
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, isOwnProfile, setSearchParams]);
+
+  // Notices link to a section (?section=credits); it renders after its data loads.
+  const linkedSection = searchParams.get("section");
+  useEffect(() => {
+    if (!linkedSection || !/^[a-z_]+$/.test(linkedSection)) return;
+    let tries = 0;
+    const timer = window.setInterval(() => {
+      const el = document.getElementById(`profile-section-${linkedSection}`);
+      if (el || ++tries > 25) window.clearInterval(timer);
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 200);
+    return () => window.clearInterval(timer);
+  }, [linkedSection]);
 
   useEffect(() => {
     const postId = searchParams.get("post");
@@ -407,6 +421,9 @@ const Profile = () => {
             )}
           </motion.div>
         );
+      case 'credits':
+        if (!targetUserId) return null;
+        return <ProfileCredits key="credits" userId={targetUserId} isOwner={!!isOwnProfile} />;
       case 'reviews':
         if (!targetUserId) return null;
         return (

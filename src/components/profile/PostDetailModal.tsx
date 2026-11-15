@@ -51,6 +51,7 @@ import { EmbedPlayer } from "@/components/feed/EmbedPlayer";
 import { embedFromPost } from "@/lib/videoEmbed";
 import { InlineError } from "@/components/ui/inline-error";
 import { writeError } from "@/lib/writeError";
+import { PostCredits } from "@/components/credits/PostCredits";
 
 interface PostDetailModalProps {
   post: ProfilePost | null;
@@ -322,6 +323,10 @@ export function PostDetailModal({
                       <p className="mono-label mt-1 text-[9px] text-muted-foreground">{timeAgo}</p>
                     </div>
                   </div>
+                )}
+
+                {!post.repost && (
+                  <PostCredits postId={post.id} ownsPost={ownsPost} viewerId={user?.id} onNavigate={() => onOpenChange(false)} />
                 )}
 
                 {/* Comments */}
