@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { buildReleases } from "@/lib/musicCatalog";
 import { canExtractArtist, cleanMusicLinks, detectMusicPlatform, normalizeMusicUrl } from "@/lib/musicLinks";
 import { createArtistExtractor } from "@/lib/artistExtract";
 
@@ -63,6 +63,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange, defaultName }: ConnectM
   const [extractError, setExtractError] = useState<{ index: number; message: string } | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [linkErrors, setLinkErrors] = useState<Record<number, string>>({});
+  const foundReleases = useMemo(() => buildReleases(albums, topTracks), [albums, topTracks]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   // Latest URL asked for per row; a slower earlier answer for the same row is dropped.
@@ -405,7 +406,14 @@ export const ConnectMusicDialog = ({ open, onOpenChange, defaultName }: ConnectM
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 -mx-4 px-4 sm:-mx-6 sm:px-6">
+        {/* Native scroll, not ScrollArea: inside a dialog that only has a max-height its
+            viewport never gets a height, so with the keyboard up the lower fields were
+            clipped and could not be reached. */}
+        <div
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain -mx-4 px-4 sm:-mx-6 sm:px-6"
+          style={{ WebkitOverflowScrolling: "touch" }}
+          data-testid="connect-music-scroll"
+        >
           <div className="space-y-5 py-2">
             {/* Platform Links */}
             <div className="space-y-3">
@@ -568,53 +576,32 @@ export const ConnectMusicDialog = ({ open, onOpenChange, defaultName }: ConnectM
               </div>
             )}
 
-            {/* Extracted Top Tracks */}
-            {topTracks.length > 0 && (
-              <div className="space-y-2">
-                <Label>Top Tracks (extracted)</Label>
-                <div className="space-y-1">
-                  {topTracks.slice(0, 5).map((track, i) => (
-                    <div key={i} className="flex items-center gap-2 text-sm p-1.5 rounded bg-muted/50">
-                      {track.album_image && (
-                        <img src={track.album_image} alt="" className="w-8 h-8 rounded object-cover" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate text-foreground">{track.name}</p>
-                        {track.album_name && (
-                          <p className="text-xs text-muted-foreground truncate">{track.album_name}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {topTracks.length > 5 && (
-                    <p className="text-xs text-muted-foreground">+{topTracks.length - 5} more tracks</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Extracted Albums */}
-            {albums.length > 0 && (
-              <div className="space-y-2">
-                <Label>Albums (extracted)</Label>
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {albums.slice(0, 6).map((album, i) => (
-                    <div key={i} className="shrink-0 w-20 text-center">
-                      {album.image_url ? (
-                        <img src={album.image_url} alt={album.name} className="w-20 h-20 rounded object-cover" />
+            {/* Everything read from the links, as it will look in the catalog */}
+            {foundReleases.length > 0 && (
+              <div className="space-y-2" data-testid="connect-music-found">
+                <Label>Found on your links</Label>
+                <div className="grid grid-cols-4 gap-2">
+                  {foundReleases.slice(0, 8).map((release) => (
+                    <div key={release.key} className="min-w-0">
+                      {release.cover ? (
+                        <img src={release.cover} alt={release.title} className="aspect-square w-full rounded object-cover" />
                       ) : (
-                        <div className="w-20 h-20 rounded bg-muted flex items-center justify-center">
-                          <Music className="w-6 h-6 text-muted-foreground" />
+                        <div className="flex aspect-square w-full items-center justify-center rounded bg-muted">
+                          <Music className="h-5 w-5 text-muted-foreground" />
                         </div>
                       )}
-                      <p className="text-xs mt-1 truncate text-foreground">{album.name}</p>
+                      <p className="mt-1 truncate text-[11px] text-foreground">{release.title}</p>
                     </div>
                   ))}
                 </div>
+                {foundReleases.length > 8 && (
+                  <p className="text-xs text-muted-foreground">+{foundReleases.length - 8} more on your music page</p>
+                )}
+                <p className="text-xs text-muted-foreground">Arrange these into sections from your music page.</p>
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Actions */}
         <div className="flex shrink-0 items-center justify-between gap-2 pt-2 border-t border-border/30">
