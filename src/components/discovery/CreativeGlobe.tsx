@@ -1,17 +1,33 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { geoDistance, geoGraticule10, geoPath, type GeoPermissibleObjects } from "d3-geo";
+import { geoGraticule10, geoPath, type GeoPermissibleObjects } from "d3-geo";
 import land from "@/data/globeLand.json";
 import coordinates from "@/data/cityCoordinates.json";
 import { safeWebLink } from "@/lib/tripMoney";
 import { globeCities, type Person } from "@/lib/peopleDiscovery";
 import { MAX_ZOOM, clusterMarkers, fanOffsets, isDoubleTap, pinchZoom, stackDepth, zoomToSplit, type GlobeMarker } from "@/lib/globeMarkers";
-import { GLOBE_SIZE, anchorRotation, globeProjection, pointAt, screenPoint, type Rotation } from "@/lib/globeView";
+import { GLOBE_SIZE, GLOBE_SCALE, anchorRotation, globeProjection, pointAt, screenPoint, type Rotation } from "@/lib/globeView";
+import { GLOBE_LOOK, GLOBE_PAINT, LAND_OVERLAYS } from "@/lib/globePaint";
+import { detailClipAngle, fanHeading, limbOpacity, outwardReach, viewDot } from "@/lib/globeLimb";
+import { layersForZoom, loadGlobeLayer, pickCityLabels, type GlobeLayers } from "@/lib/globeLod";
 
 const POINTS = coordinates as Record<string, number[]>;
 
 /** Initials for a marker without photos. */
 function monogram(label: string) {
   return label.split(",")[0].slice(0, 2).toUpperCase();
+}
+
+function useReducedMotion() {
+  const [reduce, setReduce] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduce(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  return reduce;
 }
 
 /** One round face on the globe: a photo when there is a safe one, otherwise initials. */
@@ -35,10 +51,10 @@ function Face({ clip, href, label, x = 0, y = 0, r, dim }: { clip: string; href?
 }
 
 /** The selected group fans its faces out above the marker so it is obvious several people are there. */
-function Fan({ clip, faces, total, label }: { clip: string; faces: string[]; total: number; label: string }) {
+function Fan({ clip, faces, total, label, heading }: { clip: string; faces: string[]; total: number; label: string; heading: number }) {
   const shown = faces.slice(0, 4);
   const extra = total - shown.length;
-  const slots = fanOffsets(shown.length + (extra > 0 ? 1 : 0));
+  const slots = fanOffsets(shown.length + (extra > 0 ? 1 : 0), undefined, heading);
   return (
     <g pointerEvents="none" aria-hidden>
       {shown.map((face, i) => (
@@ -76,22 +92,69 @@ export function CreativeGlobe({
     me ? [-me.point[0], -me.point[1] * 0.6] : [80, -25]
   );
   const [zoom, setZoom] = useState(1);
+  const [look, setLook] = useState<"natural" | "jewel">(GLOBE_LOOK);
   const view = useRef({ rotation, zoom });
   view.current = { rotation, zoom };
   const chosen = cities.find((city) => city.key === selected)?.point;
   const chosenLon = chosen?.[0];
   const chosenLat = chosen?.[1];
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("globeRot")) return;
     if (chosenLon !== undefined && chosenLat !== undefined)
       // Tilt a little on the whole globe for context; when zoomed in, centre exactly so the city stays in view.
       setRotation([-chosenLon, -chosenLat * (view.current.zoom > 1.5 ? 1 : 0.8)]);
   }, [chosenLon, chosenLat]);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const z = Number(q.get("globeZoom"));
+    const rot = q.get("globeRot");
+    const nextLook = q.get("globeLook");
+    if (z >= 1 && z <= MAX_ZOOM) setZoom(z);
+    if (rot) {
+      const [a, b] = rot.split(",").map(Number);
+      if (Number.isFinite(a) && Number.isFinite(b)) setRotation([a, b]);
+    }
+    if (nextLook === "jewel" || nextLook === "natural") setLook(nextLook);
+  }, []);
   const id = useId().replace(/:/g, "");
   const svgRef = useRef<SVGSVGElement>(null);
+  const reduceMotion = useReducedMotion();
+  const paint = GLOBE_PAINT[look];
+  const globeR = GLOBE_SCALE * zoom;
+  const haloR = globeR + 22;
+  const haloStart = Math.max(0, Math.min(1, (globeR / haloR) * 0.92));
+  const [layers, setLayers] = useState<GlobeLayers>({});
+  const wanted = layersForZoom(zoom).join(",");
+  useEffect(() => {
+    let live = true;
+    for (const name of layersForZoom(zoom)) {
+      loadGlobeLayer(name).then(
+        (value) => {
+          if (live) setLayers((prev) => (prev[name] === value ? prev : { ...prev, [name]: value }));
+        },
+        () => {}
+      );
+    }
+    return () => {
+      live = false;
+    };
+  }, [wanted, zoom]);
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      for (const name of ["countries", "land50", "lakes"] as const) {
+        loadGlobeLayer(name).then(
+          (value) => setLayers((prev) => (prev[name] ? prev : { ...prev, [name]: value })),
+          () => {}
+        );
+      }
+    }, 250);
+    return () => clearTimeout(id);
+  }, []);
   const projection = useMemo(() => globeProjection(rotation, zoom), [rotation, zoom]);
+  const detail = useMemo(() => globeProjection(rotation, zoom).clipAngle(detailClipAngle(zoom)), [rotation, zoom]);
   const path = geoPath(projection);
-  const facing = (point: [number, number]) =>
-    geoDistance(point, [-rotation[0], -rotation[1]]) <= Math.PI / 2;
+  const detailPath = geoPath(detail);
+  const borderDraw = detailPath;
 
   // Gestures. Every finger is tracked; one finger grabs and turns the globe, two fingers pinch
   // around their midpoint. State changes are batched to one per animation frame, and markers
@@ -215,7 +278,7 @@ export function CreativeGlobe({
   };
 
   const visible = cities.flatMap((city) => {
-    if (!facing(city.point)) return [];
+    if (viewDot(city.point, rotation) <= 0) return [];
     const xy = projection(city.point);
     return xy ? [{ ...city, xy }] : [];
   });
@@ -229,6 +292,14 @@ export function CreativeGlobe({
       })
     : clusterMarkers(visible, selected);
   if (!moving) settled.current = markers;
+  // During a pinch or pan, keep the 110m land so frame rate stays high; swap detail back in when the fingers lift.
+  const detailed = !moving ? (zoom >= 5.5 && layers.land10) || layers.land50 : null;
+  const landGeom = (detailed || land) as GeoPermissibleObjects;
+  const landDraw = detailed ? detailPath : path;
+  const showStates = !moving && !!layers.states && zoom >= 3;
+  const showRivers = !moving && !!layers.rivers && zoom >= 4.5;
+  const showLakes = !moving && !!layers.lakes && zoom >= 2;
+  const showLabels = !moving && !!layers.places;
   // A cluster zooms in far enough to split; at full zoom it opens its biggest city and fans its faces out.
   const open = (marker: { key: string; cities: number; point: [number, number]; points: [number, number][] }) => {
     if (suppressClick.current) return;
@@ -237,7 +308,14 @@ export function CreativeGlobe({
       setZoom(zoomToSplit(marker.points, zoom));
     } else onSelect(marker.key);
   };
-  const dot = me && facing(me.point) ? projection(me.point) : null;
+  const meOpacity = me ? limbOpacity(viewDot(me.point, rotation), globeR, 8, 16) : 0;
+  const dot = me && meOpacity > 0 ? projection(me.point) : null;
+  const labels = layers.places
+    ? pickCityLabels(layers.places, zoom, (point) => {
+        const xy = projection(point);
+        return xy ? [xy[0], xy[1]] : null;
+      }, rotation, globeR, markers)
+    : [];
   return (
     <div className="relative" aria-label="People globe">
       <svg
@@ -302,42 +380,100 @@ export function CreativeGlobe({
         }}
       >
         <defs>
-          <radialGradient id={`${id}-sea`} cx="38%" cy="32%">
-            <stop stopColor="#3b3542" />
-            <stop offset=".75" stopColor="#1a1822" />
-            <stop offset="1" stopColor="#0b0b12" />
+          <radialGradient id={`${id}-sea`} cx="36%" cy="30%">
+            <stop stopColor={paint.ocean[0]} />
+            <stop offset=".55" stopColor={paint.ocean[1]} />
+            <stop offset="1" stopColor={paint.ocean[2]} />
           </radialGradient>
-          <radialGradient id={`${id}-halo`}>
-            <stop offset=".78" stopColor="#ff9fc8" stopOpacity="0" />
-            <stop offset=".9" stopColor="#79c3cf" stopOpacity=".16" />
-            <stop offset="1" stopColor="#79c3cf" stopOpacity="0" />
+          <radialGradient id={`${id}-halo`} cx="50%" cy="50%">
+            <stop offset={Math.max(0, haloStart - 0.04)} stopColor={paint.atmosphere} stopOpacity="0" />
+            <stop offset={haloStart} stopColor={paint.atmosphere} stopOpacity=".32" />
+            <stop offset={Math.min(1, haloStart + 0.06)} stopColor="#ff9fc8" stopOpacity=".1" />
+            <stop offset="1" stopColor={paint.atmosphere} stopOpacity="0" />
           </radialGradient>
+          <radialGradient id={`${id}-day`} cx="34%" cy="28%">
+            <stop offset="0" stopColor={paint.day} stopOpacity=".22" />
+            <stop offset=".4" stopColor={paint.day} stopOpacity=".07" />
+            <stop offset="1" stopColor={paint.day} stopOpacity="0" />
+          </radialGradient>
+          <radialGradient id={`${id}-night`} cx="78%" cy="72%">
+            <stop offset="0" stopColor={paint.night} stopOpacity=".42" />
+            <stop offset=".55" stopColor={paint.night} stopOpacity=".16" />
+            <stop offset="1" stopColor={paint.night} stopOpacity="0" />
+          </radialGradient>
+          <clipPath id={`${id}-disc`}>
+            <circle cx="200" cy="200" r={globeR} />
+          </clipPath>
           <clipPath id={`${id}-face`} clipPathUnits="objectBoundingBox">
             <circle cx=".5" cy=".5" r=".5" />
           </clipPath>
         </defs>
-        <circle cx="200" cy="200" r="200" fill={`url(#${id}-halo)`} />
-        <path d={path({ type: "Sphere" }) || ""} fill={`url(#${id}-sea)`} stroke="#8c858e" strokeOpacity=".25" />
-        <path d={path(land as GeoPermissibleObjects) || ""} fill="#8b8390" fillOpacity=".55" stroke="#b5aeb8" strokeWidth=".3" />
-        <path d={path(geoGraticule10()) || ""} fill="none" stroke="#a29baa" strokeOpacity=".08" strokeWidth=".5" />
+        <circle cx="200" cy="200" r={haloR} fill={`url(#${id}-halo)`} pointerEvents="none" />
+        <path d={path({ type: "Sphere" }) || ""} fill={`url(#${id}-sea)`} stroke={paint.oceanStroke} strokeOpacity=".35" />
+        <clipPath id={`${id}-land`}>
+          <path d={landDraw(landGeom) || ""} />
+        </clipPath>
+        <path d={landDraw(landGeom) || ""} fill={paint.land.temperate} />
+        <g clipPath={`url(#${id}-land)`} pointerEvents="none">
+          {LAND_OVERLAYS.map((overlay) => (
+            <path key={overlay.tint} d={landDraw(overlay.geometry) || ""} fill={paint.land[overlay.tint]} />
+          ))}
+        </g>
+        {showLakes && <path d={borderDraw(layers.lakes) || ""} fill={paint.ocean[1]} fillOpacity=".85" stroke="none" pointerEvents="none" />}
+        <path d={landDraw(landGeom) || ""} fill="none" stroke={paint.landStroke} strokeOpacity=".45" strokeWidth={zoom > 3 ? 0.5 : 0.35} />
+        {layers.countries && (
+          <path d={borderDraw(layers.countries) || ""} fill="none" stroke="#d8e4c8" strokeOpacity={zoom >= 3 ? 0.18 : 0.28} strokeWidth={zoom >= 3 ? 0.35 : 0.4} pointerEvents="none" />
+        )}
+        {showStates && (
+          <path d={borderDraw(layers.states) || ""} fill="none" stroke="#f2efe6" strokeOpacity=".28" strokeWidth=".4" pointerEvents="none" />
+        )}
+        {showRivers && (
+          <path d={borderDraw(layers.rivers) || ""} fill="none" stroke={paint.ocean[0]} strokeOpacity=".55" strokeWidth=".45" pointerEvents="none" />
+        )}
+        <g clipPath={`url(#${id}-disc)`} pointerEvents="none">
+          <circle cx="200" cy="200" r={globeR} fill={`url(#${id}-day)`} />
+          <circle cx="200" cy="200" r={globeR} fill={`url(#${id}-night)`} />
+        </g>
+        {zoom < 2.4 && (
+          <path d={path(geoGraticule10()) || ""} fill="none" stroke={paint.atmosphere} strokeOpacity=".07" strokeWidth=".5" pointerEvents="none" />
+        )}
+        {showLabels && labels.map((label) => (
+          <g key={`${label.name}-${label.xy[0].toFixed(1)}`} transform={`translate(${label.xy[0]},${label.xy[1]})`} pointerEvents="none" aria-hidden>
+            <circle r="1.7" fill="#faf4ed" stroke="#0b0b12" strokeWidth=".6" />
+            <text y="10" textAnchor="middle" fill="#faf4ed" fontSize="6.5" fontWeight="600" stroke="#0b0b12" strokeWidth="2.2" paintOrder="stroke" strokeLinejoin="round">
+              {label.name}
+            </text>
+          </g>
+        ))}
         {dot && (
-          <g transform={`translate(${dot[0]},${dot[1]})`} aria-label={me?.live ? `You, live in ${me.label}` : `You, ${me?.label}`}>
+          <g transform={`translate(${dot[0]},${dot[1]})`} opacity={meOpacity} aria-label={me?.live ? `You, live in ${me.label}` : `You, ${me?.label}`}>
             {me?.live && (
-              <circle r="9" fill="#79c3cf" opacity=".35">
-                <animate attributeName="r" values="6;16;6" dur="2.4s" repeatCount="indefinite" />
-                <animate attributeName="opacity" values=".5;0;.5" dur="2.4s" repeatCount="indefinite" />
+              <circle r="9" fill="#79c3cf" opacity={reduceMotion ? ".4" : ".35"}>
+                {!reduceMotion && (
+                  <>
+                    <animate attributeName="r" values="6;16;6" dur="2.4s" repeatCount="indefinite" />
+                    <animate attributeName="opacity" values=".5;0;.5" dur="2.4s" repeatCount="indefinite" />
+                  </>
+                )}
               </circle>
             )}
             <circle r="5" fill={me?.live ? "#79c3cf" : "#faf4ed"} stroke="#0b0b12" strokeWidth="1.5" />
           </g>
         )}
+        <g clipPath={`url(#${id}-disc)`}>
         {markers.map((city) => {
           const active = selected === city.key;
+          const fanned = !!(active && city.total > 1);
+          const heading = fanned ? fanHeading(city.xy[0], city.xy[1], globeR) : -Math.PI / 2;
+          const opacity = limbOpacity(viewDot(city.point, rotation), globeR, outwardReach(city.xy, globeR, fanned, heading));
+          if (opacity <= 0) return null;
           return (
             <g
               key={city.key}
               data-city-marker
+              data-limb-opacity={opacity.toFixed(2)}
               transform={`translate(${city.xy[0]},${city.xy[1]})`}
+              opacity={opacity}
               role="button"
               tabIndex={0}
               aria-pressed={active}
@@ -357,9 +493,13 @@ export function CreativeGlobe({
             >
               <circle r="22" fill="transparent" />
               {city.liveTotal > 0 && (
-                <circle r="18" fill="none" stroke="#79c3cf" strokeWidth="2">
-                  <animate attributeName="r" values="17;23;17" dur="2.4s" repeatCount="indefinite" />
-                  <animate attributeName="opacity" values="1;0;1" dur="2.4s" repeatCount="indefinite" />
+                <circle r="18" fill="none" stroke="#79c3cf" strokeWidth="2" opacity={reduceMotion ? ".85" : undefined}>
+                  {!reduceMotion && (
+                    <>
+                      <animate attributeName="r" values="17;23;17" dur="2.4s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="1;0;1" dur="2.4s" repeatCount="indefinite" />
+                    </>
+                  )}
                 </circle>
               )}
               {/* A group reads as a group: up to two faces stacked behind the front one. */}
@@ -376,7 +516,7 @@ export function CreativeGlobe({
                   </text>
                 </g>
               )}
-              {active && city.total > 1 && <Fan clip={`${id}-face`} faces={city.faces} total={city.total} label={city.label} />}
+              {fanned && <Fan clip={`${id}-face`} faces={city.faces} total={city.total} label={city.label} heading={heading} />}
               <g transform="translate(13,-13)">
                 <circle r="8.5" fill="#ff9fc8" stroke="#0b0b12" strokeWidth="1.2" />
                 <text y="3" textAnchor="middle" fill="#1b1520" fontSize="8.5" fontWeight="700">
@@ -386,6 +526,7 @@ export function CreativeGlobe({
             </g>
           );
         })}
+        </g>
       </svg>
       <div className="absolute bottom-1 right-1 flex gap-1" aria-label="Globe controls">
         {[

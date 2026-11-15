@@ -149,7 +149,7 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
   return (
     <>
       <section aria-labelledby="people-title" className="overflow-hidden rounded-[28px] bg-[#1d1a22] px-4 pb-5 pt-4 text-[#faf5f0] shadow-[0_30px_80px_-40px_rgba(0,0,0,.9)] sm:px-6">
-        <header className="flex items-start justify-between gap-3">
+        <header className="relative z-20 flex items-start justify-between gap-3">
           <div>
             <p className="text-[10px] uppercase tracking-[.25em] text-[#ff9fc8]">People</p>
             <h2 id="people-title" className="font-display text-[26px] leading-tight sm:text-[30px]">Find your people</h2>
@@ -164,7 +164,7 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
           </button>
         </header>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="relative z-20 mt-3 flex flex-wrap items-center gap-2">
           <label className="flex min-h-11 min-w-0 flex-1 basis-[180px] items-center gap-2 rounded-full bg-white/10 px-3">
             <MapPin size={16} className="shrink-0 text-[#ff9fc8]" />
             <select
