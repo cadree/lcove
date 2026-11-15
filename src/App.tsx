@@ -41,6 +41,7 @@ const Waitlist = lazy(() => import("./pages/Waitlist"));
 const Feed = lazy(loadFeed);
 const Explore = lazy(loadExplore);
 const Travel = lazy(() => import("./pages/Travel"));
+const ProfileMusic = lazy(() => import("./pages/ProfileMusic"));
 const Directory = lazy(() => import("./pages/Directory"));
 const Projects = lazy(() => import("./pages/Projects"));
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
@@ -203,6 +204,7 @@ const App = () => (
                 <Route path="/id/v/:token" element={<EtherIdVerify />} />
                 <Route path="/tickets" element={<Tickets />} />
                 <Route path="/profile/:userId" element={<Profile />} />
+                <Route path="/profile/:userId/music" element={<ProfileMusic />} />
                 <Route path="/blog" element={<BlogIndex />} />
                 <Route path="/blog/:blogId" element={<BlogPostPage />} />
                 <Route path="/settings" element={<Settings />} />

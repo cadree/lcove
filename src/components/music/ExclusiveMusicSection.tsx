@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import { Capacitor } from "@capacitor/core";
 import { motion } from "framer-motion";
 import { Music, Plus, Upload, Loader2, Lock, AlertTriangle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,23 +12,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ExclusiveTrackCard } from "./ExclusiveTrackCard";
 import { AccessRuleEditor } from "./AccessRuleEditor";
+import { useLockedMusic } from "@/hooks/useLockedMusic";
 import {
-  useExclusiveTracks,
-  useAccessRules,
-  useTrackSales,
-  type ExclusiveTrack,
-  type ExclusiveAccessRule,
-} from "@/hooks/useExclusiveMusic";
-import {
-  useArtistPayoutStatus,
   useCreateMusicPayoutAccount,
   useRefreshMusicPayoutStatus,
 } from "@/hooks/useMusicPayouts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
 import { AUDIO_FILE_ACCEPT, AUDIO_UPLOAD_ACTION, AUDIO_UPLOAD_REJECTED, audioContentType, audioExtension, isAudioUpload } from "@/lib/audioFiles";
@@ -43,23 +33,6 @@ import {
   parsePriceCents,
   type LockedUploadProblem,
 } from "@/lib/lockedMusic";
-import { readFunctionError } from "@/lib/functionError";
-
-interface VerifyResultRow {
-  status?: string;
-  updated?: boolean;
-}
-
-interface InvokePayload {
-  results?: VerifyResultRow[];
-  error?: string;
-  url?: string;
-}
-
-function asInvokePayload(value: unknown): InvokePayload | null {
-  if (typeof value !== "object" || value === null) return null;
-  return value as InvokePayload;
-}
 
 interface ExclusiveMusicSectionProps {
   userId: string;
@@ -67,21 +40,24 @@ interface ExclusiveMusicSectionProps {
   hideOwnerEmpty?: boolean;
 }
 
+/**
+ * Locked-music tools around the catalog: the owner uploads, sets rules and
+ * connects payouts here; visitors only see a note when buying is unavailable.
+ * The track cards themselves live in the catalog sections (MusicCatalog).
+ */
 export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: ExclusiveMusicSectionProps) => {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const {
     tracks,
     isLoading,
-    hasAccess,
     createTrack,
-    updateTrack,
-    deleteTrack,
     isOwner,
-  } = useExclusiveTracks(userId);
-  const { rules, createRule, updateRule, deleteRule } = useAccessRules(userId);
-  const { data: payoutStatus } = useArtistPayoutStatus(userId);
-  const { data: sales = {} } = useTrackSales(userId, user?.id === userId);
+    rules,
+    createRule,
+    updateRule,
+    deleteRule,
+    payoutStatus,
+  } = useLockedMusic(userId);
   const createPayoutAccount = useCreateMusicPayoutAccount();
   const refreshPayoutStatus = useRefreshMusicPayoutStatus();
   const refreshPayoutsRef = useRef(refreshPayoutStatus.mutate);
@@ -102,72 +78,6 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
   const [uploadProblems, setUploadProblems] = useState<LockedUploadProblem[]>([]);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
-
-  // Refresh queries after returning from Stripe.
-  // CRITICAL: never trust URL params alone to grant access. We MUST call the
-  // verify edge function (which asks Stripe directly) before claiming success.
-  // Canceled / abandoned checkouts must leave the track locked.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const purchase = params.get("purchase");
-    const subscribed = params.get("subscribed");
-    const musicPayouts = params.get("music_payouts");
-
-    if (purchase === "success") {
-      // Optimistic toast removed — only confirm after Stripe verification.
-      (async () => {
-        try {
-          const { data } = await supabase.functions.invoke("verify-music-purchase");
-          // "paid" either just now (updated) or already by the webhook.
-          const verified = asInvokePayload(data)?.results?.some((r) => r.status === "paid");
-          if (verified) {
-            toast.success("Payment confirmed — track unlocked!");
-          } else {
-            toast.info("Finalizing your purchase…", {
-              description: "If this takes more than a minute, refresh the page.",
-            });
-          }
-        } catch (e) {
-          console.warn("[MusicPurchase] verify failed", e);
-          toast.error("Could not verify payment. Please refresh in a moment.");
-        }
-        queryClient.invalidateQueries({ queryKey: ["exclusive-purchases"] });
-        queryClient.invalidateQueries({ queryKey: ["my-exclusive-purchases"] });
-        queryClient.invalidateQueries({ queryKey: ["artist-subscriptions"] });
-        queryClient.invalidateQueries({ queryKey: ["private-track-url"] });
-      })();
-      window.history.replaceState({}, "", window.location.pathname);
-    } else if (purchase === "canceled") {
-      // Defensive: ensure no client-side optimistic unlock happened.
-      toast.info("Purchase canceled — track remains locked.");
-      queryClient.invalidateQueries({ queryKey: ["my-exclusive-purchases"] });
-      window.history.replaceState({}, "", window.location.pathname);
-    } else if (subscribed === "true") {
-      (async () => {
-        try {
-          const { data } = await supabase.functions.invoke("verify-artist-subscription");
-          const verified = asInvokePayload(data)?.results?.some(
-            (r) => r.status === "active" && r.updated
-          );
-          if (verified) {
-            toast.success("Subscription active! You now have access.");
-          } else {
-            toast.info("Finalizing your subscription…");
-          }
-        } catch (e) {
-          console.warn("[MusicSub] verify failed", e);
-          toast.error("Could not verify subscription. Please refresh in a moment.");
-        }
-        queryClient.invalidateQueries({ queryKey: ["artist-subscriptions"] });
-        queryClient.invalidateQueries({ queryKey: ["exclusive-purchases"] });
-      })();
-      window.history.replaceState({}, "", window.location.pathname);
-    } else if (musicPayouts === "success" && isOwner) {
-      toast.success("Payouts connected!");
-      refreshPayoutsRef.current();
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, [queryClient, isOwner]);
 
   // On mount, refresh live payout status if owner has account but flag isn't set
   useEffect(() => {
@@ -296,73 +206,31 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
     }
   };
 
-  const handlePurchase = async (track: ExclusiveTrack, rule: ExclusiveAccessRule | null) => {
-    if (Capacitor.getPlatform() === "ios") {
-      toast.error("This purchase isn't available in the iOS app.");
-      return;
-    }
-    if (!user) {
-      toast.error("Sign in to purchase music");
-      return;
-    }
+  if (isLoading) return null;
 
-    const fnName =
-      rule?.rule_type === "subscription" ? "create-artist-subscription" : "purchase-exclusive-track";
-    const body =
-      rule?.rule_type === "subscription"
-        ? { artist_user_id: track.artist_user_id, access_rule_id: rule.id }
-        : { track_id: track.id, access_rule_id: rule?.id ?? null, artist_user_id: track.artist_user_id };
-
-    try {
-      const { data, error } = await supabase.functions.invoke(fnName, { body });
-      const payload = asInvokePayload(data);
-      if (error) {
-        const serverMsg = await readFunctionError(error, data, "Failed to start checkout");
-        console.error("[MusicPurchase] error", serverMsg);
-        toast.error(serverMsg, { duration: 6000 });
-        return;
-      }
-      if (payload?.error) {
-        toast.error(payload.error, { duration: 6000 });
-        return;
-      }
-      if (payload?.url) {
-        // Same tab: a window.open after an await is blocked as a popup on iOS
-        // Safari and most phone browsers. Checkout returns to this profile.
-        window.location.assign(payload.url);
-      } else {
-        toast.error("No checkout URL returned");
-      }
-    } catch (err: unknown) {
-      console.error("[MusicPurchase] exception", err);
-      toast.error(errorMessage(err, "Failed to start checkout"), { duration: 6000 });
-    }
-  };
-
-  if (isLoading) {
+  if (!isOwner) {
+    if (tracks.length === 0 || !payoutStatus || payoutStatus.payout_enabled) return null;
     return (
-      <div className="glass-strong rounded-xl p-6 animate-pulse">
-        <div className="h-5 bg-muted rounded w-1/3 mb-4" />
-        <div className="space-y-3">
-          <div className="h-16 bg-muted rounded" />
-          <div className="h-16 bg-muted rounded" />
-        </div>
+      <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 flex items-start gap-2">
+        <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-muted-foreground">
+          This artist hasn't connected payouts yet, so purchases and subscriptions are temporarily unavailable. You can still preview locked tracks.
+        </p>
       </div>
     );
   }
-
-  if (!isOwner && tracks.length === 0) return null;
-  if (isOwner && hideOwnerEmpty && tracks.length === 0) return null;
+  if (hideOwnerEmpty && tracks.length === 0) return null;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="glass-strong rounded-xl overflow-hidden"
+      data-testid="locked-music-tools"
     >
-      <div className="p-5">
+      <div className="p-4">
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <div className="flex items-center gap-2 whitespace-nowrap">
             <Lock className="w-4 h-4 text-amber-500" />
             <h3 className="font-display text-base font-medium text-foreground">
@@ -372,32 +240,35 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
               <span className="text-xs text-muted-foreground">({tracks.length})</span>
             )}
           </div>
-          {isOwner && (
-            <div className="flex gap-1.5">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs min-h-11"
-                onClick={() => setShowRules(!showRules)}
-              >
-                Rules
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs min-h-11"
-                onClick={() => setShowUpload(true)}
-                data-testid="exclusive-upload-open"
-              >
-                <Plus className="w-3 h-3 mr-1" /> Upload
-              </Button>
-            </div>
-          )}
+          <div className="flex gap-1.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs min-h-11"
+              onClick={() => setShowRules(!showRules)}
+            >
+              Rules
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs min-h-11"
+              onClick={() => setShowUpload(true)}
+              data-testid="exclusive-upload-open"
+            >
+              <Plus className="w-3 h-3 mr-1" /> Upload
+            </Button>
+          </div>
         </div>
+        {tracks.length > 0 && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Locked tracks show as sealed records in your catalog. Use Arrange to put them in a section.
+          </p>
+        )}
 
         {/* Payout warning banner — owner only */}
         {showPayoutWarning && (
-          <div className="mb-4 p-4 rounded-lg border border-amber-500/40 bg-amber-500/10 flex items-start gap-3">
+          <div className="mt-4 p-4 rounded-lg border border-amber-500/40 bg-amber-500/10 flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-foreground">
@@ -424,19 +295,9 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
           </div>
         )}
 
-        {/* Visitor info banner — payouts not connected */}
-        {!isOwner && tracks.length > 0 && payoutStatus && !payoutStatus.payout_enabled && (
-          <div className="mb-4 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-muted-foreground">
-              This artist hasn't connected payouts yet, so purchases and subscriptions are temporarily unavailable. You can still preview tracks below.
-            </p>
-          </div>
-        )}
-
         {/* Access Rules Editor (owner only) */}
         {isOwner && showRules && (
-          <div className="mb-4 p-4 rounded-lg bg-muted/10 border border-border/20">
+          <div className="mt-4 p-4 rounded-lg bg-muted/10 border border-border/20">
             <AccessRuleEditor
               rules={rules}
               onCreateRule={(r) => createRule.mutate(r)}
@@ -447,39 +308,15 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
         )}
 
 
-        {tracks.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {tracks.map((track) => (
-              <ExclusiveTrackCard
-                key={track.id}
-                track={track}
-                hasAccess={hasAccess(track.id)}
-                isOwner={isOwner}
-                rules={rules}
-                payoutEnabled={!!payoutStatus?.payout_enabled}
-                sales={isOwner ? sales[track.id] : undefined}
-                onDelete={() => deleteTrack.mutate(track.id)}
-                onTogglePublish={() =>
-                  updateTrack.mutate({
-                    id: track.id,
-                    is_published: !track.is_published,
-                  })
-                }
-                onPurchase={handlePurchase}
-              />
-            ))}
+        {tracks.length === 0 && (
+          <div className="text-center pt-4 pb-2 text-muted-foreground">
+            <Music className="w-8 h-8 mx-auto mb-2 opacity-40" />
+            <p className="text-sm text-foreground">Sell tracks fans unlock with one payment</p>
+            <p className="text-xs mt-1">Fans hear a 15-second preview. The full file stays private until they buy.</p>
+            <Button size="sm" className="mt-3 min-h-11" onClick={() => setShowUpload(true)}>
+              <Plus className="w-4 h-4 mr-1" /> Upload a locked track
+            </Button>
           </div>
-        ) : (
-          isOwner && (
-            <div className="text-center py-6 text-muted-foreground">
-              <Music className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="text-sm text-foreground">Sell tracks fans unlock with one payment</p>
-              <p className="text-xs mt-1">Fans hear a 15-second preview. The full file stays private until they buy.</p>
-              <Button size="sm" className="mt-3 min-h-11" onClick={() => setShowUpload(true)}>
-                <Plus className="w-4 h-4 mr-1" /> Upload a locked track
-              </Button>
-            </div>
-          )
         )}
       </div>
 

@@ -8,6 +8,8 @@ interface PreviewPlayerProps {
   durationSeconds?: number;
   locked?: boolean;
   className?: string;
+  /** Lets a cover react to playback (the unlocked record spins). */
+  onPlayingChange?: (playing: boolean) => void;
 }
 
 /**
@@ -21,9 +23,15 @@ export const PreviewPlayer = ({
   durationSeconds = 15,
   locked = true,
   className,
+  onPlayingChange,
 }: PreviewPlayerProps) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const playingChangeRef = useRef(onPlayingChange);
+  playingChangeRef.current = onPlayingChange;
+  useEffect(() => {
+    playingChangeRef.current?.(isPlaying);
+  }, [isPlaying]);
   const [progress, setProgress] = useState(0); // 0 - 1 within preview window
 
   useEffect(() => {
