@@ -415,6 +415,7 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
       )}
       <ConnectMomentHost
         viewerId={user?.id}
+        viewer={me ? { name: me.name, avatarUrl: me.avatar_url } : { name: "You", avatarUrl: null }}
         me={myIcebreaker}
         event={moment}
         onClear={() => setMoment(null)}

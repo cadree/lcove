@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { Calendar, FolderKanban, MessageCircle, Plane, X } from "lucide-react";
-import { NoviCutout } from "@/components/novi/NoviPeek";
-import { XpBurst } from "@/components/novi/XpBurst";
 import { MessageRequestDialog } from "@/components/messages/MessageRequestDialog";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { pulseConnectHaptic } from "@/lib/xpHaptic";
 import {
   addNudge,
+  celebrationEyebrow,
+  celebrationHeadline,
   CONNECT_NUDGE_EVENT,
   dismissNudge,
   firstName,
@@ -27,6 +27,12 @@ import type { Person } from "@/lib/peopleDiscovery";
 import { cn } from "@/lib/utils";
 
 const CELEBRATE_MS = 2000;
+const IMPACT_MS = 420;
+
+export interface ConnectViewer {
+  name: string;
+  avatarUrl: string | null;
+}
 
 export interface ConnectMomentEvent {
   person: Person;
@@ -70,14 +76,16 @@ function reducedMotion(): boolean {
   return typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 }
 
-/** Novi pops up with confetti, then a CTA sheet. Tap skips the burst. */
+/** Two profile pictures bump, with confetti at impact, then a CTA sheet. Tap skips the burst. */
 export function ConnectMomentHost({
   viewerId,
+  viewer,
   me,
   event,
   onClear,
 }: {
   viewerId: string | undefined;
+  viewer?: ConnectViewer | null;
   me?: IcebreakerMe | null;
   event: ConnectMomentEvent | null;
   onClear: () => void;
@@ -89,12 +97,17 @@ export function ConnectMomentHost({
     if (!event) return;
     const nudge = nudgeFromPerson(event.person, event.matched, event.conversationId);
     addNudge(window.localStorage, viewerId, nudge);
-    pulseConnectHaptic(event.matched ? "match" : "connect");
     setCurrent(nudge);
     setPhase("celebrate");
-    const wait = reducedMotion() ? 0 : CELEBRATE_MS;
+    const motionOff = reducedMotion();
+    const hapticAt = motionOff ? 0 : IMPACT_MS;
+    const wait = motionOff ? 0 : CELEBRATE_MS;
+    const buzz = window.setTimeout(() => pulseConnectHaptic(event.matched ? "match" : "connect"), hapticAt);
     const timer = window.setTimeout(() => setPhase("cta"), wait);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(buzz);
+      window.clearTimeout(timer);
+    };
   }, [event, viewerId]);
 
   const skip = () => setPhase("cta");
@@ -107,7 +120,7 @@ export function ConnectMomentHost({
   if (phase === "off" || !current) return null;
   return (
     <>
-      {phase === "celebrate" && <ConnectCelebration nudge={current} onDismiss={skip} />}
+      {phase === "celebrate" && <ConnectCelebration nudge={current} viewer={viewer} onDismiss={skip} />}
       <ConnectCtaSheet
         open={phase === "cta"}
         nudge={current}
@@ -139,13 +152,12 @@ function ConnectBurst({ matched }: { matched: boolean }) {
   const bits = matched ? MATCH_BITS : MATCH_BITS.slice(0, 6);
   return (
     <span className="connect-burst" aria-hidden="true">
-      <XpBurst />
       {bits.map((bit, index) => (
           <i
             key={index}
             style={{
               background: bit.color,
-              animationDelay: bit.delay,
+              animationDelay: `${IMPACT_MS + Number.parseInt(bit.delay, 10)}ms`,
               borderRadius: bit.round ? "999px" : "2px",
               ["--dx" as string]: `${bit.x}px`,
               ["--dy" as string]: `${bit.y}px`,
@@ -156,7 +168,30 @@ function ConnectBurst({ matched }: { matched: boolean }) {
   );
 }
 
-function ConnectCelebration({ nudge, onDismiss }: { nudge: ConnectNudge; onDismiss: () => void }) {
+function ConnectFace({ name, url, side }: { name: string; url: string | null; side: "left" | "right" }) {
+  const photo = safeWebLink(url);
+  const letter = (firstName(name).charAt(0) || "?").toUpperCase();
+  return (
+    <span className={cn("connect-pair-face", side === "left" ? "is-left" : "is-right")} aria-hidden="true">
+      {photo ? (
+        <img src={photo} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <span className="font-display text-[40px] leading-none text-[#faf5f0]">{letter}</span>
+      )}
+    </span>
+  );
+}
+
+function ConnectCelebration({
+  nudge,
+  viewer,
+  onDismiss,
+}: {
+  nudge: ConnectNudge;
+  viewer?: ConnectViewer | null;
+  onDismiss: () => void;
+}) {
+  const you = viewer?.name?.trim() ? viewer : { name: "You", avatarUrl: null };
   return createPortal(
     <div
       role="dialog"
@@ -170,13 +205,15 @@ function ConnectCelebration({ nudge, onDismiss }: { nudge: ConnectNudge; onDismi
       tabIndex={0}
       autoFocus
     >
-      <div className={cn("relative flex flex-col items-center", nudge.matched ? "connect-novi-pop-lg" : "connect-novi-pop")}>
-        <NoviCutout className={nudge.matched ? "h-48 w-48" : "h-36 w-36"} />
+      <div className={cn("connect-pair", !nudge.matched && "is-soft")} data-testid="connect-pair">
+        <span className="connect-pair-glow" aria-hidden="true" />
+        <ConnectFace name={you.name} url={you.avatarUrl} side="left" />
+        <ConnectFace name={nudge.name} url={nudge.avatarUrl} side="right" />
         <ConnectBurst matched={nudge.matched} />
       </div>
-      <p className="mono-label mt-5 text-[10px] tracking-[.25em] text-[#ff9fc8]">{nudge.matched ? "It's a match" : "Connected"}</p>
+      <p className="mono-label mt-5 text-[10px] tracking-[.25em] text-[#ff9fc8]">{celebrationEyebrow(nudge.matched)}</p>
       <h2 className={cn("mt-2 font-display leading-tight text-[#faf5f0]", nudge.matched ? "text-[36px]" : "text-[28px]")}>
-        {nudge.matched ? `You and ${firstName(nudge.name)} both connected` : `You connected with ${firstName(nudge.name)}`}
+        {celebrationHeadline(nudge)}
       </h2>
       <p className="mt-2 max-w-xs text-sm text-white/70">
         {nudge.matched ? "Your chat is ready. Pick something to start together." : "They only find out if they connect back. You can still send a note or start a plan."}
@@ -236,7 +273,7 @@ export function ConnectCtaSheet({
                   {photo ? <img src={photo} alt="" className="h-full w-full object-cover" /> : <span className="font-display text-xl">{firstName(nudge.name).charAt(0)}</span>}
                 </span>
                 <div className="min-w-0">
-                  <p className="mono-label text-[8px] text-[#ff9fc8]">{nudge.matched ? "It's a match" : "Connected"}</p>
+                  <p className="mono-label text-[8px] text-[#ff9fc8]">{celebrationEyebrow(nudge.matched)}</p>
                   <SheetTitle className="ether-title truncate text-left text-[26px] text-[#faf5f0]">{nudge.name}</SheetTitle>
                   <SheetDescription className="text-left text-sm text-white/65">
                     What do you want to start together?
