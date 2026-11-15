@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { X, ChevronLeft, ChevronRight, Eye, Heart, Share2, Send, Trash2 } from 'lucide-react';
@@ -307,18 +308,32 @@ const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryView
 
   if (!currentStory) return null;
 
-  return (
+  // Rendered on <body>: inside the page it shared z-50 with the bottom nav,
+  // which comes later in the page and painted over the reply bar. On <body>
+  // it covers the nav, and the share and delete dialogs (also z-50 on <body>,
+  // added when opened) still open above it.
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-background/95 backdrop-blur-xl"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Story"
+      className="fixed inset-0 z-50 overscroll-contain bg-background/95 backdrop-blur-xl"
       onClick={onClose}
     >
       <div
         className="absolute inset-0 flex items-center justify-center"
-        // With the keyboard open the story shrinks into the space above it, so the reply box stays visible.
-        style={keyboardInset ? { bottom: keyboardInset } : undefined}
+        // Sized from the visible screen, not vh: Safari's vh is the height with
+        // its bars hidden, so a vh-tall story ran under the toolbar. The story
+        // stays clear of the notch and home bar, and with the keyboard open it
+        // shrinks into the space above it so the reply box stays visible.
+        style={{
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingBottom: keyboardInset ? 0 : 'env(safe-area-inset-bottom, 0px)',
+          bottom: keyboardInset || 0,
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Story Container */}
@@ -326,8 +341,7 @@ const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryView
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
-          className="relative w-full max-w-md h-[85vh] max-h-[900px] rounded-3xl overflow-hidden bg-card shadow-2xl"
-          style={keyboardInset ? { height: "calc(100% - 1rem)" } : undefined}
+          className="relative h-[calc(100%-1rem)] max-h-[900px] w-full max-w-md overflow-hidden rounded-3xl bg-card shadow-2xl md:h-[85%]"
         >
           {/* Progress Bars */}
           <div className="absolute top-4 left-4 right-4 z-20 flex gap-1">
@@ -393,6 +407,7 @@ const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryView
             <Button
               variant="ghost"
               size="icon"
+              aria-label="Close story"
               onClick={onClose}
               className="text-foreground hover:bg-foreground/10"
             >
@@ -653,7 +668,8 @@ const StoryViewer = ({ stories, onClose, onNextUser, initialStoryId }: StoryView
           },
         }}
       />
-    </motion.div>
+    </motion.div>,
+    document.body,
   );
 };
 
