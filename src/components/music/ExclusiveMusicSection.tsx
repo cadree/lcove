@@ -18,6 +18,7 @@ import { AccessRuleEditor } from "./AccessRuleEditor";
 import {
   useExclusiveTracks,
   useAccessRules,
+  useTrackSales,
   type ExclusiveTrack,
   type ExclusiveAccessRule,
 } from "@/hooks/useExclusiveMusic";
@@ -31,7 +32,17 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
-import { AUDIO_FILE_ACCEPT, AUDIO_UPLOAD_ACTION, AUDIO_UPLOAD_REJECTED, audioContentType, audioExtension, isAudioUpload } from "@/lib/audioFiles";
+import { AUDIO_FILE_ACCEPT, AUDIO_UPLOAD_ACTION, audioContentType, audioExtension, isAudioUpload } from "@/lib/audioFiles";
+import { makePreviewClip, PREVIEW_SECONDS } from "@/lib/audioPreview";
+import {
+  LOCKED_AUDIO_DETAIL,
+  LOCKED_MUSIC_BUCKET,
+  LOCKED_UPLOAD_MESSAGES,
+  formatBytes,
+  lockedUploadProblems,
+  parsePriceCents,
+  type LockedUploadProblem,
+} from "@/lib/lockedMusic";
 import { readFunctionError } from "@/lib/functionError";
 
 interface VerifyResultRow {
@@ -52,9 +63,11 @@ function asInvokePayload(value: unknown): InvokePayload | null {
 
 interface ExclusiveMusicSectionProps {
   userId: string;
+  /** Hide the owner's "sell tracks" prompt (used before they've connected any music). */
+  hideOwnerEmpty?: boolean;
 }
 
-export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) => {
+export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: ExclusiveMusicSectionProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const {
@@ -68,6 +81,7 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
   } = useExclusiveTracks(userId);
   const { rules, createRule, updateRule, deleteRule } = useAccessRules(userId);
   const { data: payoutStatus } = useArtistPayoutStatus(userId);
+  const { data: sales = {} } = useTrackSales(userId, user?.id === userId);
   const createPayoutAccount = useCreateMusicPayoutAccount();
   const refreshPayoutStatus = useRefreshMusicPayoutStatus();
   const refreshPayoutsRef = useRef(refreshPayoutStatus.mutate);
@@ -84,6 +98,8 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadStep, setUploadStep] = useState("");
+  const [uploadProblems, setUploadProblems] = useState<LockedUploadProblem[]>([]);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
@@ -102,9 +118,8 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
       (async () => {
         try {
           const { data } = await supabase.functions.invoke("verify-music-purchase");
-          const verified = asInvokePayload(data)?.results?.some(
-            (r) => r.status === "paid" && r.updated
-          );
+          // "paid" either just now (updated) or already by the webhook.
+          const verified = asInvokePayload(data)?.results?.some((r) => r.status === "paid");
           if (verified) {
             toast.success("Payment confirmed — track unlocked!");
           } else {
@@ -119,6 +134,7 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
         queryClient.invalidateQueries({ queryKey: ["exclusive-purchases"] });
         queryClient.invalidateQueries({ queryKey: ["my-exclusive-purchases"] });
         queryClient.invalidateQueries({ queryKey: ["artist-subscriptions"] });
+        queryClient.invalidateQueries({ queryKey: ["private-track-url"] });
       })();
       window.history.replaceState({}, "", window.location.pathname);
     } else if (purchase === "canceled") {
@@ -171,71 +187,116 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
     if (!file) return;
     setCoverFile(file);
     setCoverPreview(URL.createObjectURL(file));
+    setUploadProblems((prev) => prev.filter((p) => p !== "cover_type" && p !== "cover_size"));
+  };
+
+  const hasSubscriptionRule = rules.some((r) => r.rule_type === "subscription" && r.is_active);
+
+  const resetUploadForm = () => {
+    setNewTitle("");
+    setNewDescription("");
+    setNewPrice("");
+    setAllowDownloads(false);
+    setPreviewStart("0");
+    setAudioFile(null);
+    setCoverFile(null);
+    setCoverPreview("");
+    setUploadProblems([]);
+    setUploadStep("");
   };
 
   const handleUploadTrack = async () => {
-    if (!user || !newTitle.trim()) {
-      toast.error("Title is required");
-      return;
-    }
-    if (!audioFile || !isAudioUpload(audioFile)) {
-      toast.error(AUDIO_UPLOAD_REJECTED);
-      return;
-    }
+    if (!user) return;
+    const problems = lockedUploadProblems({
+      title: newTitle,
+      audio: audioFile,
+      cover: coverFile,
+      price: newPrice,
+      isAudio: isAudioUpload,
+      hasSubscriptionRule,
+    });
+    setUploadProblems(problems);
+    if (problems.length > 0 || !audioFile) return;
 
     setIsUploading(true);
+    const uploaded: Array<{ bucket: string; path: string }> = [];
     try {
+      const stamp = Date.now();
+      const startSeconds = Math.max(0, parseInt(previewStart || "0", 10) || 0);
+
+      // Preview first: if the browser can decode the file, fans get a real
+      // 15-second clip. The full file is never used as the preview.
+      setUploadStep("Making the preview…");
+      const preview = await makePreviewClip(audioFile, startSeconds, PREVIEW_SECONDS);
+
+      setUploadStep(`Uploading ${formatBytes(audioFile.size)}…`);
       const audioExt = audioExtension(audioFile.name) || "mp3";
-      const audioPath = `${user.id}/exclusive-${Date.now()}.${audioExt}`;
+      const audioPath = `${user.id}/exclusive-${stamp}.${audioExt}`;
       const { error: audioErr } = await supabase.storage
-        .from("media")
-        .upload(audioPath, audioFile, { upsert: true, contentType: audioContentType(audioFile) });
+        .from(LOCKED_MUSIC_BUCKET)
+        .upload(audioPath, audioFile, { upsert: false, contentType: audioContentType(audioFile) });
       if (audioErr) throw audioErr;
-      const { data: audioUrl } = supabase.storage.from("media").getPublicUrl(audioPath);
+      uploaded.push({ bucket: LOCKED_MUSIC_BUCKET, path: audioPath });
+
+      let previewUrl: string | undefined;
+      if (preview) {
+        const previewPath = `${user.id}/exclusive-preview-${stamp}.wav`;
+        const { error: previewErr } = await supabase.storage
+          .from("media")
+          .upload(previewPath, preview.blob, { upsert: false, contentType: "audio/wav" });
+        if (previewErr) throw previewErr;
+        uploaded.push({ bucket: "media", path: previewPath });
+        previewUrl = supabase.storage.from("media").getPublicUrl(previewPath).data.publicUrl;
+      }
 
       let coverUrl: string | undefined;
       if (coverFile) {
-        const coverExt = coverFile.name.split(".").pop() || "jpg";
-        const coverPath = `${user.id}/exclusive-cover-${Date.now()}.${coverExt}`;
+        setUploadStep("Uploading cover art…");
+        const coverExt = coverFile.name.split(".").pop()?.toLowerCase() || "jpg";
+        const coverPath = `${user.id}/exclusive-cover-${stamp}.${coverExt}`;
         const { error: coverErr } = await supabase.storage
           .from("media")
-          .upload(coverPath, coverFile, { upsert: true });
+          .upload(coverPath, coverFile, { upsert: false, contentType: coverFile.type || undefined });
         if (coverErr) throw coverErr;
-        const { data: coverData } = supabase.storage.from("media").getPublicUrl(coverPath);
-        coverUrl = coverData.publicUrl;
+        uploaded.push({ bucket: "media", path: coverPath });
+        coverUrl = supabase.storage.from("media").getPublicUrl(coverPath).data.publicUrl;
       }
 
+      setUploadStep("Saving…");
       await createTrack.mutateAsync({
         title: newTitle.trim(),
         description: newDescription.trim() || undefined,
-        audio_file_url: audioUrl.publicUrl,
+        audio_file_path: audioPath,
+        preview_clip_url: previewUrl,
+        duration_seconds: preview?.durationSeconds,
         cover_image_url: coverUrl,
-        price_cents: Math.round(parseFloat(newPrice || "0") * 100),
+        price_cents: parsePriceCents(newPrice) ?? 0,
         access_type: "purchase",
         is_published: true,
         allow_downloads: allowDownloads,
-        preview_start_seconds: Math.max(0, parseInt(previewStart || "0", 10) || 0),
-        preview_duration_seconds: 15,
+        preview_start_seconds: startSeconds,
+        preview_duration_seconds: PREVIEW_SECONDS,
       });
+      if (!preview) {
+        toast.info("Track is up. We couldn't make a preview from this file, so fans see it locked without a sample.");
+      }
 
-      setNewTitle("");
-      setNewDescription("");
-      setNewPrice("");
-      setAllowDownloads(false);
-      setPreviewStart("0");
-      setAudioFile(null);
-      setCoverFile(null);
-      setCoverPreview("");
+      resetUploadForm();
       setShowUpload(false);
     } catch (error) {
       console.error("Upload error:", error);
+      // Don't leave orphaned files behind when the save fails part-way.
+      for (const file of uploaded) {
+        await supabase.storage.from(file.bucket).remove([file.path]).catch(() => undefined);
+      }
       toast.error(errorMessage(error, "Failed to upload track"));
     } finally {
       setIsUploading(false);
+      setUploadStep("");
     }
   };
 
-  const handlePurchase = async (track: ExclusiveTrack, rule: ExclusiveAccessRule) => {
+  const handlePurchase = async (track: ExclusiveTrack, rule: ExclusiveAccessRule | null) => {
     if (Capacitor.getPlatform() === "ios") {
       toast.error("This purchase isn't available in the iOS app.");
       return;
@@ -244,14 +305,13 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
       toast.error("Sign in to purchase music");
       return;
     }
-    console.log("[MusicPurchase] starting", { trackId: track.id, ruleType: rule.rule_type });
 
     const fnName =
-      rule.rule_type === "subscription" ? "create-artist-subscription" : "purchase-exclusive-track";
+      rule?.rule_type === "subscription" ? "create-artist-subscription" : "purchase-exclusive-track";
     const body =
-      rule.rule_type === "subscription"
+      rule?.rule_type === "subscription"
         ? { artist_user_id: track.artist_user_id, access_rule_id: rule.id }
-        : { track_id: track.id, access_rule_id: rule.id, artist_user_id: track.artist_user_id };
+        : { track_id: track.id, access_rule_id: rule?.id ?? null, artist_user_id: track.artist_user_id };
 
     try {
       const { data, error } = await supabase.functions.invoke(fnName, { body });
@@ -267,7 +327,9 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
         return;
       }
       if (payload?.url) {
-        window.open(payload.url, "_blank");
+        // Same tab: a window.open after an await is blocked as a popup on iOS
+        // Safari and most phone browsers. Checkout returns to this profile.
+        window.location.assign(payload.url);
       } else {
         toast.error("No checkout URL returned");
       }
@@ -290,6 +352,7 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
   }
 
   if (!isOwner && tracks.length === 0) return null;
+  if (isOwner && hideOwnerEmpty && tracks.length === 0) return null;
 
   return (
     <motion.div
@@ -299,11 +362,11 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
     >
       <div className="p-5">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-4">
+          <div className="flex items-center gap-2 whitespace-nowrap">
             <Lock className="w-4 h-4 text-amber-500" />
             <h3 className="font-display text-base font-medium text-foreground">
-              Exclusive Music
+              Locked music
             </h3>
             {tracks.length > 0 && (
               <span className="text-xs text-muted-foreground">({tracks.length})</span>
@@ -314,7 +377,7 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-xs"
+                className="text-xs min-h-11"
                 onClick={() => setShowRules(!showRules)}
               >
                 Rules
@@ -322,8 +385,9 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
               <Button
                 variant="outline"
                 size="sm"
-                className="text-xs"
+                className="text-xs min-h-11"
                 onClick={() => setShowUpload(true)}
+                data-testid="exclusive-upload-open"
               >
                 <Plus className="w-3 h-3 mr-1" /> Upload
               </Button>
@@ -345,7 +409,7 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
               </p>
               <Button
                 size="sm"
-                className="mt-3 h-8 text-xs"
+                className="mt-3 min-h-11 text-xs"
                 disabled={createPayoutAccount.isPending}
                 onClick={() => createPayoutAccount.mutate()}
               >
@@ -393,6 +457,7 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
                 isOwner={isOwner}
                 rules={rules}
                 payoutEnabled={!!payoutStatus?.payout_enabled}
+                sales={isOwner ? sales[track.id] : undefined}
                 onDelete={() => deleteTrack.mutate(track.id)}
                 onTogglePublish={() =>
                   updateTrack.mutate({
@@ -408,29 +473,35 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
           isOwner && (
             <div className="text-center py-6 text-muted-foreground">
               <Music className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">Upload exclusive tracks for your fans</p>
+              <p className="text-sm text-foreground">Sell tracks fans unlock with one payment</p>
+              <p className="text-xs mt-1">Fans hear a 15-second preview. The full file stays private until they buy.</p>
+              <Button size="sm" className="mt-3 min-h-11" onClick={() => setShowUpload(true)}>
+                <Plus className="w-4 h-4 mr-1" /> Upload a locked track
+              </Button>
             </div>
           )
         )}
       </div>
 
       {/* Upload Dialog */}
-      <Dialog open={showUpload} onOpenChange={setShowUpload}>
-        <DialogContent className="max-w-md">
+      <Dialog open={showUpload} onOpenChange={(open) => { if (!isUploading) setShowUpload(open); }}>
+        <DialogContent className="max-w-md flex flex-col p-4 sm:p-6" data-testid="exclusive-upload-dialog">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Upload className="w-5 h-5 text-primary" />
-              Upload Exclusive Track
+              Upload a locked track
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2 min-h-0 flex-1 overflow-y-auto -mx-1 px-1">
             <div className="space-y-2">
-              <Label>Title *</Label>
+              <Label htmlFor="exclusive-title">Title</Label>
               <Input
+                id="exclusive-title"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 placeholder="Track name"
+                className="h-11"
               />
             </div>
 
@@ -445,13 +516,13 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="exclusive-audio-file">Audio File *</Label>
+              <Label htmlFor="exclusive-audio-file">Audio file</Label>
               <label
                 htmlFor="exclusive-audio-file"
                 className="relative block border-2 border-dashed border-border/60 rounded-xl p-4 text-center cursor-pointer hover:border-primary/40 transition-colors"
               >
                 {audioFile ? (
-                  <p className="text-sm text-foreground">{audioFile.name}</p>
+                  <p className="text-sm text-foreground break-all">{audioFile.name} · {formatBytes(audioFile.size)}</p>
                 ) : (
                   <div>
                     <Music className="w-6 h-6 mx-auto mb-1 text-muted-foreground" />
@@ -460,6 +531,7 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
                     </p>
                   </div>
                 )}
+                <p className="text-[11px] text-muted-foreground mt-1">{LOCKED_AUDIO_DETAIL}</p>
                 <input
                   id="exclusive-audio-file"
                   ref={audioInputRef}
@@ -468,22 +540,22 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
                   className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                   onChange={(e) => {
                     const file = e.target.files?.[0] || null;
-                    if (file && !isAudioUpload(file)) {
-                      toast.error(AUDIO_UPLOAD_REJECTED);
-                      e.target.value = "";
-                      setAudioFile(null);
-                      return;
-                    }
                     setAudioFile(file);
+                    setUploadProblems(
+                      file
+                        ? lockedUploadProblems({ title: "x", audio: file, cover: null, price: "1", isAudio: isAudioUpload })
+                        : [],
+                    );
                   }}
                 />
               </label>
             </div>
 
             <div className="space-y-2">
-              <Label>Cover Art</Label>
-              <div
-                className="border-2 border-dashed border-border/60 rounded-xl p-4 text-center cursor-pointer hover:border-primary/40 transition-colors"
+              <Label>Cover art</Label>
+              <button
+                type="button"
+                className="w-full min-h-11 border-2 border-dashed border-border/60 rounded-xl p-4 text-center cursor-pointer hover:border-primary/40 transition-colors"
                 onClick={() => coverInputRef.current?.click()}
               >
                 {coverPreview ? (
@@ -493,9 +565,9 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
                     className="w-20 h-20 mx-auto rounded-lg object-cover"
                   />
                 ) : (
-                  <p className="text-xs text-muted-foreground">Optional cover image</p>
+                  <p className="text-xs text-muted-foreground">Optional · square image under 5MB</p>
                 )}
-              </div>
+              </button>
               <input
                 ref={coverInputRef}
                 type="file"
@@ -506,23 +578,32 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
             </div>
 
             <div className="space-y-2">
-              <Label>Price ($)</Label>
+              <Label htmlFor="exclusive-price">Price (USD)</Label>
               <Input
-                type="number"
-                min="0"
-                step="0.01"
+                id="exclusive-price"
+                type="text"
+                inputMode="decimal"
                 value={newPrice}
-                onChange={(e) => setNewPrice(e.target.value)}
-                placeholder="0.00 (free preview, paid full access)"
+                onChange={(e) => {
+                  setNewPrice(e.target.value);
+                  setUploadProblems((prev) => prev.filter((p) => p !== "price"));
+                }}
+                placeholder={hasSubscriptionRule ? "4.99, or empty for subscribers only" : "4.99"}
+                className="h-11"
               />
+              <p className="text-[11px] text-muted-foreground">
+                Fans pay once to unlock the full track, on any device they sign in on. 100% of the price goes to you.
+              </p>
             </div>
 
             <div className="space-y-2">
               <Label>Preview start (seconds)</Label>
               <Input
                 type="number"
+                inputMode="numeric"
                 min="0"
                 step="1"
+                className="h-11"
                 value={previewStart}
                 onChange={(e) => setPreviewStart(e.target.value)}
                 placeholder="0"
@@ -543,13 +624,28 @@ export const ExclusiveMusicSection = ({ userId }: ExclusiveMusicSectionProps) =>
             </div>
           </div>
 
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowUpload(false)}>
+          {uploadProblems.length > 0 && (
+            <ul role="alert" className="space-y-1 text-xs text-destructive" data-testid="exclusive-upload-problems">
+              {uploadProblems.map((problem) => (
+                <li key={problem} className="flex items-start gap-1">
+                  <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" /> {LOCKED_UPLOAD_MESSAGES[problem]}
+                </li>
+              ))}
+            </ul>
+          )}
+          {isUploading && uploadStep && (
+            <p className="text-xs text-muted-foreground" aria-live="polite">{uploadStep}</p>
+          )}
+
+          <div className="flex shrink-0 justify-end gap-2">
+            <Button variant="outline" className="min-h-11" disabled={isUploading} onClick={() => setShowUpload(false)}>
               Cancel
             </Button>
             <Button
+              className="min-h-11"
               onClick={handleUploadTrack}
-              disabled={isUploading || !newTitle.trim() || !audioFile}
+              disabled={isUploading}
+              data-testid="exclusive-upload-submit"
             >
               {isUploading ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />

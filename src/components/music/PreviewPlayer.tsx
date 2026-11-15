@@ -97,7 +97,7 @@ export const PreviewPlayer = ({
       <button
         type="button"
         onClick={handleToggle}
-        className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0 hover:scale-105 transition-transform"
+        className="w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0 hover:scale-105 transition-transform"
         aria-label={isPlaying ? "Pause preview" : "Play preview"}
       >
         {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}

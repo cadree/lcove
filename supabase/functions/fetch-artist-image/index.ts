@@ -1,3 +1,8 @@
+import { parseSpotifyEmbed, spotifyEmbedPageUrl, spotifyRef } from '../_shared/spotify-embed-meta.mjs'
+
+// Upstream pages sometimes hang; never hold the app's Connect Music dialog longer than this.
+const UPSTREAM_TIMEOUT_MS = 6000
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -18,8 +23,16 @@ Deno.serve(async (req) => {
       )
     }
 
-    const isSpotify = url.includes('open.spotify.com')
-    const isAppleMusic = url.includes('music.apple.com')
+    // Match the real host, not a substring: this function fetches the URL server-side.
+    let host = ''
+    try {
+      const parsedUrl = new URL(url)
+      host = parsedUrl.protocol === 'https:' ? parsedUrl.hostname.toLowerCase() : ''
+    } catch {
+      host = ''
+    }
+    const isSpotify = host === 'open.spotify.com'
+    const isAppleMusic = host === 'music.apple.com'
 
     if (!isSpotify && !isAppleMusic) {
       return new Response(
@@ -39,7 +52,7 @@ Deno.serve(async (req) => {
       try {
         const oembedRes = await fetch(
           `https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`,
-          { headers: { 'User-Agent': 'Mozilla/5.0' } }
+          { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) }
         )
         if (oembedRes.ok) {
           const oembedData = await oembedRes.json()
@@ -73,6 +86,25 @@ Deno.serve(async (req) => {
       }
     }
 
+    // --- Spotify embed page: artist, tracks and art as JSON, no credentials ---
+    const ref = isSpotify ? spotifyRef(url) : null
+    if (ref) {
+      try {
+        const embedRes = await fetch(spotifyEmbedPageUrl(ref), {
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'en-US,en;q=0.9' },
+          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+        })
+        if (embedRes.ok) {
+          const parsed = parseSpotifyEmbed(await embedRes.text(), ref, { oembedImage: imageUrl, pageUrl: url })
+          if (parsed && (parsed.artist_name || parsed.top_tracks.length || parsed.albums.length)) {
+            return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+          }
+        }
+      } catch (e) {
+        console.error('Spotify embed page failed:', e)
+      }
+    }
+
     // --- Fetch HTML for metadata ---
     try {
       const pageRes = await fetch(url, {
@@ -82,6 +114,7 @@ Deno.serve(async (req) => {
           'Accept-Language': 'en-US,en;q=0.9',
         },
         redirect: 'follow',
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       })
 
       if (pageRes.ok) {
@@ -121,8 +154,9 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Extract og:title - fallback for artist name
-        if (!artistName) {
+        // Extract og:title - fallback for artist name. On Spotify track/album/playlist
+        // pages og:title is the song or album, so it is only trusted on artist pages.
+        if (!artistName && (!isSpotify || url.includes('/artist/'))) {
           const ogTitleMatch = html.match(
             /<meta\s+(?:property|name)=["']og:title["']\s+content=["']([^"']+)["']/i
           ) || html.match(

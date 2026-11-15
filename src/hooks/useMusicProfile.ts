@@ -110,31 +110,20 @@ export const useMusicProfile = (userId?: string) => {
         platform_links: profileData.platform_links as unknown as Json,
       };
 
-      const { data: existing } = await supabase
+      // One upsert on the user_id unique key: no read-then-write race when Save is tapped
+      // twice, and no insert that collides because the first read failed.
+      const { error } = await supabase
         .from("music_profiles")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (existing) {
-        const { error } = await supabase
-          .from("music_profiles")
-          .update({ ...dataToSave, updated_at: new Date().toISOString() })
-          .eq("user_id", user.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("music_profiles")
-          .insert({ user_id: user.id, ...dataToSave });
-        if (error) throw error;
-      }
+        .upsert({ user_id: user.id, ...dataToSave }, { onConflict: "user_id" });
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["music-profile", user?.id] });
       toast.success("Music profile saved!");
     },
     onError: (error) => {
-      toast.error("Failed to save music profile");
+      const detail = error instanceof Error && error.message ? `: ${error.message}` : "";
+      toast.error(`Couldn't save your music${detail}. Check your connection and try again.`);
       console.error(error);
     },
   });

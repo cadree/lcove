@@ -317,7 +317,7 @@ const Profile = () => {
                 />
               </div>
             )}
-            <div className="px-5 py-4">
+            <div className="px-5 py-4 empty:hidden [&:has(>div:empty)]:hidden">
               <MusicProfileBlock
                 userId={targetUserId}
                 onConnectClick={() => setShowMusicDialog(true)}
@@ -629,7 +629,7 @@ const Profile = () => {
         {/* Dialogs */}
         {isOwnProfile && (
           <>
-            <ConnectMusicDialog open={showMusicDialog} onOpenChange={setShowMusicDialog} />
+            <ConnectMusicDialog open={showMusicDialog} onOpenChange={setShowMusicDialog} defaultName={profile?.display_name} />
             <ProfileCustomizationDialog open={showCustomizationDialog} onOpenChange={setShowCustomizationDialog} />
             <CreateBlogDialog
               open={showCreateBlogDialog}
