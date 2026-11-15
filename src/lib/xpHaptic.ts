@@ -12,3 +12,13 @@ export function pulseXpHaptic(): void {
     .then(({ Haptics, ImpactStyle }) => Haptics.impact({ style: ImpactStyle.Light }))
     .catch(() => undefined);
 }
+
+/** Light tap on a one-sided connect, a slightly stronger one on a mutual match. Web skips it. */
+export function pulseConnectHaptic(kind: "connect" | "match"): void {
+  if (!isIosApp()) return;
+  void import("@capacitor/haptics")
+    .then(({ Haptics, ImpactStyle }) =>
+      Haptics.impact({ style: kind === "match" ? ImpactStyle.Medium : ImpactStyle.Light }),
+    )
+    .catch(() => undefined);
+}

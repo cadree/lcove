@@ -1,5 +1,5 @@
 import { Suspense, lazy, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Globe2, MapPin, Plane, SlidersHorizontal, UserPlus, Users } from "lucide-react";
 import { markConnectHintSeen, showConnectHint } from "@/lib/firstRun";
@@ -15,10 +15,12 @@ import {
   type DiscoverySignal, type Person,
 } from "@/lib/peopleDiscovery";
 import { safeWebLink } from "@/lib/tripMoney";
+import { ConnectCtaSheet, ConnectMomentHost, ConnectNudgeLine, nudgeFromPerson, personNudge, useConnectNudges } from "./ConnectMoment";
 import { MemberGrid } from "./MemberGrid";
 import { SwipeDeck } from "./SwipeDeck";
 import { TravelingToCity } from "./TravelingToCity";
 import { supabase } from "@/integrations/supabase/client";
+import type { IcebreakerMe } from "@/lib/connectMoment";
 
 // The globe and its city coordinates (~300 KB) load after the deck renders.
 const CreativeGlobe = lazy(() => import("@/components/discovery/CreativeGlobe").then((m) => ({ default: m.CreativeGlobe })));
@@ -31,12 +33,14 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
   const { user, people, members, signals, settings } = usePeopleDiscovery();
   const { blockUser } = useUserBlocks();
   const cache = useQueryClient();
-  const navigate = useNavigate();
   const search = useDeferredValue(query);
   const [city, setCity] = useState<string | null>(null);
   const [focus, setFocus] = useState<{ id: string; at: number } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reporting, setReporting] = useState<Person | null>(null);
+  const [moment, setMoment] = useState<{ person: Person; matched: boolean; conversationId: string | null } | null>(null);
+  const [ctaPerson, setCtaPerson] = useState<Person | null>(null);
+  const nudges = useConnectNudges(user?.id);
   const location = useLocation();
   // First run (arriving from onboarding): open on my city if anyone is there, and show one Connect hint.
   const [hint, setHint] = useState(() => showConnectHint(window.localStorage, user?.id, location.search));
@@ -55,6 +59,9 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
   });
 
   const me = people.find((p) => p.user_id === user?.id);
+  const myIcebreaker: IcebreakerMe | null = me
+    ? { skills: me.skills, passions: me.passions, city: me.live?.label || me.home?.label || me.city_display || me.city }
+    : null;
   const myLive = placeForKey(settings.data?.live_city_key);
   const myPlace = myLive || me?.home || null;
   const options = useMemo(() => placeOptions(people), [people]);
@@ -101,10 +108,8 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
         void supabase.functions.invoke("send-push-notification", {
           body: { user_id: person.user_id, notification_type: "match", title: "It's a match", data: { conversation_id: data.conversation_id } },
         }).catch(() => undefined);
-        toast.success(`It's a match with ${person.name}. Your chat is ready.`, {
-          action: { label: "Open chat", onClick: () => navigate(`/messages?conversation=${data.conversation_id}`) },
-        });
-      } else if (liked) toast.success(`Connect sent to ${person.name}. They only find out if they connect back.`);
+      }
+      if (liked) setMoment({ person, matched: !!data.matched, conversationId: data.conversation_id });
     },
     onError: (e: Error) => {
       toast.error(e.message);
@@ -125,6 +130,9 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
     }
     setCity(myPlace.key);
   };
+
+  const matchIds = new Set((matches.data || []).map((m) => m.user_id));
+  const openNudges = nudges.filter((n) => !n.started && !matchIds.has(n.userId));
 
   if (!user) {
     return (
@@ -287,6 +295,10 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
               people={deck}
               focus={focus}
               pending={swipe.isPending}
+              viewerId={user?.id}
+              me={myIcebreaker}
+              nudgeFor={(id) => personNudge(nudges, id)}
+              onReopen={(person) => setCtaPerson(person)}
               onDecide={(person, liked) => {
                 if (hint) dismissHint();
                 return swipe.mutateAsync({ person, liked }).catch(() => undefined);
@@ -312,12 +324,17 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
 
         </div>
 
-        {!!matches.data?.length && (
+        {!!(matches.data?.length || openNudges.length) && (
           <div className="mt-5 border-t border-white/10 pt-4">
+            {!!matches.data?.length && (
+              <>
             <h3 className="mb-2 text-[10px] uppercase tracking-[.25em] text-white/60">Your matches</h3>
-            <ul className="space-y-1">
-              {matches.data.map((m) => (
-                <li key={m.user_id} className="flex items-center justify-between gap-3">
+            <ul className="space-y-2">
+              {matches.data.map((m) => {
+                const nudge = personNudge(nudges, m.user_id);
+                return (
+                <li key={m.user_id} className="space-y-1">
+                  <div className="flex items-center justify-between gap-3">
                   <Link className="flex min-h-11 items-center text-sm" to={`/messages?conversation=${m.conversation_id}`}>
                     {m.display_name || "Creative"} · Open chat
                   </Link>
@@ -331,9 +348,26 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
                   >
                     Unmatch
                   </button>
+                  </div>
+                  {nudge && <ConnectNudgeLine nudge={nudge} viewerId={user?.id} me={myIcebreaker} />}
                 </li>
-              ))}
+                );
+              })}
             </ul>
+              </>
+            )}
+            {!!openNudges.length && (
+              <div className={matches.data?.length ? "mt-4" : ""}>
+                <h3 className="mb-2 text-[10px] uppercase tracking-[.25em] text-white/60">Start something</h3>
+                <ul className="space-y-2">
+                  {openNudges.map((nudge) => (
+                    <li key={nudge.userId}>
+                      <ConnectNudgeLine nudge={nudge} viewerId={user?.id} me={myIcebreaker} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
         <p className="mt-4 text-[11px] leading-relaxed text-white/45">
@@ -378,6 +412,30 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
       </Dialog>
       {reporting && (
         <ReportDialog open onOpenChange={(open) => !open && setReporting(null)} targetType="profile" targetId={reporting.user_id} />
+      )}
+      <ConnectMomentHost
+        viewerId={user?.id}
+        me={myIcebreaker}
+        event={moment}
+        onClear={() => setMoment(null)}
+      />
+      {ctaPerson && (
+        <ConnectCtaSheet
+          open
+          nudge={
+            personNudge(nudges, ctaPerson.user_id)
+            || nudgeFromPerson(
+              ctaPerson,
+              !!matches.data?.some((m) => m.user_id === ctaPerson.user_id),
+              matches.data?.find((m) => m.user_id === ctaPerson.user_id)?.conversation_id || null,
+            )
+          }
+          me={myIcebreaker}
+          viewerId={user?.id}
+          onOpenChange={(open) => {
+            if (!open) setCtaPerson(null);
+          }}
+        />
       )}
     </>
   );

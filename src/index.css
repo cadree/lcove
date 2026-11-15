@@ -816,6 +816,44 @@ button.novi-peek:focus-visible {
   animation: xp-pop 680ms ease-out forwards;
 }
 
+.connect-burst {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 0;
+  height: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.connect-burst i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  opacity: 0;
+  animation: xp-pop 1200ms ease-out forwards;
+}
+
+.connect-novi-pop,
+.connect-novi-pop-lg {
+  animation: connect-novi-pop 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes connect-novi-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(28px) scale(0.86);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+
 @keyframes novi-breathe {
   0%,
   100% {
@@ -1011,7 +1049,10 @@ button.novi-peek:focus-visible {
   .novi-glance,
   .novi-lid,
   .quest-fill,
-  .xp-burst i {
+  .xp-burst i,
+  .connect-burst i,
+  .connect-novi-pop,
+  .connect-novi-pop-lg {
     animation: none !important;
   }
 

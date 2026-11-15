@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -12,12 +12,17 @@ export function MessageRequestDialog({
   person,
   open,
   onOpenChange,
+  initialBody = "",
 }: {
   person: { user_id: string; name: string };
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialBody?: string;
 }) {
-  const [body, setBody] = useState("");
+  const [body, setBody] = useState(initialBody);
+  useEffect(() => {
+    if (open) setBody(initialBody);
+  }, [open, initialBody]);
   const navigate = useNavigate();
   const cache = useQueryClient();
   const send = useMutation({
