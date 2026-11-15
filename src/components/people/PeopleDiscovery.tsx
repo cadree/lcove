@@ -1,6 +1,8 @@
 import { Suspense, lazy, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { OpenToFilter } from "@/components/openTo/OpenToChips";
+import { hasOpenTo, openToLabel, type OpenToTag } from "@/lib/openTo";
 import { Globe2, MapPin, Plane, SlidersHorizontal, UserPlus, Users } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { markConnectHintSeen, showConnectHint } from "@/lib/firstRun";
@@ -46,7 +48,13 @@ function useCityPoints(enabled: boolean) {
  * avatar row, the swipe deck and matches; "See all" opens the full member list.
  */
 export function PeopleDiscovery({ query }: { query: string }) {
-  const { user, people, members, signals, settings } = usePeopleDiscovery();
+  const { user, people: everyone, members, signals, settings } = usePeopleDiscovery();
+  const [openFilter, setOpenFilter] = useState<OpenToTag[]>([]);
+  const people = useMemo(
+    () => (openFilter.length ? everyone.filter((p) => hasOpenTo(p.open_to, openFilter)) : everyone),
+    [everyone, openFilter],
+  );
+  const openFilterLabel = openFilter.map((tag) => openToLabel(tag)?.toLowerCase()).join(" + ");
   const { blockUser } = useUserBlocks();
   const cache = useQueryClient();
   const search = useDeferredValue(query);
@@ -81,7 +89,7 @@ export function PeopleDiscovery({ query }: { query: string }) {
     hintRef.current.scrollIntoView({ block: "start", behavior: "smooth" });
   });
 
-  const me = people.find((p) => p.user_id === user?.id);
+  const me = everyone.find((p) => p.user_id === user?.id);
   const myIcebreaker: IcebreakerMe | null = me
     ? { skills: me.skills, passions: me.passions, city: me.live?.label || me.home?.label || me.city_display || me.city }
     : null;
@@ -297,6 +305,7 @@ export function PeopleDiscovery({ query }: { query: string }) {
             <Plane size={16} /> Let’s travel
           </Link>
         </div>
+        <OpenToFilter value={openFilter} onChange={setOpenFilter} />
 
         <div className="lg:mt-2 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-8">
         <div className="min-w-0">
@@ -337,6 +346,7 @@ export function PeopleDiscovery({ query }: { query: string }) {
                 ? `${nearbyDeck.length} within ${NEARBY_KM} km of ${myPlace?.label.split(",")[0] || "you"}${myArea ? " · using your live area" : " · by profile city"}`
                 : `${here.length} ${here.length === 1 ? "member" : "members"} ${cityLabel ? "here" : "on the globe"}${here.some((p) => p.live) ? ` · ${here.filter((p) => p.live).length} here live` : ""}`}
               {search ? ` · matching “${search}”` : ""}
+              {openFilterLabel ? ` · open to ${openFilterLabel}` : ""}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-3">
@@ -390,7 +400,9 @@ export function PeopleDiscovery({ query }: { query: string }) {
           ) : (
             <div className="rounded-[28px] border border-dashed border-white/15 px-6 py-10 text-center">
               <p className="font-display text-xl">
-                {search
+                {openFilterLabel && !search
+                  ? `Nobody here is open to ${openFilterLabel} yet`
+                  : search
                   ? `Nobody here matches “${search}”`
                   : nearbyMode
                     ? `No one else near ${myPlace?.label.split(",")[0] || "you"} yet`
@@ -461,11 +473,11 @@ export function PeopleDiscovery({ query }: { query: string }) {
       <Sheet open={listOpen} onOpenChange={setListOpen}>
         <SheetContent side="bottom" className="max-h-[88dvh] rounded-t-[28px] px-4 pb-8">
           <SheetTitle className="ether-title pr-10 text-[22px]">{cityLabel ? `Everyone in ${cityLabel}` : "Everyone"} · {list.length}</SheetTitle>
-          <SheetDescription className="mb-4 text-sm text-muted-foreground">Every member{search ? ` matching “${search}”` : ""}, including people who hide from the globe.</SheetDescription>
+          <SheetDescription className="mb-4 text-sm text-muted-foreground">Every member{search ? ` matching “${search}”` : ""}{openFilterLabel ? ` open to ${openFilterLabel}` : ""}, including people who hide from the globe.</SheetDescription>
           {members.isPending ? (
             <p role="status" className="text-sm text-muted-foreground">Loading members…</p>
           ) : list.length ? (
-            <MemberGrid people={list} resetKey={`${city}|${search}`} />
+            <MemberGrid people={list} resetKey={`${city}|${search}|${openFilter.join(",")}`} />
           ) : (
             <div className="file-panel flex flex-col items-center gap-2 p-6 text-center">
               <Users className="h-6 w-6 text-muted-foreground" />

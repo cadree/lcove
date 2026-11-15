@@ -9,6 +9,8 @@ export function toneForPath(pathname: string): ScreenTone {
     path === "/landing" ||
     path.startsWith("/auth") ||
     path.startsWith("/onboarding") ||
+    path.startsWith("/pending") ||
+    path.startsWith("/denied") ||
     path.startsWith("/locked")
   ) {
     return "blood";

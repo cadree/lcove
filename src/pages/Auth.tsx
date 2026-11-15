@@ -10,23 +10,20 @@ import { PENDING_SIGNUP_KEY, applyPendingSignupProfile, inviteTokenFromMetadata 
 import { captureSignupAttribution } from '@/lib/signupAttribution';
 import { WAITLIST_MODE } from '@/config/launch';
 import { PageMeta } from '@/components/seo/PageMeta';
-import { HERO_TAGLINE } from '@/content/copy';
+import { EMAIL_CONFIRMED_BODY, EMAIL_CONFIRMED_TITLE, HERO_TAGLINE, VERIFY_SIGNAL_BODY, VERIFY_SIGNAL_TITLE } from '@/content/copy';
 import { getAuthRedirectUrl } from '@/lib/capacitorStorage';
 import { resendCooldownRemaining } from '@/lib/resendCooldown';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { logAuthEvent, logAuthError } from '@/lib/authDebug';
-import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, User, Phone, Wifi, WifiOff } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, User, Wifi, WifiOff } from 'lucide-react';
 import { EtherWordmark } from '@/components/brand/EtherWordmark';
 import { eventReturnPath, rememberEventReturn } from '../../functions/_shared/eventShare.js';
-import { MEMBER_OF_HINT, MEMBER_OF_LIMIT, memberOfError } from '@/lib/etherId';
 
 const signupSchema = z.object({
   email: z.string().email('Please enter a valid email').max(255),
   password: z.string().min(8, 'Password must be at least 8 characters').max(100),
   displayName: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name must be less than 50 characters'),
-  phone: z.string().optional().refine(val => !val || /^[\d\s\-+()]*$/.test(val), 'Please enter a valid phone number'),
-  memberOf: z.string().trim().max(MEMBER_OF_LIMIT, 'Member of is 24 characters or fewer.'),
 });
 
 const loginSchema = z.object({
@@ -42,7 +39,7 @@ const passwordSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters').max(100),
 });
 
-type AuthMode = 'login' | 'signup' | 'forgot' | 'reset' | 'confirm-email';
+type AuthMode = 'login' | 'signup' | 'forgot' | 'reset' | 'confirm-email' | 'confirmed-signin';
 
 /**
  * Map Supabase auth errors to user-friendly messages
@@ -120,14 +117,14 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [memberOf, setMemberOf] = useState('');
-  const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string; displayName?: string; phone?: string; memberOf?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; displayName?: string }>({});
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [confirmationSentAt, setConfirmationSentAt] = useState<number | null>(null);
+  const [emailCode, setEmailCode] = useState('');
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
   const [resendNow, setResendNow] = useState(() => Date.now());
   const [isResending, setIsResending] = useState(false);
   const inviteToken = searchParams.get('invite')?.trim() ?? '';
@@ -136,7 +133,7 @@ const Auth = () => {
     inviteToken ? 'checking' : 'none',
   );
 
-  const { signIn, signUp, user, resetPassword, updatePassword } = useAuth();
+  const { signIn, signUp, user, loading: authLoading, resetPassword, updatePassword } = useAuth();
   const [termsAccepted, setTermsAccepted] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -185,8 +182,27 @@ const Auth = () => {
     setConfirmationSentAt(Date.now());
     toast({
       title: 'Email sent',
-      description: 'We sent another confirmation link.',
+      description: 'We sent another code and link.',
     });
+  };
+
+
+  const handleVerifyEmailCode = async () => {
+    const token = emailCode.replace(/\s+/g, '');
+    if (token.length < 6 || isVerifyingCode || !email) return;
+    setIsVerifyingCode(true);
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'signup',
+    });
+    setIsVerifyingCode(false);
+    if (error) {
+      const { title, description } = getAuthErrorMessage(error);
+      toast({ title, description, variant: 'destructive' });
+      return;
+    }
+    logAuthEvent('Signup email code verified');
   };
 
   // Log platform info on mount. mode is read from a ref so this stays mount-only.
@@ -233,7 +249,7 @@ const Auth = () => {
     if (!user || mode === 'reset' || mode === 'forgot') return;
     if (inviteToken && inviteState === 'checking') return;
     let cancelled = false;
-    applyPendingSignupProfile(user.id, inviteTokenFromMetadata(user.user_metadata)).then((result) => {
+    applyPendingSignupProfile(user.id, inviteTokenFromMetadata(user.user_metadata), user.user_metadata).then((result) => {
       if (cancelled) return;
       if (result === 'invite-failed') {
         toast({
@@ -271,6 +287,12 @@ const Auth = () => {
     else if (tab === 'signin' || tab === 'login') setMode('login');
   }, [isResetMode, tab]);
 
+  const confirmedRedirect = searchParams.get('confirmed') === '1';
+  useEffect(() => {
+    if (!confirmedRedirect || authLoading || user) return;
+    setMode('confirmed-signin');
+  }, [confirmedRedirect, authLoading, user]);
+
   const validateForm = () => {
     if (mode === 'forgot') {
       const result = emailSchema.safeParse({ email });
@@ -285,9 +307,9 @@ const Auth = () => {
         return false;
       }
     } else if (mode === 'signup') {
-      const result = signupSchema.safeParse({ email, password, displayName, phone, memberOf });
+      const result = signupSchema.safeParse({ email, password, displayName });
       if (!result.success) {
-        const fieldErrors: { email?: string; password?: string; displayName?: string; phone?: string; memberOf?: string } = {};
+        const fieldErrors: { email?: string; password?: string; displayName?: string } = {};
         result.error.errors.forEach((err) => {
           const field = err.path[0] as string;
           fieldErrors[field as keyof typeof fieldErrors] = err.message;
@@ -331,7 +353,7 @@ const Auth = () => {
     logAuthEvent(`Auth attempt: ${mode}`, { email: email.replace(/(.{2}).*(@.*)/, '$1***$2') });
 
     try {
-      if (mode === 'login') {
+      if (mode === 'login' || mode === 'confirmed-signin') {
         const { error } = await signIn(email, password);
         if (error) {
           logAuthError('Login failed', error);
@@ -346,18 +368,11 @@ const Auth = () => {
           setErrors({ email: 'Use the invited email.' });
           return;
         }
-        const memberError = memberOfError(memberOf);
-        if (memberError) {
-          setErrors({ memberOf: memberError });
-          return;
-        }
         sessionStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({
           displayName: displayName.trim(),
-          phone: phone.trim(),
-          memberOf: memberOf.trim(),
           ...(inviteToken ? { inviteToken } : {}),
         }));
-        const { error, session } = await signUp(email, password, inviteToken || undefined);
+        const { error, session } = await signUp(email, password, inviteToken || undefined, { displayName: displayName.trim() });
         if (error) {
           logAuthError('Signup failed', error);
           const { title, description } = getAuthErrorMessage(error);
@@ -416,7 +431,8 @@ const Auth = () => {
     switch (mode) {
       case 'forgot': return 'Reset Password';
       case 'reset': return 'New Password';
-      case 'confirm-email': return 'Check your email';
+      case 'confirm-email': return VERIFY_SIGNAL_TITLE;
+      case 'confirmed-signin': return EMAIL_CONFIRMED_TITLE;
       default: return '';
     }
   };
@@ -427,12 +443,13 @@ const Auth = () => {
       case 'signup': return 'Create an account. Free to join.';
       case 'forgot': return resetEmailSent ? 'Check your inbox' : 'Enter your email to reset';
       case 'reset': return 'Create your new password';
-      case 'confirm-email': return 'Confirm your email to continue';
+      case 'confirm-email': return VERIFY_SIGNAL_BODY;
+      case 'confirmed-signin': return EMAIL_CONFIRMED_BODY;
     }
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4 safe-area-all">
+    <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-start px-4 pb-4 pt-6 safe-area-all">
       <PageMeta title="Sign in · Ether" description={HERO_TAGLINE} />
       {/* Offline indicator */}
       {!isOnline && (
@@ -451,17 +468,17 @@ const Auth = () => {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
-        <div className="text-center mb-10">
+        <div className="text-center mb-5">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.1 }}
             className="mb-4"
           >
-            <EtherWordmark className="mx-auto w-[16rem] max-w-full" />
+            <EtherWordmark className="mx-auto w-[11rem] max-w-full" />
           </motion.div>
           <motion.h1
-            className="ether-title text-4xl text-foreground mb-2"
+            className="ether-title text-3xl text-foreground mb-2"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
@@ -481,7 +498,7 @@ const Auth = () => {
         </div>
 
         <motion.div
-          className="file-panel p-8"
+          className="file-panel p-5"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
@@ -492,8 +509,8 @@ const Auth = () => {
             </p>
           )}
 
-          {(mode === 'login' || mode === 'signup') && (
-            <div className="mb-8 flex rounded-[16px] border border-border p-1">
+          {(mode === 'login' || mode === 'signup' || mode === 'confirmed-signin') && (
+            <div className="mb-4 flex rounded-[16px] border border-border p-1">
               <button
                 onClick={() => setMode('login')}
                 className={`mono-label flex-1 min-h-11 rounded-[14px] text-[12px] transition-all ${
@@ -532,13 +549,30 @@ const Auth = () => {
           )}
 
           {mode === 'confirm-email' ? (
-            <div className="text-center py-4">
-              <Mail className="h-12 w-12 text-primary mx-auto mb-4" />
-              <p className="text-foreground mb-2">Check your email to confirm</p>
+            <div className="text-center py-2">
               <p className="text-sm text-muted-foreground mb-4">
-                We sent a confirmation link to <span className="text-primary">{email}</span>.
-                Open it to finish creating your account. You will continue onboarding after you confirm.
+                Sent to <span className="text-primary">{email}</span>.
               </p>
+              <label htmlFor="email-code" className="sr-only">6-digit code</label>
+              <Input
+                id="email-code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={8}
+                value={emailCode}
+                onChange={(e) => setEmailCode(e.target.value.replace(/[^0-9]/g, ''))}
+                onKeyDown={(e) => { if (e.key === 'Enter') void handleVerifyEmailCode(); }}
+                placeholder="6-digit code"
+                className="mb-3 h-12 text-center tracking-[0.4em] text-lg"
+              />
+              <Button
+                type="button"
+                className="w-full mb-3"
+                onClick={() => void handleVerifyEmailCode()}
+                disabled={isVerifyingCode || emailCode.replace(/\s+/g, '').length < 6}
+              >
+                {isVerifyingCode ? 'Verifying' : 'Verify'}
+              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -547,8 +581,8 @@ const Auth = () => {
                 className="w-full mb-3"
               >
                 {resendWaitMs > 0
-                  ? `Resend email (${Math.ceil(resendWaitMs / 1000)}s)`
-                  : 'Resend email'}
+                  ? `Resend (${Math.ceil(resendWaitMs / 1000)}s)`
+                  : 'Resend code'}
               </Button>
               <Button
                 variant="outline"
@@ -590,7 +624,7 @@ const Auth = () => {
               </Button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-3">
               {mode === 'signup' && (
                 <>
                   <div className="space-y-2">
@@ -633,42 +667,7 @@ const Auth = () => {
                     )}
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        type="text"
-                        placeholder="Member of"
-                        value={memberOf}
-                        maxLength={MEMBER_OF_LIMIT}
-                        onChange={(e) => setMemberOf(e.target.value)}
-                        className="pl-11 h-12 bg-input border-border focus:border-primary"
-                        aria-describedby="member-of-hint"
-                      />
-                    </div>
-                    <p id="member-of-hint" className="text-xs text-muted-foreground pl-1">
-                      {MEMBER_OF_HINT}
-                    </p>
-                    {errors.memberOf && (
-                      <p className="text-sm text-destructive">{errors.memberOf}</p>
-                    )}
-                  </div>
 
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        type="tel"
-                        placeholder="Phone number (optional)"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="pl-11 h-12 bg-input border-border focus:border-primary"
-                      />
-                    </div>
-                    {errors.phone && (
-                      <p className="text-sm text-destructive">{errors.phone}</p>
-                    )}
-                  </div>
                 </>
               )}
 
@@ -752,7 +751,7 @@ const Auth = () => {
                   </>
                 ) : (
                   <>
-                    {mode === 'login' && 'Sign in'}
+                    {(mode === 'login' || mode === 'confirmed-signin') && 'Sign in'}
                     {mode === 'signup' && 'Join'}
                     {mode === 'forgot' && 'Send Reset Link'}
                     {mode === 'reset' && 'Update Password'}
@@ -763,8 +762,9 @@ const Auth = () => {
             </form>
           )}
 
-          {(mode === 'login' || mode === 'signup') && (
+          {(mode === 'login' || mode === 'signup' || mode === 'confirmed-signin') && (
             <>
+              {mode !== 'signup' && (
               <div className="mt-4 text-center">
                 <button
                   type="button"
@@ -774,6 +774,7 @@ const Auth = () => {
                   Forgot your password?
                 </button>
               </div>
+              )}
 
               <AnimatePresence mode="wait">
                 <motion.p
@@ -783,7 +784,7 @@ const Auth = () => {
                   exit={{ opacity: 0, y: -10 }}
                   className="mt-6 text-center text-xs text-muted-foreground"
                 >
-                  {mode === 'login' ? (
+                  {mode === 'login' || mode === 'confirmed-signin' ? (
                     <>
                       Don&apos;t have an account? Use the Join tab above.{" "}
                       <Link to="/privacy" className="text-primary underline">Privacy</Link>

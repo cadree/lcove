@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { EtherWordmark } from "@/components/brand/EtherWordmark";
-import { APP_STORE_URL, INSTAGRAM_URL, SLACK_URL } from "@/config/launch";
-import { APP_STORE_COMING, SLACK_INTRO } from "@/content/copy";
+import { APP_STORE_URL, INSTAGRAM_URL } from "@/config/launch";
+import { APP_STORE_COMING } from "@/content/copy";
 import { publicJoinPath } from "@/lib/publicJoin";
 
 const columns = [
@@ -64,14 +64,6 @@ export function LandingFooter() {
             <a href={INSTAGRAM_URL} className="min-h-11 text-muted-foreground hover:text-foreground">
               Instagram
             </a>
-          ) : null}
-          {SLACK_URL ? (
-            <a href={SLACK_URL} className="min-h-11 text-muted-foreground hover:text-foreground">
-              Slack
-            </a>
-          ) : null}
-          {SLACK_URL ? (
-            <p className="text-muted-foreground">{SLACK_INTRO}</p>
           ) : null}
           {APP_STORE_URL ? (
             <a href={APP_STORE_URL} className="inline-flex min-h-11 items-center rounded-lg bg-foreground px-3 text-background">

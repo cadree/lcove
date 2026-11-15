@@ -43,6 +43,9 @@ jobs:
       - name: Item invite database checks
         run: npm run test:invite-db
 
+      - name: Creative bridge database checks
+        run: npm run test:bridge-db
+
       - name: Stripe webhook fixtures
         run: npm run test:webhook
 

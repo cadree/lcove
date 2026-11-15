@@ -22,22 +22,6 @@ export function memberOfPass(value) {
   return shown(value) || "LCOVE";
 }
 
-function reviewPass(card) {
-  const count = card.peer_review_count;
-  if (typeof count === "number" && count <= 0) return null;
-  const label = shown(card.peer_review_label);
-  if (label && !/^no peer reviews$/i.test(label)) return label;
-  if (
-    typeof count === "number" &&
-    count > 0 &&
-    card.peer_review_average != null &&
-    !Number.isNaN(Number(card.peer_review_average))
-  ) {
-    return `${card.peer_review_average} · ${count}`;
-  }
-  return null;
-}
-
 function projectPass(card) {
   const count = card.projects_completed;
   if (typeof count === "number") {
@@ -118,7 +102,6 @@ export function etherIdStripCopy(card) {
 export function etherIdPassJson(card, meta) {
   const since = sincePass(card);
   const city = shown(card.city);
-  const reviews = reviewPass(card);
   const projects = projectPass(card);
 
   const backFields = [];
@@ -130,7 +113,6 @@ export function etherIdPassJson(card, meta) {
     });
   }
   if (since) backFields.push({ key: "since", label: "Member since", value: since });
-  if (reviews) backFields.push({ key: "reviews", label: "Reviews", value: reviews });
   if (projects) backFields.push({ key: "projects", label: "Projects", value: projects });
   backFields.push({ key: "verify", label: "Verify", value: meta.verifyUrl });
 

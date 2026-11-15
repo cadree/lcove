@@ -694,6 +694,78 @@
   background: radial-gradient(125% 105% at 50% 38%, transparent 55%, rgba(60, 40, 30, 0.16));
 }
 
+.entry-atmosphere {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.entry-glow {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.entry-glow-a {
+  left: 50%;
+  top: 6%;
+  width: 22rem;
+  height: 22rem;
+  background: radial-gradient(circle, rgba(255, 159, 200, 0.34) 0%, transparent 68%);
+  transform: translateX(-50%);
+  animation: entry-drift-a 20s ease-in-out infinite alternate;
+}
+
+.entry-glow-b {
+  left: -18%;
+  bottom: 4%;
+  width: 16rem;
+  height: 16rem;
+  background: radial-gradient(circle, rgba(255, 120, 180, 0.16) 0%, transparent 70%);
+  animation: entry-drift-b 26s ease-in-out infinite alternate;
+}
+
+.entry-glow-c {
+  right: -14%;
+  top: 46%;
+  width: 14rem;
+  height: 14rem;
+  background: radial-gradient(circle, rgba(236, 231, 220, 0.1) 0%, transparent 70%);
+  animation: entry-drift-c 24s ease-in-out infinite alternate;
+}
+
+.entry-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 90% at 50% 40%, transparent 40%, rgba(0, 0, 0, 0.62) 100%);
+}
+
+.entry-breath {
+  animation: entry-breath 3.6s ease-in-out infinite;
+}
+
+@keyframes entry-drift-a {
+  from { transform: translate(-50%, 0) scale(1); }
+  to { transform: translate(-46%, 8%) scale(1.1); }
+}
+
+@keyframes entry-drift-b {
+  from { transform: translate(0, 0); }
+  to { transform: translate(12%, -10%); }
+}
+
+@keyframes entry-drift-c {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-10%, 8%); }
+}
+
+@keyframes entry-breath {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.45); }
+}
+
 .mark-cutout {
   filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.45));
 }
@@ -1141,6 +1213,8 @@ button.novi-peek:focus-visible {
   .world-grain,
   .world-sweep,
   .world-glow,
+  .entry-glow,
+  .entry-breath,
   .novi-bob,
   .novi-glance,
   .novi-lid,

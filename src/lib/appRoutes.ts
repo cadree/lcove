@@ -18,6 +18,7 @@ const PUBLIC_EXACT = new Set([
 ]);
 
 const APP_EXACT = new Set([
+  "/pending",
   "/feed",
   "/explore",
   "/directory",

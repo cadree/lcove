@@ -8,6 +8,7 @@ import {
   FEATURE_PREVIEW,
   FEATURE_PREVIEW_LABEL,
   HERO_TAGLINE,
+  OG_DESCRIPTION,
   INVITE_EMAIL_LINES,
   INVITE_EMAIL_SUBJECT,
   NO_FAKE_LINE,
@@ -147,6 +148,11 @@ describe("app routes", () => {
     assert.equal(isKnownPath("/tickets"), true);
     assert.equal(isPublicPath("/tickets"), false);
   });
+
+  it("keeps the pending verification screen behind sign-in", () => {
+    assert.equal(isKnownPath("/pending"), true);
+    assert.equal(isPublicPath("/pending"), false);
+  });
 });
 
 describe("campaign copy", () => {
@@ -189,18 +195,19 @@ describe("campaign copy", () => {
     };
     walk(".");
     assert.deepEqual(hits, ["src/config/launch.ts"]);
+    assert.equal(readFileSync("src/components/landing/LandingFooter.tsx", "utf8").includes("SLACK_URL"), false);
     const invite = readFileSync("supabase/functions/send-waitlist-invites/index.ts", "utf8");
     assert.equal(invite.includes(INVITE_EMAIL_SUBJECT), true);
     for (const line of INVITE_EMAIL_LINES) assert.equal(invite.includes(line), true);
     assert.equal(invite.includes("PLACEHOLDER"), false);
     assert.equal(invite.includes(SLACK_URL), false);
-    assert.equal(readFileSync("index.html", "utf8").includes(HERO_TAGLINE), true);
-    assert.equal(readFileSync("public/manifest.json", "utf8").includes(HERO_TAGLINE), true);
+    assert.equal(readFileSync("index.html", "utf8").includes(OG_DESCRIPTION), true);
+    assert.equal(readFileSync("public/manifest.json", "utf8").includes(OG_DESCRIPTION), true);
     assert.equal(readFileSync("index.html", "utf8").includes('href="/auth?tab=join"'), true);
   });
 
   it("shows the feature preview on the landing page and keeps the AI rule in the guidelines", () => {
-    assert.equal(FEATURE_PREVIEW_LABEL, "App feature preview");
+    assert.equal(FEATURE_PREVIEW_LABEL, "Inside Ether");
     assert.deepEqual(FEATURE_PREVIEW.map((feature) => feature.title), [
       "Social media for the creative culture",
       "Throw your own event",

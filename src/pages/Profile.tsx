@@ -15,7 +15,9 @@ import { ProfilePostsGrid } from "@/components/profile/ProfilePostsGrid";
 import { PostDetailModal } from "@/components/profile/PostDetailModal";
 import { CreateBlogDialog } from "@/components/profile/CreateBlogDialog";
 import { ProfileBlogsGrid } from "@/components/profile/ProfileBlogsGrid";
-import { UserReviews } from "@/components/profile/UserReviews";
+import { ProfileOpenTo } from "@/components/openTo/ProfileOpenTo";
+import { ProfileVouches } from "@/components/vouches/ProfileVouches";
+import { ProfileCredits } from "@/components/credits/ProfileCredits";
 import { CreatorModuleTabs } from "@/components/profile/CreatorModuleTabs";
 import { EditProfileDetailsDialog } from "@/components/profile/EditProfileDetailsDialog";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
@@ -107,6 +109,19 @@ const Profile = () => {
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, isOwnProfile, setSearchParams]);
+
+  // Notices link to a section (?section=credits); it renders after its data loads.
+  const linkedSection = searchParams.get("section");
+  useEffect(() => {
+    if (!linkedSection || !/^[a-z_]+$/.test(linkedSection)) return;
+    let tries = 0;
+    const timer = window.setInterval(() => {
+      const el = document.getElementById(`profile-section-${linkedSection}`);
+      if (el || ++tries > 25) window.clearInterval(timer);
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 200);
+    return () => window.clearInterval(timer);
+  }, [linkedSection]);
 
   useEffect(() => {
     const postId = searchParams.get("post");
@@ -407,19 +422,12 @@ const Profile = () => {
             )}
           </motion.div>
         );
-      case 'reviews':
+      case 'credits':
         if (!targetUserId) return null;
-        return (
-          <motion.div
-            key="reviews"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="px-5 py-4"
-          >
-            <UserReviews userId={targetUserId} />
-          </motion.div>
-        );
+        return <ProfileCredits key="credits" userId={targetUserId} isOwner={!!isOwnProfile} />;
+      case 'vouches':
+        if (!targetUserId) return null;
+        return <ProfileVouches key="vouches" userId={targetUserId} viewerId={user?.id} isOwner={!!isOwnProfile} />;
       case 'quick_links':
         return <ProfileQuickLinks key="quick_links" isOwner={isOwnProfile} />;
       case 'pipeline':
@@ -600,6 +608,7 @@ const Profile = () => {
           founding={profile?.founding}
         />
 
+        {targetUserId && <ProfileOpenTo userId={targetUserId} isOwner={!!isOwnProfile} />}
         {isOwnProfile && <EtherIdEntry />}
         {isOwnProfile && <div className="px-4 pt-4"><ProfileNovi /></div>}
         <ProfileBookEntry />

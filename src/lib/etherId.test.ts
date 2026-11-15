@@ -127,6 +127,7 @@ describe("passion title", () => {
     assert.doesNotMatch(etherIdFace, /ether-id-handle/);
     assert.doesNotMatch(etherIdFace, /Designer/);
     assert.match(etherIdFace, /Add your passion/);
+    assert.doesNotMatch(etherIdFace, />Reviews</);
   });
 });
 

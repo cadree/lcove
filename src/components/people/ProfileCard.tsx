@@ -6,6 +6,7 @@ import { MessageRequestDialog } from "@/components/messages/MessageRequestDialog
 import { supabase } from "@/integrations/supabase/client";
 import { ConnectNudgeLine } from "@/components/people/ConnectMoment";
 import { tripBadge, type Person } from "@/lib/peopleDiscovery";
+import { OpenToChips } from "@/components/openTo/OpenToChips";
 import type { ConnectNudge, IcebreakerMe } from "@/lib/connectMoment";
 import { safeWebLink } from "@/lib/tripMoney";
 
@@ -64,7 +65,8 @@ export function ProfileCard({ person, near, nudge, viewerId, me }: { person: Per
           <p className="text-[11px] uppercase tracking-[.2em] text-white/70">{place || "City not shared"}</p>
           <h3 className="mt-1 font-display text-[34px] leading-[1.05]">{person.name}</h3>
           {person.role && <p className="mt-1 text-sm font-medium text-[#ffc6de]">{person.role}</p>}
-          {person.bio && <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-white/85">{person.bio}</p>}
+          {!!person.open_to?.length && <OpenToChips tags={person.open_to} tone="photo" limit={3} className="mt-2" />}
+          {person.bio && <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-white/85">{person.bio}</p>}
         </div>
       </div>
       {nudge && (

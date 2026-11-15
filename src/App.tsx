@@ -37,7 +37,6 @@ if (typeof window !== "undefined") {
 }
 
 const Landing = lazy(() => import("./pages/Landing"));
-const Waitlist = lazy(() => import("./pages/Waitlist"));
 const Feed = lazy(loadFeed);
 const Explore = lazy(loadExplore);
 const Travel = lazy(() => import("./pages/Travel"));
@@ -53,6 +52,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Locked = lazy(() => import("./pages/Locked"));
 const Denied = lazy(() => import("./pages/Denied"));
+const Pending = lazy(() => import("./pages/Pending"));
 const Messages = lazy(loadMessages);
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Wallet = lazy(() => import("./pages/Wallet"));
@@ -185,13 +185,14 @@ const App = () => (
               <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/" element={<Landing />} />
-                <Route path="/waitlist" element={<Waitlist />} />
+                <Route path="/waitlist" element={<Navigate to="/auth?tab=join" replace />} />
                 <Route path="/home" element={<Navigate to="/feed" replace />} />
                 <Route path="/landing" element={<Navigate to="/" replace />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/onboarding" element={<Onboarding />} />
                 <Route path="/locked" element={<Locked />} />
                 <Route path="/denied" element={<Denied />} />
+                <Route path="/pending" element={<Pending />} />
                 <Route path="/feed" element={<Feed />} />
                 <Route path="/explore" element={<Explore />} />
                 <Route path="/directory" element={<Directory />} />

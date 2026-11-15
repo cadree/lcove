@@ -1,5 +1,7 @@
 import { cityByKey, resolveCity } from "./cities.ts";
+import { isHiddenTestAccount } from "./hiddenTestAccount.ts";
 import { safeArea } from "./nearbyMap.ts";
+import { openToLabel } from "./openTo.ts";
 
 /** One onboarded member as the directory loads them from profiles_public. */
 export interface Member {
@@ -13,6 +15,8 @@ export interface Member {
   created_at: string | null;
   skills: string[];
   passions: string[];
+  /** Current "open to" tags (expired ones are left out). Older loaders omit it. */
+  open_to?: string[];
 }
 
 export interface TripBadge {
@@ -79,7 +83,7 @@ export function buildPeople(members: Member[], signals: DiscoverySignal[] | unde
   const seen = new Set<string>();
   const people: Person[] = [];
   for (const member of members) {
-    if (hidden.has(member.user_id) || seen.has(member.user_id)) continue;
+    if (hidden.has(member.user_id) || seen.has(member.user_id) || isHiddenTestAccount(member.display_name)) continue;
     seen.add(member.user_id);
     const signal = byId.get(member.user_id);
     const livePlace = signal?.live_city_key ? placeForKey(signal.live_city_key) : null;
@@ -160,6 +164,7 @@ export function matchesQuery(person: Person, query: string): boolean {
     person.trip?.city_label,
     ...person.skills,
     ...person.passions,
+    ...(person.open_to || []).map((tag) => openToLabel(tag)),
   ];
   return haystack.some((value) => value?.toLowerCase().includes(q));
 }

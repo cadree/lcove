@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -52,6 +52,9 @@ import { formatRoleCompensation } from "@/lib/projectCollaborations";
 import { inviteParam } from "@/lib/itemInvite";
 import { applyWithInvite } from "@/lib/itemInviteApi";
 import { messageHref } from "@/lib/connectMoment";
+import { ProjectWrapUp } from "@/components/vouches/ProjectWrapUp";
+import { ProjectOpenCalls } from "@/components/openCalls/ProjectOpenCalls";
+import { scrollToRoles, useRoleFromLink } from "@/hooks/useRoleFromLink";
 
 const statusColors: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
@@ -231,6 +234,13 @@ export default function PublicProjectPage() {
   const handleApplyClick = (roleId: string) => {
     setSelectedRoleId(selectedRoleId === roleId ? null : roleId);
   };
+
+  // Open calls: Apply picks the call's role in the form below.
+  const pickRole = useCallback((roleId: string) => {
+    setSelectedRoleId(roleId);
+    scrollToRoles();
+  }, []);
+  useRoleFromLink(project?.roles, setSelectedRoleId, !user || user.id === project?.creator_id);
 
   const handleSubmitApplication = () => {
     if (!selectedRoleId) return;
@@ -432,6 +442,9 @@ export default function PublicProjectPage() {
           </Card>
         </motion.div>
 
+        {user && projectId && project.status === "completed" && <ProjectWrapUp projectId={projectId} projectTitle={project.title} />}
+        {user && projectId && <ProjectOpenCalls projectId={projectId} roles={project.roles || []} isOwner={isCreator} onApply={pickRole} />}
+
         {/* Apply for Roles Card */}
         {project.roles && project.roles.length > 0 && !isCreator && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
@@ -609,7 +622,7 @@ export default function PublicProjectPage() {
         )}
 
         {/* Action buttons */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="flex gap-2">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
           <Button
             variant="outline"
             className="flex-1 gap-2"

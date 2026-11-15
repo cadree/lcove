@@ -22,6 +22,7 @@ const popularCities = [
   'Berlin',
   'Miami',
   'Atlanta',
+  'Charlotte',
   'Toronto',
   'Sydney',
   'Amsterdam',

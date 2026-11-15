@@ -1,5 +1,5 @@
 /** Account creation keeps these and then opens the app. Tools and roles are not asked. */
-export const SIGNUP_ONBOARDING_STEPS = ["name", "passion", "city", "questionnaire"] as const;
+export const SIGNUP_ONBOARDING_STEPS = ["name", "passion", "city", "pledge"] as const;
 
 export type SignupOnboardingStep = (typeof SIGNUP_ONBOARDING_STEPS)[number];
 

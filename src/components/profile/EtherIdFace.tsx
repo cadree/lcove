@@ -7,7 +7,6 @@ import {
   cardNameLines,
   memberOfFace,
   memberSinceShort,
-  reviewsFace,
   usernameAt,
   type EtherIdCard,
   type EtherIdPublic,
@@ -195,10 +194,6 @@ function OwnerEtherId({
               <div>
                 <dt className="ether-id-lab ether-id-dim">City</dt>
                 <dd className="ether-id-val ether-id-city">{card.city?.trim() || "—"}</dd>
-              </div>
-              <div>
-                <dt className="ether-id-lab ether-id-dim">Reviews</dt>
-                <dd className="ether-id-val">{reviewsFace(card.peer_review_average, card.peer_review_count)}</dd>
               </div>
               <div>
                 <dt className="ether-id-lab ether-id-dim">Projects</dt>
