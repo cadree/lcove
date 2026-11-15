@@ -37,7 +37,11 @@ function avatar(person: MapGroup["people"][number], size: number) {
 }
 
 /** A pin: stacked faces and a count. City-level groups say so, so nobody reads them as a street. */
-function pinElement(group: MapGroup, onPick: (id: string) => void) {
+/** Finger travel (CSS px) and time that still count as a tap on a pin rather than a drag. */
+const TAP_SLOP = 10;
+const TAP_MS = 600;
+
+function pinElement(group: MapGroup, onPick: (group: MapGroup) => void) {
   const button = document.createElement("button");
   button.type = "button";
   button.dataset.mapPin = group.kind;
@@ -66,10 +70,38 @@ function pinElement(group: MapGroup, onPick: (id: string) => void) {
     note.textContent = "city";
     button.append(note);
   }
-  // Pins are taps, not drags: let a drag that starts on a pin still move the map.
+  // Pins are taps, not drags: a drag or pinch that starts on a pin still moves the map (MapLibre
+  // listens on the map container, and nothing here stops those events). The tap is read from the
+  // pointer itself rather than waiting for a synthesized click, which a WebView can drop while the
+  // map is handling the same touch; the click stays for keyboard and mouse.
+  let down: { id: number; x: number; y: number; t: number } | null = null;
+  let tapped = 0;
+  const others = (e: PointerEvent) => {
+    if (down && e.pointerId !== down.id) down = null;
+  };
+  button.addEventListener("pointerdown", (e) => {
+    down = e.isPrimary ? { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp } : null;
+    // A second finger anywhere turns this into a pinch.
+    document.addEventListener("pointerdown", others, true);
+  });
+  const end = () => {
+    down = null;
+    document.removeEventListener("pointerdown", others, true);
+  };
+  button.addEventListener("pointercancel", end);
+  button.addEventListener("pointerup", (e) => {
+    const start = down;
+    end();
+    if (!start || e.pointerId !== start.id) return;
+    if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > TAP_SLOP || e.timeStamp - start.t > TAP_MS) return;
+    tapped = e.timeStamp;
+    onPick(group);
+  });
   button.addEventListener("click", (e) => {
     e.stopPropagation();
-    onPick(group.people[0].user_id);
+    // The pointerup already handled this tap.
+    if (tapped && e.timeStamp - tapped < 1000) return;
+    onPick(group);
   });
   return button;
 }
@@ -96,7 +128,8 @@ export function StreetMap({
   center: LonLat;
   groups: MapGroup[];
   me: { point: LonLat; live: boolean } | null;
-  onPick: (userId: string) => void;
+  /** A pin was tapped: a city pin means that city's members, an area pin the people in it. */
+  onPick: (group: MapGroup) => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
@@ -189,12 +222,19 @@ export function StreetMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- framing is a one-off
   }, [groups, ready]);
 
+  // Rebuild pins only when what they show changes. The parent passes a fresh `me` object on every
+  // render; rebuilding on that removed the pin under a finger mid-tap, so its touchend never reached
+  // the map and MapLibre kept counting that finger (the next pinch then saw three and did nothing).
+  const meLon = me?.point[0];
+  const meLat = me?.point[1];
+  const meLive = me?.live;
   useEffect(() => {
     const instance = map.current;
     if (!instance || !ready) return;
+    const me = meLon !== undefined && meLat !== undefined ? { point: [meLon, meLat] as LonLat, live: !!meLive } : null;
     markers.current.forEach((m) => m.remove());
     markers.current = groups.map((group) =>
-      new maplibregl.Marker({ element: pinElement(group, (id) => pick.current(id)), anchor: "bottom" }).setLngLat(group.point).addTo(instance),
+      new maplibregl.Marker({ element: pinElement(group, (picked) => pick.current(picked)), anchor: "bottom" }).setLngLat(group.point).addTo(instance),
     );
     if (me) markers.current.push(new maplibregl.Marker({ element: meElement(me.live) }).setLngLat(me.point).addTo(instance));
     const halos = groups.filter((g) => g.kind === "area").map((g) => ({
@@ -203,7 +243,7 @@ export function StreetMap({
       geometry: { type: "Polygon" as const, coordinates: [circleRing(g.point, AREA_HALO_M)] },
     }));
     (instance.getSource("areas") as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: halos });
-  }, [groups, me, ready]);
+  }, [groups, meLon, meLat, meLive, ready]);
 
   return (
     <div

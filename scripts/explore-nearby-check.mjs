@@ -148,6 +148,75 @@ await page.locator("h3", { hasText: "Members near" }).evaluate((el) => el.scroll
 await sleep(500);
 await page.screenshot({ path: `${out}/07-nearby-members-deck.png` });
 
+// 3b. Pins are taps. A real touch tap (not a mouse click) on a city pin opens that city's members;
+// an area pin opens its city with that person first. A drag or pinch that starts on a pin moves the map.
+await map.evaluate((el) => el.scrollIntoView({ block: "center" }));
+await sleep(900);
+await page.evaluate(() => {
+  window.__pinClicks = 0;
+  window.__pin0 = document.querySelector("[data-map-pin]");
+  document.addEventListener("click", (e) => { if (e.target.closest?.("[data-map-pin]")) window.__pinClicks++; }, true);
+});
+const pinBox = async (kind) => {
+  const b = await page.locator(`[data-map-pin="${kind}"]`).first().boundingBox();
+  return b && { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+};
+const tapAt = async (p) => { await touch("touchStart", [p]); await sleep(70); await touch("touchEnd", []); await sleep(900); };
+const sheetTitle = async () => ((await page.getByRole("dialog").count()) ? (await page.getByRole("dialog").locator("h2").first().innerText().catch(() => "")) : "");
+const closeSheet = async () => { if (await page.getByRole("dialog").count()) { await page.keyboard.press("Escape"); await sleep(600); } };
+{
+  const at = await pinBox("city");
+  await tapAt(at);
+  const title = await sheetTitle();
+  const clicks = await page.evaluate(() => window.__pinClicks);
+  ok("street-pin-tap-city", /Members in Charlotte/.test(title) || (await page.getByRole("dialog").getByText("Members in Charlotte, NC").count()) > 0, `click events ${clicks}, sheet "${title}"`);
+  await page.screenshot({ path: `${out}/10-street-pin-tap-city.png` });
+  // The tap re-rendered the page; the pins must be the same elements, not rebuilt under the finger.
+  ok("street-pins-survive-rerender", await page.evaluate(() => window.__pin0?.isConnected === true));
+  await closeSheet();
+}
+{
+  const at = await pinBox("area");
+  const label = await page.locator('[data-map-pin="area"]').first().getAttribute("aria-label");
+  const first = label.split(":")[0].split(",")[0].trim();
+  await tapAt(at);
+  const dialog = page.getByRole("dialog");
+  const open = (await dialog.count()) > 0;
+  // The deck's connect button names the profile at the front.
+  const front = open ? (await dialog.getByRole("button", { name: /^Connect(ed)? with / }).first().getAttribute("aria-label").catch(() => "")) || "" : "";
+  ok("street-pin-tap-area", open && front.includes(first), `sheet ${open ? "open" : "closed"}, front "${front}", expected ${first}`);
+  await page.screenshot({ path: `${out}/11-street-pin-tap-area.png` });
+  await closeSheet();
+}
+{
+  const a = await page.evaluate(() => document.querySelector("[data-street-map]").dataset.center.split(",").map(Number));
+  const start = await pinBox("city");
+  await touch("touchStart", [start]);
+  for (let i = 1; i <= 12; i++) { await touch("touchMove", [{ x: start.x - i * 8, y: start.y + i * 5 }]); await sleep(16); }
+  await touch("touchEnd", []);
+  await sleep(900);
+  const b = await page.evaluate(() => document.querySelector("[data-street-map]").dataset.center.split(",").map(Number));
+  const opened = (await page.getByRole("dialog").count()) > 0;
+  ok("street-drag-from-pin", Math.hypot(b[0] - a[0], b[1] - a[1]) > 0.001 && !opened, `center moved ${Math.hypot(b[0] - a[0], b[1] - a[1]).toFixed(4)}°, sheet opened ${opened}`);
+  await closeSheet();
+}
+{
+  const z0 = Number(await map.getAttribute("data-zoom"));
+  const p = await pinBox("city");
+  const at = (d) => [{ x: p.x, y: p.y }, { x: p.x + d, y: p.y + 20 }];
+  await touch("touchStart", [at(40)[0]]);
+  await touch("touchStart", at(40));
+  for (let i = 1; i <= 12; i++) { await touch("touchMove", [{ x: p.x - i * 3, y: p.y }, { x: p.x + 40 + i * 8, y: p.y + 20 }]); await sleep(16); }
+  await touch("touchEnd", []);
+  await sleep(900);
+  const z1 = Number(await map.getAttribute("data-zoom"));
+  const opened = (await page.getByRole("dialog").count()) > 0;
+  ok("street-pinch-from-pin", z1 > z0 + 0.3 && !opened, `zoom ${z0} -> ${z1}, sheet opened ${opened}`);
+  await closeSheet();
+  // Back to where the pins were framed for the gesture checks below.
+  await page.evaluate(() => window.scrollTo(0, 0));
+}
+
 // 4. Street map gestures: real touch pinch and drag; the page must not zoom or scroll.
 await map.evaluate((el) => el.scrollIntoView({ block: "center" }));
 await sleep(1500);
