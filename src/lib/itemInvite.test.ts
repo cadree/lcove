@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  cardStatus,
   createHref,
+  inviteParam,
+  parseInviteCard,
+  safeInvitePath,
   detailLine,
   itemInviteNotice,
   joinLabel,
@@ -122,5 +126,63 @@ describe("itemInviteNotice", () => {
     const items = [{ id: "1", type: "item_invite" }, { id: "2", type: "project_invite" }, { id: "3", type: "like" }];
     assert.deepEqual(notificationsForTab(items, "project_invite").map((i) => i.id), ["1", "2"]);
     assert.deepEqual(notificationsForTab(items, "like").map((i) => i.id), ["3"]);
+  });
+});
+
+const CARD_INV = "11111111-1111-4111-8111-111111111111";
+const ITEM = "22222222-2222-4222-8222-222222222222";
+const rawCard = (over: Record<string, unknown> = {}) => ({
+  invite_id: CARD_INV, item_type: "project", item_id: ITEM, title: " Night Shoot ", cover_url: "http://insecure/x.jpg",
+  starts_at: "2026-11-21", place: "NoDa", available: true, status: "pending", stage: "pending", role_name: null,
+  viewer: "invitee", invitee_name: "Rezza Monet", ticket_required: false, path: `/project/${ITEM}?invite=${CARD_INV}`, ...over,
+});
+
+describe("invite card", () => {
+  it("only follows paths to the item, its role picker or its ticket step", () => {
+    assert.equal(safeInvitePath(`/project/${ITEM}?invite=${CARD_INV}`), `/project/${ITEM}?invite=${CARD_INV}`);
+    assert.equal(safeInvitePath(`/event/${ITEM}/tickets`), `/event/${ITEM}/tickets`);
+    assert.equal(safeInvitePath(`/event/${ITEM}`), `/event/${ITEM}`);
+    assert.equal(safeInvitePath("https://evil.example/event"), null);
+    assert.equal(safeInvitePath(`/event/${ITEM}/tickets?x=1`), null);
+    assert.equal(safeInvitePath(`/project/${ITEM}?invite=<script>`), null);
+  });
+
+  it("reads ?invite= only when it is an id", () => {
+    assert.equal(inviteParam(`?invite=${CARD_INV}`), CARD_INV);
+    assert.equal(inviteParam("?invite=nope"), null);
+    assert.equal(inviteParam(""), null);
+  });
+
+  it("parses the card and drops unsafe covers", () => {
+    const card = parseInviteCard(rawCard());
+    assert.equal(card?.title, "Night Shoot");
+    assert.equal(card?.coverUrl, null);
+    assert.equal(card?.viewer, "invitee");
+    assert.equal(parseInviteCard({ ...rawCard(), item_id: "x" }), null);
+    assert.equal(parseInviteCard(null), null);
+  });
+
+  it("invitee answers while pending; the sender waits", () => {
+    assert.deepEqual(cardStatus(parseInviteCard(rawCard())!), { line: "Invite", tone: "muted", action: "answer", continueLabel: null });
+    assert.equal(cardStatus(parseInviteCard(rawCard({ viewer: "sender" }))!).line, "Waiting on Rezza");
+    assert.equal(cardStatus(parseInviteCard(rawCard({ viewer: "sender" }))!).action, null);
+  });
+
+  it("after accepting, the invitee keeps a next-step button until she has really joined or is going", () => {
+    const project = cardStatus(parseInviteCard(rawCard({ stage: "accepted" }))!);
+    assert.deepEqual([project.line, project.continueLabel], ["Accepted · picking a role", "Pick a role"]);
+    const paid = cardStatus(parseInviteCard(rawCard({ item_type: "event", stage: "accepted", ticket_required: true }))!);
+    assert.deepEqual([paid.line, paid.continueLabel], ["Accepted · getting a ticket", "Get a ticket"]);
+    const free = cardStatus(parseInviteCard(rawCard({ item_type: "event", stage: "accepted" }))!);
+    assert.deepEqual([free.line, free.continueLabel], ["Accepted · RSVPing", "RSVP"]);
+    assert.equal(cardStatus(parseInviteCard(rawCard({ stage: "accepted", viewer: "sender" }))!).action, null);
+  });
+
+  it("shows applied, joined, going and passed", () => {
+    assert.equal(cardStatus(parseInviteCard(rawCard({ stage: "applied", role_name: "Stylist", viewer: "sender" }))!).line, "Rezza applied as Stylist · waiting on the owner");
+    assert.equal(cardStatus(parseInviteCard(rawCard({ stage: "joined", role_name: "Photographer" }))!).line, "You joined as Photographer");
+    assert.equal(cardStatus(parseInviteCard(rawCard({ item_type: "event", stage: "going", viewer: "sender" }))!).line, "Rezza is going");
+    assert.equal(cardStatus(parseInviteCard(rawCard({ item_type: "event", stage: "going" }))!).line, "You're going");
+    assert.equal(cardStatus(parseInviteCard(rawCard({ stage: "declined", viewer: "sender" }))!).line, "Rezza passed");
   });
 });

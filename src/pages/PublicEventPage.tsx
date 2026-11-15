@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { GuestRsvpDialog } from "@/components/events/guest/GuestRsvpDialog";
@@ -26,6 +26,7 @@ import { eventIsShareable, eventPublicPath, eventPublicUrl, eventShareDescriptio
 import { SHARE_BASE_URL } from "@/lib/shareLink";
 import { guestRsvpErrorMessage, rememberedGuestRsvp, rememberGuestRsvp } from "@/lib/guestRsvp";
 import { toast } from "sonner";
+import { inviteParam } from "@/lib/itemInvite";
 
 const savedKey = "ether-saved-events";
 
@@ -41,6 +42,9 @@ function readSaved(id: string) {
 export default function PublicEventPage() {
   const { eventId = "" } = useParams();
   const navigate = useNavigate();
+  const { search } = useLocation();
+  // Arrived from an invite's RSVP. Accepting the invite is not an RSVP.
+  const invited = Boolean(inviteParam(search));
   const { user } = useAuth();
   const { rsvpAsync } = useRSVP();
   const [rsvpOpen, setRsvpOpen] = useState(false);
@@ -350,6 +354,11 @@ export default function PublicEventPage() {
         reminder={model.past ? null : <EventReminderToggle eventId={event.id} />}
         details={(
           <div className="space-y-4">
+            {invited && user && !model.past ? (
+              <p data-testid="invite-rsvp-banner" className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm">
+                You're invited. RSVP to save your spot.
+              </p>
+            ) : null}
             <EventMoodboardView eventId={event.id} />
             {hostNotes ? (
               <div className="rounded-2xl border border-border/60 bg-card px-4 py-3">

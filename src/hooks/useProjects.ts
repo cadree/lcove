@@ -587,7 +587,7 @@ export const useProjectApplications = (projectId?: string) => {
   });
 
   const reviewApplication = useMutation({
-    mutationFn: async ({ applicationId, status, projectTitle, roleTitle }: { 
+    mutationFn: async ({ applicationId, status }: { 
       applicationId: string; 
       status: 'accepted' | 'rejected';
       projectTitle?: string;
@@ -631,26 +631,17 @@ export const useProjectApplications = (projectId?: string) => {
         if (error) throw error;
       }
 
-      // If accepted, create/update project group chat and send notification
+      // If accepted, the database has already put them in the project's main
+      // group chat with a join line (add_accepted_member_to_project_chat).
+      // Here we only ping the chat about that line and notify the applicant.
       if (status === 'accepted' && application) {
-        // Get project and role details
         const { data: project } = await supabase
           .from('projects')
-          .select('title, description, creator_id, cover_image_url')
+          .select('creator_id')
           .eq('id', application.project_id)
           .single();
-        
-        const { data: role } = await supabase
-          .from('project_roles')
-          .select('role_name')
-          .eq('id', newCustomRoleId || application.role_id)
-          .single();
 
-        const finalProjectTitle = projectTitle || project?.title || 'a project';
-        const finalRoleTitle = roleTitle || role?.role_name || 'a role';
-
-        // Find existing project group chat
-        const { data: existingConversation } = await supabase
+        const { data: mainChat } = await supabase
           .from('conversations')
           .select('id')
           .eq('project_id', application.project_id)
@@ -661,73 +652,21 @@ export const useProjectApplications = (projectId?: string) => {
           .limit(1)
           .maybeSingle();
 
-        let conversationId = existingConversation?.id;
-
-        if (!conversationId && project?.creator_id) {
-          const { data: createdChat, error: chatError } = await supabase
-            .from('conversations')
-            .insert({
-              type: 'group',
-              name: project.title || finalProjectTitle,
-              description: project.description || `Project group chat for ${finalProjectTitle}`,
-              avatar_url: project.cover_image_url || null,
-              created_by: project.creator_id,
-              visibility: 'private',
-              project_id: application.project_id,
-            })
+        if (mainChat?.id && project?.creator_id) {
+          const { data: joinMessage } = await supabase
+            .from('messages')
             .select('id')
-            .single();
-          if (chatError) throw chatError;
-          conversationId = createdChat.id;
-          await supabase.from('conversation_participants').insert({
-            conversation_id: conversationId,
-            user_id: project.creator_id,
-            role: 'owner',
-            project_role_name: 'Owner',
-          });
-        }
-
-        // Add accepted applicant to the group chat
-        if (conversationId) {
-          // Check if user is already a participant (prevent duplicates)
-          const { data: existingParticipant } = await supabase
-            .from('conversation_participants')
-            .select('id')
-            .eq('conversation_id', conversationId)
-            .eq('user_id', application.applicant_id)
+            .eq('conversation_id', mainChat.id)
+            .eq('sender_id', project.creator_id)
+            .like('content', '🎉 % joined the project as %')
+            .gte('created_at', new Date(Date.now() - 5 * 60_000).toISOString())
+            .order('created_at', { ascending: false })
+            .limit(1)
             .maybeSingle();
-
-          if (!existingParticipant) {
-            await supabase
-              .from('conversation_participants')
-              .insert({
-                conversation_id: conversationId,
-                user_id: application.applicant_id,
-                role: 'member',
-                project_role_name: finalRoleTitle
-              });
-
-            // Send system join message
-            const { data: applicantProfile } = await supabase
-              .from('profiles_public')
-              .select('display_name')
-              .eq('user_id', application.applicant_id)
-              .maybeSingle();
-
-            const { data: joinMessage } = await supabase
-              .from('messages')
-              .insert({
-                conversation_id: conversationId,
-                sender_id: project?.creator_id || user?.id,
-                content: `🎉 ${applicantProfile?.display_name || 'New member'} joined the project as ${finalRoleTitle}`
-              })
-              .select('id')
-              .single();
-            if (joinMessage?.id) {
-              supabase.functions.invoke('notify-chat-message', {
-                body: { conversation_id: conversationId, message_id: joinMessage.id },
-              }).catch((err) => console.error('Failed to notify the project chat', err));
-            }
+          if (joinMessage?.id) {
+            supabase.functions.invoke('notify-chat-message', {
+              body: { conversation_id: mainChat.id, message_id: joinMessage.id },
+            }).catch((err) => console.error('Failed to notify the project chat', err));
           }
         }
 

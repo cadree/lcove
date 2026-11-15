@@ -176,3 +176,105 @@ export function pickerCopy(kind: InviteKind, firstName: string) {
         create: "Create a new project or gig",
       };
 }
+
+/** Where Join/RSVP may lead: the item, the role picker (?invite=) or the ticket step. */
+const ACT_PATH = /^\/(project|event)\/[0-9a-f-]{36}(\/tickets|\?invite=[0-9a-f-]{36})?$/i;
+export function safeInvitePath(path: unknown): string | null {
+  return typeof path === "string" && ACT_PATH.test(path) ? path : null;
+}
+
+/** The ?invite=<id> on a project or event page, if it is a real id. */
+export function inviteParam(search: string): string | null {
+  const id = new URLSearchParams(search).get("invite");
+  return id && UUID.test(id) ? id : null;
+}
+
+export type CardStage = "pending" | "declined" | "accepted" | "applied" | "joined" | "going";
+const STAGES = new Set<CardStage>(["pending", "declined", "accepted", "applied", "joined", "going"]);
+
+/** What item_invite_card says, for the sender or the invitee. */
+export interface InviteCardData {
+  inviteId: string;
+  kind: InviteKind;
+  itemId: string;
+  title: string;
+  coverUrl: string | null;
+  startsAt: string | null;
+  place: string | null;
+  available: boolean;
+  stage: CardStage;
+  roleName: string | null;
+  viewer: "sender" | "invitee";
+  /** The invitee's first name, for the sender's status line. */
+  inviteeFirstName: string | null;
+  ticketRequired: boolean;
+  path: string | null;
+}
+
+export function parseInviteCard(raw: unknown): InviteCardData | null {
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw as Record<string, unknown>;
+  const kind = row.item_type as InviteKind;
+  if (!KINDS.has(kind) || typeof row.item_id !== "string" || !UUID.test(row.item_id)) return null;
+  if (typeof row.invite_id !== "string" || !UUID.test(row.invite_id)) return null;
+  const text = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : null);
+  return {
+    inviteId: row.invite_id,
+    kind,
+    itemId: row.item_id,
+    title: text(row.title) ?? (kind === "event" ? "An event" : "A project"),
+    coverUrl: typeof row.cover_url === "string" && /^https:\/\//i.test(row.cover_url) ? row.cover_url : null,
+    startsAt: text(row.starts_at),
+    place: text(row.place),
+    available: row.available !== false,
+    stage: STAGES.has(row.stage as CardStage) ? (row.stage as CardStage) : "pending",
+    roleName: text(row.role_name),
+    viewer: row.viewer === "sender" ? "sender" : "invitee",
+    inviteeFirstName: text(row.invitee_name)?.split(/\s+/)[0] ?? null,
+    ticketRequired: row.ticket_required === true,
+    path: safeInvitePath(row.path),
+  };
+}
+
+/**
+ * The card's status line and its button. The invitee answers while it is
+ * pending, and keeps a "next step" button (pick a role, get a ticket, RSVP)
+ * after accepting until she has actually applied, joined or is going.
+ */
+export function cardStatus(card: InviteCardData): {
+  line: string;
+  tone: "muted" | "progress" | "done";
+  action: "answer" | "continue" | null;
+  continueLabel: string | null;
+} {
+  const inviteeName = card.inviteeFirstName;
+  const she = card.viewer === "invitee" ? "You" : inviteeName || "They";
+  const role = card.roleName ? ` as ${card.roleName}` : "";
+  const nextLabel = card.kind === "project" ? "Pick a role" : card.ticketRequired ? "Get a ticket" : "RSVP";
+  switch (card.stage) {
+    case "joined":
+      return { line: `${she} joined${role}`, tone: "done", action: null, continueLabel: null };
+    case "applied":
+      return { line: `${she} applied${role} · waiting on the owner`, tone: "progress", action: null, continueLabel: null };
+    case "going":
+      return { line: card.viewer === "invitee" ? "You're going" : `${she} is going`, tone: "done", action: null, continueLabel: null };
+    case "declined":
+      return { line: card.viewer === "invitee" ? "You passed" : `${she} passed`, tone: "muted", action: null, continueLabel: null };
+    case "accepted": {
+      const step = card.kind === "project" ? "picking a role" : card.ticketRequired ? "getting a ticket" : "RSVPing";
+      return {
+        line: `Accepted · ${step}`,
+        tone: "progress",
+        action: card.viewer === "invitee" && card.available ? "continue" : null,
+        continueLabel: card.viewer === "invitee" && card.available ? nextLabel : null,
+      };
+    }
+    default:
+      return {
+        line: card.viewer === "invitee" ? "Invite" : `Waiting on ${inviteeName || "them"}`,
+        tone: "muted",
+        action: card.viewer === "invitee" && card.available ? "answer" : null,
+        continueLabel: null,
+      };
+  }
+}
