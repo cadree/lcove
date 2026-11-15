@@ -41,10 +41,11 @@ export const RecordSleeve = ({ cover, title, open, spinning = false, sealLabel, 
         transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 120, damping: 18, delay: open ? 0.15 : 0 }}
       >
         <motion.div
-          className="h-full w-full rounded-full shadow-[0_6px_18px_rgba(0,0,0,0.45)]"
+          className="h-full w-full rounded-full shadow-[0_6px_18px_rgba(0,0,0,0.45)] ring-1 ring-white/15"
+          data-record-disc=""
           style={{
             background:
-              "radial-gradient(circle at 50% 50%, #0b0b0c 0 17%, transparent 17.5%), repeating-radial-gradient(circle at 50% 50%, #161618 0 1.2px, #0c0c0d 1.2px 2.6px)",
+              "radial-gradient(circle at 50% 50%, #111113 0 17%, transparent 17.5%), repeating-radial-gradient(circle at 50% 50%, #2b2b30 0 1.2px, #141417 1.2px 2.8px)",
           }}
           animate={spinning && open && !reduceMotion ? { rotate: 360 } : { rotate: 0 }}
           transition={spinning && open && !reduceMotion ? { repeat: Infinity, ease: "linear", duration: 2.2 } : { duration: 0.4 }}

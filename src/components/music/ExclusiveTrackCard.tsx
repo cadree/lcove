@@ -109,7 +109,7 @@ export const ExclusiveTrackCard = ({
           spinning={playing}
           sealLabel={statusBadge.label}
         />
-        {fullAccess && (
+        {isOwner && (
           <div className="absolute top-1 right-1">
             <Badge variant={statusBadge.variant} className="text-[10px] backdrop-blur-sm">
               {statusBadge.label}
