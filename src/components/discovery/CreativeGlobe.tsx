@@ -125,31 +125,34 @@ export function CreativeGlobe({
   const haloStart = Math.max(0, Math.min(1, (globeR / haloR) * 0.92));
   const [layers, setLayers] = useState<GlobeLayers>({});
   const wanted = layersForZoom(zoom).join(",");
+  const movingRef = useRef(false);
   useEffect(() => {
     let live = true;
-    for (const name of layersForZoom(zoom)) {
-      loadGlobeLayer(name).then(
-        (value) => {
-          if (live) setLayers((prev) => (prev[name] === value ? prev : { ...prev, [name]: value }));
-        },
-        () => {}
-      );
-    }
-    return () => {
-      live = false;
-    };
-  }, [wanted, zoom]);
-  useEffect(() => {
-    const id = window.setTimeout(() => {
-      for (const name of ["countries", "land50", "lakes"] as const) {
+    // Delay so a first pinch or double-tap is not interrupted by parsing the detail layers.
+    const start = window.setTimeout(() => {
+      if (!live) return;
+      for (const name of layersForZoom(zoom)) {
         loadGlobeLayer(name).then(
-          (value) => setLayers((prev) => (prev[name] ? prev : { ...prev, [name]: value })),
+          (value) => {
+            const tryApply = () => {
+              if (!live) return;
+              if (movingRef.current) {
+                window.setTimeout(tryApply, 100);
+                return;
+              }
+              setLayers((prev) => (prev[name] === value ? prev : { ...prev, [name]: value }));
+            };
+            tryApply();
+          },
           () => {}
         );
       }
-    }, 250);
-    return () => clearTimeout(id);
-  }, []);
+    }, 2000);
+    return () => {
+      live = false;
+      window.clearTimeout(start);
+    };
+  }, [wanted, zoom]);
   const projection = useMemo(() => globeProjection(rotation, zoom), [rotation, zoom]);
   const detail = useMemo(() => globeProjection(rotation, zoom).clipAngle(detailClipAngle(zoom)), [rotation, zoom]);
   const path = geoPath(projection);
@@ -167,6 +170,7 @@ export function CreativeGlobe({
     | null
   >(null);
   const [moving, setMoving] = useState(false);
+  movingRef.current = moving;
   const suppressClick = useRef(false);
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
   const frame = useRef<number | null>(null);
@@ -300,6 +304,8 @@ export function CreativeGlobe({
   const showRivers = !moving && !!layers.rivers && zoom >= 4.5;
   const showLakes = !moving && !!layers.lakes && zoom >= 2;
   const showLabels = !moving && !!layers.places;
+  const showCountries = !moving && !!layers.countries;
+  const showOverlays = !moving;
   // A cluster zooms in far enough to split; at full zoom it opens its biggest city and fans its faces out.
   const open = (marker: { key: string; cities: number; point: [number, number]; points: [number, number][] }) => {
     if (suppressClick.current) return;
@@ -410,18 +416,23 @@ export function CreativeGlobe({
         </defs>
         <circle cx="200" cy="200" r={haloR} fill={`url(#${id}-halo)`} pointerEvents="none" />
         <path d={path({ type: "Sphere" }) || ""} fill={`url(#${id}-sea)`} stroke={paint.oceanStroke} strokeOpacity=".35" />
-        <clipPath id={`${id}-land`}>
-          <path d={landDraw(landGeom) || ""} />
-        </clipPath>
-        <path d={landDraw(landGeom) || ""} fill={paint.land.temperate} />
-        <g clipPath={`url(#${id}-land)`} pointerEvents="none">
-          {LAND_OVERLAYS.map((overlay) => (
-            <path key={overlay.tint} d={landDraw(overlay.geometry) || ""} fill={paint.land[overlay.tint]} />
-          ))}
-        </g>
+        {/* Second defs: land clip must come after the ocean path so tests can measure that path. */}
+        <defs>
+          <clipPath id={`${id}-land`}>
+            <path d={landDraw(landGeom) || ""} />
+          </clipPath>
+        </defs>
+        <path d={landDraw(landGeom) || ""} fill={paint.land.temperate} pointerEvents="none" />
+        {showOverlays && (
+          <g clipPath={`url(#${id}-land)`} pointerEvents="none">
+            {LAND_OVERLAYS.map((overlay) => (
+              <path key={overlay.tint} d={landDraw(overlay.geometry) || ""} fill={paint.land[overlay.tint]} />
+            ))}
+          </g>
+        )}
         {showLakes && <path d={borderDraw(layers.lakes) || ""} fill={paint.ocean[1]} fillOpacity=".85" stroke="none" pointerEvents="none" />}
-        <path d={landDraw(landGeom) || ""} fill="none" stroke={paint.landStroke} strokeOpacity=".45" strokeWidth={zoom > 3 ? 0.5 : 0.35} />
-        {layers.countries && (
+        <path d={landDraw(landGeom) || ""} fill="none" stroke={paint.landStroke} strokeOpacity=".45" strokeWidth={zoom > 3 ? 0.5 : 0.35} pointerEvents="none" />
+        {showCountries && (
           <path d={borderDraw(layers.countries) || ""} fill="none" stroke="#d8e4c8" strokeOpacity={zoom >= 3 ? 0.18 : 0.28} strokeWidth={zoom >= 3 ? 0.35 : 0.4} pointerEvents="none" />
         )}
         {showStates && (
