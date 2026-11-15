@@ -37,6 +37,13 @@ export default function Travel() {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [create, setCreate] = useState(false);
+  useEffect(() => {
+    if (params.get("action") !== "create" || !user) return;
+    setCreate(true);
+    const next = new URLSearchParams(params);
+    next.delete("action");
+    setParams(next, { replace: true });
+  }, [params, user, setParams]);
   const trips = useQuery({
     queryKey: ["trips", user?.id, city, start, end],
     queryFn: () =>

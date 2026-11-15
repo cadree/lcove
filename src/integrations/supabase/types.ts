@@ -2978,6 +2978,7 @@ export type Database = {
           access_type: string
           allow_downloads: boolean
           artist_user_id: string
+          audio_file_path: string | null
           audio_file_url: string | null
           cover_image_url: string | null
           created_at: string
@@ -2997,6 +2998,7 @@ export type Database = {
           access_type?: string
           allow_downloads?: boolean
           artist_user_id: string
+          audio_file_path?: string | null
           audio_file_url?: string | null
           cover_image_url?: string | null
           created_at?: string
@@ -3016,6 +3018,7 @@ export type Database = {
           access_type?: string
           allow_downloads?: boolean
           artist_user_id?: string
+          audio_file_path?: string | null
           audio_file_url?: string | null
           cover_image_url?: string | null
           created_at?: string

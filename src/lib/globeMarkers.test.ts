@@ -28,6 +28,7 @@ test("a group of one shows no stack; groups show up to two discs behind", () => 
 test("fan positions sit above the marker and spread symmetrically", () => {
   assert.deepEqual(fanOffsets(0), []);
   assert.deepEqual(fanOffsets(1), [[0, -FAN_RADIUS]]);
+  assert.deepEqual(fanOffsets(1, FAN_RADIUS, Math.PI / 2), [[0, FAN_RADIUS]]);
   const five = fanOffsets(5);
   assert.equal(five.length, 5);
   assert.ok(five.every(([, y]) => y < 0));

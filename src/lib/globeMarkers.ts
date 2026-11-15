@@ -67,12 +67,12 @@ export function stackDepth(total: number): number {
   return Math.max(0, Math.min(2, total - 1));
 }
 
-/** Positions for a fanned-out group: an arc above the marker, n slots. */
-export function fanOffsets(n: number, radius = FAN_RADIUS): [number, number][] {
+/** Positions for a fanned-out group: an arc around `heading` (default: above the marker), n slots. */
+export function fanOffsets(n: number, radius = FAN_RADIUS, heading = -Math.PI / 2): [number, number][] {
   if (n <= 0) return [];
   const spread = Math.min(Math.PI * 0.9, (n - 1) * 0.5);
   return Array.from({ length: n }, (_, i) => {
-    const angle = -Math.PI / 2 + (n === 1 ? 0 : -spread / 2 + (spread * i) / (n - 1));
+    const angle = heading + (n === 1 ? 0 : -spread / 2 + (spread * i) / (n - 1));
     return [Math.round(Math.cos(angle) * radius * 10) / 10, Math.round(Math.sin(angle) * radius * 10) / 10];
   });
 }

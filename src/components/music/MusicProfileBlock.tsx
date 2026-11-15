@@ -1,10 +1,12 @@
 import { motion } from "framer-motion";
-import { Music, ExternalLink } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
+import { Music, ExternalLink, Plus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useMusicProfile } from "@/hooks/useMusicProfile";
 import { ExclusiveMusicSection } from "./ExclusiveMusicSection";
 import { SavedMusicSection } from "./SavedMusicSection";
+import { MUSIC_PLATFORM_LABELS, detectMusicPlatform, featuredEmbed, normalizeMusicUrl, type MusicPlatform } from "@/lib/musicLinks";
 
 interface MusicProfileBlockProps {
   userId?: string;
@@ -24,16 +26,15 @@ const PLATFORM_ICONS: Record<string, React.ReactNode> = {
   ),
 };
 
-const getPlatformLabel = (platform: string) => {
-  const labels: Record<string, string> = {
-    spotify: "Spotify",
-    apple_music: "Apple Music",
-    soundcloud: "SoundCloud",
-    youtube_music: "YouTube Music",
-    tidal: "Tidal",
-    bandcamp: "Bandcamp",
-  };
-  return labels[platform] || platform;
+const getPlatformLabel = (platform: string, url: string) => {
+  const detected = detectMusicPlatform(url);
+  if (detected !== "other") return MUSIC_PLATFORM_LABELS[detected];
+  return MUSIC_PLATFORM_LABELS[platform as MusicPlatform] || "Listen";
+};
+
+const openLink = (url?: string) => {
+  const safe = url ? normalizeMusicUrl(url) : null;
+  if (safe) window.open(safe, "_blank", "noopener,noreferrer");
 };
 
 export const MusicProfileBlock = ({ userId, onConnectClick }: MusicProfileBlockProps) => {
@@ -51,36 +52,48 @@ export const MusicProfileBlock = ({ userId, onConnectClick }: MusicProfileBlockP
   }
 
   if (!musicProfile) {
-    if (isOwner) {
-      return (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-strong rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-accent/20 transition-colors"
-          onClick={onConnectClick}
-        >
-          <Music className="w-8 h-8 text-muted-foreground mb-3" />
-          <span className="text-muted-foreground font-medium">Connect Music</span>
-          <span className="text-xs text-muted-foreground/60 mt-1">
-            Link your Spotify, Apple Music & more
-          </span>
-        </motion.div>
-      );
-    }
-    return null;
+    if (!userId) return null;
+    return (
+      <div className="space-y-4 empty:hidden">
+        {isOwner && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-strong rounded-xl p-5 text-center"
+            data-testid="music-empty-owner"
+          >
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/15">
+              <Music className="h-6 w-6 text-primary" />
+            </div>
+            <h3 className="font-display text-lg font-medium text-foreground">Add your music</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Paste a Spotify, Apple Music, SoundCloud or YouTube link. Visitors get a player right on your profile.
+            </p>
+            <Button className="mt-4 min-h-11 w-full sm:w-auto" onClick={onConnectClick} data-testid="music-connect-cta">
+              <Plus className="mr-1.5 h-4 w-4" /> Connect music
+            </Button>
+            <p className="mt-2 text-[11px] text-muted-foreground/80">Only you see this until you add something.</p>
+          </motion.div>
+        )}
+        {/* Visitors still see an artist's locked tracks and saved music without a connected profile. */}
+        <ExclusiveMusicSection userId={userId} hideOwnerEmpty />
+        <SavedMusicSection userId={userId} />
+      </div>
+    );
   }
 
-  const allLinks = musicProfile.platform_links?.length
+  const allLinks = (musicProfile.platform_links?.length
     ? musicProfile.platform_links
     : [
         ...(musicProfile.spotify_artist_url ? [{ platform: "spotify", url: musicProfile.spotify_artist_url }] : []),
         ...(musicProfile.apple_music_artist_url ? [{ platform: "apple_music", url: musicProfile.apple_music_artist_url }] : []),
-      ];
+      ]).filter((l) => l.url && normalizeMusicUrl(l.url));
 
   const targetUserId = userId || musicProfile.user_id;
   const hasGenres = musicProfile.genres && musicProfile.genres.length > 0;
   const hasTopTracks = musicProfile.top_tracks && musicProfile.top_tracks.length > 0;
   const hasAlbums = musicProfile.albums && musicProfile.albums.length > 0;
+  const embed = featuredEmbed(allLinks, { native: Capacitor.isNativePlatform() });
 
   return (
     <div className="space-y-4">
@@ -88,23 +101,25 @@ export const MusicProfileBlock = ({ userId, onConnectClick }: MusicProfileBlockP
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="glass-strong rounded-xl overflow-hidden"
+        data-testid="music-profile-block"
       >
-        <div className="p-5 space-y-4">
+        <div className="p-4 sm:p-5 space-y-4">
           {/* Header */}
           <div className="flex items-center gap-3">
             {musicProfile.artist_image_url ? (
               <img
                 src={musicProfile.artist_image_url}
                 alt={musicProfile.display_name || "Artist"}
-                className="w-14 h-14 rounded-full object-cover border-2 border-primary/30"
+                className="w-14 h-14 rounded-full object-cover border-2 border-primary/30 shrink-0"
               />
             ) : (
-              <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
                 <Music className="w-7 h-7 text-primary" />
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <h3 className="font-display text-lg font-medium text-foreground">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Music</p>
+              <h3 className="font-display text-lg font-medium text-foreground truncate">
                 {musicProfile.display_name || "Music"}
               </h3>
               {hasGenres && (
@@ -117,21 +132,50 @@ export const MusicProfileBlock = ({ userId, onConnectClick }: MusicProfileBlockP
                 </div>
               )}
             </div>
+            {isOwner && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-11 w-11 shrink-0"
+                aria-label="Edit music"
+                onClick={onConnectClick}
+                data-testid="music-edit"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
           </div>
+
+          {/* Official player for the first link that has one */}
+          {embed && (
+            <iframe
+              key={embed.src}
+              src={embed.src}
+              title={`${embed.title} player`}
+              width="100%"
+              height={embed.height}
+              loading="lazy"
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              referrerPolicy="strict-origin-when-cross-origin"
+              className="block w-full rounded-xl border-0 bg-muted/30"
+              style={{ height: embed.height }}
+              data-testid="music-embed"
+            />
+          )}
 
           {/* Platform Links */}
           {allLinks.length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {allLinks.filter(l => l.url).map((link, i) => (
+              {allLinks.map((link, i) => (
                 <Button
                   key={i}
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs gap-1.5"
-                  onClick={() => window.open(link.url, "_blank")}
+                  className="min-h-11 text-xs gap-1.5"
+                  onClick={() => openLink(link.url)}
                 >
-                  {PLATFORM_ICONS[link.platform] || <ExternalLink className="w-3.5 h-3.5" />}
-                  {getPlatformLabel(link.platform)}
+                  {PLATFORM_ICONS[detectMusicPlatform(link.url)] || PLATFORM_ICONS[link.platform] || <ExternalLink className="w-3.5 h-3.5" />}
+                  {getPlatformLabel(link.platform, link.url)}
                 </Button>
               ))}
             </div>
@@ -140,30 +184,30 @@ export const MusicProfileBlock = ({ userId, onConnectClick }: MusicProfileBlockP
           {/* Top Tracks */}
           {hasTopTracks && (
             <div className="space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Top Tracks</p>
-              {musicProfile.top_tracks!.slice(0, 5).map((track, i) => (
-                <div key={i} className="flex items-center gap-2 text-sm p-1.5 rounded bg-muted/30">
-                  {track.album_image && (
-                    <img src={track.album_image} alt="" className="w-8 h-8 rounded object-cover" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate text-foreground text-xs">{track.name}</p>
-                    {track.album_name && (
-                      <p className="text-[10px] text-muted-foreground truncate">{track.album_name}</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Top tracks</p>
+              {musicProfile.top_tracks!.slice(0, 5).map((track, i) => {
+                const url = track.spotify_url || track.apple_music_url;
+                return (
+                  <button
+                    type="button"
+                    key={i}
+                    disabled={!url}
+                    onClick={() => openLink(url)}
+                    className="flex w-full min-h-11 items-center gap-2 text-left text-sm p-1.5 rounded bg-muted/30 disabled:cursor-default"
+                  >
+                    {track.album_image && (
+                      <img src={track.album_image} alt="" className="w-8 h-8 rounded object-cover shrink-0" />
                     )}
-                  </div>
-                  {(track.spotify_url || track.apple_music_url) && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 shrink-0"
-                      onClick={() => window.open(track.spotify_url || track.apple_music_url, "_blank")}
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                    </Button>
-                  )}
-                </div>
-              ))}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate text-foreground text-xs">{track.name}</p>
+                      {track.album_name && (
+                        <p className="text-[10px] text-muted-foreground truncate">{track.album_name}</p>
+                      )}
+                    </div>
+                    {url && <ExternalLink className="w-3 h-3 shrink-0 text-muted-foreground" />}
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -173,13 +217,11 @@ export const MusicProfileBlock = ({ userId, onConnectClick }: MusicProfileBlockP
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Discography</p>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {musicProfile.albums!.slice(0, 8).map((album, i) => (
-                  <div
+                  <button
+                    type="button"
                     key={i}
-                    className="shrink-0 w-20 cursor-pointer"
-                    onClick={() => {
-                      const url = album.spotify_url || album.apple_music_url;
-                      if (url) window.open(url, "_blank");
-                    }}
+                    className="shrink-0 w-20 text-left"
+                    onClick={() => openLink(album.spotify_url || album.apple_music_url)}
                   >
                     {album.image_url ? (
                       <img src={album.image_url} alt={album.name} className="w-20 h-20 rounded object-cover" />
@@ -192,24 +234,21 @@ export const MusicProfileBlock = ({ userId, onConnectClick }: MusicProfileBlockP
                     {album.release_date && (
                       <p className="text-[9px] text-muted-foreground">{album.release_date.slice(0, 4)}</p>
                     )}
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Edit button for owner */}
-          {isOwner && (
-            <div className="pt-3 border-t border-border/30">
-              <Button variant="ghost" size="sm" className="w-full" onClick={onConnectClick}>
-                Edit Music Profile
-              </Button>
-            </div>
+          {isOwner && !embed && allLinks.length === 0 && (
+            <Button variant="outline" className="w-full min-h-11" onClick={onConnectClick}>
+              <Plus className="mr-1.5 h-4 w-4" /> Add a link so visitors can listen
+            </Button>
           )}
         </div>
       </motion.div>
 
-      {/* Exclusive Music Section */}
+      {/* Locked (paid) tracks */}
       <ExclusiveMusicSection userId={targetUserId} />
 
       {/* Collected / Saved Music Section */}

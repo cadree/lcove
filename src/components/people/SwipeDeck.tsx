@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X, UserCheck, UserPlus } from "lucide-react";
+import type { ConnectNudge, IcebreakerMe } from "@/lib/connectMoment";
 import type { Person } from "@/lib/peopleDiscovery";
 import { ProfileCard } from "./ProfileCard";
 
@@ -17,6 +18,10 @@ export function SwipeDeck({
   onDecide,
   onReport,
   onBlock,
+  onReopen,
+  nudgeFor,
+  viewerId,
+  me,
 }: {
   people: Person[];
   /** Scroll to this person, for example after tapping them in the avatar row. */
@@ -25,6 +30,11 @@ export function SwipeDeck({
   onDecide: (person: Person, liked: boolean) => Promise<unknown>;
   onReport: (person: Person) => void;
   onBlock: (person: Person) => void;
+  /** Already connected: open the start-something sheet instead of sending another swipe. */
+  onReopen?: (person: Person) => void;
+  nudgeFor?: (userId: string) => ConnectNudge | undefined;
+  viewerId?: string;
+  me?: IcebreakerMe | null;
 }) {
   const track = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
@@ -74,8 +84,13 @@ export function SwipeDeck({
 
   const decide = async (liked: boolean) => {
     if (!current || pending) return;
+    if (liked && current.liked) {
+      onReopen?.(current);
+      return;
+    }
     await onDecide(current, liked);
-    if (active + 1 < people.length) go(active + 1);
+    // Stay on a connect so the celebration and nudge stay in view. Pass still advances.
+    if (!liked && active + 1 < people.length) go(active + 1);
   };
 
   if (!people.length) return null;
@@ -121,7 +136,7 @@ export function SwipeDeck({
             aria-roledescription="slide"
             aria-label={`${index + 1} of ${people.length}`}
           >
-            <ProfileCard person={person} near={Math.abs(index - active) <= 1} />
+            <ProfileCard person={person} near={Math.abs(index - active) <= 1} nudge={nudgeFor?.(person.user_id)} viewerId={viewerId} me={me} />
           </div>
         ))}
       </div>

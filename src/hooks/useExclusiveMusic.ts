@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import type { Json, TablesUpdate } from "@/integrations/supabase/types";
+import { LOCKED_MUSIC_BUCKET, summarizeSales, type TrackSales } from "@/lib/lockedMusic";
 
 function jsonRecord(value: Json | null): Record<string, Json | undefined> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -15,6 +16,8 @@ export interface ExclusiveTrack {
   title: string;
   cover_image_url?: string | null;
   audio_file_url?: string | null;
+  /** Full file in the private music bucket ("<artist id>/<file>"). */
+  audio_file_path?: string | null;
   preview_clip_url?: string | null;
   duration_seconds?: number | null;
   access_type: string;
@@ -134,13 +137,16 @@ export const useExclusiveTracks = (artistUserId?: string) => {
         artist_user_id: user.id,
         title: track.title || "Untitled",
         cover_image_url: track.cover_image_url,
-        audio_file_url: track.audio_file_url,
+        audio_file_path: track.audio_file_path,
         preview_clip_url: track.preview_clip_url,
         duration_seconds: track.duration_seconds,
         access_type: track.access_type || "purchase",
         price_cents: track.price_cents || 0,
         description: track.description,
         is_published: track.is_published ?? false,
+        allow_downloads: track.allow_downloads ?? false,
+        preview_start_seconds: track.preview_start_seconds ?? 0,
+        preview_duration_seconds: track.preview_duration_seconds ?? 15,
       });
       if (error) throw error;
     },
@@ -148,7 +154,7 @@ export const useExclusiveTracks = (artistUserId?: string) => {
       queryClient.invalidateQueries({ queryKey: ["exclusive-tracks", user?.id] });
       toast.success("Track added!");
     },
-    onError: () => toast.error("Failed to add track"),
+    // The upload form shows the error with its own message.
   });
 
   const updateTrack = useMutation({
@@ -171,12 +177,17 @@ export const useExclusiveTracks = (artistUserId?: string) => {
   const deleteTrack = useMutation({
     mutationFn: async (trackId: string) => {
       if (!user) throw new Error("Not authenticated");
+      const track = tracks.find((t) => t.id === trackId);
       const { error } = await supabase
         .from("exclusive_tracks")
         .delete()
         .eq("id", trackId)
         .eq("artist_user_id", user.id);
       if (error) throw error;
+      // Best effort: the row is gone, so nobody can reach the file through it anyway.
+      if (track?.audio_file_path) {
+        await supabase.storage.from(LOCKED_MUSIC_BUCKET).remove([track.audio_file_path]).catch(() => undefined);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exclusive-tracks", user?.id] });
@@ -282,4 +293,50 @@ export const useAccessRules = (artistUserId?: string) => {
   });
 
   return { rules, isLoading, createRule, updateRule, deleteRule };
+};
+
+/**
+ * Short-lived URL for the full private file. The storage API signs it only when
+ * the caller passes the bucket's read policy (artist, paid buyer, or subscriber),
+ * so this works the same on every device the buyer signs in on.
+ */
+export const usePrivateTrackUrl = (track: Pick<ExclusiveTrack, "id" | "audio_file_path">, enabled: boolean) => {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["private-track-url", track.id, track.audio_file_path, user?.id],
+    queryFn: async () => {
+      if (!track.audio_file_path) return null;
+      const { data, error } = await supabase.storage
+        .from(LOCKED_MUSIC_BUCKET)
+        .createSignedUrl(track.audio_file_path, 60 * 60);
+      if (error) throw error;
+      return data?.signedUrl ?? null;
+    },
+    enabled: enabled && !!user && !!track.audio_file_path,
+    staleTime: 50 * 60 * 1000,
+    retry: 1,
+  });
+};
+
+/** Sales per track for the artist (RLS shows an artist only purchases of their own tracks). */
+export const useTrackSales = (artistUserId: string | undefined, enabled: boolean) => {
+  return useQuery({
+    queryKey: ["exclusive-track-sales", artistUserId],
+    queryFn: async (): Promise<Record<string, TrackSales>> => {
+      const { data: own, error: tracksError } = await supabase
+        .from("exclusive_tracks")
+        .select("id")
+        .eq("artist_user_id", artistUserId as string);
+      if (tracksError) throw tracksError;
+      const ids = (own || []).map((t) => t.id);
+      if (ids.length === 0) return {};
+      const { data, error } = await supabase
+        .from("exclusive_track_purchases")
+        .select("track_id, amount_cents, payment_status")
+        .in("track_id", ids);
+      if (error) throw error;
+      return summarizeSales(data || []);
+    },
+    enabled: enabled && !!artistUserId,
+  });
 };

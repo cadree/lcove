@@ -89,6 +89,24 @@ serve(async (req) => {
       }
     }
 
+    // The webhook usually lands before the buyer is back on the profile. Report
+    // that recent paid purchase too, so the app says "unlocked" instead of
+    // "finalizing" for a track that is already playable.
+    if (!results.some((r) => r.status === "paid")) {
+      const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      const { data: recent } = await supabaseAdmin
+        .from("exclusive_track_purchases")
+        .select("stripe_session_id")
+        .eq("buyer_user_id", user.id)
+        .eq("payment_status", "paid")
+        .gte("created_at", since)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (recent?.[0]?.stripe_session_id) {
+        results.push({ session: recent[0].stripe_session_id, status: "paid", updated: false });
+      }
+    }
+
     return new Response(JSON.stringify({ ok: true, checked: results.length, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

@@ -39,6 +39,12 @@ export async function applyStripeEvent(event, db) {
     case "checkout.session.expired":
       await applyCheckoutExpired(event.data.object, db);
       return;
+    case "checkout.session.async_payment_succeeded":
+      await applyAsyncPayment(event.data.object, db, true);
+      return;
+    case "checkout.session.async_payment_failed":
+      await applyAsyncPayment(event.data.object, db, false);
+      return;
     case "invoice.paid":
       await db.recordPaidInvoiceFee(event.data.object);
       return;
@@ -61,7 +67,9 @@ async function applyCheckoutCompleted(session, db) {
   const { meta, type, source } = checkoutMeta(session);
 
   if (type === "exclusive_track_purchase") {
-    await db.recordExclusivePurchase(session);
+    // A delayed method (bank debit) completes Checkout with payment_status
+    // "unpaid"; the track unlocks on async_payment_succeeded instead.
+    if (session.payment_status === "paid") await db.recordExclusivePurchase(session);
   }
   if (type === "artist_subscription") {
     await db.recordArtistSubscription(session);
@@ -98,8 +106,18 @@ async function applyCheckoutCompleted(session, db) {
   }
 }
 
+async function applyAsyncPayment(session, db, succeeded) {
+  const { type } = checkoutMeta(session);
+  if (type !== "exclusive_track_purchase") return;
+  if (succeeded) await db.recordExclusivePurchase(session);
+  else await db.closeExclusivePurchase(session, "failed");
+}
+
 async function applyCheckoutExpired(session, db) {
   const { meta, type } = checkoutMeta(session);
+  if (type === "exclusive_track_purchase") {
+    await db.closeExclusivePurchase(session, "expired");
+  }
   if (meta.order_id && type === "event_ticket") {
     await db.cancelPendingTicketOrder(meta.order_id);
   } else if (meta.order_id && (type === "store_order" || meta.item_id)) {
@@ -294,6 +312,16 @@ export function createSupabaseStripeDb(supabase, stripe) {
         amount_cents: amountCents,
         payment_status: "paid",
       });
+      throwIf(error);
+    },
+
+    /** Pending row for this session becomes "expired" or "failed"; a paid row is never touched. */
+    async closeExclusivePurchase(session, status) {
+      const { error } = await supabase
+        .from("exclusive_track_purchases")
+        .update({ payment_status: status })
+        .eq("stripe_session_id", session.id)
+        .eq("payment_status", "pending");
       throwIf(error);
     },
 
@@ -679,6 +707,15 @@ export function createSupabaseStripeDb(supabase, stripe) {
           })
           .eq("stripe_payment_intent_id", paymentIntentId);
         throwIf(ticketError);
+        // A full refund takes the track back; a partial refund keeps access.
+        if (charge.refunded === true) {
+          const { error: musicError } = await supabase
+            .from("exclusive_track_purchases")
+            .update({ payment_status: "refunded" })
+            .eq("stripe_payment_intent_id", paymentIntentId)
+            .eq("payment_status", "paid");
+          throwIf(musicError);
+        }
       }
       await refundMembershipInvoice(supabase, stripe, charge);
     },

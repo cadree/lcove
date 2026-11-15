@@ -4,11 +4,13 @@ import { useState } from "react";
 import { ArrowUpRight, MessageCircle, Plane, Radio, UserCheck } from "lucide-react";
 import { MessageRequestDialog } from "@/components/messages/MessageRequestDialog";
 import { supabase } from "@/integrations/supabase/client";
+import { ConnectNudgeLine } from "@/components/people/ConnectMoment";
 import { tripBadge, type Person } from "@/lib/peopleDiscovery";
+import type { ConnectNudge, IcebreakerMe } from "@/lib/connectMoment";
 import { safeWebLink } from "@/lib/tripMoney";
 
 /** A large swipe-deck profile card. Work previews load only for cards near the screen. */
-export function ProfileCard({ person, near }: { person: Person; near: boolean }) {
+export function ProfileCard({ person, near, nudge, viewerId, me }: { person: Person; near: boolean; nudge?: ConnectNudge; viewerId?: string; me?: IcebreakerMe | null }) {
   const [messaging, setMessaging] = useState(false);
   const work = useQuery({
     queryKey: ["discovery-work", person.user_id],
@@ -65,6 +67,9 @@ export function ProfileCard({ person, near }: { person: Person; near: boolean })
           {person.bio && <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-white/85">{person.bio}</p>}
         </div>
       </div>
+      {nudge && (
+        <ConnectNudgeLine nudge={nudge} viewerId={viewerId} me={me} className="mx-3 mt-3" />
+      )}
       <div className="flex items-center gap-2 p-3">
         <div className="flex min-w-0 flex-1 gap-2" aria-label="Work preview">
           {(work.data || []).map((item) => {

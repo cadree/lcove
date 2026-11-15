@@ -86,6 +86,7 @@ REGEN
 regen
 repost
 Regen
+Rezza
 Rsvping
 rsvps
 Rsvps
@@ -102,10 +103,13 @@ startdt
 streetwear
 Subheadline
 subvalue
+summarises
 SUPABASE
 Supabase
 supabase
 thirdparty
+unmigrated
+unparseable
 unsuspended
 Unviewed
 VCALENDAR

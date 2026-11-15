@@ -151,7 +151,7 @@ test("store, ticket, network, music, and artist checkouts route apart", async ()
     [{ id: "cs_store", metadata: { order_id: "ord_1", item_id: "item_1", buyer_id: "user_1" } }, "confirmStoreOrder"],
     [{ id: "cs_ticket", metadata: { type: "event_ticket", order_id: "ord_t", event_id: "evt" } }, "confirmEventTicket"],
     [{ id: "cs_net", metadata: { network_id: "net_1", user_id: "user_1" }, subscription: "sub_n" }, "upsertNetworkSubscription"],
-    [{ id: "cs_track", metadata: { type: "exclusive_track_purchase", track_id: "track_1", buyer_user_id: "user_1" } }, "recordExclusivePurchase"],
+    [{ id: "cs_track", payment_status: "paid", metadata: { type: "exclusive_track_purchase", track_id: "track_1", buyer_user_id: "user_1" } }, "recordExclusivePurchase"],
     [{ id: "cs_artist", metadata: { type: "artist_subscription", artist_user_id: "artist_1", subscriber_user_id: "user_1" }, subscription: "sub_a" }, "recordArtistSubscription"],
   ];
   for (const [object, method] of cases) {
@@ -1111,4 +1111,60 @@ test("customer.subscription.deleted still cancels an active membership and leave
   }, "customer.subscription.deleted");
   assert.equal(db.rows("memberships")[0].status, "cancelled");
   assert.equal(db.rows("memberships")[0].lifetime_contribution, 40);
+});
+
+test("locked music unlocks only on a paid checkout and closes failed or expired ones", async () => {
+  const track = { type: "exclusive_track_purchase", track_id: "track_1", buyer_user_id: "user_1" };
+  const unpaid = makeDb();
+  await post(event("checkout.session.completed", { id: "cs_bank", payment_status: "unpaid", metadata: track }), { db: unpaid.db });
+  assert.equal(methods(unpaid.calls).includes("recordExclusivePurchase"), false);
+
+  const later = makeDb();
+  await post(event("checkout.session.async_payment_succeeded", { id: "cs_bank", payment_status: "paid", metadata: track }), { db: later.db });
+  assert.ok(methods(later.calls).includes("recordExclusivePurchase"));
+
+  const failed = makeDb();
+  await post(event("checkout.session.async_payment_failed", { id: "cs_bank", payment_status: "unpaid", metadata: track }), { db: failed.db });
+  const failCall = failed.calls.find((call) => call.method === "closeExclusivePurchase");
+  assert.equal(failCall?.args[1], "failed");
+
+  const expired = makeDb();
+  await post(event("checkout.session.expired", { id: "cs_gone", metadata: track }), { db: expired.db });
+  const expireCall = expired.calls.find((call) => call.method === "closeExclusivePurchase");
+  assert.equal(expireCall?.args[1], "expired");
+
+  const otherAsync = makeDb();
+  await post(event("checkout.session.async_payment_succeeded", { id: "cs_store_async", metadata: { order_id: "o", item_id: "i" } }), { db: otherAsync.db });
+  assert.equal(methods(otherAsync.calls).includes("recordExclusivePurchase"), false);
+});
+
+test("music purchase rows: paid, expired, failed, full refund revokes, partial refund keeps", async () => {
+  const db = rowDb({
+    exclusive_track_purchases: [
+      { id: "p_paid", track_id: "t1", buyer_user_id: "u1", stripe_session_id: "cs_paid", payment_status: "pending" },
+      { id: "p_exp", track_id: "t1", buyer_user_id: "u2", stripe_session_id: "cs_exp", payment_status: "pending" },
+      { id: "p_part", track_id: "t1", buyer_user_id: "u3", stripe_session_id: "cs_part", stripe_payment_intent_id: "pi_part_music", payment_status: "paid" },
+    ],
+  });
+  const adapter = createSupabaseStripeDb(db, stripeStub({}));
+  const meta = { type: "exclusive_track_purchase", track_id: "t1", buyer_user_id: "u1" };
+
+  await adapter.recordExclusivePurchase({ id: "cs_paid", payment_status: "paid", payment_intent: "pi_music", amount_total: 999, metadata: meta });
+  const rows = () => Object.fromEntries(db.rows("exclusive_track_purchases").map((row) => [row.id, row]));
+  assert.equal(rows().p_paid.payment_status, "paid");
+  assert.equal(rows().p_paid.stripe_payment_intent_id, "pi_music");
+  assert.equal(rows().p_paid.amount_cents, 999);
+
+  // A late expired event for a session that already paid changes nothing.
+  await adapter.closeExclusivePurchase({ id: "cs_paid" }, "expired");
+  assert.equal(rows().p_paid.payment_status, "paid");
+  await adapter.closeExclusivePurchase({ id: "cs_exp" }, "expired");
+  assert.equal(rows().p_exp.payment_status, "expired");
+
+  await adapter.markChargeRefunded({ id: "ch_part_music", object: "charge", payment_intent: "pi_part_music", amount: 999, amount_refunded: 300, refunded: false });
+  assert.equal(rows().p_part.payment_status, "paid");
+
+  await adapter.markChargeRefunded({ id: "ch_music", object: "charge", payment_intent: "pi_music", amount: 999, amount_refunded: 999, refunded: true });
+  assert.equal(rows().p_paid.payment_status, "refunded");
+  assert.equal(rows().p_part.payment_status, "paid");
 });
