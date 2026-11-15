@@ -27,6 +27,8 @@ export function isMainTabPath(pathname: string): boolean {
  * Main tabs are not given a parent; callers still receive /feed if they ask.
  */
 export function parentFallback(pathname: string): string {
+  const music = pathname.match(/^\/profile\/([^/]+)\/music\/?$/);
+  if (music) return `/profile/${music[1]}`;
   if (/^\/profile\/[^/]+/.test(pathname)) return "/directory";
   if (pathname.startsWith("/settings/")) return "/settings";
   if (pathname === "/settings") return "/profile";

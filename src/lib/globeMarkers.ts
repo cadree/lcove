@@ -1,4 +1,4 @@
-/** Globe marker layout: fold overlapping cities, keep everyone's faces, and fan a group out. */
+/** Globe marker layout: one card per city, and cities whose cards would overlap fold into one. */
 export interface PlacedCity {
   key: string;
   label: string;
@@ -38,18 +38,20 @@ export function zoomToSplit(points: [number, number][], current: number, gap = 3
 
 export const MAX_FACES = 5;
 
-/** How far a selected marker's fan reaches; nothing else may sit inside it. */
-export const FAN_RADIUS = 44;
-export const FAN_CLEARANCE = FAN_RADIUS + 22;
+/** City card geometry in globe units (the globe is drawn in a 400 x 400 frame). */
+export const CARD = { w: 50, h: 46, lift: 6, badge: 9 } as const;
+/** Anchors closer than this would make two cards overlap, so they fold into one. */
+export const CARD_GAP = 54;
+/** Zoom a tapped city card opens to: close enough to read the region around it. */
+export const CITY_ZOOM = 5;
 
-export function clusterMarkers(visible: PlacedCity[], selected: string | null, gap = 36, selectedGap = FAN_CLEARANCE): GlobeMarker[] {
+export function clusterMarkers(visible: PlacedCity[], selected: string | null, gap = CARD_GAP): GlobeMarker[] {
   const markers: GlobeMarker[] = [];
   const order = [...visible].sort(
     (a, b) => Number(b.key === selected) - Number(a.key === selected) || b.count - a.count || a.key.localeCompare(b.key)
   );
   for (const city of order) {
-    // The selected marker fans its faces out, so it claims a wider circle than a plain marker.
-    const near = markers.find((m) => Math.hypot(m.xy[0] - city.xy[0], m.xy[1] - city.xy[1]) < (m.key === selected ? selectedGap : gap));
+    const near = markers.find((m) => Math.hypot(m.xy[0] - city.xy[0], m.xy[1] - city.xy[1]) < gap);
     if (near) {
       near.cities++;
       near.total += city.count;
@@ -60,21 +62,6 @@ export function clusterMarkers(visible: PlacedCity[], selected: string | null, g
       markers.push({ ...city, cities: 1, total: city.count, liveTotal: city.live, faces: city.avatars.slice(0, MAX_FACES), points: [city.point] });
   }
   return markers;
-}
-
-/** Faces drawn stacked behind the main one: how many extra discs (0-2) a marker shows. */
-export function stackDepth(total: number): number {
-  return Math.max(0, Math.min(2, total - 1));
-}
-
-/** Positions for a fanned-out group: an arc around `heading` (default: above the marker), n slots. */
-export function fanOffsets(n: number, radius = FAN_RADIUS, heading = -Math.PI / 2): [number, number][] {
-  if (n <= 0) return [];
-  const spread = Math.min(Math.PI * 0.9, (n - 1) * 0.5);
-  return Array.from({ length: n }, (_, i) => {
-    const angle = heading + (n === 1 ? 0 : -spread / 2 + (spread * i) / (n - 1));
-    return [Math.round(Math.cos(angle) * radius * 10) / 10, Math.round(Math.sin(angle) * radius * 10) / 10];
-  });
 }
 
 /** Pinch: the new zoom from the finger spread, clamped to the globe's range. */

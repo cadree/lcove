@@ -1,6 +1,6 @@
 // cspell:words ndotv
 import { geoDistance } from "d3-geo";
-import { FAN_RADIUS } from "./globeMarkers.ts";
+import { CARD } from "./globeMarkers.ts";
 import { GLOBE_SCALE, GLOBE_SIZE, type Rotation } from "./globeView.ts";
 
 /** Surface normal · view direction: 1 at the centre of the disc, 0 on the limb, <0 on the far side. */
@@ -9,22 +9,24 @@ export function viewDot(point: [number, number], rotation: Rotation): number {
 }
 
 /**
- * How many pixels of a marker stick out toward the limb (away from the disc centre).
- * When the fan points inward, only the disc, badge and lower label count.
+ * How many pixels of a city card stick out toward the limb (away from the disc centre):
+ * the card above its anchor, the count badge on its corner and the "N cities" pill below.
  */
-export function outwardReach(xy: [number, number], globeR: number, fanned: boolean, heading: number): number {
+export function outwardReach(xy: [number, number]): number {
   const [x, y] = xy;
   const cx = GLOBE_SIZE / 2;
   const cy = GLOBE_SIZE / 2;
   const dist = Math.hypot(x - cx, y - cy) || 1;
   const ox = (x - cx) / dist;
   const oy = (y - cy) / dist;
-  const project = (px: number, py: number, r: number) => px * ox + py * oy + r;
-  let reach = 17;
-  reach = Math.max(reach, project(13, -13, 8.5));
-  reach = Math.max(reach, project(0, 26, 8));
-  if (fanned) reach = Math.max(reach, project(Math.cos(heading) * FAN_RADIUS, Math.sin(heading) * FAN_RADIUS, 12));
-  return reach;
+  const project = (px: number, py: number, r = 0) => px * ox + py * oy + r;
+  const half = CARD.w / 2;
+  const top = -(CARD.h + CARD.lift);
+  return Math.max(
+    project(-half, top), project(half, top), project(-half, -CARD.lift), project(half, -CARD.lift),
+    project(half - 2, top + 2, CARD.badge),
+    project(-22, 21), project(22, 21),
+  );
 }
 
 /** Smooth fade: 1 when the whole footprint is on the disc, 0 at or past the limb. */
@@ -36,16 +38,6 @@ export function limbOpacity(ndotv: number, globeR: number, outwardPx: number, fa
   if (room >= outwardPx + fadePx) return 1;
   const t = (room - outwardPx) / fadePx;
   return t * t * (3 - 2 * t);
-}
-
-/** Fan arc heading: up when that stays on the disc, otherwise toward the globe centre. */
-export function fanHeading(x: number, y: number, globeR: number, reach = FAN_RADIUS + 12): number {
-  const up = -Math.PI / 2;
-  const cx = GLOBE_SIZE / 2;
-  const cy = GLOBE_SIZE / 2;
-  const inward = Math.atan2(cy - y, cx - x);
-  if (Math.hypot(x - cx, y - reach - cy) <= globeR - 2) return up;
-  return inward;
 }
 
 /** Tighter clip angle so zoomed-in land only covers the visible cap, not the whole hemisphere. */

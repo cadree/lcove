@@ -38,6 +38,7 @@ describe("parent screens", () => {
 
   it("sends a deep link to a parent that can open the screen again", () => {
     assert.equal(parentFallback("/profile/abc"), "/directory");
+    assert.equal(parentFallback("/profile/abc/music"), "/profile/abc");
     assert.equal(parentFallback("/settings/booking"), "/settings");
     assert.equal(parentFallback("/settings"), "/profile");
     assert.equal(parentFallback("/blog/post"), "/blog");

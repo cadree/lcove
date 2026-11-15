@@ -150,7 +150,8 @@ const markerAt = (page, name) =>
   page.evaluate((n) => {
     const el = [...document.querySelectorAll("[data-city-marker]")].find((m) => m.getAttribute("aria-label").startsWith(n));
     if (!el) return null;
-    const c = el.querySelector("circle[r='17']") || el;
+    // The card's anchor dot sits exactly on the city.
+    const c = el.querySelector("[data-card-anchor]") || el;
     const r = c.getBoundingClientRect();
     return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
   }, name);

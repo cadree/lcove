@@ -1,4 +1,5 @@
 import { cityByKey, resolveCity } from "./cities.ts";
+import { safeArea } from "./nearbyMap.ts";
 
 /** One onboarded member as the directory loads them from profiles_public. */
 export interface Member {
@@ -27,6 +28,8 @@ export interface DiscoverySignal {
   liked: boolean | null;
   live_city_key: string | null;
   live_until: string | null;
+  /** Opt-in live area: [lon, lat] on a 0.01° grid, only while the live city is on. Older servers omit it. */
+  live_area?: number[] | null;
   trip: TripBadge | null;
   /** Server-chosen deck position (lower first). Never shown; older servers omit it. */
   deck?: number | null;
@@ -41,7 +44,7 @@ export interface Person extends Member {
   name: string;
   role: string | null;
   home: Place | null;
-  live: (Place & { until: string }) | null;
+  live: (Place & { until: string; area?: [number, number] | null }) | null;
   trip: TripBadge | null;
   /** On the globe and in the swipe deck. False for members who hid themselves. */
   discoverable: boolean;
@@ -85,7 +88,7 @@ export function buildPeople(members: Member[], signals: DiscoverySignal[] | unde
       name: member.display_name?.trim() || "Creative",
       role: member.skills[0] || member.passions[0] || null,
       home: homePlace(member),
-      live: livePlace && signal?.live_until ? { ...livePlace, until: signal.live_until } : null,
+      live: livePlace && signal?.live_until ? { ...livePlace, until: signal.live_until, area: safeArea(signal.live_area) } : null,
       trip: signal?.trip || null,
       discoverable: !!signal,
       liked: signal?.liked ?? null,

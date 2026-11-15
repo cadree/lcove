@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Lock, Music, DollarSign, Trash2, Eye, EyeOff, Bookmark, BookmarkCheck, Download, UserPlus } from "lucide-react";
+import { Lock, DollarSign, Trash2, Eye, EyeOff, Bookmark, BookmarkCheck, Download, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,7 @@ import {
   downloadTrack,
 } from "@/hooks/useMusicLibrary";
 import { PreviewPlayer } from "./PreviewPlayer";
+import { RecordSleeve } from "./RecordSleeve";
 import { IosDigitalGoodsNotice } from "@/components/ios/IosDigitalGoodsNotice";
 import { digitalPurchasesEnabled } from "@/lib/platform";
 import { toast } from "sonner";
@@ -43,6 +45,7 @@ export const ExclusiveTrackCard = ({
   sales,
 }: ExclusiveTrackCardProps) => {
   const { user } = useAuth();
+  const [playing, setPlaying] = useState(false);
   const { data: purchases = [] } = useMyPurchases();
   const { data: saves = [] } = useMySaves();
   const { saveTrack, unsaveTrack, toggleAddToProfile } = useMusicLibraryMutations();
@@ -93,31 +96,35 @@ export const ExclusiveTrackCard = ({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
-        "rounded-xl overflow-hidden bg-card border border-border/40 flex flex-col",
-        !track.is_published && isOwner && "opacity-70 border-dashed"
+        "h-full min-w-0 flex flex-col",
+        !track.is_published && isOwner && "opacity-70"
       )}
     >
-      {/* Cover */}
-      <div className="aspect-square relative bg-muted">
-        {track.cover_image_url ? (
-          <img src={track.cover_image_url} alt={track.title} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Music className="w-10 h-10 text-muted-foreground" />
+      {/* Cover: a sealed sleeve until unlocked, then the record slides out */}
+      <div className="relative">
+        <RecordSleeve
+          cover={track.cover_image_url}
+          title={track.title}
+          open={fullAccess}
+          spinning={playing}
+          sealLabel={statusBadge.label}
+        />
+        {isOwner && (
+          <div className="absolute top-1 right-1">
+            <Badge variant={statusBadge.variant} className="text-[10px] backdrop-blur-sm">
+              {statusBadge.label}
+            </Badge>
           </div>
         )}
-        <div className="absolute top-2 right-2">
-          <Badge variant={statusBadge.variant} className="text-[10px] backdrop-blur-sm">
-            {!fullAccess && <Lock className="w-2.5 h-2.5 mr-1" />}
-            {statusBadge.label}
-          </Badge>
-        </div>
       </div>
 
       {/* Info */}
-      <div className="p-3 space-y-2.5 flex-1 flex flex-col">
-        <div>
-          <p className="font-medium text-foreground text-sm truncate">{track.title}</p>
+      <div className="pt-2.5 space-y-2.5 flex-1 flex flex-col">
+        <div className="space-y-0.5">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            {fullAccess && !isOwner ? "Unlocked" : "Exclusive"}
+          </p>
+          <p className="font-display font-medium text-foreground text-sm truncate">{track.title}</p>
           {track.description && (
             <p className="text-xs text-muted-foreground line-clamp-1">{track.description}</p>
           )}
@@ -125,13 +132,14 @@ export const ExclusiveTrackCard = ({
 
         {/* Preview / Player */}
         {fullAccess && fullUrl ? (
-          <PreviewPlayer audioUrl={fullUrl} locked={false} />
+          <PreviewPlayer audioUrl={fullUrl} locked={false} onPlayingChange={setPlaying} />
         ) : previewUrl ? (
           <PreviewPlayer
             audioUrl={previewUrl}
             startSeconds={previewStart}
             durationSeconds={track.preview_duration_seconds || 15}
             locked
+            onPlayingChange={setPlaying}
           />
         ) : null}
         {fullAccess && track.audio_file_path && privateUrl.isLoading && (

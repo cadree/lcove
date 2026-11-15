@@ -22,6 +22,8 @@ export interface DiscoverySettings {
   /** Opt-in live city, city level only. Null when off or expired. */
   live_city_key?: string | null;
   live_until?: string | null;
+  /** Opt-in live area, [lon, lat] on a 0.01° grid. Only with a live city; older servers omit it. */
+  live_area?: number[] | null;
 }
 export interface CreativeMatch {
   user_id: string;
@@ -98,6 +100,7 @@ export interface MessageRequestInbox {
   incoming: MessageRequest[];
   outgoing: MessageRequest[];
 }
+export const AREA_UNAVAILABLE = "Live areas are not on this server yet";
 export const discovery = {
   settings: (
     values: { p_discoverable?: boolean; p_matches_only?: boolean } = {}
@@ -112,6 +115,19 @@ export const discovery = {
   /** Share a live city for 1-168 hours, or pass null to turn it off. */
   liveCity: (cityKey: string | null, hours: number | null) =>
     callRpc<DiscoverySettings>("discovery_live_city", { p_city_key: cityKey, p_hours: hours }),
+  /**
+   * Share a live city plus the ~1 km area you are in, for 1-168 hours. The server snaps the point
+   * to a 0.01° grid again and drops it with the live city. Throws AREA_UNAVAILABLE on servers
+   * without this function, so callers can fall back to sharing the city only.
+   */
+  liveArea: async (cityKey: string, lon: number, lat: number, hours: number) => {
+    try {
+      return await callRpc<DiscoverySettings>("discovery_live_area", { p_city_key: cityKey, p_lon: lon, p_lat: lat, p_hours: hours });
+    } catch (e) {
+      if (/Could not find the function|schema cache/i.test((e as Error).message)) throw new Error(AREA_UNAVAILABLE);
+      throw e;
+    }
+  },
   swipe: (target: string, liked: boolean) =>
     callRpc<{ matched: boolean; conversation_id: string | null }>(
       "creative_swipe",
