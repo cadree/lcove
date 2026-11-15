@@ -99,7 +99,8 @@ export function usePendingOnboarding() {
       const { data, error } = await supabase
         .from('profiles_public')
         .select('*')
-        .eq('onboarding_completed', false)
+        .eq('onboarding_completed', true)
+        .eq('access_status', 'pending')
         .order('created_at', { ascending: false });
 
       if (error) throw error;

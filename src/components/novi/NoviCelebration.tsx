@@ -24,7 +24,7 @@ export function NoviCelebration() {
   return (
     <div
       role="status"
-      className="pointer-events-none fixed left-1/2 top-16 z-[80] -translate-x-1/2 rounded-full bg-[linear-gradient(180deg,#FFD6E8,#FF9FC8)] px-4 py-2 font-body text-sm font-extrabold text-[#0A0A0A] shadow-lg"
+      className="pointer-events-none fixed bottom-[calc(96px+env(safe-area-inset-bottom,0px))] left-1/2 z-[80] -translate-x-1/2 rounded-full bg-[linear-gradient(180deg,#FFD6E8,#FF9FC8)] px-4 py-2 font-body text-sm font-extrabold text-[#0A0A0A] shadow-lg"
     >
       +{gained} XP
     </div>

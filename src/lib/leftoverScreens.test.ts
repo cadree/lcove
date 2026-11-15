@@ -21,8 +21,13 @@ describe("leftover screens", () => {
     const hero = source("components/landing/LandingHero.tsx");
     assert.match(hero, /<h1[^>]*>\s*<EtherWordmark/);
     assert.match(hero, /HERO_TAGLINE/);
-    assert.match(hero, /Familcy access/);
+    assert.match(hero, /HERO_SUB/);
+    assert.equal(hero.includes("Year 2096"), false);
+    assert.equal(hero.includes("Familcy access"), false);
+    assert.equal(hero.includes("ether-bear-logo"), false);
+    assert.equal(hero.includes("bearLogo"), false);
   });
+
 
   it("gives a denied account its own page", () => {
     const app = source("App.tsx");

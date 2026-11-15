@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,16 +14,27 @@ interface Props {
   updateMemberOf: (memberOf: string) => void;
   onNext: () => void;
   onBack?: () => void;
+  /** Hide the name field when sign-up already saved it. */
+  nameLocked?: boolean;
   /** Optional photo, uploaded when onboarding finishes. */
   avatarPreview?: string | null;
   onAvatar?: (file: File | null) => void;
 }
 
-const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onNext, onBack, avatarPreview, onAvatar }: Props) => {
+const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onNext, onBack, nameLocked = false, avatarPreview, onAvatar }: Props) => {
   const [name, setName] = useState(displayName);
   const [member, setMember] = useState(memberOf);
   const [error, setError] = useState('');
   const [memberError, setMemberError] = useState('');
+
+  // Sign-up metadata can arrive after the first render. Keep the locked name
+  // in local state so Continue is enabled.
+  useEffect(() => {
+    if (displayName.trim()) setName((current) => current.trim() || displayName);
+  }, [displayName]);
+  useEffect(() => {
+    if (memberOf) setMember((current) => current || memberOf);
+  }, [memberOf]);
 
   const handleNext = () => {
     const trimmedName = name.trim();
@@ -102,6 +113,12 @@ const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onN
               </div>
             </div>
           )}
+          {nameLocked ? (
+            <div className="space-y-1">
+              <p className="text-base font-medium">Display Name</p>
+              <p className="text-lg text-foreground">{displayName}</p>
+            </div>
+          ) : (
           <div className="space-y-3">
             <Label htmlFor="displayName" className="text-base">
               Display Name
@@ -139,6 +156,7 @@ const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onN
               Letters, spaces, hyphens, or apostrophes.
             </p>
           </div>
+          )}
 
           <div className="space-y-3">
             <Label htmlFor="memberOf" className="text-base">
@@ -147,7 +165,7 @@ const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onN
             <Input
               id="memberOf"
               type="text"
-              placeholder="LCOVE"
+              placeholder="Your community or brand"
               value={member}
               maxLength={MEMBER_OF_LIMIT}
               onChange={(e) => {

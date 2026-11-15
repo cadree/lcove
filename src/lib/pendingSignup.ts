@@ -32,9 +32,21 @@ async function claimInvite(token: string, userId: string): Promise<boolean> {
   return claimed;
 }
 
+export function identityFromMetadata(
+  metadata: { display_name?: unknown; member_of?: unknown } | null | undefined,
+): { displayName?: string; memberOf?: string } {
+  const displayName = typeof metadata?.display_name === "string" ? metadata.display_name.trim() : "";
+  const memberOf = typeof metadata?.member_of === "string" ? metadata.member_of : "";
+  return {
+    ...(displayName ? { displayName } : {}),
+    ...(memberOf ? { memberOf } : {}),
+  };
+}
+
 export async function applyPendingSignupProfile(
   userId: string,
   metadataToken?: string | null,
+  metadata?: { display_name?: unknown; member_of?: unknown } | null,
 ): Promise<'ok' | 'invite-failed' | 'empty'> {
   const raw = sessionStorage.getItem(PENDING_SIGNUP_KEY);
   let parsed: PendingSignup = {};
@@ -47,9 +59,11 @@ export async function applyPendingSignupProfile(
     }
   }
 
-  const displayName = parsed.displayName?.trim();
+  const fromMeta = identityFromMetadata(metadata);
+  const displayName = parsed.displayName?.trim() || fromMeta.displayName;
   const phone = parsed.phone?.trim();
-  const memberOf = memberOfError(parsed.memberOf) ? null : normalizeMemberOf(parsed.memberOf);
+  const memberSource = parsed.memberOf ?? fromMeta.memberOf;
+  const memberOf = memberOfError(memberSource) ? null : normalizeMemberOf(memberSource);
   const inviteToken = parsed.inviteToken?.trim() || (metadataToken ?? '').trim();
   if (!displayName && !phone && !memberOf && !inviteToken) return 'empty';
 

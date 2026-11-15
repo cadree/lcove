@@ -10,7 +10,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, inviteToken?: string) => Promise<{ error: Error | null; session: Session | null }>;
+  signUp: (email: string, password: string, inviteToken?: string, profile?: { displayName?: string; memberOf?: string }) => Promise<{ error: Error | null; session: Session | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
@@ -89,7 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signUp = async (email: string, password: string, inviteToken?: string) => {
+  const signUp = async (email: string, password: string, inviteToken?: string, profile?: { displayName?: string; memberOf?: string }) => {
     const token = inviteToken?.trim() ?? '';
     const redirectPath = token
       ? `/auth?confirmed=1&invite=${encodeURIComponent(token)}`
@@ -105,7 +105,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       password,
       options: {
         emailRedirectTo: redirectUrl,
-        data: token ? { [WAITLIST_INVITE_METADATA_KEY]: token } : undefined,
+        data: {
+          ...(profile?.displayName?.trim() ? { display_name: profile.displayName.trim() } : {}),
+          ...(profile?.memberOf?.trim() ? { member_of: profile.memberOf.trim() } : {}),
+          ...(token ? { [WAITLIST_INVITE_METADATA_KEY]: token } : {}),
+        },
       }
     });
     

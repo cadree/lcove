@@ -86,7 +86,7 @@ const OnboardingPassions = ({ data, updateData, onNext, onBack }: Props) => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col p-4 md:p-6 pb-36">
+    <div className="min-h-screen flex flex-col p-4 md:p-6 pb-52">
       <div className="max-w-2xl mx-auto w-full">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -248,7 +248,7 @@ const OnboardingPassions = ({ data, updateData, onNext, onBack }: Props) => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-8 glass-strong rounded-2xl p-4 md:p-6"
+            className="mt-8 mb-6 glass-strong rounded-2xl p-4 md:p-6"
           >
             <h3 className="font-display text-lg md:text-xl text-foreground mb-4">
               How serious are you about your passions?

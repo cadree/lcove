@@ -83,3 +83,12 @@ test("the deck follows the server's deck order among undecided people and never 
   assert.deepEqual(deckFor(people, undefined, null, "").map((p) => p.user_id), ["b", "a", "d", "c"]);
   assert.equal(Object.keys(people[1]).some((k) => /incoming|connected_me|liked_me/i.test(k)), false);
 });
+
+test("hides App Review and test accounts from discovery", () => {
+  const people = buildPeople([
+    member("1", "Cadre Wallace", "Charlotte"),
+    member("2", "App Review Apple App Review test account", "Charlotte"),
+    member("3", "Apple test account", "Charlotte"),
+  ], [signal("1"), signal("2"), signal("3")]);
+  assert.deepEqual(people.map((p) => p.user_id), ["1"]);
+});

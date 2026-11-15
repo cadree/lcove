@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { callRpc } from "@/lib/rpc";
 import { autoFileQuestId, questViews, streakFromDays, type QuestView } from "@/lib/noviQuests";
@@ -101,7 +100,6 @@ export function useNoviQuests() {
       queryClient.invalidateQueries({ queryKey: ["my-xp", user?.id] });
       const gained = next && previous ? next.total - previous.total : 0;
       if (gained > 0) {
-        toast.success(`+${gained} XP`);
         window.dispatchEvent(new CustomEvent("ether-novi-xp", { detail: { gained, total: next?.total ?? 0 } }));
       }
     },

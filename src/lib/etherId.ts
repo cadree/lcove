@@ -30,7 +30,7 @@ export interface EtherIdCard extends EtherIdPublic {
 
 export const MEMBER_OF_LIMIT = 24;
 export const MEMBER_OF_EMPTY = "LCOVE";
-export const MEMBER_OF_HINT = "A community or personal brand you belong to, or N/A or LCOVE.";
+export const MEMBER_OF_HINT = "A community or personal brand you belong to. Optional.";
 export const PASSION_TITLE_LIMIT = 24;
 export const PASSION_TITLE_HINT = "A short title you write yourself, such as Filmmaker or Beat maker.";
 export const ETHER_ID_SITE = "etherbylcove.com";

@@ -1,4 +1,5 @@
 import { cityByKey, resolveCity } from "./cities.ts";
+import { isHiddenTestAccount } from "./hiddenTestAccount.ts";
 import { safeArea } from "./nearbyMap.ts";
 import { openToLabel } from "./openTo.ts";
 
@@ -82,7 +83,7 @@ export function buildPeople(members: Member[], signals: DiscoverySignal[] | unde
   const seen = new Set<string>();
   const people: Person[] = [];
   for (const member of members) {
-    if (hidden.has(member.user_id) || seen.has(member.user_id)) continue;
+    if (hidden.has(member.user_id) || seen.has(member.user_id) || isHiddenTestAccount(member.display_name)) continue;
     seen.add(member.user_id);
     const signal = byId.get(member.user_id);
     const livePlace = signal?.live_city_key ? placeForKey(signal.live_city_key) : null;

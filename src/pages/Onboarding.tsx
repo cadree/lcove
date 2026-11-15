@@ -2,21 +2,22 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
+import { identityFromMetadata } from '@/lib/pendingSignup';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import OnboardingName from '@/components/onboarding/OnboardingName';
 import OnboardingPassions from '@/components/onboarding/OnboardingPassions';
 import OnboardingCity from '@/components/onboarding/OnboardingCity';
-import OnboardingQuestionnaire from '@/components/onboarding/OnboardingQuestionnaire';
+import OnboardingPledge from '@/components/onboarding/OnboardingPledge';
 import { buildUserPassionInserts } from '@/lib/onboardingPassions';
 import { memberOfError, normalizeMemberOf } from '@/lib/etherId';
 import { assertCleanText } from '@/lib/objectionableText';
 import { scoreRedFlags, clearQuizSeed, type ChoiceId } from '@/lib/onboardingQuiz';
 import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from '@/lib/onboardingDraft';
 import { takeEventReturn } from '../../functions/_shared/eventShare.js';
+import { accessPath } from '@/lib/accessPath';
 import { uploadAvatar } from '@/lib/avatarUpload';
-import { FIRST_RUN_PATH } from '@/lib/firstRun';
 
 export interface OnboardingData {
   displayName: string;
@@ -51,6 +52,7 @@ const Onboarding = () => {
     return () => URL.revokeObjectURL(url);
   }, [avatarFile]);
   const [initialized, setInitialized] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [data, setData] = useState<OnboardingData>({
     displayName: '',
     memberOf: '',
@@ -77,21 +79,29 @@ const Onboarding = () => {
   const memberOfRef = useRef(data.memberOf);
   memberOfRef.current = data.memberOf;
   useEffect(() => {
-    if (profile?.display_name && !displayNameRef.current) {
-      setData(prev => ({ ...prev, displayName: profile.display_name || '' }));
+    const fromMeta = identityFromMetadata(user?.user_metadata);
+    if (!displayNameRef.current) {
+      const nextName = profile?.display_name || fromMeta.displayName || '';
+      if (nextName) setData(prev => ({ ...prev, displayName: nextName }));
     }
-    if (profile?.member_of && !memberOfRef.current) {
-      setData(prev => ({ ...prev, memberOf: profile.member_of || '' }));
+    if (!memberOfRef.current) {
+      const nextMember = profile?.member_of || fromMeta.memberOf || '';
+      if (nextMember) setData(prev => ({ ...prev, memberOf: nextMember }));
     }
-  }, [profile]);
+  }, [profile, user]);
 
   // Resume a mid-onboarding refresh. Completed profiles still go to the feed.
   useEffect(() => {
     if (authLoading || profileLoading || initialized || !user) return;
     setInitialized(true);
-    if (profile?.onboarding_completed && profile.access_status !== 'banned') {
+    if (profile?.onboarding_completed) {
       clearOnboardingDraft(window.localStorage, user.id);
-      navigate(takeEventReturn() || '/feed');
+      const next = accessPath(
+        { onboarding_completed: true, access_status: profile.access_status },
+        '/onboarding',
+      );
+      const hold = next === '/pending' || next === '/denied' || next === '/locked';
+      navigate(hold ? next : (takeEventReturn() || next));
       return;
     }
     const draft = readOnboardingDraft(window.localStorage, user.id);
@@ -116,7 +126,8 @@ const Onboarding = () => {
   };
 
   const handleComplete = async () => {
-    if (!user) return;
+    if (!user || saving) return;
+    setSaving(true);
 
     // Final validation - name is required
     if (!data.displayName.trim()) {
@@ -126,6 +137,7 @@ const Onboarding = () => {
         variant: 'destructive'
       });
       setCurrentStep(0);
+      setSaving(false);
       return;
     }
 
@@ -133,6 +145,7 @@ const Onboarding = () => {
     if (memberError) {
       toast({ title: 'Member of', description: memberError, variant: 'destructive' });
       setCurrentStep(0);
+      setSaving(false);
       return;
     }
 
@@ -196,7 +209,7 @@ const Onboarding = () => {
       clearQuizSeed(window.sessionStorage);
       clearOnboardingDraft(window.localStorage, user.id);
 
-      // Finishing onboarding always grants access. passed_exam records
+      // Access stays pending until a human approves entry. passed_exam records
       // whether the red-flag count stayed under the threshold.
       assertCleanText(data.memberOf);
       let avatarUrl: string | null = null;
@@ -219,13 +232,13 @@ const Onboarding = () => {
         onboarding_completed: true,
         mindset_level: level,
         onboarding_level: level,
-        access_status: 'active',
+        access_status: 'pending',
         onboarding_score: score,
         passed_exam: passedExam,
       });
 
-      // First run lands on the people deck so a new creative meets real members right away.
-      navigate(takeEventReturn() || FIRST_RUN_PATH, { replace: true });
+      // A human still has to approve access. The pending screen is the next step.
+      navigate(takeEventReturn() || '/pending', { replace: true });
     } catch (error) {
       console.error('Error saving onboarding data:', error);
       toast({
@@ -233,6 +246,7 @@ const Onboarding = () => {
         description: 'Please try again.',
         variant: 'destructive'
       });
+      setSaving(false);
     }
   };
 
@@ -263,12 +277,13 @@ const Onboarding = () => {
       updateName={(name) => updateData({ displayName: name })}
       updateMemberOf={(memberOf) => updateData({ memberOf })}
       onNext={nextStep}
+      nameLocked={Boolean((profile?.display_name || identityFromMetadata(user?.user_metadata).displayName || '').trim())}
       avatarPreview={avatarPreview}
       onAvatar={setAvatarFile}
     />,
     <OnboardingPassions key="passions" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingCity key="city" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
-    <OnboardingQuestionnaire key="questionnaire" data={data} updateData={updateData} onComplete={handleComplete} onBack={prevStep} />,
+    <OnboardingPledge key="pledge" onComplete={() => void handleComplete()} onBack={prevStep} submitting={saving} />,
   ];
 
   return (

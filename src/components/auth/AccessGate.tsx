@@ -6,6 +6,8 @@ import bearLogo from '@/assets/ether-bear-logo.webp';
 import { isKnownPath, isPublicPath } from "@/lib/appRoutes";
 import { NO_FAKE_LINE, WELCOME_HOME } from "@/content/copy";
 import { SignUpPrompt } from "@/components/auth/SignUpPrompt";
+import { accessPath } from "@/lib/accessPath";
+import { FIRST_RUN_PATH } from "@/lib/firstRun";
 import { EVENT_RETURN_KEY, eventReturnPath, rememberEventReturn } from "../../../functions/_shared/eventShare.js";
 
 interface AccessGateProps {
@@ -78,23 +80,34 @@ const AccessGate = ({ children }: AccessGateProps) => {
         sessionStorage.removeItem('onboarding_just_completed');
       }
 
-      // Banned accounts stay on the locked screen. Finishing onboarding
-      // never denies access, and existing denied rows are opened by migration.
+      const next = accessPath(
+        { onboarding_completed: profile.onboarding_completed, access_status: profile.access_status },
+        `${location.pathname}${location.search}`,
+      );
+      if (next === '/pending' && location.pathname !== '/pending') {
+        navigate('/pending', { replace: true });
+        return;
+      }
+      if (next === '/denied' && location.pathname !== '/denied') {
+        navigate('/denied', { replace: true });
+        return;
+      }
+      if (next === '/locked' && location.pathname !== '/locked') {
+        navigate('/locked', { replace: true });
+        return;
+      }
+      if (location.pathname === '/pending' && next !== '/pending') {
+        navigate(next === '/feed' ? FIRST_RUN_PATH : next, { replace: true });
+        return;
+      }
+      if ((location.pathname === '/locked' || location.pathname === '/denied') && next !== location.pathname) {
+        navigate(profile.onboarding_completed ? '/feed' : '/onboarding', { replace: true });
+        return;
+      }
+
       const accessStatus = profile.access_status || 'pending';
-      
-      if (accessStatus === 'banned') {
-        if (location.pathname !== '/locked') {
-          navigate('/locked');
-        }
-        return;
-      }
 
-      if (location.pathname === '/locked') {
-        navigate(profile.onboarding_completed ? '/feed' : '/onboarding');
-        return;
-      }
-
-      // If access is active, show welcome popup once
+      // Welcome only after a human has let the person in.
       if (accessStatus === 'active' && !hasSeenWelcome) {
         const welcomeKey = `welcome_shown_${user.id}`;
         const alreadyShown = localStorage.getItem(welcomeKey);

@@ -16,7 +16,6 @@ export function FeaturePreview({ joinSearch = "" }: { joinSearch?: string }) {
     <section className="py-16 md:py-24">
       <div className="container px-4 sm:px-6 lg:px-8">
         <div className="mb-10">
-          <p className="eyebrow mb-2">{FEATURE_PREVIEW_LABEL}</p>
           <h2 className="ether-title text-3xl sm:text-4xl">{FEATURE_PREVIEW_LABEL}</h2>
         </div>
 
