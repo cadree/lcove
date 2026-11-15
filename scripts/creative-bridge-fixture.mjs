@@ -11,6 +11,7 @@ import { readFile } from "node:fs/promises";
 
 export const MIGRATIONS = [
   "supabase/migrations/20261115160000_work_credits.sql",
+  "supabase/migrations/20261115161000_open_to.sql",
 ];
 /** Whether a creative-bridge migration (by name, e.g. "open_to") is part of this build. */
 export const has = (name) => MIGRATIONS.some((m) => m.includes(`_${name}.sql`));

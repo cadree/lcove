@@ -6,6 +6,8 @@ import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { discovery } from "@/lib/creativeDiscovery";
 import { buildPeople, type Member } from "@/lib/peopleDiscovery";
 import { abortAfter } from "@/lib/requestDeadline";
+import { openToByUser } from "@/lib/openTo";
+import { openToApi } from "@/lib/openToApi";
 
 interface PassionRow {
   user_id: string;
@@ -16,7 +18,7 @@ interface PassionRow {
 /** Every onboarded member with their skills and passions, as the old directory loaded them. */
 export async function fetchMembers(): Promise<Member[]> {
   const signal = abortAfter();
-  const [profiles, passions, skills] = await Promise.all([
+  const [profiles, passions, skills, openTo] = await Promise.all([
     supabase
       .from("profiles_public")
       .select("user_id, display_name, avatar_url, city, city_display, city_key, bio, created_at")
@@ -25,7 +27,10 @@ export async function fetchMembers(): Promise<Member[]> {
       .abortSignal(signal),
     supabase.from("user_passions").select("user_id, custom_name, passions(name)").abortSignal(signal),
     supabase.from("user_skills").select("user_id, skills(name)").abortSignal(signal),
+    // Optional: people still load if this fails.
+    openToApi.all().catch(() => []),
   ]);
+  const openToBy = openToByUser(openTo);
   if (profiles.error) throw profiles.error;
   const add = (map: Map<string, string[]>, id: string, name: string | null | undefined) => {
     const value = name?.trim();
@@ -46,6 +51,7 @@ export async function fetchMembers(): Promise<Member[]> {
     ...p,
     skills: skillsBy.get(p.user_id) || [],
     passions: passionsBy.get(p.user_id) || [],
+    open_to: openToBy.get(p.user_id) || [],
   })) as Member[];
 }
 

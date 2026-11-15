@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { OpenToChips } from "@/components/openTo/OpenToChips";
 import { Link } from "react-router-dom";
 import { Plane, Radio } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -34,6 +35,7 @@ export function MemberGrid({ people, resetKey }: { people: Person[]; resetKey: s
                   <span className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground"><Plane size={11} /> {tripBadge(person.trip)}</span>
                 )}
                 {person.bio && <span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">{person.bio}</span>}
+                {!!person.open_to?.length && <OpenToChips tags={person.open_to} limit={3} className="mt-1.5" />}
               </span>
             </Link>
           </li>

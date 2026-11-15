@@ -16,6 +16,7 @@ import { PostDetailModal } from "@/components/profile/PostDetailModal";
 import { CreateBlogDialog } from "@/components/profile/CreateBlogDialog";
 import { ProfileBlogsGrid } from "@/components/profile/ProfileBlogsGrid";
 import { UserReviews } from "@/components/profile/UserReviews";
+import { ProfileOpenTo } from "@/components/openTo/ProfileOpenTo";
 import { ProfileCredits } from "@/components/credits/ProfileCredits";
 import { CreatorModuleTabs } from "@/components/profile/CreatorModuleTabs";
 import { EditProfileDetailsDialog } from "@/components/profile/EditProfileDetailsDialog";
@@ -617,6 +618,7 @@ const Profile = () => {
           founding={profile?.founding}
         />
 
+        {targetUserId && <ProfileOpenTo userId={targetUserId} isOwner={!!isOwnProfile} />}
         {isOwnProfile && <EtherIdEntry />}
         {isOwnProfile && <div className="px-4 pt-4"><ProfileNovi /></div>}
         <ProfileBookEntry />

@@ -42,7 +42,11 @@ const OPS = { eq: "=", neq: "<>", gt: ">", gte: ">=", lt: "<", lte: "<=", like: 
  * @param opts.rows { [table]: async (row, viewer) => row } extra fields per row
  * @param opts.log array that collects every request
  */
+// PostgREST sends date columns as "YYYY-MM-DD", not timestamps.
+const DATE_AS_TEXT = { parsers: { 1082: (value) => value } };
+
 export function backend(db, { rpcs = [], fixed = {}, rows = {}, log = [] } = {}) {
+  const q = (sql, params) => db.query(sql, params, DATE_AS_TEXT);
   const columns = new Map();
   const tableColumns = async (table) => {
     if (!columns.has(table)) {
@@ -92,7 +96,7 @@ export function backend(db, { rpcs = [], fixed = {}, rows = {}, log = [] } = {})
         const order = (url.searchParams.get("order") || "").split(",").map((o) => o.split(".")).filter(([c]) => cols.has(c))
           .map(([c, dir]) => `${c} ${dir === "desc" ? "DESC" : "ASC"}`).join(", ");
         const limit = Number(url.searchParams.get("limit")) || null;
-        out = (await db.query(`SELECT * FROM public.${table}${whereSql}${order ? ` ORDER BY ${order}` : ""}${limit ? ` LIMIT ${limit}` : ""}`, params)).rows;
+        out = (await q(`SELECT * FROM public.${table}${whereSql}${order ? ` ORDER BY ${order}` : ""}${limit ? ` LIMIT ${limit}` : ""}`, params)).rows;
         if (req.method() === "HEAD" || (req.headers()["prefer"] || "").includes("count=exact")) {
           return { headers: { ...headers, "content-range": `0-${Math.max(out.length - 1, 0)}/${out.length}` }, body: req.method() === "HEAD" ? "" : await Promise.all(out.map((r) => extra(r, viewer))) };
         }
@@ -101,16 +105,16 @@ export function backend(db, { rpcs = [], fixed = {}, rows = {}, log = [] } = {})
         out = [];
         for (const item of Array.isArray(payload) ? payload : [payload]) {
           const keys = Object.keys(item).filter((k) => cols.has(k));
-          out.push((await db.query(`INSERT INTO public.${table}(${keys.join(",")}) VALUES(${keys.map((_, i) => `$${i + 1}`).join(",")}) RETURNING *`, keys.map((k) => item[k]))).rows[0]);
+          out.push((await q(`INSERT INTO public.${table}(${keys.join(",")}) VALUES(${keys.map((_, i) => `$${i + 1}`).join(",")}) RETURNING *`, keys.map((k) => item[k]))).rows[0]);
         }
       } else if (req.method() === "PATCH") {
         const payload = JSON.parse(req.postData() || "{}");
         const keys = Object.keys(payload).filter((k) => cols.has(k));
         if (!keys.length) return { body: single ? null : [] };
         const set = keys.map((k, i) => `${k} = $${params.length + i + 1}`).join(", ");
-        out = (await db.query(`UPDATE public.${table} SET ${set}${whereSql} RETURNING *`, [...params, ...keys.map((k) => payload[k])])).rows;
+        out = (await q(`UPDATE public.${table} SET ${set}${whereSql} RETURNING *`, [...params, ...keys.map((k) => payload[k])])).rows;
       } else if (req.method() === "DELETE") {
-        out = (await db.query(`DELETE FROM public.${table}${whereSql} RETURNING *`, params)).rows;
+        out = (await q(`DELETE FROM public.${table}${whereSql} RETURNING *`, params)).rows;
       } else {
         return { body: [] };
       }

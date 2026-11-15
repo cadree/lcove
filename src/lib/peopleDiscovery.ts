@@ -1,5 +1,6 @@
 import { cityByKey, resolveCity } from "./cities.ts";
 import { safeArea } from "./nearbyMap.ts";
+import { openToLabel } from "./openTo.ts";
 
 /** One onboarded member as the directory loads them from profiles_public. */
 export interface Member {
@@ -13,6 +14,8 @@ export interface Member {
   created_at: string | null;
   skills: string[];
   passions: string[];
+  /** Current "open to" tags (expired ones are left out). Older loaders omit it. */
+  open_to?: string[];
 }
 
 export interface TripBadge {
@@ -160,6 +163,7 @@ export function matchesQuery(person: Person, query: string): boolean {
     person.trip?.city_label,
     ...person.skills,
     ...person.passions,
+    ...(person.open_to || []).map((tag) => openToLabel(tag)),
   ];
   return haystack.some((value) => value?.toLowerCase().includes(q));
 }

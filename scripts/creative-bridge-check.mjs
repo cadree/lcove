@@ -6,7 +6,7 @@
 // Run the app with VITE_SUPABASE_URL=https://fixture.supabase.co (any key).
 import { chromium } from "playwright";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { addUser, as, bridgeDb } from "./creative-bridge-fixture.mjs";
+import { addUser, as, bridgeDb, has } from "./creative-bridge-fixture.mjs";
 import { backend, signIn } from "./creative-bridge-backend.mjs";
 
 const root = process.env.ROOT || "http://127.0.0.1:8130";
@@ -38,8 +38,20 @@ const ok = (name, pass, detail = "") => {
 };
 const log = [];
 const install = backend(db, {
-  rpcs: ["profile_credits", "post_credits", "credit_post", "remove_post_credit", "respond_work_credit"],
+  rpcs: [
+    "profile_credits", "post_credits", "credit_post", "remove_post_credit", "respond_work_credit",
+    ...(has("open_to") ? ["set_open_to"] : []),
+  ],
   log,
+  fixed: {
+    // Explore's people deck: everyone else is on the globe, nobody decided yet.
+    discovery_globe: async (viewer) =>
+      (await all("SELECT user_id FROM profiles WHERE user_id<>$1", [viewer])).map((r) => ({
+        user_id: r.user_id, liked: null, live_city_key: null, live_until: null, trip: null,
+      })),
+    discovery_settings: async () => ({ discoverable: true, matches_only: false, live_city_key: null, live_until: null }),
+    creative_match_list: async () => [],
+  },
   rows: {
     projects: async (p) => ({ ...p, project_roles: await all("SELECT * FROM project_roles WHERE project_id=$1", [p.id]) }),
   },
@@ -47,9 +59,11 @@ const install = backend(db, {
 
 const browser = await chromium.launch({ channel: "chrome" });
 const pages = [];
+const allErrors = [];
 process.on("uncaughtException", async (e) => {
   console.error("FAILED:", e.message.split("\n")[0]);
   for (const [i, p] of pages.entries()) await p.screenshot({ path: `${out}/fail-${i}.png` }).catch(() => undefined);
+  if (allErrors.length) console.error("page errors:", allErrors.slice(-3).join("\n---\n").slice(0, 3000));
   if (process.env.DEBUG_REST) console.error(JSON.stringify(log.slice(-40)));
   process.exit(1);
 });
@@ -59,7 +73,7 @@ const phone = async (uid) => {
   const page = await context.newPage();
   await install(page);
   const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
+  page.on("pageerror", (e) => { errors.push(e.message); allErrors.push(e.stack || e.message); });
   pages.push(page);
   const cdp = await context.newCDPSession(page);
   return { context, page, errors, cdp };
@@ -75,6 +89,17 @@ const swipe = async (cdp, { x = 195, from, to, steps = 12 }) => {
   }
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   await sleep(500);
+};
+/** A sideways one-finger swipe, as on the people deck. */
+const swipeX = async (cdp, { y, from, to, steps = 10 }) => {
+  const point = (x) => [{ x, y, id: 1, radiusX: 4, radiusY: 4, force: 1 }];
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: point(from) });
+  for (let i = 1; i <= steps; i++) {
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: point(from + ((to - from) * i) / steps) });
+    await sleep(16);
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await sleep(700);
 };
 const overflow = (page) => page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
 
@@ -152,6 +177,75 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   ok("pending-post-credit-private", (await theo.page.getByText("Jade Okafor").count()) === 0);
   for (const [who, p] of [["rezza", rezza], ["theo", theo], ["maya", maya]]) ok(`no-page-errors-${who}-credits`, p.errors.length === 0, p.errors.join(" | "));
   await Promise.all([rezza.context.close(), theo.context.close(), maya.context.close()]);
+}
+
+// ============================================================ 2. open to
+if (has("open_to")) {
+  const today = new Date().toISOString().slice(0, 10);
+  const inMonth = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+  const rezza = await phone(REZZA);
+  await rezza.page.goto(root + "/profile", { waitUntil: "networkidle" });
+  const add = rezza.page.getByRole("button", { name: /Add what you're open to/ });
+  await add.waitFor({ timeout: 15000 });
+  await add.tap();
+  const sheet = rezza.page.getByRole("dialog");
+  await sheet.getByRole("button", { name: "Shoots" }).tap();
+  await sheet.getByRole("button", { name: "Paid gigs" }).tap();
+  await sheet.getByLabel("Until (optional)").fill(inMonth);
+  await sleep(300);
+  await shot(rezza.page, "08-open-to-editor-rezza");
+  ok("open-to-pressed-state", (await sheet.getByRole("button", { name: "Paid gigs" }).getAttribute("aria-pressed")) === "true");
+  await sheet.getByRole("button", { name: "Save", exact: true }).tap();
+  await rezza.page.getByText("Saved. People can see what you're open to.").waitFor({ timeout: 10000 });
+  await rezza.page.getByTestId("profile-open-to").getByText("Paid gigs").waitFor({ timeout: 10000 });
+  await sleep(500);
+  await shot(rezza.page, "09-open-to-on-profile-rezza");
+  const saved = await one("SELECT tags, until::text FROM profile_open_to WHERE user_id=$1", [REZZA]);
+  ok("open-to-saved", [...(saved?.tags || [])].sort().join(",") === "paid_gigs,shoots" && saved.until === inMonth, JSON.stringify(saved));
+  ok("no-sideways-scroll-open-to", (await overflow(rezza.page)) <= 0);
+
+  // Theo browses people in Explore, swipes the deck, then filters to paid gigs.
+  const theo = await phone(THEO);
+  await theo.page.goto(root + "/explore?section=people", { waitUntil: "networkidle" });
+  const slides = theo.page.locator("[aria-roledescription=slide]");
+  await slides.first().waitFor({ timeout: 20000 });
+  const filter = theo.page.getByTestId("open-to-filter");
+  await filter.scrollIntoViewIfNeeded();
+  ok("deck-has-everyone", (await slides.count()) === 3, String(await slides.count()));
+  const deck = await slides.first().evaluate((el) => { const r = el.parentElement.getBoundingClientRect(); return { y: r.top + r.height / 2, left: el.parentElement.scrollLeft }; });
+  await slides.first().scrollIntoViewIfNeeded();
+  const box = await slides.first().boundingBox();
+  await swipeX(theo.cdp, { y: box.y + box.height / 2, from: 330, to: 60 });
+  ok("deck-touch-swipe-moved", (await slides.first().evaluate((el) => el.parentElement.scrollLeft)) > deck.left);
+  await filter.scrollIntoViewIfNeeded();
+  await filter.getByRole("button", { name: "Paid gigs" }).tap();
+  await sleep(800);
+  await shot(theo.page, "10-open-to-filter-explore-theo");
+  ok("filter-leaves-open-people", (await slides.count()) === 1 && (await slides.first().getByText("Rezza Monet").count()) === 1);
+  const card = slides.first().getByTestId("open-to-chips");
+  ok("card-shows-open-to", (await card.getByText("Paid gigs").count()) === 1 && (await card.getByText("Shoots").count()) === 1);
+  await slides.first().scrollIntoViewIfNeeded();
+  await sleep(300);
+  await shot(theo.page, "11-open-to-card-theo");
+  await theo.page.getByRole("button", { name: /^See all/ }).tap();
+  const grid = theo.page.getByRole("dialog");
+  await grid.getByText("Rezza Monet").waitFor({ timeout: 10000 });
+  await sleep(500);
+  await shot(theo.page, "12-open-to-see-all-theo");
+  ok("see-all-filtered", (await grid.getByRole("link").filter({ hasText: "Jade Okafor" }).count()) === 0 && (await grid.getByTestId("open-to-chips").count()) === 1);
+  ok("no-sideways-scroll-explore", (await overflow(theo.page)) <= 0);
+
+  // Expiry: once the end date passes, visitors stop seeing the tags and Rezza is asked to renew.
+  await db.query("UPDATE profile_open_to SET until=$2::date - 1 WHERE user_id=$1", [REZZA, today]);
+  await theo.page.goto(root + `/profile/${REZZA}`, { waitUntil: "networkidle" });
+  await sleep(1500);
+  ok("expired-hidden-from-visitor", (await theo.page.getByTestId("profile-open-to").count()) === 0);
+  await rezza.page.reload({ waitUntil: "networkidle" });
+  await rezza.page.getByText(/tags expired/).waitFor({ timeout: 10000 });
+  await shot(rezza.page, "13-open-to-expired-rezza");
+  ok("owner-asked-to-renew", true);
+  for (const [who, p] of [["rezza", rezza], ["theo", theo]]) ok(`no-page-errors-${who}-open-to`, p.errors.length === 0, p.errors.join(" | "));
+  await Promise.all([rezza.context.close(), theo.context.close()]);
 }
 
 await browser.close();
