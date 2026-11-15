@@ -4,6 +4,14 @@ export interface LayoutSection {
   order: number;
 }
 
+/** Star reviews were retired in favor of vouches. Saved layouts may still list this id. */
+export const RETIRED_PROFILE_SECTIONS = new Set(["reviews"]);
+
+export function withoutRetiredProfileSections<T extends { id: string }>(sections: T[]): T[] {
+  return sections.filter((section) => !RETIRED_PROFILE_SECTIONS.has(section.id));
+}
+
+
 /** Dialog section ids mapped onto the sections the profile actually renders. */
 const CUSTOM_TO_LAYOUT: Record<string, string[]> = {
   about: ["about"],

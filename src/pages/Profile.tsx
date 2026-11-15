@@ -15,7 +15,6 @@ import { ProfilePostsGrid } from "@/components/profile/ProfilePostsGrid";
 import { PostDetailModal } from "@/components/profile/PostDetailModal";
 import { CreateBlogDialog } from "@/components/profile/CreateBlogDialog";
 import { ProfileBlogsGrid } from "@/components/profile/ProfileBlogsGrid";
-import { UserReviews } from "@/components/profile/UserReviews";
 import { ProfileOpenTo } from "@/components/openTo/ProfileOpenTo";
 import { ProfileVouches } from "@/components/vouches/ProfileVouches";
 import { ProfileCredits } from "@/components/credits/ProfileCredits";
@@ -429,19 +428,6 @@ const Profile = () => {
       case 'vouches':
         if (!targetUserId) return null;
         return <ProfileVouches key="vouches" userId={targetUserId} viewerId={user?.id} isOwner={!!isOwnProfile} />;
-      case 'reviews':
-        if (!targetUserId) return null;
-        return (
-          <motion.div
-            key="reviews"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="px-5 py-4"
-          >
-            <UserReviews userId={targetUserId} />
-          </motion.div>
-        );
       case 'quick_links':
         return <ProfileQuickLinks key="quick_links" isOwner={isOwnProfile} />;
       case 'pipeline':

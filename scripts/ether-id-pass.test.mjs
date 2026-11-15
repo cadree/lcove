@@ -98,7 +98,7 @@ describe("pass.json", () => {
     assert.equal(pass.storeCard.secondaryFields.find((field) => field.key === "since").value, "OCT 2026");
     assert.equal(pass.storeCard.secondaryFields.find((field) => field.key === "city").value, "LOS ANGELES");
     assert.equal(pass.storeCard.auxiliaryFields, undefined);
-    assert.equal(pass.storeCard.backFields.find((field) => field.key === "reviews").value, "4.5 average · 2 reviews");
+    assert.equal(pass.storeCard.backFields.some((field) => field.key === "reviews"), false);
     assert.equal(pass.storeCard.backFields.find((field) => field.key === "projects").value, "2 completed");
     assert.equal(pass.passTypeIdentifier, meta.passTypeIdentifier);
     assert.equal(pass.serialNumber, meta.serialNumber);

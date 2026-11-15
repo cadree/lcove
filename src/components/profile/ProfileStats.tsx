@@ -5,11 +5,10 @@ interface ProfileStatsProps {
   credits: number;
   projectCount: number;
   eventCount: number;
-  reviewScore?: number | null;
   isOwnProfile?: boolean;
 }
 
-export function ProfileStats({ credits, projectCount, eventCount, reviewScore, isOwnProfile = false }: ProfileStatsProps) {
+export function ProfileStats({ credits, projectCount, eventCount, isOwnProfile = false }: ProfileStatsProps) {
   const navigate = useNavigate();
   
   const stats = [
@@ -28,19 +27,11 @@ export function ProfileStats({ credits, projectCount, eventCount, reviewScore, i
       label: 'Events',
       onClick: isOwnProfile ? () => navigate('/dashboard/events') : undefined,
     },
-    ...(reviewScore !== null && reviewScore !== undefined ? [{
-      value: reviewScore.toFixed(1),
-      label: 'Rating',
-      onClick: undefined,
-    }] : []),
   ];
 
   return (
     <div className="px-4 py-4">
-      <div className={cn(
-        "grid gap-2",
-        stats.length === 4 ? "grid-cols-4" : "grid-cols-3"
-      )}>
+      <div className="grid grid-cols-3 gap-2">
         {stats.map((stat) => {
           const isClickable = !!stat.onClick;
           return (

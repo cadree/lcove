@@ -5,6 +5,7 @@ import {
   hexToHslChannels,
   sectionFieldsForSave,
   sectionStateFromLayout,
+  withoutRetiredProfileSections,
 } from "./profileSections.ts";
 
 const layout = [
@@ -73,4 +74,13 @@ test("hiding top friends does not rewrite the other sections", () => {
 
 test("accent hex becomes hsl channels", () => {
   assert.equal(hexToHslChannels("#00ff9f"), "157 100% 50%");
+});
+
+test("star reviews are dropped from saved layouts so vouches remain the reputation section", () => {
+  const next = withoutRetiredProfileSections([
+    { id: "about", visible: true, order: 0 },
+    { id: "reviews", visible: true, order: 12 },
+    { id: "vouches", visible: true, order: 2.2 },
+  ]);
+  assert.deepEqual(next.map((section) => section.id), ["about", "vouches"]);
 });
