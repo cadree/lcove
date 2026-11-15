@@ -37,6 +37,9 @@ jobs:
       - name: Discovery and trip database checks
         run: npm run test:discovery-db
 
+      - name: Music catalog database checks
+        run: npm run test:music-db
+
       - name: Stripe webhook fixtures
         run: npm run test:webhook
 

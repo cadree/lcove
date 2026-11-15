@@ -3976,6 +3976,81 @@ export type Database = {
           },
         ]
       }
+      music_section_items: {
+        Row: {
+          created_at: string
+          exclusive_track_id: string | null
+          id: string
+          item_key: string
+          position: number
+          section_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          exclusive_track_id?: string | null
+          id?: string
+          item_key: string
+          position?: number
+          section_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          exclusive_track_id?: string | null
+          id?: string
+          item_key?: string
+          position?: number
+          section_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "music_section_items_exclusive_track_id_fkey"
+            columns: ["exclusive_track_id"]
+            isOneToOne: false
+            referencedRelation: "exclusive_tracks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "music_section_items_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "music_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      music_sections: {
+        Row: {
+          cover_url: string | null
+          created_at: string
+          id: string
+          position: number
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cover_url?: string | null
+          created_at?: string
+          id?: string
+          position?: number
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cover_url?: string | null
+          created_at?: string
+          id?: string
+          position?: number
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       network_content: {
         Row: {
           cast_members: string[] | null
