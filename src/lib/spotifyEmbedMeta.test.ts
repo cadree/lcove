@@ -1,4 +1,4 @@
-// cspell:words Cydonia
+// cspell:words Cydonia DASZB OWNNs Inumwj
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";

@@ -7,7 +7,7 @@ export const MAX_COVER_BYTES = 5 * 1024 * 1024;
 export const MIN_TRACK_PRICE_CENTS = 50;
 export const MAX_TRACK_PRICE_CENTS = 50000;
 export const LOCKED_AUDIO_DETAIL =
-  "MP3, WAV, FLAC, M4A or AAC, up to 50MB. Fans hear a 15-second preview until they buy.";
+  "Any audio file, up to 50MB. Fans hear a 15-second preview until they buy.";
 
 /** "$4.99", "4.99", "5" → cents; anything else → null. */
 export function parsePriceCents(input: string): number | null {
@@ -57,7 +57,7 @@ export function lockedUploadProblems(input: LockedUploadInput): LockedUploadProb
 export const LOCKED_UPLOAD_MESSAGES: Record<LockedUploadProblem, string> = {
   title: "Give the track a title.",
   audio_missing: "Choose the audio file.",
-  audio_type: "That file isn't audio. Use MP3, WAV, FLAC, M4A or AAC.",
+  audio_type: "Choose an audio file.",
   audio_size: "That file is over 50MB. Export a smaller MP3 or M4A and try again.",
   cover_type: "Cover art must be an image.",
   cover_size: "Cover art must be under 5MB.",

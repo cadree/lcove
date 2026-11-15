@@ -1,4 +1,4 @@
-// cspell:words soundcloud bandcamp tidal youtu
+// cspell:words soundcloud bandcamp tidal youtu itsct itscg
 import { embedPlayerSrc, nativeEmbedFrameSrc, parseVideoEmbedUrl } from "./videoEmbed.ts";
 
 export type MusicPlatform =

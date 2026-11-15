@@ -1,3 +1,4 @@
+// cspell:words DASZB Inumwj
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { canExtractArtist, cleanMusicLinks, detectMusicPlatform, featuredEmbed, musicEmbedFor, normalizeMusicUrl } from "./musicLinks.ts";

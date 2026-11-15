@@ -32,7 +32,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
-import { AUDIO_FILE_ACCEPT, AUDIO_UPLOAD_ACTION, audioContentType, audioExtension, isAudioUpload } from "@/lib/audioFiles";
+import { AUDIO_FILE_ACCEPT, AUDIO_UPLOAD_ACTION, AUDIO_UPLOAD_REJECTED, audioContentType, audioExtension, isAudioUpload } from "@/lib/audioFiles";
 import { makePreviewClip, PREVIEW_SECONDS } from "@/lib/audioPreview";
 import {
   LOCKED_AUDIO_DETAIL,
@@ -628,7 +628,7 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
             <ul role="alert" className="space-y-1 text-xs text-destructive" data-testid="exclusive-upload-problems">
               {uploadProblems.map((problem) => (
                 <li key={problem} className="flex items-start gap-1">
-                  <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" /> {LOCKED_UPLOAD_MESSAGES[problem]}
+                  <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" /> {problem === "audio_type" ? AUDIO_UPLOAD_REJECTED : LOCKED_UPLOAD_MESSAGES[problem]}
                 </li>
               ))}
             </ul>
