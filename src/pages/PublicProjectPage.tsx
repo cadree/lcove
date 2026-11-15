@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
@@ -49,6 +49,9 @@ import { cn } from "@/lib/utils";
 import { ProjectDetail } from "@/components/projects/ProjectDetail";
 import type { Project } from "@/hooks/useProjects";
 import { formatRoleCompensation } from "@/lib/projectCollaborations";
+import { inviteParam } from "@/lib/itemInvite";
+import { applyWithInvite } from "@/lib/itemInviteApi";
+import { messageHref } from "@/lib/connectMoment";
 
 const statusColors: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
@@ -69,7 +72,10 @@ const statusLabels: Record<string, string> = {
 export default function PublicProjectPage() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
+  // Arrived from an invite's Join: show the role picker and apply through it.
+  const inviteId = user ? inviteParam(location.search) : null;
   const queryClient = useQueryClient();
 
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
@@ -125,6 +131,9 @@ export default function PublicProjectPage() {
   const applyMutation = useMutation({
     mutationFn: async ({ roleId, message }: { roleId: string; message: string }) => {
       if (!user?.id) throw new Error("Not authenticated");
+      if (inviteId) {
+        return applyWithInvite(inviteId, projectId!, roleId, message || null);
+      }
       const { error } = await supabase.from("project_applications").insert({
         project_id: projectId!,
         role_id: roleId,
@@ -140,10 +149,21 @@ export default function PublicProjectPage() {
       } catch {
         // Application already succeeded; notification failure is non-fatal.
       }
+      return null;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["my-project-applications"] });
-      toast.success("Application submitted!");
+      queryClient.invalidateQueries({ queryKey: ["public-project", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["item-invite-card"] });
+      if (result?.status === "accepted") {
+        const chatId = result.chatId;
+        toast.success("You're on the project", {
+          description: chatId ? "You're in the project chat now." : undefined,
+          action: chatId ? { label: "Open chat", onClick: () => navigate(messageHref(chatId)) } : undefined,
+        });
+      } else {
+        toast.success("Application submitted!");
+      }
       setSelectedRoleId(null);
       setApplicationMessage("");
     },
@@ -230,6 +250,13 @@ export default function PublicProjectPage() {
   };
 
   const isPending = applyMutation.isPending || guestApplyMutation.isPending;
+
+  const hasRoles = Boolean(project?.roles?.length);
+  useEffect(() => {
+    if (!inviteId || !hasRoles) return;
+    const frame = requestAnimationFrame(() => document.getElementById("roles")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    return () => cancelAnimationFrame(frame);
+  }, [inviteId, hasRoles]);
 
   if (isLoading) {
     return (
@@ -408,14 +435,20 @@ export default function PublicProjectPage() {
         {/* Apply for Roles Card */}
         {project.roles && project.roles.length > 0 && !isCreator && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <Card className="border-border/50 shadow-lg bg-card/95 backdrop-blur-md">
+            <Card id="roles" className="scroll-mt-16 border-border/50 shadow-lg bg-card/95 backdrop-blur-md">
               <CardContent className="p-5 space-y-4">
                 <h3 className="text-lg font-display font-semibold flex items-center gap-2">
-                  <Users className="h-5 w-5 text-primary" /> Apply for a Role
+                  <Users className="h-5 w-5 text-primary" /> {inviteId ? "Pick your role" : "Apply for a Role"}
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  Select a role below and submit your application.
-                </p>
+                {inviteId ? (
+                  <p data-testid="invite-role-banner" className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm">
+                    You're invited. Pick the role you want to join as.
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Select a role below and submit your application.
+                  </p>
+                )}
 
                 <div className="space-y-2">
                   {project.roles.map((role) => {
@@ -546,7 +579,7 @@ export default function PublicProjectPage() {
                                   className="gap-1.5"
                                 >
                                   <Send className="h-3.5 w-3.5" />
-                                  {isPending ? "Submitting..." : "Submit Application"}
+                                  {isPending ? "Submitting..." : inviteId ? "Choose this role" : "Submit Application"}
                                 </Button>
                                 <Button
                                   size="sm"

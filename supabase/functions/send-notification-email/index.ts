@@ -33,6 +33,7 @@ const getEmailTemplate = (type: string, title: string, body: string) => {
     like: "#E91E63",
     comment: "#2196F3",
     project_invite: "#4CAF50",
+    item_invite: "#4CAF50",
     event_reminder: "#FF9800",
     live_stream: "#F44336",
   };
@@ -169,6 +170,7 @@ serve(async (req) => {
       like: "likes_enabled",
       comment: "comments_enabled",
       project_invite: "project_invites_enabled",
+        item_invite: "project_invites_enabled",
       event_reminder: "event_reminders_enabled",
       live_stream: "live_streams_enabled",
       admin: "admin_enabled",

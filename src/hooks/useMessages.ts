@@ -25,6 +25,8 @@ interface Message {
   shared_post_id?: string | null;
   shared_story_id?: string | null;
   shared_profile_id?: string | null;
+  /** An item invite card (item_invites.id); only the invite RPC can set it. */
+  shared_invite_id?: string | null;
   share?: MessageSharePreview | null;
 }
 

@@ -436,3 +436,75 @@ describe("match notifications", () => {
     assert.deepEqual(seen.find(([table]) => table === "creative_matches")[1], [["first_id", caller], ["second_id", recipient]]);
   });
 });
+
+describe("item invite notifications", () => {
+  const inviteId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const fresh = (overrides: Record<string, unknown> = {}) => ({
+    id: inviteId,
+    status: "pending",
+    createdAt: new Date().toISOString(),
+    itemType: "event",
+    itemId: eventId,
+    title: "Gallery night",
+    ...overrides,
+  });
+  const ask = (itemInvite: unknown) =>
+    authorizeUserNotification({
+      callerId: caller,
+      recipientId: recipient,
+      notificationType: "item_invite",
+      data: { invite_id: inviteId, title: "Ignored from the body" },
+      facts: { callerName: "Cadre", itemInvite },
+    });
+
+  it("builds the copy from the stored invite, not the request", () => {
+    assert.deepEqual(ask(fresh()), {
+      ok: true,
+      title: "Cadre invited you to Gallery night",
+      body: "Tap RSVP to see the event.",
+      data: { invite_id: inviteId, item_type: "event", item_id: eventId, path: `/event/${eventId}` },
+    });
+    const project = ask(fresh({ itemType: "project", itemId: projectId, title: null }));
+    assert.equal(project.ok && project.title, "Cadre invited you to a project");
+    assert.equal(project.ok && project.data.path, `/project/${projectId}`);
+  });
+
+  it("refuses a missing, answered, stale or odd invite", () => {
+    for (const invite of [
+      null,
+      fresh({ status: "accepted" }),
+      fresh({ status: "declined" }),
+      fresh({ createdAt: new Date(Date.now() - 16 * 60_000).toISOString() }),
+      fresh({ createdAt: "not a date" }),
+      fresh({ itemType: "post" }),
+    ]) {
+      assert.equal(ask(invite).ok, false);
+    }
+  });
+
+  it("loads the invite by sender and recipient, and needs the in-app notice", async () => {
+    const seen: [string, [string, string][]][] = [];
+    const build = (hasNotice: boolean) => ({
+      from(table: string) {
+        const filters: [string, string][] = [];
+        const query = {
+          select: () => query,
+          eq: (column: string, value: string) => { filters.push([column, value]); return query; },
+          maybeSingle: async () => {
+            seen.push([table, filters]);
+            if (table === "item_invites") return { data: { id: inviteId, status: "pending", created_at: "2026-11-15T12:00:00Z", item_type: "event", item_id: eventId } };
+            if (table === "notifications") return { data: hasNotice ? { id: "n1" } : null };
+            if (table === "events") return { data: { title: "Gallery night" } };
+            return { data: { display_name: "Cadre" } };
+          },
+        };
+        return query;
+      },
+    });
+    const facts = await loadUserNotificationFacts(build(true), { callerId: caller, recipientId: recipient, notificationType: "item_invite", data: { invite_id: inviteId } });
+    assert.equal(facts.itemInvite.title, "Gallery night");
+    assert.deepEqual(seen.find(([table]) => table === "item_invites")?.[1], [["id", inviteId], ["sender_id", caller], ["recipient_id", recipient]]);
+    const quiet = await loadUserNotificationFacts(build(false), { callerId: caller, recipientId: recipient, notificationType: "item_invite", data: { invite_id: inviteId } });
+    assert.equal(quiet.itemInvite, null);
+  });
+});

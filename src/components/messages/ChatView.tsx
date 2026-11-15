@@ -31,6 +31,7 @@ import ProjectCommandCenter from './ProjectCommandCenter';
 import { toast } from 'sonner';
 import { ReportDialog } from '@/components/safety/ReportDialog';
 import { SharedContentCard } from '@/components/share/SharedContentCard';
+import { InviteCard } from '@/components/messages/InviteCard';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -527,8 +528,10 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                             </div>
                           )}
 
-                          {/* Encoded share card, note, or plain text */}
-                          {(() => {
+                          {/* Project/event invite card (direct chats; the text is the fallback) */}
+                          {msg.shared_invite_id ? (
+                            <InviteCard inviteId={msg.shared_invite_id} />
+                          ) : (() => {
                             const shared = splitShareMessage(msg.content);
                             const note = shared.card ? shared.note : msg.content;
                             return (

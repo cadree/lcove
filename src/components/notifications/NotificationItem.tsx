@@ -2,12 +2,14 @@ import { FeedVideo } from "@/components/media/FeedVideo";
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Handshake, Sparkles, X, type LucideIcon } from 'lucide-react';
+import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Handshake, Sparkles, Send, X, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Notification, NotificationType } from '@/hooks/useNotifications';
 import { SquircleIcon, type IconFill } from '@/components/world/SquircleIcon';
 import { respondCollabInvite } from '@/lib/collabInvite';
+import { itemInviteNotice, joinLabel } from '@/lib/itemInvite';
+import { respondItemInvite } from '@/lib/itemInviteApi';
 import { useQueryClient } from '@tanstack/react-query';
 import { notificationDisplay, type PostLikePreview } from '@/lib/likeNotice';
 
@@ -30,6 +32,7 @@ const notificationMark: Record<NotificationType, { icon: LucideIcon; fill: IconF
   live_stream: { icon: Radio, fill: 'red' },
   collab_invite: { icon: Handshake, fill: 'denim' },
   match: { icon: Sparkles, fill: 'pink' },
+  item_invite: { icon: Send, fill: 'cyan' },
 };
 
 export const NotificationItem: React.FC<NotificationItemProps> = ({
@@ -47,6 +50,24 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   const answered = notification.data != null && Object.prototype.hasOwnProperty.call(notification.data, "accepted");
   const pendingInvite = notification.type === "collab_invite" && inviteId && !answered && notification.title === "Collab invite";
   const display = notificationDisplay(notification, preview);
+  const itemInvite = itemInviteNotice(notification);
+  const [answering, setAnswering] = React.useState(false);
+
+  const answerItemInvite = async (accept: boolean) => {
+    if (!itemInvite || answering) return;
+    setAnswering(true);
+    try {
+      const result = await respondItemInvite(itemInvite.inviteId, accept);
+      if (isUnread) onRead(notification.id);
+      await queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      if (accept) navigate(result.path ?? itemInvite.path);
+      else toast.success("Invite declined");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not answer that invite");
+    } finally {
+      setAnswering(false);
+    }
+  };
 
   const respond = async (accept: boolean) => {
     try {
@@ -67,6 +88,10 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   const handleClick = () => {
     if (isUnread) {
       onRead(notification.id);
+    }
+    if (itemInvite) {
+      navigate(itemInvite.path);
+      return;
     }
     if (notification.type === 'project_invite' && onProjectInviteTap) {
       onProjectInviteTap(notification);
@@ -125,6 +150,35 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
         <p className="mono-label mt-1 text-[9px] text-muted-foreground">
           {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
         </p>
+        {itemInvite?.answerable && (
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              disabled={answering}
+              className="inline-flex h-11 items-center rounded-full bg-foreground px-4 font-body text-xs font-bold text-background disabled:opacity-60"
+              onClick={(event) => {
+                event.stopPropagation();
+                void answerItemInvite(true);
+              }}
+            >
+              {joinLabel(itemInvite.kind)}
+            </button>
+            <button
+              type="button"
+              disabled={answering}
+              className="inline-flex h-11 items-center rounded-full border border-border px-4 font-body text-xs font-bold disabled:opacity-60"
+              onClick={(event) => {
+                event.stopPropagation();
+                void answerItemInvite(false);
+              }}
+            >
+              Not now
+            </button>
+          </div>
+        )}
+        {itemInvite && itemInvite.accepted !== null && notification.data?.answer !== true && (
+          <p className="mono-label mt-1 text-[9px] text-muted-foreground">{itemInvite.accepted ? "Accepted" : "Declined"}</p>
+        )}
         {pendingInvite && (
           <div className="mt-2 flex gap-2">
             <button

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { geoGraticule10, geoPath, type GeoPermissibleObjects } from "d3-geo";
 import land from "@/data/globeLand.json";
 import coordinates from "@/data/cityCoordinates.json";
 import { globeCities, type Person } from "@/lib/peopleDiscovery";
 import { CARD, CITY_ZOOM, MAX_ZOOM, clusterMarkers, isDoubleTap, pinchZoom, zoomToSplit, type GlobeMarker } from "@/lib/globeMarkers";
+import { coastStep, flingVelocity, type RotationSample } from "@/lib/globeInertia";
 import { cardName, cardTone, memberCount } from "@/lib/cityCard";
 import { GLOBE_SIZE, GLOBE_SCALE, anchorRotation, globeProjection, pointAt, screenPoint, type Rotation } from "@/lib/globeView";
 import { GLOBE_LOOK, GLOBE_PAINT, LAND_OVERLAYS } from "@/lib/globePaint";
@@ -11,6 +12,8 @@ import { detailClipAngle, limbOpacity, outwardReach, viewDot } from "@/lib/globe
 import { layersForZoom, loadGlobeLayer, pickCityLabels, type GlobeLayers } from "@/lib/globeLod";
 
 const POINTS = coordinates as Record<string, number[]>;
+/** Degrees the globe turns per frame unit of finger travel, matching a grab at the centre of the globe. */
+const DEG_PER_UNIT = 180 / Math.PI / GLOBE_SCALE;
 
 function useReducedMotion() {
   const [reduce, setReduce] = useState(
@@ -29,7 +32,7 @@ function useReducedMotion() {
  * A city on the globe: a name card on a short stem, with the member count on its corner.
  * It shows the place, not anyone's face; tapping it opens who is there.
  */
-function CityCard({ id, cityKey, label, total, cities, active }: { id: string; cityKey: string; label: string; total: number; cities: number; active: boolean }) {
+const CityCard = memo(function CityCard({ id, cityKey, label, total, cities, active }: { id: string; cityKey: string; label: string; total: number; cities: number; active: boolean }) {
   const tone = cardTone(cityKey);
   const half = CARD.w / 2;
   const top = -(CARD.h + CARD.lift);
@@ -66,7 +69,7 @@ function CityCard({ id, cityKey, label, total, cities, active }: { id: string; c
       <circle data-card-anchor r="2.2" fill="#0b0b12" stroke={active ? "#ff9fc8" : "#faf4ed"} strokeWidth="1.2" />
     </g>
   );
-}
+});
 
 export function CreativeGlobe({
   people,
@@ -150,8 +153,9 @@ export function CreativeGlobe({
   }, [wanted, zoom]);
   const projection = useMemo(() => globeProjection(rotation, zoom), [rotation, zoom]);
   const detail = useMemo(() => globeProjection(rotation, zoom).clipAngle(detailClipAngle(zoom)), [rotation, zoom]);
-  const path = geoPath(projection);
-  const detailPath = geoPath(detail);
+  // One decimal is a third of a device pixel on a phone, and cheaper to build than d3's default of three.
+  const path = useMemo(() => geoPath(projection).digits(1), [projection]);
+  const detailPath = useMemo(() => geoPath(detail).digits(1), [detail]);
   const borderDraw = detailPath;
 
   // Gestures. Every finger is tracked; one finger grabs and turns the globe, two fingers pinch
@@ -170,8 +174,14 @@ export function CreativeGlobe({
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
   const frame = useRef<number | null>(null);
   const next = useRef<{ rotation: Rotation; zoom: number } | null>(null);
+  const samples = useRef<RotationSample[]>([]);
+  const coast = useRef<number | null>(null);
   const commit = useCallback((rotationNext: Rotation, zoomNext: number) => {
     next.current = { rotation: rotationNext, zoom: zoomNext };
+    if (gesture.current?.kind === "pan") {
+      samples.current.push({ t: performance.now(), rotation: rotationNext });
+      if (samples.current.length > 8) samples.current.shift();
+    }
     if (frame.current !== null) return;
     frame.current = requestAnimationFrame(() => {
       frame.current = null;
@@ -185,7 +195,40 @@ export function CreativeGlobe({
   }, []);
   useEffect(() => () => {
     if (frame.current !== null) cancelAnimationFrame(frame.current);
+    if (coast.current !== null) cancelAnimationFrame(coast.current);
   }, []);
+  /** Stop a coasting globe. True when it was coasting, so the touch that stopped it is not a tap. */
+  const stopCoast = () => {
+    if (coast.current === null) return false;
+    cancelAnimationFrame(coast.current);
+    coast.current = null;
+    return true;
+  };
+  /** After a flick the globe keeps turning and slows down, like a scroll view on iOS. */
+  const startCoast = (): boolean => {
+    const velocity = reduceMotion ? null : flingVelocity(samples.current, performance.now());
+    samples.current = [];
+    if (!velocity) return false;
+    let v = velocity;
+    let last = performance.now();
+    const step = (t: number) => {
+      const dt = Math.min(48, t - last);
+      last = t;
+      const at = view.current;
+      const moved = coastStep(at.rotation, v, dt);
+      v = moved.velocity;
+      if (!moved.going) {
+        coast.current = null;
+        setMoving(false);
+        return;
+      }
+      view.current = { rotation: moved.rotation, zoom: at.zoom };
+      setRotation(moved.rotation);
+      coast.current = requestAnimationFrame(step);
+    };
+    coast.current = requestAnimationFrame(step);
+    return true;
+  };
   const local = (clientX: number, clientY: number): [number, number] => {
     const box = svgRef.current?.getBoundingClientRect();
     if (!box || !box.width) return [clientX, clientY];
@@ -222,6 +265,11 @@ export function CreativeGlobe({
   /** Zoom by a factor around a point of the frame, for double-tap, ctrl+wheel and the buttons. */
   const zoomAround = useCallback(
     (factor: number, at: [number, number]) => {
+      if (coast.current !== null) {
+        cancelAnimationFrame(coast.current);
+        coast.current = null;
+        setMoving(false);
+      }
       const v = next.current ?? view.current;
       const z = Math.min(MAX_ZOOM, Math.max(1, v.zoom * factor));
       const anchor = pointAt(v.rotation, v.zoom, at);
@@ -272,7 +320,8 @@ export function CreativeGlobe({
     else if (pointers.current.size === 1) startPan([...pointers.current.values()][0]);
     else {
       gesture.current = null;
-      setMoving(false);
+      // A flick hands over to coasting, which clears `moving` when it stops.
+      if (!(g?.kind === "pan" && e.type === "pointerup" && startCoast())) setMoving(false);
     }
   };
 
@@ -295,6 +344,10 @@ export function CreativeGlobe({
   const detailed = !moving ? (zoom >= 5.5 && layers.land10) || layers.land50 : null;
   const landGeom = (detailed || land) as GeoPermissibleObjects;
   const landDraw = detailed ? detailPath : path;
+  // Projecting the land is most of a frame's work, and the fill, the outline and the overlay clip all
+  // use the same outline: build it once per frame, not three times.
+  const landD = useMemo(() => landDraw(landGeom) || "", [landDraw, landGeom]);
+  const graticuleD = useMemo(() => (zoom < 2.4 ? path(geoGraticule10()) || "" : ""), [path, zoom]);
   const showStates = !moving && !!layers.states && zoom >= 3;
   const showRivers = !moving && !!layers.rivers && zoom >= 4.5;
   const showLakes = !moving && !!layers.lakes && zoom >= 2;
@@ -313,7 +366,7 @@ export function CreativeGlobe({
   };
   const meOpacity = me ? limbOpacity(viewDot(me.point, rotation), globeR, 8, 16) : 0;
   const dot = me && meOpacity > 0 ? projection(me.point) : null;
-  const labels = layers.places
+  const labels = showLabels && layers.places
     ? pickCityLabels(layers.places, zoom, (point) => {
         const xy = projection(point);
         return xy ? [xy[0], xy[1]] : null;
@@ -337,9 +390,13 @@ export function CreativeGlobe({
           if (e.pointerType === "mouse" && e.button !== 0) return;
           const at = local(e.clientX, e.clientY);
           pointers.current.set(e.pointerId, at);
+          // A finger on a coasting globe stops it; that touch is a stop, not a tap on what is under it.
+          const stopped = stopCoast();
           if (pointers.current.size === 1) {
-            suppressClick.current = false;
-            gesture.current = { kind: "pending", start: at, at: e.timeStamp, onMarker: !!(e.target as Element).closest("[data-city-marker]") };
+            suppressClick.current = stopped;
+            if (stopped) lastTap.current = null;
+            samples.current = [];
+            gesture.current = { kind: "pending", start: at, at: e.timeStamp, onMarker: stopped || !!(e.target as Element).closest("[data-city-marker]") };
           } else if (pointers.current.size === 2) startPinch();
         }}
         onPointerMove={(e) => {
@@ -355,13 +412,19 @@ export function CreativeGlobe({
           }
           const active = gesture.current;
           if (active?.kind === "pan") {
-            if (active.anchor) commit(anchorRotation(active.anchor, at, current().zoom, current().rotation), current().zoom);
-            else {
-              const z = current().zoom;
+            const z = current().zoom;
+            if (active.anchor) {
+              const r = anchorRotation(active.anchor, at, z, current().rotation);
+              // The grabbed place cannot follow a finger past the globe's edge or the tilt limit. Rather
+              // than stopping dead there, keep turning at the same rate from where it got to.
+              const xy = screenPoint(r, z, active.anchor);
+              if (!xy || Math.hypot(xy[0] - at[0], xy[1] - at[1]) > 4) gesture.current = { kind: "pan", anchor: null, start: at, rotation: r };
+              commit(r, z);
+            } else {
               commit(
                 [
-                  active.rotation[0] + ((at[0] - active.start[0]) * 0.4) / z,
-                  Math.max(-80, Math.min(80, active.rotation[1] - ((at[1] - active.start[1]) * 0.4) / z)),
+                  active.rotation[0] + ((at[0] - active.start[0]) * DEG_PER_UNIT) / z,
+                  Math.max(-80, Math.min(80, active.rotation[1] - ((at[1] - active.start[1]) * DEG_PER_UNIT) / z)),
                 ],
                 z
               );
@@ -414,12 +477,14 @@ export function CreativeGlobe({
         <circle cx="200" cy="200" r={haloR} fill={`url(#${id}-halo)`} pointerEvents="none" />
         <path d={path({ type: "Sphere" }) || ""} fill={`url(#${id}-sea)`} stroke={paint.oceanStroke} strokeOpacity=".35" />
         {/* Second defs: land clip must come after the ocean path so tests can measure that path. */}
-        <defs>
-          <clipPath id={`${id}-land`}>
-            <path d={landDraw(landGeom) || ""} />
-          </clipPath>
-        </defs>
-        <path d={landDraw(landGeom) || ""} fill={paint.land.temperate} pointerEvents="none" />
+        {showOverlays && (
+          <defs>
+            <clipPath id={`${id}-land`}>
+              <path d={landD} />
+            </clipPath>
+          </defs>
+        )}
+        <path d={landD} fill={paint.land.temperate} pointerEvents="none" />
         {showOverlays && (
           <g clipPath={`url(#${id}-land)`} pointerEvents="none">
             {LAND_OVERLAYS.map((overlay) => (
@@ -428,7 +493,7 @@ export function CreativeGlobe({
           </g>
         )}
         {showLakes && <path d={borderDraw(layers.lakes) || ""} fill={paint.ocean[1]} fillOpacity=".85" stroke="none" pointerEvents="none" />}
-        <path d={landDraw(landGeom) || ""} fill="none" stroke={paint.landStroke} strokeOpacity=".45" strokeWidth={zoom > 3 ? 0.5 : 0.35} pointerEvents="none" />
+        <path d={landD} fill="none" stroke={paint.landStroke} strokeOpacity=".45" strokeWidth={zoom > 3 ? 0.5 : 0.35} pointerEvents="none" />
         {showCountries && (
           <path d={borderDraw(layers.countries) || ""} fill="none" stroke="#d8e4c8" strokeOpacity={zoom >= 3 ? 0.18 : 0.28} strokeWidth={zoom >= 3 ? 0.35 : 0.4} pointerEvents="none" />
         )}
@@ -442,8 +507,8 @@ export function CreativeGlobe({
           <circle cx="200" cy="200" r={globeR} fill={`url(#${id}-day)`} />
           <circle cx="200" cy="200" r={globeR} fill={`url(#${id}-night)`} />
         </g>
-        {zoom < 2.4 && (
-          <path d={path(geoGraticule10()) || ""} fill="none" stroke={paint.atmosphere} strokeOpacity=".07" strokeWidth=".5" pointerEvents="none" />
+        {graticuleD && (
+          <path d={graticuleD} fill="none" stroke={paint.atmosphere} strokeOpacity=".07" strokeWidth=".5" pointerEvents="none" />
         )}
         {showLabels && labels.map((label) => (
           <g key={`${label.name}-${label.xy[0].toFixed(1)}`} transform={`translate(${label.xy[0]},${label.xy[1]})`} pointerEvents="none" aria-hidden>
@@ -523,8 +588,8 @@ export function CreativeGlobe({
       </svg>
       <div className="absolute bottom-1 right-1 flex gap-1" aria-label="Globe controls">
         {[
-          ["Rotate globe west", "←", () => setRotation((r) => [r[0] - 35, r[1]])],
-          ["Rotate globe east", "→", () => setRotation((r) => [r[0] + 35, r[1]])],
+          ["Rotate globe west", "←", () => { if (stopCoast()) setMoving(false); setRotation((r) => [r[0] - 35, r[1]]); }],
+          ["Rotate globe east", "→", () => { if (stopCoast()) setMoving(false); setRotation((r) => [r[0] + 35, r[1]]); }],
           ["Zoom in", "+", () => zoomAround(1.6, [GLOBE_SIZE / 2, GLOBE_SIZE / 2])],
           ["Zoom out", "−", () => zoomAround(1 / 1.6, [GLOBE_SIZE / 2, GLOBE_SIZE / 2])],
         ].map(([label, glyph, run]) => (

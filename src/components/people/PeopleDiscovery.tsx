@@ -23,7 +23,7 @@ import { SwipeDeck } from "./SwipeDeck";
 import { TravelingToCity } from "./TravelingToCity";
 import { supabase } from "@/integrations/supabase/client";
 import type { IcebreakerMe } from "@/lib/connectMoment";
-import { NEARBY_KM, nearbyGroups, safeArea, type LonLat } from "@/lib/nearbyMap";
+import { NEARBY_KM, nearbyGroups, safeArea, type LonLat, type MapGroup } from "@/lib/nearbyMap";
 
 // The globe and its city coordinates (~300 KB) load after the deck renders.
 const CreativeGlobe = lazy(() => import("@/components/discovery/CreativeGlobe").then((m) => ({ default: m.CreativeGlobe })));
@@ -181,6 +181,15 @@ export function PeopleDiscovery({ query }: { query: string }) {
     setCity(key);
     setSheetCity(key);
   };
+  // A street-map pin opens its city's members as a sheet, over the map where the tap was. An area
+  // pin opens the same sheet with the person (or the first of the people) in that area in front.
+  const openPin = (group: MapGroup) => {
+    const first = group.people[0];
+    const key = group.kind === "city" ? group.key.replace(/^city:/, "") : first?.live?.key ?? first?.home?.key;
+    if (!key) return;
+    setSheetFocus(group.kind === "area" && first ? { id: first.user_id, at: Date.now() } : null);
+    setSheetCity(key);
+  };
 
   const deckProps = {
     pending: swipe.isPending,
@@ -299,7 +308,7 @@ export function PeopleDiscovery({ query }: { query: string }) {
                   center={nearCenter}
                   groups={groups}
                   me={myArea ? { point: myArea, live: true } : nearCenter ? { point: nearCenter, live: false } : null}
-                  onPick={(id) => setFocus({ id, at: Date.now() })}
+                  onPick={openPin}
                 />
               ) : (
                 <div className="h-[min(420px,52dvh)] w-full animate-pulse rounded-[24px] bg-white/5" role="status" aria-label="Loading map" />

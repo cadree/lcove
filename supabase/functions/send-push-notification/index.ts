@@ -236,6 +236,7 @@ serve(async (req) => {
         comment: "comments_enabled",
         follow: "follows_enabled",
         project_invite: "project_invites_enabled",
+        item_invite: "project_invites_enabled",
         event_reminder: "event_reminders_enabled",
         live_stream: "live_streams_enabled",
         admin: "admin_enabled",

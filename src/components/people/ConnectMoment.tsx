@@ -23,6 +23,8 @@ import {
   type IcebreakerMe,
 } from "@/lib/connectMoment";
 import { safeWebLink } from "@/lib/tripMoney";
+import { createHref, type InviteKind } from "@/lib/itemInvite";
+import { InvitePicker } from "@/components/people/InvitePicker";
 import type { Person } from "@/lib/peopleDiscovery";
 import { cn } from "@/lib/utils";
 
@@ -239,6 +241,20 @@ export function ConnectCtaSheet({
 }) {
   const navigate = useNavigate();
   const [messaging, setMessaging] = useState(false);
+  const [picking, setPicking] = useState<InviteKind | null>(null);
+  const [invited, setInvited] = useState(false);
+  useEffect(() => {
+    if (!open) setPicking(null);
+  }, [open]);
+  // Dismissing the nudge unmounts the line that owns this sheet, so an invite
+  // only counts as "started" once the sheet closes.
+  const changeOpen = (next: boolean) => {
+    if (!next && invited) {
+      setInvited(false);
+      markNudgeStarted(window.localStorage, viewerId, nudge.userId);
+    }
+    onOpenChange(next);
+  };
   const suggestion = useMemo(() => icebreaker({
     name: nudge.name,
     skills: nudge.skills,
@@ -258,7 +274,7 @@ export function ConnectCtaSheet({
 
   return (
     <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
+      <Sheet open={open} onOpenChange={changeOpen}>
         {open && (
           <SheetContent
             hideClose
@@ -267,71 +283,84 @@ export function ConnectCtaSheet({
             style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
           >
             <div className="mx-auto mb-3 mt-1 h-1 w-10 rounded-full bg-white/20" aria-hidden="true" />
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#4a4150] ring-2 ring-[#ff9fc8]/70">
-                  {photo ? <img src={photo} alt="" className="h-full w-full object-cover" /> : <span className="font-display text-xl">{firstName(nudge.name).charAt(0)}</span>}
-                </span>
-                <div className="min-w-0">
-                  <p className="mono-label text-[8px] text-[#ff9fc8]">{celebrationEyebrow(nudge.matched)}</p>
-                  <SheetTitle className="ether-title truncate text-left text-[26px] text-[#faf5f0]">{nudge.name}</SheetTitle>
-                  <SheetDescription className="text-left text-sm text-white/65">
-                    What do you want to start together?
-                  </SheetDescription>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => onOpenChange(false)}
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-white/60"
-                aria-label="Close"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="grid gap-2">
-              <CtaButton
-                icon={<MessageCircle size={18} />}
-                label={canDm ? `Message ${firstName(nudge.name)}` : `Send ${firstName(nudge.name)} a note`}
-                hint={canDm ? "Opens your chat." : "A match unlocks a direct chat. This waits in their Requests."}
-                onClick={() => {
-                  if (canDm && nudge.conversationId) {
+            {picking ? (
+              <>
+                <SheetTitle className="sr-only">{`Invite ${nudge.name}`}</SheetTitle>
+                <SheetDescription className="sr-only">Pick a project, gig or event to invite them to.</SheetDescription>
+                <InvitePicker
+                  kind={picking}
+                  invitee={{ userId: nudge.userId, firstName: firstName(nudge.name) }}
+                  onBack={() => setPicking(null)}
+                  onSent={() => setInvited(true)}
+                  onCreate={() => {
                     started();
-                    navigate(messageHref(nudge.conversationId));
-                    return;
-                  }
-                  setMessaging(true);
-                }}
-              />
-              <CtaButton
-                icon={<FolderKanban size={18} />}
-                label="Invite to a project or gig"
-                hint="Opens project setup. You can add them from there."
-                onClick={() => {
-                  started();
-                  navigate("/projects?action=create");
-                }}
-              />
-              <CtaButton
-                icon={<Plane size={18} />}
-                label="Plan a trip together"
-                hint="Opens trip planning."
-                onClick={() => {
-                  started();
-                  navigate(travelHref(nudge));
-                }}
-              />
-              <CtaButton
-                icon={<Calendar size={18} />}
-                label="Invite to an event"
-                hint="Opens event setup on the calendar."
-                onClick={() => {
-                  started();
-                  navigate("/calendar?action=create");
-                }}
-              />
-            </div>
+                    navigate(createHref(picking));
+                  }}
+                />
+              </>
+            ) : (
+              <>
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#4a4150] ring-2 ring-[#ff9fc8]/70">
+                      {photo ? <img src={photo} alt="" className="h-full w-full object-cover" /> : <span className="font-display text-xl">{firstName(nudge.name).charAt(0)}</span>}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="mono-label text-[8px] text-[#ff9fc8]">{celebrationEyebrow(nudge.matched)}</p>
+                      <SheetTitle className="ether-title truncate text-left text-[26px] text-[#faf5f0]">{nudge.name}</SheetTitle>
+                      <SheetDescription className="text-left text-sm text-white/65">
+                        What do you want to start together?
+                      </SheetDescription>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => changeOpen(false)}
+                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-white/60"
+                    aria-label="Close"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="grid gap-2">
+                  <CtaButton
+                    icon={<MessageCircle size={18} />}
+                    label={canDm ? `Message ${firstName(nudge.name)}` : `Send ${firstName(nudge.name)} a note`}
+                    hint={canDm ? "Opens your chat." : "A match unlocks a direct chat. This waits in their Requests."}
+                    onClick={() => {
+                      if (canDm && nudge.conversationId) {
+                        started();
+                        navigate(messageHref(nudge.conversationId));
+                        return;
+                      }
+                      setMessaging(true);
+                    }}
+                  />
+                  <CtaButton
+                    icon={<FolderKanban size={18} />}
+                    label="Invite to a project or gig"
+                    hint="Pick one of yours, or an open one near you."
+                    onClick={() => setPicking("project")}
+                  />
+                  <CtaButton
+                    icon={<Plane size={18} />}
+                    label="Plan a trip together"
+                    hint="Opens trip planning."
+                    onClick={() => {
+                      started();
+                      navigate(travelHref(nudge));
+                    }}
+                  />
+                  <CtaButton
+                    icon={<Calendar size={18} />}
+                    label="Invite to an event"
+                    hint="Pick an upcoming event of yours, or one near you."
+                    onClick={() => setPicking("event")}
+                  />
+                </div>
+              </>
+            )}
           </SheetContent>
         )}
       </Sheet>
