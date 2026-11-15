@@ -2,20 +2,15 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { geoGraticule10, geoPath, type GeoPermissibleObjects } from "d3-geo";
 import land from "@/data/globeLand.json";
 import coordinates from "@/data/cityCoordinates.json";
-import { safeWebLink } from "@/lib/tripMoney";
 import { globeCities, type Person } from "@/lib/peopleDiscovery";
-import { MAX_ZOOM, clusterMarkers, fanOffsets, isDoubleTap, pinchZoom, stackDepth, zoomToSplit, type GlobeMarker } from "@/lib/globeMarkers";
+import { CARD, CITY_ZOOM, MAX_ZOOM, clusterMarkers, isDoubleTap, pinchZoom, zoomToSplit, type GlobeMarker } from "@/lib/globeMarkers";
+import { cardName, cardTone, memberCount } from "@/lib/cityCard";
 import { GLOBE_SIZE, GLOBE_SCALE, anchorRotation, globeProjection, pointAt, screenPoint, type Rotation } from "@/lib/globeView";
 import { GLOBE_LOOK, GLOBE_PAINT, LAND_OVERLAYS } from "@/lib/globePaint";
-import { detailClipAngle, fanHeading, limbOpacity, outwardReach, viewDot } from "@/lib/globeLimb";
+import { detailClipAngle, limbOpacity, outwardReach, viewDot } from "@/lib/globeLimb";
 import { layersForZoom, loadGlobeLayer, pickCityLabels, type GlobeLayers } from "@/lib/globeLod";
 
 const POINTS = coordinates as Record<string, number[]>;
-
-/** Initials for a marker without photos. */
-function monogram(label: string) {
-  return label.split(",")[0].slice(0, 2).toUpperCase();
-}
 
 function useReducedMotion() {
   const [reduce, setReduce] = useState(
@@ -30,45 +25,45 @@ function useReducedMotion() {
   return reduce;
 }
 
-/** One round face on the globe: a photo when there is a safe one, otherwise initials. */
-function Face({ clip, href, label, x = 0, y = 0, r, dim }: { clip: string; href?: string; label: string; x?: number; y?: number; r: number; dim?: boolean }) {
-  const photo = safeWebLink(href);
+/**
+ * A city on the globe: a name card on a short stem, with the member count on its corner.
+ * It shows the place, not anyone's face; tapping it opens who is there.
+ */
+function CityCard({ id, cityKey, label, total, cities, active }: { id: string; cityKey: string; label: string; total: number; cities: number; active: boolean }) {
+  const tone = cardTone(cityKey);
+  const half = CARD.w / 2;
+  const top = -(CARD.h + CARD.lift);
+  const gradient = `${id}-card-${cityKey.replace(/[^a-z0-9]/gi, "")}`;
   return (
-    <g transform={`translate(${x},${y})`} opacity={dim ? 0.92 : 1} pointerEvents="none">
-      <circle r={r + 1.5} fill="#0b0b12" />
-      <circle r={r} fill={dim ? "#433a48" : "#5d5262"} />
-      {photo ? (
-        <image href={photo} x={-r} y={-r} width={r * 2} height={r * 2} preserveAspectRatio="xMidYMid slice" clipPath={`url(#${clip})`} />
-      ) : (
-        !dim && (
-          <text y={r * 0.27} textAnchor="middle" fill="#faf4ed" fontSize={r * 0.67} fontWeight="700">
-            {monogram(label)}
-          </text>
-        )
-      )}
-    </g>
-  );
-}
-
-/** The selected group fans its faces out above the marker so it is obvious several people are there. */
-function Fan({ clip, faces, total, label, heading }: { clip: string; faces: string[]; total: number; label: string; heading: number }) {
-  const shown = faces.slice(0, 4);
-  const extra = total - shown.length;
-  const slots = fanOffsets(shown.length + (extra > 0 ? 1 : 0), undefined, heading);
-  return (
-    <g pointerEvents="none" aria-hidden>
-      {shown.map((face, i) => (
-        <Face key={face} clip={clip} href={face} label={label} x={slots[i][0]} y={slots[i][1]} r={10} />
-      ))}
-      {extra > 0 && (
-        <g transform={`translate(${slots[shown.length][0]},${slots[shown.length][1]})`}>
-          <circle r="11.5" fill="#0b0b12" />
-          <circle r="10" fill="#ff9fc8" />
-          <text y="3" textAnchor="middle" fill="#1b1520" fontSize="8" fontWeight="700">
-            +{extra > 99 ? "99" : extra}
-          </text>
-        </g>
-      )}
+    <g pointerEvents="none">
+      <defs>
+        <linearGradient id={gradient} x1="0" y1="0" x2="1" y2="1">
+          <stop stopColor={tone.from} />
+          <stop offset="1" stopColor={tone.to} />
+        </linearGradient>
+      </defs>
+      <path d={`M-4 ${-CARD.lift - 0.5} L0 0 L4 ${-CARD.lift - 0.5} Z`} fill={active ? "#ff9fc8" : "#faf4ed"} />
+      <rect x={-half - 1.5} y={top - 1.5} width={CARD.w + 3} height={CARD.h + 3} rx="10" fill={active ? "#ff9fc8" : "#faf4ed"} />
+      <rect x={-half} y={top} width={CARD.w} height={CARD.h} rx="9" fill={`url(#${gradient})`} />
+      {/* Darker lower band so the name always reads, whatever the card color. */}
+      <path
+        d={`M${-half} ${top + CARD.h * 0.55} H${half} V${top + CARD.h - 9} Q${half} ${top + CARD.h} ${half - 9} ${top + CARD.h} H${-half + 9} Q${-half} ${top + CARD.h} ${-half} ${top + CARD.h - 9} Z`}
+        fill="#0b0b12"
+        fillOpacity=".3"
+      />
+      <text x={-half + 5} y={top + CARD.h - 7} fill="#faf4ed" fontSize="8.4" fontWeight="700" letterSpacing=".1">
+        {cardName(label)}
+      </text>
+      <text x={-half + 5} y={top + 12} fill="#faf4ed" fillOpacity=".85" fontSize="6.4" fontWeight="700" letterSpacing=".5">
+        {cities > 1 ? `${cities} CITIES` : "MEMBERS"}
+      </text>
+      <g transform={`translate(${half - 2},${top + 2})`}>
+        <circle r={CARD.badge} fill="#ff9fc8" stroke="#0b0b12" strokeWidth="1.2" />
+        <text y="3.2" textAnchor="middle" fill="#1b1520" fontSize="9" fontWeight="700">
+          {memberCount(total)}
+        </text>
+      </g>
+      <circle data-card-anchor r="2.2" fill="#0b0b12" stroke={active ? "#ff9fc8" : "#faf4ed"} strokeWidth="1.2" />
     </g>
   );
 }
@@ -306,13 +301,15 @@ export function CreativeGlobe({
   const showLabels = !moving && !!layers.places;
   const showCountries = !moving && !!layers.countries;
   const showOverlays = !moving;
-  // A cluster zooms in far enough to split; at full zoom it opens its biggest city and fans its faces out.
+  // A cluster zooms in far enough to split. A single city zooms in on itself and opens it.
   const open = (marker: { key: string; cities: number; point: [number, number]; points: [number, number][] }) => {
     if (suppressClick.current) return;
-    if (marker.cities > 1 && zoom < MAX_ZOOM) {
-      setRotation([-marker.point[0], -marker.point[1]]);
-      setZoom(zoomToSplit(marker.points, zoom));
-    } else onSelect(marker.key);
+    setRotation([-marker.point[0], -marker.point[1]]);
+    if (marker.cities > 1 && zoom < MAX_ZOOM) setZoom(zoomToSplit(marker.points, zoom));
+    else {
+      setZoom((z) => Math.max(z, CITY_ZOOM));
+      onSelect(marker.key);
+    }
   };
   const meOpacity = me ? limbOpacity(viewDot(me.point, rotation), globeR, 8, 16) : 0;
   const dot = me && meOpacity > 0 ? projection(me.point) : null;
@@ -474,9 +471,7 @@ export function CreativeGlobe({
         <g clipPath={`url(#${id}-disc)`}>
         {markers.map((city) => {
           const active = selected === city.key;
-          const fanned = !!(active && city.total > 1);
-          const heading = fanned ? fanHeading(city.xy[0], city.xy[1], globeR) : -Math.PI / 2;
-          const opacity = limbOpacity(viewDot(city.point, rotation), globeR, outwardReach(city.xy, globeR, fanned, heading));
+          const opacity = limbOpacity(viewDot(city.point, rotation), globeR, outwardReach(city.xy));
           if (opacity <= 0) return null;
           return (
             <g
@@ -502,38 +497,25 @@ export function CreativeGlobe({
               }}
               className="cursor-pointer outline-none"
             >
-              <circle r="22" fill="transparent" />
+              {/* Tap target: the whole card plus a margin, at least 44 px on a phone. */}
+              <rect data-card-hit x={-CARD.w / 2 - 4} y={-(CARD.h + CARD.lift) - 6} width={CARD.w + 8} height={CARD.h + CARD.lift + 10} fill="transparent" />
               {city.liveTotal > 0 && (
-                <circle r="18" fill="none" stroke="#79c3cf" strokeWidth="2" opacity={reduceMotion ? ".85" : undefined}>
-                  {!reduceMotion && (
-                    <>
-                      <animate attributeName="r" values="17;23;17" dur="2.4s" repeatCount="indefinite" />
-                      <animate attributeName="opacity" values="1;0;1" dur="2.4s" repeatCount="indefinite" />
-                    </>
-                  )}
-                </circle>
+                <rect
+                  x={-CARD.w / 2 - 4} y={-(CARD.h + CARD.lift) - 4} width={CARD.w + 8} height={CARD.h + 8} rx="12"
+                  fill="none" stroke="#79c3cf" strokeWidth="2" opacity={reduceMotion ? ".85" : undefined} pointerEvents="none"
+                >
+                  {!reduceMotion && <animate attributeName="opacity" values="1;.15;1" dur="2.4s" repeatCount="indefinite" />}
+                </rect>
               )}
-              {/* A group reads as a group: up to two faces stacked behind the front one. */}
-              {!(active && city.total > 1) && [2, 1].filter((n) => n <= stackDepth(city.total)).map((n) => (
-                <Face key={n} clip={`${id}-face`} href={city.faces[n]} label={city.label} x={n === 1 ? -13 : 13} y={4} r={11.5} dim />
-              ))}
-              <circle r="17" fill={active ? "#ff9fc8" : "#faf4ed"} />
-              <Face clip={`${id}-face`} href={city.faces[0]} label={city.label} r={15} />
+              <CityCard id={id} cityKey={city.key} label={city.label} total={city.total} cities={city.cities} active={active} />
               {city.cities > 1 && (
-                <g transform="translate(0,26)">
-                  <rect x="-22" y="-7" width="44" height="13" rx="6.5" fill="#0b0b12" fillOpacity=".8" stroke="#faf4ed" strokeOpacity=".35" strokeWidth=".6" />
-                  <text y="2.6" textAnchor="middle" fill="#faf4ed" fontSize="7.5" fontWeight="600">
-                    {city.cities} cities
+                <g transform="translate(0,9)" pointerEvents="none">
+                  <rect x="-22" y="-1" width="44" height="13" rx="6.5" fill="#0b0b12" fillOpacity=".8" stroke="#faf4ed" strokeOpacity=".35" strokeWidth=".6" />
+                  <text y="8.4" textAnchor="middle" fill="#faf4ed" fontSize="7.5" fontWeight="600">
+                    Zoom in
                   </text>
                 </g>
               )}
-              {fanned && <Fan clip={`${id}-face`} faces={city.faces} total={city.total} label={city.label} heading={heading} />}
-              <g transform="translate(13,-13)">
-                <circle r="8.5" fill="#ff9fc8" stroke="#0b0b12" strokeWidth="1.2" />
-                <text y="3" textAnchor="middle" fill="#1b1520" fontSize="8.5" fontWeight="700">
-                  {city.total > 99 ? "99+" : city.total}
-                </text>
-              </g>
             </g>
           );
         })}

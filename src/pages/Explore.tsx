@@ -87,7 +87,7 @@ const Explore = () => {
         </nav>
 
         {(section === "for-you" || section === "people") && (
-          <PeopleDiscovery query={query} full={section === "people"} />
+          <PeopleDiscovery query={query} />
         )}
 
         {section === "for-you" && openQuest && <div className="mt-6"><QuestCard quest={openQuest} /></div>}

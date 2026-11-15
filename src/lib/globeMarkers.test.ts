@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FAN_CLEARANCE, FAN_RADIUS, MAX_ZOOM, clusterMarkers, fanOffsets, isDoubleTap, pinchZoom, stackDepth, zoomToSplit, type PlacedCity } from "./globeMarkers.ts";
+import { CARD, CARD_GAP, MAX_ZOOM, clusterMarkers, isDoubleTap, pinchZoom, zoomToSplit, type PlacedCity } from "./globeMarkers.ts";
 
 const city = (key: string, x: number, count: number, avatars: string[] = []): PlacedCity => ({
   key, label: key, count, live: 0, avatars, point: [0, 0], xy: [x, 100],
@@ -21,20 +21,6 @@ test("the selected city leads its cluster and faces are capped", () => {
   assert.equal(m.faces.length, 5);
 });
 
-test("a group of one shows no stack; groups show up to two discs behind", () => {
-  assert.deepEqual([1, 2, 3, 40].map(stackDepth), [0, 1, 2, 2]);
-});
-
-test("fan positions sit above the marker and spread symmetrically", () => {
-  assert.deepEqual(fanOffsets(0), []);
-  assert.deepEqual(fanOffsets(1), [[0, -FAN_RADIUS]]);
-  assert.deepEqual(fanOffsets(1, FAN_RADIUS, Math.PI / 2), [[0, FAN_RADIUS]]);
-  const five = fanOffsets(5);
-  assert.equal(five.length, 5);
-  assert.ok(five.every(([, y]) => y < 0));
-  assert.equal(five[0][0], -five[4][0]);
-});
-
 test("zooming a cluster goes far enough to split it, capped at the globe's limit", () => {
   const charlotte: [number, number] = [-80.84, 35.23];
   const atlanta: [number, number] = [-84.39, 33.75];
@@ -44,17 +30,14 @@ test("zooming a cluster goes far enough to split it, capped at the globe's limit
   assert.equal(zoomToSplit([charlotte], 2), 4);
 });
 
-test("no marker sits inside a selected city's fan: nearby cities fold into it", () => {
-  // Raleigh 50px from the selected Charlotte would collide with its fanned faces (the "+2" slot).
-  const near = clusterMarkers([city("charlotte", 100, 6), city("raleigh", 150, 2), city("atlanta", 100 + FAN_CLEARANCE + 4, 3)], "charlotte");
+test("city cards never overlap: anchors closer than a card fold into one, farther ones stay apart", () => {
+  assert.ok(CARD_GAP >= CARD.w, "the fold distance covers a whole card width");
+  const near = clusterMarkers([city("charlotte", 100, 6), city("concord", 100 + CARD_GAP - 1, 2), city("atlanta", 100 + CARD_GAP + 1, 3)], null);
   assert.deepEqual(near.map((m) => m.key), ["charlotte", "atlanta"]);
   assert.equal(near[0].total, 8);
-  // Unselected, the same two cities stay apart (50px is more than the plain gap).
-  assert.equal(clusterMarkers([city("charlotte", 100, 6), city("raleigh", 150, 2)], null).length, 2);
-  // Whatever is left is clear of every fan slot by at least a marker's radius.
-  for (const [dx, dy] of fanOffsets(5)) {
-    for (const m of near.slice(1)) assert.ok(Math.hypot(m.xy[0] - (100 + dx), m.xy[1] - (100 + dy)) >= 17);
-  }
+  assert.equal(near[0].cities, 2);
+  // Selecting a city no longer widens its footprint: there is no fan of faces to make room for.
+  assert.deepEqual(clusterMarkers([city("charlotte", 100, 6), city("atlanta", 100 + CARD_GAP + 1, 3)], "atlanta").map((m) => m.key), ["atlanta", "charlotte"]);
 });
 
 test("pinch zoom follows the finger spread and stays in range", () => {

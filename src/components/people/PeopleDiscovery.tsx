@@ -2,6 +2,7 @@ import { Suspense, lazy, useDeferredValue, useEffect, useMemo, useRef, useState 
 import { Link, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Globe2, MapPin, Plane, SlidersHorizontal, UserPlus, Users } from "lucide-react";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { markConnectHintSeen, showConnectHint } from "@/lib/firstRun";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,31 +12,53 @@ import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { usePeopleDiscovery } from "@/hooks/usePeopleDiscovery";
 import { discovery } from "@/lib/creativeDiscovery";
 import {
-  REGION, deckFor, inCity, listFor, placeForKey, placeOptions,
+  REGION, deckFor, inCity, listFor, matchesQuery, placeForKey, placeOptions,
   type DiscoverySignal, type Person,
 } from "@/lib/peopleDiscovery";
-import { safeWebLink } from "@/lib/tripMoney";
 import { ConnectCtaSheet, ConnectMomentHost, ConnectNudgeLine, nudgeFromPerson, personNudge, useConnectNudges } from "./ConnectMoment";
+import { AvatarRow } from "./AvatarRow";
+import { LiveAreaToggle } from "./LiveAreaToggle";
 import { MemberGrid } from "./MemberGrid";
 import { SwipeDeck } from "./SwipeDeck";
 import { TravelingToCity } from "./TravelingToCity";
 import { supabase } from "@/integrations/supabase/client";
 import type { IcebreakerMe } from "@/lib/connectMoment";
+import { NEARBY_KM, nearbyGroups, safeArea, type LonLat } from "@/lib/nearbyMap";
 
 // The globe and its city coordinates (~300 KB) load after the deck renders.
 const CreativeGlobe = lazy(() => import("@/components/discovery/CreativeGlobe").then((m) => ({ default: m.CreativeGlobe })));
+// The street map (MapLibre, ~250 KB gzipped) loads only when someone opens Nearby.
+const StreetMap = lazy(() => import("@/components/discovery/StreetMap"));
+
+/** City centres, loaded once for Nearby (the globe bundles its own copy). */
+function useCityPoints(enabled: boolean) {
+  return useQuery({
+    queryKey: ["city-coordinates"],
+    queryFn: async () => (await import("@/data/cityCoordinates.json")).default as Record<string, number[]>,
+    enabled,
+    staleTime: Infinity,
+  });
+}
 
 /**
- * The one people experience: globe, city or state picker, Nearby/Global, the member
- * avatar row, the swipe deck, matches and the full member list share one search and city.
+ * The one people experience. Global: the globe with a card per city; a card opens that city's
+ * people. Nearby: a street map of your city with members at area or city level. Both share the
+ * avatar row, the swipe deck and matches; "See all" opens the full member list.
  */
-export function PeopleDiscovery({ query, full }: { query: string; full: boolean }) {
+export function PeopleDiscovery({ query }: { query: string }) {
   const { user, people, members, signals, settings } = usePeopleDiscovery();
   const { blockUser } = useUserBlocks();
   const cache = useQueryClient();
   const search = useDeferredValue(query);
   const [city, setCity] = useState<string | null>(null);
+  const [mode, setMode] = useState<"global" | "nearby">("global");
+  /** The city whose sheet is open, after tapping its card on the globe. */
+  const [sheetCity, setSheetCity] = useState<string | null>(null);
+  const [listOpen, setListOpen] = useState(false);
+  /** My own ~1 km area from this session's opt-in, for centring my map before the server echoes it. */
+  const [localArea, setLocalArea] = useState<LonLat | null>(null);
   const [focus, setFocus] = useState<{ id: string; at: number } | null>(null);
+  const [sheetFocus, setSheetFocus] = useState<{ id: string; at: number } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reporting, setReporting] = useState<Person | null>(null);
   const [moment, setMoment] = useState<{ person: Person; matched: boolean; conversationId: string | null } | null>(null);
@@ -64,6 +87,10 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
     : null;
   const myLive = placeForKey(settings.data?.live_city_key);
   const myPlace = myLive || me?.home || null;
+  const myArea = myLive ? safeArea(settings.data?.live_area) || localArea : null;
+  const points = useCityPoints(mode === "nearby");
+  const cityPoint = myPlace && points.data?.[myPlace.key];
+  const nearCenter: LonLat | null = myArea || (cityPoint?.length === 2 ? [cityPoint[0], cityPoint[1]] : null);
   const options = useMemo(() => placeOptions(people), [people]);
   // Order the deck when the city, search or member set changes, not on every like,
   // so the card in front does not jump away after a decision.
@@ -79,6 +106,18 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
   }, [deckOrder, people]);
   const list = useMemo(() => listFor(people, city, search), [people, city, search]);
   const here = useMemo(() => people.filter((p) => p.discoverable && inCity(p, city)), [people, city]);
+  const groups = useMemo(
+    () => (nearCenter && points.data ? nearbyGroups(people, nearCenter, points.data, user?.id) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the centre is two numbers
+    [people, nearCenter?.[0], nearCenter?.[1], points.data, user?.id],
+  );
+  const nearbyDeck = useMemo(() => {
+    const near = new Set(groups.flatMap((g) => g.people.map((p) => p.user_id)));
+    return deck.filter((p) => near.has(p.user_id) && matchesQuery(p, search));
+  }, [groups, deck, search]);
+  const sheetDeck = useMemo(() => (sheetCity ? deck.filter((p) => inCity(p, sheetCity)) : []), [deck, sheetCity]);
+  const nearbyMode = mode === "nearby" && !!myPlace;
+  const shownDeck = nearbyMode ? nearbyDeck : deck;
   useEffect(() => {
     if (!hint || openedHome.current || !myPlace || city) return;
     if (people.some((p) => p.user_id !== user?.id && p.discoverable && inCity(p, myPlace.key))) {
@@ -86,9 +125,12 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
       setCity(myPlace.key);
     }
   }, [hint, myPlace, city, people, user?.id]);
-  const cityLabel = city
-    ? options.cities.find((c) => c.key === city)?.label || options.regions.find((r) => r.key === city)?.label || placeForKey(city)?.label || "This city"
-    : null;
+  const labelFor = (key: string | null) =>
+    key
+      ? options.cities.find((c) => c.key === key)?.label || options.regions.find((r) => r.key === key)?.label || placeForKey(key)?.label || "This city"
+      : null;
+  const cityLabel = labelFor(city);
+  const sheetLabel = labelFor(sheetCity);
 
   const matches = useQuery({
     queryKey: ["creative-matches", user?.id],
@@ -128,9 +170,37 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
       setSettingsOpen(true);
       return;
     }
-    setCity(myPlace.key);
+    setMode("nearby");
+    setCity(null);
+  };
+  const global = () => {
+    setMode("global");
+    setCity(null);
+  };
+  const openCity = (key: string) => {
+    setCity(key);
+    setSheetCity(key);
   };
 
+  const deckProps = {
+    pending: swipe.isPending,
+    viewerId: user?.id,
+    me: myIcebreaker,
+    nudgeFor: (id: string) => personNudge(nudges, id),
+    onReopen: (person: Person) => setCtaPerson(person),
+    onDecide: (person: Person, liked: boolean) => {
+      if (hint) dismissHint();
+      return swipe.mutateAsync({ person, liked }).catch(() => undefined);
+    },
+    onReport: setReporting,
+    onBlock: (person: Person) => {
+      if (window.confirm(`Block ${person.name}? They disappear from discovery and any match is removed.`))
+        blockUser.mutate(person.user_id, {
+          onSuccess: () => void cache.invalidateQueries({ queryKey: ["discovery-globe"] }),
+          onError: (e: Error) => toast.error(e.message),
+        });
+    },
+  };
   const matchIds = new Set((matches.data || []).map((m) => m.user_id));
   const openNudges = nudges.filter((n) => !n.started && !matchIds.has(n.userId));
 
@@ -170,7 +240,10 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
             <select
               aria-label="Select a city or state"
               value={city || ""}
-              onChange={(e) => setCity(e.target.value || null)}
+              onChange={(e) => {
+                setMode("global");
+                setCity(e.target.value || null);
+              }}
               className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none"
             >
               <option className="bg-[#1d1a22]" value="">Everywhere</option>
@@ -193,17 +266,17 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
           <div className="flex rounded-full bg-white/10 p-1" role="group" aria-label="Range">
             <button
               type="button"
-              aria-pressed={!!city && city === myPlace?.key}
+              aria-pressed={nearbyMode}
               onClick={nearby}
-              className={`min-h-9 rounded-full px-4 text-sm ${city && city === myPlace?.key ? "bg-[#faf4ed] text-[#1d1a22]" : "text-white/80"}`}
+              className={`min-h-9 rounded-full px-4 text-sm ${nearbyMode ? "bg-[#faf4ed] text-[#1d1a22]" : "text-white/80"}`}
             >
               Nearby
             </button>
             <button
               type="button"
-              aria-pressed={!city}
-              onClick={() => setCity(null)}
-              className={`min-h-9 rounded-full px-4 text-sm ${!city ? "bg-[#faf4ed] text-[#1d1a22]" : "text-white/80"}`}
+              aria-pressed={!nearbyMode}
+              onClick={global}
+              className={`min-h-9 rounded-full px-4 text-sm ${!nearbyMode ? "bg-[#faf4ed] text-[#1d1a22]" : "text-white/80"}`}
             >
               Global
             </button>
@@ -218,56 +291,63 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
 
         <div className="lg:mt-2 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-8">
         <div className="min-w-0">
-        <Suspense fallback={<div className="mx-auto my-3 aspect-square w-full max-w-[520px] rounded-full bg-white/5" role="status" aria-label="Loading globe" />}>
-          <CreativeGlobe
-            people={people}
-            selected={city}
-            onSelect={setCity}
-            me={myPlace ? { key: myPlace.key, label: myPlace.label, live: !!myLive } : null}
-          />
-        </Suspense>
+        {nearbyMode ? (
+          <div className="mt-3">
+            <Suspense fallback={<div className="h-[min(420px,52dvh)] w-full animate-pulse rounded-[24px] bg-white/5" role="status" aria-label="Loading map" />}>
+              {nearCenter ? (
+                <StreetMap
+                  center={nearCenter}
+                  groups={groups}
+                  me={myArea ? { point: myArea, live: true } : nearCenter ? { point: nearCenter, live: false } : null}
+                  onPick={(id) => setFocus({ id, at: Date.now() })}
+                />
+              ) : (
+                <div className="h-[min(420px,52dvh)] w-full animate-pulse rounded-[24px] bg-white/5" role="status" aria-label="Loading map" />
+              )}
+            </Suspense>
+            <LiveAreaToggle on={!!myArea} disabled={!settings.data?.discoverable} onArea={setLocalArea} />
+          </div>
+        ) : (
+          <Suspense fallback={<div className="mx-auto my-3 aspect-square w-full max-w-[520px] rounded-full bg-white/5" role="status" aria-label="Loading globe" />}>
+            <CreativeGlobe
+              people={people}
+              selected={city}
+              onSelect={openCity}
+              me={myPlace ? { key: myPlace.key, label: myPlace.label, live: !!myLive } : null}
+            />
+          </Suspense>
+        )}
 
-        <div className="mt-1 flex items-end justify-between gap-3">
+        <div className="mt-3 flex items-end justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="truncate font-display text-2xl">{cityLabel || "Around the world"}</h3>
+            <h3 className="truncate font-display text-2xl">
+              {nearbyMode ? "Members nearby" : cityLabel || "Around the world"}
+            </h3>
             <p className="text-xs text-white/60">
-              {here.length} {here.length === 1 ? "member" : "members"} on the globe
-              {here.some((p) => p.live) ? ` · ${here.filter((p) => p.live).length} here live` : ""}
+              {nearbyMode
+                ? `${nearbyDeck.length} within ${NEARBY_KM} km of ${myPlace?.label.split(",")[0] || "you"}${myArea ? " · using your live area" : " · by profile city"}`
+                : `${here.length} ${here.length === 1 ? "member" : "members"} ${cityLabel ? "here" : "on the globe"}${here.some((p) => p.live) ? ` · ${here.filter((p) => p.live).length} here live` : ""}`}
               {search ? ` · matching “${search}”` : ""}
             </p>
           </div>
-          {city && (
-            <button type="button" className="min-h-11 shrink-0 text-xs text-white/70 underline" onClick={() => setCity(null)}>
-              <Globe2 size={14} className="mr-1 inline" />
-              All cities
+          <div className="flex shrink-0 items-center gap-3">
+            {city && !nearbyMode && (
+              <button type="button" className="min-h-11 text-xs text-white/70 underline" onClick={() => setCity(null)}>
+                <Globe2 size={14} className="mr-1 inline" />
+                All cities
+              </button>
+            )}
+            <button type="button" className="min-h-11 text-xs font-medium text-[#ff9fc8]" onClick={() => setListOpen(true)}>
+              See all{list.length ? ` ${list.length}` : ""}
             </button>
-          )}
+          </div>
         </div>
 
-        {!!deck.length && (
-          <ul className="-mx-4 mt-3 flex gap-3 overflow-x-auto px-4 pb-1 scrollbar-hide" aria-label={`Members ${cityLabel ? `in ${cityLabel}` : "around the world"}`}>
-            {deck.slice(0, 30).map((person) => (
-              <li key={person.user_id} className="shrink-0">
-                <button
-                  type="button"
-                  className="flex w-14 flex-col items-center gap-1"
-                  onClick={() => setFocus({ id: person.user_id, at: Date.now() })}
-                  aria-label={`Show ${person.name}`}
-                >
-                  <span className={`relative block h-14 w-14 overflow-hidden rounded-full ring-2 ${person.live ? "ring-[#79c3cf]" : person.liked ? "ring-[#ff9fc8]" : "ring-white/20"}`}>
-                    {safeWebLink(person.avatar_url) ? (
-                      <img src={safeWebLink(person.avatar_url)} alt="" loading="lazy" className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="flex h-full w-full items-center justify-center bg-[#4a4150] font-bold">{person.name.charAt(0).toUpperCase()}</span>
-                    )}
-                    {person.trip && <Plane size={12} className="absolute bottom-0.5 right-0.5 rounded-full bg-[#faf4ed] p-0.5 text-[#1d1a22]" />}
-                  </span>
-                  <span className="w-full truncate text-center text-[11px] text-white/75">{person.name.split(" ")[0]}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <AvatarRow
+          people={shownDeck}
+          label={nearbyMode ? "Members nearby" : `Members ${cityLabel ? `in ${cityLabel}` : "around the world"}`}
+          onPick={(id) => setFocus({ id, at: Date.now() })}
+        />
 
         </div>
         <div className="mt-4 min-w-0 lg:mt-0">
@@ -278,9 +358,9 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
               <p>People did not load.</p>
               <button type="button" className="min-h-11 underline" onClick={() => { void members.refetch(); void signals.refetch(); }}>Try again</button>
             </div>
-          ) : deck.length ? (
+          ) : shownDeck.length ? (
             <>
-            {hint && (
+            {hint && !nearbyMode && (
               <div ref={hintRef} role="note" className="mb-3 flex max-w-[380px] items-start gap-3 rounded-2xl border border-[#ff9fc8]/40 bg-[#ff9fc8]/10 p-3 text-sm">
                 <UserPlus size={18} className="mt-0.5 shrink-0 text-[#ff9fc8]" aria-hidden />
                 <p className="min-w-0 flex-1">
@@ -291,33 +371,25 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
                 </button>
               </div>
             )}
-            <SwipeDeck
-              people={deck}
-              focus={focus}
-              pending={swipe.isPending}
-              viewerId={user?.id}
-              me={myIcebreaker}
-              nudgeFor={(id) => personNudge(nudges, id)}
-              onReopen={(person) => setCtaPerson(person)}
-              onDecide={(person, liked) => {
-                if (hint) dismissHint();
-                return swipe.mutateAsync({ person, liked }).catch(() => undefined);
-              }}
-              onReport={setReporting}
-              onBlock={(person) => {
-                if (window.confirm(`Block ${person.name}? They disappear from discovery and any match is removed.`))
-                  blockUser.mutate(person.user_id, {
-                    onSuccess: () => void cache.invalidateQueries({ queryKey: ["discovery-globe"] }),
-                    onError: (e: Error) => toast.error(e.message),
-                  });
-              }}
-            />
-            {city && !city.startsWith("region:") && cityLabel && <TravelingToCity cityKey={city} label={cityLabel} />}
+            <SwipeDeck people={shownDeck} focus={focus} {...deckProps} />
+            {nearbyMode && myPlace ? (
+              <TravelingToCity cityKey={myPlace.key} label={myPlace.label} />
+            ) : (
+              city && !city.startsWith(REGION) && cityLabel && <TravelingToCity cityKey={city} label={cityLabel} />
+            )}
             </>
           ) : (
             <div className="rounded-[28px] border border-dashed border-white/15 px-6 py-10 text-center">
-              <p className="font-display text-xl">{search ? `Nobody on the globe matches “${search}”` : cityLabel ? `No one on the globe in ${cityLabel} yet` : "No one else on the globe yet"}</p>
-              <p className="mt-2 text-sm text-white/60">{list.length ? `${list.length} ${list.length === 1 ? "member matches" : "members match"} in the list below.` : "Try another city or a different search."}</p>
+              <p className="font-display text-xl">
+                {search
+                  ? `Nobody here matches “${search}”`
+                  : nearbyMode
+                    ? `No one else near ${myPlace?.label.split(",")[0] || "you"} yet`
+                    : cityLabel ? `No one on the globe in ${cityLabel} yet` : "No one else on the globe yet"}
+              </p>
+              <p className="mt-2 text-sm text-white/60">
+                {nearbyMode ? "Switch to Global to see every city." : list.length ? `${list.length} ${list.length === 1 ? "member matches" : "members match"} in See all.` : "Try another city or a different search."}
+              </p>
             </div>
           )}
         </div>
@@ -371,35 +443,50 @@ export function PeopleDiscovery({ query, full }: { query: string; full: boolean 
           </div>
         )}
         <p className="mt-4 text-[11px] leading-relaxed text-white/45">
-          Members appear at their profile city unless they hide themselves in settings. Live cities are opt-in, city-level and expire. Map data:{" "}
+          Members appear at their profile city unless they hide themselves in settings. Live cities and live areas (about 1 km, never an exact spot) are opt-in and expire. Globe data:{" "}
           <a className="underline" href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer">GeoNames</a>,{" "}
           <a className="underline" href="https://www.naturalearthdata.com/" target="_blank" rel="noopener noreferrer">Natural Earth</a>.
         </p>
       </section>
 
-      <section aria-labelledby="members-title" className="mt-6">
-        <div className="mb-3 flex items-end justify-between gap-3">
-          <div>
-            <p className="kicker">Directory</p>
-            <h2 id="members-title" className="ether-title text-[22px]">
-              {cityLabel ? `Everyone in ${cityLabel}` : "Everyone"} · {list.length}
-            </h2>
-          </div>
-          {!full && list.length > 6 && (
-            <Link to="/explore?section=people" className="mono-label min-h-11 content-center text-[10px] text-muted-foreground">See all</Link>
+      <Sheet open={listOpen} onOpenChange={setListOpen}>
+        <SheetContent side="bottom" className="max-h-[88dvh] rounded-t-[28px] px-4 pb-8">
+          <SheetTitle className="ether-title pr-10 text-[22px]">{cityLabel ? `Everyone in ${cityLabel}` : "Everyone"} · {list.length}</SheetTitle>
+          <SheetDescription className="mb-4 text-sm text-muted-foreground">Every member{search ? ` matching “${search}”` : ""}, including people who hide from the globe.</SheetDescription>
+          {members.isPending ? (
+            <p role="status" className="text-sm text-muted-foreground">Loading members…</p>
+          ) : list.length ? (
+            <MemberGrid people={list} resetKey={`${city}|${search}`} />
+          ) : (
+            <div className="file-panel flex flex-col items-center gap-2 p-6 text-center">
+              <Users className="h-6 w-6 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">No members match{search ? ` “${search}”` : ""}{cityLabel ? ` in ${cityLabel}` : ""}.</p>
+            </div>
           )}
-        </div>
-        {members.isPending ? (
-          <p role="status" className="text-sm text-muted-foreground">Loading members…</p>
-        ) : list.length ? (
-          <MemberGrid people={full ? list : list.slice(0, 6)} resetKey={`${city}|${search}`} />
-        ) : (
-          <div className="file-panel flex flex-col items-center gap-2 p-6 text-center">
-            <Users className="h-6 w-6 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">No members match{search ? ` “${search}”` : ""}{cityLabel ? ` in ${cityLabel}` : ""}.</p>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={!!sheetCity} onOpenChange={(open) => !open && setSheetCity(null)}>
+        <SheetContent
+          side="bottom"
+          className="max-h-[92dvh] rounded-t-[28px] border-white/10 bg-[#1d1a22] px-4 pb-8 text-[#faf5f0]"
+          style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
+        >
+          <div className="mx-auto mb-3 mt-1 h-1 w-10 rounded-full bg-white/20" aria-hidden="true" />
+          <p className="text-[10px] uppercase tracking-[.25em] text-[#ff9fc8]">{sheetDeck.length} {sheetDeck.length === 1 ? "member" : "members"}</p>
+          <SheetTitle className="pr-10 font-display text-[26px] font-normal leading-tight text-[#faf5f0]">Members in {sheetLabel}</SheetTitle>
+          <SheetDescription className="text-xs text-white/60">Connect with anyone you would make something with. If they connect back, a chat opens.</SheetDescription>
+          <AvatarRow people={sheetDeck} label={`Members in ${sheetLabel}`} onPick={(id) => setSheetFocus({ id, at: Date.now() })} />
+          <div className="mt-4">
+            {sheetDeck.length ? (
+              <SwipeDeck people={sheetDeck} focus={sheetFocus} {...deckProps} />
+            ) : (
+              <p className="py-8 text-center text-sm text-white/60">No one else on the globe here yet.</p>
+            )}
           </div>
-        )}
-      </section>
+          {sheetCity && !sheetCity.startsWith(REGION) && sheetLabel && <TravelingToCity cityKey={sheetCity} label={sheetLabel} />}
+        </SheetContent>
+      </Sheet>
 
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DialogContent>

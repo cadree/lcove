@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { discovery, type DiscoverySettings } from "@/lib/creativeDiscovery";
 import { nearestCity, placeForKey } from "@/lib/peopleDiscovery";
 import { suggestCities } from "@/lib/cities";
+import { devicePosition } from "@/lib/devicePosition";
 
 const DURATIONS = [
   { hours: 4, label: "4 hours" },
@@ -13,17 +14,6 @@ const DURATIONS = [
   { hours: 72, label: "3 days" },
   { hours: 168, label: "7 days" },
 ];
-
-function devicePosition(): Promise<GeolocationPosition> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) reject(new Error("Location is not available on this device."));
-    else navigator.geolocation.getCurrentPosition(resolve, () => reject(new Error("Location permission was not granted. Pick your city instead.")), {
-      enableHighAccuracy: false,
-      maximumAge: 10 * 60_000,
-      timeout: 15_000,
-    });
-  });
-}
 
 /**
  * Opt-in live city. Only a city key leaves the device; coordinates are snapped to the
