@@ -1,7 +1,7 @@
 // cspell:words ndotv
 import { geoDistance } from "d3-geo";
-import { FAN_RADIUS } from "./globeMarkers";
-import { GLOBE_SCALE, GLOBE_SIZE, type Rotation } from "./globeView";
+import { FAN_RADIUS } from "./globeMarkers.ts";
+import { GLOBE_SCALE, GLOBE_SIZE, type Rotation } from "./globeView.ts";
 
 /** Surface normal · view direction: 1 at the centre of the disc, 0 on the limb, <0 on the far side. */
 export function viewDot(point: [number, number], rotation: Rotation): number {

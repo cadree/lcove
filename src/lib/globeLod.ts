@@ -1,8 +1,8 @@
 // cspell:words Topo
 import type { GeoPermissibleObjects } from "d3-geo";
-import { GLOBE_SIZE } from "./globeView";
-import { limbOpacity, onDisc, viewDot } from "./globeLimb";
-import { topologyGeometry, type Topology } from "./globeTopo";
+import { GLOBE_SIZE } from "./globeView.ts";
+import { limbOpacity, onDisc, viewDot } from "./globeLimb.ts";
+import { topologyGeometry, type Topology } from "./globeTopo.ts";
 
 /** Zoom at which each detail tier appears. The first fetch (50m land + countries + lakes) is the cheap tier. */
 export const LOD_ZOOM = {
