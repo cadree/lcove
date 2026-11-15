@@ -33,7 +33,11 @@ export async function mockSupabase(page, extra = {}) {
     for (const [key, handler] of Object.entries(extra)) {
       if (table === key || fn === key || url.pathname.includes(key)) {
         const result = await handler(req, url);
-        if (result) return route.fulfill({ headers, status: 200, ...result, body: typeof result.body === "string" ? result.body : JSON.stringify(result.body) });
+        if (!result) continue;
+        // .single()/.maybeSingle() ask for one object; hand back the first row like PostgREST does.
+        const one = (req.headers()["accept"] || "").includes("vnd.pgrst.object") && Array.isArray(result.body);
+        const body = one ? result.body[0] ?? null : result.body;
+        return route.fulfill({ headers, status: 200, ...result, body: typeof body === "string" ? body : JSON.stringify(body) });
       }
     }
     let body = [];
