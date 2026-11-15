@@ -161,6 +161,28 @@ export function authorizeUserNotification({ callerId, recipientId, notificationT
     };
   }
 
+  if (notificationType === "item_invite") {
+    // Only the sender of a pending invite, within 15 minutes of sending it.
+    const invite = facts?.itemInvite;
+    if (!invite || invite.status !== "pending") return deny(403, "Forbidden");
+    const sentAt = Date.parse(invite.createdAt ?? "");
+    if (!Number.isFinite(sentAt) || Date.now() - sentAt > 15 * 60_000) return deny(403, "Forbidden");
+    if (invite.itemType !== "project" && invite.itemType !== "event") return deny(403, "Forbidden");
+    const fallback = invite.itemType === "event" ? "an event" : "a project";
+    const title = singleLine(invite.title, 120) || fallback;
+    return {
+      ok: true,
+      title: `${name} invited you to ${title}`,
+      body: invite.itemType === "event" ? "Tap RSVP to see the event." : "Tap Join to see the project and pick a role.",
+      data: {
+        invite_id: invite.id,
+        item_type: invite.itemType,
+        item_id: invite.itemId,
+        path: `/${invite.itemType}/${invite.itemId}`,
+      },
+    };
+  }
+
   if (notificationType === "comment") {
     if (!isUuid(payload.post_id)) return deny(400, "post_id is required");
     if (!facts?.comment || facts.comment.ownerId !== recipientId) return deny(403, "Forbidden");
@@ -240,6 +262,34 @@ export async function loadUserNotificationFacts(supabase, { callerId, recipientI
       ["second_id", second],
     ]);
     facts.match = match ? { active: Boolean(match.active), conversationId: match.conversation_id ?? null } : null;
+  } else if (notificationType === "item_invite" && isUuid(payload.invite_id) && isUuid(recipientId)) {
+    const invite = await one(supabase, "item_invites", [
+      ["id", payload.invite_id],
+      ["sender_id", callerId],
+      ["recipient_id", recipientId],
+    ]);
+    // send_item_invite skips the in-app notice for muted or already-joined
+    // invitees. No notice row, no push or email either.
+    const notice = invite
+      ? await one(supabase, "notifications", [
+          ["user_id", recipientId],
+          ["type", "item_invite"],
+          ["data->>invite_id", invite.id],
+        ])
+      : null;
+    const item = invite && notice && isUuid(invite.item_id)
+      ? await one(supabase, invite.item_type === "event" ? "events" : "projects", [["id", invite.item_id]])
+      : null;
+    facts.itemInvite = invite && notice
+      ? {
+          id: invite.id,
+          status: invite.status,
+          createdAt: invite.created_at,
+          itemType: invite.item_type,
+          itemId: invite.item_id,
+          title: item?.title ?? null,
+        }
+      : null;
   } else if (notificationType === "live_stream" && isUuid(payload.stream_id)) {
     const stream = await one(supabase, "live_streams", [["id", payload.stream_id]]);
     const fan = await one(supabase, "favorite_friends", [
