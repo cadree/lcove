@@ -5,6 +5,7 @@ import PageLayout from "@/components/layout/PageLayout";
 import { CommunityMall } from "@/components/explore/CommunityMall";
 import { ExploreBrowse } from "@/components/explore/ExploreBrowse";
 import { PeopleDiscovery } from "@/components/people/PeopleDiscovery";
+import { OpenCallsNearby } from "@/components/openCalls/OpenCallsNearby";
 import { QuestCard } from "@/components/novi/QuestCard";
 import { Input } from "@/components/ui/input";
 import { useNoviQuests } from "@/hooks/useNoviQuests";
@@ -89,6 +90,7 @@ const Explore = () => {
         {(section === "for-you" || section === "people") && (
           <PeopleDiscovery query={query} />
         )}
+        {(section === "for-you" || section === "people") && <OpenCallsNearby />}
 
         {section === "for-you" && openQuest && <div className="mt-6"><QuestCard quest={openQuest} /></div>}
 

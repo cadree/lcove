@@ -42,6 +42,7 @@ const install = backend(db, {
     "profile_credits", "post_credits", "credit_post", "remove_post_credit", "respond_work_credit",
     ...(has("open_to") ? ["set_open_to"] : []),
     ...(has("project_vouches") ? ["project_wrap_up", "profile_vouches", "vouch_for"] : []),
+    ...(has("open_calls") ? ["post_open_call", "close_open_call", "open_calls_near"] : []),
   ],
   log,
   fixed: {
@@ -323,6 +324,83 @@ if (has("project_vouches")) {
   ok("author-deleted-vouch", (await all("SELECT 1 FROM project_vouches WHERE author_id=$1", [THEO])).length === 0);
   for (const [who, p] of [["theo", theo], ["rezza", rezza], ["jade", jade]]) ok(`no-page-errors-${who}-vouches`, p.errors.length === 0, p.errors.join(" | "));
   await Promise.all([theo.context.close(), rezza.context.close(), jade.context.close()]);
+}
+
+// ============================================================ 4. open calls
+if (has("open_calls")) {
+  const inDays = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+  const rooftop = (await one("INSERT INTO projects(creator_id,title,status,cover_image_url,venue) VALUES($1,'Rooftop Session','in_progress',$2,'1400 S Tryon St, Rooftop') RETURNING id", [MAYA, cover])).id;
+  const modelRole = (await one("INSERT INTO project_roles(project_id,role_name,slots_available) VALUES($1,'Model',1) RETURNING id", [rooftop])).id;
+
+  // Maya posts a call from her project page.
+  const maya = await phone(MAYA);
+  maya.page.on("dialog", (d) => d.accept());
+  await maya.page.goto(root + `/project/${rooftop}`, { waitUntil: "networkidle" });
+  const panel = maya.page.getByTestId("project-open-calls");
+  await panel.waitFor({ timeout: 20000 });
+  await panel.getByRole("button", { name: "Post a call" }).tap();
+  const sheet = maya.page.getByRole("dialog");
+  await sheet.getByLabel("Date").fill(inDays(5));
+  await sheet.getByLabel("City").fill("Charlotte, NC");
+  await sheet.getByLabel("What it is (optional)").tap();
+  await sheet.getByLabel("What it is (optional)").fill("Golden hour on a rooftop, two looks. Bring heels.");
+  await sleep(300);
+  await shot(maya.page, "20-post-call-maya");
+  ok("call-defaults-to-open-role", (await sheet.getByLabel("Role").inputValue()) === modelRole);
+  await sheet.getByRole("button", { name: "Post call" }).tap();
+  await maya.page.getByText(/Call posted/).first().waitFor({ timeout: 10000 });
+  await panel.getByTestId("open-call").first().waitFor({ timeout: 10000 });
+  await sleep(500);
+  await panel.scrollIntoViewIfNeeded();
+  await shot(maya.page, "21-call-on-project-maya");
+  const saved = await one("SELECT city_key, city_label, paid, call_date::text FROM project_open_calls WHERE project_id=$1", [rooftop]);
+  ok("call-saved-city-level", saved?.city_key === "charlotte|nc" && saved.paid === true && saved.call_date === inDays(5), JSON.stringify(saved));
+  ok("no-sideways-scroll-post-call", (await overflow(maya.page)) <= 0);
+
+  // Jade sees it in Explore (her city), with no address, and applies through the role form.
+  const jade = await phone(JADE);
+  await jade.page.goto(root + "/explore", { waitUntil: "networkidle" });
+  const near = jade.page.getByTestId("open-calls-nearby");
+  await near.waitFor({ timeout: 20000 });
+  for (let i = 0; i < 10 && !(await near.evaluate((el) => el.getBoundingClientRect().bottom < innerHeight)); i++) {
+    await swipe(jade.cdp, { from: 720, to: 260 });
+  }
+  ok("explore-touch-scrolled", (await jade.page.evaluate(() => scrollY)) > 0);
+  await near.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await sleep(400);
+  await shot(jade.page, "22-open-calls-explore-jade");
+  const card = near.getByTestId("nearby-call").filter({ hasText: "Model" });
+  ok("call-in-explore", (await card.count()) === 1 && (await card.getByText("Rooftop Session").count()) === 1 && (await card.getByText("Paid").count()) === 1);
+  ok("no-address-in-explore", (await near.getByText(/Tryon|Rooftop St|1400/).count()) === 0);
+  await card.tap();
+  await jade.page.waitForURL(`**/project/${rooftop}?role=${modelRole}`, { timeout: 10000 });
+  const submit = jade.page.getByRole("button", { name: "Submit Application" });
+  await submit.waitFor({ timeout: 15000 });
+  await sleep(1200);
+  await shot(jade.page, "23-apply-from-call-jade");
+  ok("role-preselected-and-scrolled", await jade.page.locator("#roles").evaluate((el) => { const r = el.getBoundingClientRect(); return r.top < innerHeight / 2 && r.bottom > 0; }));
+  await jade.page.getByPlaceholder(/message|why/i).first().fill("I model for Charlotte brands, free on that date.").catch(() => undefined);
+  await submit.tap();
+  await jade.page.getByText("Application submitted!").waitFor({ timeout: 10000 });
+  ok("applied-through-existing-flow", (await all("SELECT status FROM project_applications WHERE project_id=$1 AND applicant_id=$2 AND role_id=$3", [rooftop, JADE, modelRole]))[0]?.status === "pending");
+  ok("no-sideways-scroll-apply", (await overflow(jade.page)) <= 0);
+
+  // Maya accepts Jade (existing flow fills the role); the call stops showing in Explore.
+  await as(db, "authenticated", MAYA);
+  await db.query("UPDATE project_applications SET status='accepted' WHERE project_id=$1 AND applicant_id=$2", [rooftop, JADE]);
+  await db.exec("RESET ROLE");
+  const theo = await phone(THEO);
+  await theo.page.goto(root + "/explore", { waitUntil: "networkidle" });
+  await theo.page.locator("[aria-roledescription=slide]").first().waitFor({ timeout: 20000 });
+  await sleep(2000);
+  ok("filled-call-leaves-explore", (await theo.page.getByTestId("open-calls-nearby").count()) === 0);
+  await maya.page.reload({ waitUntil: "networkidle" });
+  await panel.getByText("Role filled").waitFor({ timeout: 15000 });
+  await panel.scrollIntoViewIfNeeded();
+  await shot(maya.page, "24-call-filled-maya");
+  ok("owner-sees-role-filled", true);
+  for (const [who, p] of [["maya", maya], ["jade", jade], ["theo", theo]]) ok(`no-page-errors-${who}-open-calls`, p.errors.length === 0, p.errors.join(" | "));
+  await Promise.all([maya.context.close(), jade.context.close(), theo.context.close()]);
 }
 
 await browser.close();

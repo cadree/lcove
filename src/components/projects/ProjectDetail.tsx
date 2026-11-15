@@ -32,6 +32,7 @@ import { ClientDashboardView } from '@/components/projects/ClientDashboardView';
 import { ClientInviteDialog } from '@/components/projects/ClientInviteDialog';
 import { CallSheetSection } from '@/components/projects/CallSheetSection';
 import { ProjectWrapUp } from '@/components/vouches/ProjectWrapUp';
+import { ProjectOpenCalls } from '@/components/openCalls/ProjectOpenCalls';
 import { useQuery } from '@tanstack/react-query';
 import { errorMessage } from '@/lib/errorMessage';
 
@@ -783,6 +784,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onC
             )}
 
             {project.status === 'completed' && <ProjectWrapUp projectId={project.id} projectTitle={project.title} />}
+            <ProjectOpenCalls projectId={project.id} roles={project.roles || []} isOwner={isCreator} />
 
             {/* Call Sheet Section */}
             <CallSheetSection projectId={project.id} roles={project.roles || []} isOwner={isCreator} />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -53,6 +53,8 @@ import { inviteParam } from "@/lib/itemInvite";
 import { applyWithInvite } from "@/lib/itemInviteApi";
 import { messageHref } from "@/lib/connectMoment";
 import { ProjectWrapUp } from "@/components/vouches/ProjectWrapUp";
+import { ProjectOpenCalls } from "@/components/openCalls/ProjectOpenCalls";
+import { scrollToRoles, useRoleFromLink } from "@/hooks/useRoleFromLink";
 
 const statusColors: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
@@ -232,6 +234,13 @@ export default function PublicProjectPage() {
   const handleApplyClick = (roleId: string) => {
     setSelectedRoleId(selectedRoleId === roleId ? null : roleId);
   };
+
+  // Open calls: Apply picks the call's role in the form below.
+  const pickRole = useCallback((roleId: string) => {
+    setSelectedRoleId(roleId);
+    scrollToRoles();
+  }, []);
+  useRoleFromLink(project?.roles, setSelectedRoleId, !user || user.id === project?.creator_id);
 
   const handleSubmitApplication = () => {
     if (!selectedRoleId) return;
@@ -434,6 +443,7 @@ export default function PublicProjectPage() {
         </motion.div>
 
         {user && projectId && project.status === "completed" && <ProjectWrapUp projectId={projectId} projectTitle={project.title} />}
+        {user && projectId && <ProjectOpenCalls projectId={projectId} roles={project.roles || []} isOwner={isCreator} onApply={pickRole} />}
 
         {/* Apply for Roles Card */}
         {project.roles && project.roles.length > 0 && !isCreator && (
