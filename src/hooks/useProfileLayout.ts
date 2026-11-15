@@ -17,6 +17,7 @@ export const DEFAULT_SECTIONS: ProfileSection[] = [
   { id: 'friends', label: 'Friends', visible: true, size: 'medium', order: 1 },
   { id: 'about', label: 'About', visible: true, size: 'medium', order: 2 },
   { id: 'credits', label: 'Credits', visible: true, size: 'medium', order: 2.1 },
+  { id: 'vouches', label: 'Vouches', visible: true, size: 'medium', order: 2.2 },
   { id: 'pipeline', label: 'My Pipeline', visible: true, size: 'large', order: 3 },
   { id: 'boards', label: 'Boards', visible: true, size: 'medium', order: 4 },
   { id: 'portfolio', label: 'Portfolio', visible: true, size: 'medium', order: 5 },

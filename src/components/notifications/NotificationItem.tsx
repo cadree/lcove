@@ -2,7 +2,7 @@ import { FeedVideo } from "@/components/media/FeedVideo";
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Handshake, Sparkles, Send, X, Award, type LucideIcon } from 'lucide-react';
+import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Handshake, Sparkles, Send, X, Award, HandHeart, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Notification, NotificationType } from '@/hooks/useNotifications';
@@ -35,6 +35,7 @@ const notificationMark: Record<NotificationType, { icon: LucideIcon; fill: IconF
   match: { icon: Sparkles, fill: 'pink' },
   item_invite: { icon: Send, fill: 'cyan' },
   credit: { icon: Award, fill: 'gold' },
+  vouch: { icon: HandHeart, fill: 'gold' },
 };
 
 export const NotificationItem: React.FC<NotificationItemProps> = ({

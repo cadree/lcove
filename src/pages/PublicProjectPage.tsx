@@ -52,6 +52,7 @@ import { formatRoleCompensation } from "@/lib/projectCollaborations";
 import { inviteParam } from "@/lib/itemInvite";
 import { applyWithInvite } from "@/lib/itemInviteApi";
 import { messageHref } from "@/lib/connectMoment";
+import { ProjectWrapUp } from "@/components/vouches/ProjectWrapUp";
 
 const statusColors: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
@@ -432,6 +433,8 @@ export default function PublicProjectPage() {
           </Card>
         </motion.div>
 
+        {user && projectId && project.status === "completed" && <ProjectWrapUp projectId={projectId} projectTitle={project.title} />}
+
         {/* Apply for Roles Card */}
         {project.roles && project.roles.length > 0 && !isCreator && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
@@ -609,7 +612,7 @@ export default function PublicProjectPage() {
         )}
 
         {/* Action buttons */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="flex gap-2">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
           <Button
             variant="outline"
             className="flex-1 gap-2"

@@ -41,6 +41,7 @@ const install = backend(db, {
   rpcs: [
     "profile_credits", "post_credits", "credit_post", "remove_post_credit", "respond_work_credit",
     ...(has("open_to") ? ["set_open_to"] : []),
+    ...(has("project_vouches") ? ["project_wrap_up", "profile_vouches", "vouch_for"] : []),
   ],
   log,
   fixed: {
@@ -53,7 +54,11 @@ const install = backend(db, {
     creative_match_list: async () => [],
   },
   rows: {
-    projects: async (p) => ({ ...p, project_roles: await all("SELECT * FROM project_roles WHERE project_id=$1", [p.id]) }),
+    // Prod columns the fixture leaves out (budget, currency, payouts).
+    projects: async (p) => ({
+      total_budget: 1200, currency: "USD", ...p,
+      project_roles: (await all("SELECT * FROM project_roles WHERE project_id=$1", [p.id])).map((r) => ({ payout_amount: 600, ...r })),
+    }),
   },
 });
 
@@ -101,7 +106,8 @@ const swipeX = async (cdp, { y, from, to, steps = 10 }) => {
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   await sleep(700);
 };
-const overflow = (page) => page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+// Mobile Chrome widens the layout viewport to fit wide content, so compare against the phone's 390 px too.
+const overflow = (page) => page.evaluate(() => Math.max(document.documentElement.scrollWidth, innerWidth) - 390);
 
 // ============================================================ 1. credits
 {
@@ -246,6 +252,77 @@ if (has("open_to")) {
   ok("owner-asked-to-renew", true);
   for (const [who, p] of [["rezza", rezza], ["theo", theo]]) ok(`no-page-errors-${who}-open-to`, p.errors.length === 0, p.errors.join(" | "));
   await Promise.all([rezza.context.close(), theo.context.close()]);
+}
+
+// ============================================================ 3. vouches
+if (has("project_vouches")) {
+  // Night Shoot was marked complete above. Theo vouches for Rezza from the project page.
+  const theo = await phone(THEO);
+  theo.page.on("dialog", (d) => d.accept());
+  await theo.page.goto(root + `/project/${nightShoot}`, { waitUntil: "networkidle" });
+  const wrap = theo.page.getByTestId("project-wrap-up");
+  await wrap.waitFor({ timeout: 20000 });
+  for (let i = 0; i < 6 && !(await wrap.evaluate((el) => el.getBoundingClientRect().bottom < innerHeight)); i++) {
+    await swipe(theo.cdp, { from: 700, to: 300 });
+  }
+  await sleep(400);
+  await shot(theo.page, "14-wrap-up-theo");
+  ok("wrap-up-lists-team", (await wrap.getByTestId("wrap-up-member").count()) === 2 && (await wrap.getByText("Project lead").count()) === 1);
+  await wrap.getByTestId("wrap-up-member").filter({ hasText: "Rezza Monet" }).getByRole("button", { name: "Vouch" }).tap();
+  const sheet = theo.page.getByRole("dialog");
+  await sheet.getByLabel("Add a note (optional)").fill("Pulled every look in two hours and kept the set calm.");
+  await sleep(300);
+  await shot(theo.page, "15-vouch-sheet-theo");
+  await sheet.getByRole("button", { name: "Vouch", exact: true }).tap();
+  await theo.page.getByText("You vouched for Rezza Monet").waitFor({ timeout: 10000 });
+  await wrap.getByTestId("wrap-up-member").filter({ hasText: "Rezza Monet" }).getByText("Vouched").waitFor({ timeout: 10000 });
+  await sleep(500);
+  await shot(theo.page, "16-wrap-up-vouched-theo");
+  ok("vouch-saved", (await all("SELECT note FROM project_vouches WHERE author_id=$1 AND subject_id=$2", [THEO, REZZA]))[0]?.note?.startsWith("Pulled every look"));
+  ok("no-sideways-scroll-wrap-up", (await overflow(theo.page)) <= 0);
+
+  // Rezza gets a notice and lands on her Vouches section.
+  const rezza = await phone(REZZA);
+  await rezza.page.goto(root + "/notifications", { waitUntil: "networkidle" });
+  const notice = rezza.page.locator(".file-panel").filter({ hasText: "vouched for you on Night Shoot" });
+  await notice.waitFor({ timeout: 20000 });
+  await shot(rezza.page, "17-vouch-notice-rezza");
+  await notice.tap();
+  await rezza.page.waitForURL("**/profile?section=vouches", { timeout: 10000 });
+  const section = rezza.page.locator("#profile-section-vouches");
+  await section.getByTestId("vouch-row").first().waitFor({ timeout: 15000 });
+  await sleep(1500);
+  await shot(rezza.page, "18-vouches-on-profile-rezza");
+  ok("vouch-count-shown", (await section.getByTestId("vouch-count").textContent()) === "1 vouch");
+  ok("vouch-note-shown", (await section.getByText("Pulled every look", { exact: false }).count()) === 1);
+  ok("vouches-scrolled-into-view", await section.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top < innerHeight && r.bottom > 0; }));
+
+  // Jade (not on the project) sees it on Rezza's profile, can report it, and gets no wrap-up on the project.
+  const jade = await phone(JADE);
+  await jade.page.goto(root + `/profile/${REZZA}?section=vouches`, { waitUntil: "networkidle" });
+  const jadeSection = jade.page.locator("#profile-section-vouches");
+  await jadeSection.getByTestId("vouch-row").first().waitFor({ timeout: 15000 });
+  await jadeSection.getByRole("button", { name: /Report vouch from Theo Grant/ }).tap();
+  await jade.page.getByRole("dialog").getByRole("button", { name: "Send report" }).waitFor({ timeout: 10000 });
+  await shot(jade.page, "19-report-vouch-jade");
+  await jade.page.getByRole("dialog").getByRole("button", { name: "Send report" }).tap();
+  await jade.page.getByText("Report sent").waitFor({ timeout: 10000 });
+  ok("vouch-reported", (await all("SELECT 1 FROM content_reports WHERE target_type='vouch' AND reporter_id=$1", [JADE])).length === 1);
+  await jade.page.goto(root + `/project/${nightShoot}`, { waitUntil: "networkidle" });
+  await sleep(1500);
+  ok("no-wrap-up-for-non-member", (await jade.page.getByTestId("project-wrap-up").count()) === 0);
+
+  // Theo deletes his own vouch from Rezza's profile.
+  await theo.page.goto(root + `/profile/${REZZA}?section=vouches`, { waitUntil: "networkidle" });
+  const theoSection = theo.page.locator("#profile-section-vouches");
+  await theoSection.getByRole("button", { name: "Delete your vouch" }).waitFor({ timeout: 15000 });
+  ok("author-has-no-report-button", (await theoSection.getByRole("button", { name: /Report vouch/ }).count()) === 0);
+  await theoSection.getByRole("button", { name: "Delete your vouch" }).tap();
+  await theo.page.getByText("Vouch removed").waitFor({ timeout: 10000 });
+  await theoSection.waitFor({ state: "detached", timeout: 10000 });
+  ok("author-deleted-vouch", (await all("SELECT 1 FROM project_vouches WHERE author_id=$1", [THEO])).length === 0);
+  for (const [who, p] of [["theo", theo], ["rezza", rezza], ["jade", jade]]) ok(`no-page-errors-${who}-vouches`, p.errors.length === 0, p.errors.join(" | "));
+  await Promise.all([theo.context.close(), rezza.context.close(), jade.context.close()]);
 }
 
 await browser.close();

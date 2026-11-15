@@ -5,6 +5,7 @@
  */
 const PATHS: Record<string, RegExp> = {
   credit: /^\/profile\?section=credits$/,
+  vouch: /^\/profile\?section=vouches$/,
 };
 
 export function noticePath(notification: { type: string; data?: unknown }): string | null {

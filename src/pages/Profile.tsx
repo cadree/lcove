@@ -17,6 +17,7 @@ import { CreateBlogDialog } from "@/components/profile/CreateBlogDialog";
 import { ProfileBlogsGrid } from "@/components/profile/ProfileBlogsGrid";
 import { UserReviews } from "@/components/profile/UserReviews";
 import { ProfileOpenTo } from "@/components/openTo/ProfileOpenTo";
+import { ProfileVouches } from "@/components/vouches/ProfileVouches";
 import { ProfileCredits } from "@/components/credits/ProfileCredits";
 import { CreatorModuleTabs } from "@/components/profile/CreatorModuleTabs";
 import { EditProfileDetailsDialog } from "@/components/profile/EditProfileDetailsDialog";
@@ -425,6 +426,9 @@ const Profile = () => {
       case 'credits':
         if (!targetUserId) return null;
         return <ProfileCredits key="credits" userId={targetUserId} isOwner={!!isOwnProfile} />;
+      case 'vouches':
+        if (!targetUserId) return null;
+        return <ProfileVouches key="vouches" userId={targetUserId} viewerId={user?.id} isOwner={!!isOwnProfile} />;
       case 'reviews':
         if (!targetUserId) return null;
         return (
