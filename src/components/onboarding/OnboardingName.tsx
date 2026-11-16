@@ -70,7 +70,7 @@ const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onN
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center mx-auto mb-6">
             <User className="w-8 h-8 text-primary-foreground" />
           </div>
-          <p className="text-primary text-sm font-medium mb-2">Step 1 of 4</p>
+          <p className="text-primary text-sm font-medium mb-2">Step 1 of 5</p>
           <h1 className="font-display text-4xl md:text-5xl text-gradient-pink mb-3">
             What's your name?
           </h1>
