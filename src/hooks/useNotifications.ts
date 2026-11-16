@@ -27,6 +27,7 @@ export interface NotificationPreferences {
   event_reminders_enabled: boolean;
   live_streams_enabled: boolean;
   admin_enabled: boolean;
+  new_member_applications_push_enabled: boolean;
   push_enabled: boolean;
   email_enabled: boolean;
   sms_enabled: boolean;
