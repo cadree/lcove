@@ -43,6 +43,7 @@ await db.query("INSERT INTO notifications(user_id,type,title,body,data) VALUES($
 const notices=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce',colorScheme:'dark'});
 await signIn(notices,user);const n=await notices.newPage();await backend(db)(n);
 await n.goto(root+'/notifications');await n.getByText('You connected',{exact:true}).waitFor();
+assert.ok(await n.locator('h1').evaluate(el=>el.getBoundingClientRect().right<=innerWidth),'Notification heading fits on the phone');
 await n.screenshot({path:`${out}/connection-notice-390.png`,animations:'disabled'});
 await notices.close();
 await browser.close();await db.close();assert.deepEqual(errors,[]);

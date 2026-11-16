@@ -9,7 +9,7 @@ const claims=JSON.parse(Buffer.from(session.access_token.split('.')[1],'base64ur
 assert.equal(claims.iss,`https://${ref}.supabase.co/auth/v1`);
 const browser=await chromium.launch({channel:'chrome'});
 try {
- const context=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce'});
+ const context=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce',colorScheme:'dark'});
  await context.addInitScript(({session,ref})=>{
   localStorage.setItem(`sb-${ref}-auth-token`,JSON.stringify(session));
   localStorage.setItem(`ether-onboarding-draft:${session.user.id}`,JSON.stringify({version:2,step:3,data:{displayName:'Staging Creative',memberOf:'',passions:['Photography'],passionSeriousness:5,city:'Atlanta',cityDisplay:'Atlanta, GA',cityKey:'atlanta|ga',skills:[],roles:[],questionnaireResponses:{}}}));
@@ -30,6 +30,7 @@ try {
  await page.getByRole('button',{name:"I'm in",exact:true}).click({timeout:30000});
  await page.waitForURL('**/pending',{timeout:30000});
  await page.getByText("A real person will review your application before you're let in.").waitFor();
+ await page.getByText('Error saving data',{exact:true}).waitFor({state:'hidden'});
  await page.screenshot({path:'docs/release-completion/screenshots/staging-pending-390.png',animations:'allow',timeout:15000});
  await page.waitForTimeout(2000);
  assert.ok(page.url().endsWith('/pending'),'Pending screen must stay stable without a redirect loop');

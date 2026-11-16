@@ -53,6 +53,7 @@ const Onboarding = () => {
   }, [avatarFile]);
   const [initialized, setInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
+  const saveErrorToast = useRef<{ dismiss: () => void } | null>(null);
   const [data, setData] = useState<OnboardingData>({
     displayName: '',
     memberOf: '',
@@ -127,6 +128,8 @@ const Onboarding = () => {
 
   const handleComplete = async () => {
     if (!user || saving) return;
+    saveErrorToast.current?.dismiss();
+    saveErrorToast.current = null;
     setSaving(true);
 
     // Final validation - name is required
@@ -241,7 +244,7 @@ const Onboarding = () => {
       navigate(takeEventReturn() || '/pending', { replace: true });
     } catch (error) {
       console.error('Error saving onboarding data:', error);
-      toast({
+      saveErrorToast.current = toast({
         title: 'Error saving data',
         description: 'Please try again.',
         variant: 'destructive'

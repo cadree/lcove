@@ -46,7 +46,7 @@ export const PageHeader = ({
                 {icon}
               </span>
             )}
-            <h1 className="ether-title text-[34px] leading-tight">{title}</h1>
+            <h1 className="ether-title min-w-0 break-words text-xl leading-tight [overflow-wrap:anywhere] sm:text-[34px]">{title}</h1>
           </div>
         </div>
         {showMore && <MoreMenuButton />}

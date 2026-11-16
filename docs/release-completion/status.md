@@ -48,5 +48,7 @@ Protected local snapshots are under `/tmp/lcove-staging-before-20261114.json` an
 
 - Typecheck; lint (0 errors, 25 existing warnings); spellcheck; staging build passed.
 - Unit: 649 passed. Discovery/trip database: 66. Music: 17. Invites: 41. Creative bridge: 129. Pending-access database: 28. Webhook fixtures passed.
+- Production full-schema rollback trial passed for all nine existing accounts (eight approved members, one incomplete applicant).
+- Phone notification heading now fits without clipping; signup retry dismisses its prior error toast.
 - Screenshots in `screenshots/` use synthetic users; they are browser captures, not proof of native iPhone gestures, keyboard or push delivery.
 - Native compile archive: `/tmp/lcove-release-completion-staging.xcarchive` (unsigned; not installable/uploadable as-is).
