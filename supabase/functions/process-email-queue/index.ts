@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { DEFAULT_EMAIL_FROM, sendWithResend } from "../_shared/email-queue-dispatch.mjs";
 import { handleEmailQueueRequest } from "./handler.ts";
+import { assertMemberApplicationPushDelivered } from "../_shared/member-application-push.mjs";
 
 function productionDeps() {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -19,9 +20,7 @@ function productionDeps() {
       const { data, error } = await supabase.functions.invoke("send-push-notification", { body: payload });
       if (error) throw error;
       if (data?.error) throw new Error(String(data.error));
-      if (Array.isArray(data?.results) && data.results.some((result: { status?: string }) => result.status === "failed") && !data.sent) {
-        throw new Error("All registered push endpoints failed");
-      }
+      assertMemberApplicationPushDelivered(data);
     },
   };
 }
