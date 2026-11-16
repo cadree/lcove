@@ -11,9 +11,18 @@ function productionDeps() {
     return undefined;
   }
   const emailFrom = Deno.env.get("EMAIL_FROM") || DEFAULT_EMAIL_FROM;
+  const supabase = createClient(supabaseUrl, serviceKey);
   return {
-    supabase: createClient(supabaseUrl, serviceKey),
+    supabase,
     sendEmail: (payload: Record<string, unknown>) => sendWithResend(resendKey, emailFrom, payload),
+    sendPush: async (payload: Record<string, unknown>) => {
+      const { data, error } = await supabase.functions.invoke("send-push-notification", { body: payload });
+      if (error) throw error;
+      if (data?.error) throw new Error(String(data.error));
+      if (Array.isArray(data?.results) && data.results.some((result: { status?: string }) => result.status === "failed") && !data.sent) {
+        throw new Error("All registered push endpoints failed");
+      }
+    },
   };
 }
 
