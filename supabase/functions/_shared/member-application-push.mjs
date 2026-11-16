@@ -1,4 +1,17 @@
 /**
+ * A successful Edge Function HTTP response does not establish delivery.
+ * It can report that no devices are registered or that push is disabled.
+ * Only treat a positive sender delivery count as successful.
+ */
+export function assertMemberApplicationPushDelivered(response) {
+  if (!response || typeof response.sent !== "number" || response.sent < 1 ||
+      response.success === false || response.error) {
+    throw new Error("Application push did not reach any registered devices");
+  }
+  return response.sent;
+}
+
+/**
  * Deliver new-member application pushes only to administrators who opt in.
  * A separate durable queue keeps this independent of the review-inbox email.
  */
