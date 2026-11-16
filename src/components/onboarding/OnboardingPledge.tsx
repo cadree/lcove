@@ -33,8 +33,8 @@ const OnboardingPledge = ({ onComplete, onBack, submitting = false }: Props) => 
     <div className="relative flex min-h-[100dvh] flex-col overflow-hidden bg-background">
       <EntryAtmosphere />
       <div className="relative z-10 mx-auto flex w-full max-w-md flex-1 flex-col items-center px-6 pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))] pt-8 text-center">
-        <motion.div {...fade(0)}>
-          <EtherWordmark className="mb-5 w-[8.5rem] max-w-[46%]" />
+        <motion.div {...fade(0)} className="flex w-full justify-center">
+          <EtherWordmark className="mx-auto mb-5 w-[8.5rem] max-w-full" />
         </motion.div>
         <motion.p {...fade(0.06)} className="text-sm font-medium tracking-wide text-primary">
           {LCOVE_GREETING}.
