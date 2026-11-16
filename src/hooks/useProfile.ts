@@ -47,6 +47,12 @@ export interface Profile {
 }
 
 const profileCache = new Map<string, Profile>();
+const profileListeners = new Map<string, Set<(profile: Profile | null) => void>>();
+function publishProfile(key: string, profile: Profile | null) {
+  if (profile) profileCache.set(key, profile);
+  else profileCache.delete(key);
+  profileListeners.get(key)?.forEach(listener => listener(profile));
+}
 const profileLoads = new Map<string, Promise<Profile | null>>();
 
 function profileKey(userId: string, own: boolean) {
@@ -99,7 +105,7 @@ function loadProfile(userId: string, own: boolean, fresh = false): Promise<Profi
       const profile = shotOnboardingPreview()
         ? { ...shotProfile, onboarding_completed: false }
         : shotProfile;
-      profileCache.set(key, profile);
+      publishProfile(key, profile);
       return profile;
     }
 
@@ -115,11 +121,11 @@ function loadProfile(userId: string, own: boolean, fresh = false): Promise<Profi
 
     if (!result.error && result.data) {
       const profile = profileFromRow(result.data as Record<string, unknown>, own);
-      profileCache.set(key, profile);
+      publishProfile(key, profile);
       return profile;
     }
     if (!own) {
-      profileCache.delete(key);
+      publishProfile(key, null);
       return null;
     }
     return profileCache.get(key) ?? null;
@@ -150,23 +156,35 @@ export const useProfile = (userId?: string) => {
 
   useEffect(() => {
     if (targetUserId) {
+      const key = profileKey(targetUserId, isOwnProfile);
+      const listeners = profileListeners.get(key) ?? new Set();
+      const receive = (next: Profile | null) => { setProfile(next); setLoading(false); };
+      listeners.add(receive);
+      profileListeners.set(key, listeners);
+      setProfile(profileCache.get(key) ?? null);
       void fetchProfile();
+      return () => {
+        listeners.delete(receive);
+        if (!listeners.size) profileListeners.delete(key);
+      };
     } else {
       setProfile(null);
       setLoading(false);
     }
-  }, [targetUserId, fetchProfile]);
+  }, [targetUserId, isOwnProfile, fetchProfile]);
 
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) return { error: new Error('Not authenticated') };
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .update(updates as never)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .select('*')
+      .single();
 
-    if (!error) {
-      await fetchProfile(true);
+    if (!error && data) {
+      publishProfile(profileKey(user.id, true), profileFromRow(data as Record<string, unknown>, true));
     }
 
     return { error };

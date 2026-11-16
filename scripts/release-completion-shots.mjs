@@ -35,6 +35,14 @@ for(const width of [390,820,1280]){
  assert.equal(await p.locator('img[alt="Maya Torres"]').count(),0);
  await p.screenshot({path:`${out}/pending-${width}.png`,animations:'disabled'});
  assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ if(width===390){await db.query("UPDATE profiles SET access_status='active' WHERE user_id=$1",[user]);await p.evaluate(()=>window.dispatchEvent(new Event('focus')));await p.waitForURL(url=>!url.pathname.endsWith('/pending'));console.log('Admin approval refreshes all profile readers and leaves the pending screen');await db.query("UPDATE profiles SET access_status='pending' WHERE user_id=$1",[user]);}
  await signed.close();await db.query("UPDATE profiles SET onboarding_completed=false WHERE user_id=$1",[user]);console.log(`Signup, verification, oath and private pending screen captured at ${width}px`);
 }
+await db.query("UPDATE profiles SET onboarding_completed=true,access_status='active' WHERE user_id=$1",[user]);
+await db.query("INSERT INTO notifications(user_id,type,title,body,data) VALUES($1,'match','You connected','You and Jordan both connected. Say hello.',$2)",[user,JSON.stringify({conversation_id:'00000000-0000-4000-8000-00000000bb01',action:'open_conversation'})]);
+const notices=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce',colorScheme:'dark'});
+await signIn(notices,user);const n=await notices.newPage();await backend(db)(n);
+await n.goto(root+'/notifications');await n.getByText('You connected',{exact:true}).waitFor();
+await n.screenshot({path:`${out}/connection-notice-390.png`,animations:'disabled'});
+await notices.close();
 await browser.close();await db.close();assert.deepEqual(errors,[]);

@@ -205,10 +205,6 @@ const Onboarding = () => {
         }
       }
 
-      sessionStorage.setItem('onboarding_just_completed', 'true');
-      clearQuizSeed(window.sessionStorage);
-      clearOnboardingDraft(window.localStorage, user.id);
-
       // Access stays pending until a human approves entry. passed_exam records
       // whether the red-flag count stayed under the threshold.
       assertCleanText(data.memberOf);
@@ -220,7 +216,7 @@ const Onboarding = () => {
           toast({ title: 'Photo not saved', description: 'You can add one from your profile.' });
         }
       }
-      await updateProfile({
+      const { error: profileError } = await updateProfile({
         ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
         display_name: data.displayName.trim(),
         member_of: normalizeMemberOf(data.memberOf),
@@ -236,6 +232,10 @@ const Onboarding = () => {
         onboarding_score: score,
         passed_exam: passedExam,
       });
+
+      if (profileError) throw profileError;
+      clearQuizSeed(window.sessionStorage);
+      clearOnboardingDraft(window.localStorage, user.id);
 
       // A human still has to approve access. The pending screen is the next step.
       navigate(takeEventReturn() || '/pending', { replace: true });

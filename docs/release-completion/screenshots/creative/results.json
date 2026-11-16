@@ -1,0 +1,282 @@
+[
+ {
+  "name": "credits-created-on-complete",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "credit-notice-shown",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "pending-credit-on-own-profile",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "pending-scrolled-into-view",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "accepted-toast",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "credit-accepted",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "no-sideways-scroll-profile",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "visitor-sees-accepted-credit",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "visitor-no-pending-ui",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "touch-scroll-moved",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "post-credit-created",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "author-sees-waiting-chip",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "pending-post-credit-private",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "no-page-errors-rezza-credits",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "no-page-errors-theo-credits",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "no-page-errors-maya-credits",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "open-to-pressed-state",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "open-to-saved",
+  "pass": true,
+  "detail": "{\"tags\":[\"paid_gigs\",\"shoots\"],\"until\":\"2026-12-16\"}"
+ },
+ {
+  "name": "no-sideways-scroll-open-to",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "deck-has-everyone",
+  "pass": true,
+  "detail": "3"
+ },
+ {
+  "name": "deck-touch-swipe-moved",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "filter-leaves-open-people",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "card-shows-open-to",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "see-all-filtered",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "no-sideways-scroll-explore",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "expired-hidden-from-visitor",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "owner-asked-to-renew",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "no-page-errors-rezza-open-to",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "no-page-errors-theo-open-to",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "wrap-up-lists-team",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "vouch-saved",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "no-sideways-scroll-wrap-up",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "vouch-count-shown",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "vouch-note-shown",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "vouches-scrolled-into-view",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "vouch-reported",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "no-wrap-up-for-non-member",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "author-has-no-report-button",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "author-deleted-vouch",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "no-page-errors-theo-vouches",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "no-page-errors-rezza-vouches",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "no-page-errors-jade-vouches",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "call-defaults-to-open-role",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "call-saved-city-level",
+  "pass": true,
+  "detail": "{\"city_key\":\"charlotte|nc\",\"city_label\":\"Charlotte, NC\",\"paid\":true,\"call_date\":\"2026-11-21\"}"
+ },
+ {
+  "name": "no-sideways-scroll-post-call",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "explore-touch-scrolled",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "call-in-explore",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "no-address-in-explore",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "role-preselected-and-scrolled",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "applied-through-existing-flow",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "no-sideways-scroll-apply",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "filled-call-leaves-explore",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "owner-sees-role-filled",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "no-page-errors-maya-open-calls",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "no-page-errors-jade-open-calls",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "name": "no-page-errors-theo-open-calls",
+  "pass": true,
+  "detail": ""
+ }
+]

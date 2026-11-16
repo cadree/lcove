@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -9,8 +10,21 @@ import { EntryAtmosphere } from "@/components/entry/EntryAtmosphere";
 
 export default function Pending() {
   const { signOut } = useAuth();
-  const { profile } = useProfile();
+  const { profile, refetch } = useProfile();
   const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === "visible") void refetch(true); };
+    refresh();
+    const timer = window.setInterval(refresh, 15_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [refetch]);
 
   const fade = (delay: number) =>
     reduceMotion
