@@ -4401,6 +4401,7 @@ export type Database = {
       notification_preferences: {
         Row: {
           admin_enabled: boolean | null
+          new_member_applications_push_enabled: boolean
           application_updates_enabled: boolean | null
           comments_enabled: boolean | null
           created_at: string
@@ -4422,6 +4423,7 @@ export type Database = {
         }
         Insert: {
           admin_enabled?: boolean | null
+          new_member_applications_push_enabled?: boolean
           application_updates_enabled?: boolean | null
           comments_enabled?: boolean | null
           created_at?: string
@@ -4443,6 +4445,7 @@ export type Database = {
         }
         Update: {
           admin_enabled?: boolean | null
+          new_member_applications_push_enabled?: boolean
           application_updates_enabled?: boolean | null
           comments_enabled?: boolean | null
           created_at?: string
