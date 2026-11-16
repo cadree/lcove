@@ -221,6 +221,23 @@ serve(async (req) => {
 
     if (prefsError) throw prefsError;
 
+    // Review alerts are explicitly opt-in and admin-only; ordinary users must
+    // never receive these, even if someone supplies a recipient ID.
+    if (notification_type === "member_application") {
+      const { data: adminRole, error: roleError } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("user_id", user_id)
+        .eq("role", "admin")
+        .maybeSingle();
+      if (roleError) throw roleError;
+      if (!adminRole || prefs?.new_member_applications_push_enabled !== true) {
+        return new Response(JSON.stringify({ message: "Membership review pushes disabled" }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const pushEnabled = prefs?.push_enabled ?? true;
     if (!pushEnabled) {
       return new Response(
@@ -240,6 +257,7 @@ serve(async (req) => {
         event_reminder: "event_reminders_enabled",
         live_stream: "live_streams_enabled",
         admin: "admin_enabled",
+        member_application: "new_member_applications_push_enabled",
       };
       const prefKey = typePreferenceMap[notification_type];
       if (prefKey && prefs[prefKey] === false) {
