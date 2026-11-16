@@ -105,3 +105,27 @@ describe("email queue", () => {
     assert.deepEqual(deletes, [1, 3]);
   });
 });
+
+describe("rate limited email queue", () => {
+  it("records a pending send and retains the message for a later retry", async () => {
+    const supabase = fakeSupabase({
+      auth_emails: [message("throttled", 7)],
+      transactional_emails: [],
+    });
+    const response = await runEmailQueue({
+      supabase,
+      sleep: () => Promise.resolve(),
+      sendEmail: async () => {
+        const error = new Error("429 rate limit");
+        (error as Error & { status?: number; retryAfterSeconds?: number }).status = 429;
+        (error as Error & { retryAfterSeconds?: number }).retryAfterSeconds = 60;
+        throw error;
+      },
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { processed: 0, stopped: "rate_limited" });
+    assert.ok(supabase.calls.some((call) => call.type === "insert" && call.row?.status === "pending"));
+    assert.ok(!supabase.calls.some((call) => call.name === "delete_email"));
+    assert.ok(supabase.calls.some((call) => call.type === "update"));
+  });
+});
