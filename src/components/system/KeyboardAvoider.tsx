@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Capacitor, type PluginListenerHandle } from "@capacitor/core";
 import { Keyboard } from "@capacitor/keyboard";
-import { isTextEntry, needsReveal, revealDelta, webKeyboardInset } from "@/lib/keyboardViewport";
+import { isTextEntry, nativeKeyboardVisibleHeight, revealDelta, webKeyboardInset } from "@/lib/keyboardViewport";
 
 /**
  * App-wide: when the keyboard opens or a field gains focus, scroll the field
@@ -14,6 +14,7 @@ export function KeyboardAvoider() {
     const root = document.documentElement;
     const viewport = window.visualViewport;
     let nativeKeyboard = 0;
+    let fullHeight = window.innerHeight;
     let timer = 0;
     const handles: PluginListenerHandle[] = [];
     let disposed = false;
@@ -21,8 +22,9 @@ export function KeyboardAvoider() {
     const visible = () => {
       const top = viewport?.offsetTop ?? 0;
       const height = viewport?.height ?? window.innerHeight;
-      // On the iOS app the WebView keeps its height; the plugin reports the keyboard.
-      return { top, height: nativeKeyboard ? Math.min(height, window.innerHeight - nativeKeyboard) : height };
+      // With Keyboard.resize="body" the WebView can already be smaller.
+      // Use the pre-keyboard height to avoid subtracting twice.
+      return { top, height: nativeKeyboardVisibleHeight(height, fullHeight, nativeKeyboard) };
     };
 
     let inset = 0;
@@ -30,9 +32,8 @@ export function KeyboardAvoider() {
       const focused = document.activeElement;
       if (!isTextEntry(focused)) return;
       const { top, height } = visible();
-      if (!needsReveal(focused.getBoundingClientRect(), top, height)) return;
-      // Room below the last field, only when a field actually needs to move.
-      if (inset > 0) root.setAttribute("data-keyboard-pad", "");
+      if (!revealDelta(focused.getBoundingClientRect(), top, height)) return;
+      // Keep nested scroll areas usable while the app's body is also scrollable.
       // Inner scroll areas first, then the page, measured against the part the keyboard leaves.
       focused.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
       const delta = revealDelta(focused.getBoundingClientRect(), top, height);
@@ -49,22 +50,35 @@ export function KeyboardAvoider() {
     };
 
     const update = () => {
+      if (!nativeKeyboard) fullHeight = window.innerHeight;
       inset = nativeKeyboard || (viewport ? webKeyboardInset(window.innerHeight, viewport.height, viewport.offsetTop) : 0);
       root.style.setProperty("--keyboard-inset", `${inset}px`);
       root.toggleAttribute("data-keyboard-open", inset > 0);
-      if (!inset) root.removeAttribute("data-keyboard-pad");
+      const focused = document.activeElement;
+      // Even before a field becomes hidden, the last form controls need enough
+      // scroll room. Dialogs/sheets manage their own keyboard-safe height.
+      root.toggleAttribute("data-keyboard-pad", inset > 0 && isTextEntry(focused) && !focused.closest('[role="dialog"]'));
       schedule(inset > 0 ? 280 : 0);
     };
 
     const onFocus = (event: FocusEvent) => {
-      if (!isTextEntry(event.target as Element)) return;
+      const focused = event.target as Element;
+      if (!isTextEntry(focused)) return;
+      root.toggleAttribute("data-keyboard-pad", inset > 0 && !focused.closest('[role="dialog"]'));
       schedule(320);
     };
 
     viewport?.addEventListener("resize", update);
+    window.addEventListener("resize", update);
     document.addEventListener("focusin", onFocus);
     if (Capacitor.isNativePlatform()) {
       void (async () => {
+        const willShow = await Keyboard.addListener("keyboardWillShow", (info) => {
+          // Capture the unresized window before the keyboard animates in.
+          fullHeight = window.innerHeight;
+          nativeKeyboard = info.keyboardHeight;
+          update();
+        });
         const show = await Keyboard.addListener("keyboardDidShow", (info) => {
           nativeKeyboard = info.keyboardHeight;
           update();
@@ -74,9 +88,10 @@ export function KeyboardAvoider() {
           update();
         });
         if (disposed) {
+          void willShow.remove();
           void show.remove();
           void hide.remove();
-        } else handles.push(show, hide);
+        } else handles.push(willShow, show, hide);
       })().catch(() => undefined);
     }
     update();
@@ -85,6 +100,7 @@ export function KeyboardAvoider() {
       window.clearTimeout(timer);
       window.clearTimeout(second);
       viewport?.removeEventListener("resize", update);
+      window.removeEventListener("resize", update);
       document.removeEventListener("focusin", onFocus);
       handles.forEach((handle) => void handle.remove());
       root.style.removeProperty("--keyboard-inset");
