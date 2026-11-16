@@ -798,6 +798,26 @@ const Settings = () => {
             <Separator className="bg-border/50 my-4" />
             <p className="text-sm font-medium text-muted-foreground mb-4">Delivery Methods</p>
 
+            {isAdmin && (
+              <div className="flex items-center justify-between gap-4 py-3">
+                <div>
+                  <Label className="text-foreground">New member applications</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Push alerts when a new creator requests membership review. Off by default.
+                    Turning this off does not affect the central review email.
+                  </p>
+                  {!preferences?.push_enabled && (
+                    <p className="text-xs text-muted-foreground">Enable Push Notifications below to receive these alerts.</p>
+                  )}
+                </div>
+                <Switch
+                  aria-label="New member application push notifications"
+                  checked={preferences?.new_member_applications_push_enabled ?? false}
+                  onCheckedChange={(checked) => handleNotificationToggle("new_member_applications_push_enabled", checked)}
+                  disabled={prefsLoading || !preferences}
+                />
+              </div>
+            )}
             <div className="flex items-center justify-between py-2">
               <div>
                 <Label className="text-foreground">Email Notifications</Label>
