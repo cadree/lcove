@@ -49,6 +49,9 @@ jobs:
       - name: Pending member access checks
         run: npm run test:access-db
 
+      - name: New application email and review-link checks
+        run: npm run test:application-db
+
       - name: Stripe webhook fixtures
         run: npm run test:webhook
 
