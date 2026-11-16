@@ -155,8 +155,8 @@ export function authorizeUserNotification({ callerId, recipientId, notificationT
     if (isUuid(facts.match.conversationId)) next.conversation_id = facts.match.conversationId;
     return {
       ok: true,
-      title: "It's a match",
-      body: `You and ${name} connected. Say hello.`,
+      title: "You connected",
+      body: `You and ${name} both connected. Say hello.`,
       data: next,
     };
   }

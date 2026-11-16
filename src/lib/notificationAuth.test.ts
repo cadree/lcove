@@ -399,7 +399,7 @@ function stubDb(tables: Record<string, Array<Record<string, unknown>>>) {
 }
 
 describe("match notifications", () => {
-  it("only a live mutual connection can notify, and the copy says match", () => {
+  it("only a live mutual connection can notify, and the copy says connected", () => {
     const allowed = authorizeUserNotification({
       callerId: caller,
       recipientId: recipient,
@@ -407,7 +407,7 @@ describe("match notifications", () => {
       data: {},
       facts: { callerName: "Rezza", match: { active: true, conversationId: conversation } },
     });
-    assert.deepEqual(allowed, { ok: true, title: "It's a match", body: "You and Rezza connected. Say hello.", data: { conversation_id: conversation } });
+    assert.deepEqual(allowed, { ok: true, title: "You connected", body: "You and Rezza both connected. Say hello.", data: { conversation_id: conversation } });
     for (const match of [null, { active: false, conversationId: conversation }]) {
       const denied = authorizeUserNotification({ callerId: caller, recipientId: recipient, notificationType: "match", data: {}, facts: { callerName: "Rezza", match } });
       assert.equal(denied.ok, false);

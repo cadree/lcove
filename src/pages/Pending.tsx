@@ -1,56 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { PageMeta } from "@/components/seo/PageMeta";
-import { FAMILCY_GLOSS, PENDING_BODY, PENDING_GLIMPSE, PENDING_TITLE, PENDING_WELCOME } from "@/content/copy";
-import { isHiddenTestAccount } from "@/lib/hiddenTestAccount";
+import { FAMILCY_GLOSS, PENDING_BODY, PENDING_TITLE, PENDING_WELCOME } from "@/content/copy";
 import { EtherWordmark } from "@/components/brand/EtherWordmark";
 import { EntryAtmosphere } from "@/components/entry/EntryAtmosphere";
 
-interface Glimpse {
-  user_id: string;
-  display_name: string | null;
-  avatar_url: string | null;
-}
-
-let glimpseLoad: Promise<Glimpse[]> | null = null;
-
-function loadGlimpse(): Promise<Glimpse[]> {
-  if (!glimpseLoad) {
-    glimpseLoad = Promise.resolve(
-      supabase
-        .from("profiles_public")
-        .select("user_id, display_name, avatar_url")
-        .eq("onboarding_completed", true)
-        .not("avatar_url", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(12)
-        .then(({ data }) =>
-          (data ?? []).filter((row) => !isHiddenTestAccount(row.display_name)).slice(0, 6),
-        ),
-    );
-  }
-  return glimpseLoad;
-}
-
 export default function Pending() {
   const { signOut } = useAuth();
-  const { profile } = useProfile();
+  const { profile, refetch } = useProfile();
   const reduceMotion = useReducedMotion();
-  const [people, setPeople] = useState<Glimpse[]>([]);
 
   useEffect(() => {
-    let cancelled = false;
-    void loadGlimpse().then((seen) => {
-      if (!cancelled) setPeople(seen);
-    });
+    const refresh = () => { if (document.visibilityState === "visible") void refetch(true); };
+    refresh();
+    const timer = window.setInterval(refresh, 15_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
     return () => {
-      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
     };
-  }, []);
+  }, [refetch]);
 
   const fade = (delay: number) =>
     reduceMotion
@@ -91,22 +65,6 @@ export default function Pending() {
           </motion.p>
         ) : null}
 
-        {people.length > 0 ? (
-          <div className="mt-12 w-full">
-            <p className="mb-4 text-xs uppercase tracking-[0.14em] text-muted-foreground">{PENDING_GLIMPSE}</p>
-            <div className="flex justify-center -space-x-3">
-              {people.map((person) => (
-                <img
-                  key={person.user_id}
-                  src={person.avatar_url ?? ""}
-                  alt=""
-                  title={person.display_name ?? undefined}
-                  className="h-14 w-14 rounded-full border-2 border-background object-cover"
-                />
-              ))}
-            </div>
-          </div>
-        ) : null}
 
         <Button
           type="button"

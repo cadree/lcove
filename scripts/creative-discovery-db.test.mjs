@@ -718,6 +718,20 @@ await db.exec(await readFile("supabase/rollbacks/20261114160000_connect_match_no
 await fails(() => rpc("creative_swipe", [ana, true]), /Show yourself in discovery to like/);
 assert.equal((await sql("SELECT count(*)::int n FROM public.ether_schema_migrations")).rows[0].n, 0);
 check("connect: rollback restores the previous creative_swipe");
+await db.exec(await readFile("supabase/migrations/20261116090000_connection_notice_copy.sql", "utf8"));
+await as(cai);
+assert.equal((await rpc("creative_swipe", [ben, true])).new_match, false);
+await rpc("creative_unmatch", [ben]);
+await as(ben); await rpc("creative_swipe", [cai, true]);
+await as(cai);
+assert.equal((await rpc("creative_swipe", [ben, true])).new_match, true);
+const connectionNotices = (await notices()).filter(n => n.title === "You connected");
+assert.equal(connectionNotices.length, 2);
+assert.ok(connectionNotices.every(n => n.body.includes("both connected. Say hello.")));
+assert.equal((await rpc("creative_swipe", [ben, true])).new_match, false);
+assert.equal((await notices()).filter(n => n.title === "You connected").length, 2);
+check("connection copy and new_match distinguish new connections from replayed swipes");
+
 // Deck order (20261114161000): incoming connects lean to the top, nothing reveals them.
 await db.exec(await readFile("supabase/migrations/20261114161000_deck_incoming_first.sql", "utf8"));
 await sql("INSERT INTO public.ether_schema_migrations VALUES('20261114161000_deck_incoming_first.sql')");

@@ -69,13 +69,13 @@ test("icebreaker prefers a shared skill, then passion, trip, city, then role", (
 
 test("nudge copy and routes stay on existing pages", () => {
   assert.equal(firstName("Jordan Blake"), "Jordan");
-  assert.equal(celebrationEyebrow(true), "It's a match");
+  assert.equal(celebrationEyebrow(true), "You connected");
   assert.equal(celebrationEyebrow(false), "Connected");
   assert.equal(celebrationHeadline({ name: "Jordan Blake", matched: true }), "You and Jordan both connected");
   assert.equal(celebrationHeadline({ name: "Rezza", matched: true }), "You and Rezza both connected");
   assert.equal(celebrationHeadline({ name: "Jordan Blake", matched: false }), "You connected with Jordan");
   assert.equal(nudgeCopy({ name: "Jordan Blake", matched: false }), "You and Jordan connected, start something");
-  assert.equal(nudgeCopy({ name: "Jordan Blake", matched: true }), "You and Jordan matched, start something");
+  assert.equal(nudgeCopy({ name: "Jordan Blake", matched: true }), "You and Jordan both connected, start something");
   assert.equal(messageHref("chat-1"), "/messages?conversation=chat-1");
   assert.equal(travelHref({ city: "Charlotte, NC", tripCity: null }), "/travel?action=create&city=Charlotte");
   assert.equal(travelHref({ city: "Charlotte, NC", tripCity: "Miami, FL" }), "/travel?action=create&city=Miami");

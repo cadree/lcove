@@ -16,7 +16,8 @@
     "test:discovery-db": "node scripts/creative-discovery-db.test.mjs",
     "test:music-db": "node scripts/music-catalog-db.test.mjs",
     "test:invite-db": "node scripts/item-invites-db.test.mjs",
-    "test:bridge-db": "node scripts/creative-bridge-db.test.mjs"
+    "test:bridge-db": "node scripts/creative-bridge-db.test.mjs",
+    "test:access-db": "node scripts/pending-access-db.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.1",

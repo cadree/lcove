@@ -153,10 +153,10 @@ export function PeopleDiscovery({ query }: { query: string }) {
         rows?.map((row) => (row.user_id === person.user_id ? { ...row, liked } : row)),
       );
       await cache.invalidateQueries({ queryKey: ["creative-matches"] });
-      if (data.matched && data.conversation_id) {
+      if (data.new_match && data.conversation_id) {
         // Both people get an in-app notice from the database; this pushes it to the other phone.
         void supabase.functions.invoke("send-push-notification", {
-          body: { user_id: person.user_id, notification_type: "match", title: "It's a match", data: { conversation_id: data.conversation_id } },
+          body: { user_id: person.user_id, notification_type: "match", title: "You connected", data: { conversation_id: data.conversation_id } },
         }).catch(() => undefined);
       }
       if (liked) setMoment({ person, matched: !!data.matched, conversationId: data.conversation_id });
@@ -383,7 +383,7 @@ export function PeopleDiscovery({ query }: { query: string }) {
               <div ref={hintRef} role="note" className="mb-3 flex max-w-[380px] items-start gap-3 rounded-2xl border border-[#ff9fc8]/40 bg-[#ff9fc8]/10 p-3 text-sm">
                 <UserPlus size={18} className="mt-0.5 shrink-0 text-[#ff9fc8]" aria-hidden />
                 <p className="min-w-0 flex-1">
-                  These are real members{cityLabel ? ` in ${cityLabel}` : ""}. Tap <strong>Connect</strong> on anyone you'd make something with. If they connect back, it's a match and a chat opens.
+                  These are real members{cityLabel ? ` in ${cityLabel}` : ""}. Tap <strong>Connect</strong> on anyone you'd make something with. If they connect back, a chat opens for you both.
                 </p>
                 <button type="button" className="min-h-11 shrink-0 px-2 text-xs underline" onClick={dismissHint}>
                   Got it

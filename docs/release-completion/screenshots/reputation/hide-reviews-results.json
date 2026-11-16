@@ -1,0 +1,72 @@
+[
+  {
+    "name": "star-review-row-kept",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "vouch-row-present",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "vouch-shown",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "vouch-note-shown",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "no-reviews-heading",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "no-write-review",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "no-star-review-title",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "no-sideways-scroll-profile",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "no-page-errors-theo",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "layout-has-vouches",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "layout-hides-reviews",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "no-reviews-label-in-editor",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "layout-end-has-no-reviews",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "no-page-errors-rezza",
+    "pass": true,
+    "detail": ""
+  }
+]

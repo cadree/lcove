@@ -78,7 +78,7 @@ export function icebreaker(person: IcebreakerPerson, me?: IcebreakerMe | null): 
 }
 
 export function celebrationEyebrow(matched: boolean): string {
-  return matched ? "It's a match" : "Connected";
+  return matched ? "You connected" : "Connected";
 }
 
 /** Heading on the celebration overlay. A mutual match says both people connected. */
@@ -88,7 +88,7 @@ export function celebrationHeadline(nudge: Pick<ConnectNudge, "name" | "matched"
 }
 
 export function nudgeCopy(nudge: Pick<ConnectNudge, "name" | "matched">): string {
-  return `You and ${firstName(nudge.name)} ${nudge.matched ? "matched" : "connected"}, start something`;
+  return `You and ${firstName(nudge.name)} ${nudge.matched ? "both connected" : "connected"}, start something`;
 }
 
 export function readNudges(store: Store, viewerId: string | undefined): ConnectNudge[] {

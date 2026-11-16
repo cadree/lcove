@@ -53,6 +53,7 @@ const Onboarding = () => {
   }, [avatarFile]);
   const [initialized, setInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
+  const saveErrorToast = useRef<{ dismiss: () => void } | null>(null);
   const [data, setData] = useState<OnboardingData>({
     displayName: '',
     memberOf: '',
@@ -127,6 +128,8 @@ const Onboarding = () => {
 
   const handleComplete = async () => {
     if (!user || saving) return;
+    saveErrorToast.current?.dismiss();
+    saveErrorToast.current = null;
     setSaving(true);
 
     // Final validation - name is required
@@ -205,10 +208,6 @@ const Onboarding = () => {
         }
       }
 
-      sessionStorage.setItem('onboarding_just_completed', 'true');
-      clearQuizSeed(window.sessionStorage);
-      clearOnboardingDraft(window.localStorage, user.id);
-
       // Access stays pending until a human approves entry. passed_exam records
       // whether the red-flag count stayed under the threshold.
       assertCleanText(data.memberOf);
@@ -220,7 +219,7 @@ const Onboarding = () => {
           toast({ title: 'Photo not saved', description: 'You can add one from your profile.' });
         }
       }
-      await updateProfile({
+      const { error: profileError } = await updateProfile({
         ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
         display_name: data.displayName.trim(),
         member_of: normalizeMemberOf(data.memberOf),
@@ -237,11 +236,15 @@ const Onboarding = () => {
         passed_exam: passedExam,
       });
 
+      if (profileError) throw profileError;
+      clearQuizSeed(window.sessionStorage);
+      clearOnboardingDraft(window.localStorage, user.id);
+
       // A human still has to approve access. The pending screen is the next step.
       navigate(takeEventReturn() || '/pending', { replace: true });
     } catch (error) {
       console.error('Error saving onboarding data:', error);
-      toast({
+      saveErrorToast.current = toast({
         title: 'Error saving data',
         description: 'Please try again.',
         variant: 'destructive'

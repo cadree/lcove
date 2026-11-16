@@ -129,7 +129,7 @@ export const discovery = {
     }
   },
   swipe: (target: string, liked: boolean) =>
-    callRpc<{ matched: boolean; conversation_id: string | null }>(
+    callRpc<{ matched: boolean; new_match?: boolean; conversation_id: string | null }>(
       "creative_swipe",
       { p_target: target, p_liked: liked }
     ),

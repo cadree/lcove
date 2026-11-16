@@ -1,0 +1,49 @@
+import {chromium} from 'playwright';
+import {mkdirSync} from 'node:fs';
+import assert from 'node:assert/strict';
+import {bridgeDb,addUser} from './creative-bridge-fixture.mjs';
+import {backend,signIn} from './creative-bridge-backend.mjs';
+const root=process.env.ROOT||'http://127.0.0.1:8130';
+const out='docs/release-completion/screenshots';mkdirSync(out,{recursive:true});
+const {db}=await bridgeDb();const user='00000000-0000-4000-8000-00000000aa01';
+await addUser(db,user,'Maya Torres','atlanta|ga',{access_status:'pending',onboarding_completed:false});
+const browser=await chromium.launch({channel:'chrome'});
+const errors=[];
+for(const width of [390,820,1280]){
+ const context=await browser.newContext({viewport:{width,height:844},reducedMotion:'reduce',colorScheme:'dark'});
+ const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
+ await page.route('**/*supabase.co/**',async route=>{
+  const u=new URL(route.request().url());let body=[];
+  if(u.pathname.includes('/auth/v1/signup')) body={id:user,aud:'authenticated',email:'maya@example.com',identities:[{id:user}]};
+  else if(u.pathname.includes('/auth/v1/')) body={};
+  await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body),headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*'}});
+ });
+ await page.goto(root+'/auth?tab=join');await page.getByPlaceholder('Email *').waitFor();
+ await page.screenshot({path:`${out}/signup-${width}.png`,animations:'disabled'});
+ await page.getByPlaceholder('Email *').fill('maya@example.com');await page.getByPlaceholder('Your name *').fill('Maya Torres');await page.getByPlaceholder('Password *',{exact:true}).fill('Fixture-only-123!');
+ await page.getByRole('checkbox').check();await page.locator('button[type=submit]').click();
+ await page.getByPlaceholder('6-digit code').waitFor();
+ await page.screenshot({path:`${out}/verify-${width}.png`,animations:'disabled'});
+ await context.close();
+ const signed=await browser.newContext({viewport:{width,height:844},reducedMotion:'reduce',colorScheme:'dark'});
+ await signIn(signed,user);
+ await signed.addInitScript(id=>localStorage.setItem(`ether-onboarding-draft:${id}`,JSON.stringify({version:2,step:3,data:{displayName:'Maya Torres',memberOf:'',passions:['Photography'],passionSeriousness:5,city:'Atlanta',cityDisplay:'Atlanta, GA',cityKey:'atlanta|ga',skills:[],roles:[],questionnaireResponses:{}}})),user);
+ const p=await signed.newPage();p.on('pageerror',e=>errors.push(e.message));await backend(db)(p);
+ await p.goto(root+'/onboarding');await p.getByRole('button',{name:'Back',exact:true}).waitFor();await p.waitForTimeout(800);
+ await p.screenshot({path:`${out}/oath-${width}.png`,animations:'disabled'});
+ await db.query("UPDATE profiles SET onboarding_completed=true WHERE user_id=$1",[user]);await p.goto(root+'/pending');await p.getByText("A real person will review your application before you're let in.").waitFor();
+ assert.equal(await p.locator('img[alt="Maya Torres"]').count(),0);
+ await p.screenshot({path:`${out}/pending-${width}.png`,animations:'disabled'});
+ assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ if(width===390){await db.query("UPDATE profiles SET access_status='active' WHERE user_id=$1",[user]);await p.evaluate(()=>window.dispatchEvent(new Event('focus')));await p.waitForURL(url=>!url.pathname.endsWith('/pending'));console.log('Admin approval refreshes all profile readers and leaves the pending screen');await db.query("UPDATE profiles SET access_status='pending' WHERE user_id=$1",[user]);}
+ await signed.close();await db.query("UPDATE profiles SET onboarding_completed=false WHERE user_id=$1",[user]);console.log(`Signup, verification, oath and private pending screen captured at ${width}px`);
+}
+await db.query("UPDATE profiles SET onboarding_completed=true,access_status='active' WHERE user_id=$1",[user]);
+await db.query("INSERT INTO notifications(user_id,type,title,body,data) VALUES($1,'match','You connected','You and Jordan both connected. Say hello.',$2)",[user,JSON.stringify({conversation_id:'00000000-0000-4000-8000-00000000bb01',action:'open_conversation'})]);
+const notices=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce',colorScheme:'dark'});
+await signIn(notices,user);const n=await notices.newPage();await backend(db)(n);
+await n.goto(root+'/notifications');await n.getByText('You connected',{exact:true}).waitFor();
+assert.ok(await n.locator('h1').evaluate(el=>el.getBoundingClientRect().right<=innerWidth),'Notification heading fits on the phone');
+await n.screenshot({path:`${out}/connection-notice-390.png`,animations:'disabled'});
+await notices.close();
+await browser.close();await db.close();assert.deepEqual(errors,[]);
