@@ -20,6 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useIsAdmin, useAllUsers, useQuestionnaireResponses, useChangeAccessStatus } from '@/hooks/useAdmin';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
+import { normalizeApplicantLink } from '@/lib/applicantLinks';
 
 const MAX_PASSIONS = 10;
 const MIN_PASSION_LENGTH = 2;
@@ -36,6 +37,7 @@ interface UserProfile {
   access_status: string | null;
   onboarding_score: number | null;
   onboarding_completed: boolean | null;
+  social_links: Record<string, string> | null;
 }
 
 type AdminListUser = NonNullable<ReturnType<typeof useAllUsers>['data']>[number];
@@ -55,6 +57,9 @@ function toUserProfile(user: AdminListUser): UserProfile | null {
     access_status: user.access_status || null,
     onboarding_score: user.onboarding_score || null,
     onboarding_completed: user.onboarding_completed,
+    social_links: user.social_links && typeof user.social_links === 'object' && !Array.isArray(user.social_links)
+      ? user.social_links as Record<string, string>
+      : null,
   };
 }
 
@@ -383,6 +388,28 @@ const AdminOnboarding: React.FC = () => {
                       </div>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Applicant links are required for new applications and visible to reviewers. */}
+              <Card>
+                <CardHeader><CardTitle className="text-lg">Application links</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  {(['social_profile', 'website'] as const).map((key) => {
+                    const input = selectedUser.social_links?.[key] || '';
+                    const url = normalizeApplicantLink(input);
+                    if (!url) return null;
+                    return (
+                      <div key={key} className="min-w-0">
+                        <p className="text-xs text-muted-foreground">{key === 'social_profile' ? 'Social media' : 'Website / portfolio'}</p>
+                        <a href={url} target="_blank" rel="noopener noreferrer"
+                          className="block break-all text-sm text-primary underline">{url}</a>
+                      </div>
+                    );
+                  })}
+                  {!selectedUser.social_links?.social_profile && !selectedUser.social_links?.website && (
+                    <p className="text-sm text-muted-foreground">No application links on file (older account).</p>
+                  )}
                 </CardContent>
               </Card>
 
