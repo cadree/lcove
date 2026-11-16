@@ -218,7 +218,11 @@ const Settings = () => {
     setSaving(true);
     try {
       // Build social_links object, filtering out empty strings
-      const cleanedSocialLinks: Record<string, string> = {};
+      // Keep the original creator-review URL when editing public profile links.
+      // It is stored as social_profile by the application intake form.
+      const cleanedSocialLinks: Record<string, string> = profile?.social_links?.social_profile
+        ? { social_profile: profile.social_links.social_profile }
+        : {};
       Object.entries(socialLinks).forEach(([key, value]) => {
         if (value.trim()) {
           cleanedSocialLinks[key] = value.trim();
