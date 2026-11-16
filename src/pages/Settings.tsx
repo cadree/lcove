@@ -80,7 +80,7 @@ const Settings = () => {
   const { isAdmin } = useIsAdmin();
   const navigate = useNavigate();
   const { profile, loading, updateProfile } = useProfile();
-  const { preferences, isLoading: prefsLoading, updatePreferences } = useNotificationPreferences();
+  const { preferences, isLoading: prefsLoading, updatePreferences, updatePreferencesAsync } = useNotificationPreferences();
   const { isSupported: pushSupported, isSubscribed: pushSubscribed, permission: pushPermission, requestPermission, unsubscribe: unsubscribePush, status: pushStatus, error: pushError, isLoading: pushLoading } = usePushNotifications();
   const { blockedUsers, unblockUser, isLoading: blocksLoading } = useUserBlocks();
 
@@ -817,7 +817,14 @@ const Settings = () => {
                 <Switch
                   aria-label="New member application push notifications"
                   checked={preferences?.new_member_applications_push_enabled ?? false}
-                  onCheckedChange={(checked) => handleNotificationToggle("new_member_applications_push_enabled", checked)}
+                  onCheckedChange={async (checked) => {
+                    try {
+                      await updatePreferencesAsync({ new_member_applications_push_enabled: checked });
+                      toast.success(checked ? "Application push alerts enabled" : "Application push alerts disabled");
+                    } catch {
+                      toast.error("Could not update application push alerts");
+                    }
+                  }}
                   disabled={prefsLoading || !preferences}
                 />
               </div>
