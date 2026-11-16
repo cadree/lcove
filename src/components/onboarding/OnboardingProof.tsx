@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Globe2, Instagram } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,7 @@ export default function OnboardingProof({ socialProfile, website, updateLinks, o
   const [site, setSite] = useState(website);
   const [error, setError] = useState('');
 
-  const continueToOath = (event: React.FormEvent) => {
+  const continueToOath = (event: FormEvent) => {
     event.preventDefault();
     const validation = applicantLinksError(social, site);
     if (validation) {
@@ -50,7 +50,7 @@ export default function OnboardingProof({ socialProfile, website, updateLinks, o
             <Label htmlFor="application-social" className="flex items-center gap-2">
               <Instagram className="h-4 w-4" /> Social media profile
             </Label>
-            <Input id="application-social" type="url" inputMode="url" autoCapitalize="none"
+            <Input id="application-social" type="text" inputMode="url" autoCapitalize="none"
               autoComplete="url" placeholder="https://instagram.com/yourname"
               value={social} maxLength={500}
               onChange={(event) => { setSocial(event.target.value); setError(''); }}
