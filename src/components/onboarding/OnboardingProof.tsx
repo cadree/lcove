@@ -56,7 +56,7 @@ export default function OnboardingProof({ socialProfile, website, updateLinks, o
               onChange={(event) => { setSocial(event.target.value); setError(''); }}
               className="h-12" aria-invalid={Boolean(error) || undefined}
               aria-describedby="review-links-hint" />
-            <p className="text-xs text-muted-foreground">Instagram, TikTok, YouTube, LinkedIn, Behance, or another public profile.</p>
+            <p className="text-xs text-muted-foreground">Instagram, TikTok, YouTube, LinkedIn, or another public creative profile.</p>
           </div>
 
           <div className="space-y-2">
