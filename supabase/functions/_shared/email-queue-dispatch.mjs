@@ -263,7 +263,9 @@ export async function runEmailQueue(deps) {
             message_id: payload.message_id,
             template_name: payload.label || queue,
             recipient_email: payload.to,
-            status: "rate_limited",
+            // 'pending' is allowed by email_send_log's status constraint.
+            // Rate limits are temporary: the queued message remains for retry.
+            status: "pending",
             error_message: errorMsg.slice(0, 1000),
           });
 
