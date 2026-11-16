@@ -74,7 +74,7 @@ export function KeyboardAvoider() {
     if (Capacitor.isNativePlatform()) {
       void (async () => {
         const willShow = await Keyboard.addListener("keyboardWillShow", (info) => {
-          // Capture the unresized window before the keyboard animates in.
+          // Capture the full window height before the keyboard animates in.
           fullHeight = window.innerHeight;
           nativeKeyboard = info.keyboardHeight;
           update();
