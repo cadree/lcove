@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { dispatchMemberApplicationPushes } from "../supabase/functions/_shared/member-application-push.mjs";
+import { assertMemberApplicationPushDelivered, dispatchMemberApplicationPushes } from "../supabase/functions/_shared/member-application-push.mjs";
 
 function fakeBackend() {
   const applicantId = "00000000-0000-4000-8000-000000000101";
@@ -101,4 +101,18 @@ test("failed send keeps application job for retry", async () => {
   });
   assert.equal(h.db.application_push_deliveries.length, 0);
   assert.deepEqual(h.acknowledgements, []);
+});
+
+test("HTTP success with zero push deliveries is not a delivered alert", () => {
+  assert.equal(assertMemberApplicationPushDelivered({ sent: 1, success: true }), 1);
+  assert.equal(assertMemberApplicationPushDelivered({ sent: 2, success: true }), 2);
+  for (const response of [
+    { message: "No push subscriptions", sent: 0 },
+    { message: "Push notifications disabled" },
+    { success: false, sent: 0, total: 1 },
+    { error: "APNs credential failure", sent: 0 },
+    null,
+  ]) {
+    assert.throws(() => assertMemberApplicationPushDelivered(response), /did not reach any registered devices/);
+  }
 });
