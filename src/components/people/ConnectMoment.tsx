@@ -198,7 +198,7 @@ function ConnectCelebration({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={nudge.matched ? `It's a match with ${nudge.name}` : `Connected with ${nudge.name}`}
+      aria-label={nudge.matched ? `You connected with ${nudge.name}` : `Connected with ${nudge.name}`}
       className="fixed inset-0 z-[200] flex cursor-pointer flex-col items-center justify-center bg-[rgba(8,8,10,0.92)] px-6 text-center backdrop-blur-sm"
       onClick={onDismiss}
       onKeyDown={(e) => {

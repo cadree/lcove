@@ -78,7 +78,7 @@ export function icebreaker(person: IcebreakerPerson, me?: IcebreakerMe | null): 
 }
 
 export function celebrationEyebrow(matched: boolean): string {
-  return matched ? "It's a match" : "Connected";
+  return matched ? "You connected" : "Connected";
 }
 
 /** Heading on the celebration overlay. A mutual match says both people connected. */

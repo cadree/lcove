@@ -69,7 +69,7 @@ test("icebreaker prefers a shared skill, then passion, trip, city, then role", (
 
 test("nudge copy and routes stay on existing pages", () => {
   assert.equal(firstName("Jordan Blake"), "Jordan");
-  assert.equal(celebrationEyebrow(true), "It's a match");
+  assert.equal(celebrationEyebrow(true), "You connected");
   assert.equal(celebrationEyebrow(false), "Connected");
   assert.equal(celebrationHeadline({ name: "Jordan Blake", matched: true }), "You and Jordan both connected");
   assert.equal(celebrationHeadline({ name: "Rezza", matched: true }), "You and Rezza both connected");

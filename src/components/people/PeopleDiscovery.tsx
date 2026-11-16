@@ -153,10 +153,10 @@ export function PeopleDiscovery({ query }: { query: string }) {
         rows?.map((row) => (row.user_id === person.user_id ? { ...row, liked } : row)),
       );
       await cache.invalidateQueries({ queryKey: ["creative-matches"] });
-      if (data.matched && data.conversation_id) {
+      if (data.new_match && data.conversation_id) {
         // Both people get an in-app notice from the database; this pushes it to the other phone.
         void supabase.functions.invoke("send-push-notification", {
-          body: { user_id: person.user_id, notification_type: "match", title: "It's a match", data: { conversation_id: data.conversation_id } },
+          body: { user_id: person.user_id, notification_type: "match", title: "You connected", data: { conversation_id: data.conversation_id } },
         }).catch(() => undefined);
       }
       if (liked) setMoment({ person, matched: !!data.matched, conversationId: data.conversation_id });
