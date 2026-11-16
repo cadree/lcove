@@ -52,6 +52,9 @@ jobs:
       - name: New application email and review-link checks
         run: npm run test:application-db
 
+      - name: Admin-only application push checks
+        run: npm run test:application-push
+
       - name: Stripe webhook fixtures
         run: npm run test:webhook
 
