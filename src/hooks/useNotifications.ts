@@ -218,5 +218,6 @@ export const useNotificationPreferences = () => {
     preferences,
     isLoading,
     updatePreferences: updatePreferences.mutate,
+    updatePreferencesAsync: updatePreferences.mutateAsync,
   };
 };
