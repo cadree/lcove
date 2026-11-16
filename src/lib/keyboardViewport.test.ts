@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { needsReveal, revealDelta, webKeyboardInset } from "./keyboardViewport.ts";
+import { nativeKeyboardVisibleHeight, needsReveal, revealDelta, webKeyboardInset } from "./keyboardViewport.ts";
 import { feedVideoSource } from "./videoWindow.ts";
 
 test("keyboard height comes from the visual viewport, ignoring toolbar jitter", () => {
@@ -10,11 +10,20 @@ test("keyboard height comes from the visual viewport, ignoring toolbar jitter", 
   assert.equal(webKeyboardInset(844, Number.NaN, 0), 0);
 });
 
+test("native keyboard never gets subtracted twice when WebView already resized", () => {
+  assert.equal(nativeKeyboardVisibleHeight(844, 844, 336), 508); // overlay
+  assert.equal(nativeKeyboardVisibleHeight(508, 844, 336), 508); // resize: body
+  assert.equal(nativeKeyboardVisibleHeight(508, 844, 0), 508);
+  assert.equal(nativeKeyboardVisibleHeight(844, 844, 0), 844);
+});
+
 test("fields under the keyboard are revealed, visible ones are left alone", () => {
   assert.equal(needsReveal({ top: 631, bottom: 675 }, 0, 508), true);
   assert.equal(needsReveal({ top: 442, bottom: 492 }, 0, 508), false);
   assert.equal(needsReveal({ top: -20, bottom: 20 }, 0, 508), true);
-  assert.equal(revealDelta({ top: 442, bottom: 492 }, 0, 508), 0);
+  assert.equal(revealDelta({ top: 442, bottom: 492 }, 0, 508), 4); // 20px space above keys
+  assert.equal(revealDelta({ top: 442, bottom: 482 }, 0, 508), 0);
+  assert.equal(revealDelta({ top: -20, bottom: 20 }, 0, 508), -40);
   const delta = revealDelta({ top: 631, bottom: 675 }, 0, 508);
   const centre = (631 + 675) / 2 - delta;
   assert.ok(centre > 0 && centre < 508 - 24);
