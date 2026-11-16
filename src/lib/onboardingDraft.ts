@@ -8,6 +8,8 @@ export interface OnboardingDraftData {
   city: string;
   cityDisplay: string;
   cityKey: string;
+  socialProfile: string;
+  website: string;
   skills: string[];
   roles: string[];
   questionnaireResponses: Record<number, "A" | "B" | "C">;
@@ -18,7 +20,7 @@ export interface OnboardingDraft {
   data: OnboardingDraftData;
 }
 
-const DRAFT_VERSION = 2;
+const DRAFT_VERSION = 3;
 
 export function onboardingDraftKey(userId: string) {
   return `ether-onboarding-draft:${userId}`;
@@ -55,6 +57,8 @@ export function readOnboardingDraft(storage: Storage, userId: string): Onboardin
         city: typeof data.city === "string" ? data.city : "",
         cityDisplay: typeof data.cityDisplay === "string" ? data.cityDisplay : "",
         cityKey: typeof data.cityKey === "string" ? data.cityKey : "",
+        socialProfile: typeof data.socialProfile === "string" ? data.socialProfile : "",
+        website: typeof data.website === "string" ? data.website : "",
         skills: Array.isArray(data.skills) ? data.skills.filter((item) => typeof item === "string") : [],
         roles: Array.isArray(data.roles) ? data.roles.filter((item) => typeof item === "string") : [],
         questionnaireResponses: responses,
