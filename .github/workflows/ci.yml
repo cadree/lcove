@@ -46,6 +46,9 @@ jobs:
       - name: Creative bridge database checks
         run: npm run test:bridge-db
 
+      - name: Pending member access checks
+        run: npm run test:access-db
+
       - name: Stripe webhook fixtures
         run: npm run test:webhook
 

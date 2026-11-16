@@ -88,7 +88,7 @@ export function celebrationHeadline(nudge: Pick<ConnectNudge, "name" | "matched"
 }
 
 export function nudgeCopy(nudge: Pick<ConnectNudge, "name" | "matched">): string {
-  return `You and ${firstName(nudge.name)} ${nudge.matched ? "matched" : "connected"}, start something`;
+  return `You and ${firstName(nudge.name)} ${nudge.matched ? "both connected" : "connected"}, start something`;
 }
 
 export function readNudges(store: Store, viewerId: string | undefined): ConnectNudge[] {
