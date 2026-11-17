@@ -1,5 +1,7 @@
-/** First run: onboarding ends on the people deck with a single, dismissible Connect hint. */
-export const FIRST_RUN_PATH = "/explore?section=people&welcome=1";
+/** After human approval, the member first registers their ETHER Card. */
+export const FIRST_RUN_PATH = "/welcome";
+/** ETHER Card setup exits to the people deck. */
+export const AFTER_WELCOME_PATH = "/explore?section=people&welcome=1";
 
 const key = (userId: string) => `ether:first-connect-hint:${userId}`;
 
