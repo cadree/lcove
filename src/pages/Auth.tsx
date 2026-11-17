@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { PENDING_SIGNUP_KEY, applyPendingSignupProfile, inviteTokenFromMetadata } from '@/lib/pendingSignup';
+import { normalizedMemberReferralCode, type MemberReferralPreview } from '@/lib/memberReferrals';
+import { callRpc } from '@/lib/rpc';
 import { captureSignupAttribution } from '@/lib/signupAttribution';
 import { WAITLIST_MODE } from '@/config/launch';
 import { PageMeta } from '@/components/seo/PageMeta';
@@ -128,6 +130,9 @@ const Auth = () => {
   const [resendNow, setResendNow] = useState(() => Date.now());
   const [isResending, setIsResending] = useState(false);
   const inviteToken = searchParams.get('invite')?.trim() ?? '';
+  const referralCode = normalizedMemberReferralCode(searchParams.get('ref'));
+  const [referralPreview, setReferralPreview] = useState<MemberReferralPreview | null>(null);
+  const [referralChecking, setReferralChecking] = useState(Boolean(referralCode));
   const [inviteEmail, setInviteEmail] = useState<string | null>(null);
   const [inviteState, setInviteState] = useState<'none' | 'checking' | 'ready' | 'inactive'>(
     inviteToken ? 'checking' : 'none',
@@ -216,6 +221,17 @@ const Auth = () => {
       mode: modeRef.current,
     });
   }, []);
+
+  useEffect(() => {
+    if (!referralCode) return;
+    let cancelled = false;
+    setReferralChecking(true);
+    callRpc<MemberReferralPreview | null>('preview_member_referral', { p_code: referralCode })
+      .then((preview) => { if (!cancelled) setReferralPreview(preview); })
+      .catch(() => { if (!cancelled) setReferralPreview(null); })
+      .finally(() => { if (!cancelled) setReferralChecking(false); });
+    return () => { cancelled = true; };
+  }, [referralCode]);
 
   useEffect(() => {
     if (!inviteToken) return;
@@ -372,7 +388,7 @@ const Auth = () => {
           displayName: displayName.trim(),
           ...(inviteToken ? { inviteToken } : {}),
         }));
-        const { error, session } = await signUp(email, password, inviteToken || undefined, { displayName: displayName.trim() });
+        const { error, session } = await signUp(email, password, inviteToken || undefined, { displayName: displayName.trim() }, referralCode || undefined);
         if (error) {
           logAuthError('Signup failed', error);
           const { title, description } = getAuthErrorMessage(error);
@@ -625,6 +641,15 @@ const Auth = () => {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-3">
+              {mode === 'signup' && referralCode && (
+                <p role="status" className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-center text-sm leading-relaxed text-foreground">
+                  {referralChecking
+                    ? 'Checking your creative invitation…'
+                    : referralPreview
+                      ? `${referralPreview.name} ${referralPreview.kind === 'vouch' ? 'vouched for you' : 'invited you'} to apply to ETHER. Your application will still be reviewed.`
+                      : 'This referral link is no longer active. You can still apply directly.'}
+                </p>
+              )}
               {mode === 'signup' && (
                 <>
                   <div className="space-y-2">
