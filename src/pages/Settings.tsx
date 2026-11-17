@@ -360,7 +360,11 @@ const Settings = () => {
           </div>
         </section>
 
-        {/* Profile Section */}
+        {profile?.onboarding_completed && profile.access_status === "active" && (
+          <div className="mb-6"><MemberInviteCard mode="vouch" /></div>
+        )}
+
+        {/* Profile Section */
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
