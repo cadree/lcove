@@ -20,6 +20,7 @@ import StoryViewer from '@/components/stories/StoryViewer';
 
 const NOTIFICATION_TYPES: { value: string; label: string }[] = [
   { value: 'all', label: 'All' },
+  { value: 'membership_accepted', label: 'Familcy' },
   { value: 'message', label: 'Messages' },
   { value: 'like', label: 'Likes' },
   { value: 'comment', label: 'Comments' },
