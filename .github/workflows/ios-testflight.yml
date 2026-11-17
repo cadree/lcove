@@ -1,12 +1,12 @@
 name: Build ETHER for iPhone TestFlight
 
-# Creates a macOS/iOS simulator smoke build after each candidate push.
+# Builds the current live release branch on a macOS runner for native QA.
 # With an App Store Connect team API key, Xcode also signs and uploads a
 # distribution archive for the EXISTING ETHER by LCOVE App Store Connect app.
 on:
   push:
     branches:
-      - feat/member-referral-vouches-testflight-nov17
+      - cursor/ether-combined
   workflow_dispatch:
 
 permissions:
