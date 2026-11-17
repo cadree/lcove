@@ -76,6 +76,9 @@ const getAuthErrorMessage = (error: Error): { title: string; description: string
       description: 'Email or password is incorrect. Please try again.',
     };
   }
+  if (message.includes('otp_expired') || message.includes('token has expired') || message.includes('invalid token') || message.includes('token is expired')) {
+    return { title: 'Code expired', description: 'Request a new verification code below, or sign in if your email is already confirmed.' };
+  }
   if (message.includes('email not confirmed')) {
     return {
       title: 'Email Not Confirmed',
@@ -167,7 +170,10 @@ const Auth = () => {
   const resendWaitMs = resendCooldownRemaining(confirmationSentAt, resendNow);
 
   const handleResendConfirmation = async () => {
-    if (resendWaitMs > 0 || isResending || !email) return;
+    if (resendWaitMs > 0 || isResending || !emailSchema.safeParse({ email }).success) {
+      setErrors({ email: 'Enter your signup email to request a new code.' });
+      return;
+    }
     setIsResending(true);
     const { error } = await supabase.auth.resend({
       type: 'signup',
@@ -184,10 +190,12 @@ const Auth = () => {
       toast({ title, description, variant: 'destructive' });
       return;
     }
+    setEmailCode('');
+    setMode('confirm-email');
     setConfirmationSentAt(Date.now());
     toast({
-      title: 'Email sent',
-      description: 'We sent another code and link.',
+      title: 'Check your email',
+      description: 'If your email still needs verification, we sent a new code. Already verified? Sign in to resume your application.',
     });
   };
 
@@ -375,6 +383,10 @@ const Auth = () => {
           logAuthError('Login failed', error);
           const { title, description } = getAuthErrorMessage(error);
           toast({ title, description, variant: 'destructive' });
+          if (error.message.toLowerCase().includes('email not confirmed')) {
+            setMode('confirm-email');
+            setConfirmationSentAt(null);
+          }
         } else {
           logAuthEvent('Login successful');
         }
@@ -393,6 +405,10 @@ const Auth = () => {
           logAuthError('Signup failed', error);
           const { title, description } = getAuthErrorMessage(error);
           toast({ title, description, variant: 'destructive' });
+          if (/already registered|already exists/i.test(error.message)) {
+            setMode('login');
+            toast({ title: 'Resume your application', description: 'Your account already exists. Sign in with your original password, or reset it below.' });
+          }
         } else if (!session) {
           logAuthEvent('Signup needs email confirmation');
           setConfirmationSentAt(Date.now());
@@ -567,8 +583,12 @@ const Auth = () => {
           {mode === 'confirm-email' ? (
             <div className="text-center py-2">
               <p className="text-sm text-muted-foreground mb-4">
-                Sent to <span className="text-primary">{email}</span>.
+                {email ? <>Verification for <span className="text-primary">{email}</span>.</> : 'Enter your signup email to request a fresh verification code.'}
               </p>
+              {!emailSchema.safeParse({ email }).success && (
+                <Input type="email" autoComplete="email" aria-label="Signup email" placeholder="Your signup email"
+                  className="mb-3 h-12" value={email} onChange={(event) => setEmail(event.target.value)} />
+              )}
               <label htmlFor="email-code" className="sr-only">6-digit code</label>
               <Input
                 id="email-code"
@@ -593,7 +613,7 @@ const Auth = () => {
                 type="button"
                 variant="outline"
                 onClick={() => void handleResendConfirmation()}
-                disabled={isResending || resendWaitMs > 0}
+                disabled={isResending || resendWaitMs > 0 || !emailSchema.safeParse({ email }).success}
                 className="w-full mb-3"
               >
                 {resendWaitMs > 0
@@ -605,7 +625,7 @@ const Auth = () => {
                 onClick={() => setMode('login')}
                 className="w-full"
               >
-                Back to log in
+                Already verified? Sign in to finish your application
               </Button>
             </div>
           ) : resetEmailSent && mode === 'forgot' ? (
@@ -785,6 +805,18 @@ const Auth = () => {
                 )}
               </Button>
             </form>
+          )}
+
+          {mode === 'signup' && (
+            <div className="mt-5 space-y-2 border-t border-border pt-4 text-center text-sm">
+              <button type="button" className="min-h-11 w-full text-primary underline underline-offset-4" onClick={() => setMode('login')}>
+                Already verified or started an application? Sign in to continue
+              </button>
+              <button type="button" className="min-h-11 w-full text-muted-foreground underline underline-offset-4"
+                onClick={() => { setMode('confirm-email'); setConfirmationSentAt(null); }}>
+                Verification code expired? Request a fresh code
+              </button>
+            </div>
           )}
 
           {(mode === 'login' || mode === 'signup' || mode === 'confirmed-signin') && (
