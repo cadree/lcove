@@ -9,12 +9,13 @@ import { applicantLinksError, normalizeApplicantLink } from '@/lib/applicantLink
 interface Props {
   socialProfile: string;
   website: string;
+  verifiedEmail: string | null;
   updateLinks: (links: { socialProfile: string; website: string }) => void;
   onNext: () => void;
   onBack: () => void;
 }
 
-export default function OnboardingProof({ socialProfile, website, updateLinks, onNext, onBack }: Props) {
+export default function OnboardingProof({ socialProfile, website, verifiedEmail, updateLinks, onNext, onBack }: Props) {
   const [social, setSocial] = useState(socialProfile);
   const [site, setSite] = useState(website);
   const [error, setError] = useState('');
@@ -24,6 +25,10 @@ export default function OnboardingProof({ socialProfile, website, updateLinks, o
     const validation = applicantLinksError(social, site);
     if (validation) {
       setError(validation);
+      return;
+    }
+    if (!social.trim() && !verifiedEmail) {
+      setError('Verify your signup email before submitting a website-only application.');
       return;
     }
     updateLinks({
@@ -42,13 +47,13 @@ export default function OnboardingProof({ socialProfile, website, updateLinks, o
         <h1 className="font-display text-3xl text-foreground md:text-4xl">Show us your work</h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
           Before we approve your application, we review the person and the creative work behind it.
-          Add your public social media profile and your website or portfolio.
+          Add at least one public social media profile or a website/portfolio. Both are welcome.
         </p>
 
         <form onSubmit={continueToOath} className="mt-8 space-y-5">
           <div className="space-y-2">
             <Label htmlFor="application-social" className="flex items-center gap-2">
-              <Instagram className="h-4 w-4" /> Social media profile (required)
+              <Instagram className="h-4 w-4" /> Social media profile (optional if providing a website)
             </Label>
             <Input id="application-social" type="text" inputMode="url" autoCapitalize="none"
               autoComplete="url" placeholder="https://instagram.com/yourname"
@@ -61,7 +66,7 @@ export default function OnboardingProof({ socialProfile, website, updateLinks, o
 
           <div className="space-y-2">
             <Label htmlFor="application-website" className="flex items-center gap-2">
-              <Globe2 className="h-4 w-4" /> Website or portfolio (required)
+              <Globe2 className="h-4 w-4" /> Website or portfolio (optional if providing a social profile)
             </Label>
             <Input id="application-website" type="text" inputMode="url" autoCapitalize="none"
               autoComplete="url" placeholder="https://yourportfolio.com"
@@ -72,8 +77,13 @@ export default function OnboardingProof({ socialProfile, website, updateLinks, o
           </div>
 
           <p id="review-links-hint" className="text-sm text-muted-foreground">
-            Both links are required and must be publicly viewable. A hosted portfolio is welcome; you do not need your own domain.
+            At least one public link is required. A hosted portfolio is welcome; you do not need your own domain. If you provide only a website, your verified account email is your review contact.
           </p>
+          <div className="rounded-xl border border-border/70 p-3 text-sm" aria-label="Application contact email">
+            <p className="font-medium text-foreground">Application contact email</p>
+            <p className="mt-1 break-all text-muted-foreground">{verifiedEmail || 'Email verification required'}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Contact details come from your verified ETHER account, not from the public links.</p>
+          </div>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
           <div className="flex items-center gap-3 pt-3">
