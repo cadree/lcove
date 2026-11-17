@@ -42,18 +42,18 @@ export default function OnboardingProof({ socialProfile, website, updateLinks, o
         <h1 className="font-display text-3xl text-foreground md:text-4xl">Show us your work</h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
           Before we approve your application, we review the person and the creative work behind it.
-          Add at least one public social media profile or personal website.
+          Add your public social media profile and your website or portfolio.
         </p>
 
         <form onSubmit={continueToOath} className="mt-8 space-y-5">
           <div className="space-y-2">
             <Label htmlFor="application-social" className="flex items-center gap-2">
-              <Instagram className="h-4 w-4" /> Social media profile
+              <Instagram className="h-4 w-4" /> Social media profile (required)
             </Label>
             <Input id="application-social" type="text" inputMode="url" autoCapitalize="none"
               autoComplete="url" placeholder="https://instagram.com/yourname"
               value={social} maxLength={500}
-              onChange={(event) => { setSocial(event.target.value); setError(''); }}
+              onChange={(event) => { setSocial(event.target.value); updateLinks({ socialProfile: event.target.value, website: site }); setError(''); }}
               className="h-12" aria-invalid={Boolean(error) || undefined}
               aria-describedby="review-links-hint" />
             <p className="text-xs text-muted-foreground">Instagram, TikTok, YouTube, LinkedIn, or another public creative profile.</p>
@@ -61,18 +61,18 @@ export default function OnboardingProof({ socialProfile, website, updateLinks, o
 
           <div className="space-y-2">
             <Label htmlFor="application-website" className="flex items-center gap-2">
-              <Globe2 className="h-4 w-4" /> Website or portfolio
+              <Globe2 className="h-4 w-4" /> Website or portfolio (required)
             </Label>
-            <Input id="application-website" type="url" inputMode="url" autoCapitalize="none"
+            <Input id="application-website" type="text" inputMode="url" autoCapitalize="none"
               autoComplete="url" placeholder="https://yourportfolio.com"
               value={site} maxLength={500}
-              onChange={(event) => { setSite(event.target.value); setError(''); }}
+              onChange={(event) => { setSite(event.target.value); updateLinks({ socialProfile: social, website: event.target.value }); setError(''); }}
               className="h-12" aria-invalid={Boolean(error) || undefined}
               aria-describedby="review-links-hint" />
           </div>
 
           <p id="review-links-hint" className="text-sm text-muted-foreground">
-            At least one link is required. The link must be publicly viewable for review.
+            Both links are required and must be publicly viewable. A hosted portfolio is welcome; you do not need your own domain.
           </p>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 

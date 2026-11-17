@@ -17,6 +17,7 @@
     "test:music-db": "node scripts/music-catalog-db.test.mjs",
     "test:invite-db": "node scripts/item-invites-db.test.mjs",
     "test:bridge-db": "node scripts/creative-bridge-db.test.mjs",
+    "test:membership-review-db": "node scripts/membership-review-db.test.mjs",
     "test:access-db": "node scripts/pending-access-db.test.mjs",
     "test:application-db": "node --test scripts/onboarding-application-db.test.mjs",
     "test:application-push": "node --test scripts/member-application-push.test.mjs scripts/admin-application-push-db.test.mjs"

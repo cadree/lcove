@@ -197,20 +197,6 @@ serve(async (req) => {
     const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY");
     const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:push@ether.local";
 
-    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-      logStep("ERROR: VAPID keys not configured");
-      return new Response(
-        JSON.stringify({ error: "Push notifications not configured - VAPID keys missing" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    const vapidKeys = await loadVapidKeys(VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-    const appServer = await ApplicationServer.new({
-      contactInformation: VAPID_SUBJECT,
-      vapidKeys,
-    });
-
     logStep("Processing push notification", { user_id, title, notification_type });
 
     const { data: prefs, error: prefsError } = await supabase
@@ -282,6 +268,14 @@ serve(async (req) => {
       );
     }
 
+    // Native APNs must not depend on unrelated web-push VAPID configuration.
+    let appServer: ApplicationServer | null = null;
+    const needsWebPush = subscriptions.some((sub) => classifyPushSubscription(sub.platform, sub.endpoint).channel !== "apns");
+    if (needsWebPush && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+      const vapidKeys = await loadVapidKeys(VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+      appServer = await ApplicationServer.new({ contactInformation: VAPID_SUBJECT, vapidKeys });
+    }
+
     const notificationType = notification_type || "general";
     const payload = JSON.stringify({
       title,
@@ -326,6 +320,7 @@ serve(async (req) => {
       }
 
       try {
+        if (!appServer) throw new Error("Web push is not configured");
         const subscription = appServer.subscribe({
           endpoint,
           keys: { p256dh: sub.p256dh, auth: sub.auth },
