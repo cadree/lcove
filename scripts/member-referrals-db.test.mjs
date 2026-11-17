@@ -13,7 +13,7 @@ test("member invitations never auto-approve and acceptance notices send once", a
      SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid
    $fn$;
    CREATE TABLE auth.users(id uuid PRIMARY KEY,email text,email_confirmed_at timestamptz,raw_user_meta_data jsonb DEFAULT '{}'::jsonb);
-   CREATE TABLE public.profiles(user_id uuid PRIMARY KEY,display_name text,access_status text DEFAULT 'pending',onboarding_completed boolean DEFAULT false);
+   CREATE TABLE public.profiles(user_id uuid PRIMARY KEY,display_name text,username text,passion_title text,access_status text DEFAULT 'pending',onboarding_completed boolean DEFAULT false);
    CREATE TABLE public.notifications(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid,type text,title text,body text,data jsonb);
    CREATE TABLE public.test_queue(queue text,payload jsonb);
    CREATE FUNCTION pgmq.send(q text,p jsonb) RETURNS bigint LANGUAGE plpgsql AS $fn$
@@ -21,6 +21,7 @@ test("member invitations never auto-approve and acceptance notices send once", a
    $fn$;
   `);
   await db.exec(await readFile("supabase/migrations/20261117060000_member_referrals_and_familcy_acceptance.sql", "utf8"));
+  await db.exec(await readFile("supabase/migrations/20261117070000_familcy_welcome_card_handoff.sql", "utf8"));
   const sponsor="00000000-0000-4000-8000-000000000701";
   const applicant="00000000-0000-4000-8000-000000000702";
   const waiting="00000000-0000-4000-8000-000000000703";
@@ -40,11 +41,21 @@ test("member invitations never auto-approve and acceptance notices send once", a
   await db.query("INSERT INTO profiles(user_id,display_name,access_status,onboarding_completed) VALUES($1,'New Creative','pending',true)",[applicant]);
   assert.equal((await db.query("SELECT count(*)::int AS n FROM notifications")).rows[0].n,0);
   await db.query("UPDATE profiles SET access_status='active' WHERE user_id=$1",[applicant]);
-  let notifications=(await db.query("SELECT user_id,type FROM notifications")).rows;
+  let notifications=(await db.query("SELECT user_id,type,title,data FROM notifications")).rows;
   assert.equal(notifications.length,2);
-  assert.ok(notifications.some(n=>n.user_id===applicant&&n.type==="membership_accepted"));
+  assert.ok(notifications.some(n=>n.user_id===applicant&&n.type==="membership_accepted"
+    &&n.title==="Welcome to the Familcy"&&n.data.path==="/welcome"));
   assert.ok(notifications.some(n=>n.user_id===sponsor&&n.type==="referral_accepted"));
   assert.equal((await db.query("SELECT count(*)::int AS n FROM test_queue")).rows[0].n,2);
+  await setUser(applicant);
+  const welcome = async () => (await db.query("SELECT public.get_my_familcy_welcome_status() AS status")).rows[0].status;
+  assert.deepEqual(await welcome(),{needs_setup:true,card_registered:false});
+  await assert.rejects(db.query("SELECT public.complete_my_familcy_welcome()"),/Register your ETHER Card/);
+  await db.query("UPDATE profiles SET username='newcreative',passion_title='Photographer' WHERE user_id=$1",[applicant]);
+  await db.query("SELECT public.register_my_ether_card()");
+  assert.deepEqual(await welcome(),{needs_setup:true,card_registered:true});
+  await db.query("SELECT public.complete_my_familcy_welcome()");
+  assert.deepEqual(await welcome(),{needs_setup:false,card_registered:true});
   await db.query("UPDATE profiles SET access_status='pending' WHERE user_id=$1",[applicant]);
   await db.query("UPDATE profiles SET access_status='active' WHERE user_id=$1",[applicant]);
   assert.equal((await db.query("SELECT count(*)::int AS n FROM notifications")).rows[0].n,2);
