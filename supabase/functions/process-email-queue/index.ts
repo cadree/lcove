@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { DEFAULT_EMAIL_FROM, sendWithResend } from "../_shared/email-queue-dispatch.mjs";
 import { handleEmailQueueRequest } from "./handler.ts";
+import { assertMemberApplicationPushDelivered } from "../_shared/member-application-push.mjs";
 
 function productionDeps() {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -11,9 +12,16 @@ function productionDeps() {
     return undefined;
   }
   const emailFrom = Deno.env.get("EMAIL_FROM") || DEFAULT_EMAIL_FROM;
+  const supabase = createClient(supabaseUrl, serviceKey);
   return {
-    supabase: createClient(supabaseUrl, serviceKey),
+    supabase,
     sendEmail: (payload: Record<string, unknown>) => sendWithResend(resendKey, emailFrom, payload),
+    sendPush: async (payload: Record<string, unknown>) => {
+      const { data, error } = await supabase.functions.invoke("send-push-notification", { body: payload });
+      if (error) throw error;
+      if (data?.error) throw new Error(String(data.error));
+      assertMemberApplicationPushDelivered(data);
+    },
   };
 }
 

@@ -10,6 +10,8 @@ import OnboardingName from '@/components/onboarding/OnboardingName';
 import OnboardingPassions from '@/components/onboarding/OnboardingPassions';
 import OnboardingCity from '@/components/onboarding/OnboardingCity';
 import OnboardingPledge from '@/components/onboarding/OnboardingPledge';
+import OnboardingProof from '@/components/onboarding/OnboardingProof';
+import { applicantLinksError, normalizeApplicantLink } from '@/lib/applicantLinks';
 import { buildUserPassionInserts } from '@/lib/onboardingPassions';
 import { memberOfError, normalizeMemberOf } from '@/lib/etherId';
 import { assertCleanText } from '@/lib/objectionableText';
@@ -27,6 +29,8 @@ export interface OnboardingData {
   city: string;
   cityDisplay: string;
   cityKey: string;
+  socialProfile: string;
+  website: string;
   skills: string[];
   roles: string[];
   questionnaireResponses: Record<number, 'A' | 'B' | 'C'>;
@@ -62,6 +66,8 @@ const Onboarding = () => {
     city: '',
     cityDisplay: '',
     cityKey: '',
+    socialProfile: '',
+    website: '',
     skills: [],
     roles: [],
     questionnaireResponses: {}
@@ -152,6 +158,21 @@ const Onboarding = () => {
       return;
     }
 
+    const reviewError = applicantLinksError(data.socialProfile, data.website);
+    if (reviewError) {
+      toast({ title: 'Review link required', description: reviewError, variant: 'destructive' });
+      setCurrentStep(3);
+      setSaving(false);
+      return;
+    }
+
+    if (!data.socialProfile.trim() && !(user.email && user.email_confirmed_at)) {
+      toast({ title: 'Email verification required', description: 'Verify your account email before submitting a website-only application.', variant: 'destructive' });
+      setCurrentStep(3);
+      setSaving(false);
+      return;
+    }
+
     const { level, score, passed: passedExam } = calculateMindsetLevel(data.questionnaireResponses);
 
     try {
@@ -223,6 +244,11 @@ const Onboarding = () => {
         ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
         display_name: data.displayName.trim(),
         member_of: normalizeMemberOf(data.memberOf),
+        social_links: {
+          ...(profile?.social_links ?? {}),
+          social_profile: normalizeApplicantLink(data.socialProfile) || '',
+          website: normalizeApplicantLink(data.website) || '',
+        },
         city: data.city,
         city_display: data.cityDisplay,
         city_key: data.cityKey,
@@ -286,6 +312,9 @@ const Onboarding = () => {
     />,
     <OnboardingPassions key="passions" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingCity key="city" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
+    <OnboardingProof key="review-links" socialProfile={data.socialProfile} website={data.website}
+      verifiedEmail={user?.email && user.email_confirmed_at ? user.email : null}
+      updateLinks={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingPledge key="pledge" onComplete={() => void handleComplete()} onBack={prevStep} submitting={saving} />,
   ];
 

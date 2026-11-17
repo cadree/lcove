@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
-export type NotificationType = 'message' | 'like' | 'comment' | 'project_invite' | 'project_client_invite' | 'event_reminder' | 'live_stream' | 'collab_invite' | 'match' | 'item_invite' | 'credit' | 'vouch';
+export type NotificationType = 'message' | 'like' | 'comment' | 'project_invite' | 'project_client_invite' | 'event_reminder' | 'live_stream' | 'collab_invite' | 'match' | 'item_invite' | 'credit' | 'vouch' | 'member_application';
 
 export interface Notification {
   id: string;
@@ -27,6 +27,7 @@ export interface NotificationPreferences {
   event_reminders_enabled: boolean;
   live_streams_enabled: boolean;
   admin_enabled: boolean;
+  new_member_applications_push_enabled: boolean;
   push_enabled: boolean;
   email_enabled: boolean;
   sms_enabled: boolean;
@@ -217,5 +218,6 @@ export const useNotificationPreferences = () => {
     preferences,
     isLoading,
     updatePreferences: updatePreferences.mutate,
+    updatePreferencesAsync: updatePreferences.mutateAsync,
   };
 };

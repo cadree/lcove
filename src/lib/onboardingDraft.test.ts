@@ -26,6 +26,8 @@ const sample = {
     city: "Charlotte",
     cityDisplay: "Charlotte, NC",
     cityKey: "charlotte-nc",
+    socialProfile: "https://instagram.com/ada",
+    website: "",
     skills: [],
     roles: ["Director"],
     questionnaireResponses: { 6: "A" as const },
@@ -57,6 +59,15 @@ test("a draft without member of reads as empty", () => {
     JSON.stringify({ step: 1, version: 2, data }),
   );
   assert.equal(readOnboardingDraft(storage, "user-1")?.data.memberOf, "");
+});
+
+test("a previous oath draft now resumes at the required review step", () => {
+  const storage = memoryStorage();
+  storage.setItem("ether-onboarding-draft:user-1", JSON.stringify({ step: 3, version: 2, data: { ...sample.data, socialProfile: undefined, website: undefined } }));
+  const restored = readOnboardingDraft(storage, "user-1");
+  assert.equal(restored?.step, 3);
+  assert.equal(restored?.data.socialProfile, "");
+  assert.equal(restored?.data.website, "");
 });
 
 test("a broken draft is ignored and completion clears it", () => {

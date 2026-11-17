@@ -197,20 +197,6 @@ serve(async (req) => {
     const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY");
     const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:push@ether.local";
 
-    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-      logStep("ERROR: VAPID keys not configured");
-      return new Response(
-        JSON.stringify({ error: "Push notifications not configured - VAPID keys missing" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    const vapidKeys = await loadVapidKeys(VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-    const appServer = await ApplicationServer.new({
-      contactInformation: VAPID_SUBJECT,
-      vapidKeys,
-    });
-
     logStep("Processing push notification", { user_id, title, notification_type });
 
     const { data: prefs, error: prefsError } = await supabase
@@ -220,6 +206,23 @@ serve(async (req) => {
       .maybeSingle();
 
     if (prefsError) throw prefsError;
+
+    // Review alerts are explicitly opt-in and admin-only; ordinary users must
+    // never receive these, even if someone supplies a recipient ID.
+    if (notification_type === "member_application") {
+      const { data: adminRole, error: roleError } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("user_id", user_id)
+        .eq("role", "admin")
+        .maybeSingle();
+      if (roleError) throw roleError;
+      if (!adminRole || prefs?.new_member_applications_push_enabled !== true) {
+        return new Response(JSON.stringify({ message: "Membership review pushes disabled" }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     const pushEnabled = prefs?.push_enabled ?? true;
     if (!pushEnabled) {
@@ -240,6 +243,7 @@ serve(async (req) => {
         event_reminder: "event_reminders_enabled",
         live_stream: "live_streams_enabled",
         admin: "admin_enabled",
+        member_application: "new_member_applications_push_enabled",
       };
       const prefKey = typePreferenceMap[notification_type];
       if (prefKey && prefs[prefKey] === false) {
@@ -262,6 +266,14 @@ serve(async (req) => {
         JSON.stringify({ message: "No push subscriptions", sent: 0 }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    // Native APNs must not depend on unrelated web-push VAPID configuration.
+    let appServer: ApplicationServer | null = null;
+    const needsWebPush = subscriptions.some((sub) => classifyPushSubscription(sub.platform, sub.endpoint).channel !== "apns");
+    if (needsWebPush && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+      const vapidKeys = await loadVapidKeys(VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+      appServer = await ApplicationServer.new({ contactInformation: VAPID_SUBJECT, vapidKeys });
     }
 
     const notificationType = notification_type || "general";
@@ -308,6 +320,7 @@ serve(async (req) => {
       }
 
       try {
+        if (!appServer) throw new Error("Web push is not configured");
         const subscription = appServer.subscribe({
           endpoint,
           keys: { p256dh: sub.p256dh, auth: sub.auth },

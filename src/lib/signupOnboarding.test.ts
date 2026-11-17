@@ -3,8 +3,8 @@ import { describe, it } from "node:test";
 import { migrateOnboardingDraftStep, SIGNUP_ONBOARDING_STEPS, signupOnboardingAsksForTools } from "./signupOnboarding.ts";
 
 describe("signup onboarding", () => {
-  it("asks for name, passion, city, and the oath to enter", () => {
-    assert.deepEqual(SIGNUP_ONBOARDING_STEPS, ["name", "passion", "city", "pledge"]);
+  it("asks for identity, passion, city, a reviewable link, and the oath", () => {
+    assert.deepEqual(SIGNUP_ONBOARDING_STEPS, ["name", "passion", "city", "proof", "pledge"]);
     assert.equal(signupOnboardingAsksForTools(), false);
   });
 
@@ -16,6 +16,8 @@ describe("signup onboarding", () => {
     assert.equal(migrateOnboardingDraftStep(4, undefined), 3);
     assert.equal(migrateOnboardingDraftStep(6, undefined), 3);
     assert.equal(migrateOnboardingDraftStep(2, 2), 2);
+    assert.equal(migrateOnboardingDraftStep(3, 2), 3);
     assert.equal(migrateOnboardingDraftStep(9, 2), 3);
+    assert.equal(migrateOnboardingDraftStep(4, 3), 4);
   });
 });

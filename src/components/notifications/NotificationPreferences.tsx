@@ -3,6 +3,7 @@ import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Bell, Mail
 import { IosPushInstallSteps } from '@/components/settings/IosPushInstallSteps';
 import { useNotificationPreferences } from '@/hooks/useNotifications';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useIsAdmin } from '@/hooks/useAdmin';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -45,6 +46,7 @@ const PreferenceItem: React.FC<PreferenceItemProps> = ({
 
 export const NotificationPreferences: React.FC = () => {
   const { preferences, isLoading, updatePreferences } = useNotificationPreferences();
+  const { isAdmin } = useIsAdmin();
   const { isSupported, permission, requestPermission, status } = usePushNotifications();
 
   const handlePushToggle = async (checked: boolean) => {
@@ -190,6 +192,20 @@ export const NotificationPreferences: React.FC = () => {
           onCheckedChange={(checked) => updatePreferences({ new_events_enabled: checked })}
         />
       </div>
+
+      {isAdmin && (
+        <>
+          <Separator className="my-6" />
+          <h4 className="text-sm font-semibold mb-3">Admin Review Alerts</h4>
+          <PreferenceItem
+            icon={<Bell className="h-4 w-4" />}
+            label="New member applications"
+            description="Push alerts for new creator applications. Off by default; the review Gmail remains enabled."
+            checked={preferences.new_member_applications_push_enabled ?? false}
+            onCheckedChange={(checked) => updatePreferences({ new_member_applications_push_enabled: checked })}
+          />
+        </>
+      )}
 
       <Separator className="my-6" />
 
