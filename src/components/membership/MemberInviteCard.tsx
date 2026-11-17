@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Copy, Link2, Send, Users } from "lucide-react";
+import { type FormEvent, useEffect, useId, useState } from "react";
+import { Copy, Link2, Mail, Send, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,22 +9,28 @@ import { memberInviteUrl } from "@/lib/memberReferrals";
 
 type Props = { mode: "vouch" | "referral" };
 
-/** Both admitted members and applicants awaiting review can invite others.
- * An invitation never grants access: every invitee must still apply. */
+/** Both active members and verified pending applicants may introduce others.
+ * Every invitee creates an account and completes independent human review. */
 export function MemberInviteCard({ mode }: Props) {
   const { user } = useAuth();
+  const id = useId();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(true);
   const [failure, setFailure] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState("");
 
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
     setBusy(true);
+    setFailure("");
     callRpc<string>("get_my_member_referral_code")
-      .then((result) => { if (!cancelled) setCode(result); })
+      .then((value) => { if (!cancelled) setCode(value); })
       .catch((error: unknown) => {
-        if (!cancelled) setFailure(error instanceof Error ? error.message : "Your invite link is unavailable.");
+        if (!cancelled) setFailure(error instanceof Error ? error.message : "Your invitation link is unavailable.");
       })
       .finally(() => { if (!cancelled) setBusy(false); });
     return () => { cancelled = true; };
@@ -34,8 +40,33 @@ export function MemberInviteCard({ mode }: Props) {
   const isVouch = mode === "vouch";
   const title = isVouch ? "Vouch for a Creative" : "Bring a Creative with You";
   const description = isVouch
-    ? "Know someone who belongs in ETHER? Share your personal vouch link. Your creative will still complete the application and be reviewed."
-    : "You can invite other creatives while your own application is under review. They'll apply and wait for approval, just like you.";
+    ? "Invite a creative you believe in. They'll apply and be reviewed before joining."
+    : "You can invite other creatives while your own application is under review.";
+
+  const sendEmail = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (sending || !link) return;
+    const recipient = email.trim();
+    setSending(true);
+    setFailure("");
+    setResult("");
+    try {
+      await callRpc<{ queued: boolean }>("send_member_referral_invite", {
+        p_name: name.trim(),
+        p_email: recipient,
+      });
+      setName("");
+      setEmail("");
+      setResult(`Invitation queued for ${recipient}. You can invite another creative.`);
+      toast.success("ETHER invitation queued");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not send your invitation.";
+      setFailure(message);
+      toast.error("Could not queue invitation");
+    } finally {
+      setSending(false);
+    }
+  };
 
   const copy = async () => {
     try {
@@ -51,14 +82,12 @@ export function MemberInviteCard({ mode }: Props) {
     try {
       await navigator.share({
         title: "Join the ETHER Familcy",
-        text: isVouch
-          ? "I'm vouching for you to join ETHER. Every creative belongs somewhere."
-          : "Come apply to ETHER with me.",
+        text: isVouch ? "I'm vouching for you to join ETHER." : "Come apply to ETHER with me.",
         url: link,
       });
     } catch (error) {
       if (error instanceof Error && error.name !== "AbortError") {
-        toast.error("Could not open sharing. You can copy the link instead.");
+        toast.error("Could not open sharing. Copy the link instead.");
       }
     }
   };
@@ -74,33 +103,64 @@ export function MemberInviteCard({ mode }: Props) {
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{description}</p>
         </div>
       </div>
-      {failure ? <p role="status" className="mt-4 text-sm text-muted-foreground">{failure}</p> : null}
-      {!failure && (
-        <div className="mt-5 space-y-3">
-          <label htmlFor={isVouch ? "vouch-url" : "referral-url"} className="text-xs text-muted-foreground">
-            Your personal ETHER invite
-          </label>
-          <Input
-            id={isVouch ? "vouch-url" : "referral-url"}
-            value={link || ""}
-            readOnly
-            disabled={busy || !link}
-            onFocus={(event) => event.currentTarget.select()}
-            className="h-12 w-full text-xs"
-            aria-label="Your ETHER invitation link"
-          />
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" className="h-12 flex-1" onClick={() => void copy()} disabled={busy || !link}>
-              <Copy className="mr-2 h-4 w-4" /> Copy link
+
+      {busy && <p role="status" className="mt-5 text-sm text-muted-foreground">Preparing your invitation…</p>}
+      {failure && <p role="alert" className="mt-4 text-sm text-destructive">{failure}</p>}
+      {result && <p role="status" className="mt-4 text-sm text-primary">{result}</p>}
+
+      {!busy && link && (
+        <>
+          <form onSubmit={(event) => void sendEmail(event)} className="mt-5 space-y-3">
+            <div className="space-y-1">
+              <label htmlFor={`${id}-creative-name`} className="text-xs font-medium text-foreground">
+                Creative's name
+              </label>
+              <Input id={`${id}-creative-name`} type="text" value={name} required maxLength={80}
+                onChange={(event) => setName(event.target.value)} placeholder="Their name"
+                autoComplete="off" className="h-12 w-full" disabled={sending} />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor={`${id}-creative-email`} className="text-xs font-medium text-foreground">
+                Email address
+              </label>
+              <Input id={`${id}-creative-email`} type="email" value={email} required maxLength={254}
+                onChange={(event) => setEmail(event.target.value)} placeholder="creative@example.com"
+                autoComplete="off" autoCapitalize="none" className="h-12 w-full" disabled={sending} />
+            </div>
+            <Button type="submit" className="min-h-12 w-full" disabled={sending || !name.trim() || !email.trim()}>
+              <Mail className="mr-2 h-4 w-4" aria-hidden="true" />
+              {sending ? "Sending invitation…" : "Send ETHER invitation"}
             </Button>
-            <Button type="button" className="h-12 flex-1" onClick={() => void share()} disabled={busy || !link}>
-              <Send className="mr-2 h-4 w-4" /> Share invite
+          </form>
+
+          <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="h-px flex-1 bg-border" aria-hidden="true" />
+            Or share your personal link
+            <span className="h-px flex-1 bg-border" aria-hidden="true" />
+          </div>
+          <Input value={link} readOnly onFocus={(event) => event.currentTarget.select()}
+            className="h-11 w-full text-xs" aria-label="Your ETHER invitation link" />
+          <div className="mt-3 flex gap-2">
+            <Button type="button" variant="outline" className="min-h-11 flex-1" onClick={() => void copy()}>
+              <Copy className="mr-2 h-4 w-4" aria-hidden="true" /> Copy
+            </Button>
+            <Button type="button" variant="outline" className="min-h-11 flex-1" onClick={() => void share()}>
+              <Send className="mr-2 h-4 w-4" aria-hidden="true" /> Share
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">
-            A real person reviews every application. A vouch is an introduction, not automatic admission.
+          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+            Invitations are limited to 10 per day. Each person must complete an application and be approved.
           </p>
-        </div>
+        </>
+      )}
+      {!busy && !link && (
+        <Button type="button" variant="outline" className="mt-4 min-h-11"
+          onClick={() => { setFailure(""); setBusy(true);
+            callRpc<string>("get_my_member_referral_code")
+              .then(setCode).catch((error: unknown) => setFailure(error instanceof Error ? error.message : "Could not load invites"))
+              .finally(() => setBusy(false)); }}>
+          Retry invitations
+        </Button>
       )}
     </section>
   );
