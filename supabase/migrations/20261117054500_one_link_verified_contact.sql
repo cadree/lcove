@@ -57,7 +57,7 @@ CREATE TRIGGER ether_require_application_links
   FOR EACH ROW EXECUTE FUNCTION public.ether_require_application_links();
 REVOKE ALL ON FUNCTION public.ether_require_application_links() FROM PUBLIC, anon, authenticated;
 CREATE OR REPLACE FUNCTION public.ether_notify_pending_application()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE recipient record; review_path text; message_key text; email_body text; verified_contact text; submission uuid:=gen_random_uuid();
 BEGIN
  IF NEW.onboarding_completed IS DISTINCT FROM TRUE OR OLD.onboarding_completed IS TRUE
@@ -91,7 +91,7 @@ BEGIN
   jsonb_build_object('applicant_id',NEW.user_id,'path',review_path)
  FROM public.user_roles r WHERE r.role='admin';
  RETURN NEW;
-END $;
+END $$;
 
 REVOKE ALL ON FUNCTION public.ether_notify_pending_application() FROM PUBLIC, anon, authenticated;
 COMMIT;
