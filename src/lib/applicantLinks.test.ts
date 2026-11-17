@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { applicantLinksError, normalizeApplicantLink } from "./applicantLinks.ts";
 
-test("member application requires both public review links", () => {
+test("member application requires at least one public review link", () => {
   assert.match(applicantLinksError("", "") || "", /required|review your application/);
-  assert.ok(applicantLinksError("instagram.com/ada", ""));
-  assert.ok(applicantLinksError("", "https://portfolio.example.com/"));
+  assert.equal(applicantLinksError("instagram.com/ada", ""), null);
+  assert.equal(applicantLinksError("", "https://portfolio.example.com/"), null);
   assert.equal(applicantLinksError("https://social.example.com/ada", "portfolio.example.com"), null);
 });
 
