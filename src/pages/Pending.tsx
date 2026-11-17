@@ -1,3 +1,4 @@
+import { RequestVouchCard } from "@/components/membership/RequestVouchCard";
 import { WaitingFilm } from "@/components/onboarding/WaitingFilm";
 import { MemberInviteCard } from "@/components/membership/MemberInviteCard";
 import { useEffect } from "react";
@@ -70,6 +71,7 @@ export default function Pending() {
         <div className="my-7 w-full"><MemberInviteCard mode="referral" /></div>
         <WaitingFilm />
 
+        <p className="my-4 text-xs text-muted-foreground">You can safely sign out. Sign back in with the same email and password to return to your application. No new email verification is needed.</p>
         <Button
           type="button"
           variant="outline"

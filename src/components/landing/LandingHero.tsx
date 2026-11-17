@@ -1,3 +1,6 @@
+import lotus from "@/assets/brand/silver-lotus.png";
+import lcove from "@/assets/brand/silver-lcove.png";
+import star from "@/assets/brand/silver-star.png";
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -22,13 +25,10 @@ export function LandingHero() {
         </h1>
         <p className="lore mb-4 text-[22px] text-foreground">{HERO_TAGLINE}</p>
         <p className="mb-8 text-base leading-relaxed text-muted-foreground">{HERO_SUB}</p>
-        {/* Reserved for 2–3 consented member portraits. Empty until Cadre picks who appears. */}
-        <div className="mb-8 flex items-center justify-center -space-x-3" aria-hidden="true">
-          {[0, 1, 2].map((slot) => (
-            <span
-              key={slot}
-              className="h-14 w-14 rounded-full border border-primary/20 bg-gradient-to-b from-primary/[0.06] to-transparent shadow-[inset_0_0_16px_rgba(255,159,200,0.08)]"
-            />
+        <div className="mb-8 flex items-center justify-center gap-5" aria-label="ETHER creative family">
+          {[lotus, lcove, star].map((src, index) => (
+            <img key={src} src={src} alt={["Lotus emblem", "LCOVE emblem", "Star emblem"][index]}
+              width={72} height={72} className="h-[72px] w-[72px] object-contain" decoding="async" />
           ))}
         </div>
         <Button className="w-full" onClick={() => navigate(publicJoinPath(location.search))}>

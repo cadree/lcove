@@ -52,6 +52,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Locked = lazy(() => import("./pages/Locked"));
 const Denied = lazy(() => import("./pages/Denied"));
+const MembershipVouch = lazy(() => import("./pages/MembershipVouch"));
 const Pending = lazy(() => import("./pages/Pending"));
 const WelcomeFamilcy = lazy(() => import("./pages/WelcomeFamilcy"));
 const Messages = lazy(loadMessages);
@@ -193,6 +194,7 @@ const App = () => (
                 <Route path="/onboarding" element={<Onboarding />} />
                 <Route path="/locked" element={<Locked />} />
                 <Route path="/denied" element={<Denied />} />
+                <Route path="/vouch/:token" element={<MembershipVouch />} />
                 <Route path="/pending" element={<Pending />} />
                 <Route path="/welcome" element={<WelcomeFamilcy />} />
                 <Route path="/feed" element={<Feed />} />

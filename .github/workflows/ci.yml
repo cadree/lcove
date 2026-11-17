@@ -64,6 +64,9 @@ jobs:
       - name: Direct creative invitation and abuse-limit checks
         run: node --test scripts/member-invitation-emails-db.test.mjs
 
+      - name: Application vouch permissions and duplicate checks
+        run: node scripts/membership-vouch-db.test.mjs
+
       - name: Mobile admin scrolling regression
         run: node --test scripts/admin-mobile-scroll.test.mjs
 

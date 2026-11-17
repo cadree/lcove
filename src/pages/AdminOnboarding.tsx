@@ -311,7 +311,7 @@ const AdminOnboarding: React.FC = () => {
                 />
               </div>
 
-              <ScrollArea className="h-[500px]">
+              <div>
                 {loadingUsers ? (
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
@@ -355,7 +355,7 @@ const AdminOnboarding: React.FC = () => {
                     })}
                   </div>
                 )}
-              </ScrollArea>
+              </div>
             </div>
           ) : (
             <div className="space-y-6">
