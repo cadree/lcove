@@ -36,7 +36,7 @@ export function WaitingFilm() {
         )}
       </div>
       <h2 id="waiting-film-title" className="mt-5 text-center font-display text-xl leading-snug text-foreground">ETHER — The Feeling Behind Creating</h2>
-      <p className="mt-2 text-center text-[10px] uppercase tracking-[0.16em] text-muted-foreground">18-second film · Optional viewing</p>
+      <p className="mt-2 text-center text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Short film · Optional viewing</p>
       <p className="mx-auto mt-5 max-w-xs text-center font-display text-lg italic leading-relaxed text-foreground/80">Creativity is more than what you make. It's a part of who you are.</p>
       <p className="mt-3 text-center text-xs leading-relaxed text-muted-foreground">An introduction to the spirit behind ETHER.</p>
       {playing && <Button variant="ghost" size="sm" className="mx-auto mt-2 flex" onClick={() => {
