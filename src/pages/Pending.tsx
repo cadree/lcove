@@ -1,4 +1,5 @@
 import { WaitingFilm } from "@/components/onboarding/WaitingFilm";
+import { MemberInviteCard } from "@/components/membership/MemberInviteCard";
 import { useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -66,6 +67,7 @@ export default function Pending() {
           </motion.p>
         ) : null}
 
+        <div className="my-7 w-full"><MemberInviteCard mode="referral" /></div>
         <WaitingFilm />
 
         <Button
