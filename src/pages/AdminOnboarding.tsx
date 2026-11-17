@@ -21,6 +21,7 @@ import { useIsAdmin, useAllUsers, useQuestionnaireResponses, useChangeAccessStat
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { normalizeApplicantLink } from '@/lib/applicantLinks';
+import { MemberReferralReview } from "@/components/membership/MemberReferralReview";
 
 const MAX_PASSIONS = 10;
 const MIN_PASSION_LENGTH = 2;
@@ -412,6 +413,8 @@ const AdminOnboarding: React.FC = () => {
                   )}
                 </CardContent>
               </Card>
+
+              <MemberReferralReview applicantId={selectedUser.user_id} />
 
               {/* Status Control */}
               <Card>
