@@ -17,6 +17,7 @@ test('membership review validates both URLs and atomically notifies each admin a
  INSERT INTO user_roles VALUES('00000000-0000-4000-8000-000000000001','admin'),('00000000-0000-4000-8000-000000000002','admin');`);
  await db.exec(await readFile('supabase/migrations/20261116103000_onboarding_review_links_email.sql','utf8'));
  await db.exec(await readFile('supabase/migrations/20261117050833_membership_review_alerts.sql','utf8'));
+ await db.exec(await readFile('supabase/migrations/20261117052021_protect_pending_review_links.sql','utf8'));
  const id='00000000-0000-4000-8000-000000000003';
  await db.query('INSERT INTO profiles(user_id,display_name) VALUES($1,$2)',[id,'Test applicant']);
  const submit=links=>db.query('UPDATE profiles SET onboarding_completed=true,social_links=$2::jsonb WHERE user_id=$1',[id,JSON.stringify(links)]);
@@ -29,7 +30,9 @@ test('membership review validates both URLs and atomically notifies each admin a
  assert.equal((await db.query('SELECT count(*)::int n FROM notifications')).rows[0].n,2);
  await db.query('UPDATE profiles SET onboarding_completed=true,display_name=$2 WHERE user_id=$1',[id,'Updated name']);
  assert.equal((await db.query('SELECT count(*)::int n FROM test_queue')).rows[0].n,2);
- // Existing members retain normal editing, even if they predate mandatory links.
+ await assert.rejects(db.query("UPDATE profiles SET social_links='{}' WHERE user_id=$1",[id]),/required for review/);
+ // Approved members retain ordinary profile editing.
+ await db.query("UPDATE profiles SET access_status='active' WHERE user_id=$1",[id]);
  await db.query("UPDATE profiles SET social_links='{}' WHERE user_id=$1",[id]);
  }finally{await db.close();}
 });
