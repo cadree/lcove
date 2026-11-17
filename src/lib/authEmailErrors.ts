@@ -16,3 +16,14 @@ export function emailSendingHelp(error: { message?: string; code?: string; statu
   }
   return null;
 }
+
+/** Only email-delivery failures can leave an unverified signup that needs
+ * confirmation recovery. Do not treat arbitrary signup failures this way. */
+export function signupEmailDeliveryFailed(error: { message?: string; code?: string; status?: number }): boolean {
+  const message = (error.message || "").toLowerCase();
+  return Boolean(emailSendingHelp(error)) ||
+    message.includes("smtp") ||
+    message.includes("authentication credentials invalid") ||
+    message.includes("error sending confirmation email") ||
+    message.includes("failed to send confirmation email");
+}
