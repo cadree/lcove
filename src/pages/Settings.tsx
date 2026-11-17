@@ -364,7 +364,7 @@ const Settings = () => {
           <div className="mb-6"><MemberInviteCard mode="vouch" /></div>
         )}
 
-        {/* Profile Section */
+        {/* Profile Section */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
