@@ -1,15 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FIRST_RUN_PATH, markConnectHintSeen, showConnectHint } from "./firstRun.ts";
+import { FIRST_RUN_PATH, AFTER_WELCOME_PATH, markConnectHintSeen, showConnectHint } from "./firstRun.ts";
 
 const memory = () => {
   const map = new Map<string, string>();
   return { getItem: (k: string) => map.get(k) ?? null, setItem: (k: string, v: string) => void map.set(k, v) };
 };
 
-test("onboarding lands on the people deck", () => {
-  assert.equal(FIRST_RUN_PATH.split("?")[0], "/explore");
-  assert.equal(new URLSearchParams(FIRST_RUN_PATH.split("?")[1]).get("section"), "people");
+test("approved applicants first register their card, then reach Explore", () => {
+  assert.equal(FIRST_RUN_PATH, "/welcome");
+  assert.equal(AFTER_WELCOME_PATH.split("?")[0], "/explore");
+  assert.equal(new URLSearchParams(AFTER_WELCOME_PATH.split("?")[1]).get("section"), "people");
 });
 
 test("the Connect hint shows once, only after onboarding, per member", () => {
