@@ -166,6 +166,13 @@ const Onboarding = () => {
       return;
     }
 
+    if (!data.socialProfile.trim() && !(user.email && user.email_confirmed_at)) {
+      toast({ title: 'Email verification required', description: 'Verify your account email before submitting a website-only application.', variant: 'destructive' });
+      setCurrentStep(3);
+      setSaving(false);
+      return;
+    }
+
     const { level, score, passed: passedExam } = calculateMindsetLevel(data.questionnaireResponses);
 
     try {
@@ -306,6 +313,7 @@ const Onboarding = () => {
     <OnboardingPassions key="passions" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingCity key="city" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingProof key="review-links" socialProfile={data.socialProfile} website={data.website}
+      verifiedEmail={user?.email && user.email_confirmed_at ? user.email : null}
       updateLinks={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingPledge key="pledge" onComplete={() => void handleComplete()} onBack={prevStep} submitting={saving} />,
   ];
