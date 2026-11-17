@@ -89,7 +89,7 @@ jobs:
           umask 077
           printf '%s' "$APP_STORE_CONNECT_API_KEY_P8" > "$KEY_PATH"
           trap 'rm -f "$KEY_PATH"' EXIT
-          BUILD_NUMBER=$((100 + GITHUB_RUN_NUMBER))
+          BUILD_NUMBER="$(date -u +%Y%m%d%H%M)"
           xcodebuild archive \
             -project ios/App/App.xcodeproj \
             -scheme App \
