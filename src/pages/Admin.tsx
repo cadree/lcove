@@ -21,7 +21,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
@@ -495,7 +494,7 @@ const Admin: React.FC = () => {
                 </div>
               </div>
               
-              <ScrollArea className="h-[500px]">
+              <div className="w-full">
                 {loadingAdminData ? (
                   <div className="space-y-3">
                     {[1, 2, 3].map(i => <Skeleton key={i} className="h-16" />)}
@@ -508,7 +507,7 @@ const Admin: React.FC = () => {
                         className={`overflow-hidden transition-colors ${selectedUsers.has(user.user_id) ? 'ring-2 ring-primary bg-primary/5' : ''}`}
                       >
                         <CardContent className="p-4">
-                          <div className="flex items-start justify-between gap-4">
+                          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                             <div className="flex items-start gap-3 flex-1 min-w-0">
                               <div className="flex flex-col items-center gap-2">
                                 <Checkbox
@@ -592,7 +591,7 @@ const Admin: React.FC = () => {
                               </div>
                             </div>
 
-                            <div className="flex flex-col gap-2">
+                            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-col">
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -710,13 +709,13 @@ const Admin: React.FC = () => {
                     ))}
                   </div>
                 )}
-              </ScrollArea>
+              </div>
             </div>
           </TabsContent>
 
           {/* Pending Onboarding Tab */}
           <TabsContent value="pending" className="mt-4">
-            <ScrollArea className="h-[400px]">
+            <div className="w-full">
               {loadingPending ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map(i => <Skeleton key={i} className="h-24" />)}
@@ -775,7 +774,7 @@ const Admin: React.FC = () => {
                   ))}
                 </div>
               )}
-            </ScrollArea>
+            </div>
           </TabsContent>
 
           {/* Partner Applications Tab */}
@@ -802,7 +801,7 @@ const Admin: React.FC = () => {
                 <CardDescription>Previous mass notifications sent to users</CardDescription>
               </CardHeader>
               <CardContent>
-                <ScrollArea className="h-[350px]">
+                <div className="w-full">
                   {loadingAnnouncements ? (
                     <div className="space-y-3">
                       {[1, 2, 3].map(i => <Skeleton key={i} className="h-20" />)}
@@ -838,14 +837,14 @@ const Admin: React.FC = () => {
                       ))}
                     </div>
                   )}
-                </ScrollArea>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           {/* Flagged Users Tab */}
           <TabsContent value="flagged" className="mt-4">
-            <ScrollArea className="h-[400px]">
+            <div className="w-full">
               {lowRepUsers?.length === 0 ? (
                 <div className="text-center py-12">
                   <CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-4" />
@@ -874,7 +873,7 @@ const Admin: React.FC = () => {
                   ))}
                 </div>
               )}
-            </ScrollArea>
+            </div>
           </TabsContent>
 
           <TabsContent value="reports" className="mt-4">
@@ -887,7 +886,7 @@ const Admin: React.FC = () => {
 
           {/* Action History Tab */}
           <TabsContent value="history" className="mt-4">
-            <ScrollArea className="h-[400px]">
+            <div className="w-full">
               {loadingActions ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map(i => <Skeleton key={i} className="h-16" />)}
@@ -923,7 +922,7 @@ const Admin: React.FC = () => {
                   ))}
                 </div>
               )}
-            </ScrollArea>
+            </div>
           </TabsContent>
 
           <TabsContent value="nuance" className="mt-4">
