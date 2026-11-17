@@ -5,12 +5,13 @@ import { getAuthRedirectUrl, clearAllAuthStorage } from '@/lib/capacitorStorage'
 import { logAuthEvent, logAuthError, logSessionState } from '@/lib/authDebug';
 import { applyPendingSignupProfile, inviteTokenFromMetadata, WAITLIST_INVITE_METADATA_KEY } from '@/lib/pendingSignup';
 import { SHOT_USER_ID, shotSessionEnabled } from '@/lib/shotSession';
+import { MEMBER_REFERRAL_META_KEY, normalizedMemberReferralCode } from '@/lib/memberReferrals';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, inviteToken?: string, profile?: { displayName?: string; memberOf?: string }) => Promise<{ error: Error | null; session: Session | null }>;
+  signUp: (email: string, password: string, inviteToken?: string, profile?: { displayName?: string; memberOf?: string }, referralCode?: string) => Promise<{ error: Error | null; session: Session | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
@@ -89,8 +90,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signUp = async (email: string, password: string, inviteToken?: string, profile?: { displayName?: string; memberOf?: string }) => {
+  const signUp = async (email: string, password: string, inviteToken?: string, profile?: { displayName?: string; memberOf?: string }, referralCode?: string) => {
     const token = inviteToken?.trim() ?? '';
+    const safeReferral = normalizedMemberReferralCode(referralCode);
     const redirectPath = token
       ? `/auth?confirmed=1&invite=${encodeURIComponent(token)}`
       : '/auth?confirmed=1';
@@ -109,6 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ...(profile?.displayName?.trim() ? { display_name: profile.displayName.trim() } : {}),
           ...(profile?.memberOf?.trim() ? { member_of: profile.memberOf.trim() } : {}),
           ...(token ? { [WAITLIST_INVITE_METADATA_KEY]: token } : {}),
+          ...(safeReferral ? { [MEMBER_REFERRAL_META_KEY]: safeReferral } : {}),
         },
       }
     });
