@@ -61,6 +61,9 @@ jobs:
       - name: Member invitations and Familcy acceptance checks
         run: node --test scripts/member-referrals-db.test.mjs
 
+      - name: Direct creative invitation and abuse-limit checks
+        run: node --test scripts/member-invitation-emails-db.test.mjs
+
       - name: Stripe webhook fixtures
         run: npm run test:webhook
 
