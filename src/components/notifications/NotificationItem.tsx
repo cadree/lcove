@@ -36,6 +36,7 @@ const notificationMark: Record<NotificationType, { icon: LucideIcon; fill: IconF
   item_invite: { icon: Send, fill: 'cyan' },
   credit: { icon: Award, fill: 'gold' },
   vouch: { icon: HandHeart, fill: 'gold' },
+  member_application: { icon: Users, fill: 'pink' },
 };
 
 export const NotificationItem: React.FC<NotificationItemProps> = ({

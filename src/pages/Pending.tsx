@@ -1,3 +1,4 @@
+import { WaitingFilm } from "@/components/onboarding/WaitingFilm";
 import { useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -39,7 +40,7 @@ export default function Pending() {
     <div className="relative flex min-h-[100dvh] flex-col overflow-hidden bg-background">
       <PageMeta title={`${PENDING_TITLE} · Ether`} description={PENDING_BODY} />
       <EntryAtmosphere />
-      <div className="relative z-10 mx-auto flex w-full max-w-md flex-1 flex-col items-center px-6 pb-10 pt-16 text-center">
+      <div className="relative z-10 mx-auto flex w-full max-w-md flex-1 flex-col items-center px-6 pb-10 pt-10 text-center">
         <motion.div {...fade(0)}>
           <EtherWordmark className="mb-8 w-[11rem] max-w-full" />
         </motion.div>
@@ -53,8 +54,8 @@ export default function Pending() {
         <motion.p {...fade(0.08)} className="mb-8 text-[11px] leading-snug text-muted-foreground">
           {FAMILCY_GLOSS}
         </motion.p>
-        <motion.h1 {...fade(0.12)} className="ether-title text-4xl text-foreground">
-          {PENDING_TITLE}
+        <motion.h1 {...fade(0.12)} className="ether-title text-3xl text-foreground">
+          Your application is under review.
         </motion.h1>
         <motion.p {...fade(0.18)} className="mt-4 max-w-sm text-base leading-relaxed text-muted-foreground">
           {PENDING_BODY}
@@ -65,6 +66,7 @@ export default function Pending() {
           </motion.p>
         ) : null}
 
+        <WaitingFilm />
 
         <Button
           type="button"
