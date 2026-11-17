@@ -19,10 +19,10 @@ export function normalizeApplicantLink(value: string): string | null {
   }
 }
 
-/** Both reviewable links, and every non-empty link must be valid. */
+/** Either a public social profile OR portfolio/website is required. */
 export function applicantLinksError(social: string, website: string): string | null {
-  if (!social.trim() || !website.trim()) {
-    return "A public social profile and a website or portfolio link are required to review your application.";
+  if (!social.trim() && !website.trim()) {
+    return "Add a public social profile or a website/portfolio for review.";
   }
   if (normalizeApplicantLink(social) === null) return "Enter a valid public social media URL.";
   if (normalizeApplicantLink(website) === null) return "Enter a valid website or portfolio URL.";
