@@ -5,7 +5,7 @@
  */
 const PATHS: Record<string, RegExp> = {
   member_application: /^\/admin\/onboarding\/[0-9a-f-]{36}$/i,
-  membership_accepted: /^\/feed$/,
+  membership_accepted: /^\/welcome$/,
   referral_accepted: /^\/feed$/,
   credit: /^\/profile\?section=credits$/,
   vouch: /^\/profile\?section=vouches$/,
