@@ -1,4 +1,5 @@
 import { DiscoveryPreferences } from '@/components/discovery/DiscoveryPreferences';
+import { MemberInviteCard } from "@/components/membership/MemberInviteCard";
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
