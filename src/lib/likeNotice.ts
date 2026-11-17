@@ -96,6 +96,7 @@ export function likeTarget(notification: Pick<LikeNotice, "type" | "user_id" | "
 
 export function notificationsForTab<T extends { type: string }>(items: T[], tab: string): T[] {
   if (tab === "all") return items;
+  if (tab === "membership_accepted") return items.filter(item => item.type === "membership_accepted" || item.type === "referral_accepted");
   // The Invites tab also holds invites to a project, gig or event.
   if (tab === "project_invite") return items.filter((item) => item.type === tab || item.type === "item_invite");
   return items.filter((item) => item.type === tab);

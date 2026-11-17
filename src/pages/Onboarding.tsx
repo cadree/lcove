@@ -108,7 +108,10 @@ const Onboarding = () => {
         '/onboarding',
       );
       const hold = next === '/pending' || next === '/denied' || next === '/locked';
-      navigate(hold ? next : (takeEventReturn() || next));
+      // An already-verified member who resumes a previous signup must not
+      // loop on /onboarding; /welcome checks for their approval event.
+      const afterApproval = profile.access_status === "active" ? "/welcome" : next;
+      navigate(hold ? next : (takeEventReturn() || afterApproval), { replace: true });
       return;
     }
     const draft = readOnboardingDraft(window.localStorage, user.id);

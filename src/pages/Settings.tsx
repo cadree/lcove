@@ -1,4 +1,5 @@
 import { DiscoveryPreferences } from '@/components/discovery/DiscoveryPreferences';
+import { MemberInviteCard } from "@/components/membership/MemberInviteCard";
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -359,6 +360,10 @@ const Settings = () => {
             })}
           </div>
         </section>
+
+        {profile?.onboarding_completed && profile.access_status === "active" && (
+          <div className="mb-6"><MemberInviteCard mode="vouch" /></div>
+        )}
 
         {/* Profile Section */}
         <motion.section

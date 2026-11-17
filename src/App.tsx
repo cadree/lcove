@@ -53,6 +53,7 @@ const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Locked = lazy(() => import("./pages/Locked"));
 const Denied = lazy(() => import("./pages/Denied"));
 const Pending = lazy(() => import("./pages/Pending"));
+const WelcomeFamilcy = lazy(() => import("./pages/WelcomeFamilcy"));
 const Messages = lazy(loadMessages);
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Wallet = lazy(() => import("./pages/Wallet"));
@@ -193,6 +194,7 @@ const App = () => (
                 <Route path="/locked" element={<Locked />} />
                 <Route path="/denied" element={<Denied />} />
                 <Route path="/pending" element={<Pending />} />
+                <Route path="/welcome" element={<WelcomeFamilcy />} />
                 <Route path="/feed" element={<Feed />} />
                 <Route path="/explore" element={<Explore />} />
                 <Route path="/directory" element={<Directory />} />

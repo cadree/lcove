@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { PENDING_SIGNUP_KEY, applyPendingSignupProfile, inviteTokenFromMetadata } from '@/lib/pendingSignup';
+import { normalizedMemberReferralCode, type MemberReferralPreview } from '@/lib/memberReferrals';
+import { callRpc } from '@/lib/rpc';
 import { captureSignupAttribution } from '@/lib/signupAttribution';
 import { WAITLIST_MODE } from '@/config/launch';
 import { PageMeta } from '@/components/seo/PageMeta';
@@ -74,6 +76,9 @@ const getAuthErrorMessage = (error: Error): { title: string; description: string
       description: 'Email or password is incorrect. Please try again.',
     };
   }
+  if (message.includes('otp_expired') || message.includes('token has expired') || message.includes('invalid token') || message.includes('token is expired')) {
+    return { title: 'Code expired', description: 'Request a new verification code below, or sign in if your email is already confirmed.' };
+  }
   if (message.includes('email not confirmed')) {
     return {
       title: 'Email Not Confirmed',
@@ -128,6 +133,9 @@ const Auth = () => {
   const [resendNow, setResendNow] = useState(() => Date.now());
   const [isResending, setIsResending] = useState(false);
   const inviteToken = searchParams.get('invite')?.trim() ?? '';
+  const referralCode = normalizedMemberReferralCode(searchParams.get('ref'));
+  const [referralPreview, setReferralPreview] = useState<MemberReferralPreview | null>(null);
+  const [referralChecking, setReferralChecking] = useState(Boolean(referralCode));
   const [inviteEmail, setInviteEmail] = useState<string | null>(null);
   const [inviteState, setInviteState] = useState<'none' | 'checking' | 'ready' | 'inactive'>(
     inviteToken ? 'checking' : 'none',
@@ -162,7 +170,10 @@ const Auth = () => {
   const resendWaitMs = resendCooldownRemaining(confirmationSentAt, resendNow);
 
   const handleResendConfirmation = async () => {
-    if (resendWaitMs > 0 || isResending || !email) return;
+    if (resendWaitMs > 0 || isResending || !emailSchema.safeParse({ email }).success) {
+      setErrors({ email: 'Enter your signup email to request a new code.' });
+      return;
+    }
     setIsResending(true);
     const { error } = await supabase.auth.resend({
       type: 'signup',
@@ -179,10 +190,12 @@ const Auth = () => {
       toast({ title, description, variant: 'destructive' });
       return;
     }
+    setEmailCode('');
+    setMode('confirm-email');
     setConfirmationSentAt(Date.now());
     toast({
-      title: 'Email sent',
-      description: 'We sent another code and link.',
+      title: 'Check your email',
+      description: 'If your email still needs verification, we sent a new code. Already verified? Sign in to resume your application.',
     });
   };
 
@@ -216,6 +229,17 @@ const Auth = () => {
       mode: modeRef.current,
     });
   }, []);
+
+  useEffect(() => {
+    if (!referralCode) return;
+    let cancelled = false;
+    setReferralChecking(true);
+    callRpc<MemberReferralPreview | null>('preview_member_referral', { p_code: referralCode })
+      .then((preview) => { if (!cancelled) setReferralPreview(preview); })
+      .catch(() => { if (!cancelled) setReferralPreview(null); })
+      .finally(() => { if (!cancelled) setReferralChecking(false); });
+    return () => { cancelled = true; };
+  }, [referralCode]);
 
   useEffect(() => {
     if (!inviteToken) return;
@@ -359,6 +383,10 @@ const Auth = () => {
           logAuthError('Login failed', error);
           const { title, description } = getAuthErrorMessage(error);
           toast({ title, description, variant: 'destructive' });
+          if (error.message.toLowerCase().includes('email not confirmed')) {
+            setMode('confirm-email');
+            setConfirmationSentAt(null);
+          }
         } else {
           logAuthEvent('Login successful');
         }
@@ -372,11 +400,15 @@ const Auth = () => {
           displayName: displayName.trim(),
           ...(inviteToken ? { inviteToken } : {}),
         }));
-        const { error, session } = await signUp(email, password, inviteToken || undefined, { displayName: displayName.trim() });
+        const { error, session } = await signUp(email, password, inviteToken || undefined, { displayName: displayName.trim() }, referralCode || undefined);
         if (error) {
           logAuthError('Signup failed', error);
           const { title, description } = getAuthErrorMessage(error);
           toast({ title, description, variant: 'destructive' });
+          if (/already registered|already exists/i.test(error.message)) {
+            setMode('login');
+            toast({ title: 'Resume your application', description: 'Your account already exists. Sign in with your original password, or reset it below.' });
+          }
         } else if (!session) {
           logAuthEvent('Signup needs email confirmation');
           setConfirmationSentAt(Date.now());
@@ -551,8 +583,12 @@ const Auth = () => {
           {mode === 'confirm-email' ? (
             <div className="text-center py-2">
               <p className="text-sm text-muted-foreground mb-4">
-                Sent to <span className="text-primary">{email}</span>.
+                {email ? <>Verification for <span className="text-primary">{email}</span>.</> : 'Enter your signup email to request a fresh verification code.'}
               </p>
+              {!emailSchema.safeParse({ email }).success && (
+                <Input type="email" autoComplete="email" aria-label="Signup email" placeholder="Your signup email"
+                  className="mb-3 h-12" value={email} onChange={(event) => setEmail(event.target.value)} />
+              )}
               <label htmlFor="email-code" className="sr-only">6-digit code</label>
               <Input
                 id="email-code"
@@ -577,7 +613,7 @@ const Auth = () => {
                 type="button"
                 variant="outline"
                 onClick={() => void handleResendConfirmation()}
-                disabled={isResending || resendWaitMs > 0}
+                disabled={isResending || resendWaitMs > 0 || !emailSchema.safeParse({ email }).success}
                 className="w-full mb-3"
               >
                 {resendWaitMs > 0
@@ -589,7 +625,7 @@ const Auth = () => {
                 onClick={() => setMode('login')}
                 className="w-full"
               >
-                Back to log in
+                Already verified? Sign in to finish your application
               </Button>
             </div>
           ) : resetEmailSent && mode === 'forgot' ? (
@@ -625,6 +661,15 @@ const Auth = () => {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-3">
+              {mode === 'signup' && referralCode && (
+                <p role="status" className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-center text-sm leading-relaxed text-foreground">
+                  {referralChecking
+                    ? 'Checking your creative invitation…'
+                    : referralPreview
+                      ? `${referralPreview.name} ${referralPreview.kind === 'vouch' ? 'vouched for you' : 'invited you'} to apply to ETHER. Your application will still be reviewed.`
+                      : 'This referral link is no longer active. You can still apply directly.'}
+                </p>
+              )}
               {mode === 'signup' && (
                 <>
                   <div className="space-y-2">
@@ -760,6 +805,18 @@ const Auth = () => {
                 )}
               </Button>
             </form>
+          )}
+
+          {mode === 'signup' && (
+            <div className="mt-5 space-y-2 border-t border-border pt-4 text-center text-sm">
+              <button type="button" className="min-h-11 w-full text-primary underline underline-offset-4" onClick={() => setMode('login')}>
+                Already verified or started an application? Sign in to continue
+              </button>
+              <button type="button" className="min-h-11 w-full text-muted-foreground underline underline-offset-4"
+                onClick={() => { setMode('confirm-email'); setConfirmationSentAt(null); }}>
+                Verification code expired? Request a fresh code
+              </button>
+            </div>
           )}
 
           {(mode === 'login' || mode === 'signup' || mode === 'confirmed-signin') && (

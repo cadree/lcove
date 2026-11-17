@@ -58,6 +58,9 @@ jobs:
       - name: Admin-only application push checks
         run: npm run test:application-push
 
+      - name: Member invitations and Familcy acceptance checks
+        run: node --test scripts/member-referrals-db.test.mjs
+
       - name: Stripe webhook fixtures
         run: npm run test:webhook
 

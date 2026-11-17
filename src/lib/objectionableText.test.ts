@@ -27,7 +27,7 @@ describe("iOS digital purchases", () => {
     assert.equal(digitalPurchasesAllowed(true, true), true);
   });
 
-  it("uses the existing App Store bundle id and a version after 1.0 (1)", () => {
+  it("uses the existing App Store bundle id and version 1.0.5 after the latest TestFlight 1.0.4", () => {
     const bundle = "app.lovable.e07d9c457fd949f78f3cc7d5998be668";
     const ids = readFileSync("src/config/nativeIds.ts", "utf8");
     const plist = readFileSync("ios/App/App/Info.plist", "utf8");
@@ -37,8 +37,8 @@ describe("iOS digital purchases", () => {
     assert.equal(plist.includes("com.etherbylcove.app"), false);
     assert.equal(project.includes(`PRODUCT_BUNDLE_IDENTIFIER = ${bundle};`), true);
     assert.equal(project.includes("com.etherbylcove.app"), false);
-    assert.equal(project.includes("MARKETING_VERSION = 1.0.1;"), true);
-    assert.equal(project.includes("CURRENT_PROJECT_VERSION = 2;"), true);
+    assert.equal(project.includes("MARKETING_VERSION = 1.0.5;"), true);
+    assert.equal(project.includes("CURRENT_PROJECT_VERSION = 202611170600;"), true);
     assert.equal(project.includes("DEVELOPMENT_TEAM = 926NTNU4M7;"), true);
   });
 

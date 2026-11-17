@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import PageLayout from "@/components/layout/PageLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -29,6 +30,8 @@ import {
   type EtherIdCard,
 } from "@/lib/etherId";
 import { toast } from "sonner";
+import { callRpc } from "@/lib/rpc";
+import { AFTER_WELCOME_PATH } from "@/lib/firstRun";
 
 const SHOT_CARD: EtherIdCard = {
   display_name: "Cadre Wallace",
@@ -63,6 +66,10 @@ async function loadCard(): Promise<EtherIdCard | null> {
 
 export default function EtherId() {
   const { session } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const setupMode = searchParams.get('setup') === '1';
+  const [walletOpened, setWalletOpened] = useState(false);
   useEffect(() => {
     document.body.classList.add("ether-id-page");
     return () => document.body.classList.remove("ether-id-page");
@@ -83,6 +90,20 @@ export default function EtherId() {
     },
   });
   const card = cardQuery.data;
+  const familcyStatus = useQuery({
+    queryKey: ['familcy-welcome', session?.user.id],
+    enabled: Boolean(session?.user.id && setupMode),
+    queryFn: () => callRpc<{ needs_setup: boolean; card_registered: boolean }>('get_my_familcy_welcome_status'),
+  });
+  const cardRegistered = setupMode && Boolean(familcyStatus.data?.card_registered);
+  const completeWelcome = useMutation({
+    mutationFn: () => callRpc<void>('complete_my_familcy_welcome'),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['familcy-welcome', session?.user.id] });
+      navigate(AFTER_WELCOME_PATH, { replace: true });
+    },
+    onError: (error: Error) => toast.error(error.message || 'Could not finish card setup'),
+  });
   const [username, setUsername] = useState<string | null>(null);
   const [passionTitle, setPassionTitle] = useState<string | null>(null);
   const [memberOf, setMemberOf] = useState<string | null>(null);
@@ -102,6 +123,9 @@ export default function EtherId() {
       const titleError = passionTitleError(passionValue);
       const dateError = birthdayError(monthValue, dayValue);
       const ofError = memberOfError(memberOfValue);
+      if (setupMode && (!normalizeUsername(usernameValue) || !normalizePassionTitle(passionValue))) {
+        throw new Error('Add your username and creative passion to register your ETHER Card.');
+      }
       if (nameError || titleError || dateError || ofError) {
         throw new Error(nameError || titleError || dateError || ofError || "Check the card");
       }
@@ -121,10 +145,14 @@ export default function EtherId() {
         })
         .eq("user_id", userId);
       if (error) throw error;
+      if (setupMode && familcyStatus.data?.needs_setup) {
+        await callRpc<void>('register_my_ether_card');
+      }
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["ether-id"] });
-      toast.success("Ether ID updated");
+      if (setupMode) await queryClient.invalidateQueries({ queryKey: ['familcy-welcome', session?.user.id] });
+      toast.success(setupMode ? 'ETHER Card registered' : 'Ether ID updated');
     },
     onError: (error: Error) => {
       toast.error(error.message || "Could not update Ether ID");
@@ -177,8 +205,10 @@ export default function EtherId() {
     try {
       if (isIosApp()) {
         await openInSafari(passUrl);
+        setWalletOpened(true);
         return;
       }
+      setWalletOpened(true);
       window.location.assign(passUrl);
     } catch {
       toast.error("Could not open Apple Wallet");
@@ -192,9 +222,9 @@ export default function EtherId() {
     <PageLayout bleed>
       <div className="px-6 pb-24 pt-6">
         <PageHeader
-          eyebrow="Member"
-          title="Ether ID"
-          description="Your card. The verify page reads status live."
+          eyebrow={setupMode ? 'Familcy · Card setup' : 'Member'}
+          title={setupMode ? 'Register your ETHER Card' : 'Ether ID'}
+          description={setupMode ? 'Save your username and passion, then add your card to Apple Wallet.' : 'Your card. The verify page reads status live.'}
           showMore={false}
         />
         {cardQuery.isLoading && <p className="text-sm text-muted-foreground">Loading your card…</p>}
@@ -215,7 +245,7 @@ export default function EtherId() {
               <Button type="button" variant="outline" className="min-h-11" onClick={() => refresh.mutate()} disabled={refresh.isPending}>
                 Refresh code
               </Button>
-              {showWallet && (
+              {!setupMode && showWallet && (
                 <Button type="button" className="min-h-11" onClick={() => void addToWallet()}>
                   Add to Apple Wallet
                 </Button>
@@ -308,9 +338,30 @@ export default function EtherId() {
                 </div>
               </div>
               <Button type="submit" className="min-h-11 w-full" disabled={save.isPending}>
-                Save
+                {save.isPending ? 'Saving…' : setupMode ? (cardRegistered ? 'Update ETHER Card' : 'Register ETHER Card') : 'Save'}
               </Button>
             </form>
+            {setupMode && cardRegistered && (
+              <section className="mt-8 space-y-3 rounded-2xl border border-border p-5" aria-label="Your next step">
+                {showWallet ? (
+                  <>
+                    <Button type="button" className="min-h-12 w-full" onClick={() => void addToWallet()}>
+                      {walletOpened ? 'Open Apple Wallet again' : 'Add to Apple Wallet'}
+                    </Button>
+                    <p className="text-xs text-muted-foreground">Apple Wallet opens outside ETHER. Return here after adding your card.</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Apple Wallet is not available for this card on your device yet. Your ETHER Card is registered and available here.</p>
+                )}
+                <Button type="button" variant={showWallet ? 'outline' : 'default'} className="min-h-12 w-full"
+                  disabled={completeWelcome.isPending} onClick={() => completeWelcome.mutate()}>
+                  {completeWelcome.isPending ? 'Entering ETHER…' : 'Continue to Explore'}
+                </Button>
+              </section>
+            )}
+            {setupMode && familcyStatus.isError && (
+              <p role="alert" className="mt-4 text-sm text-destructive">Card registration could not be verified. Please reload the page.</p>
+            )}
           </>
         )}
       </div>

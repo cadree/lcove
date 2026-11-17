@@ -1,13 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
-import bearLogo from '@/assets/ether-bear-logo.webp';
 import { isKnownPath, isPublicPath } from "@/lib/appRoutes";
-import { NO_FAKE_LINE, WELCOME_HOME } from "@/content/copy";
 import { SignUpPrompt } from "@/components/auth/SignUpPrompt";
 import { accessPath } from "@/lib/accessPath";
 import { FIRST_RUN_PATH } from "@/lib/firstRun";
+import { callRpc } from "@/lib/rpc";
 import { EVENT_RETURN_KEY, eventReturnPath, rememberEventReturn } from "../../../functions/_shared/eventShare.js";
 
 interface AccessGateProps {
@@ -22,8 +21,6 @@ const AccessGate = ({ children }: AccessGateProps) => {
   const { profile, loading: profileLoading } = useProfile();
   const navigate = useNavigate();
   const location = useLocation();
-  const [showWelcome, setShowWelcome] = useState(false);
-  const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
 
   const knownRoute = isKnownPath(location.pathname);
   const isPublicRoute = isPublicPath(location.pathname);
@@ -105,20 +102,24 @@ const AccessGate = ({ children }: AccessGateProps) => {
         return;
       }
 
-      const accessStatus = profile.access_status || 'pending';
-
-      // Welcome only after a human has let the person in.
-      if (accessStatus === 'active' && !hasSeenWelcome) {
-        const welcomeKey = `welcome_shown_${user.id}`;
-        const alreadyShown = localStorage.getItem(welcomeKey);
-        if (!alreadyShown) {
-          setShowWelcome(true);
-          localStorage.setItem(welcomeKey, 'true');
-          setHasSeenWelcome(true);
-        }
-      }
     }
-  }, [user, profile, authLoading, profileLoading, isPublicRoute, isLandingRoute, knownRoute, legacyStreamId, navigate, location.pathname, location.search, hasSeenWelcome]);
+  }, [user, profile, authLoading, profileLoading, isPublicRoute, isLandingRoute, knownRoute, legacyStreamId, navigate, location.pathname, location.search]);
+
+  // An approved creative must complete the card handoff even after closing
+  // the browser or signing in on another device. Legacy members without an
+  // acceptance event are not interrupted by this flow.
+  useEffect(() => {
+    if (!user?.id || authLoading || profileLoading || !profile?.onboarding_completed || profile.access_status !== 'active') return;
+    if (location.pathname === '/welcome') return;
+    if (location.pathname === '/id' && new URLSearchParams(location.search).get('setup') === '1') return;
+    let cancelled = false;
+    callRpc<{ needs_setup: boolean }>('get_my_familcy_welcome_status')
+      .then((status) => {
+        if (!cancelled && status?.needs_setup) navigate('/welcome', { replace: true });
+      })
+      .catch(() => { /* A temporary lookup failure must not erase approval. */ });
+    return () => { cancelled = true; };
+  }, [user?.id, authLoading, profileLoading, profile?.onboarding_completed, profile?.access_status, location.pathname, location.search, navigate]);
 
   if (!knownRoute) {
     return <>{children}</>;
@@ -146,45 +147,7 @@ const AccessGate = ({ children }: AccessGateProps) => {
     );
   }
 
-  return (
-    <>
-      {children}
-      
-      {/* Welcome Home Popup */}
-      {showWelcome && (
-        <div
-          className="fixed inset-x-0 top-0 z-40 flex animate-fade-in items-center justify-center bg-background/80 backdrop-blur-sm motion-reduce:animate-none"
-          style={{ bottom: "calc(84px + env(safe-area-inset-bottom, 0px))" }}
-          onClick={() => setShowWelcome(false)}
-        >
-          <div
-            className="file-panel mx-4 max-w-md animate-fade-in p-8 text-center motion-reduce:animate-none md:p-12"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-6 flex justify-center">
-              <img src={bearLogo} alt="Ether" className="mx-auto h-28 w-auto" width={112} height={112} />
-            </div>
-
-            <h2 className="ether-title mb-4 text-3xl text-foreground md:text-4xl">
-              {WELCOME_HOME}
-            </h2>
-
-            <p className="mb-8 text-muted-foreground">
-              {NO_FAKE_LINE}
-            </p>
-
-            <button
-              type="button"
-              onClick={() => setShowWelcome(false)}
-              className="w-full rounded-xl bg-primary px-6 py-3 font-medium text-primary-foreground transition-transform hover:scale-[1.02] hover:bg-primary/90 active:scale-[0.98] motion-reduce:transform-none"
-            >
-              Enter
-            </button>
-          </div>
-        </div>
-      )}
-    </>
-  );
+  return <>{children}</>;
 };
 
 export default AccessGate;

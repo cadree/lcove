@@ -1,0 +1,127 @@
+name: Build ETHER for iPhone TestFlight
+
+# Creates a macOS/iOS simulator smoke build after each candidate push.
+# With an App Store Connect team API key, Xcode also signs and uploads a
+# distribution archive for the EXISTING ETHER by LCOVE App Store Connect app.
+on:
+  push:
+    branches:
+      - feat/member-referral-vouches-testflight-nov17
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ether-testflight-candidate
+  cancel-in-progress: false
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://aykopqinnnssxdhxqruo.supabase.co' }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_7pBuzr74eJQ94S3dEt1prQ_5d_V8jud' }}
+      VITE_SUPABASE_PROJECT_ID: ${{ vars.VITE_SUPABASE_PROJECT_ID || 'aykopqinnnssxdhxqruo' }}
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Check production client configuration
+        run: |
+          set -euo pipefail
+          test "$VITE_SUPABASE_URL" = "https://aykopqinnnssxdhxqruo.supabase.co"
+          test "$VITE_SUPABASE_PROJECT_ID" = "aykopqinnnssxdhxqruo"
+          test -n "$VITE_SUPABASE_PUBLISHABLE_KEY"
+      - name: Build and check ETHER web assets
+        run: |
+          npm ci
+          npm run typecheck
+          npm run test:unit
+          node --test scripts/member-referrals-db.test.mjs
+          npm run build
+          npx cap sync ios
+      - name: Inspect Xcode toolchain
+        run: |
+          xcodebuild -version
+          xcodebuild -list -project ios/App/App.xcodeproj
+      - name: Verify unsigned iOS simulator compilation
+        run: |
+          xcodebuild build \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/EtherDerived" \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Package simulator build for developer QA
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$RUNNER_TEMP/EtherDerived/Build/Products/Release-iphonesimulator/App.app" \
+            "$RUNNER_TEMP/ether-ios-simulator.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ether-ios-simulator-unsigned
+          path: ${{ runner.temp }}/ether-ios-simulator.zip
+          retention-days: 7
+
+      - name: Check whether Apple upload credentials are configured
+        id: apple
+        run: |
+          if [[ -n "$APP_STORE_CONNECT_KEY_ID" && -n "$APP_STORE_CONNECT_ISSUER_ID" && -n "$APP_STORE_CONNECT_API_KEY_P8" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Unsigned simulator build succeeded; no App Store Connect API key was configured, so no TestFlight upload was attempted."
+          fi
+
+      - name: Archive and upload signed ETHER build to TestFlight
+        if: steps.apple.outputs.configured == 'true'
+        run: |
+          set -euo pipefail
+          KEY_PATH="$RUNNER_TEMP/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          umask 077
+          printf '%s' "$APP_STORE_CONNECT_API_KEY_P8" > "$KEY_PATH"
+          trap 'rm -f "$KEY_PATH"' EXIT
+          BUILD_NUMBER="$(date -u +%Y%m%d%H%M)"
+          xcodebuild archive \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/ETHER.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
+            DEVELOPMENT_TEAM=926NTNU4M7 \
+            CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>teamID</key><string>926NTNU4M7</string>
+            <key>uploadSymbols</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/ETHER.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/ETHERExport" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"
+          echo "::notice::ETHER build $BUILD_NUMBER was submitted to App Store Connect for TestFlight processing. Check Apple for availability."
