@@ -8,7 +8,8 @@ This release extends the already-merged ETHER review flow with member vouches, p
 - Apple ID: **6758372010**
 - Team ID: **926NTNU4M7**
 - Bundle ID: `app.lovable.e07d9c457fd949f78f3cc7d5998be668`
-- Marketing version: `1.0.1`; Xcode project build number incremented from 2 to 3
+- Most recent TestFlight confirmation in Gmail: ETHER by LCOVE **1.0.4 (202610281204)** on October 28, 2026.
+- Next marketing version: **1.0.5**, with an Xcode project candidate build number above the previous TestFlight release.
 
 Do not create another app, new bundle identifier, or distribution team. Publishing an iOS build to TestFlight is **not** the same as launching it on the public App Store.
 
@@ -26,7 +27,7 @@ The workflow attempts the signed Apple archive and upload **only when all three 
 
 Configure them in [GitHub Actions secrets](https://github.com/cadree/lcove/settings/secrets/actions). Do not paste keys or provisioning certificates in chat or commit them to Git. The key must belong to the existing Apple team and have sufficient App Store Connect/provisioning access. If the team does not permit automatic Xcode signing from an API key, use the manual Xcode signing route below.
 
-The workflow picks a unique build number (`100 + GITHUB_RUN_NUMBER`) and uses `xcodebuild archive` plus `xcodebuild -exportArchive` with destination `upload`, method `app-store-connect` and the existing bundle/team identifiers. A green upload **only establishes Apple's acceptance of the binary**; the build must still be processed by App Store Connect and assigned to internal TestFlight testers.
+The workflow picks a chronological UTC build number (`YYYYMMDDHHMM`) and uses `xcodebuild archive` plus `xcodebuild -exportArchive` with destination `upload`, method `app-store-connect` and the existing bundle/team identifiers. A green upload **only establishes Apple's acceptance of the binary**; the build must still be processed by App Store Connect and assigned to internal TestFlight testers.
 
 ## Manual Mac fallback
 
