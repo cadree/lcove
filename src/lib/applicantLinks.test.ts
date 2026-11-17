@@ -3,7 +3,7 @@ import test from "node:test";
 import { applicantLinksError, normalizeApplicantLink } from "./applicantLinks.ts";
 
 test("member application requires at least one public review link", () => {
-  assert.match(applicantLinksError("", "") || "", /required|review your application/);
+  assert.match(applicantLinksError("", "") || "", /Add a public social profile/);
   assert.equal(applicantLinksError("instagram.com/ada", ""), null);
   assert.equal(applicantLinksError("", "https://portfolio.example.com/"), null);
   assert.equal(applicantLinksError("https://social.example.com/ada", "portfolio.example.com"), null);
