@@ -33,7 +33,7 @@ const OnboardingCompletion = ({ accessLevel }: Props) => {
           className="space-y-6"
         >
           <h1 className="font-display text-4xl md:text-5xl text-foreground">
-            Welcome to <span className="text-gradient-pink">ETHER</span>
+            Welcome to the <span className="text-gradient-pink">Familcy</span>
           </h1>
 
           <div className="glass-strong rounded-2xl p-8 space-y-4 text-left">
