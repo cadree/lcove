@@ -119,6 +119,7 @@ const Auth = () => {
   const [confirmationSentAt, setConfirmationSentAt] = useState<number | null>(null);
   const [resendNow, setResendNow] = useState(() => Date.now());
   const [isResending, setIsResending] = useState(false);
+  const [unconfirmedLogin, setUnconfirmedLogin] = useState(false);
 
   const { signIn, signUp, user, resetPassword, updatePassword } = useAuth();
   const navigate = useNavigate();
@@ -148,11 +149,11 @@ const Auth = () => {
   const resendWaitMs = resendCooldownRemaining(confirmationSentAt, resendNow);
 
   const handleResendConfirmation = async () => {
-    if (resendWaitMs > 0 || isResending || !email) return;
+    if (resendWaitMs > 0 || isResending || !email.trim() || !isOnline) return;
     setIsResending(true);
     const { error } = await supabase.auth.resend({
       type: 'signup',
-      email,
+      email: email.trim().toLowerCase(),
       options: { emailRedirectTo: getAuthRedirectUrl('/auth?confirmed=1') },
     });
     setIsResending(false);
@@ -278,6 +279,11 @@ const Auth = () => {
         if (error) {
           logAuthError('Login failed', error);
           const { title, description } = getAuthErrorMessage(error);
+          if (error.message.toLowerCase().includes('email not confirmed')) {
+            setUnconfirmedLogin(true);
+            setMode('confirm-email');
+            setConfirmationSentAt(null);
+          }
           toast({ title, description, variant: 'destructive' });
         } else {
           logAuthEvent('Login successful');
@@ -468,8 +474,9 @@ const Auth = () => {
               <Mail className="h-12 w-12 text-primary mx-auto mb-4" />
               <p className="text-foreground mb-2">Check your email to confirm</p>
               <p className="text-sm text-muted-foreground mb-4">
-                We sent a confirmation link to <span className="text-primary">{email}</span>.
-                Open it to finish creating your account. You will continue onboarding after you confirm.
+                {unconfirmedLogin ? 'Your email still needs confirmation: ' : 'We sent a confirmation link to '}
+                <span className="text-primary">{email}</span>.
+                {unconfirmedLogin ? ' Request a new link below to continue.' : ' Open it to finish creating your account. You will continue onboarding after you confirm.'}
               </p>
               <Button
                 type="button"
