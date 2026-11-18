@@ -163,7 +163,7 @@ const AccessGate = ({ children }: AccessGateProps) => {
             />
             
             <h2 className="font-display text-3xl md:text-4xl text-foreground mb-4">
-              Welcome home Familcy
+              Welcome to the Familcy
             </h2>
             
             <p className="text-muted-foreground mb-8">
