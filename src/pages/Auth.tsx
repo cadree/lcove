@@ -281,8 +281,7 @@ const Auth = () => {
           const { title, description } = getAuthErrorMessage(error);
           if (error.message.toLowerCase().includes('email not confirmed')) {
             setUnconfirmedLogin(true);
-            setUnconfirmedLogin(false);
-          setMode('confirm-email');
+            setMode('confirm-email');
             setConfirmationSentAt(null);
           }
           toast({ title, description, variant: 'destructive' });
