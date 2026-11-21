@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { EtherWordmark } from "@/components/brand/EtherWordmark";
 import { APP_STORE_URL, INSTAGRAM_URL } from "@/config/launch";
 import { APP_STORE_COMING } from "@/content/copy";
+import { AppStoreLink } from "@/components/landing/AppStoreLink";
 import { publicJoinPath } from "@/lib/publicJoin";
 
 const columns = [
@@ -66,9 +67,7 @@ export function LandingFooter() {
             </a>
           ) : null}
           {APP_STORE_URL ? (
-            <a href={APP_STORE_URL} className="inline-flex min-h-11 items-center rounded-lg bg-foreground px-3 text-background">
-              Download on the App Store
-            </a>
+            <AppStoreLink />
           ) : (
             <p className="text-muted-foreground">{APP_STORE_COMING}</p>
           )}

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { APP_STORE_URL, APPLE_TEAM_ID, INSTAGRAM_URL, SLACK_URL, WAITLIST_MODE } from "../config/launch.ts";
+import { APP_STORE_APPLE_ID, APP_STORE_URL, APPLE_TEAM_ID, INSTAGRAM_URL, SLACK_URL, WAITLIST_MODE } from "../config/launch.ts";
 import {
   APP_STORE_COMING,
   FEATURE_PREVIEW,
@@ -175,9 +175,15 @@ describe("campaign copy", () => {
     ]);
   });
 
-  it("keeps the slack invite in one config value and hides a missing app store link", () => {
+  it("keeps the slack invite in one config value and links the live App Store listing", () => {
     assert.equal(INSTAGRAM_URL, "https://www.instagram.com/_familcy/");
-    assert.equal(APP_STORE_URL, "");
+    assert.equal(APP_STORE_URL, "https://apps.apple.com/app/ether-by-lcove/id6758372010");
+    assert.equal(APP_STORE_APPLE_ID, "6758372010");
+    const footer = readFileSync("src/components/landing/LandingFooter.tsx", "utf8");
+    const hero = readFileSync("src/components/landing/LandingHero.tsx", "utf8");
+    assert.equal(footer.includes("AppStoreLink"), true);
+    assert.equal(hero.includes("AppStoreLink"), true);
+    assert.equal(readFileSync("src/components/landing/AppStoreLink.tsx", "utf8").includes("Download on the App Store"), true);
     assert.equal(SLACK_URL.startsWith("https://join.slack.com/"), true);
     const hits: string[] = [];
     const skip = new Set(["node_modules", "dist", ".git", "coverage"]);
