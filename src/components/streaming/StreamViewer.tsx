@@ -1,3 +1,4 @@
+import { CARD_GIFT_DISCLOSURE } from "@/lib/supportCopy";
 import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -461,6 +462,10 @@ export const StreamViewer: React.FC<StreamViewerProps> = ({ streamId, open, onCl
                 )}
               </div>
             </div>
+
+            {digitalGoods && (
+              <p className="text-xs text-muted-foreground">{CARD_GIFT_DISCLOSURE}</p>
+            )}
 
             {/* Tip Input */}
             {digitalGoods && showTipInput && (

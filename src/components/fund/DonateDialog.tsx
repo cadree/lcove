@@ -12,7 +12,7 @@ import { openExternalCheckout, readStorefrontCountry } from "@/lib/externalCheck
 import { isUsStorefront } from "@/lib/iosStorefront";
 import { errorMessage } from "@/lib/errorMessage";
 import { ETHER_WEB_ORIGIN, isIosApp } from "@/lib/platform";
-import { supportCadenceLabel, supportCheckoutLabel } from "@/lib/supportCopy";
+import { supportCadenceLabel, supportCheckoutLabel, SUPPORT_PAYMENT_DISCLOSURE } from "@/lib/supportCopy";
 import { readNumber } from "@/lib/numberField";
 
 const PRESET_AMOUNTS = [5, 10, 25, 50];
@@ -157,6 +157,8 @@ export function DonateDialog({ children }: { children: React.ReactNode }) {
               {mode === "recurring" && <span className="text-sm font-normal text-muted-foreground">/mo</span>}
             </p>
           </div>
+
+          <p className="text-xs text-muted-foreground text-center">{SUPPORT_PAYMENT_DISCLOSURE}</p>
 
           {!user && (
             <p className="text-xs text-muted-foreground text-center">
