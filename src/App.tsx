@@ -15,6 +15,7 @@ import { watchImageCheckPrefetch } from "@/lib/nsfwImageCheck";
 import { PresenceProvider } from "@/hooks/usePresence";
 import { CreateFlowProvider } from "@/components/create/CreateFlowContext";
 import AccessGate from "@/components/auth/AccessGate";
+import { GetTheAppPrompt } from "@/components/auth/GetTheAppPrompt";
 import { EtherSplash } from "@/components/brand/EtherSplash";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
 import { IosCheckoutReturn } from "@/components/ios/IosCheckoutReturn";
@@ -181,6 +182,7 @@ const App = () => (
                 <ActivityTracker />
                 <WarmTabs />
                 <StoreListingMeta />
+                <GetTheAppPrompt />
                 <Toaster />
               <Sonner />
               <UploadQueuePill />

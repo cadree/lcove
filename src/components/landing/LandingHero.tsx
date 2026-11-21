@@ -8,6 +8,7 @@ import { EtherWordmark } from "@/components/brand/EtherWordmark";
 import { HERO_SUB, HERO_TAGLINE } from "@/content/copy";
 import { captureSignupAttribution } from "@/lib/signupAttribution";
 import { publicJoinPath } from "@/lib/publicJoin";
+import { AppStoreLink } from "@/components/landing/AppStoreLink";
 
 export function LandingHero() {
   const navigate = useNavigate();
@@ -31,9 +32,12 @@ export function LandingHero() {
               width={72} height={72} className="h-[72px] w-[72px] object-contain" decoding="async" />
           ))}
         </div>
-        <Button className="w-full" onClick={() => navigate(publicJoinPath(location.search))}>
-          Join
-        </Button>
+        <div className="flex w-full flex-col items-center gap-3">
+          <Button className="w-full" onClick={() => navigate(publicJoinPath(location.search))}>
+            Join
+          </Button>
+          <AppStoreLink className="w-full" />
+        </div>
       </div>
     </section>
   );

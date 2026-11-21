@@ -5,16 +5,16 @@
 export const WAITLIST_MODE = false;
 
 /**
- * Set when the App Store listing exists. Empty keeps the smart banner off
+ * Live App Store listing. Empty hides the badge, keeps the smart banner off,
  * and shows "on the web now, iPhone app coming" instead of a link.
  */
-export const APP_STORE_URL = "";
+export const APP_STORE_URL = "https://apps.apple.com/app/ether-by-lcove/id6758372010";
 
 /**
  * Numeric App Store id for `<meta name="apple-itunes-app">`.
- * Leave empty until the listing exists. The smart banner stays off without it.
+ * The smart banner stays off without it.
  */
-export const APP_STORE_APPLE_ID = "";
+export const APP_STORE_APPLE_ID = "6758372010";
 
 /**
  * Apple Team ID. The universal-link appID is written in
