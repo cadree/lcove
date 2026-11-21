@@ -313,7 +313,7 @@ export function AdminMembersTab({ actions }: { actions: MemberRowActions }) {
             </button>
           )}
         </div>
-        <Button variant="outline" size="sm" className="h-10 shrink-0 gap-1.5 px-3" onClick={() => setFiltersOpen(true)}>
+        <Button variant="outline" size="sm" className="h-10 shrink-0 gap-1.5 px-3" onClick={() => setFiltersOpen(true)} aria-label="Filters">
           <SlidersHorizontal className="h-4 w-4" />
           <span className="hidden sm:inline">Filters</span>
           {extraFilters > 0 && <span className="rounded-full bg-primary px-1.5 text-[11px] text-primary-foreground">{extraFilters}</span>}
