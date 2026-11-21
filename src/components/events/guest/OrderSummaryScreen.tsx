@@ -4,6 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PoweredByEther } from "./PoweredByEther";
+import { SellerSetupNotice } from "@/components/store/SellerSetupNotice";
 
 export interface SummaryLine {
   id: string;
@@ -29,6 +30,7 @@ export function OrderSummaryScreen({
   onPhone,
   errors,
   submitting,
+  sellerNotReady = false,
   onName,
   onEmail,
   onPassword,
@@ -52,6 +54,7 @@ export function OrderSummaryScreen({
   onPhone?: (value: string) => void;
   errors: Record<string, string>;
   submitting: boolean;
+  sellerNotReady?: boolean;
   onName: (value: string) => void;
   onEmail: (value: string) => void;
   onPassword: (value: string) => void;
@@ -108,9 +111,11 @@ export function OrderSummaryScreen({
       </div>
       <PoweredByEther />
       <div className="fixed inset-x-0 bottom-0 border-t border-border/50 bg-background/95 px-4 py-3 pb-[max(env(safe-area-inset-bottom),12px)]">
+        {sellerNotReady && !free ? <SellerSetupNotice /> : (
         <Button className="h-12 w-full rounded-full" disabled={submitting} onClick={onCheckout}>
           {submitting ? "Working…" : free ? "RSVP" : "Checkout"}
         </Button>
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
+import { sellerSetupIncomplete } from "@/lib/sellerPaymentSetup";
+import { SellerSetupNotice } from "@/components/store/SellerSetupNotice";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +31,7 @@ export function TicketCheckoutDialog({ eventId, eventTitle, open, onOpenChange }
   const [qty, setQty] = useState(1);
   const [attendees, setAttendees] = useState<AttendeeForm[]>([{ name: "", email: "", phone: "", social: "" }]);
   const [submitting, setSubmitting] = useState(false);
+  const [sellerNotReady, setSellerNotReady] = useState(false);
 
   const tier = activeTiers.find(t => t.id === tierId) || activeTiers[0] || null;
   const remaining = tier?.capacity != null ? Math.max(0, tier.capacity - (tier.quantity_sold || 0)) : null;
@@ -84,6 +87,10 @@ export function TicketCheckoutDialog({ eventId, eventTitle, open, onOpenChange }
         },
         headers,
       });
+      if (sellerSetupIncomplete(data)) {
+        setSellerNotReady(true);
+        return;
+      }
       if (error) throw error;
       if (data?.free && data?.url) {
         toast.success("Registered!");
@@ -179,10 +186,14 @@ export function TicketCheckoutDialog({ eventId, eventTitle, open, onOpenChange }
               <p className="text-lg font-semibold">{totalCents === 0 ? "Free" : `$${(totalCents / 100).toFixed(2)}`}</p>
             </div>
 
-            <Button className="w-full" disabled={submitting || !tier} onClick={handleCheckout}>
-              {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {totalCents === 0 ? "Confirm registration" : "Proceed to payment"}
-            </Button>
+            {sellerNotReady && totalCents > 0 ? (
+              <SellerSetupNotice />
+            ) : (
+              <Button className="w-full" disabled={submitting || !tier} onClick={handleCheckout}>
+                {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {totalCents === 0 ? "Confirm registration" : "Proceed to payment"}
+              </Button>
+            )}
           </div>
         )}
       </DialogContent>

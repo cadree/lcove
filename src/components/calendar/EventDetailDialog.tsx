@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SELLER_SETUP_INCOMPLETE_MESSAGE, sellerSetupIncomplete } from "@/lib/sellerPaymentSetup";
 import { useNavigate } from "react-router-dom";
 import {
   Dialog,
@@ -209,6 +210,11 @@ export function EventDetailDialog({ eventId, open, onOpenChange }: EventDetailDi
       }
 
       console.log('Checkout response:', data);
+
+      if (sellerSetupIncomplete(data)) {
+        toast.message(SELLER_SETUP_INCOMPLETE_MESSAGE);
+        return;
+      }
 
       if (data?.url) {
         // Redirect to Stripe checkout

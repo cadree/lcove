@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { assertEventStripeTestKey } from "../_shared/stripe-mode.mjs";
+import { sellerSetupIncompleteBody } from "../_shared/seller-payment-setup.mjs";
 import { priceCheckout } from "../_shared/ticket-fees.mjs";
 import { sendOrderConfirmation } from "../_shared/order-confirmation-email.ts";
 import { httpStatusForError } from "../_shared/http-error.mjs";
@@ -246,6 +247,28 @@ serve(async (req) => {
     });
 
     const isFree = priced.total === 0;
+
+    // Paid tickets go straight to the host's connected account. Look it up before any order,
+    // attendee or sold count is written, and refuse checkout when the host can't be paid.
+    let creatorConnectId: string | null = null;
+    let creatorPayoutEnabled = false;
+    if (!isFree && event.creator_id) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("stripe_connect_account_id, payout_enabled")
+        .eq("user_id", event.creator_id)
+        .maybeSingle();
+      if (profile) {
+        creatorConnectId = profile.stripe_connect_account_id;
+        creatorPayoutEnabled = profile.payout_enabled === true;
+      }
+    }
+    if (!isFree && !(creatorConnectId && creatorPayoutEnabled)) {
+      return new Response(JSON.stringify(sellerSetupIncompleteBody()), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
     const nearbyOptIn = nearbyConsent === true;
     const nearbyAt = nearbyOptIn ? new Date().toISOString() : null;
     const notes = [
@@ -325,20 +348,6 @@ serve(async (req) => {
     if (!stripeKey) throw new Error("Stripe not configured");
     const stripe = new Stripe(assertEventStripeTestKey(stripeKey), { apiVersion: "2025-08-27.basil" });
 
-    let creatorConnectId: string | null = null;
-    let creatorPayoutEnabled = false;
-    if (event.creator_id) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("stripe_connect_account_id, payout_enabled")
-        .eq("user_id", event.creator_id)
-        .maybeSingle();
-      if (profile) {
-        creatorConnectId = profile.stripe_connect_account_id;
-        creatorPayoutEnabled = profile.payout_enabled === true;
-      }
-    }
-
     let customerId: string | undefined;
     if (buyerEmail) {
       const customers = await stripe.customers.list({ email: buyerEmail, limit: 1 });
@@ -372,12 +381,10 @@ serve(async (req) => {
       },
     };
 
-    if (creatorConnectId && creatorPayoutEnabled) {
-      sessionConfig.payment_intent_data = {
-        transfer_data: { destination: creatorConnectId },
-        ...(priced.fee > 0 ? { application_fee_amount: priced.fee } : {}),
-      };
-    }
+    sessionConfig.payment_intent_data = {
+      transfer_data: { destination: creatorConnectId! },
+      ...(priced.fee > 0 ? { application_fee_amount: priced.fee } : {}),
+    };
 
     const session = await stripe.checkout.sessions.create(sessionConfig);
     await supabase.from("ticket_orders").update({ stripe_session_id: session.id }).eq("id", order.id);

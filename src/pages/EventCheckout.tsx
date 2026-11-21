@@ -10,6 +10,7 @@ import { readTicketLines } from "@/lib/guestEvent";
 import { formatUsd, priceCheckout } from "@/lib/ticketFees";
 import { errorMessage } from "@/lib/errorMessage";
 import { toast } from "sonner";
+import { sellerSetupIncomplete } from "@/lib/sellerPaymentSetup";
 
 export default function EventCheckout() {
   const { eventId = "" } = useParams();
@@ -25,6 +26,7 @@ export default function EventCheckout() {
   const [consent, setConsent] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [sellerNotReady, setSellerNotReady] = useState(false);
 
   const { data: host } = useQuery({
     queryKey: ["public-event-organizer", event?.creator_id],
@@ -86,6 +88,10 @@ export default function EventCheckout() {
         },
         headers,
       });
+      if (sellerSetupIncomplete(data)) {
+        setSellerNotReady(true);
+        return;
+      }
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       if (data?.free && data?.url) {
@@ -127,6 +133,7 @@ export default function EventCheckout() {
       onPhone={user ? undefined : setPhone}
       errors={errors}
       submitting={submitting}
+      sellerNotReady={sellerNotReady}
       onName={setName}
       onEmail={setEmail}
       onPassword={setPassword}
