@@ -143,6 +143,8 @@ export function useSuspendUser() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       queryClient.invalidateQueries({ queryKey: ['admin-user-data'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-members'] });
+      queryClient.invalidateQueries({ queryKey: ['people-members'] });
       queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
       toast.success('User suspended');
     },
@@ -167,6 +169,8 @@ export function useUnsuspendUser() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       queryClient.invalidateQueries({ queryKey: ['admin-user-data'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-members'] });
+      queryClient.invalidateQueries({ queryKey: ['people-members'] });
       queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
       toast.success('User unsuspended');
     },
@@ -213,6 +217,8 @@ export function useApproveOnboarding() {
       queryClient.invalidateQueries({ queryKey: ['pending-onboarding'] });
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       queryClient.invalidateQueries({ queryKey: ['admin-user-data'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-members'] });
+      queryClient.invalidateQueries({ queryKey: ['people-members'] });
       queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
       toast.success('Onboarding approved');
     },
@@ -238,6 +244,8 @@ export function useChangeAccessStatus() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       queryClient.invalidateQueries({ queryKey: ['admin-user-data'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-members'] });
+      queryClient.invalidateQueries({ queryKey: ['people-members'] });
       queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
       toast.success(`User status changed to ${variables.status}`);
     },
@@ -377,9 +385,10 @@ export function useDeleteUser() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       queryClient.invalidateQueries({ queryKey: ['admin-user-data'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-members'] });
+      queryClient.invalidateQueries({ queryKey: ['people-members'] });
       queryClient.invalidateQueries({ queryKey: ['admin-users-detailed'] });
       queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
-      toast.success('User removed from the app');
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to remove user');
@@ -400,6 +409,8 @@ export function useRestoreUser() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       queryClient.invalidateQueries({ queryKey: ['admin-user-data'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-members'] });
+      queryClient.invalidateQueries({ queryKey: ['people-members'] });
       queryClient.invalidateQueries({ queryKey: ['admin-users-detailed'] });
       queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
       toast.success('Account restored');
@@ -425,6 +436,8 @@ export function useHardDeleteUser() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       queryClient.invalidateQueries({ queryKey: ['admin-user-data'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-members'] });
+      queryClient.invalidateQueries({ queryKey: ['people-members'] });
       queryClient.invalidateQueries({ queryKey: ['admin-users-detailed'] });
       queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
       toast.success('Account permanently deleted');
