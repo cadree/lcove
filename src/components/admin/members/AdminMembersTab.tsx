@@ -645,7 +645,7 @@ function FiltersSheet({
   const set = <K extends keyof MemberFilters>(key: K, value: MemberFilters[K] | "any") =>
     setDraft((prev) => ({ ...prev, [key]: value === "any" ? undefined : value }));
 
-  const pick = (key: keyof MemberFilters, label: string, options: [string, string][]) => (
+  const pick = (key: keyof MemberFilters, label: string, options: [string, string][], anyLabel = "Any") => (
     <div className="space-y-1.5">
       <Label className="text-xs text-muted-foreground">{label}</Label>
       <Select value={String(draft[key] ?? "any")} onValueChange={(v) => set(key, (key === "level" && v !== "any" ? Number(v) : v) as never)}>
@@ -653,7 +653,7 @@ function FiltersSheet({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="any">Any</SelectItem>
+          <SelectItem value="any">{anyLabel}</SelectItem>
           {options.map(([value, text]) => (
             <SelectItem key={value} value={value}>
               {text}
@@ -677,7 +677,7 @@ function FiltersSheet({
           {pick("role", "Role", [["admin", "Admins"], ["member", "Members"]])}
           {pick("level", "Level", [["1", "Level 1"], ["2", "Level 2"], ["3", "Level 3"]])}
           {pick("active", "Activity", [["7d", "Active in 7 days"], ["30d", "Active in 30 days"], ["inactive_30d", "Quiet 30+ days"], ["never", "Never active"]])}
-          {pick("removed", "Removed accounts", [["hide", "Hide"], ["only", "Only removed"], ["all", "Show too"]])}
+          {pick("removed", "Removed accounts", [["only", "Only removed"], ["all", "Show too"]], "Hide")}
           <div className="col-span-2 space-y-1.5">
             <Label className="text-xs text-muted-foreground">City</Label>
             <Input className="h-10" value={draft.city ?? ""} onChange={(e) => set("city", e.target.value)} placeholder="Any city" />
