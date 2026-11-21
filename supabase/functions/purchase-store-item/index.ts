@@ -5,6 +5,7 @@ import { STORE_PLATFORM_FEE_PERCENT, storeCashSplit } from "../_shared/fees.mjs"
 
 import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
 import { verifiedDestination } from "../_shared/creator-connect.mjs";
+import { sellerSetupIncompleteBody } from "../_shared/seller-payment-setup.mjs";
 import { ledgerBalances } from "../_shared/credit-balances.ts";
 import { httpStatusForError } from "../_shared/http-error.mjs";
 import { requestRole } from "../_shared/require-caller.ts";
@@ -72,7 +73,7 @@ serve(async (req) => {
       if (!guest) throw new Error("name and email required");
       const { data: priced, error: priceError } = await supabaseAdmin
         .from("store_items")
-        .select("price, type, is_digital, store:stores(flat_shipping_cents, tax_line_cents)")
+        .select("price, type, is_digital, store:stores(id, user_id, payout_enabled, flat_shipping_cents, tax_line_cents)")
         .eq("id", itemId)
         .maybeSingle();
       if (priceError || !priced?.price) throw new Error("Item not found");
@@ -80,6 +81,21 @@ serve(async (req) => {
         throw new Error('This item is not available for purchase in the iOS app');
       }
       const pricedStore = Array.isArray(priced.store) ? priced.store[0] : priced.store;
+      if (!pricedStore?.id) throw new Error("Store not found");
+      // Card sales go straight to the seller's connected account. No account, no checkout.
+      const { data: guestStoreSecrets } = await supabaseAdmin
+        .from("store_secrets")
+        .select("stripe_connect_account_id")
+        .eq("store_id", pricedStore.id)
+        .maybeSingle();
+      const guestDestination = (await verifiedDestination(supabaseAdmin, pricedStore.user_id))
+        || (pricedStore.payout_enabled ? guestStoreSecrets?.stripe_connect_account_id ?? null : null);
+      if (!guestDestination) {
+        return new Response(
+          JSON.stringify(sellerSetupIncompleteBody()),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+        );
+      }
       const split = storeCashSplit(
         Math.round(Number(priced.price) * 100) * guest.quantity,
         priced.type === "product" ? Number(pricedStore?.flat_shipping_cents || 0) : 0,
@@ -111,16 +127,8 @@ serve(async (req) => {
         tax_label: string | null;
         platform_fee_cents: number;
       };
-      const { data: storeSecrets } = await supabaseAdmin
-        .from("store_secrets")
-        .select("stripe_connect_account_id")
-        .eq("store_id", order.store_id)
-        .maybeSingle();
-      const profileDestination = await verifiedDestination(supabaseAdmin, order.seller_user_id);
-      const connectAccountId = profileDestination || storeSecrets?.stripe_connect_account_id || null;
-      if (connectAccountId) {
-        await supabaseAdmin.from("store_orders").update({ seller_payout_status: "processing" }).eq("id", order.order_id);
-      }
+      const connectAccountId = guestDestination;
+      await supabaseAdmin.from("store_orders").update({ seller_payout_status: "processing" }).eq("id", order.order_id);
       const stripe = new Stripe(assertStripeTestKey(Deno.env.get("STRIPE_SECRET_KEY")), {
         apiVersion: "2025-08-27.basil",
       });
@@ -177,13 +185,11 @@ serve(async (req) => {
           receipt_email: guest.email,
         },
       };
-      if (connectAccountId) {
-        sessionConfig.payment_intent_data = {
-          ...sessionConfig.payment_intent_data,
-          ...(order.platform_fee_cents > 0 ? { application_fee_amount: order.platform_fee_cents } : {}),
-          transfer_data: { destination: connectAccountId },
-        };
-      }
+      sessionConfig.payment_intent_data = {
+        ...sessionConfig.payment_intent_data,
+        ...(order.platform_fee_cents > 0 ? { application_fee_amount: order.platform_fee_cents } : {}),
+        transfer_data: { destination: connectAccountId },
+      };
       let session: Stripe.Checkout.Session;
       try {
         session = await stripe.checkout.sessions.create(sessionConfig);
@@ -335,6 +341,14 @@ serve(async (req) => {
         throw new Error("This item is sold outside Ether");
       }
 
+      // Card sales go straight to the seller's connected account. No account, no checkout.
+      if (!connectAccountId) {
+        return new Response(
+          JSON.stringify(sellerSetupIncompleteBody()),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+        );
+      }
+
       const split = storeCashSplit(
         Math.round(item.price * 100) * quantity,
         item.type === "product" ? Number(store.flat_shipping_cents || 0) : 0,
@@ -378,7 +392,7 @@ serve(async (req) => {
           status: "pending",
           seller_amount: sellerAmount / 100,
           platform_fee: platformFeeAmount / 100,
-          seller_payout_status: connectAccountId ? "processing" : "pending_setup",
+          seller_payout_status: "processing",
         })
         .select()
         .single();
@@ -447,19 +461,17 @@ serve(async (req) => {
       // Ether does not collect a shipping address or limit countries.
       // Connect fee is STORE_PLATFORM_FEE_PERCENT of the item price. Shipping and tax are not in the fee.
       // Linked Shopify items are rejected above and never reach this split.
-      if (connectAccountId) {
-        sessionConfig.payment_intent_data = {
-          ...sessionConfig.payment_intent_data,
-          ...(platformFeeAmount > 0 ? { application_fee_amount: platformFeeAmount } : {}),
-          transfer_data: {
-            destination: connectAccountId,
-          },
-        };
-        logStep("Using Stripe Connect with application fee", { 
-          platformFeeAmount, 
-          connectAccountId
-        });
-      }
+      sessionConfig.payment_intent_data = {
+        ...sessionConfig.payment_intent_data,
+        ...(platformFeeAmount > 0 ? { application_fee_amount: platformFeeAmount } : {}),
+        transfer_data: {
+          destination: connectAccountId,
+        },
+      };
+      logStep("Using Stripe Connect with application fee", {
+        platformFeeAmount,
+        connectAccountId
+      });
 
       let session: Stripe.Checkout.Session;
       try {

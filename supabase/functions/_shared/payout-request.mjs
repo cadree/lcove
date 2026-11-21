@@ -1,6 +1,13 @@
 export const PAYOUT_UPGRADE_MESSAGE =
   "Payouts use Stripe Connect. Open Wallet and finish payout setup. Ether does not store bank details.";
 
+// Earned credits (LC) can't be cashed out. Credits can't be bought with money, and ETHER does not
+// pay creators from its own balance. Keep this off unless a reviewed release turns it back on.
+// Keep the message equal to src/lib/creditCashOut.ts.
+export const CREDIT_CASH_OUT_ENABLED = false;
+export const CREDIT_CASH_OUT_OFF_MESSAGE =
+  "Cashing out credits is turned off. Your credits stay in your wallet to spend on ETHER.";
+
 export class PayoutRefusal extends Error {
   constructor(message) {
     super(message);

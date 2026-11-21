@@ -107,7 +107,7 @@ const Membership = () => {
                   : "Community Member"
                 : "Become a Member"
             }
-            description="Support the creative community and unlock exclusive benefits. Every contribution goes directly into community grants, events, and education."
+            description="Memberships are paid to ETHER and unlock member benefits. ETHER uses them for the platform, member events and programs."
             icon={<Heart className="w-5 h-5" />}
             tile="gold"
             className="mb-12 text-center"
