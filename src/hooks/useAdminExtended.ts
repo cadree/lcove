@@ -84,12 +84,16 @@ async function logAdminActionSafe(payload: {
 }
 
 // Fetch admin user data with extended info
-export function useAdminUserData() {
+/**
+ * Every member with skills, roles and credits. Heavy: only load it for a CSV
+ * export or an audience-wide credit award, never to draw the member list.
+ */
+export function useAdminUserData(options: { enabled?: boolean } = {}) {
   const { isAdmin } = useIsAdmin();
 
   return useQuery({
     queryKey: ["admin-user-data"],
-    enabled: isAdmin,
+    enabled: isAdmin && (options.enabled ?? true),
     queryFn: async (): Promise<AdminUserData[]> => {
       const { data: userData, error: userError } = await supabase.rpc("get_admin_user_data");
       if (userError) throw userError;
@@ -283,6 +287,8 @@ export function useAdjustUserCredits() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-user-data"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-members"] });
+      queryClient.invalidateQueries({ queryKey: ["people-members"] });
       queryClient.invalidateQueries({ queryKey: ["admin-actions"] });
       toast.success("Credits adjusted successfully");
     },
@@ -323,6 +329,8 @@ export function useBulkAwardCredits() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["admin-user-data"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-members"] });
+      queryClient.invalidateQueries({ queryKey: ["people-members"] });
       toast.success(`Credits awarded to ${result.succeeded}/${result.total} users`);
     },
     onError: (error: Error) => {
@@ -415,6 +423,8 @@ export function useToggleAdminRole() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["admin-user-data"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-members"] });
+      queryClient.invalidateQueries({ queryKey: ["people-members"] });
       queryClient.invalidateQueries({ queryKey: ["user-roles"] });
       queryClient.invalidateQueries({ queryKey: ["admin-actions"] });
       toast.success(data.makeAdmin ? "Admin role granted" : "Admin role revoked");

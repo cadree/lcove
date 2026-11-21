@@ -57,8 +57,9 @@ export function ContentReportsTab() {
       const reporterIds = [...new Set(rows.map((row) => row.reporter_id))];
       if (reporterIds.length === 0) return rows;
 
+      // Admins read profiles directly so reporters who were later removed still have a name.
       const { data: profiles } = await supabase
-        .from("profiles_public")
+        .from("profiles")
         .select("user_id, display_name")
         .in("user_id", reporterIds);
 
