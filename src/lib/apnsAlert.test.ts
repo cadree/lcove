@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   APNS_PRODUCTION_HOST,
+  APNS_SANDBOX_HOST,
+  apnsHostForEnv,
   IOS_APP_TOPIC,
   apnsTokenShouldDrop,
   buildApnsAlertPayload,
@@ -106,5 +108,22 @@ describe("APNs token removal", () => {
     });
     assert.deepEqual(classifyPushSubscription("web", "https://push.example/sub"), { channel: "web", action: "send" });
     assert.deepEqual(classifyPushSubscription("web", "mailto:someone"), { channel: "web", action: "skip" });
+  });
+});
+
+describe("APNs host per environment", () => {
+  it("defaults to production APNs", () => {
+    for (const value of [undefined, "", "production", "prod", "sandbox-ish"]) {
+      assert.equal(apnsHostForEnv(value), APNS_PRODUCTION_HOST);
+    }
+  });
+  it("uses sandbox only when staging sets APNS_ENV to sandbox or development", () => {
+    assert.equal(apnsHostForEnv("sandbox"), APNS_SANDBOX_HOST);
+    assert.equal(apnsHostForEnv(" Development "), APNS_SANDBOX_HOST);
+  });
+  it("sends a sandbox alert to the sandbox host", async () => {
+    const { calls, fetchImpl } = fakeFetch(200);
+    await sendApnsAlert({ jwt: "j", deviceToken: TOKEN, title: "t", body: "b", fetchImpl, host: apnsHostForEnv("sandbox") });
+    assert.equal(calls[0].url, `${APNS_SANDBOX_HOST}/3/device/${TOKEN}`);
   });
 });

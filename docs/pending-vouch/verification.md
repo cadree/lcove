@@ -1,4 +1,4 @@
-# Pending application vouches and recovery — November 17, 2026
+# Pending application vouches and recovery — November 17, 2026 (rechecked November 21)
 
 Changes are on `codex/pending-vouch-recovery`. Production release is held until the remaining staging gates pass.
 
@@ -23,12 +23,27 @@ Project: `vjdrihmriufkameqngfg` only. Migration `20261117203615_membership_vouch
 - PASS: no Edge Function warning/error entries during the test window starting 20:40 UTC. Routine boot/shutdown entries are present.
 - PASS: PGlite vouch access/deduplication tests; 8 existing referral, push preference, push dispatch, and admin scroll tests; 6 access-routing/cooldown tests; typecheck; lint (25 pre-existing warnings, no errors); spellcheck; staging production build.
 
-## Release blockers
+## November 21, 2026 recheck (staging `vjdrihmriufkameqngfg`)
 
-1. Auth `/resend` returned 500 at 20:43:37 UTC. Auth log request `01a1eb40-38f6-78a7-b1ce-5571a80a4cd2`: SMTP `535 Authentication credentials invalid`. The Edge worker secret works, but Auth's separately configured SMTP credential must be updated. No new code receipt has been claimed.
-2. No registered staging iPhone. Provider/device delivery and actual iPhone receipt remain unverified. Supplied account credentials did not authenticate to staging; separate temporary fixtures were used. Production credentials/settings were not modified.
+Branch merged with `cursor/ether-combined` at `03a1990` (no conflicts).
 
-The security advisor also reports pre-existing definer views and function grants; the new vouch tables deliberately have RLS and no direct client grants. Existing unrelated advisories are not changed by this release.
+- FIXED: `RequestVouchCard` was imported but not rendered on `/pending`, so applicants had no vouch link. It is rendered again, and the staging browser flow now passes.
+- FIXED: shared vouch links use `VITE_PUBLIC_WEB_ORIGIN` (`src/lib/publicWebOrigin.mjs`). Production stays the default. A build on any other Supabase project gets no link unless it names a non-production origin, and a production build refuses a non-production origin. Unit tests cover both directions; a staging native bundle embeds the staging origin.
+- PASS (SMTP fixed): fresh signup `etherbylcove+stg20261121@gmail.com` got a 6-digit code in the Gmail inbox within a second; a wrong code returned 403; password sign-in before verifying returned `email_not_confirmed`; resend returned 200 and delivered a new code; an immediate second resend returned 429 (`over_email_send_rate_limit`); the new code verified and password sign-in then succeeded. No SMTP or 535 errors in auth or function logs since Nov 18; only expected invalid-code and unconfirmed-login warnings.
+- PASS: application alert for that applicant was sent once to `etherbylcove@gmail.com` (Gmail inbox, 15:22 UTC) although the profile was submitted again by the retry; queues and dead-letter queues are empty; no duplicate `sent` message ids.
+- PASS: `scripts/staging-vouch-flow-check.mjs`: sign-out/sign-in returns to `/pending` with the same link; member vouch with note persists and a retry shows it recorded; admin sees member and note at 390px with no horizontal overflow; exactly one vouch row; applicant stays `pending`.
+- PASS: hosted checks: migration recorded; RLS on both tables; no `anon`/`authenticated`/`PUBLIC` table grants; the four RPCs are `SECURITY DEFINER` with `search_path=""` and executable only by `authenticated`; pending guard allows `get_my_membership_vouch_link`.
+- PASS: admin `/admin` and `/admin/onboarding` at 390px scroll as one document with no nested scroll areas and no horizontal overflow.
+- PASS: typecheck; lint (0 errors, 25 existing warnings); 663 unit tests; spellcheck; staging build; `scripts/membership-vouch-db.test.mjs`.
+
+Production admin recipients: the only admin is `etherbylcove@gmail.com`, which is also the fixed review inbox, so each application sends one email. Its application push preference is off in production (and staging), so no application pushes will be sent until an admin turns it on.
+
+## Release blocker: iPhone push (not verified)
+
+- Sender now picks the APNs host from the `APNS_ENV` secret: `sandbox`/`development` uses `api.sandbox.push.apple.com`, anything else production. Production has no `APNS_ENV`, so it is unchanged. Deployed to staging only.
+- Staging secrets set: `APNS_ENV=sandbox`, `APPLE_TEAM_ID` (same value as production, checked by digest). Still missing in staging: `APPLE_APNS_KEY_P8`, `APPLE_APNS_KEY_ID`. No `.p8` exists on the Mac, and Supabase never returns secret values, so they must be added from the Apple Developer key file.
+- `ios/App/App/App.staging.entitlements` (`aps-environment=development`, no app links) is used only by `scripts/ios-staging-build.sh`; the committed `App.entitlements` still says production. A development-signed staging build compiled and signed with `aps-environment=development`.
+- Both paired iPhones show `unavailable`, so nothing was installed. Registration, delivery, tap navigation, preference suppression and duplicate checks on a real iPhone are not done. Production release is held.
 
 ## Assets
 

@@ -4,7 +4,7 @@ import { ApplicationServer, importVapidKeys, Urgency, type ExportedVapidKeys } f
 import { getBearerUser, requestRole, requireUserOrService } from "../_shared/require-caller.ts";
 import { noticeForUser } from "../_shared/notification-auth.mjs";
 import { httpStatusForError } from "../_shared/http-error.mjs";
-import { IOS_APP_TOPIC, classifyPushSubscription, sendApnsAlert, signApnsJwt } from "../_shared/apns.mjs";
+import { IOS_APP_TOPIC, apnsHostForEnv, classifyPushSubscription, sendApnsAlert, signApnsJwt } from "../_shared/apns.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -121,6 +121,7 @@ async function sendApnsSubscription(input: {
       jwt,
       deviceToken: decision.token,
       topic: IOS_APP_TOPIC,
+      host: apnsHostForEnv(Deno.env.get("APNS_ENV")),
       title,
       body,
       url,

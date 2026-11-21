@@ -68,6 +68,7 @@ export default function Pending() {
           </motion.p>
         ) : null}
 
+        <RequestVouchCard />
         <div className="my-7 w-full"><MemberInviteCard mode="referral" /></div>
         <WaitingFilm />
 

@@ -52,6 +52,18 @@ export async function pushPassUpdate({ jwt, pushToken, topic, fetchImpl = fetch 
 
 /** Production APNs for the Ether iOS app. Topic is the App Store bundle id. */
 export const APNS_PRODUCTION_HOST = "https://api.push.apple.com";
+/** Sandbox APNs, for development-signed builds installed from Xcode. */
+export const APNS_SANDBOX_HOST = "https://api.sandbox.push.apple.com";
+
+/**
+ * APNs host for this project. Production unless the APNS_ENV secret is exactly
+ * `sandbox` or `development` (staging only). Tokens from a development build
+ * only work on sandbox, and production tokens only on production.
+ */
+export function apnsHostForEnv(value) {
+  const env = String(value ?? "").trim().toLowerCase();
+  return env === "sandbox" || env === "development" ? APNS_SANDBOX_HOST : APNS_PRODUCTION_HOST;
+}
 export const IOS_APP_TOPIC = "app.lovable.e07d9c457fd949f78f3cc7d5998be668";
 
 const APNS_DROP_REASONS = new Set(["BadDeviceToken", "Unregistered"]);

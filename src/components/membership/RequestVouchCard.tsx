@@ -1,5 +1,4 @@
-import { Capacitor } from "@capacitor/core";
-import { ETHER_JOIN_ORIGIN } from "@/lib/memberReferrals";
+import { publicWebOrigin } from "@/lib/appWebOrigin";
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,8 +15,10 @@ export function RequestVouchCard() {
   if(!user) return;
   let cancelled=false;
   setError('');
+  const origin=publicWebOrigin();
+  if(!origin){setError('Vouch links are not set up for this version of the app.');return;}
   callRpc<string>('get_my_membership_vouch_link').then(token=>{
-   if(!cancelled) setLink(`${Capacitor.isNativePlatform() ? ETHER_JOIN_ORIGIN : window.location.origin}/vouch/${token}`);
+   if(!cancelled) setLink(`${origin}/vouch/${token}`);
   }).catch(()=>{if(!cancelled) setError('Could not prepare your vouch link. Please retry.');});
   return ()=>{cancelled=true;};
  },[user,attempt]);

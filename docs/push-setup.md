@@ -39,6 +39,10 @@ Signing reuses `signApnsJwt` in `supabase/functions/_shared/apns.mjs`. These Sup
 
 `ios/App/App/App.entitlements` sets `aps-environment` to `production` and still has `com.apple.developer.associated-domains` (`applinks:etherbylcove.com`). iOS only issues a push token from a build signed with that entitlement. The App ID also needs the Push Notifications capability in the Apple Developer portal.
 
+### Staging and sandbox APNs
+
+A development-signed build installed from Xcode registers a sandbox token, which production APNs rejects (and the sender then deletes the row). Set the Supabase secret `APNS_ENV=sandbox` on staging only; the sender then uses `https://api.sandbox.push.apple.com`. Leave it unset in production. Build the staging app with `scripts/ios-staging-build.sh`, which signs with `ios/App/App/App.staging.entitlements` (`aps-environment=development`) without changing the release entitlements. It replaces the installed Ether app on that phone (same bundle id).
+
 A response of `410`, `BadDeviceToken`, or `Unregistered` deletes that `push_subscriptions` row. A row whose endpoint is not a hex token after the `apns:` prefix is deleted as invalid. Other failures are logged with the HTTP status and Apple's reason code. Device tokens and private keys are not written to the logs.
 
 Web push above is unchanged. A real iPhone build is required before a banner can be confirmed on a device. The payload shape and the 410 / invalid-token decision are covered by unit tests and do not call Apple.
