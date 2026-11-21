@@ -70,6 +70,9 @@ jobs:
       - name: Mobile admin scrolling regression
         run: node --test scripts/admin-mobile-scroll.test.mjs
 
+      - name: Auth ban end date
+        run: node --test scripts/auth-ban-end.test.mjs
+
       - name: Stripe webhook fixtures
         run: npm run test:webhook
 
