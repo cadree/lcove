@@ -126,6 +126,10 @@ function useDebounced<T>(value: T, ms = 300): T {
   return debounced;
 }
 
+function initial(name: string): string {
+  return (name.replace(/[^\p{L}\p{N}]/gu, "")[0] ?? "?").toUpperCase();
+}
+
 function ago(value: string | null): string {
   if (!value) return "never";
   return formatDistanceToNow(new Date(value), { addSuffix: true });
@@ -439,20 +443,20 @@ export function AdminMembersTab({ actions }: { actions: MemberRowActions }) {
           data-testid="bulk-bar"
         >
           <div className="mx-auto flex max-w-3xl items-center gap-2 rounded-2xl border border-border bg-background/95 p-2 shadow-xl backdrop-blur">
-            <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setSelected(new Set())} aria-label="Clear selection">
+            <Button variant="ghost" size="icon" className="h-9 w-8 shrink-0" onClick={() => setSelected(new Set())} aria-label="Clear selection">
               <X className="h-4 w-4" />
             </Button>
-            <span className="min-w-0 flex-1 truncate text-sm font-medium">{selected.size.toLocaleString()} selected</span>
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">{selected.size.toLocaleString()}<span className="hidden min-[380px]:inline"> selected</span></span>
             {bulkChoices.includes("message") && (
-              <Button size="sm" variant="outline" className="h-9 gap-1.5" onClick={() => setBulk("message")}>
+              <Button size="sm" variant="outline" className="h-9 gap-1 px-2.5" onClick={() => setBulk("message")}>
                 <MessageCircle className="h-4 w-4" />
-                <span className="hidden min-[400px]:inline">Message</span>
+                <span>Message</span>
               </Button>
             )}
             {bulkChoices.includes("suspend") && (
-              <Button size="sm" variant="outline" className="h-9 gap-1.5" onClick={() => setBulk("suspend")}>
+              <Button size="sm" variant="outline" className="h-9 gap-1 px-2.5" onClick={() => setBulk("suspend")}>
                 <Ban className="h-4 w-4" />
-                <span className="hidden min-[400px]:inline">Suspend</span>
+                <span>Suspend</span>
               </Button>
             )}
             {bulkChoices.includes("restore") && (
@@ -464,7 +468,7 @@ export function AdminMembersTab({ actions }: { actions: MemberRowActions }) {
             {bulkChoices.length > 2 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="sm" className="h-9 gap-1">
+                  <Button size="sm" className="h-9 gap-1 px-3">
                     More
                   </Button>
                 </DropdownMenuTrigger>
@@ -545,7 +549,7 @@ function MemberRow({
       <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 text-left">
         <Avatar className="h-9 w-9 shrink-0">
           {member.avatar_url && <AvatarImage src={member.avatar_url} alt="" />}
-          <AvatarFallback className="text-xs">{name[0]?.toUpperCase() ?? "?"}</AvatarFallback>
+          <AvatarFallback className="text-xs">{initial(name)}</AvatarFallback>
         </Avatar>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
@@ -723,7 +727,7 @@ function MemberDetailSheet({
               <div className="flex items-center gap-3">
                 <Avatar className="h-12 w-12">
                   {member.avatar_url && <AvatarImage src={member.avatar_url} alt="" />}
-                  <AvatarFallback>{memberLabel(member)[0]?.toUpperCase()}</AvatarFallback>
+                  <AvatarFallback>{initial(memberLabel(member))}</AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
                   <SheetTitle className="truncate">{memberLabel(member)}</SheetTitle>

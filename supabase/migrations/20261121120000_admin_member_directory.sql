@@ -308,36 +308,35 @@ BEGIN
 
   SELECT count(*) INTO v_total FROM public.admin_member_matches(p_filters);
 
-  WITH page AS (
-    SELECT m.*
+  WITH ranked AS (
+    SELECT m.*, row_number() OVER (
+      ORDER BY
+        CASE WHEN v_sort = 'name' AND NOT v_desc THEN lower(COALESCE(m.display_name, m.email, '')) END ASC,
+        CASE WHEN v_sort = 'name' AND v_desc THEN lower(COALESCE(m.display_name, m.email, '')) END DESC,
+        CASE WHEN v_sort = 'active' AND NOT v_desc THEN m.last_active_at END ASC NULLS FIRST,
+        CASE WHEN v_sort = 'active' AND v_desc THEN m.last_active_at END DESC NULLS LAST,
+        CASE WHEN v_sort = 'city' AND NOT v_desc THEN lower(COALESCE(m.city, '')) END ASC,
+        CASE WHEN v_sort = 'city' AND v_desc THEN lower(COALESCE(m.city, '')) END DESC,
+        CASE WHEN v_sort = 'level' AND NOT v_desc THEN m.mindset_level END ASC NULLS FIRST,
+        CASE WHEN v_sort = 'level' AND v_desc THEN m.mindset_level END DESC NULLS LAST,
+        CASE WHEN NOT v_desc THEN m.created_at END ASC,
+        m.created_at DESC,
+        m.user_id
+    ) AS ord
     FROM public.admin_member_matches(p_filters) m
-    ORDER BY
-      CASE WHEN v_sort = 'name' AND NOT v_desc THEN lower(COALESCE(m.display_name, m.email, '')) END ASC,
-      CASE WHEN v_sort = 'name' AND v_desc THEN lower(COALESCE(m.display_name, m.email, '')) END DESC,
-      CASE WHEN v_sort = 'active' AND NOT v_desc THEN m.last_active_at END ASC NULLS FIRST,
-      CASE WHEN v_sort = 'active' AND v_desc THEN m.last_active_at END DESC NULLS LAST,
-      CASE WHEN v_sort = 'city' AND NOT v_desc THEN lower(COALESCE(m.city, '')) END ASC,
-      CASE WHEN v_sort = 'city' AND v_desc THEN lower(COALESCE(m.city, '')) END DESC,
-      CASE WHEN v_sort = 'level' AND NOT v_desc THEN m.mindset_level END ASC NULLS FIRST,
-      CASE WHEN v_sort = 'level' AND v_desc THEN m.mindset_level END DESC NULLS LAST,
-      CASE WHEN NOT v_desc THEN m.created_at END ASC,
-      m.created_at DESC,
-      m.user_id
-    LIMIT v_limit OFFSET v_offset
+  ), page AS (
+    SELECT * FROM ranked WHERE ord > v_offset AND ord <= v_offset + v_limit
   ), balances AS (
     SELECT l.user_id, COALESCE(SUM(d.genesis_delta + d.earned_delta), 0) AS balance
     FROM public.credit_ledger l
     CROSS JOIN LATERAL public.ledger_entry_deltas(l.credit_type, l.amount, l.genesis_amount, l.earned_amount) d
-    WHERE l.user_id IN (SELECT user_id FROM page)
+    WHERE l.user_id IN (SELECT page.user_id FROM page)
     GROUP BY l.user_id
-  ), numbered AS (
-    SELECT page.*, COALESCE(b.balance, 0) AS credit_balance, row_number() OVER () AS position
-    FROM page
-    LEFT JOIN balances b ON b.user_id = page.user_id
   )
-  SELECT COALESCE(jsonb_agg(to_jsonb(n) - 'position' ORDER BY n.position), '[]'::jsonb)
+  SELECT COALESCE(jsonb_agg((to_jsonb(page) - 'ord') || jsonb_build_object('credit_balance', COALESCE(b.balance, 0)) ORDER BY page.ord), '[]'::jsonb)
   INTO v_rows
-  FROM numbered n;
+  FROM page
+  LEFT JOIN balances b ON b.user_id = page.user_id;
 
   RETURN jsonb_build_object('total', v_total, 'rows', v_rows);
 END;
