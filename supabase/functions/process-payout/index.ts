@@ -2,7 +2,12 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { ledgerBalances } from "../_shared/credit-balances.ts";
 import { loadProfileConnect, syncPayoutEnabled, testStripe, withdrawalBlockedReason } from "../_shared/creator-connect.mjs";
-import { PayoutRefusal, interpretPayoutRequest } from "../_shared/payout-request.mjs";
+import {
+  CREDIT_CASH_OUT_ENABLED,
+  CREDIT_CASH_OUT_OFF_MESSAGE,
+  PayoutRefusal,
+  interpretPayoutRequest,
+} from "../_shared/payout-request.mjs";
 import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
@@ -38,6 +43,15 @@ serve(async (req) => {
     if (userError) throw new Error(`Authentication error: ${userError.message}`);
     const user = userData.user;
     if (!user?.id) throw new Error("User not authenticated");
+
+    // Server-side switch: no credit cash-out, whatever the client sends.
+    if (!CREDIT_CASH_OUT_ENABLED) {
+      logStep("Credit cash-out is off", { userId: user.id });
+      return new Response(JSON.stringify({ success: false, error: CREDIT_CASH_OUT_OFF_MESSAGE }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
 
     const decision = interpretPayoutRequest(await req.json());
     if (!decision.ok) {

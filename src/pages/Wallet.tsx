@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { CREDIT_CASH_OUT_ENABLED, CREDIT_CASH_OUT_OFF_MESSAGE } from "@/lib/creditCashOut";
 import { format } from 'date-fns';
 import { useSearchParams } from 'react-router-dom';
 import { 
@@ -195,6 +196,7 @@ const WalletPage: React.FC = () => {
             Send LC
           </Button>
           
+          {CREDIT_CASH_OUT_ENABLED ? (
           <Dialog open={payoutDialogOpen} onOpenChange={setPayoutDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" disabled={earnedBalance <= 0}>
@@ -244,6 +246,11 @@ const WalletPage: React.FC = () => {
               </div>
             </DialogContent>
           </Dialog>
+          ) : (
+            <p data-testid="credit-cash-out-off" className="w-full text-xs text-muted-foreground">
+              {CREDIT_CASH_OUT_OFF_MESSAGE}
+            </p>
+          )}
         </div>
 
         <Card className="mb-6">
