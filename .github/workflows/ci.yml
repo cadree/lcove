@@ -28,6 +28,51 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Spellcheck
+        run: npm run lint:spell
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Discovery and trip database checks
+        run: npm run test:discovery-db
+
+      - name: Music catalog database checks
+        run: npm run test:music-db
+
+      - name: Item invite database checks
+        run: npm run test:invite-db
+
+      - name: Creative bridge database checks
+        run: npm run test:bridge-db
+
+      - name: Pending member access checks
+        run: npm run test:access-db
+
+      - name: Membership review and admin inbox checks
+        run: npm run test:membership-review-db
+
+      - name: New application email and review-link checks
+        run: npm run test:application-db
+
+      - name: Admin-only application push checks
+        run: npm run test:application-push
+
+      - name: Member invitations and Familcy acceptance checks
+        run: node --test scripts/member-referrals-db.test.mjs
+
+      - name: Direct creative invitation and abuse-limit checks
+        run: node --test scripts/member-invitation-emails-db.test.mjs
+
+      - name: Application vouch permissions and duplicate checks
+        run: node scripts/membership-vouch-db.test.mjs
+
+      - name: Mobile admin scrolling regression
+        run: node --test scripts/admin-mobile-scroll.test.mjs
+
+      - name: Auth ban end date
+        run: node --test scripts/auth-ban-end.test.mjs
+
       - name: Stripe webhook fixtures
         run: npm run test:webhook
 

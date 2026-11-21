@@ -22,8 +22,10 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import { Plus, X, Upload, Package, Wrench, Building2 } from 'lucide-react';
 import { STORE_PLATFORM_FEE_PERCENT } from '@/lib/fees';
+import { readNumber } from "@/lib/numberField";
 
 interface CreateItemDialogProps {
   open: boolean;
@@ -46,6 +48,7 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
   const updateItem = useUpdateStoreItem();
 
   const [type, setType] = useState<'product' | 'service' | 'rental'>(defaultType || 'product');
+  const [isDigital, setIsDigital] = useState<boolean | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -65,6 +68,7 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
   const resetForm = useCallback(() => {
     setType(defaultType || 'product');
     setTitle('');
+    setIsDigital(null);
     setDescription('');
     setPrice('');
     setCreditsPrice('');
@@ -82,6 +86,7 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
 
   useEffect(() => {
     if (editItem) {
+      setIsDigital(editItem.is_digital ?? null);
       setType(editItem.type);
       setTitle(editItem.title);
       setDescription(editItem.description || '');
@@ -125,7 +130,7 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
         .upload(filePath, file);
 
       if (uploadError) {
-        toast.error(`Failed to upload ${file.name}`);
+        toast.error(errorMessage(uploadError, `Failed to upload ${file.name}`));
         continue;
       }
 
@@ -168,18 +173,30 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
       return;
     }
 
+    if (type !== 'rental' && isDigital === null) { toast.error('Choose physical goods / real-world service or digital content.'); return; }
+
+    const priceRead = readNumber(price, { label: 'Price', min: 0, decimals: 2, optional: true });
+    const creditsRead = readNumber(creditsPrice, { label: 'Credits price', min: 0, integer: true, optional: true });
+    const stockRead = readNumber(inventoryCount, { label: 'Stock', min: 0, integer: true, optional: true });
+    const durationRead = readNumber(durationMinutes, { label: 'Duration', min: 1, integer: true, optional: true });
+    for (const read of [priceRead, creditsRead, type === 'product' ? stockRead : null, type === 'service' ? durationRead : null]) {
+      if (read?.error) { toast.error(read.error); return; }
+    }
+    const valueOf = (read: typeof priceRead) => read.value;
+
     const itemData = {
+      is_digital: type === 'rental' ? false : isDigital,
       store_id: store.id,
       type,
       title: title.trim(),
       description: description.trim() || null,
-      price: parseFloat(price) || 0,
-      credits_price: parseInt(creditsPrice) || 0,
+      price: valueOf(priceRead) ?? 0,
+      credits_price: valueOf(creditsRead) ?? 0,
       category_id: categoryId || null,
       images,
       is_active: isActive,
-      inventory_count: type === 'product' ? (parseInt(inventoryCount) || null) : null,
-      duration_minutes: type === 'service' ? (parseInt(durationMinutes) || null) : null,
+      inventory_count: type === 'product' ? valueOf(stockRead) : null,
+      duration_minutes: type === 'service' ? valueOf(durationRead) : null,
       location: type === 'rental' ? (location.trim() || null) : null,
       amenities: type === 'rental' ? amenities : null,
       contact_email: type === 'rental' ? (contactEmail.trim() || null) : null,
@@ -220,11 +237,11 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
                     key={opt.value}
                     type="button"
                     variant={type === opt.value ? 'default' : 'outline'}
-                    className="flex flex-col h-auto py-3"
+                    className="flex h-auto min-w-0 flex-col whitespace-normal py-3 text-center leading-tight"
                     onClick={() => setType(opt.value as typeof type)}
                   >
                     <Icon className="w-5 h-5 mb-1" />
-                    <span className="text-xs">{opt.label}</span>
+                    <span className="whitespace-normal text-xs">{opt.label}</span>
                   </Button>
                 );
               })}
@@ -270,6 +287,17 @@ export const CreateItemDialog = ({ open, onOpenChange, editItem, defaultType }: 
               </SelectContent>
             </Select>
           </div>
+
+          {type !== 'rental' && <div className="space-y-2">
+              <Label htmlFor="delivery-kind">Delivery</Label>
+              <select id="delivery-kind" required value={isDigital === null ? '' : String(isDigital)}
+                onChange={e => setIsDigital(e.target.value === '' ? null : e.target.value === 'true')}
+                className="h-11 w-full rounded-md border border-border bg-background px-3">
+                <option value="">Choose delivery type</option>
+                <option value="false">Physical goods / real-world service</option>
+                <option value="true">Digital content</option>
+              </select>
+          </div>}
 
           {/* Pricing */}
           <div className="grid grid-cols-2 gap-4">

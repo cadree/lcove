@@ -37,9 +37,10 @@ SECRET_NAMES = (
     "GOOGLE_WALLET_ISSUER_ID",
     "GOOGLE_WALLET_SERVICE_ACCOUNT_KEY",
     "INTERNAL_FUNCTION_SECRET",
+    "LIVEKIT_API_KEY",
+    "LIVEKIT_API_SECRET",
+    "LIVEKIT_URL",
     "LOVABLE_API_KEY",
-    "MUX_TOKEN_ID",
-    "MUX_TOKEN_SECRET",
     "RESEND_API_KEY",
     "SITE_URL",
     "STRIPE_PRICE_COMMUNITY",
@@ -110,7 +111,7 @@ def selected_names(functions: str, directories: list[str]) -> list[str]:
     for part in raw.split(","):
         name = part.strip()
         if not name:
-            raise SystemExit("functions list has an empty name. Example: stripe-music-webhook,mux-stream")
+            raise SystemExit("functions list has an empty name. Example: stripe-music-webhook,livekit-token")
         if not SLUG_RE.fullmatch(name):
             raise SystemExit(f"invalid function name: {name}")
         if name in seen:

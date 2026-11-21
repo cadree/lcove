@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { BackButton } from '@/components/navigation/BackButton';
 import PageLayout from '@/components/layout/PageLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +18,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
 import { 
-  ArrowLeft, Building2, Upload, Save, Globe, MapPin, Image as ImageIcon, 
+  Building2, Upload, Save, Globe, MapPin, Image as ImageIcon, 
   CheckCircle, AlertCircle, Loader2, Trash2
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -177,6 +178,7 @@ export default function PartnerPortal() {
       
       if (uploadError) {
         console.error('Failed to upload gallery image:', uploadError);
+        toast.error(errorMessage(uploadError, "Couldn't upload that image"));
         continue;
       }
       
@@ -253,11 +255,12 @@ export default function PartnerPortal() {
   if (!user) {
     return (
       <PageLayout>
-        <div className="container max-w-2xl py-12 px-4 text-center">
+        <div className="container max-w-2xl py-6 px-4 text-center">
+          <BackButton label="Back" fallback="/partners" className="mb-6" />
           <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h2 className="text-xl font-semibold mb-2">Sign in required</h2>
           <p className="text-muted-foreground mb-4">Please sign in to access your partner portal</p>
-          <Button onClick={() => navigate('/auth')}>Sign In</Button>
+          <Button onClick={() => navigate('/auth')}>Sign in</Button>
         </div>
       </PageLayout>
     );
@@ -267,6 +270,7 @@ export default function PartnerPortal() {
     return (
       <PageLayout>
         <div className="container max-w-2xl py-6 px-4">
+          <BackButton label="Back" fallback="/partners" className="mb-6" />
           <Skeleton className="h-8 w-48 mb-6" />
           <Skeleton className="h-64 w-full" />
         </div>
@@ -277,7 +281,8 @@ export default function PartnerPortal() {
   if (!partnership) {
     return (
       <PageLayout>
-        <div className="container max-w-2xl py-12 px-4 text-center">
+        <div className="container max-w-2xl py-6 px-4 text-center">
+          <BackButton label="Back" fallback="/partners" className="mb-6" />
           <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h2 className="text-xl font-semibold mb-2">No Partnership Found</h2>
           <p className="text-muted-foreground mb-4">
@@ -306,9 +311,7 @@ export default function PartnerPortal() {
       <div className="container max-w-2xl py-6 px-4 pb-24">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <BackButton label="Back" fallback="/brand-partners" />
           <div className="flex-1">
             <h1 className="text-2xl font-display font-medium">Partner Portal</h1>
             <p className="text-sm text-muted-foreground">Customize your brand partnership profile</p>

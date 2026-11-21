@@ -1,10 +1,12 @@
 import { useRef, useState, useCallback, memo, useEffect } from "react";
+import { cropPinch, type CropPinchStart } from "@/lib/cropGesture";
 import { BoardItem } from "./BoardItem";
 import { ConnectorLayer } from "./ConnectorLayer";
 import { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 
 type ItemType = 'note' | 'todo' | 'link' | 'image' | 'column' | 'board_ref' | 'line' | 'connector';
 
@@ -70,12 +72,6 @@ export const BoardCanvas = memo(function BoardCanvas({
   const [scale, setScale] = useState(1);
   const startPanRef = useRef({ x: 0, y: 0 });
   const [isDragOver, setIsDragOver] = useState(false);
-  const initialPinchDistanceRef = useRef<number | null>(null);
-  const initialScaleRef = useRef<number>(1);
-  
-  // For single-finger panning on mobile
-  const singleTouchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
-  const isSingleTouchPanning = useRef(false);
 
   // Dispatch custom event when offset changes for connector updates
   useEffect(() => {
@@ -121,88 +117,59 @@ export const BoardCanvas = memo(function BoardCanvas({
     setIsPanning(false);
   }, []);
 
-  const getPinchDistance = (touches: React.TouchList) => {
-    const dx = touches[0].clientX - touches[1].clientX;
-    const dy = touches[0].clientY - touches[1].clientY;
-    return Math.sqrt(dx * dx + dy * dy);
+  // Touch: one finger on empty canvas pans, two fingers pinch around their midpoint. The view
+  // lives in a ref as well, so fast moves never read a stale offset or scale from a render ago,
+  // and lifting one finger of a pinch carries on as a pan with the other one, without a jump.
+  const view = useRef({ offset, scale });
+  view.current = { offset, scale };
+  const touchGesture = useRef<
+    | { kind: "pending" | "pan"; x: number; y: number; ox: number; oy: number }
+    | { kind: "pinch"; start: CropPinchStart }
+    | null
+  >(null);
+  const touchPoints = (touches: React.TouchList) => {
+    const box = canvasRef.current?.getBoundingClientRect();
+    return Array.from(touches, (t) => ({ x: t.clientX - (box?.left ?? 0), y: t.clientY - (box?.top ?? 0) }));
   };
-  
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    const target = e.target as HTMLElement;
-    const isOnCard = target.closest('[data-item-id]');
-    
-    // Two-finger touch for pinch zoom
-    if (e.touches.length === 2) {
-      e.preventDefault();
-      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      setIsPanning(true);
-      startPanRef.current = { x: midX - offset.x, y: midY - offset.y };
-      initialPinchDistanceRef.current = getPinchDistance(e.touches);
-      initialScaleRef.current = scale;
-      isSingleTouchPanning.current = false;
-    }
-    // Single-finger touch for panning (only if not on a card)
-    else if (e.touches.length === 1 && !isOnCard) {
-      const touch = e.touches[0];
-      singleTouchStartRef.current = { 
-        x: touch.clientX, 
-        y: touch.clientY,
-        time: Date.now()
-      };
-      startPanRef.current = { x: touch.clientX - offset.x, y: touch.clientY - offset.y };
-      isSingleTouchPanning.current = true;
-    }
-  }, [offset, scale]);
+  const startTouchGesture = useCallback((e: React.TouchEvent) => {
+    const points = touchPoints(e.touches);
+    const { offset: o, scale: s } = view.current;
+    if (points.length >= 2) {
+      const [a, b] = points;
+      touchGesture.current = { kind: "pinch", start: { scale: s, offset: o, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, distance: Math.hypot(a.x - b.x, a.y - b.y) } };
+    } else if (points.length === 1 && !(e.target as HTMLElement).closest("[data-item-id]")) {
+      touchGesture.current = { kind: touchGesture.current ? "pan" : "pending", x: points[0].x, y: points[0].y, ox: o.x, oy: o.y };
+    } else touchGesture.current = null;
+  }, []);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => startTouchGesture(e), [startTouchGesture]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    // Two-finger pinch to zoom and pan
-    if (e.touches.length === 2) {
-      e.preventDefault();
-      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      
-      // Pan
-      if (isPanning) {
-        const newOffset = {
-          x: midX - startPanRef.current.x,
-          y: midY - startPanRef.current.y,
-        };
-        setOffset(newOffset);
-      }
-      
-      // Pinch to zoom
-      if (initialPinchDistanceRef.current !== null) {
-        const currentDistance = getPinchDistance(e.touches);
-        const scaleChange = currentDistance / initialPinchDistanceRef.current;
-        const newScale = Math.min(Math.max(initialScaleRef.current * scaleChange, 0.25), 3);
-        setScale(newScale);
-      }
+    const g = touchGesture.current;
+    if (!g) return;
+    const points = touchPoints(e.touches);
+    if (g.kind === "pinch" && points.length >= 2) {
+      const [a, b] = points;
+      const next = cropPinch(g.start, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, Math.hypot(a.x - b.x, a.y - b.y), 0.25, 3);
+      view.current = next;
+      setScale(next.scale);
+      setOffset(next.offset);
+    } else if (g.kind !== "pinch" && points.length === 1) {
+      const dx = points[0].x - g.x;
+      const dy = points[0].y - g.y;
+      // Start panning after a few pixels so a tap on the canvas still deselects.
+      if (g.kind === "pending" && Math.abs(dx) <= 5 && Math.abs(dy) <= 5) return;
+      g.kind = "pan";
+      const next = { x: g.ox + dx, y: g.oy + dy };
+      view.current = { ...view.current, offset: next };
+      setOffset(next);
     }
-    // Single-finger panning
-    else if (e.touches.length === 1 && isSingleTouchPanning.current && singleTouchStartRef.current) {
-      const touch = e.touches[0];
-      const dx = touch.clientX - singleTouchStartRef.current.x;
-      const dy = touch.clientY - singleTouchStartRef.current.y;
-      
-      // Start panning after threshold to avoid accidental pans
-      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-        e.preventDefault();
-        const newOffset = {
-          x: touch.clientX - startPanRef.current.x,
-          y: touch.clientY - startPanRef.current.y,
-        };
-        setOffset(newOffset);
-      }
-    }
-  }, [isPanning]);
-
-  const handleTouchEnd = useCallback(() => {
-    setIsPanning(false);
-    singleTouchStartRef.current = null;
-    initialPinchDistanceRef.current = null;
-    isSingleTouchPanning.current = false;
   }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 0) touchGesture.current = null;
+    else startTouchGesture(e);
+  }, [startTouchGesture]);
 
   // Mouse wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -292,7 +259,7 @@ export const BoardCanvas = memo(function BoardCanvas({
         toast.success(`${isVideo ? 'Video' : 'Image'} added to board`);
       } catch (error) {
         console.error('Upload error:', error);
-        toast.error(`Failed to upload ${file.name}`);
+        toast.error(errorMessage(error, `Failed to upload ${file.name}`));
       }
     }
   }, [offset, onCreateItem, user]);

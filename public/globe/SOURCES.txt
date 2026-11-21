@@ -1,0 +1,8 @@
+Geographic layers on the Explore globe. All of this is free and public-domain (or ISC for the packaging):
+
+- land-50m.json, land-10m.json, countries-110m.json: Natural Earth, via world-atlas 2.0.2 (ISC).
+- states.json: Natural Earth 10m admin-1 state and province lines, simplified.
+- lakes.json, rivers.json: Natural Earth 50m physical, filtered to the larger features.
+- places.json: Natural Earth 10m populated places, packed to name / lon / lat / population / rank.
+
+Natural Earth: https://www.naturalearthdata.com/ (public domain).

@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { callRpc } from '@/lib/rpc';
+import type { GroupJoinResult } from '@/hooks/useCollectives';
 
 export interface GroupExpense {
   id: string;
@@ -251,20 +253,15 @@ export function useJoinGroup() {
 
   return useMutation({
     mutationFn: async (conversationId: string) => {
-      const { error } = await supabase
-        .from('conversation_participants')
-        .insert({
-          conversation_id: conversationId,
-          user_id: user?.id,
-          role: 'member',
-        });
-
-      if (error) throw error;
+      if (!user) throw new Error('Sign in to join');
+      // Private groups only take invites or approved requests; the database enforces it.
+      return callRpc<GroupJoinResult>('join_group', { p_conversation_id: conversationId });
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['community-groups'] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      toast.success('Joined group');
+      toast.success(result === 'requested' ? 'Join request sent' : 'Joined group');
     },
+    onError: (error) => toast.error(error instanceof Error ? error.message : 'Could not join'),
   });
 }

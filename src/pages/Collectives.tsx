@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,8 +14,9 @@ import {
   COLLECTIVE_TOPICS,
 } from "@/hooks/useCollectives";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Users, Sparkles } from "lucide-react";
+import { BackButton } from "@/components/navigation/BackButton";
 import { motion } from "framer-motion";
 
 const topicLabels: Record<string, string> = {
@@ -41,17 +42,25 @@ export default function Collectives() {
   const { data: collectives, isLoading } = useCollectives(selectedTopic);
   const { data: myCollectives, isLoading: myLoading } = useMyCollectives();
 
-  const handleCreateClick = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const handleCreateClick = useCallback(() => {
     if (!user) {
       navigate("/auth");
       return;
     }
     setCreateDialogOpen(true);
-  };
+  }, [user, navigate]);
+
+  useEffect(() => {
+    if (searchParams.get('action') !== 'create' || !user) return;
+    handleCreateClick();
+    setSearchParams(previous => { const next = new URLSearchParams(previous); next.delete('action'); return next; }, { replace: true });
+  }, [searchParams, setSearchParams, user, handleCreateClick]);
 
   return (
     <PageLayout>
       <div className="container max-w-2xl py-6 px-4">
+        <BackButton label="Back" className="mb-3" />
         <h1 className="text-2xl font-display font-medium mb-6">Collectives</h1>
         
         {/* Hero Section */}
@@ -158,7 +167,7 @@ export default function Collectives() {
                 title="Sign in to see your collectives"
                 description="Create an account to join and create collectives"
                 action={{
-                  label: "Sign In",
+                  label: "Sign in",
                   onClick: () => navigate("/auth"),
                 }}
               />

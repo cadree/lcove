@@ -128,7 +128,7 @@ Deno.serve(async (req) => {
     if (type === "e") {
       const { data } = await supabase
         .from("events")
-        .select("title, description, image_url, is_public, venue, city")
+        .select("title, description, image_url, is_public, status, venue, city")
         .eq("id", id)
         .maybeSingle();
 
@@ -140,7 +140,9 @@ Deno.serve(async (req) => {
         .eq("format", "feed")
         .maybeSingle();
 
-      if (data && data.is_public) {
+      const status = String(data?.status || "").toLowerCase();
+      const shareable = Boolean(data?.is_public) && status !== "draft" && status !== "cancelled";
+      if (shareable && data) {
         title = data.title || SITE_NAME;
         description = data.description
           ? data.description.slice(0, 155)
@@ -148,8 +150,9 @@ Deno.serve(async (req) => {
         if (flyer?.flyer_url) imageUrl = flyer.flyer_url;
         else if (data.image_url) imageUrl = data.image_url;
       } else {
-        title = "Event on ETHER";
-        description = "Sign in to view this event";
+        title = SITE_NAME;
+        description = DEFAULT_DESCRIPTION;
+        imageUrl = DEFAULT_OG_IMAGE;
       }
     } else if (type === "p") {
       const { data } = await supabase

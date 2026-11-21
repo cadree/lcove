@@ -35,7 +35,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { NetworkContent, useContentLike, useTVSeasons } from '@/hooks/useCinema';
-import { isIosApp } from '@/lib/platform';
+import { digitalPurchasesEnabled } from '@/lib/platform';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -65,7 +65,7 @@ export const ContentDetailDialog = ({
 
   return (
     <Sheet open={!!content} onOpenChange={() => onClose()}>
-      <SheetContent 
+      <SheetContent hideClose
         side="bottom" 
         className="h-[90vh] md:h-[85vh] rounded-t-2xl p-0 border-t border-border/50"
       >
@@ -186,7 +186,7 @@ export const ContentDetailDialog = ({
                   <Play className="w-5 h-5 fill-current" />
                   {isTVShow ? 'Resume' : 'Play'}
                 </>
-              ) : isIosApp() ? (
+              ) : !digitalPurchasesEnabled() ? (
                 <>
                   <Play className="w-5 h-5 fill-current" />
                   Preview

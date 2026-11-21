@@ -17,6 +17,7 @@ export interface HostEmailContext {
   eventUrl: string;
   customMessage?: string | null;
   moodboardThumbnails?: string[]; // up to 3 image urls
+  unsubscribeUrl?: string | null;
 }
 
 const escapeHtml = (s: string) =>
@@ -153,8 +154,12 @@ export function buildHostEventEmail(
       ${signatureBlock}
     </div>
   </div>
-  <p style="color:#aaa;font-size:11px;text-align:center;margin-top:16px;">
-    Sent via ETHER by lcove on behalf of ${escapeHtml(identity.organizerName)}
+  <p style="color:#9a9a9a;font-size:11px;line-height:1.5;text-align:center;margin-top:16px;">
+    Powered by Ether<br />
+    <a href="https://etherbylcove.com/privacy" style="color:#9a9a9a;text-decoration:underline;">Privacy</a>
+    &nbsp;·&nbsp;
+    <a href="https://etherbylcove.com/terms" style="color:#9a9a9a;text-decoration:underline;">Terms</a>
+    ${ctx.unsubscribeUrl ? `&nbsp;·&nbsp; <a href="${escapeHtml(ctx.unsubscribeUrl)}" style="color:#9a9a9a;text-decoration:underline;">Unsubscribe</a>` : ""}
   </p>
 </div>`.trim();
 

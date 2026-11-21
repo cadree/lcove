@@ -17,6 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PartyPopper, MessageSquare, Calendar, Bell } from 'lucide-react';
 import { toast } from 'sonner';
+import { parseCalendarDate } from '@/lib/calendarDate';
 
 interface ProjectAcceptedDialogProps {
   projectId: string | null;
@@ -88,8 +89,8 @@ export const ProjectAcceptedDialog: React.FC<ProjectAcceptedDialogProps> = ({
   const calendarEvent = hasTimeline ? {
     title: project.title,
     description: project.description || `Project: ${project.title}`,
-    startDate: new Date(project.timeline_start!),
-    endDate: project.timeline_end ? new Date(project.timeline_end) : null,
+    startDate: parseCalendarDate(project.timeline_start!),
+    endDate: project.timeline_end ? parseCalendarDate(project.timeline_end) : null,
     location: project.venue,
   } : null;
 

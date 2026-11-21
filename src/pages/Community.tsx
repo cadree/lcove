@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Megaphone, Star, FileText, BarChart3, Plus, Pin, ArrowLeft } from 'lucide-react';
+import { Megaphone, Star, FileText, BarChart3, Plus, Pin } from 'lucide-react';
+import { BackButton } from '@/components/navigation/BackButton';
 import PageLayout from '@/components/layout/PageLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,8 +16,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCommunityUpdates, useCreateCommunityUpdate, UPDATE_CATEGORY_CONFIG, UpdateCategory } from '@/hooks/useCommunityUpdates';
 import { useAuth } from '@/contexts/AuthContext';
-import FirstRunEmpty from '@/components/onboarding/FirstRunEmpty';
 import { useIsAdmin } from '@/hooks/useAdmin';
+import { PageMeta } from '@/components/seo/PageMeta';
 import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -54,14 +55,13 @@ const Community: React.FC = () => {
 
   return (
     <PageLayout>
+      <PageMeta title="Community · Ether" description="Community updates." />
       <div className="min-h-screen pb-20">
         {/* Header */}
         <div className="bg-gradient-to-b from-primary/10 to-background px-4 pt-6 pb-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
+              <BackButton />
               <div>
                 <h1 className="text-2xl font-bold">Community</h1>
                 <p className="text-muted-foreground">
@@ -97,26 +97,7 @@ const Community: React.FC = () => {
             <div className="space-y-4">
               {[1, 2, 3].map(i => <Skeleton key={i} className="h-40" />)}
             </div>
-          ) : updates?.length === 0 ? (
-            user ? (
-              <FirstRunEmpty
-                title="Nothing here yet"
-                description="The community board is empty. You can still set up your profile, browse members, or open the feed."
-                actions={[
-                  { label: "Open the feed", to: "/feed" },
-                  { label: "Edit your profile", to: "/settings" },
-                  { label: "Browse directory", to: "/directory" },
-                ]}
-              />
-            ) : (
-              <div className="text-center py-12">
-                <Megaphone className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="font-medium">No public updates yet</h3>
-                <p className="text-sm text-muted-foreground mb-4">This page is a read-only preview.</p>
-                <Button onClick={() => navigate('/auth')}>Sign up</Button>
-              </div>
-            )
-          ) : (
+          ) : updates?.length === 0 ? null : (
             <AnimatePresence>
               {updates?.map((update, i) => (
                 <motion.div

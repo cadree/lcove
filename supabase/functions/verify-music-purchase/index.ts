@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,7 +45,7 @@ serve(async (req) => {
     const user = userData.user;
     if (!user) throw new Error("Not authenticated");
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+    const stripe = new Stripe(assertStripeTestKey(Deno.env.get("STRIPE_SECRET_KEY")), {
       apiVersion: "2025-08-27.basil",
     });
 
@@ -87,6 +89,24 @@ serve(async (req) => {
       }
     }
 
+    // The webhook usually lands before the buyer is back on the profile. Report
+    // that recent paid purchase too, so the app says "unlocked" instead of
+    // "finalizing" for a track that is already playable.
+    if (!results.some((r) => r.status === "paid")) {
+      const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      const { data: recent } = await supabaseAdmin
+        .from("exclusive_track_purchases")
+        .select("stripe_session_id")
+        .eq("buyer_user_id", user.id)
+        .eq("payment_status", "paid")
+        .gte("created_at", since)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (recent?.[0]?.stripe_session_id) {
+        results.push({ session: recent[0].stripe_session_id, status: "paid", updated: false });
+      }
+    }
+
     return new Response(JSON.stringify({ ok: true, checked: results.length, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
@@ -96,7 +116,7 @@ serve(async (req) => {
     log("ERROR", { msg });
     return new Response(JSON.stringify({ ok: false, error: msg }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
+      status: httpStatusForError(error),
     });
   }
 });

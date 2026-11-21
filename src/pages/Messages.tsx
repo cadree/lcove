@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useConversations } from "@/hooks/useConversations";
+import { toast } from "sonner";
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MessageCircle, ArrowLeft } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import ConversationList from '@/components/messages/ConversationList';
+import { MessageRequests } from '@/components/messages/MessageRequests';
 import ChatView from '@/components/messages/ChatView';
 import NewChatDialog from '@/components/messages/NewChatDialog';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,10 +16,26 @@ import { Link } from 'react-router-dom';
 const Messages = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const chatParam = searchParams.get('chat');
+  const chatParam = searchParams.get('chat') || searchParams.get('conversation');
   const actionParam = searchParams.get('action');
   const [selectedConversation, setSelectedConversation] = useState<string | null>(chatParam);
   const [showNewChat, setShowNewChat] = useState(false);
+
+  const newUserId = searchParams.get('new');
+  const { createDirectConversation: { mutateAsync: createDirect } } = useConversations();
+  const pendingDirect = useRef<string | null>(null);
+  useEffect(() => {
+    if (!newUserId || !user || pendingDirect.current === newUserId) return;
+    pendingDirect.current = newUserId;
+    void createDirect(newUserId).then(conversation => {
+      setSelectedConversation(conversation.id);
+    }).catch(error => {
+      toast.error(error instanceof Error ? error.message : 'Could not open conversation');
+    }).finally(() => {
+      setSearchParams(previous => { const next = new URLSearchParams(previous); if (next.get('new') === newUserId) next.delete('new'); return next; }, { replace: true });
+      pendingDirect.current = null;
+    });
+  }, [newUserId, user, createDirect, setSearchParams]);
 
   // Handle chat query parameter to auto-select conversation
   useEffect(() => {
@@ -54,9 +73,9 @@ const Messages = () => {
             <p className="text-muted-foreground mb-6 text-sm">
               Connect with other creatives through direct messages
             </p>
-            <Link to="/auth">
-              <Button className="w-full">Sign In</Button>
-            </Link>
+            <Button asChild className="w-full">
+              <Link to="/auth">Sign in</Link>
+            </Button>
           </motion.div>
         </div>
       </PageLayout>
@@ -80,11 +99,12 @@ const Messages = () => {
             onSelect={setSelectedConversation}
             onNewChat={() => setShowNewChat(true)}
             onDeleteConversation={() => setSelectedConversation(null)}
+            beforeChats={<MessageRequests onOpenChat={setSelectedConversation} />}
           />
         </motion.div>
 
         {/* Chat View */}
-        <div className={`flex-1 ${!selectedConversation ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`min-h-0 flex-1 ${!selectedConversation ? 'hidden md:flex' : 'flex'}`}>
           {selectedConversation ? (
             <ChatView
               conversationId={selectedConversation}

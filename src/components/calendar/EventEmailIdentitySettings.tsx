@@ -152,10 +152,10 @@ export function EventEmailIdentitySettings({ eventId, hostDisplayName }: Props) 
       <Card className="p-4 bg-muted/30 space-y-1">
         <div className="text-xs text-muted-foreground">Recipients will see:</div>
         <div className="text-sm font-medium">
-          From: <span className="text-primary">{effectiveFromName}</span> &lt;events@notifications.etherbylcove.com&gt;
+          From: <span className="text-primary">{effectiveFromName}</span> &lt;events@etherbylcove.com&gt;
         </div>
         <div className="text-sm">
-          Reply-To: {replyTo || "support@notify.etherbylcove.com"}
+          Reply-To: {isVerified && replyTo ? replyTo : "No reply-to until this address is verified"}
           {isVerified && <Badge variant="secondary" className="ml-2 gap-1"><CheckCircle2 className="h-3 w-3" /> Verified</Badge>}
         </div>
       </Card>
@@ -268,7 +268,7 @@ export function EventEmailIdentitySettings({ eventId, hostDisplayName }: Props) 
         </div>
       </div>
 
-      <Button onClick={handleSave} disabled={saving} className="w-full">
+      <Button type="button" onClick={handleSave} disabled={saving} className="w-full">
         {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
         Save Email Identity
       </Button>

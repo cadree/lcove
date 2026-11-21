@@ -97,15 +97,18 @@ export const useBoardItems = (boardId: string | undefined) => {
 
   const updateItem = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<BoardItem> & { id: string }) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("board_items")
         .update(updates)
-        .eq("id", id);
+        .eq("id", id)
+        .select("id");
 
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error("That change did not save");
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["board-items", boardId] });
+      if (variables.content !== undefined) toast.success("Saved");
     },
     onError: () => {
       toast.error("Failed to update item");
@@ -114,12 +117,14 @@ export const useBoardItems = (boardId: string | undefined) => {
 
   const deleteItem = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("board_items")
         .update({ is_trashed: true })
-        .eq("id", id);
+        .eq("id", id)
+        .select("id");
 
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error("That item did not update");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["board-items", boardId] });

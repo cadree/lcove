@@ -1,0 +1,115 @@
+{
+ "track": {
+  "type": "track",
+  "name": "Knights of Cydonia",
+  "title": "Knights of Cydonia",
+  "artists": [
+   {
+    "name": "Muse",
+    "uri": "spotify:artist:12Chz98pHFMPJEknJQMWvI"
+   }
+  ],
+  "releaseDate": {
+   "isoString": "2006-06-28T00:00:00Z"
+  },
+  "audioPreview": {
+   "url": "https://p.scdn.co/mp3-preview/8196f1d0cb4c14a5a5bd1ab078c6893b30dab102"
+  },
+  "visualIdentity": {
+   "image": [
+    {
+     "url": "https://image-cdn-ak.spotifycdn.com/image/ab67616d00001e0228933b808bfb4cbbd0385400",
+     "maxHeight": 300,
+     "maxWidth": 300
+    },
+    {
+     "url": "https://image-cdn-ak.spotifycdn.com/image/ab67616d0000485128933b808bfb4cbbd0385400",
+     "maxHeight": 64,
+     "maxWidth": 64
+    }
+   ]
+  }
+ },
+ "album": {
+  "type": "album",
+  "name": "The Dark Side of the Moon",
+  "title": "The Dark Side of the Moon",
+  "subtitle": "Pink Floyd",
+  "releaseDate": null,
+  "visualIdentity": {
+   "image": [
+    {
+     "url": "https://image-cdn-ak.spotifycdn.com/image/ab67616d00001e02db216ca805faf5fe35df4ee6",
+     "maxHeight": 300,
+     "maxWidth": 300
+    },
+    {
+     "url": "https://image-cdn-ak.spotifycdn.com/image/ab67616d00004851db216ca805faf5fe35df4ee6",
+     "maxHeight": 64,
+     "maxWidth": 64
+    }
+   ]
+  },
+  "trackList": [
+   {
+    "uri": "spotify:track:574y1r7o2tRA009FW0LE7v",
+    "title": "Speak to Me",
+    "subtitle": "Pink Floyd",
+    "audioPreview": {
+     "format": "MP3_96",
+     "url": "https://p.scdn.co/mp3-preview/4caa4ecf0519b90ed0827569d237fe30f4824818"
+    }
+   },
+   {
+    "uri": "spotify:track:2ctvdKmETyOzPb2GiJJT53",
+    "title": "Breathe (In the Air)",
+    "subtitle": "Pink Floyd",
+    "audioPreview": {
+     "format": "MP3_96",
+     "url": "https://p.scdn.co/mp3-preview/5b355f9a9d2d1a6bb780d871ebefd9489837619e"
+    }
+   }
+  ]
+ },
+ "artist": {
+  "type": "artist",
+  "name": "Drake",
+  "title": "Drake",
+  "subtitle": "Top tracks",
+  "releaseDate": null,
+  "visualIdentity": {
+   "image": [
+    {
+     "url": "https://image-cdn-fa.spotifycdn.com/image/ab676161000051744293385d324db8558179afd9",
+     "maxHeight": 320,
+     "maxWidth": 320
+    },
+    {
+     "url": "https://image-cdn-fa.spotifycdn.com/image/ab6761610000e5eb4293385d324db8558179afd9",
+     "maxHeight": 640,
+     "maxWidth": 640
+    }
+   ]
+  },
+  "trackList": [
+   {
+    "uri": "spotify:track:1zi7xx7UVEFkmKfv06H8x0",
+    "title": "One Dance",
+    "subtitle": "Drake,\u00a0Wizkid,\u00a0Kyla",
+    "audioPreview": {
+     "format": "MP3_96",
+     "url": "https://p.scdn.co/mp3-preview/0ee5843f6060102ce4ac239c856c452439e3d9d2"
+    }
+   },
+   {
+    "uri": "spotify:track:514joG57v4yKTsfQmz7stz",
+    "title": "Janice STFU",
+    "subtitle": "Drake",
+    "audioPreview": {
+     "format": "MP3_96",
+     "url": "https://p.scdn.co/mp3-preview/1de9b315e1aa811aedaf905b1058b668b2d3146e"
+    }
+   }
+  ]
+ }
+}

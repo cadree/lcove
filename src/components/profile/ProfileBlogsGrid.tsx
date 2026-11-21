@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
-import { FileText, Eye, Calendar, MoreHorizontal } from "lucide-react";
+import { FileText, Eye, Calendar } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { Button } from "@/components/ui/button";
+import { SquircleIcon } from "@/components/world/SquircleIcon";
 import { Badge } from "@/components/ui/badge";
 import { BlogPost } from "@/hooks/useProfileBlogs";
 
@@ -26,10 +26,8 @@ export function ProfileBlogsGrid({ blogs, onBlogClick, isLoading, isOwner }: Pro
   if (blogs.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-20 h-20 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center mb-4">
-          <FileText className="w-10 h-10 text-muted-foreground/50" />
-        </div>
-        <h3 className="text-xl font-medium text-foreground mb-2">Write Your Story</h3>
+        <SquircleIcon icon={FileText} fill="bone" size={52} className="mb-4" />
+        <h3 className="ether-title mb-2 text-xl text-foreground">Write Your Story</h3>
         <p className="text-muted-foreground text-sm max-w-[250px]">
           Share your thoughts, experiences, and creative process.
         </p>
@@ -45,7 +43,7 @@ export function ProfileBlogsGrid({ blogs, onBlogClick, isLoading, isOwner }: Pro
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: index * 0.1 }}
-          className="w-full text-left glass-strong rounded-lg overflow-hidden hover:bg-accent/10 transition-colors"
+          className="file-panel w-full overflow-hidden text-left transition-colors hover:border-[hsl(var(--scan))]"
           onClick={() => onBlogClick(blog)}
         >
           <div className="flex">
@@ -63,7 +61,7 @@ export function ProfileBlogsGrid({ blogs, onBlogClick, isLoading, isOwner }: Pro
             {/* Content */}
             <div className="flex-1 p-4">
               <div className="flex items-start justify-between gap-2 mb-2">
-                <h3 className="font-display text-lg font-medium text-foreground line-clamp-1">
+                <h3 className="ether-title line-clamp-1 text-lg text-foreground">
                   {blog.title}
                 </h3>
                 {isOwner && !blog.is_published && (
@@ -77,7 +75,7 @@ export function ProfileBlogsGrid({ blogs, onBlogClick, isLoading, isOwner }: Pro
                 {blog.excerpt || blog.content.slice(0, 150)}
               </p>
               
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <div className="mono-label flex items-center gap-4 text-[9px] text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
                   {formatDistanceToNow(new Date(blog.created_at), { addSuffix: true })}

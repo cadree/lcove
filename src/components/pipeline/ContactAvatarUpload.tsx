@@ -3,6 +3,7 @@ import { Camera, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useContactAvatar } from "@/hooks/useContactAvatar";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 
 interface ContactAvatarUploadProps {
   avatarUrl: string | null;
@@ -54,7 +55,7 @@ export function ContactAvatarUpload({
       toast.success("Photo updated");
     } catch (error) {
       setPreviewUrl(null);
-      toast.error("Failed to upload photo");
+      toast.error(errorMessage(error, "Failed to upload photo"));
     }
 
     // Reset input

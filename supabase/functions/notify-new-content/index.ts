@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireUserOrService } from "../_shared/require-caller.ts";
+import { getBearerUser, requestRole, requireUserOrService } from "../_shared/require-caller.ts";
+import { authorizeNewContent, escapeHtml } from "../_shared/notification-auth.mjs";
+import { shouldNotifyCommunity } from "../_shared/project-collaborations.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const EMAIL_FROM = "ETHER <notifications@etherbylcove.com>";
@@ -18,11 +21,20 @@ interface NotifyNewContentRequest {
   creator_name?: string;
 }
 
-const getEmailTemplate = (contentType: string, title: string, creatorName?: string) => {
+const getEmailTemplate = (
+  contentType: string,
+  listingType: string,
+  title: string,
+  creatorName?: string,
+) => {
   const isProject = contentType === "project";
+  const label = listingType === "gig" ? "Gig" : isProject ? "Project" : "Event";
   const color = isProject ? "#4CAF50" : "#FF9800";
-  const icon = isProject ? "🚀" : "📅";
+  const icon = listingType === "gig" ? "💼" : isProject ? "🚀" : "📅";
   const url = isProject ? "https://etherbylcove.com/projects" : "https://etherbylcove.com/calendar";
+  const reason = isProject
+    ? `You can turn off new ${label.toLowerCase()} emails in notification settings.`
+    : "You're receiving this because you opted in to new event notifications.";
 
   return `
     <!DOCTYPE html>
@@ -42,15 +54,15 @@ const getEmailTemplate = (contentType: string, title: string, creatorName?: stri
                       <span style="color: white; font-size: 24px;">${icon}</span>
                     </div>
                     <h1 style="color: #ffffff; font-size: 24px; margin: 0 0 16px; font-weight: 600;">
-                      New ${isProject ? "Project" : "Event"} Posted
+                      New ${label} Posted
                     </h1>
                     <p style="color: #ffffff; font-size: 20px; font-weight: 600; margin: 0 0 10px;">
-                      ${title}
+                      ${escapeHtml(title)}
                     </p>
-                    ${creatorName ? `<p style="color: #a0a0a0; font-size: 14px; margin: 0 0 30px;">by ${creatorName}</p>` : ""}
+                    ${creatorName ? `<p style="color: #a0a0a0; font-size: 14px; margin: 0 0 30px;">by ${escapeHtml(creatorName)}</p>` : ""}
                     <a href="${url}" 
                        style="display: inline-block; background: ${color}; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                      View ${isProject ? "Project" : "Event"}
+                      View ${label}
                     </a>
                   </td>
                 </tr>
@@ -60,7 +72,7 @@ const getEmailTemplate = (contentType: string, title: string, creatorName?: stri
                       ETHER Creative Collective
                     </p>
                     <p style="color: #555; font-size: 11px; margin: 8px 0 0;">
-                      You're receiving this because you opted in to new ${isProject ? "project" : "event"} notifications.
+                      ${reason}
                     </p>
                   </td>
                 </tr>
@@ -87,37 +99,115 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { content_type, content_id, title, description, creator_name }: NotifyNewContentRequest = await req.json();
+    const body = await req.json() as Partial<NotifyNewContentRequest>;
+    const content_type = body.content_type;
+    const content_id = typeof body.content_id === "string" ? body.content_id : "";
+    const role = requestRole(req);
+    const callerId = role === "service_role" ? null : await getBearerUser(req.headers.get("Authorization"), supabase);
+
+    let record: {
+      id: string;
+      creator_id: string;
+      title: string | null;
+      description?: string | null;
+      is_private?: boolean | null;
+      listing_type?: string | null;
+    } | null = null;
+    if (content_type === "project" && content_id) {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("id, creator_id, is_private, listing_type, title, description")
+        .eq("id", content_id)
+        .maybeSingle();
+      if (error) throw error;
+      record = data;
+    } else if (content_type === "event" && content_id) {
+      const { data, error } = await supabase
+        .from("events")
+        .select("id, creator_id, title, description")
+        .eq("id", content_id)
+        .maybeSingle();
+      if (error) throw error;
+      record = data;
+    }
+
+    let profileName: string | null = null;
+    if (record?.creator_id) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("user_id", record.creator_id)
+        .maybeSingle();
+      profileName = profile?.display_name ?? null;
+    }
+
+    const decision = authorizeNewContent({
+      callerId,
+      role,
+      contentType: content_type,
+      record,
+      creatorName: profileName,
+    });
+    if (!decision.ok) {
+      return new Response(JSON.stringify({ error: decision.error }), {
+        status: decision.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (decision.skip) {
+      return new Response(
+        JSON.stringify({ message: "Private projects are not announced", sent: 0 }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const title = decision.title;
+    const description = decision.description;
+    const creator_name = decision.creatorName;
+    const listingType = decision.listingType;
+    const creatorId = decision.creatorId;
 
     console.log(`Notifying users of new ${content_type}:`, title);
 
-    // Determine which preference column to check
-    const prefColumn = content_type === "project" ? "new_projects_enabled" : "new_events_enabled";
+    const prefColumn = listingType === "gig"
+      ? "new_gigs_enabled"
+      : content_type === "project"
+        ? "new_projects_enabled"
+        : "new_events_enabled";
 
-    // Get all users who have opted in to this notification type
-    const { data: optedInUsers, error: usersError } = await supabase
+    const { data: preferenceRows, error: usersError } = await supabase
       .from("notification_preferences")
-      .select("user_id")
-      .eq(prefColumn, true);
+      .select(`user_id, push_enabled, email_enabled, ${prefColumn}`);
 
     if (usersError) {
       console.error("Error fetching opted-in users:", usersError);
       throw usersError;
     }
 
-    if (!optedInUsers || optedInUsers.length === 0) {
-      console.log("No users opted in for this notification type");
+    const optedInUsers = (preferenceRows ?? []).filter((row) => {
+      if (content_type !== "project") return row[prefColumn] === true;
+      return shouldNotifyCommunity({
+        isPrivate: false,
+        isCreator: row.user_id === creatorId,
+        categoryEnabled: row[prefColumn],
+      });
+    });
+
+    if (optedInUsers.length === 0) {
+      console.log("No users left to notify for this content");
       return new Response(
-        JSON.stringify({ message: "No opted-in users", sent: 0 }),
+        JSON.stringify({ message: "No recipients", sent: 0 }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`Found ${optedInUsers.length} users opted in for ${content_type} notifications`);
+    console.log(`Found ${optedInUsers.length} users for ${listingType} notifications`);
 
-    const notificationTitle = content_type === "project" 
-      ? `New Project: ${title}` 
-      : `New Event: ${title}`;
+    const notificationTitle = listingType === "gig"
+      ? `New Gig: ${title}`
+      : content_type === "project"
+        ? `New Project: ${title}`
+        : `New Event: ${title}`;
     const notificationBody = description 
       ? description.substring(0, 100) + (description.length > 100 ? "..." : "")
       : `${creator_name ? `Posted by ${creator_name}` : "Check it out!"}`;
@@ -127,15 +217,9 @@ serve(async (req) => {
     const errors: string[] = [];
 
     // Process users in batches
-    for (const { user_id } of optedInUsers) {
+    for (const prefs of optedInUsers) {
+      const user_id = prefs.user_id;
       try {
-        // Get full preferences for this user
-        const { data: prefs } = await supabase
-          .from("notification_preferences")
-          .select("*")
-          .eq("user_id", user_id)
-          .single();
-
         // Create in-app notification
         await supabase.from("notifications").insert({
           user_id,
@@ -144,6 +228,7 @@ serve(async (req) => {
           body: notificationBody,
           data: { 
             content_type,
+            listing_type: listingType,
             content_id,
             url: content_type === "project" ? "/projects" : "/calendar"
           }
@@ -163,7 +248,7 @@ serve(async (req) => {
                 from: EMAIL_FROM,
                 to: [userData.user.email],
                 subject: notificationTitle,
-                html: getEmailTemplate(content_type, title, creator_name),
+                html: getEmailTemplate(content_type, listingType, title, creator_name),
               }),
             });
           }
@@ -205,7 +290,7 @@ serve(async (req) => {
     console.error("Error in notify-new-content:", errorMessage);
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: httpStatusForError(error), headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

@@ -1,5 +1,6 @@
 import { Eye, UserPlus } from "lucide-react";
 import { motion } from "framer-motion";
+import { revealMotion } from "@/lib/reveal";
 
 const trustPoints = [
   { icon: UserPlus, title: "Free to join" },
@@ -11,10 +12,7 @@ export function TrustSection() {
     <section className="py-12 md:py-16">
       <div className="container px-4 sm:px-6 lg:px-8">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
+          {...revealMotion({ y: 20 })}
           className="border border-border p-6 md:p-8"
         >
           <p className="eyebrow text-center mb-2">Joining</p>
@@ -26,10 +24,7 @@ export function TrustSection() {
             {trustPoints.map((point, index) => (
               <motion.div
                 key={point.title}
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
+                {...revealMotion({ scale: 0.9, duration: 0.3, delay: index * 0.05 })}
                 className="flex flex-col items-center gap-2"
               >
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">

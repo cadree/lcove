@@ -1,9 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { milestonesForInsert, roleCreditAmount } from '@/lib/projectCollaborations';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useEnergy, ENERGY_GAINS } from '@/hooks/useEnergy';
 import { errorMessage } from '@/lib/errorMessage';
+import { refreshXp } from '@/lib/xpRefresh';
 import type { Json, TablesUpdate } from '@/integrations/supabase/types';
 
 export interface ProjectDeliverable {
@@ -38,6 +40,8 @@ export interface Project {
   deliverables: ProjectDeliverable[] | null;
   allow_custom_roles: boolean;
   is_private: boolean;
+  hide_from_calendar: boolean;
+  listing_type: 'project' | 'gig';
   client_chat_in_production: boolean;
   roles?: ProjectRole[];
   creator?: { display_name: string | null; avatar_url: string | null };
@@ -49,6 +53,7 @@ export interface ProjectRole {
   role_name: string;
   description: string | null;
   payout_amount: number;
+  credit_amount: number;
   slots_available: number;
   slots_filled: number;
   is_locked: boolean;
@@ -112,7 +117,8 @@ export const useProjects = (status?: string) => {
         total_budget: Number(project.total_budget),
         roles: roles?.filter(r => r.project_id === project.id).map(r => ({
           ...r,
-          payout_amount: Number(r.payout_amount)
+          payout_amount: Number(r.payout_amount),
+          credit_amount: Number(r.credit_amount ?? 0),
         })) || [],
         creator: profiles?.find(p => p.user_id === project.creator_id)
       })) as Project[];
@@ -142,8 +148,47 @@ export const useProjects = (status?: string) => {
         total_budget: Number(project.total_budget),
         roles: roles?.filter(r => r.project_id === project.id).map(r => ({
           ...r,
-          payout_amount: Number(r.payout_amount)
+          payout_amount: Number(r.payout_amount),
+          credit_amount: Number(r.credit_amount ?? 0),
         })) || []
+      })) as Project[];
+    },
+    enabled: !!user?.id,
+  });
+
+  const { data: joinedProjects = [] } = useQuery({
+    queryKey: ['joined-projects', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data: accepted, error: acceptedError } = await supabase
+        .from('project_applications')
+        .select('project_id')
+        .eq('applicant_id', user.id)
+        .eq('status', 'accepted');
+      if (acceptedError) throw acceptedError;
+      const ids = [...new Set((accepted ?? []).map((row) => row.project_id))];
+      if (ids.length === 0) return [];
+
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .in('id', ids)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+
+      const { data: roles } = await supabase
+        .from('project_roles')
+        .select('*')
+        .in('project_id', ids);
+
+      return data.map((project) => ({
+        ...project,
+        total_budget: Number(project.total_budget),
+        roles: roles?.filter((role) => role.project_id === project.id).map((role) => ({
+          ...role,
+          payout_amount: Number(role.payout_amount),
+          credit_amount: Number(role.credit_amount ?? 0),
+        })) || [],
       })) as Project[];
     },
     enabled: !!user?.id,
@@ -202,7 +247,9 @@ export const useProjects = (status?: string) => {
       deliverables?: ProjectDeliverable[];
       allow_custom_roles?: boolean;
       is_private?: boolean;
-      roles: { role_name: string; description?: string; payout_amount: number; slots_available: number }[];
+      hide_from_calendar?: boolean;
+      listing_type?: 'project' | 'gig';
+      roles: { role_name: string; description?: string; payout_amount: number; credit_amount?: number; slots_available: number }[];
       milestones?: { title: string; phase?: string; due_date?: string }[];
     }) => {
       if (!user?.id) throw new Error('Not authenticated');
@@ -230,6 +277,8 @@ export const useProjects = (status?: string) => {
           deliverables: (data.deliverables || []) as unknown as Json,
           allow_custom_roles: data.allow_custom_roles || false,
           is_private: data.is_private || false,
+          hide_from_calendar: data.hide_from_calendar || false,
+          listing_type: data.listing_type || 'project',
           status: 'open'
         })
         .select()
@@ -246,17 +295,19 @@ export const useProjects = (status?: string) => {
             role_name: role.role_name,
             description: role.description,
             payout_amount: role.payout_amount,
+            credit_amount: roleCreditAmount(role.credit_amount),
             slots_available: role.slots_available
           })));
 
         if (rolesError) throw rolesError;
       }
 
-      // Create milestones
-      if (data.milestones && data.milestones.length > 0) {
+      // Untitled rows and blank dates are not sent. An empty date string is a 400.
+      const milestones = milestonesForInsert(data.milestones || []);
+      if (milestones.length > 0) {
         const { error: msError } = await supabase
           .from('project_milestones')
-          .insert(data.milestones.map(ms => ({
+          .insert(milestones.map(ms => ({
             project_id: project.id,
             title: ms.title,
             phase: ms.phase,
@@ -267,31 +318,8 @@ export const useProjects = (status?: string) => {
         if (msError) console.error('Failed to create milestones:', msError);
       }
 
-      // Create calendar event if timeline_start exists
-      if (data.timeline_start) {
-        const { data: creatorProfile } = await supabase
-          .from('profiles')
-          .select('city')
-          .eq('user_id', user.id)
-          .single();
-
-        await supabase
-          .from('events')
-          .insert({
-            creator_id: user.id,
-            title: data.title,
-            description: data.description || `Project: ${data.title}`,
-            start_date: data.timeline_start,
-            end_date: data.timeline_end || data.timeline_start,
-            city: creatorProfile?.city || 'Global',
-            is_public: true,
-            ticket_type: 'free',
-            project_id: project.id,
-          })
-          .then(({ error: eventError }) => {
-            if (eventError) console.error('Failed to create calendar event:', eventError);
-          });
-      }
+      // The community calendar reads the project row itself. A second public
+      // event duplicated the date and published private projects.
 
       // Auto-create project groupchat
       try {
@@ -317,30 +345,22 @@ export const useProjects = (status?: string) => {
               conversation_id: newConversation.id,
               user_id: user.id,
               role: 'owner',
-              project_role_name: 'Project Creator'
+              project_role_name: 'Owner'
             });
         }
       } catch (chatErr) {
         console.error('Failed to create project groupchat:', chatErr);
       }
 
-      // Get creator name for notification
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('display_name')
-        .eq('user_id', user.id)
-        .single();
-
       // Notify opted-in users about the new project
-      supabase.functions.invoke('notify-new-content', {
-        body: {
-          content_type: 'project',
-          content_id: project.id,
-          title: data.title,
-          description: data.description,
-          creator_name: profile?.display_name || 'A creator'
-        }
-      }).catch(err => console.error('Failed to send new project notifications:', err));
+      if (!data.is_private) {
+        supabase.functions.invoke('notify-new-content', {
+          body: {
+            content_type: 'project',
+            content_id: project.id,
+          }
+        }).catch(err => console.error('Failed to send new project notifications:', err));
+      }
 
       return project;
     },
@@ -375,9 +395,10 @@ export const useProjects = (status?: string) => {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['my-projects'] });
+      if (variables.status === 'completed') refreshXp(queryClient);
     },
   });
 
@@ -456,6 +477,7 @@ export const useProjects = (status?: string) => {
   return {
     projects,
     myProjects,
+    joinedProjects,
     isLoading,
     createProject: createProject.mutate,
     updateProjectStatus: updateProjectStatus.mutate,
@@ -544,39 +566,11 @@ export const useProjectApplications = (projectId?: string) => {
 
       if (error) throw error;
 
-      // Notify project owner of new application
+      // The function loads the application, role, and creator. Names in the body are ignored.
       try {
-        // Get project and role details
-        const { data: project } = await supabase
-          .from('projects')
-          .select('title, creator_id')
-          .eq('id', projectId)
-          .single();
-        
-        const { data: role } = await supabase
-          .from('project_roles')
-          .select('role_name')
-          .eq('id', roleId)
-          .single();
-
-        // Get applicant name
-        const { data: applicantProfile } = await supabase
-          .from('profiles')
-          .select('display_name')
-          .eq('user_id', user.id)
-          .single();
-
-        if (project && role) {
-          await supabase.functions.invoke('notify-new-application', {
-            body: {
-              project_id: projectId,
-              project_creator_id: project.creator_id,
-              project_title: project.title,
-              role_title: role.role_name,
-              applicant_name: applicantProfile?.display_name || 'Someone'
-            }
-          });
-        }
+        await supabase.functions.invoke('notify-new-application', {
+          body: { project_id: projectId },
+        });
       } catch (notifyError) {
         console.error('Error sending application notification:', notifyError);
         // Don't throw - application was submitted successfully
@@ -593,7 +587,7 @@ export const useProjectApplications = (projectId?: string) => {
   });
 
   const reviewApplication = useMutation({
-    mutationFn: async ({ applicationId, status, projectTitle, roleTitle }: { 
+    mutationFn: async ({ applicationId, status }: { 
       applicationId: string; 
       status: 'accepted' | 'rejected';
       projectTitle?: string;
@@ -637,68 +631,42 @@ export const useProjectApplications = (projectId?: string) => {
         if (error) throw error;
       }
 
-      // If accepted, create/update project group chat and send notification
+      // If accepted, the database has already put them in the project's main
+      // group chat with a join line (add_accepted_member_to_project_chat).
+      // Here we only ping the chat about that line and notify the applicant.
       if (status === 'accepted' && application) {
-        // Get project and role details
         const { data: project } = await supabase
           .from('projects')
-          .select('title, description, creator_id, cover_image_url')
+          .select('creator_id')
           .eq('id', application.project_id)
           .single();
-        
-        const { data: role } = await supabase
-          .from('project_roles')
-          .select('role_name')
-          .eq('id', newCustomRoleId || application.role_id)
-          .single();
 
-        const finalProjectTitle = projectTitle || project?.title || 'a project';
-        const finalRoleTitle = roleTitle || role?.role_name || 'a role';
-
-        // Find existing project group chat
-        const { data: existingConversation } = await supabase
+        const { data: mainChat } = await supabase
           .from('conversations')
           .select('id')
           .eq('project_id', application.project_id)
           .eq('type', 'group')
+          .eq('is_client_chat', false)
+          .is('parent_conversation_id', null)
+          .order('created_at', { ascending: true })
+          .limit(1)
           .maybeSingle();
 
-        const conversationId = existingConversation?.id;
-
-        // Add accepted applicant to the group chat
-        if (conversationId) {
-          // Check if user is already a participant (prevent duplicates)
-          const { data: existingParticipant } = await supabase
-            .from('conversation_participants')
+        if (mainChat?.id && project?.creator_id) {
+          const { data: joinMessage } = await supabase
+            .from('messages')
             .select('id')
-            .eq('conversation_id', conversationId)
-            .eq('user_id', application.applicant_id)
+            .eq('conversation_id', mainChat.id)
+            .eq('sender_id', project.creator_id)
+            .like('content', '🎉 % joined the project as %')
+            .gte('created_at', new Date(Date.now() - 5 * 60_000).toISOString())
+            .order('created_at', { ascending: false })
+            .limit(1)
             .maybeSingle();
-
-          if (!existingParticipant) {
-            await supabase
-              .from('conversation_participants')
-              .insert({
-                conversation_id: conversationId,
-                user_id: application.applicant_id,
-                role: 'member',
-                project_role_name: finalRoleTitle
-              });
-
-            // Send system join message
-            const { data: applicantProfile } = await supabase
-              .from('profiles_public')
-              .select('display_name')
-              .eq('user_id', application.applicant_id)
-              .single();
-
-            await supabase
-              .from('messages')
-              .insert({
-                conversation_id: conversationId,
-                sender_id: project?.creator_id || user?.id,
-                content: `🎉 ${applicantProfile?.display_name || 'New member'} joined the project as ${finalRoleTitle}`
-              });
+          if (joinMessage?.id) {
+            supabase.functions.invoke('notify-chat-message', {
+              body: { conversation_id: mainChat.id, message_id: joinMessage.id },
+            }).catch((err) => console.error('Failed to notify the project chat', err));
           }
         }
 
@@ -707,8 +675,6 @@ export const useProjectApplications = (projectId?: string) => {
           body: {
             applicant_id: application.applicant_id,
             project_id: application.project_id,
-            project_title: finalProjectTitle,
-            role_title: finalRoleTitle
           }
         }).catch(err => console.error('Failed to send acceptance notification:', err));
       }
@@ -717,8 +683,10 @@ export const useProjectApplications = (projectId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['project-applications'] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['my-projects'] });
+      queryClient.invalidateQueries({ queryKey: ['joined-projects'] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       toast({ title: status === 'accepted' ? 'Application accepted!' : 'Application rejected' });
+      if (status === 'accepted') refreshXp(queryClient);
       
       // Award energy points to the applicant when their application is accepted
       if (status === 'accepted') {

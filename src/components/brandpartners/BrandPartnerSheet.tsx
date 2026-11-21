@@ -243,7 +243,7 @@ export function BrandPartnerSheet({
 
       {/* Lightbox Dialog */}
       <Dialog open={lightboxIndex !== null} onOpenChange={() => closeLightbox()}>
-        <DialogContent className="max-w-3xl p-0 bg-black/95 border-none">
+        <DialogContent hideClose className="max-w-3xl p-0 bg-black/95 border-none">
           <div className="relative flex items-center justify-center min-h-[50vh]">
             <Button
               variant="ghost"

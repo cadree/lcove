@@ -21,6 +21,9 @@ verify_jwt = true
 [functions.purchase-event-ticket]
 verify_jwt = true
 
+[functions.guest-event-rsvp]
+verify_jwt = true
+
 [functions.purchase-event-with-credits]
 verify_jwt = true
 
@@ -39,17 +42,20 @@ verify_jwt = true
 [functions.send-notification-email]
 verify_jwt = true
 
+[functions.send-waitlist-invites]
+verify_jwt = true
+
 [functions.create-network-subscription]
 verify_jwt = true
 
 [functions.check-network-subscription]
 verify_jwt = true
 
-[functions.mux-stream]
-verify_jwt = false
-
-[functions.mux-status]
+[functions.livekit-token]
 verify_jwt = true
+
+[functions.livekit-webhook]
+verify_jwt = false
 
 [functions.create-connect-account]
 verify_jwt = true
@@ -73,6 +79,9 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.notify-new-content]
+verify_jwt = true
+
+[functions.notify-chat-message]
 verify_jwt = true
 
 [functions.notify-new-application]
@@ -218,3 +227,26 @@ verify_jwt = true
 
 [functions.import-shopify-products]
 verify_jwt = true
+
+[functions.manage-creator-connect]
+verify_jwt = true
+
+[functions.create-invoice-checkout]
+verify_jwt = true
+
+[functions.create-project-payment]
+verify_jwt = true
+
+[functions.create-stream-gift]
+verify_jwt = true
+
+[functions.campaign-track]
+verify_jwt = false
+
+[functions.resend-webhook]
+verify_jwt = false
+
+# Apple Wallet devices call this without a Supabase JWT. The handler checks
+# the user JWT for downloads and the ApplePass token for PassKit routes.
+[functions.ether-id-pass]
+verify_jwt = false

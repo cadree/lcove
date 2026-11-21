@@ -98,12 +98,12 @@ export const ClientInviteDialog: React.FC<ClientInviteDialogProps> = ({
         .from('conversations')
         .insert({ type: 'direct', name: `${projectTitle} – Client Chat`, created_by: user.id, visibility: 'private', project_id: projectId, is_client_chat: true })
         .select('id').single();
-      if (!convError && newConv) {
-        await supabase.from('conversation_participants').insert([
-          { conversation_id: newConv.id, user_id: user.id, role: 'owner' },
-          { conversation_id: newConv.id, user_id: clientUserId, role: 'member' },
-        ]);
-      }
+      if (convError || !newConv) throw convError ?? new Error('Could not create the client chat');
+      const { error: participantError } = await supabase.from('conversation_participants').insert([
+        { conversation_id: newConv.id, user_id: user.id, role: 'owner' },
+        { conversation_id: newConv.id, user_id: clientUserId, role: 'member' },
+      ]);
+      if (participantError) throw participantError;
 
       // Send notification
       const { data: profile } = await supabase.from('profiles').select('display_name').eq('user_id', user.id).single();

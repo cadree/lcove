@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/navigation/BackButton";
 import { Card } from "@/components/ui/card";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
@@ -67,7 +68,8 @@ const Unsubscribe = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+      <BackButton label="Back" fallback="/" className="mb-4 self-start" />
       <Card className="w-full max-w-md p-8 text-center space-y-5">
         <h1 className="text-2xl font-semibold">Unsubscribe</h1>
 

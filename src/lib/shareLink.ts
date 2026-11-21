@@ -71,6 +71,216 @@ export async function shareLink(opts: ShareLinkOptions): Promise<void> {
 /** Canonical share domain for the platform. */
 export const SHARE_BASE_URL = 'https://etherbylcove.com';
 
+/** Facebook's web sharer. The app scheme is not used. */
+export function facebookShareUrl(url: string): string {
+  return `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+}
+
+export function fileSharePlan(options: {
+  canShareFiles: boolean;
+  nativePlatform: boolean;
+  pluginAvailable: boolean;
+}): "web-file" | "capacitor" | "download" {
+  if (options.canShareFiles) return "web-file";
+  if (options.nativePlatform && options.pluginAvailable) return "capacitor";
+  return "download";
+}
+
+function canShareFiles(file: File): boolean {
+  if (typeof navigator === "undefined" || typeof navigator.canShare !== "function" || typeof navigator.share !== "function") {
+    return false;
+  }
+  try {
+    return navigator.canShare({ files: [file] });
+  } catch {
+    return false;
+  }
+}
+
+function downloadBlobFile(file: File): boolean {
+  if (typeof document === "undefined") return false;
+  try {
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = file.name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Hand a real file to the system share sheet.
+ * Web Share with files comes first. The Capacitor Share plugin, already in the
+ * iOS app, is the next try. A browser download is the last try. No new plugin.
+ */
+export async function deliverFile(
+  file: File,
+  opts: { title?: string; text?: string; url?: string },
+): Promise<"shared" | "cancelled" | "downloaded" | "unavailable"> {
+  let nativePlatform = false;
+  let pluginAvailable = false;
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+    nativePlatform = Capacitor.isNativePlatform();
+    pluginAvailable = Capacitor.isPluginAvailable("Share");
+  } catch {
+    nativePlatform = false;
+  }
+  const plan = fileSharePlan({
+    canShareFiles: canShareFiles(file),
+    nativePlatform,
+    pluginAvailable,
+  });
+  if (plan === "web-file" && typeof navigator.share === "function") {
+    try {
+      await navigator.share({ files: [file], title: opts.title, text: opts.text, url: opts.url });
+      return "shared";
+    } catch (error) {
+      if (shareWasCancelled(error)) return "cancelled";
+    }
+  }
+  if ((plan === "capacitor" || pluginAvailable) && nativePlatform) {
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      const { Share } = await import("@capacitor/share");
+      await Share.share({
+        title: opts.title,
+        text: opts.text,
+        url: opts.url || objectUrl,
+        dialogTitle: opts.title || "Share",
+        files: [objectUrl],
+      });
+      return "shared";
+    } catch (error) {
+      if (shareWasCancelled(error)) return "cancelled";
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  }
+  if (downloadBlobFile(file)) return "downloaded";
+  return "unavailable";
+}
+
+/** Free sms: link. The handset opens Messages. This never calls a paid SMS API. */
+export function smsShareHref(url: string, text?: string): string {
+  const trimmed = url.trim();
+  const note = text?.replace(/\s+/g, " ").trim();
+  const body = encodeURIComponent(note ? `${note} ${trimmed}` : trimmed);
+  return `sms:?&body=${body}`;
+}
+
+export function nativeSharePlan(options: {
+  nativePlatform: boolean;
+  pluginAvailable: boolean;
+  webShare: boolean;
+}): "capacitor" | "web" | "unavailable" {
+  if (options.nativePlatform && options.pluginAvailable) return "capacitor";
+  if (options.webShare) return "web";
+  return "unavailable";
+}
+
+function shareWasCancelled(error: unknown): boolean {
+  if (typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "AbortError") {
+    return true;
+  }
+  const message = error instanceof Error ? error.message : "";
+  return /cancel/i.test(message);
+}
+
+/**
+ * iOS Safari uses navigator.share. The Capacitor app uses the Share plugin
+ * when it is installed, then the web sheet. Nothing here sends a paid text.
+ */
+export async function openNativeShare(opts: {
+  title?: string;
+  text?: string;
+  url: string;
+}): Promise<"shared" | "cancelled" | "unavailable"> {
+  const webShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  let nativePlatform = false;
+  let pluginAvailable = false;
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+    nativePlatform = Capacitor.isNativePlatform();
+    pluginAvailable = Capacitor.isPluginAvailable("Share");
+  } catch {
+    nativePlatform = false;
+  }
+  const plan = nativeSharePlan({ nativePlatform, pluginAvailable, webShare });
+  try {
+    if (plan === "capacitor") {
+      const { Share } = await import("@capacitor/share");
+      await Share.share({
+        title: opts.title,
+        text: opts.text,
+        url: opts.url,
+        dialogTitle: opts.title || "Share",
+      });
+      return "shared";
+    }
+    if (plan === "web" && typeof navigator.share === "function") {
+      await navigator.share({ title: opts.title, text: opts.text, url: opts.url });
+      return "shared";
+    }
+  } catch (error) {
+    if (shareWasCancelled(error)) return "cancelled";
+    if (plan === "capacitor" && webShare && typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: opts.title, text: opts.text, url: opts.url });
+        return "shared";
+      } catch (webError) {
+        if (shareWasCancelled(webError)) return "cancelled";
+      }
+    }
+  }
+  return "unavailable";
+}
+
+/** Copy the event link. Does not open the system share sheet. */
+export async function copyEventLink(url: string, copyMessage = "Link copied"): Promise<void> {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(copyMessage);
+      return;
+    } catch {
+      // fall through
+    }
+  }
+  if (typeof document !== "undefined") {
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = url;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      if (ok) {
+        toast.success(copyMessage);
+        return;
+      }
+    } catch {
+      // fall through
+    }
+  }
+  if (typeof window !== "undefined") window.prompt("Copy this link:", url);
+}
+
+/** Capacitor share sheet, then the browser sheet, then copy. */
+export async function shareEventLink(opts: { title?: string; text?: string; url: string }): Promise<void> {
+  const result = await openNativeShare(opts);
+  if (result === "shared" || result === "cancelled") return;
+  await copyEventLink(opts.url);
+}
+
 export type ShareChannel =
   | 'native'
   | 'copy'
@@ -174,8 +384,10 @@ export async function shareToChannel(
 
   switch (channel) {
     case 'native':
+      await shareEventLink(opts);
+      return;
     case 'copy':
-      await shareLink(opts);
+      await copyEventLink(url);
       return;
 
     case 'twitter': {
@@ -201,12 +413,7 @@ export async function shareToChannel(
     }
 
     case 'facebook': {
-      const webUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
-      if (isMobileUA()) {
-        const appUrl = `fb://share?link=${encodeURIComponent(url)}`;
-        tryAppSchemeWithFallback(appUrl, webUrl);
-        return;
-      }
+      const webUrl = facebookShareUrl(url);
       if (!openInNewTab(webUrl)) await fallbackCopy('Facebook');
       return;
     }
@@ -262,9 +469,11 @@ export async function shareToChannel(
 
 export const buildShareUrl = {
   event: (id: string) => `${SHARE_BASE_URL}/event/${id}`,
+  product: (id: string) => `${SHARE_BASE_URL}/product/${id}`,
   project: (id: string) => `${SHARE_BASE_URL}/project/${id}`,
   profile: (userId: string) => `${SHARE_BASE_URL}/profile/${userId}`,
   post: (userId: string, postId: string) => `${SHARE_BASE_URL}/profile/${userId}?post=${postId}`,
   client: (token: string) => `${SHARE_BASE_URL}/client/${token}`,
   cinema: (id: string) => `${SHARE_BASE_URL}/cinema?content=${id}`,
+  live: (id: string) => `${SHARE_BASE_URL}/live/${id}`,
 };

@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { notifyFollow } from '@/lib/notifications';
+import { shotFavoriteIds, shotSessionEnabled } from '@/lib/shotSession';
 
 export function useFavorites() {
   const { user } = useAuth();
@@ -12,6 +13,7 @@ export function useFavorites() {
     queryKey: ['favorite-friends', user?.id],
     queryFn: async () => {
       if (!user) return [];
+      if (shotSessionEnabled()) return shotFavoriteIds;
 
       const { data, error } = await supabase
         .from('favorite_friends')
@@ -46,6 +48,7 @@ export function useFavorites() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['favorite-friends', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['novi-board', user?.id] });
       toast.success('Added to favorites');
     },
     onError: (error) => {

@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import { format } from 'date-fns';
+import { parseCalendarDate } from './calendarDate';
 
 interface PdfProjectData {
   project: {
@@ -102,8 +103,8 @@ export function generateProjectPdf(data: PdfProjectData) {
   // Timeline
   if (data.project.timeline_start || data.project.timeline_end) {
     addHeading('Timeline');
-    const start = data.project.timeline_start ? format(new Date(data.project.timeline_start), 'MMM d, yyyy') : 'TBD';
-    const end = data.project.timeline_end ? format(new Date(data.project.timeline_end), 'MMM d, yyyy') : 'TBD';
+    const start = data.project.timeline_start ? format(parseCalendarDate(data.project.timeline_start), 'MMM d, yyyy') : 'TBD';
+    const end = data.project.timeline_end ? format(parseCalendarDate(data.project.timeline_end), 'MMM d, yyyy') : 'TBD';
     addText('Dates', `${start} → ${end}`);
   }
 

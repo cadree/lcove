@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
@@ -21,6 +22,12 @@ import { formatDistanceToNow } from "date-fns";
 const Boards = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('action') !== 'create' || !user) return;
+    setShowCreateDialog(true);
+    setSearchParams(previous => { const next = new URLSearchParams(previous); next.delete('action'); return next; }, { replace: true });
+  }, [searchParams, setSearchParams, user]);
   const { boards, isLoading, deleteBoard } = useBoards();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
@@ -29,7 +36,7 @@ const Boards = () => {
       <PageLayout>
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
           <h2 className="font-display text-2xl text-foreground">Sign in to view your boards</h2>
-          <Button onClick={() => navigate("/auth")}>Sign In</Button>
+          <Button onClick={() => navigate("/auth")}>Sign in</Button>
         </div>
       </PageLayout>
     );

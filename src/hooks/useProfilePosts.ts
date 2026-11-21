@@ -3,7 +3,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import { ProfilePost } from '@/types/post';
+import { profileItemsWithReposts, repostQueryMissingCaption, type RepostRow } from '@/lib/sharing';
+import {
+  postsForViewer,
+  profilePostFromRow,
+  withProfilePostColumns,
+  type ProfilePostRow,
+} from '@/lib/profilePosts';
+import { embedColumnMissing, embedColumnsForInsert, videoEmbedMigrationMessage, type EmbedDraft } from '@/lib/videoEmbed';
+import { shotEmbedEnabled, shotEmbedPost } from '@/lib/shotSession';
+
+const EMPTY_POSTS: ProfilePost[] = [];
 
 export function useProfilePosts(userId?: string) {
   const { user } = useAuth();
@@ -12,46 +24,111 @@ export function useProfilePosts(userId?: string) {
   const targetUserId = userId || user?.id;
   const { isBlocked } = useUserBlocks();
 
-  const { data: posts = [], isLoading, refetch } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['profile-posts', targetUserId],
     queryFn: async (): Promise<ProfilePost[]> => {
-      if (!targetUserId) return [];
+      const profileUserId = targetUserId;
+      if (!profileUserId) return [];
 
-      // Get posts for the user
-      const { data: postsData, error } = await supabase
-        .from('posts')
-        .select('*')
-        .eq('user_id', targetUserId)
-        .order('created_at', { ascending: false });
+      if (shotEmbedEnabled() && targetUserId === shotEmbedPost().user_id) {
+        const post = shotEmbedPost();
+        return [{
+          id: post.id,
+          user_id: post.user_id,
+          content: post.content,
+          media_url: post.media_url,
+          media_type: post.media_type,
+          created_at: post.created_at,
+          location: post.location,
+          collaborators: post.collaborators,
+          alt_text: post.alt_text,
+          comments_enabled: post.comments_enabled,
+          folder_id: post.folder_id,
+          embed_provider: post.embed_provider,
+          embed_video_id: post.embed_video_id,
+          embed_hash: post.embed_hash,
+          embed_thumbnail_url: post.embed_thumbnail_url,
+          embed_title: post.embed_title,
+          profile: { display_name: post.profile.display_name, avatar_url: null },
+          grid_key: post.id,
+          repost: null,
+        }];
+      }
+
+      const { data: postsData, error } = await withProfilePostColumns((columns) =>
+        supabase
+          .from('posts')
+          .select(columns)
+          .eq('user_id', profileUserId)
+          .order('created_at', { ascending: false }),
+      );
 
       if (error) throw error;
 
-      // Get profile for the user using profiles_public view
       const { data: profileRows } = await supabase
         .from('profiles_public')
         .select('display_name, avatar_url')
-        .eq('user_id', targetUserId)
+        .eq('user_id', profileUserId)
         .limit(1);
-      const profile = profileRows?.[0];
+      const author = profileRows?.[0] || { display_name: null, avatar_url: null };
+      const ownRows = (postsData || []) as unknown as ProfilePostRow[];
+      const own = ownRows.map((post) => profilePostFromRow(post, author));
 
-      return (postsData || []).map(post => ({
-        id: post.id,
-        user_id: post.user_id,
-        content: post.content,
-        media_url: post.media_url,
-        media_type: post.media_type,
-        created_at: post.created_at,
-        location: post.location ?? null,
-        collaborators: post.collaborators ?? null,
-        alt_text: post.alt_text ?? null,
-        comments_enabled: post.comments_enabled ?? true,
-        folder_id: post.folder_id ?? null,
-        profile: profile || { display_name: null, avatar_url: null },
-      }));
+      try {
+        const primaryReposts = await supabase
+          .from('reposts')
+          .select('id, user_id, post_id, created_at, caption')
+          .eq('user_id', profileUserId)
+          .order('created_at', { ascending: false });
+        let repostData = primaryReposts.data as RepostRow[] | null;
+        let repostError = primaryReposts.error;
+        if (repostError && repostQueryMissingCaption(repostError.message)) {
+          const legacyReposts = await supabase
+            .from('reposts')
+            .select('id, user_id, post_id, created_at')
+            .eq('user_id', profileUserId)
+            .order('created_at', { ascending: false });
+          repostData = legacyReposts.data as RepostRow[] | null;
+          repostError = legacyReposts.error;
+        }
+        if (repostError || !repostData?.length) return own;
+
+        const originalIds = [...new Set(repostData.map((row) => row.post_id))];
+        const { data: originals, error: originalsError } = await withProfilePostColumns((columns) =>
+          supabase.from('posts').select(columns).in('id', originalIds),
+        );
+        if (originalsError || !originals?.length) return own;
+
+        const originalRows = originals as unknown as ProfilePostRow[];
+        const authorIds = [...new Set(originalRows.map((post) => post.user_id))];
+        const { data: authors } = await supabase
+          .from('profiles_public')
+          .select('user_id, display_name, avatar_url')
+          .in('user_id', authorIds);
+        const authorMap = new Map((authors ?? []).map((row) => [row.user_id, row]));
+        const reposts: RepostRow[] = repostData.map((row) => ({
+          ...row,
+          profile: { display_name: author.display_name, avatar_url: author.avatar_url },
+        }));
+
+        return profileItemsWithReposts(
+          own,
+          reposts,
+          originalRows.map((post) => profilePostFromRow(
+            post,
+            authorMap.get(post.user_id) || { display_name: null, avatar_url: null },
+          )),
+        );
+      } catch (repostFailure) {
+        console.error(repostFailure);
+        return own;
+      }
     },
     enabled: !!targetUserId,
     staleTime: 0,
   });
+
+  const posts = data ?? EMPTY_POSTS;
 
   const createPost = useMutation({
     mutationFn: async ({ 
@@ -62,6 +139,7 @@ export function useProfilePosts(userId?: string) {
       location,
       altText,
       commentsEnabled = true,
+      embed,
     }: { 
       content?: string; 
       file?: File;
@@ -70,8 +148,25 @@ export function useProfilePosts(userId?: string) {
       location?: string;
       altText?: string;
       commentsEnabled?: boolean;
+      embed?: EmbedDraft;
     }) => {
       if (!user) throw new Error('Must be logged in');
+
+      if (embed) {
+        const columns = embedColumnsForInsert(embed);
+        const { error: insertError } = await supabase
+          .from('posts')
+          .insert({
+            user_id: user.id,
+            content: content || null,
+            location: location || null,
+            alt_text: altText || null,
+            comments_enabled: commentsEnabled,
+            ...columns,
+          });
+        if (insertError) throw insertError;
+        return;
+      }
 
       let mediaUrl: string | null = null;
       let additionalMediaUrls: string[] = [];
@@ -143,7 +238,9 @@ export function useProfilePosts(userId?: string) {
       toast.success('Post shared!');
     },
     onError: (error) => {
-      toast.error('Failed to share post');
+      toast.error(embedColumnMissing(error)
+        ? videoEmbedMigrationMessage()
+        : errorMessage(error, 'Failed to share post'));
       console.error(error);
     },
   });
@@ -170,7 +267,12 @@ export function useProfilePosts(userId?: string) {
     },
   });
 
-  const visiblePosts = targetUserId && targetUserId !== user?.id && isBlocked(targetUserId) ? [] : posts;
+  const visiblePosts = postsForViewer(
+    posts,
+    user?.id,
+    targetUserId,
+    Boolean(targetUserId && isBlocked(targetUserId)),
+  );
 
   return {
     posts: visiblePosts,

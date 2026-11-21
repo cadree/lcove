@@ -1,30 +1,42 @@
 /**
  * Caller checks for edge functions.
- * Supabase verify_jwt only proves the bearer token was signed by this project.
- * The public anon key is such a token, so functions that must not be world-callable
- * also reject role "anon" here. Server-to-server calls use the service_role JWT
- * or the x-internal-secret header (cron).
+ * Supabase verify_jwt proves a legacy JWT or a user session was signed by this
+ * project, and it also lets this project's sb_publishable_ and sb_secret_ keys
+ * through. Those new keys are not JWTs, so the role is decided here by an
+ * exact match against the keys the platform injects. Server-to-server calls
+ * use a secret key. Cron uses the x-internal-secret header.
  */
 
-function decodeJwtPayload(authorization: string | null): Record<string, unknown> | null {
-  if (!authorization) return null;
-  const token = authorization.replace(/^Bearer\s+/i, "").trim();
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-  try {
-    const padded = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const json = atob(padded);
-    const payload = JSON.parse(json);
-    return payload && typeof payload === "object" ? payload : null;
-  } catch {
-    return null;
-  }
+import { decodeJwtPayload, namedKeyValues, resolveCallerRole } from "./caller-role.mjs";
+
+function projectKeys() {
+  return {
+    secrets: [
+      ...namedKeyValues(Deno.env.get("SUPABASE_SECRET_KEYS")),
+      Deno.env.get("SUPABASE_SECRET_KEY") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    ],
+    publishable: [
+      ...namedKeyValues(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS")),
+      Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+    ],
+  };
 }
 
-export function jwtRole(authorization: string | null): string | null {
-  const payload = decodeJwtPayload(authorization);
-  const role = payload?.role;
-  return typeof role === "string" ? role : null;
+/** Role of the bearer token, or of the apikey header when the bearer is empty. */
+export function jwtRole(authorization: string | null, apiKey?: string | null): string | null {
+  return resolveCallerRole(authorization, apiKey ?? null, projectKeys());
+}
+
+export function requestRole(req: Request): string | null {
+  return jwtRole(req.headers.get("Authorization"), req.headers.get("apikey"));
+}
+
+export function jwtSubject(authorization: string | null): string | null {
+  const token = authorization?.replace(/^Bearer\s+/i, "").trim() ?? "";
+  const sub = decodeJwtPayload(token)?.sub;
+  return typeof sub === "string" ? sub : null;
 }
 
 function unauthorized(corsHeaders: Record<string, string>): Response {
@@ -34,12 +46,29 @@ function unauthorized(corsHeaders: Record<string, string>): Response {
   });
 }
 
-/** Logged-in user or another edge function using the service role key. */
+/** Confirms the bearer token is a real user. The anon key and service role fail here. */
+export async function getBearerUser(
+  authorization: string | null,
+  supabase: {
+    auth: {
+      getUser: (jwt: string) => Promise<{ data: { user: { id: string } | null }; error: unknown }>;
+    };
+  },
+): Promise<string | null> {
+  if (!authorization) return null;
+  const token = authorization.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return null;
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user?.id) return null;
+  return data.user.id;
+}
+
+/** Logged-in user or another edge function using a secret key. */
 export function requireUserOrService(
   req: Request,
   corsHeaders: Record<string, string>,
 ): Response | null {
-  const role = jwtRole(req.headers.get("Authorization"));
+  const role = requestRole(req);
   if (role === "authenticated" || role === "service_role") return null;
   return unauthorized(corsHeaders);
 }

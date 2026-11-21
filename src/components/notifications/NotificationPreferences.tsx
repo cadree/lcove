@@ -1,11 +1,14 @@
 import React from 'react';
-import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Bell, Mail, Smartphone, FolderKanban, CalendarPlus, CheckCircle } from 'lucide-react';
+import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Bell, Mail, FolderKanban, CalendarPlus, CheckCircle, Briefcase } from 'lucide-react';
+import { IosPushInstallSteps } from '@/components/settings/IosPushInstallSteps';
 import { useNotificationPreferences } from '@/hooks/useNotifications';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useIsAdmin } from '@/hooks/useAdmin';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import { iconFills } from '@/components/world/SquircleIcon';
 
 interface PreferenceItemProps {
   icon: React.ReactNode;
@@ -26,7 +29,10 @@ const PreferenceItem: React.FC<PreferenceItemProps> = ({
 }) => (
   <div className="flex items-center justify-between py-3">
     <div className="flex items-center gap-3">
-      <div className="flex-shrink-0 w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+      <div
+        className="squircle-icon shrink-0 text-[#0A0A0A] [&_svg]:!h-4 [&_svg]:!w-4 [&_svg]:!text-current"
+        style={{ width: 36, height: 36, backgroundImage: iconFills.bone }}
+      >
         {icon}
       </div>
       <div>
@@ -40,7 +46,8 @@ const PreferenceItem: React.FC<PreferenceItemProps> = ({
 
 export const NotificationPreferences: React.FC = () => {
   const { preferences, isLoading, updatePreferences } = useNotificationPreferences();
-  const { isSupported, permission, requestPermission } = usePushNotifications();
+  const { isAdmin } = useIsAdmin();
+  const { isSupported, permission, requestPermission, status } = usePushNotifications();
 
   const handlePushToggle = async (checked: boolean) => {
     if (checked && permission !== 'granted') {
@@ -72,7 +79,10 @@ export const NotificationPreferences: React.FC = () => {
     );
   }
 
-  const pushDescription = !isSupported 
+  const needsHomeScreen = status === 'needs_home_screen';
+  const pushDescription = needsHomeScreen
+    ? 'Add Ether to your Home Screen, then turn push on'
+    : !isSupported
     ? 'Not supported in this browser'
     : permission === 'denied'
     ? 'Permission denied - enable in browser settings'
@@ -159,11 +169,19 @@ export const NotificationPreferences: React.FC = () => {
       </p>
       <div className="space-y-1 pb-4">
         <PreferenceItem
-          icon={<FolderKanban className="h-4 w-4 text-green-500" />}
+          icon={<FolderKanban className="h-4 w-4 text-primary" />}
           label="New Projects"
-          description="When new collaboration projects are posted"
-          checked={preferences.new_projects_enabled ?? false}
+          description="When a new project idea is posted. Turn this off to stop those alerts."
+          checked={preferences.new_projects_enabled ?? true}
           onCheckedChange={(checked) => updatePreferences({ new_projects_enabled: checked })}
+        />
+
+        <PreferenceItem
+          icon={<Briefcase className="h-4 w-4 text-primary" />}
+          label="New Gigs"
+          description="When a new gig is posted. Turn this off to stop those alerts."
+          checked={preferences.new_gigs_enabled ?? true}
+          onCheckedChange={(checked) => updatePreferences({ new_gigs_enabled: checked })}
         />
 
         <PreferenceItem
@@ -175,6 +193,20 @@ export const NotificationPreferences: React.FC = () => {
         />
       </div>
 
+      {isAdmin && (
+        <>
+          <Separator className="my-6" />
+          <h4 className="text-sm font-semibold mb-3">Admin Review Alerts</h4>
+          <PreferenceItem
+            icon={<Bell className="h-4 w-4" />}
+            label="New member applications"
+            description="Push alerts for new creator applications. Off by default; the review Gmail remains enabled."
+            checked={preferences.new_member_applications_push_enabled ?? false}
+            onCheckedChange={(checked) => updatePreferences({ new_member_applications_push_enabled: checked })}
+          />
+        </>
+      )}
+
       <Separator className="my-6" />
 
       <h4 className="text-sm font-semibold mb-3">Delivery Methods</h4>
@@ -185,8 +217,9 @@ export const NotificationPreferences: React.FC = () => {
           description={pushDescription}
           checked={(preferences.push_enabled ?? false) && permission === 'granted'}
           onCheckedChange={handlePushToggle}
-          disabled={!isSupported || permission === 'denied'}
+          disabled={!isSupported || permission === 'denied' || needsHomeScreen}
         />
+        {needsHomeScreen && <IosPushInstallSteps />}
 
         <PreferenceItem
           icon={<Mail className="h-4 w-4" />}
@@ -196,13 +229,6 @@ export const NotificationPreferences: React.FC = () => {
           onCheckedChange={(checked) => updatePreferences({ email_enabled: checked })}
         />
 
-        <PreferenceItem
-          icon={<Smartphone className="h-4 w-4" />}
-          label="SMS Notifications"
-          description="Get text messages for new DMs"
-          checked={preferences.sms_enabled ?? false}
-          onCheckedChange={(checked) => updatePreferences({ sms_enabled: checked })}
-        />
       </div>
     </div>
   );

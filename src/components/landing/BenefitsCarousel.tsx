@@ -11,6 +11,7 @@ import {
   Wallet
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { revealMotion } from "@/lib/reveal";
 import {
   Carousel,
   CarouselContent,
@@ -35,10 +36,7 @@ export function BenefitsCarousel() {
     <section className="py-12 md:py-16">
       <div className="container px-4 sm:px-6 lg:px-8">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
+          {...revealMotion({ y: 20 })}
           className="text-center mb-8"
         >
           <p className="eyebrow mb-2">In the app</p>
@@ -58,10 +56,7 @@ export function BenefitsCarousel() {
             {benefits.map((benefit, index) => (
               <CarouselItem key={benefit.title} className="pl-2 md:pl-4 basis-1/4 sm:basis-1/5 md:basis-1/6 lg:basis-[12.5%]">
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.3, delay: index * 0.05 }}
+                  {...revealMotion({ scale: 0.9, duration: 0.3, delay: index * 0.05 })}
                   className="flex flex-col items-center gap-2 p-3"
                 >
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">

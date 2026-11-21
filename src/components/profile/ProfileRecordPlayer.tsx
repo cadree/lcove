@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Play, Pause, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { cn } from "@/lib/utils";
+import { appleMusicEmbedSrc, spotifyEmbedSrc } from "@/lib/musicEmbed";
+import { X } from "lucide-react";
 
 interface ProfileRecordPlayerProps {
   musicUrl: string | null;
@@ -34,6 +35,7 @@ export const ProfileRecordPlayer = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(defaultVolume);
+  const initialVolume = useRef(defaultVolume);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [showEmbed, setShowEmbed] = useState(false);
 
@@ -43,18 +45,17 @@ export const ProfileRecordPlayer = ({
 
   useEffect(() => {
     if (playbackUrl && source === 'upload') {
-      audioRef.current = new Audio(playbackUrl);
-      audioRef.current.loop = true;
-      audioRef.current.volume = defaultVolume;
+      const audio = new Audio(playbackUrl);
+      audio.loop = true;
+      audio.volume = initialVolume.current;
+      audioRef.current = audio;
 
       return () => {
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current = null;
-        }
+        audio.pause();
+        if (audioRef.current === audio) audioRef.current = null;
       };
     }
-  }, [playbackUrl, source, defaultVolume]);
+  }, [playbackUrl, source]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -72,11 +73,14 @@ export const ProfileRecordPlayer = ({
 
     if (isPlaying) {
       audioRef.current.pause();
-    } else {
-      audioRef.current.play().catch(console.error);
+      setIsPlaying(false);
+      return;
     }
-    setIsPlaying(!isPlaying);
+    audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
   };
+
+  const spotifySrc = spotifyEmbedSrc({ externalId, previewUrl, pageUrl: musicUrl });
+  const appleSrc = appleMusicEmbedSrc({ previewUrl, pageUrl: musicUrl });
 
   const handleVolumeChange = (value: number[]) => {
     const newVolume = value[0];
@@ -92,33 +96,50 @@ export const ProfileRecordPlayer = ({
   if (!musicUrl && !previewUrl) return null;
 
   // Spotify embed view
-  if (showEmbed && source === 'spotify' && externalId) {
+  if (showEmbed && source === 'spotify' && spotifySrc) {
     return (
-      <div className="w-full rounded-xl overflow-hidden mb-6">
+      <div className="relative w-full rounded-xl overflow-hidden mb-6">
+        <button
+          type="button"
+          onClick={() => setShowEmbed(false)}
+          className="absolute right-2 top-2 z-10 rounded-full bg-black/60 p-1"
+          aria-label="Close player"
+        >
+          <X className="h-4 w-4 text-white" />
+        </button>
         <iframe
-          src={`https://open.spotify.com/embed/track/${externalId}?utm_source=generator&theme=0`}
+          src={`${spotifySrc}${spotifySrc.includes('?') ? '&' : '?'}utm_source=generator&theme=0`}
           width="100%"
           height="152"
           frameBorder="0"
           allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
           loading="lazy"
+          title={title || 'Spotify player'}
           className="rounded-xl"
         />
       </div>
     );
   }
 
-  // Apple Music embed
-  if (showEmbed && source === 'apple_music' && previewUrl) {
+  // Apple Music embed. No sandbox: the official player needs scripts and storage.
+  if (showEmbed && source === 'apple_music' && appleSrc) {
     return (
-      <div className="w-full rounded-xl overflow-hidden mb-6">
+      <div className="relative w-full rounded-xl overflow-hidden mb-6">
+        <button
+          type="button"
+          onClick={() => setShowEmbed(false)}
+          className="absolute right-2 top-2 z-10 rounded-full bg-black/60 p-1"
+          aria-label="Close player"
+        >
+          <X className="h-4 w-4 text-white" />
+        </button>
         <iframe
-          src={previewUrl}
+          src={appleSrc}
           width="100%"
           height="175"
           frameBorder="0"
           allow="autoplay *; encrypted-media *; fullscreen *"
-          sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-top-navigation-by-user-activation"
+          title={title || 'Apple Music player'}
           className="rounded-xl"
         />
       </div>

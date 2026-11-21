@@ -1,3 +1,4 @@
+import { NumberInput } from "@/components/ui/number-input";
 import { useState, useRef } from "react";
 import { format } from "date-fns";
 import { FileSignature, Plus, Trash2, Send, Loader2, X, Mail, Phone, Check, PenLine, ChevronDown, ChevronUp } from "lucide-react";
@@ -31,7 +32,7 @@ interface AdditionalParty {
   phone: string;
 }
 
-type ContractFormData = Partial<ContractCreateInput> & { 
+type ContractFormData = Partial<ContractCreateInput> & {
   title: string;
   additional_parties?: AdditionalParty[];
 };
@@ -83,13 +84,13 @@ export function ContactContractsSection({ pipelineItemId, contactName, contactEm
   const { user } = useAuth();
   const { profile } = useProfile();
   const { contracts, isLoading, createContract, sendContract, deleteContract, isCreating, isSending } = useContactContracts(pipelineItemId);
-  
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
   const [sendVia, setSendVia] = useState<'email' | 'sms'>('email');
   const [sendRecipient, setSendRecipient] = useState('');
-  
+
   const [newContract, setNewContract] = useState<ContractFormData>({
     ...defaultContract,
     provider_name: profile?.display_name || '',
@@ -201,7 +202,7 @@ export function ContactContractsSection({ pipelineItemId, contactName, contactEm
   };
 
   const SectionHeader = ({ title, section }: { title: string; section: string }) => (
-    <CollapsibleTrigger 
+    <CollapsibleTrigger
       onClick={() => toggleSection(section)}
       className="flex items-center justify-between w-full py-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
     >
@@ -393,19 +394,19 @@ export function ContactContractsSection({ pipelineItemId, contactName, contactEm
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label>Revisions Included</Label>
-                      <Input
-                        type="number"
+                      <NumberInput min={0}
+                        integer
                         value={newContract.revisions_included ?? 2}
-                        onChange={(e) => setNewContract({ ...newContract, revisions_included: parseInt(e.target.value) || 0 })}
+                        onValueChange={value => setNewContract({ ...newContract, revisions_included: value })}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Additional Revision Cost ($)</Label>
-                      <Input
-                        type="number"
+                      <NumberInput min={0}
+
                         placeholder="0.00"
                         value={newContract.revision_cost || ''}
-                        onChange={(e) => setNewContract({ ...newContract, revision_cost: parseFloat(e.target.value) || null })}
+                        onValueChange={value => setNewContract({ ...newContract, revision_cost: value })}
                       />
                     </div>
                   </div>
@@ -419,17 +420,17 @@ export function ContactContractsSection({ pipelineItemId, contactName, contactEm
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label>Total Price ($)</Label>
-                      <Input
-                        type="number"
+                      <NumberInput min={0}
+
                         placeholder="0.00"
                         value={newContract.total_price || ''}
-                        onChange={(e) => setNewContract({ ...newContract, total_price: parseFloat(e.target.value) || null })}
+                        onValueChange={value => setNewContract({ ...newContract, total_price: value })}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Payment Type</Label>
-                      <Select 
-                        value={newContract.payment_type || ''} 
+                      <Select
+                        value={newContract.payment_type || ''}
                         onValueChange={(v) => {
                           if (v === 'flat_fee' || v === 'hourly' || v === 'retainer' || v === 'milestone') {
                             setNewContract({ ...newContract, payment_type: v });
@@ -467,11 +468,11 @@ export function ContactContractsSection({ pipelineItemId, contactName, contactEm
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label>Late Fee (%)</Label>
-                      <Input
-                        type="number"
+                      <NumberInput min={0}
+
                         placeholder="0"
                         value={newContract.late_fee_percentage || ''}
-                        onChange={(e) => setNewContract({ ...newContract, late_fee_percentage: parseFloat(e.target.value) || null })}
+                        onValueChange={value => setNewContract({ ...newContract, late_fee_percentage: value })}
                       />
                     </div>
                   </div>
@@ -588,19 +589,19 @@ export function ContactContractsSection({ pipelineItemId, contactName, contactEm
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label>Notice Period (days)</Label>
-                      <Input
-                        type="number"
+                      <NumberInput min={0}
+                        integer
                         value={newContract.termination_notice_days ?? 14}
-                        onChange={(e) => setNewContract({ ...newContract, termination_notice_days: parseInt(e.target.value) || 14 })}
+                        onValueChange={value => setNewContract({ ...newContract, termination_notice_days: value })}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Early Termination Fee ($)</Label>
-                      <Input
-                        type="number"
+                      <NumberInput min={0}
+
                         placeholder="0.00"
                         value={newContract.early_termination_fee || ''}
-                        onChange={(e) => setNewContract({ ...newContract, early_termination_fee: parseFloat(e.target.value) || null })}
+                        onValueChange={value => setNewContract({ ...newContract, early_termination_fee: value })}
                       />
                     </div>
                   </div>
@@ -692,7 +693,7 @@ export function ContactContractsSection({ pipelineItemId, contactName, contactEm
           <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
         </div>
       ) : contracts.length === 0 ? (
-        <div 
+        <div
           className="text-center py-6 bg-muted/30 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
           onClick={() => setIsDialogOpen(true)}
           role="button"
@@ -768,8 +769,8 @@ export function ContactContractsSection({ pipelineItemId, contactName, contactEm
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Send via</Label>
-              <Select 
-                value={sendVia} 
+              <Select
+                value={sendVia}
                 onValueChange={(v) => {
                   const method = v as 'email' | 'sms';
                   setSendVia(method);

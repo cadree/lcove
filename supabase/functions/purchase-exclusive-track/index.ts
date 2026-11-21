@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
+import { MusicPurchaseError, resolveMusicPurchase } from "../_shared/music-purchase.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,12 +39,42 @@ serve(async (req) => {
     const user = userData.user;
     if (!user?.email) throw new Error("Not authenticated");
 
-    const { track_id, access_rule_id, artist_user_id } = await req.json();
-    if (!track_id || !artist_user_id) throw new Error("Missing required fields");
+    const { track_id, access_rule_id } = await req.json();
+    if (!track_id) throw new Error("Missing required fields");
 
-    if (user.id === artist_user_id) {
-      throw new Error("You can't purchase your own track");
+    // The track row decides the artist and the price. artist_user_id from the
+    // request is ignored, and a rule id must belong to this track's artist.
+    const { data: track } = await supabaseAdmin
+      .from("exclusive_tracks")
+      .select("id, title, artist_user_id, price_cents, is_published")
+      .eq("id", track_id)
+      .maybeSingle();
+
+    let rule = null;
+    if (access_rule_id) {
+      const { data } = await supabaseAdmin
+        .from("exclusive_access_rules")
+        .select("id, artist_user_id, track_id, rule_type, amount_cents, is_active")
+        .eq("id", access_rule_id)
+        .maybeSingle();
+      rule = data;
     }
+
+    const { data: owned } = await supabaseAdmin
+      .from("exclusive_track_purchases")
+      .select("id")
+      .eq("track_id", track_id)
+      .eq("buyer_user_id", user.id)
+      .eq("payment_status", "paid")
+      .limit(1);
+
+    const { artistUserId: artist_user_id, amountCents, accessRuleId } = resolveMusicPurchase({
+      track,
+      rule,
+      requestedRuleId: access_rule_id || null,
+      buyerId: user.id,
+      alreadyPaid: (owned?.length ?? 0) > 0,
+    });
 
     // Get artist's Stripe Connect account + payout status
     const { data: artistProfile, error: profileErr } = await supabaseAdmin
@@ -63,30 +96,7 @@ serve(async (req) => {
       throw new Error("This artist has not enabled payouts yet.");
     }
 
-    // Get track and rule info
-    const { data: track, error: trackErr } = await supabaseAdmin
-      .from("exclusive_tracks")
-      .select("*")
-      .eq("id", track_id)
-      .single();
-
-    if (trackErr || !track) throw new Error("Track not found");
-
-    let amountCents = track.price_cents || 0;
-    if (access_rule_id) {
-      const { data: rule } = await supabaseAdmin
-        .from("exclusive_access_rules")
-        .select("*")
-        .eq("id", access_rule_id)
-        .single();
-      if (rule?.amount_cents) amountCents = rule.amount_cents;
-    }
-
-    if (amountCents <= 0) {
-      throw new Error("This track is free — use the Fan Challenge to unlock it.");
-    }
-
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+    const stripe = new Stripe(assertStripeTestKey(Deno.env.get("STRIPE_SECRET_KEY")), {
       apiVersion: "2025-08-27.basil",
     });
 
@@ -107,7 +117,7 @@ serve(async (req) => {
           price_data: {
             currency: "usd",
             product_data: {
-              name: track.title,
+              name: track?.title ?? "Exclusive track",
               description: `Exclusive track by ${artistProfile.display_name || "artist"}`,
             },
             unit_amount: amountCents,
@@ -127,7 +137,7 @@ serve(async (req) => {
         track_id,
         buyer_user_id: user.id,
         artist_user_id,
-        access_rule_id: access_rule_id || "",
+        access_rule_id: accessRuleId || "",
       },
       success_url: `${origin}/profile/${artist_user_id}?purchase=success`,
       cancel_url: `${origin}/profile/${artist_user_id}?purchase=canceled`,
@@ -141,7 +151,7 @@ serve(async (req) => {
       .insert({
         track_id,
         buyer_user_id: user.id,
-        access_rule_id: access_rule_id || null,
+        access_rule_id: accessRuleId,
         amount_cents: amountCents,
         stripe_session_id: session.id,
         payment_status: "pending",
@@ -155,10 +165,10 @@ serve(async (req) => {
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error";
     log("ERROR", { msg });
-    // Return 200 with structured error so the client can read the body cleanly
+    // Body keeps the error string. Status is 401, 400, 404, 409, or 500.
     return new Response(JSON.stringify({ ok: false, error: msg }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
+      status: error instanceof MusicPurchaseError ? error.status : httpStatusForError(error),
     });
   }
 });

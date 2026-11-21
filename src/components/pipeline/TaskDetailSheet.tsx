@@ -190,6 +190,7 @@ export function TaskDetailSheet({
                     Cancel
                   </Button>
                   <Button
+                    type="button"
                     size="sm"
                     onClick={handleSave}
                     disabled={isSaving}

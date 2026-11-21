@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { emailDisplayName, escapeHtml, invoiceDelivery } from "../_shared/notification-auth.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -80,8 +82,8 @@ function generateInvoiceHTML(invoice: InvoiceRecord, senderName: string, senderE
           <p style="margin: 0; opacity: 0.8; font-size: 14px;">${invoice.invoice_number}</p>
         </div>
         <div style="text-align: right;">
-          <p style="margin: 0; font-weight: 600; font-size: 16px;">${senderName}</p>
-          <p style="margin: 5px 0 0 0; opacity: 0.8; font-size: 14px;">${senderEmail}</p>
+          <p style="margin: 0; font-weight: 600; font-size: 16px;">${escapeHtml(senderName)}</p>
+          <p style="margin: 5px 0 0 0; opacity: 0.8; font-size: 14px;">${escapeHtml(senderEmail)}</p>
         </div>
       </div>
     </div>
@@ -148,7 +150,7 @@ function generateInvoiceHTML(invoice: InvoiceRecord, senderName: string, senderE
     <!-- Footer -->
     <div style="background-color: #f9fafb; padding: 20px 40px; text-align: center; border-top: 1px solid #e5e7eb;">
       <p style="margin: 0; color: #6b7280; font-size: 14px;">Thank you for your business!</p>
-      <p style="margin: 8px 0 0 0; color: #9ca3af; font-size: 12px;">This invoice was sent from ${senderName}</p>
+      <p style="margin: 8px 0 0 0; color: #9ca3af; font-size: 12px;">This invoice was sent from ${escapeHtml(senderName)}</p>
     </div>
 
   </div>
@@ -163,7 +165,7 @@ serve(async (req) => {
   }
 
   try {
-    const { invoiceId, via, recipient, senderName: customSenderName, senderEmail: customSenderEmail } = await req.json();
+    const { invoiceId, via } = await req.json();
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -207,28 +209,36 @@ serve(async (req) => {
       });
     }
 
-    const storedRecipient = via === 'email' ? invoice.recipient_email : invoice.recipient_phone;
-    const destination = (typeof storedRecipient === 'string' && storedRecipient.trim())
-      ? storedRecipient.trim()
-      : recipient;
-    if (!destination || typeof destination !== 'string') {
-      return new Response(JSON.stringify({ error: 'Recipient required' }), {
+    if (via !== 'email' && via !== 'sms') {
+      return new Response(JSON.stringify({ error: 'via must be email or sms' }), {
         status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const delivery = invoiceDelivery({
+      profileName: null,
+      accountEmail: userData.user.email,
+      storedRecipient: via === 'email' ? invoice.recipient_email : invoice.recipient_phone,
+    });
+    if (!delivery.ok) {
+      return new Response(JSON.stringify({ error: delivery.error }), {
+        status: delivery.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     console.log(`Sending invoice ${invoiceId} via ${via}`);
 
-    // Get owner profile for sender info
     const { data: profile } = await supabase
       .from('profiles')
       .select('display_name')
       .eq('user_id', invoice.owner_user_id)
       .single();
 
-    const senderName = customSenderName || profile?.display_name || 'Your service provider';
-    const senderEmail = customSenderEmail || 'notifications@etherbylcove.com';
+    const senderName = emailDisplayName(profile?.display_name);
+    const senderEmail = delivery.replyTo || 'notifications@etherbylcove.com';
+    const destination = delivery.destination;
 
     if (via === 'email') {
       // Send via Resend with HTML invoice
@@ -251,7 +261,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           from: `${senderName} <notifications@etherbylcove.com>`,
-          reply_to: senderEmail !== 'notifications@etherbylcove.com' ? senderEmail : undefined,
+          reply_to: delivery.replyTo || undefined,
           to: [destination],
           subject: `Invoice ${invoice.invoice_number} - ${invoice.title}`,
           html: invoiceHTML,
@@ -335,7 +345,7 @@ Thank you for your business!`;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: httpStatusForError(error), headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

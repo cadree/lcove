@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { CalendarItem } from "@/hooks/useCalendar";
 import { cn } from "@/lib/utils";
+import { isHighlighted } from "@/lib/calendarView";
+import { safeWebLink } from "@/lib/tripMoney";
 import { format, isSameDay, isToday as checkIsToday } from "date-fns";
 import { MapPin, Calendar, Clock, Ticket, Coins, User, Sparkles } from "lucide-react";
 
@@ -141,15 +143,24 @@ export function CalendarAgendaView({
                 className="w-full text-left p-4 hover:bg-accent/20 cursor-pointer transition-colors active:bg-accent/30"
               >
                 <div className="flex items-start gap-4">
-                  {/* Type indicator */}
+                  {/* Type indicator, or the cover for events that have one */}
+                  {isHighlighted(item) ? (
+                    <img
+                      src={safeWebLink((item.data as { image_url?: string | null }).image_url) || undefined}
+                      alt=""
+                      loading="lazy"
+                      className="h-16 w-16 shrink-0 rounded-xl object-cover ring-1 ring-[#ff9fc8]/60"
+                    />
+                  ) : (
                   <div className={cn(
                     "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
                     item.type === 'event' ? "bg-primary/20 text-primary" : "",
-                    item.type === 'project' ? "bg-accent/50 text-accent-foreground" : "",
+                    item.type === 'project' ? "bg-[hsl(var(--scan)/0.45)] text-foreground" : "",
                     item.type === 'personal' ? "bg-secondary/50 text-secondary-foreground" : ""
                   )}>
                     {getTypeIcon(item.type)}
                   </div>
+                  )}
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
@@ -193,7 +204,7 @@ export function CalendarAgendaView({
                   <span className={cn(
                     "px-2 py-1 rounded-md text-xs capitalize shrink-0",
                     item.type === 'event' ? "bg-primary/20 text-primary" : "",
-                    item.type === 'project' ? "bg-accent/50 text-accent-foreground" : "",
+                    item.type === 'project' ? "bg-[hsl(var(--scan)/0.45)] text-foreground" : "",
                     item.type === 'personal' ? "bg-secondary/50 text-secondary-foreground" : ""
                   )}>
                     {item.type}

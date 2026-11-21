@@ -1,0 +1,19 @@
+-- OPTIONAL. Do not apply to ether-prod without a separate yes.
+-- UI on feat/signup-funnel already holds pending people on /pending and
+-- lists them for admin approval. Live RLS still treats anyone with
+-- onboarding_completed and access_status other than banned as eligible
+-- for discovery, posts, and trips. This file would close that hole:
+-- pending and denied members stay out of discovery and cannot write
+-- until access_status is active. Banned stays banned.
+--
+-- Review before applying. Not run from this branch.
+
+-- Example shape only. Expand to every write RPC that today checks
+-- "onboarding_completed AND access_status IS DISTINCT FROM 'banned'".
+-- Change those predicates to:
+--   onboarding_completed
+--   AND access_status = 'active'
+--   AND NOT coalesce(is_suspended, false)
+--
+-- And hide pending rows from public discovery views / match lists
+-- the same way banned rows are already hidden.

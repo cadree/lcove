@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, Pencil, Ticket as TicketIcon } from "lucide-react";
 import { useTicketTiers, useUpsertTicketTier, useDeleteTicketTier, type TicketTier } from "@/hooks/useTicketTiers";
+import { readNumber, toCents } from "@/lib/numberField";
 
 interface Props {
   eventId: string;
@@ -32,6 +33,7 @@ export function TicketTierManagerDialog({ eventId, open, onOpenChange }: Props) 
   const upsert = useUpsertTicketTier();
   const remove = useDeleteTicketTier();
   const [form, setForm] = useState<TierForm | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => { if (!open) setForm(null); }, [open]);
 
@@ -47,9 +49,13 @@ export function TicketTierManagerDialog({ eventId, open, onOpenChange }: Props) 
 
   const save = async () => {
     if (!form || !form.name.trim()) return;
-    const priceCents = Math.round(parseFloat(form.price || "0") * 100);
-    if (Number.isNaN(priceCents) || priceCents < 0) return;
-    const cap = form.capacity.trim() ? parseInt(form.capacity) : null;
+    const price = readNumber(form.price, { label: "Price", min: 0, decimals: 2, optional: true });
+    const capacity = readNumber(form.capacity, { label: "Capacity", min: 1, integer: true, optional: true });
+    const invalid = [price, capacity].find((read) => read.error);
+    if (invalid) { setFormError(invalid.error); return; }
+    setFormError(null);
+    const priceCents = toCents(price.value ?? 0);
+    const cap = capacity.value;
     await upsert.mutateAsync({
       id: form.id,
       event_id: eventId,
@@ -84,13 +90,14 @@ export function TicketTierManagerDialog({ eventId, open, onOpenChange }: Props) 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Price (USD)</Label>
-                <Input type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+                <Input type="number" min="0" step="0.01" inputMode="decimal" placeholder="0.00" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
               </div>
               <div>
                 <Label>Capacity (optional)</Label>
-                <Input type="number" min="1" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} placeholder="Unlimited" />
+                <Input type="number" min="1" step="1" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} placeholder="Unlimited" />
               </div>
             </div>
+            {formError && <p role="alert" className="text-sm text-destructive">{formError}</p>}
             <div className="flex items-center justify-between">
               <Label>Active (visible to buyers)</Label>
               <Switch checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} />

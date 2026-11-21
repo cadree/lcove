@@ -111,7 +111,7 @@ export function CalendarWeekView({
                     "absolute left-0 right-0 mx-1 px-1.5 py-1 rounded text-[10px] cursor-pointer overflow-hidden text-left z-10",
                     "hover:ring-2 hover:ring-white/50 hover:scale-[1.02] active:scale-[0.98] transition-all",
                     item.type === 'event' ? "bg-primary/90 text-primary-foreground" : "",
-                    item.type === 'project' ? "bg-accent text-accent-foreground" : "",
+                    item.type === 'project' ? "bg-[hsl(var(--scan)/0.55)] font-medium text-foreground" : "",
                     item.type === 'personal' ? "bg-secondary text-secondary-foreground" : ""
                   )}
                   style={{

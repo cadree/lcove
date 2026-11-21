@@ -1,0 +1,70 @@
+# Deploys verify-host-email to ether-staging and proves the host and rate-limit checks.
+# Does not deploy to ether-prod and does not change secrets.
+
+name: Prove staging host reply-to
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cursor/ether-host-reply-413d
+    paths:
+      - supabase/functions/verify-host-email/**
+      - supabase/functions/_shared/host-reply-guard.mjs
+      - supabase/functions/_shared/host-email-address.mjs
+      - supabase/functions/_shared/host-email-identity.ts
+      - scripts/prove-host-reply.mjs
+      - .github/workflows/prove-staging-host-reply.yml
+
+permissions:
+  contents: read
+
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      STAGING_PROJECT_REF: vjdrihmriufkameqngfg
+      STAGING_URL: https://vjdrihmriufkameqngfg.supabase.co
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Refuse production
+        run: |
+          set -euo pipefail
+          if [ "$STAGING_PROJECT_REF" = "aykopqinnnssxdhxqruo" ]; then
+            echo "refusing ether-prod"
+            exit 1
+          fi
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "SUPABASE_ACCESS_TOKEN is empty. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.121.0
+
+      - name: Deploy verify-host-email to staging
+        run: |
+          set -euo pipefail
+          supabase functions deploy verify-host-email \
+            --project-ref "$STAGING_PROJECT_REF" \
+            --use-api
+
+      - name: Prove non-host confirm and the hourly limit
+        run: |
+          set -euo pipefail
+          keys="$(mktemp)"
+          err="$(mktemp)"
+          chmod 600 "$keys" "$err"
+          cleanup() { rm -f "$keys" "$err"; }
+          trap cleanup EXIT
+          if ! supabase projects api-keys --project-ref "$STAGING_PROJECT_REF" -o json > "$keys" 2>"$err"; then
+            python3 -c 'import re,sys; text=open(sys.argv[1],encoding="utf-8",errors="replace").read(); text=re.sub(r"sb_(?:secret|publishable)_[A-Za-z0-9_-]+","sb_[redacted]",text); text=re.sub(r"eyJ[A-Za-z0-9_-]{10,}","eyJ[redacted]",text); print(text)' "$err"
+            exit 1
+          fi
+          PROOF_API_KEYS_FILE="$keys" node scripts/prove-host-reply.mjs

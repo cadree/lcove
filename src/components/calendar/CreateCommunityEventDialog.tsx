@@ -17,6 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errorMessage";
+import { isHeicImage, jpegStorageName } from "@/lib/heicImage";
 import { format } from "date-fns";
 import { 
   Upload, 
@@ -121,8 +122,7 @@ const TIMEZONES = [
     input.value = '';
     if (!file || !user) return;
 
-    const allowed = /^image\/(jpe?g|png|webp|gif|heic|heif)$/i;
-    if (!file.type.startsWith('image/') && !allowed.test(file.type)) {
+    if (!file.type.startsWith('image/') && !isHeicImage(file.name, file.type)) {
       toast.error('Please upload a JPG, PNG, WEBP, GIF or HEIC image');
       return;
     }
@@ -137,7 +137,7 @@ const TIMEZONES = [
     try {
       const fileExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
       const fileName = `event-${Date.now()}.${fileExt}`;
-      const filePath = `${user.id}/event-images/${fileName}`;
+      const filePath = jpegStorageName(`${user.id}/event-images/${fileName}`, file.type);
 
       const { error: uploadError } = await supabase.storage
         .from('media')
@@ -673,7 +673,7 @@ const TIMEZONES = [
             type="button"
             variant="outline"
             onClick={addToGoogleCalendar}
-            className="w-full flex items-center justify-center gap-2"
+            className="flex h-auto w-full items-center justify-center gap-2 whitespace-normal text-center"
           >
             <Calendar className="h-4 w-4" />
             Also Add to Google Calendar

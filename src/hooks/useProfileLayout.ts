@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Json } from "@/integrations/supabase/types";
+import { withoutRetiredProfileSections } from "@/lib/profileSections";
 
 export interface ProfileSection {
   id: string;
@@ -16,6 +17,8 @@ export const DEFAULT_SECTIONS: ProfileSection[] = [
   { id: 'stats', label: 'Stats', visible: true, size: 'medium', order: 0 },
   { id: 'friends', label: 'Friends', visible: true, size: 'medium', order: 1 },
   { id: 'about', label: 'About', visible: true, size: 'medium', order: 2 },
+  { id: 'credits', label: 'Credits', visible: true, size: 'medium', order: 2.1 },
+  { id: 'vouches', label: 'Vouches', visible: true, size: 'medium', order: 2.2 },
   { id: 'pipeline', label: 'My Pipeline', visible: true, size: 'large', order: 3 },
   { id: 'boards', label: 'Boards', visible: true, size: 'medium', order: 4 },
   { id: 'portfolio', label: 'Portfolio', visible: true, size: 'medium', order: 5 },
@@ -26,7 +29,6 @@ export const DEFAULT_SECTIONS: ProfileSection[] = [
   { id: 'creator_modules', label: 'Creator Modules', visible: true, size: 'medium', order: 9 },
   { id: 'music', label: 'Music Player', visible: true, size: 'medium', order: 10 },
   { id: 'posts_tabs', label: 'Posts & Blogs', visible: true, size: 'large', order: 11 },
-  { id: 'reviews', label: 'Reviews', visible: true, size: 'medium', order: 12 },
   { id: 'quick_links', label: 'Quick Links', visible: true, size: 'small', order: 13 },
 ];
 
@@ -34,7 +36,7 @@ const parseLayoutFromJson = (json: Json | null): ProfileSection[] => {
   if (!json || !Array.isArray(json)) return DEFAULT_SECTIONS;
   
   try {
-    const parsed = json.map((item: Json) => {
+    let parsed = json.map((item: Json) => {
       if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
         const obj = item as Record<string, Json>;
         return {
@@ -49,12 +51,13 @@ const parseLayoutFromJson = (json: Json | null): ProfileSection[] => {
     }).filter((item): item is ProfileSection => item !== null && item.id !== '');
     
     if (parsed.length === 0) return DEFAULT_SECTIONS;
+    parsed = withoutRetiredProfileSections(parsed);
     
     // Merge with defaults to handle new sections
     const savedIds = new Set(parsed.map(s => s.id));
     const newSections = DEFAULT_SECTIONS.filter(s => !savedIds.has(s.id))
       .map((s, i) => ({ ...s, order: parsed.length + i }));
-    return [...parsed, ...newSections].sort((a, b) => a.order - b.order);
+    return withoutRetiredProfileSections([...parsed, ...newSections].sort((a, b) => a.order - b.order));
   } catch {
     return DEFAULT_SECTIONS;
   }
@@ -97,7 +100,7 @@ export const useProfileLayout = (userId?: string) => {
     mutationFn: async (sections: ProfileSection[]) => {
       if (!user) throw new Error("Not authenticated");
 
-      const layoutJson = layoutToJson(sections);
+      const layoutJson = layoutToJson(withoutRetiredProfileSections(sections));
 
       const { data: existing } = await supabase
         .from("profile_customizations")
@@ -136,7 +139,7 @@ export const useProfileLayout = (userId?: string) => {
   const isOwner = user?.id === targetUserId;
 
   return {
-    layout: layout || DEFAULT_SECTIONS,
+    layout: withoutRetiredProfileSections(layout || DEFAULT_SECTIONS),
     isLoading,
     saveLayout,
     isOwner,

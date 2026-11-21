@@ -97,7 +97,7 @@ export function PartnerApplicationDialog({ open, onOpenChange }: PartnerApplicat
             Become a Partner
           </DialogTitle>
           <DialogDescription>
-            Join our partner network and offer exclusive benefits to LC members. Tell us what you bring to the table.
+            Join our partner network and offer exclusive benefits to Ether members. Tell us what you bring to the table.
           </DialogDescription>
         </DialogHeader>
 
@@ -199,7 +199,7 @@ export function PartnerApplicationDialog({ open, onOpenChange }: PartnerApplicat
                     Member Benefits
                   </FormLabel>
                   <FormDescription>
-                    What exclusive benefits will LC members receive?
+                    What exclusive benefits will Ether members receive?
                   </FormDescription>
                   <FormControl>
                     <Textarea 

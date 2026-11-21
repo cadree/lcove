@@ -51,7 +51,7 @@ In Supabase Dashboard → Authentication → URL Configuration:
 
 - **Site URL**: `https://lcove.lovable.app`
 - **Redirect URLs**:
-  - `com.etherbylcove.app://` (placeholder — confirm with Cadre; see `src/config/nativeIds.ts` and `docs/ios-release.md`)
+  - `app.lovable.e07d9c457fd949f78f3cc7d5998be668://` (App Store bundle id; see `src/config/nativeIds.ts` and `docs/ios-release.md`)
   - `capacitor://localhost`
   - `https://id-preview--e07d9c45-7fd9-49f7-8f3c-c7d5998be668.lovable.app`
   - `https://lcove.lovable.app`
@@ -63,8 +63,9 @@ In Supabase Dashboard → Edge Functions → Secrets, add:
 |--------|-------------|
 | `STRIPE_SECRET_KEY` | Stripe API key |
 | `RESEND_API_KEY` | Resend email API key |
-| `MUX_TOKEN_ID` | Mux streaming token ID |
-| `MUX_TOKEN_SECRET` | Mux streaming secret |
+| `LIVEKIT_URL` | LiveKit Cloud websocket URL |
+| `LIVEKIT_API_KEY` | LiveKit API key |
+| `LIVEKIT_API_SECRET` | LiveKit API secret |
 | `TWILIO_ACCOUNT_SID` | Twilio account SID |
 | `TWILIO_AUTH_TOKEN` | Twilio auth token |
 | `TWILIO_PHONE_NUMBER` | Twilio phone number |
@@ -113,7 +114,7 @@ The app is already configured for native platforms:
 - ✅ PKCE flow enabled
 - ✅ Capacitor Preferences storage adapter
 - ✅ `detectSessionInUrl: false` on native
-- ✅ Deep link scheme: `com.etherbylcove.app://` (placeholder until Cadre confirms the bundle id)
+- ✅ Deep link scheme: `app.lovable.e07d9c457fd949f78f3cc7d5998be668://`
 
 ## Verification Checklist
 

@@ -163,12 +163,10 @@ export function useContactInvoices(pipelineItemId: string | null) {
   });
 
   const sendInvoice = useMutation({
-    mutationFn: async ({ invoiceId, via, recipient, senderName, senderEmail }: { 
-      invoiceId: string; 
-      via: 'email' | 'sms'; 
+    mutationFn: async ({ invoiceId, via, recipient }: {
+      invoiceId: string;
+      via: 'email' | 'sms';
       recipient: string;
-      senderName?: string;
-      senderEmail?: string;
     }) => {
       // Update invoice status to sent
       const { error } = await supabase
@@ -186,7 +184,7 @@ export function useContactInvoices(pipelineItemId: string | null) {
 
       // Call edge function to actually send the invoice
       const { error: sendError } = await supabase.functions.invoke('send-invoice', {
-        body: { invoiceId, via, recipient, senderName, senderEmail },
+        body: { invoiceId, via },
       });
       
       if (sendError) {
