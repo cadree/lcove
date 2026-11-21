@@ -15,13 +15,16 @@ PROD_REF=aykopqinnnssxdhxqruo
 case "$VITE_SUPABASE_URL $VITE_SUPABASE_PROJECT_ID" in *"$PROD_REF"*) echo "Refusing: this is the production project." >&2; exit 1;; esac
 case "$VITE_PUBLIC_WEB_ORIGIN" in *etherbylcove.com*) echo "Refusing: staging links must not use etherbylcove.com." >&2; exit 1;; esac
 
+# Outside the repo so eslint never scans build output.
+DERIVED="${DERIVED_DATA:-$HOME/Library/Developer/Xcode/DerivedData/ether-staging}"
+
 npm run build
 npx cap sync ios
 xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
-  -destination "id=$DEVICE_ID" -derivedDataPath ios/App/build/staging \
+  -destination "id=$DEVICE_ID" -derivedDataPath "$DERIVED" \
   -allowProvisioningUpdates \
   CODE_SIGN_ENTITLEMENTS=App/App.staging.entitlements build
-APP=$(ls -d ios/App/build/staging/Build/Products/Debug-iphoneos/App.app)
+APP="$DERIVED/Build/Products/Debug-iphoneos/App.app"
 xcrun devicectl device install app --device "$DEVICE_ID" "$APP"
 echo "Installed staging build. dist/ and ios/App/App/public now hold STAGING assets;"
 echo "run a production build before any release archive."

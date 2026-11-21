@@ -45,6 +45,12 @@ Production admin recipients: the only admin is `etherbylcove@gmail.com`, which i
 - `ios/App/App/App.staging.entitlements` (`aps-environment=development`, no app links) is used only by `scripts/ios-staging-build.sh`; the committed `App.entitlements` still says production. A development-signed staging build compiled and signed with `aps-environment=development`.
 - Both paired iPhones show `unavailable`, so nothing was installed. Registration, delivery, tap navigation, preference suppression and duplicate checks on a real iPhone are not done. Production release is held.
 
+## November 21 iPhone push run 1 (staging app on Cadre's iPhone)
+
+- PASS: sandbox token saved; `send-push-notification` returned `sent: 1` from sandbox APNs; application push with the admin preference on delivered once (one `application_push_deliveries` row, no duplicate on re-save); with it off the worker sent nothing. Cadre confirmed both pushes arrived.
+- FAIL: tapping did not navigate (Calendar test did nothing; application push left him on his profile). Root cause: the app never listened for `pushNotificationActionPerformed`, so taps only opened the app where it was.
+- FIX: `src/lib/pushTap.ts` adds the listener at startup in `main.tsx` (before React, so a cold-start tap that Capacitor retains is not lost); `src/lib/pushTapRoute.mjs` maps the APNs payload `url` to an in-app path and holds it until `PushTapNavigator` (inside the router) navigates. Unit tests cover the sender payload to route mapping and cold-start/background/foreground delivery. A rerun on the phone is pending.
+
 ## Assets
 
 Built-in image generation edited each supplied logo separately with this prompt:

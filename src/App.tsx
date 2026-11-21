@@ -19,6 +19,7 @@ import { EtherSplash } from "@/components/brand/EtherSplash";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
 import { IosCheckoutReturn } from "@/components/ios/IosCheckoutReturn";
 import { NativeIosPush } from "@/components/ios/NativeIosPush";
+import { PushTapNavigator } from "@/components/ios/PushTapNavigator";
 import { APP_STORE_APPLE_ID, APP_STORE_URL } from "@/config/launch";
 import MotionRoot from "@/components/motion/MotionRoot";
 
@@ -173,6 +174,7 @@ const App = () => (
         <AuthProvider>
           <IosCheckoutReturn />
           <NativeIosPush />
+          <PushTapNavigator />
           <PresenceProvider>
             <CreateFlowProvider>
               <AccessGate>
