@@ -22,6 +22,8 @@ import {
   type PublicStoreItem,
 } from "@/lib/consumerAccess";
 import { readFunctionError } from "@/lib/functionError";
+import { sellerSetupIncomplete } from "@/lib/sellerPaymentSetup";
+import { SellerSetupNotice } from "@/components/store/SellerSetupNotice";
 import { errorMessage } from "@/lib/errorMessage";
 import { toast } from "sonner";
 
@@ -32,6 +34,7 @@ export default function PublicProductPage() {
   const [email, setEmail] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [buying, setBuying] = useState(false);
+  const [sellerNotReady, setSellerNotReady] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -114,6 +117,11 @@ export default function PublicProductPage() {
           guestEmail: email.trim(),
         },
       });
+      if (sellerSetupIncomplete(result)) {
+        setSellerNotReady(true);
+        setBuying(false);
+        return;
+      }
       if (error || result?.error) {
         throw new Error(await readFunctionError(error, result, "Could not start checkout"));
       }
@@ -220,9 +228,13 @@ export default function PublicProductPage() {
                     />
                   </div>
                 )}
-                <Button type="submit" className="w-full" disabled={buying}>
-                  {buying ? "Redirecting…" : "Checkout"}
-                </Button>
+                {sellerNotReady ? (
+                  <SellerSetupNotice />
+                ) : (
+                  <Button type="submit" className="w-full" disabled={buying}>
+                    {buying ? "Redirecting…" : "Checkout"}
+                  </Button>
+                )}
               </form>
             )}
             {soldOut && <p className="text-sm text-muted-foreground">This item is sold out.</p>}

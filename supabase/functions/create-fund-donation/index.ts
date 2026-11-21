@@ -87,7 +87,10 @@ serve(async (req) => {
           {
             price_data: {
               currency: "usd",
-              product_data: { name: "Community Fund monthly donation" },
+              product_data: {
+                name: "Support ETHER monthly (optional payment)",
+                description: "Optional payment to ETHER for the app. Not a charitable donation and not a tip to a creator.",
+              },
               unit_amount: amountCents,
               recurring: { interval: "month" },
             },
@@ -119,7 +122,10 @@ serve(async (req) => {
           {
             price_data: {
               currency: "usd",
-              product_data: { name: "Community Fund donation" },
+              product_data: {
+                name: "Support ETHER (optional payment)",
+                description: "Optional payment to ETHER for the app. Not a charitable donation and not a tip to a creator.",
+              },
               unit_amount: amountCents,
             },
             quantity: 1,

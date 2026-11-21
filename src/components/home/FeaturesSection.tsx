@@ -128,8 +128,7 @@ const FeaturesSection = () => {
                     Community Fund
                   </h3>
                   <p className="text-muted-foreground max-w-xl">
-                    100% transparent. Every dollar, every decision, fully visible. See how member contributions 
-                    fund grants, events, and creative opportunities.
+                    100% transparent. Every dollar, every decision, fully visible. See what ETHER collects from support and memberships, and how it is used.
                   </p>
                 </div>
                 <Button variant="outline" className="group-hover:bg-primary group-hover:text-primary-foreground transition-all">

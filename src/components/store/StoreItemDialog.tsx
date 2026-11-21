@@ -19,6 +19,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { errorMessage } from '@/lib/errorMessage';
+import { sellerSetupIncomplete } from "@/lib/sellerPaymentSetup";
+import { SellerSetupNotice } from "@/components/store/SellerSetupNotice";
 import { shareLink, buildShareUrl } from "@/lib/shareLink";
 import {
   Package,
@@ -61,6 +63,7 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
   const [inquiryMessage, setInquiryMessage] = useState('');
   const [preferredDates, setPreferredDates] = useState('');
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [sellerNotReady, setSellerNotReady] = useState(false);
   const [showBooking, setShowBooking] = useState(false);
 
   if (!item) return null;
@@ -96,6 +99,10 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
           body: { clientPlatform: isIosApp() ? 'ios' : 'web', itemId: item.id, paymentType: 'cash' },
         });
 
+        if (sellerSetupIncomplete(data)) {
+          setSellerNotReady(true);
+          return;
+        }
         if (error) throw error;
         if (data?.url) {
           window.open(data.url, '_blank');
@@ -356,7 +363,8 @@ export const StoreItemDialog = ({ item, open, onOpenChange }: StoreItemDialogPro
                         </Button>
                       )}
                     </div>
-                    {(item.price > 0 || item.credits_price > 0) && (
+                    {sellerNotReady && paymentType === 'cash' && <SellerSetupNotice />}
+                    {(item.price > 0 || item.credits_price > 0) && !(sellerNotReady && paymentType === 'cash') && (
                       <Button
                         className="w-full"
                         size="lg"

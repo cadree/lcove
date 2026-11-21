@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { COMMUNITY_FUND_FEE_PERCENT } from "../_shared/fees.mjs";
 import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
 import { verifiedDestination } from "../_shared/creator-connect.mjs";
+import { sellerSetupIncompleteBody } from "../_shared/seller-payment-setup.mjs";
 import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
@@ -62,6 +63,13 @@ serve(async (req) => {
     const ownerDestination = await verifiedDestination(supabaseClient, network.owner_id);
     const destinationAccount = ownerDestination
       || (network.payout_enabled ? network.stripe_connect_account_id : null);
+    // Subscriptions go straight to the network owner's connected account. No account, no checkout.
+    if (!destinationAccount) {
+      return new Response(JSON.stringify(sellerSetupIncompleteBody()), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
     const stripe = new Stripe(assertStripeTestKey(Deno.env.get("STRIPE_SECRET_KEY")), {
       apiVersion: "2025-08-27.basil",
     });
@@ -147,22 +155,18 @@ serve(async (req) => {
     };
 
     // Creator receives the rest. COMMUNITY_FUND_FEE_PERCENT is earmarked for the community fund.
-    if (destinationAccount) {
-      logStep("Adding revenue split", { 
-        creatorAccount: destinationAccount,
-        platformFee: `${COMMUNITY_FUND_FEE_PERCENT}%` 
-      });
+    logStep("Adding revenue split", { 
+      creatorAccount: destinationAccount,
+      platformFee: `${COMMUNITY_FUND_FEE_PERCENT}%` 
+    });
 
-      sessionOptions.subscription_data = {
-        ...sessionOptions.subscription_data,
-        application_fee_percent: COMMUNITY_FUND_FEE_PERCENT,
-        transfer_data: {
-          destination: destinationAccount,
-        },
-      };
-    } else {
-      logStep("No Connect account - all funds go to platform");
-    }
+    sessionOptions.subscription_data = {
+      ...sessionOptions.subscription_data,
+      application_fee_percent: COMMUNITY_FUND_FEE_PERCENT,
+      transfer_data: {
+        destination: destinationAccount,
+      },
+    };
 
     // Create checkout session
     const session = await stripe.checkout.sessions.create(sessionOptions);

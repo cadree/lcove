@@ -186,9 +186,16 @@ const Terms = () => {
                 </p>
               </div>
               <div>
+                <h4 className="font-medium text-foreground mb-2">Support ETHER payments</h4>
+                <p className="text-sm">
+                  &quot;Support Ether&quot; payments, one-time or monthly, are optional payments to ETHER for the
+                  Platform. They are not charitable donations, are not tax-deductible, and are not paid to creators.
+                </p>
+              </div>
+              <div>
                 <h4 className="font-medium text-foreground mb-2">Creator Payouts</h4>
                 <p className="text-sm">
-                  If you earn money through the Platform (store sales, tips, etc.), payouts are processed through 
+                  If you earn money through the Platform (store sales, event tickets, project payments, or live-stream gifts from viewers), payouts are processed through 
                   Stripe. You are responsible for providing accurate payment information and complying with tax obligations.
                 </p>
               </div>

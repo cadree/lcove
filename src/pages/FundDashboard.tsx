@@ -532,7 +532,7 @@ export default function FundDashboard() {
                             ? showDonations
                               ? "Membership checkout is not available in the iOS app. You can still support."
                               : "Membership checkout is not available in the iOS app."
-                            : "Support once or subscribe monthly — no account required."}
+                            : "An optional payment to ETHER, once or monthly. No account required."}
                         </p>
                       </div>
                     </div>
@@ -591,23 +591,23 @@ export default function FundDashboard() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-muted-foreground leading-relaxed">
-                  The Community Fund is the financial backbone of our creative ecosystem. 
-                  Unlike traditional platforms that extract value, every dollar contributed here 
-                  goes directly back into supporting creators.
+                  Support payments and memberships are optional and are paid to ETHER, the company
+                  behind the app. They aren&apos;t charitable donations and aren&apos;t tips to creators.
+                  ETHER uses them for the platform, community events and programs, and shows the totals here.
                 </p>
                 <div className="grid md:grid-cols-2 gap-4 pt-2">
                   <div className="p-4 rounded-xl bg-background/50">
                     <span className="squircle-icon mb-3 font-body text-sm font-extrabold" style={{ width: 32, height: 32, backgroundImage: iconFills.gold, color: "#0A0A0A" }}>1</span>
-                    <h4 className="font-medium text-foreground mb-1">Members Contribute</h4>
+                    <h4 className="font-medium text-foreground mb-1">Members Support ETHER</h4>
                     <p className="text-sm text-muted-foreground">
-                      Monthly contributions from members pool together
+                      Optional one-time or monthly payments go to ETHER
                     </p>
                   </div>
                   <div className="p-4 rounded-xl bg-background/50">
                     <span className="squircle-icon mb-3 font-body text-sm font-extrabold" style={{ width: 32, height: 32, backgroundImage: iconFills.gold, color: "#0A0A0A" }}>2</span>
-                    <h4 className="font-medium text-foreground mb-1">Creators Benefit</h4>
+                    <h4 className="font-medium text-foreground mb-1">ETHER Reports It</h4>
                     <p className="text-sm text-muted-foreground">
-                      Funds distributed to grants, events, and programs
+                      What ETHER collects and how it is spent shows on this page
                     </p>
                   </div>
                 </div>
