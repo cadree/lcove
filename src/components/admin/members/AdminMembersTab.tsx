@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { formatDistanceToNow } from "date-fns";
 import {
   ArrowDownUp,
@@ -435,8 +436,8 @@ export function AdminMembersTab({ actions }: { actions: MemberRowActions }) {
         </div>
       )}
 
-      {/* Sticky bulk bar */}
-      {selected.size > 0 && (
+      {/* Sticky bulk bar. Portaled: the tab panel animates with a transform, which would pin a fixed bar to the panel instead of the screen. */}
+      {selected.size > 0 && createPortal(
         <div
           className="fixed inset-x-0 z-40 px-3"
           style={{ bottom: "calc(84px + env(safe-area-inset-bottom, 0px) + 8px)" }}
@@ -446,17 +447,17 @@ export function AdminMembersTab({ actions }: { actions: MemberRowActions }) {
             <Button variant="ghost" size="icon" className="h-9 w-8 shrink-0" onClick={() => setSelected(new Set())} aria-label="Clear selection">
               <X className="h-4 w-4" />
             </Button>
-            <span className="min-w-0 flex-1 truncate text-sm font-medium">{selected.size.toLocaleString()}<span className="hidden min-[380px]:inline"> selected</span></span>
+            <span className="min-w-0 flex-1 truncate whitespace-nowrap text-sm font-medium">{selected.size.toLocaleString()} selected</span>
             {bulkChoices.includes("message") && (
-              <Button size="sm" variant="outline" className="h-9 gap-1 px-2.5" onClick={() => setBulk("message")}>
+              <Button size="sm" variant="outline" className="h-9 shrink-0 gap-1 px-2.5" onClick={() => setBulk("message")} aria-label="Message">
                 <MessageCircle className="h-4 w-4" />
-                <span>Message</span>
+                <span className="hidden min-[420px]:inline">Message</span>
               </Button>
             )}
             {bulkChoices.includes("suspend") && (
-              <Button size="sm" variant="outline" className="h-9 gap-1 px-2.5" onClick={() => setBulk("suspend")}>
+              <Button size="sm" variant="outline" className="h-9 shrink-0 gap-1 px-2.5" onClick={() => setBulk("suspend")} aria-label="Suspend">
                 <Ban className="h-4 w-4" />
-                <span>Suspend</span>
+                <span className="hidden min-[420px]:inline">Suspend</span>
               </Button>
             )}
             {bulkChoices.includes("restore") && (
@@ -468,7 +469,7 @@ export function AdminMembersTab({ actions }: { actions: MemberRowActions }) {
             {bulkChoices.length > 2 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="sm" className="h-9 gap-1 px-3">
+                  <Button size="sm" className="h-9 shrink-0 gap-1 px-3">
                     More
                   </Button>
                 </DropdownMenuTrigger>
@@ -488,7 +489,8 @@ export function AdminMembersTab({ actions }: { actions: MemberRowActions }) {
               </DropdownMenu>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       <FiltersSheet
