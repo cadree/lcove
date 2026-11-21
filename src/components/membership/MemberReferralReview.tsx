@@ -1,3 +1,4 @@
+import { ApplicationVouches } from "./ApplicationVouches";
 import { useEffect, useState } from "react";
 import { HandHeart } from "lucide-react";
 import { callRpc } from "@/lib/rpc";
@@ -49,6 +50,7 @@ export function MemberReferralReview({ applicantId }: { applicantId: string }) {
       ) : (
         <p className="mt-2 text-sm text-muted-foreground">Direct application — no member introduction recorded.</p>
       )}
+      <ApplicationVouches applicantId={applicantId} />
     </section>
   );
 }

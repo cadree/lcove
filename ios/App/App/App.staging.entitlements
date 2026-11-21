@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- Staging only. Used by scripts/ios-staging-build.sh for a development-signed
+     install. Sandbox APNs, and no etherbylcove.com app links so production links
+     never open the staging app. App.entitlements stays the release file. -->
+<dict>
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

@@ -19,6 +19,7 @@ import { EtherSplash } from "@/components/brand/EtherSplash";
 import { useTrackActivity } from "@/hooks/useTrackActivity";
 import { IosCheckoutReturn } from "@/components/ios/IosCheckoutReturn";
 import { NativeIosPush } from "@/components/ios/NativeIosPush";
+import { PushTapNavigator } from "@/components/ios/PushTapNavigator";
 import { APP_STORE_APPLE_ID, APP_STORE_URL } from "@/config/launch";
 import MotionRoot from "@/components/motion/MotionRoot";
 
@@ -52,6 +53,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Locked = lazy(() => import("./pages/Locked"));
 const Denied = lazy(() => import("./pages/Denied"));
+const MembershipVouch = lazy(() => import("./pages/MembershipVouch"));
 const Pending = lazy(() => import("./pages/Pending"));
 const WelcomeFamilcy = lazy(() => import("./pages/WelcomeFamilcy"));
 const Messages = lazy(loadMessages);
@@ -172,6 +174,7 @@ const App = () => (
         <AuthProvider>
           <IosCheckoutReturn />
           <NativeIosPush />
+          <PushTapNavigator />
           <PresenceProvider>
             <CreateFlowProvider>
               <AccessGate>
@@ -193,6 +196,7 @@ const App = () => (
                 <Route path="/onboarding" element={<Onboarding />} />
                 <Route path="/locked" element={<Locked />} />
                 <Route path="/denied" element={<Denied />} />
+                <Route path="/vouch/:token" element={<MembershipVouch />} />
                 <Route path="/pending" element={<Pending />} />
                 <Route path="/welcome" element={<WelcomeFamilcy />} />
                 <Route path="/feed" element={<Feed />} />

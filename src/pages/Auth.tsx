@@ -283,6 +283,11 @@ const Auth = () => {
         });
         return;
       }
+      const vouchReturn = searchParams.get('redirect') || '';
+      if (/^\/vouch\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(vouchReturn)) {
+        navigate(vouchReturn, { replace: true });
+        return;
+      }
       const eventReturn = eventReturnPath(searchParams.get('redirect'));
       if (eventReturn) {
         rememberEventReturn(eventReturn);
@@ -585,7 +590,7 @@ const Auth = () => {
               <p className="text-sm text-muted-foreground mb-4">
                 {email ? <>Verification for <span className="text-primary">{email}</span>.</> : 'Enter your signup email to request a fresh verification code.'}
               </p>
-              {!emailSchema.safeParse({ email }).success && (
+              {(
                 <Input type="email" autoComplete="email" aria-label="Signup email" placeholder="Your signup email"
                   className="mb-3 h-12" value={email} onChange={(event) => setEmail(event.target.value)} />
               )}
