@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowRight, ArrowLeft, Camera, User } from 'lucide-react';
-import { displayNameError } from '@/lib/displayName';
+import { displayNameError, prefillName } from '@/lib/displayName';
 import { MEMBER_OF_HINT, MEMBER_OF_LIMIT, memberOfError, normalizeMemberOf } from '@/lib/etherId';
 
 interface Props {
@@ -22,7 +22,10 @@ interface Props {
 }
 
 const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onNext, onBack, nameLocked = false, avatarPreview, onAvatar }: Props) => {
-  const [name, setName] = useState(displayName);
+  // A saved name that cannot pass validation (an email from AutoFill) stays
+  // editable; locking it left Continue failing with no visible error.
+  const locked = nameLocked && !displayNameError(displayName);
+  const [name, setName] = useState(() => prefillName(displayName));
   const [member, setMember] = useState(memberOf);
   const [error, setError] = useState('');
   const [memberError, setMemberError] = useState('');
@@ -30,7 +33,8 @@ const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onN
   // Sign-up metadata can arrive after the first render. Keep the locked name
   // in local state so Continue is enabled.
   useEffect(() => {
-    if (displayName.trim()) setName((current) => current.trim() || displayName);
+    const suggested = prefillName(displayName);
+    if (suggested) setName((current) => current.trim() || suggested);
   }, [displayName]);
   useEffect(() => {
     if (memberOf) setMember((current) => current || memberOf);
@@ -113,7 +117,7 @@ const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onN
               </div>
             </div>
           )}
-          {nameLocked ? (
+          {locked ? (
             <div className="space-y-1">
               <p className="text-base font-medium">Display Name</p>
               <p className="text-lg text-foreground">{displayName}</p>
@@ -208,7 +212,6 @@ const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onN
           )}
           <Button
             onClick={handleNext}
-            disabled={!name.trim()}
             className="h-12 px-6 bg-primary hover:bg-primary/90"
           >
             Continue

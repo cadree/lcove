@@ -8,6 +8,7 @@ brandpartners
 CALSCALE
 checkin
 cmdk
+capgo
 Collab
 collab
 commenters

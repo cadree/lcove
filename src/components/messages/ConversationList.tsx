@@ -367,7 +367,7 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
                       className="text-destructive focus:text-destructive"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (confirm('Delete this entire conversation? This cannot be undone.')) {
+                        if (confirm('Remove this chat from your list? Other members keep it, and it comes back if someone sends a new message.')) {
                           deleteConversation.mutate(conv.id);
                           if (selectedId === conv.id && onDeleteConversation) {
                             onDeleteConversation(conv.id);

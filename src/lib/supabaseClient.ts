@@ -11,6 +11,7 @@ import { retractFlaggedImage, type FlaggedImageDb } from "@/lib/nsfwRetract";
 import { fileKind, isStorageSizeRejection, storageLimitMessage } from "@/lib/storageLimit";
 import { supabaseProjectRef } from "@/lib/supabaseTarget.mjs";
 import { sendStorageObject } from "@/lib/storageTransport";
+import { withAuthDeadline } from "@/lib/authFetchDeadline";
 import type { Database } from "@/integrations/supabase/types";
 
 // Vite inlines VITE_* from the process environment and from a local .env file.
@@ -48,6 +49,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     // Use PKCE flow for better mobile security
     flowType: "pkce",
   },
+  // A token refresh that never answers holds the auth lock, and every query
+  // waits on that lock. Auth requests time out; uploads and queries do not.
+  global: { fetch: withAuthDeadline((input, init) => fetch(input, init)) },
 });
 
 // Non-2xx function responses keep their JSON error string on error.message.

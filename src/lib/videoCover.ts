@@ -62,6 +62,12 @@ export async function autoCover(source: Blob | string, timeoutMs = 6000): Promis
   try {
     video.src = url;
     if (!(await once(video, "loadedmetadata", timeoutMs))) return null;
+    // iOS stops at metadata for a video that is not on screen and never decodes a
+    // frame to draw, so the cover came back empty. A muted play/pause makes it decode.
+    if (video.readyState < 2) {
+      await Promise.race([video.play().catch(() => undefined), new Promise((resolve) => window.setTimeout(resolve, 1000))]);
+      video.pause();
+    }
     const ready = once(video, "seeked", timeoutMs);
     video.currentTime = coverSeekTime(video.duration);
     if (!(await ready) && video.readyState < 2) return null;

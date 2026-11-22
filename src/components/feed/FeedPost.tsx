@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Trash2, Flag, Repeat2 } from 'lucide-react';
+import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Trash2, Flag, Repeat2, Play, Maximize2, Volume2, VolumeX } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { usePostInteractions } from '@/hooks/usePostInteractions';
 import { useFeedCardState } from '@/hooks/feedCardState';
@@ -85,6 +85,8 @@ const FeedPost = ({ post }: { post: Post }) => {
     isCommenting,
   } = usePostInteractions(post.id, { threadOnly: true, loadComments: showComments });
   const [lightbox, setLightbox] = useState(false);
+  const [muted, setMuted] = useState(true);
+  const [playing, setPlaying] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -111,7 +113,7 @@ const FeedPost = ({ post }: { post: Post }) => {
 
   const toggleVideo = (e: React.MouseEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
-    if (video.paused) video.play();
+    if (video.paused) void video.play().catch(() => undefined);
     else video.pause();
   };
 
@@ -240,40 +242,80 @@ const FeedPost = ({ post }: { post: Post }) => {
         </div>
       ) : post.media_url && post.media_type !== 'text' && (
         <div className="mx-auto w-full max-w-[470px] bg-muted/15">
-          <button
-            type="button"
-            className="relative block w-full"
-            onClick={() => setLightbox(true)}
-            aria-label="View full size"
-          >
-            <span className="mono-label absolute left-3 top-3 z-[1] rounded-full bg-black/55 px-2 py-1 text-[8px] text-white">
-              {fileCode(post.id)}
-            </span>
-            <span className="relative mx-auto block aspect-[4/5] w-full overflow-hidden bg-black">
+          {post.media_type === 'video' ? (
+            <div className="relative mx-auto block aspect-[4/5] w-full overflow-hidden bg-black">
+              <span className="mono-label pointer-events-none absolute left-3 top-3 z-[1] rounded-full bg-black/55 px-2 py-1 text-[8px] text-white">
+                {fileCode(post.id)}
+              </span>
               {post.upload_job_id && <UploadingBadge jobId={post.upload_job_id} />}
-              {post.media_type === 'video' ? (
-                <FeedVideo
-                  src={post.media_url}
-                  poster={post.thumbnail_url ?? undefined}
-                  frameAt={1}
-                  className="absolute inset-0 h-full w-full object-contain"
-                />
-              ) : (
+              {/* Plays muted in place while on screen; a tap plays or pauses it right here. */}
+              <FeedVideo
+                src={post.media_url}
+                poster={post.thumbnail_url ?? undefined}
+                frameAt={1}
+                playWhenVisible
+                muted={muted}
+                onClick={toggleVideo}
+                onPlay={() => setPlaying(true)}
+                onPause={() => setPlaying(false)}
+                aria-label={playing ? 'Pause video' : 'Play video'}
+                className="absolute inset-0 h-full w-full cursor-pointer object-contain"
+              />
+              {!playing && (
+                <span className="pointer-events-none absolute inset-0 flex items-center justify-center" data-testid="feed-video-paused">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/55 text-white">
+                    <Play className="ml-0.5 h-6 w-6 fill-current" />
+                  </span>
+                </span>
+              )}
+              <button
+                type="button"
+                className="absolute right-2 top-2 z-[2] flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white"
+                onClick={(event) => {
+                  event.currentTarget.parentElement?.querySelector('video')?.pause();
+                  setLightbox(true);
+                }}
+                aria-label="View full size"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                className="absolute bottom-2 right-2 z-[2] flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white"
+                onClick={() => setMuted((value) => !value)}
+                aria-label={muted ? 'Turn sound on' : 'Mute'}
+              >
+                {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="relative block w-full"
+              onClick={() => setLightbox(true)}
+              aria-label="View full size"
+            >
+              <span className="mono-label absolute left-3 top-3 z-[1] rounded-full bg-black/55 px-2 py-1 text-[8px] text-white">
+                {fileCode(post.id)}
+              </span>
+              <span className="relative mx-auto block aspect-[4/5] w-full overflow-hidden bg-black">
+                {post.upload_job_id && <UploadingBadge jobId={post.upload_job_id} />}
                 <img
                   src={post.media_url}
                   alt=""
                   className="absolute inset-0 h-full w-full bg-muted object-contain"
                   loading="lazy"
                 />
-              )}
-            </span>
-          </button>
+              </span>
+            </button>
+          )}
           <Dialog open={lightbox} onOpenChange={setLightbox}>
-            <DialogContent className="max-w-[min(100vw-1.5rem,720px)] border-border bg-background p-3">
+            {/* pt-14 keeps the media below the close X, so the video's own mute control can't cover it. */}
+            <DialogContent className="max-w-[min(100vw-1.5rem,720px)] border-border bg-background p-3 pt-14">
               <DialogTitle className="sr-only">Full size media</DialogTitle>
               <DialogDescription className="sr-only">The post photo or video at full size</DialogDescription>
               {post.media_type === 'video' ? (
-                <video src={post.media_url} className="max-h-[80vh] w-full object-contain" controls playsInline autoPlay onClick={toggleVideo} />
+                <video src={post.media_url} className="max-h-[80vh] w-full object-contain" controls playsInline autoPlay />
               ) : (
                 <img src={post.media_url} alt="" className="max-h-[80vh] w-full object-contain" />
               )}

@@ -60,6 +60,15 @@ const config: CapacitorConfig = {
     CapacitorHttp: {
       enabled: true,
     },
+    // Self-hosted live updates. No Capgo cloud. autoUpdate true applies a
+    // downloaded bundle the next time the app backgrounds. updateUrl is our
+    // Pages Function. resetWhenUpdate drops old zips after a new store binary.
+    CapacitorUpdater: {
+      autoUpdate: true,
+      updateUrl: "https://etherbylcove.com/native-updates",
+      resetWhenUpdate: true,
+      appReadyTimeout: 10000,
+    },
   },
 };
 

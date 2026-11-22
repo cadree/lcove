@@ -29,3 +29,14 @@ test("member list stays light enough for thousands of people", async () => {
   assert.ok(members.includes('data-testid="bulk-bar"'), "Selecting people shows the bulk bar");
   assert.ok(members.includes("selectAllMatching"), "Admins can select everyone that matches a filter");
 });
+
+test("admin review shows applicant socials as tappable external links", async () => {
+  const members = await readFile("src/components/admin/members/AdminMembersTab.tsx", "utf8");
+  const onboarding = await readFile("src/pages/AdminOnboarding.tsx", "utf8");
+  const links = await readFile("src/components/admin/ApplicantSocialLinks.tsx", "utf8");
+  assert.ok(members.includes("<ApplicantSocialLinks"), "Member detail must render clickable social links");
+  assert.ok(onboarding.includes("<ApplicantSocialLinks"), "Onboarding review must render clickable social links");
+  assert.equal(members.includes("{key}:</span> {value}"), false, "Socials must not be plain text in the member sheet");
+  assert.ok(links.includes("onExternalHttpUrlClick"), "Taps must use the shared external open path");
+  assert.ok(links.includes('target="_blank"'), "Links keep a real href for web");
+});

@@ -1,4 +1,6 @@
 import { toast } from 'sonner';
+import { Capacitor } from '@capacitor/core';
+import { Clipboard } from '@capacitor/clipboard';
 
 export interface ShareLinkOptions {
   title?: string;
@@ -31,35 +33,10 @@ export async function shareLink(opts: ShareLinkOptions): Promise<void> {
     }
   }
 
-  // 2. Clipboard API
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success(copyMessage);
-      return;
-    } catch {
-      // fall through
-    }
-  }
-
-  // 3. Legacy execCommand
-  if (typeof document !== 'undefined') {
-    try {
-      const textarea = document.createElement('textarea');
-      textarea.value = url;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
-      const ok = document.execCommand('copy');
-      document.body.removeChild(textarea);
-      if (ok) {
-        toast.success(copyMessage);
-        return;
-      }
-    } catch {
-      // fall through
-    }
+  // 2. Copy (native clipboard, legacy copy, Clipboard API)
+  if (await copyText(url)) {
+    toast.success(copyMessage);
+    return;
   }
 
   // 4. Last resort — show the link to the user
@@ -340,28 +317,61 @@ function tryAppSchemeWithFallback(appUrl: string, webUrl: string): void {
   }, 800);
 }
 
-async function copyToClipboardSilent(text: string): Promise<boolean> {
+/** Selects text in a hidden field and runs the legacy copy command. iOS needs a real selection range. */
+function legacyCopy(text: string): boolean {
+  if (typeof document === 'undefined') return false;
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', '');
+  area.style.position = 'fixed';
+  area.style.top = '0';
+  area.style.left = '0';
+  area.style.opacity = '0';
+  area.style.fontSize = '16px';
+  // An open dialog traps focus, so the field has to live inside it to be selectable.
+  const host = document.activeElement?.closest('[role="dialog"]') ?? document.body;
+  const previous = document.activeElement as HTMLElement | null;
+  host.appendChild(area);
   try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch {
-    // Clipboard can be blocked; fall through to the legacy copy path.
-  }
-  try {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    const ok = document.execCommand('copy');
-    document.body.removeChild(ta);
-    return ok;
+    area.focus({ preventScroll: true });
+    area.select();
+    area.setSelectionRange(0, text.length);
+    return document.execCommand('copy');
   } catch {
     return false;
+  } finally {
+    area.remove();
+    previous?.focus?.({ preventScroll: true });
   }
+}
+
+/** Resolves false if a clipboard promise never settles, which WKWebView can do. */
+function settled(promise: Promise<unknown>, ms = 1500): Promise<boolean> {
+  return Promise.race([
+    promise.then(() => true, () => false),
+    new Promise<boolean>((resolve) => window.setTimeout(() => resolve(false), ms)),
+  ]);
+}
+
+/**
+ * Copies text from a tap. The iOS app uses the native clipboard plugin;
+ * the web uses the Clipboard API, then the legacy copy command.
+ * Call it straight from the click handler so the browser sees the gesture.
+ */
+export async function copyText(text: string): Promise<boolean> {
+  if (Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('Clipboard')) {
+    if (await settled(Clipboard.write({ string: text }))) return true;
+  }
+  // The legacy copy runs first while the tap still counts as a gesture; it never hangs.
+  if (legacyCopy(text)) return true;
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    return settled(navigator.clipboard.writeText(text));
+  }
+  return false;
+}
+
+async function copyToClipboardSilent(text: string): Promise<boolean> {
+  return copyText(text);
 }
 
 /**

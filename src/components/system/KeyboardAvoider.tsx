@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Capacitor, type PluginListenerHandle } from "@capacitor/core";
 import { Keyboard } from "@capacitor/keyboard";
-import { isTextEntry, nativeKeyboardVisibleHeight, revealDelta, webKeyboardInset } from "@/lib/keyboardViewport";
+import { isTextEntry, nativeKeyboardVisibleHeight, revealDelta, revealTarget, webKeyboardInset } from "@/lib/keyboardViewport";
 
 /**
  * App-wide: when the keyboard opens or a field gains focus, scroll the field
@@ -32,11 +32,14 @@ export function KeyboardAvoider() {
       const focused = document.activeElement;
       if (!isTextEntry(focused)) return;
       const { top, height } = visible();
-      if (!revealDelta(focused.getBoundingClientRect(), top, height)) return;
+      // Sign-in style forms: keep the submit button in view with the field when both fit.
+      const submit = focused.closest("form")?.querySelector<HTMLElement>('button[type="submit"]') ?? null;
+      const target = () => revealTarget(focused.getBoundingClientRect(), submit?.getBoundingClientRect() ?? null, height);
+      if (!revealDelta(target(), top, height)) return;
       // Keep nested scroll areas usable while the app's body is also scrollable.
       // Inner scroll areas first, then the page, measured against the part the keyboard leaves.
       focused.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
-      const delta = revealDelta(focused.getBoundingClientRect(), top, height);
+      const delta = revealDelta(target(), top, height);
       if (delta) window.scrollBy({ top: delta, behavior: "instant" });
     };
 
