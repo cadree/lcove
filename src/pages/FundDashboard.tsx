@@ -592,7 +592,7 @@ export default function FundDashboard() {
               <CardContent className="space-y-4">
                 <p className="text-muted-foreground leading-relaxed">
                   Support payments and memberships are optional and are paid to ETHER, the company
-                  behind the app. They aren&apos;t charitable donations and aren&apos;t tips to creators.
+                  behind the app. They are not charitable donations and are not tips to creators.
                   ETHER uses them for the platform, community events and programs, and shows the totals here.
                 </p>
                 <div className="grid md:grid-cols-2 gap-4 pt-2">

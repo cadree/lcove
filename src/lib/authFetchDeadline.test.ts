@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 import { withAuthDeadline } from "./authFetchDeadline.ts";
 
 const hang: typeof fetch = (_input, init) =>
@@ -8,6 +8,14 @@ const hang: typeof fetch = (_input, init) =>
   });
 
 describe("auth fetch deadline", () => {
+  // Node 22 does not keep the process alive for AbortSignal.timeout, so the
+  // runner would exit before the deadline fires. Hold the event loop open.
+  let keepAlive: ReturnType<typeof setInterval>;
+  before(() => {
+    keepAlive = setInterval(() => {}, 1_000);
+  });
+  after(() => clearInterval(keepAlive));
+
   it("fails a hung token refresh instead of waiting forever", async () => {
     const fetchWithDeadline = withAuthDeadline(hang, 30);
     await assert.rejects(
