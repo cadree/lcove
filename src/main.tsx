@@ -14,6 +14,7 @@ import "./index.css";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { setupDeepLinkHandler, initializeCapacitorApp } from "@/lib/deepLinkHandler";
 import { startPushTapListener } from "@/lib/pushTap";
+import { notifyLiveUpdateReady } from "@/lib/liveUpdates";
 
 // Ether Application Bootstrap - v2
 
@@ -22,6 +23,8 @@ setupDeepLinkHandler();
 initializeCapacitorApp();
 // Before React renders, so a tap that cold-started the app is not lost.
 startPushTapListener();
+// Confirm the web bundle booted so a broken live update can auto-revert.
+void notifyLiveUpdateReady();
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
