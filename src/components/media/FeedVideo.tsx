@@ -84,7 +84,8 @@ export function FeedVideo({ src, preload = "metadata", muted = true, playsInline
     const element = ref.current;
     if (!element || near) return;
     // Dropping the attribute is not enough; load() makes the browser let go of the buffer.
-    if (element.getAttribute("src")) {
+    // React has already removed src by the time this runs, so check what is loaded.
+    if (element.currentSrc || element.getAttribute("src")) {
       element.pause();
       element.removeAttribute("src");
       element.load();
