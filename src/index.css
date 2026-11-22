@@ -1736,6 +1736,10 @@ body.ether-id-page {
   padding-top: max(1rem, env(safe-area-inset-top, 0px)) !important;
   padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px)) !important;
 }
+/* Bottom sheets sit on the home indicator, not under the notch: inset the bottom only. */
+.overlay-safe-bottom {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px)) !important;
+}
 .safe-header { padding-top: calc(1rem + env(safe-area-inset-top, 0px)) !important; }
 .safe-footer { padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important; }
 [role="dialog"] input, [role="dialog"] textarea, [role="dialog"] select {

@@ -14,25 +14,12 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useShareRecipients, useMyReposts, useSharingActions } from '@/hooks/useSharing';
 import { canRepostMedia, shareUrlFor, type SharePerson, type ShareTarget } from '@/lib/sharing';
-import { openNativeShare, smsShareHref } from '@/lib/shareLink';
+import { copyText, openNativeShare, smsShareHref } from '@/lib/shareLink';
 import { useAuth } from '@/contexts/AuthContext';
 
 async function copyLink(url: string) {
-  try {
-    await navigator.clipboard.writeText(url);
-    toast.success('Link copied');
-  } catch {
-    const area = document.createElement('textarea');
-    area.value = url;
-    area.style.position = 'fixed';
-    area.style.opacity = '0';
-    document.body.appendChild(area);
-    area.select();
-    const ok = document.execCommand('copy');
-    document.body.removeChild(area);
-    if (ok) toast.success('Link copied');
-    else toast.error('Could not copy link');
-  }
+  if (await copyText(url)) toast.success('Link copied');
+  else toast.error('Could not copy link', { description: url });
 }
 
 function PersonButton({
@@ -146,8 +133,9 @@ export function ShareSheet({
 
   return (
     <Sheet open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
-      <SheetContent side="bottom" className="z-[80] max-h-[85vh] rounded-t-[28px] px-4 pb-6 pt-4">
-        <SheetHeader className="space-y-1 text-left">
+      <SheetContent side="bottom" className="z-[80] max-h-[85vh] rounded-t-[28px] px-4 pb-6 pt-3">
+        {/* The built-in X sits at top-3, 44px tall; this row matches it so the title and X share a line. */}
+        <SheetHeader className="min-h-11 justify-center space-y-0 pr-12 text-left">
           <SheetTitle>Send</SheetTitle>
           <SheetDescription className="sr-only">Choose people, copy the link, or add it to your story</SheetDescription>
         </SheetHeader>

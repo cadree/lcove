@@ -53,6 +53,22 @@ export function revealDelta(
   return 0;
 }
 
+/**
+ * What to keep above the keyboard: the field plus its form's submit button
+ * when both fit, so people can see what they type and the button that sends it.
+ * Falls back to the field alone when the pair is taller than the visible area.
+ */
+export function revealTarget(
+  field: { top: number; bottom: number },
+  submit: { top: number; bottom: number } | null,
+  viewportHeight: number,
+  margin = 20,
+): { top: number; bottom: number } {
+  if (!submit || submit.bottom <= field.bottom) return field;
+  const pair = { top: Math.min(field.top, submit.top), bottom: Math.max(field.bottom, submit.bottom) };
+  return pair.bottom - pair.top <= viewportHeight - margin * 2 ? pair : field;
+}
+
 export function isTextEntry(element: Element | null): element is HTMLElement {
   if (!(element instanceof HTMLElement)) return false;
   if (element.isContentEditable) return true;

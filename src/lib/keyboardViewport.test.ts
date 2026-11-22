@@ -38,3 +38,17 @@ test("feed videos drop their source off screen and get an iOS first-frame hint",
   // Grid tiles without a saved cover show a frame 1s in (frame 0 is often black).
   assert.equal(feedVideoSource("https://cdn/v.mp4", true, 1), "https://cdn/v.mp4#t=1");
 });
+
+test("the submit button rides along with the focused field when both fit", async () => {
+  const { revealTarget } = await import("./keyboardViewport.ts");
+  const field = { top: 400, bottom: 444 };
+  const submit = { top: 470, bottom: 514 };
+  assert.deepEqual(revealTarget(field, submit, 450), { top: 400, bottom: 514 });
+  // Too tall together: the field alone.
+  assert.deepEqual(revealTarget({ top: 0, bottom: 44 }, { top: 500, bottom: 544 }, 450), { top: 0, bottom: 44 });
+  // No button, or the button sits above the field.
+  assert.deepEqual(revealTarget(field, null, 450), field);
+  assert.deepEqual(revealTarget(field, { top: 100, bottom: 144 }, 450), field);
+  // On a 508px visible area the pair needs a scroll that shows the button too.
+  assert.ok(revealDelta(revealTarget({ top: 430, bottom: 474 }, { top: 500, bottom: 548 }, 508), 0, 508) >= 60);
+});

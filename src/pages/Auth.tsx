@@ -485,8 +485,9 @@ const Auth = () => {
     }
   };
 
+  // html already pads the safe areas; padding them here too pushed the form a notch lower, toward the keyboard.
   return (
-    <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-start px-4 pb-4 pt-6 safe-area-all">
+    <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-start px-4 pb-4 pt-6">
       <PageMeta title="Sign in · Ether" description={HERO_TAGLINE} />
       {/* Offline indicator */}
       {!isOnline && (

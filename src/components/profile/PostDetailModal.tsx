@@ -189,8 +189,8 @@ export function PostDetailModal({
           </Button>
 
           <div className="flex flex-col md:flex-row h-full">
-            {/* Media Section */}
-            <div className="md:w-[60%] bg-black flex items-center justify-center relative">
+            {/* Media Section. On phones pt-14 keeps media below the close X, so a video's mute control can't cover it. */}
+            <div className="md:w-[60%] bg-black flex items-center justify-center relative pt-14 md:pt-0">
               {embed ? (
                 <EmbedPlayer embed={embed} title={post.embed_title || post.content} className="max-h-[60vh] md:max-h-[80vh]" />
               ) : post.media_type === 'video' ? (

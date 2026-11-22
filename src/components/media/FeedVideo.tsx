@@ -56,10 +56,22 @@ export function FeedVideo({ src, preload = "metadata", muted = true, playsInline
   useEffect(() => {
     const element = ref.current;
     if (!element || !playWhenVisible) return;
-    return watchVisible(element, (visible) => {
+    let visible = false;
+    const play = () => {
       if (visible && !document.hidden) void element.play().catch(() => undefined);
+    };
+    // The source is attached a moment after the card scrolls into view. A play()
+    // before that has nothing to play, so try again once the first frame is in.
+    element.addEventListener("loadeddata", play);
+    const stop = watchVisible(element, (next) => {
+      visible = next;
+      if (visible) play();
       else element.pause();
     });
+    return () => {
+      element.removeEventListener("loadeddata", play);
+      stop();
+    };
   }, [playWhenVisible]);
 
   useEffect(() => {
