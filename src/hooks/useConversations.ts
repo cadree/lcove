@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserBlocks } from '@/hooks/useUserBlocks';
 import { toast } from 'sonner';
 import { shotConversations, shotSessionEnabled } from '@/lib/shotSession';
+import { isHiddenForMe } from '@/lib/conversationHidden';
 
 interface Participant {
   user_id: string;
@@ -151,10 +152,32 @@ export function useConversations() {
         })
       );
 
+      // Chats this member removed from their list. Tolerate a missing table so
+      // the list still loads if the web ships before the migration.
+      const hiddenClient = supabase as unknown as {
+        from: (table: string) => {
+          select: (columns: string) => {
+            eq: (column: string, value: string) => Promise<{
+              data: { conversation_id: string; hidden_at: string }[] | null;
+              error: unknown;
+            }>;
+          };
+        };
+      };
+      const { data: hiddenRows, error: hiddenError } = await hiddenClient
+        .from('conversation_hidden')
+        .select('conversation_id, hidden_at')
+        .eq('user_id', user.id);
+      const hiddenMap = new Map(
+        hiddenError ? [] : (hiddenRows ?? []).map((row) => [row.conversation_id, row.hidden_at]),
+      );
+
       const unreadMap = new Map(unreadCounts.map(uc => [uc.convId, uc.count]));
       const mutedMap = new Map(participations.map(p => [p.conversation_id, p.is_muted]));
 
-      return (convos || []).map(conv => {
+      return (convos || [])
+        .filter((conv) => !isHiddenForMe(hiddenMap.get(conv.id), lastMessageMap.get(conv.id)?.created_at))
+        .map(conv => {
         const projectId = conv.project_id;
         return {
           ...conv,
@@ -249,41 +272,23 @@ export function useConversations() {
     },
   });
 
-  // Delete entire conversation (remove all messages then conversation)
+  // "Delete Chat" removes the chat from this member's list only. It never
+  // deletes the conversation, its messages or anyone's membership, so a
+  // project chat, a creative-trip chat and the other members' history stay
+  // intact. The chat comes back when someone sends a newer message.
   const deleteConversation = useMutation({
     mutationFn: async (conversationId: string) => {
       if (!user) throw new Error('Must be logged in');
-
-      // Delete all messages in conversation
-      const { error: msgError } = await supabase
-        .from('messages')
-        .delete()
-        .eq('conversation_id', conversationId);
-
-      if (msgError) throw msgError;
-
-      // Delete all participants
-      const { error: partError } = await supabase
-        .from('conversation_participants')
-        .delete()
-        .eq('conversation_id', conversationId);
-
-      if (partError) throw partError;
-
-      // Delete the conversation itself
-      const { error: convError } = await supabase
-        .from('conversations')
-        .delete()
-        .eq('id', conversationId);
-
-      if (convError) throw convError;
+      await callRpc<string>('hide_conversation_for_me', { p_conversation_id: conversationId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      toast.success('Conversation deleted');
+      toast.success('Chat removed from your list');
     },
-    onError: () => {
-      toast.error('Failed to delete conversation');
+    onError: (error) => {
+      toast.error('Failed to delete conversation', {
+        description: error instanceof Error ? error.message : undefined,
+      });
     },
   });
 
