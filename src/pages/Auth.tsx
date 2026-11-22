@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { PENDING_SIGNUP_KEY, applyPendingSignupProfile, inviteTokenFromMetadata } from '@/lib/pendingSignup';
+import { displayNameError } from '@/lib/displayName';
 import { normalizedMemberReferralCode, type MemberReferralPreview } from '@/lib/memberReferrals';
 import { callRpc } from '@/lib/rpc';
 import { captureSignupAttribution } from '@/lib/signupAttribution';
@@ -25,7 +26,11 @@ import { eventReturnPath, rememberEventReturn } from '../../functions/_shared/ev
 const signupSchema = z.object({
   email: z.string().email('Please enter a valid email').max(255),
   password: z.string().min(8, 'Password must be at least 8 characters').max(100),
-  displayName: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name must be less than 50 characters'),
+  // Same rule as onboarding, so a name sign-up accepts never stalls step 1.
+  displayName: z.string().superRefine((value, ctx) => {
+    const message = displayNameError(value);
+    if (message) ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+  }),
 });
 
 const loginSchema = z.object({
@@ -683,6 +688,7 @@ const Auth = () => {
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
                         type="email"
+                        autoComplete="email"
                         placeholder="Email *"
                         value={email}
                         onChange={(e) => {
@@ -703,6 +709,8 @@ const Auth = () => {
                       <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
                         type="text"
+                        autoComplete="name"
+                        autoCapitalize="words"
                         placeholder="Your name *"
                         value={displayName}
                         onChange={(e) => setDisplayName(e.target.value)}

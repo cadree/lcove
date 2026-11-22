@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { identityFromMetadata } from '@/lib/pendingSignup';
+import { displayNameError, prefillName } from '@/lib/displayName';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -88,7 +89,7 @@ const Onboarding = () => {
   useEffect(() => {
     const fromMeta = identityFromMetadata(user?.user_metadata);
     if (!displayNameRef.current) {
-      const nextName = profile?.display_name || fromMeta.displayName || '';
+      const nextName = prefillName(profile?.display_name || fromMeta.displayName);
       if (nextName) setData(prev => ({ ...prev, displayName: nextName }));
     }
     if (!memberOfRef.current) {
@@ -141,11 +142,12 @@ const Onboarding = () => {
     saveErrorToast.current = null;
     setSaving(true);
 
-    // Final validation - name is required
-    if (!data.displayName.trim()) {
+    // Final validation - the name step checks the same rule.
+    const nameError = displayNameError(data.displayName);
+    if (nameError) {
       toast({
-        title: 'Name required',
-        description: 'Please go back and enter your name to complete onboarding.',
+        title: 'Check your name',
+        description: nameError,
         variant: 'destructive'
       });
       setCurrentStep(0);
