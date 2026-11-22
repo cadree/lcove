@@ -31,6 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ApplicantSocialLinks } from "@/components/admin/ApplicantSocialLinks";
 import {
   Dialog,
   DialogContent,
@@ -719,7 +720,6 @@ function MemberDetailSheet({
     onClose();
     fn(member);
   };
-  const links = Object.entries(detail?.social_links ?? {}).filter(([, v]) => !!v);
   return (
     <Sheet open={!!member} onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
@@ -783,14 +783,10 @@ function MemberDetailSheet({
                         </div>
                       ),
                   )}
-                  {links.length > 0 && (
+                  {detail.social_links && Object.values(detail.social_links).some((value) => !!value?.trim()) && (
                     <div>
                       <p className="mb-1 text-xs text-muted-foreground">Links</p>
-                      {links.map(([key, value]) => (
-                        <p key={key} className="truncate">
-                          <span className="capitalize text-muted-foreground">{key}:</span> {value}
-                        </p>
-                      ))}
+                      <ApplicantSocialLinks links={detail.social_links} />
                     </div>
                   )}
                 </div>

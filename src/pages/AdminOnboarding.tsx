@@ -20,7 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useIsAdmin, useAllUsers, useQuestionnaireResponses, useChangeAccessStatus } from '@/hooks/useAdmin';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
-import { normalizeApplicantLink } from '@/lib/applicantLinks';
+import { ApplicantSocialLinks } from "@/components/admin/ApplicantSocialLinks";
 import { MemberReferralReview } from "@/components/membership/MemberReferralReview";
 
 const MAX_PASSIONS = 10;
@@ -396,21 +396,10 @@ const AdminOnboarding: React.FC = () => {
               <Card>
                 <CardHeader><CardTitle className="text-lg">Application links</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
-                  {(['social_profile', 'website'] as const).map((key) => {
-                    const input = selectedUser.social_links?.[key] || '';
-                    const url = normalizeApplicantLink(input);
-                    if (!url) return null;
-                    return (
-                      <div key={key} className="min-w-0">
-                        <p className="text-xs text-muted-foreground">{key === 'social_profile' ? 'Social media' : 'Website / portfolio'}</p>
-                        <a href={url} target="_blank" rel="noopener noreferrer"
-                          className="block break-all text-sm text-primary underline">{url}</a>
-                      </div>
-                    );
-                  })}
-                  {!selectedUser.social_links?.social_profile && !selectedUser.social_links?.website && (
-                    <p className="text-sm text-muted-foreground">No application links on file (older account).</p>
-                  )}
+                  <ApplicantSocialLinks
+                    links={selectedUser.social_links}
+                    emptyText="No application links on file (older account)."
+                  />
                 </CardContent>
               </Card>
 
