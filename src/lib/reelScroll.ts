@@ -18,13 +18,15 @@ type Frame = (callback: () => void) => unknown;
 /** Puts the scroller at slide `index` without letting snapping pull it back. */
 export function jumpToSlide(element: Scroller, index: number, frame: Frame): void {
   const top = () => index * element.clientHeight;
-  const previous = element.style.scrollSnapType;
+  // Snapping comes from the class; restore by clearing the inline override.
+  // Saving the old inline value breaks when two jumps overlap (React
+  // StrictMode runs layout effects twice), leaving snapping off for good.
   element.style.scrollSnapType = "none";
   element.scrollTop = top();
   frame(() => {
     element.scrollTop = top();
     frame(() => {
-      element.style.scrollSnapType = previous;
+      element.style.scrollSnapType = "";
     });
   });
 }

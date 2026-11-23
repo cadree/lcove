@@ -25,3 +25,13 @@ test("jumping turns snapping off, holds the position for a frame, then restores 
   assert.equal(el.style.scrollSnapType, "");
   assert.equal(frames.length, 0);
 });
+
+test("two overlapping jumps still leave snapping on", () => {
+  const frames: Array<() => void> = [];
+  const el = { scrollTop: 0, clientHeight: 800, style: { scrollSnapType: "" } };
+  jumpToSlide(el, 2, (cb) => frames.push(cb));
+  jumpToSlide(el, 2, (cb) => frames.push(cb));
+  while (frames.length) frames.shift()!();
+  assert.equal(el.style.scrollSnapType, "");
+  assert.equal(el.scrollTop, 1600);
+});
