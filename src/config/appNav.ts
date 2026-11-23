@@ -3,7 +3,6 @@ import {
   Crown,
   FolderKanban,
   Heart,
-  Radio,
   Shirt,
   ShoppingBag,
   Store,
@@ -33,6 +32,5 @@ export const moreNavItems: AppNavItem[] = [
   { id: "fund", label: "Fund", path: "/fund", icon: Heart },
   { id: "membership", label: "Membership", path: "/membership", icon: Crown, iosHidden: true },
   { id: "live", label: "Live", path: "/live", icon: Video },
-  { id: "cinema", label: "Cinema", path: "/cinema", icon: Radio },
   { id: "nuance", label: "Nuance", path: "/nuance", icon: Shirt },
 ];

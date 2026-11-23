@@ -7,7 +7,6 @@ import {
   Radio,
   MessageCircle,
   Users,
-  Video,
   Wallet
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -27,7 +26,6 @@ const benefits = [
   { icon: Radio, title: "Live" },
   { icon: MessageCircle, title: "Messages" },
   { icon: Users, title: "Community" },
-  { icon: Video, title: "Cinema" },
   { icon: Wallet, title: "Wallet" },
 ];
 

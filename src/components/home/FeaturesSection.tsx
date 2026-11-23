@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { revealMotion } from "@/lib/reveal";
 import { Link } from "react-router-dom";
-import { Users, FolderKanban, Calendar, Coins, Store, Music, Heart, ArrowRight, Film, Handshake, Radio, Megaphone } from "lucide-react";
+import { Users, FolderKanban, Calendar, Coins, Store, Music, Heart, ArrowRight, Handshake, Radio, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useFundStats } from "@/hooks/useFundStats";
 
@@ -17,12 +17,6 @@ const features = [
     title: "Project Calls",
     description: "Structured collaboration. Post roles, find talent, build together. No mass DMs.",
     link: "/projects",
-  },
-  {
-    icon: Film,
-    title: "Creator Networks",
-    description: "Launch your own streaming network. Share films, series, and content with subscribers.",
-    link: "/cinema",
   },
   {
     icon: Calendar,
