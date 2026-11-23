@@ -11,7 +11,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, inviteToken?: string, profile?: { displayName?: string; memberOf?: string }, referralCode?: string) => Promise<{ error: Error | null; session: Session | null }>;
+  signUp: (email: string, password: string, inviteToken?: string, profile?: { displayName?: string; memberOf?: string }, referralCode?: string) => Promise<{ error: Error | null; session: Session | null; user: User | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
@@ -122,7 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logAuthEvent('Sign up successful', { hasSession: !!data.session });
     }
     
-    return { error, session: data.session };
+    return { error, session: data.session, user: data.user };
   };
 
   const signIn = async (email: string, password: string) => {
