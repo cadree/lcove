@@ -16,6 +16,7 @@ import { PageMeta } from '@/components/seo/PageMeta';
 import { EMAIL_CONFIRMED_BODY, EMAIL_CONFIRMED_TITLE, HERO_TAGLINE, VERIFY_SIGNAL_BODY, VERIFY_SIGNAL_TITLE } from '@/content/copy';
 import { getAuthRedirectUrl } from '@/lib/capacitorStorage';
 import { resendCooldownRemaining } from '@/lib/resendCooldown';
+import { emailSendingHelp, signupEmailDeliveryFailed } from '@/lib/authEmailErrors';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { logAuthEvent, logAuthError } from '@/lib/authDebug';
@@ -51,7 +52,15 @@ type AuthMode = 'login' | 'signup' | 'forgot' | 'reset' | 'confirm-email' | 'con
 /**
  * Map Supabase auth errors to user-friendly messages
  */
-const getAuthErrorMessage = (error: Error): { title: string; description: string } => {
+const getAuthErrorMessage = (error: Error & { code?: string; status?: number }): { title: string; description: string } => {
+  const quotaHelp = emailSendingHelp(error);
+  if (quotaHelp) return quotaHelp;
+  if (signupEmailDeliveryFailed(error)) {
+    return {
+      title: 'Email confirmation temporarily unavailable',
+      description: 'Your signup may have been saved, but a confirmation email could not be sent. Use the resend option once email sending is available, or sign in if you already verified your email.',
+    };
+  }
   const message = error.message.toLowerCase();
   
   // Network errors
@@ -137,6 +146,7 @@ const Auth = () => {
   const [isVerifyingCode, setIsVerifyingCode] = useState(false);
   const [resendNow, setResendNow] = useState(() => Date.now());
   const [isResending, setIsResending] = useState(false);
+  const [resendHelp, setResendHelp] = useState<string | null>(null);
   const inviteToken = searchParams.get('invite')?.trim() ?? '';
   const referralCode = normalizedMemberReferralCode(searchParams.get('ref'));
   const [referralPreview, setReferralPreview] = useState<MemberReferralPreview | null>(null);
@@ -175,10 +185,12 @@ const Auth = () => {
   const resendWaitMs = resendCooldownRemaining(confirmationSentAt, resendNow);
 
   const handleResendConfirmation = async () => {
-    if (resendWaitMs > 0 || isResending || !emailSchema.safeParse({ email }).success) {
+    if (isResending || resendWaitMs > 0) return;
+    if (!emailSchema.safeParse({ email }).success) {
       setErrors({ email: 'Enter your signup email to request a new code.' });
       return;
     }
+    setResendHelp(null);
     setIsResending(true);
     const { error } = await supabase.auth.resend({
       type: 'signup',
@@ -192,9 +204,11 @@ const Auth = () => {
     setIsResending(false);
     if (error) {
       const { title, description } = getAuthErrorMessage(error);
+      setResendHelp(description);
       toast({ title, description, variant: 'destructive' });
       return;
     }
+    setResendHelp(null);
     setEmailCode('');
     setMode('confirm-email');
     setConfirmationSentAt(Date.now());
@@ -415,7 +429,14 @@ const Auth = () => {
           logAuthError('Signup failed', error);
           const { title, description } = getAuthErrorMessage(error);
           toast({ title, description, variant: 'destructive' });
-          if (/already registered|already exists/i.test(error.message)) {
+          if (signupEmailDeliveryFailed(error)) {
+            // Supabase can create an unverified account before SMTP fails.
+            // Keep its email and offer resend instead of trapping the user
+            // in repeated account creation attempts.
+            setResendHelp(description);
+            setConfirmationSentAt(null);
+            setMode('confirm-email');
+          } else if (/already registered|already exists/i.test(error.message)) {
             setMode('login');
             toast({ title: 'Resume your application', description: 'Your account already exists. Sign in with your original password, or reset it below.' });
           }
@@ -620,6 +641,9 @@ const Auth = () => {
               >
                 {isVerifyingCode ? 'Verifying' : 'Verify'}
               </Button>
+              {resendHelp && (
+                <p role="alert" className="mb-3 text-sm leading-relaxed text-muted-foreground">{resendHelp}</p>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -637,6 +661,10 @@ const Auth = () => {
                 className="w-full"
               >
                 Already verified? Sign in to finish your application
+              </Button>
+              <Button type="button" variant="ghost" className="mt-2 w-full"
+                onClick={() => { setResendHelp(null); setMode('signup'); }}>
+                Return to Join
               </Button>
             </div>
           ) : resetEmailSent && mode === 'forgot' ? (

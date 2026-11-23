@@ -1,4 +1,5 @@
-export const RESEND_COOLDOWN_MS = 30_000;
+// Match the standard one-minute Auth resend frequency guard.
+export const RESEND_COOLDOWN_MS = 60_000;
 
 export function resendCooldownRemaining(
   sentAtMs: number | null,

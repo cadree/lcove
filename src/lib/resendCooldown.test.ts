@@ -3,6 +3,10 @@ import { describe, it } from "node:test";
 import { RESEND_COOLDOWN_MS, resendCooldownRemaining } from "./resendCooldown.ts";
 
 describe("resendCooldownRemaining", () => {
+  it("uses a full one-minute cooldown", () => {
+    assert.equal(RESEND_COOLDOWN_MS, 60_000);
+  });
+
   it("blocks resend until the cooldown elapses", () => {
     const sentAt = 1_000;
     assert.equal(resendCooldownRemaining(sentAt, sentAt), RESEND_COOLDOWN_MS);
