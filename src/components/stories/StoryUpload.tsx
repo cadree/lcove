@@ -35,12 +35,14 @@ import {
   recordingExtension,
   setTrackTorch,
   setTrackZoom,
+  shutterRelease,
   startStoryCamera,
   stopStoryCamera,
   trackHasTorch,
   trackZoom,
   trackZoomRange,
   videoTrackFrom,
+  type ShutterPhase,
   type StoryFacing,
   type ZoomRange,
 } from "@/lib/storyCamera";
@@ -102,7 +104,8 @@ const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
   const pinchPointsRef = useRef(new Map<number, { x: number; y: number }>());
   const pinchRef = useRef<{ gap: number; zoom: number } | null>(null);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pressRef = useRef<{ pointerId: number; recording: boolean } | null>(null);
+  /** The shutter press in progress, keyed by touch or pointer id. */
+  const pressRef = useRef<{ key: string; phase: ShutterPhase } | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordFrameRef = useRef(0);
   const audioRef = useRef<MediaStreamTrack | null>(null);
@@ -172,6 +175,7 @@ const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
 
   const stopCamera = useCallback(() => {
     stopRecorder(true);
+    pressRef.current = null;
     wantedRef.current = false;
     const stream = streamRef.current;
     streamRef.current = null;
@@ -419,52 +423,55 @@ const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
 
   const startRecording = async () => {
     const press = pressRef.current;
-    const stream = streamRef.current;
-    const track = videoTrackFrom(stream);
-    if (!press || !track) return;
+    if (!press || press.phase !== "pressing") return;
+    const track = videoTrackFrom(streamRef.current);
+    // Camera not ready: stay a tap, so letting go says the camera is still starting.
+    if (!track) return;
     if (typeof MediaRecorder === "undefined") {
-      toast.error("This phone cannot record video here yet. Tap to take a photo instead.");
+      press.phase = "unsupported";
+      toast.error("Video recording is not available on this phone yet. Tap for a photo.");
       return;
     }
-    press.recording = true;
+    press.phase = "starting";
     setRecording(true);
     setRecordProgress(0);
     const audio = await storyAudioTrack(700);
-    if (pressRef.current !== press) {
-      // Let go while the mic was starting: nothing to record.
+    if (pressRef.current !== press || press.phase !== "starting") {
+      // Let go while the mic was starting: that press already became a photo.
       audio?.stop();
-      setRecording(false);
       return;
     }
     audioRef.current = audio;
     const mimeType = pickStoryRecorderType((type) => MediaRecorder.isTypeSupported(type)) ?? "";
     const clip: RecordedClip = { mirror: facingFromTrack(track, facing) === "user", zoom: screenZoom };
-    let recorder: MediaRecorder;
+    const chunks: Blob[] = [];
+    const startedAt = performance.now();
     try {
       const source = new MediaStream(audio ? [track, audio] : [track]);
-      recorder = new MediaRecorder(source, mimeType ? { mimeType, videoBitsPerSecond: 6_000_000 } : undefined);
+      const recorder = new MediaRecorder(source, mimeType ? { mimeType, videoBitsPerSecond: 6_000_000 } : undefined);
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) chunks.push(event.data);
+      };
+      recorder.onstop = () => finishRecording(chunks, recorder.mimeType || mimeType, startedAt, clip);
+      // iOS writes mp4 only on stop; a timeslice there can drop the moov box.
+      if (recorder.mimeType.startsWith("video/mp4") || mimeType.startsWith("video/mp4")) recorder.start();
+      else recorder.start(1000);
+      recorderRef.current = recorder;
     } catch (error) {
       audio?.stop();
       audioRef.current = null;
-      press.recording = false;
+      press.phase = "unsupported";
       setRecording(false);
-      toast.error(errorMessage(error, "Could not start recording"));
+      toast.error(errorMessage(error, "Could not start recording. Tap for a photo."));
       return;
     }
-    const chunks: Blob[] = [];
-    const startedAt = performance.now();
-    recorder.ondataavailable = (event) => {
-      if (event.data && event.data.size > 0) chunks.push(event.data);
-    };
-    recorder.onstop = () => finishRecording(chunks, recorder.mimeType || mimeType, startedAt, clip);
-    recorderRef.current = recorder;
-    // iOS writes mp4 only on stop; a timeslice there can drop the moov box.
-    if (recorder.mimeType.startsWith("video/mp4") || mimeType.startsWith("video/mp4")) recorder.start();
-    else recorder.start(1000);
+    press.phase = "recording";
     const tick = () => {
       const elapsed = performance.now() - startedAt;
       setRecordProgress(Math.min(1, elapsed / STORY_MAX_RECORD_MS));
       if (elapsed >= STORY_MAX_RECORD_MS) {
+        // 15s cap: the finger may still be down, so this press is over now.
+        if (pressRef.current === press) pressRef.current = null;
         stopRecorder(false);
         return;
       }
@@ -473,36 +480,88 @@ const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
     recordFrameRef.current = requestAnimationFrame(tick);
   };
 
-  const onShutterDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (starting || pressRef.current) return;
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    event.preventDefault();
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {
-      /* synthetic events */
+  const beginShutterPress = (key: string) => {
+    const stale = pressRef.current;
+    if (stale) {
+      // A press whose lift never arrived (a system sheet or alert took the touch) must
+      // not leave the shutter dead. A new touch during a recording stops it.
+      pressRef.current = null;
+      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+      if (stale.phase === "recording") {
+        stopRecorder(false);
+        return;
+      }
+      if (stale.phase === "starting") setRecording(false);
     }
-    pressRef.current = { pointerId: event.pointerId, recording: false };
+    pressRef.current = { key, phase: "pressing" };
     holdTimerRef.current = setTimeout(() => {
       holdTimerRef.current = null;
       void startRecording();
     }, STORY_HOLD_TO_RECORD_MS);
   };
 
-  const onShutterUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const endShutterPress = (key: string, cancelled: boolean) => {
     const press = pressRef.current;
-    if (!press || press.pointerId !== event.pointerId) return;
+    if (!press || press.key !== key) return;
     pressRef.current = null;
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-    if (press.recording) {
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    holdTimerRef.current = null;
+    const action = shutterRelease(press.phase, cancelled);
+    if (action === "stop-recording") {
       stopRecorder(false);
       return;
     }
-    if (event.type === "pointerup") void takePhoto();
+    if (press.phase === "starting") setRecording(false);
+    if (action === "photo") void takePhoto();
   };
+
+  // Native listeners: React's touchstart is passive, and the shutter has to claim the
+  // touch (preventDefault) or iOS hands it to its own tap, long-press and callout
+  // gestures, which end the press with a cancel instead of a lift.
+  const [shutter, setShutter] = useState<HTMLButtonElement | null>(null);
+  const shutterPressRef = useRef({ begin: beginShutterPress, end: endShutterPress });
+  shutterPressRef.current = { begin: beginShutterPress, end: endShutterPress };
+  useEffect(() => {
+    if (!shutter) return;
+    const hasTouch = typeof window !== "undefined" && "ontouchstart" in window;
+    const onTouchStart = (event: TouchEvent) => {
+      if (event.cancelable) event.preventDefault();
+      const touch = event.changedTouches[0];
+      if (touch && event.touches.length === 1) shutterPressRef.current.begin(`t${touch.identifier}`);
+    };
+    const onTouchEnd = (event: TouchEvent) => {
+      if (event.cancelable) event.preventDefault();
+      for (const touch of Array.from(event.changedTouches)) {
+        shutterPressRef.current.end(`t${touch.identifier}`, event.type === "touchcancel");
+      }
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      // Touch goes through the touch listeners where the browser has them.
+      if (event.pointerType === "touch" && hasTouch) return;
+      if (event.button !== 0) return;
+      const key = `p${event.pointerId}`;
+      shutterPressRef.current.begin(key);
+      const onUp = (up: PointerEvent) => {
+        if (up.pointerId !== event.pointerId) return;
+        window.removeEventListener("pointerup", onUp, true);
+        window.removeEventListener("pointercancel", onUp, true);
+        shutterPressRef.current.end(key, up.type === "pointercancel");
+      };
+      window.addEventListener("pointerup", onUp, true);
+      window.addEventListener("pointercancel", onUp, true);
+    };
+    shutter.addEventListener("touchstart", onTouchStart, { passive: false });
+    shutter.addEventListener("touchend", onTouchEnd, { passive: false });
+    shutter.addEventListener("touchcancel", onTouchEnd);
+    shutter.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      shutter.removeEventListener("touchstart", onTouchStart);
+      shutter.removeEventListener("touchend", onTouchEnd);
+      shutter.removeEventListener("touchcancel", onTouchEnd);
+      shutter.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [shutter]);
 
   const toggleTorch = async () => {
     const track = videoTrackFrom(streamRef.current);
@@ -681,20 +740,18 @@ const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
                       </ChromeButton>
                       <button
                         type="button"
+                        ref={setShutter}
                         data-story-shutter
                         data-press="none"
                         aria-label={recording ? "Recording. Let go to stop." : "Take photo. Hold to record video."}
-                        onPointerDown={onShutterDown}
-                        onPointerUp={onShutterUp}
-                        onPointerCancel={onShutterUp}
                         onContextMenu={(event) => event.preventDefault()}
                         onClick={(event) => {
                           // Keyboard and screen readers have no hold: Enter or Space takes a photo.
                           if (event.detail === 0) void takePhoto();
                         }}
-                        disabled={starting}
                         className={cn(
-                          "relative flex h-[76px] w-[76px] items-center justify-center rounded-full transition-transform duration-200 ease-out [-webkit-touch-callout:none] disabled:opacity-50",
+                          "relative flex h-[76px] w-[76px] items-center justify-center rounded-full transition-transform duration-200 ease-out [-webkit-touch-callout:none]",
+                          starting && "opacity-50",
                           recording && "scale-[1.18]",
                         )}
                       >

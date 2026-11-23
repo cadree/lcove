@@ -17,6 +17,7 @@ import {
   pinchZoom,
   recordingExtension,
   setTrackZoom,
+  shutterRelease,
   trackZoomRange,
   zoomCrop,
 } from "./storyCamera.ts";
@@ -219,5 +220,24 @@ describe("story recording format", () => {
     assert.equal(pickStoryRecorderType(() => { throw new Error("unknown"); }), null);
     assert.equal(recordingExtension("video/mp4"), "mp4");
     assert.equal(recordingExtension("video/webm;codecs=vp8"), "webm");
+  });
+});
+
+describe("shutterRelease", () => {
+  it("takes a photo on a quick tap, even when iOS ends it with a cancel", () => {
+    assert.equal(shutterRelease("pressing", false), "photo");
+    assert.equal(shutterRelease("pressing", true), "photo");
+  });
+  it("stops a running recording on lift or cancel", () => {
+    assert.equal(shutterRelease("recording", false), "stop-recording");
+    assert.equal(shutterRelease("recording", true), "stop-recording");
+  });
+  it("treats a short hold that let go before recording began as a tap", () => {
+    assert.equal(shutterRelease("starting", false), "photo");
+    assert.equal(shutterRelease("starting", true), "none");
+  });
+  it("does nothing more after a hold on a device that cannot record", () => {
+    assert.equal(shutterRelease("unsupported", false), "none");
+    assert.equal(shutterRelease("unsupported", true), "none");
   });
 });
