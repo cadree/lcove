@@ -1,12 +1,14 @@
 import { FeedVideo } from "@/components/media/FeedVideo";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, Play } from "lucide-react";
+import { Heart, Loader2, MessageCircle, Play } from "lucide-react";
+import { useFeedCardState } from "@/hooks/feedCardState";
+import { compactCount } from "@/lib/feedEngagement";
 import FeedPost from "@/components/feed/FeedPost";
 import { usePosts } from "@/hooks/usePosts";
 import { FeedEngagementProvider } from "@/hooks/useFeedEngagement";
 import { ReelViewer } from "@/components/explore/ReelViewer";
-import { browsePosts, collectReels, growVisibleCount, matchesBrowseQuery } from "@/lib/exploreBrowse";
+import { browsePosts, collectReels, growVisibleCount, matchesBrowseQuery, type BrowseReel } from "@/lib/exploreBrowse";
 
 const PAGE = 6;
 type Lane = "reels" | "posts" | "portfolios";
@@ -92,26 +94,16 @@ export function ExploreBrowse({ query, heading }: { query: string; heading?: Rea
         reels.length === 0 ? (
           <EmptyCopy title="No reels yet" detail="Video posts from other people show up here." />
         ) : (
-          // Tiles show a still frame; tapping one opens the full-screen viewer.
-          <div className="grid grid-cols-2 gap-2">
+          // Tiles show a still frame; tapping one opens the full-screen viewer. Each tile is a
+          // rounded media card with the author on it and the caption in its own card below.
+          <FeedEngagementProvider postIds={shownReels.map((reel) => reel.postId ?? "")}>
+          <div className="grid grid-cols-2 gap-x-2.5 gap-y-3">
             {shownReels.map((reel, index) => (
-              <button
-                key={reel.id}
-                type="button"
-                data-testid="reel-tile"
-                onClick={() => setOpenReel(index)}
-                aria-label={`Watch reel by ${reel.name}`}
-                className="relative aspect-[9/16] overflow-hidden rounded-[14px] bg-black text-left"
-              >
-                <FeedVideo src={reel.mediaUrl} className="h-full w-full object-cover" frameAt={1} />
-                <Play className="absolute right-2 top-2 h-5 w-5 fill-white text-white drop-shadow" />
-                <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 px-3 pb-2 pt-6 font-body text-xs font-extrabold text-white">
-                  {reel.name}
-                </span>
-              </button>
+              <ReelTile key={reel.id} reel={reel} onOpen={() => setOpenReel(index)} />
             ))}
             {heading === undefined && <div ref={sentinel} className="col-span-2 h-1" />}
           </div>
+          </FeedEngagementProvider>
         )
       ) : shownPosts.length === 0 ? (
         <EmptyCopy
@@ -140,6 +132,40 @@ export function ExploreBrowse({ query, heading }: { query: string; heading?: Rea
       {!loading && atEnd && heading === undefined && <p className="mono-label py-6 text-center text-[10px] text-muted-foreground">You're all caught up</p>}
       {openReel !== null && <ReelViewer reels={reels} start={openReel} onClose={closeReel} />}
     </section>
+  );
+}
+
+function ReelTile({ reel, onOpen }: { reel: BrowseReel; onOpen: () => void }) {
+  const { likesCount, commentCount } = useFeedCardState(reel.postId ?? "");
+  return (
+    <div className="min-w-0 space-y-1.5">
+      <button
+        type="button"
+        data-testid="reel-tile"
+        onClick={onOpen}
+        aria-label={`Watch reel by ${reel.name}`}
+        className="relative block aspect-[9/16] w-full overflow-hidden rounded-[22px] border border-border bg-black text-left shadow-[0_14px_30px_-20px_rgba(0,0,0,.7)]"
+      >
+        <FeedVideo src={reel.mediaUrl} className="h-full w-full object-cover" frameAt={1} />
+        <span className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/45 to-transparent" />
+        <span className="absolute left-2 top-2 flex max-w-[calc(100%-3rem)] items-center gap-1.5 rounded-full border border-white/20 bg-black/35 py-0.5 pl-0.5 pr-2.5 text-white backdrop-blur-md">
+          <span className="block h-6 w-6 shrink-0 overflow-hidden rounded-full bg-white/20">
+            {reel.avatarUrl ? <img src={reel.avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full items-center justify-center text-[10px]">{reel.name.charAt(0)}</span>}
+          </span>
+          <span className="truncate font-body text-[11px] font-extrabold">{reel.name}</span>
+        </span>
+        <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/35 backdrop-blur-md">
+          <Play className="ml-0.5 h-3.5 w-3.5 fill-white text-white" />
+        </span>
+        <span className="absolute bottom-2 left-2 flex items-center gap-2 rounded-full border border-white/20 bg-black/35 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
+          <span className="flex items-center gap-1"><Heart className="h-3 w-3" aria-hidden />{compactCount(likesCount)}</span>
+          <span className="flex items-center gap-1"><MessageCircle className="h-3 w-3" aria-hidden />{compactCount(commentCount)}</span>
+        </span>
+      </button>
+      {reel.caption && (
+        <p className="line-clamp-2 rounded-[16px] border border-border bg-card px-3 py-2 text-[12px] leading-snug text-foreground/90">{reel.caption}</p>
+      )}
+    </div>
   );
 }
 

@@ -3,6 +3,10 @@ export interface BrowseReel {
   userId: string;
   name: string;
   mediaUrl: string;
+  /** For the tile's author chip and caption line. */
+  avatarUrl?: string | null;
+  caption?: string | null;
+  postId?: string;
 }
 
 interface PostLike {
@@ -12,7 +16,7 @@ interface PostLike {
   media_type: string | null;
   post_type?: string | null;
   content?: string | null;
-  profile?: { display_name?: string | null } | null;
+  profile?: { display_name?: string | null; avatar_url?: string | null } | null;
   upload_job_id?: string | null;
 }
 
@@ -32,6 +36,9 @@ export function collectReels(posts: PostLike[]): BrowseReel[] {
       userId: post.user_id,
       name: post.profile?.display_name || "Member",
       mediaUrl: post.media_url as string,
+      avatarUrl: post.profile?.avatar_url ?? null,
+      caption: post.content?.trim() || null,
+      postId: post.id,
     }));
 }
 

@@ -11,6 +11,8 @@ export function useFeedCardState(postId: string) {
     likesCount: like.count,
     hasLiked: like.hasLiked,
     isSaved: context.saved.has(postId),
+    commentCount: context.comments[postId] ?? 0,
+    reactors: (context.likers[postId] ?? []).map((id) => ({ id, ...(context.reactors[id] ?? { name: "Member", avatarUrl: null }) })),
     likesError: context.likesError,
     toggleLike: context.toggleLike,
     toggleSave: context.toggleSave,

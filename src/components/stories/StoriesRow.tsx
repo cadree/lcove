@@ -110,15 +110,18 @@ const StoriesRow = ({ showUser }: StoriesRowProps = {}) => {
         if (userStories.length > 0) handleOpenStory(user.id);
         else setShowUpload(true);
       }} className="relative shrink-0 group">
-            <div className="w-20 h-20 rounded-full relative">
-              {/* Glass ring */}
-              <div className="absolute inset-0 rounded-full bg-[conic-gradient(from_120deg,#C4142D,#FF9FC8,#C4142D)] p-[2px]">
-                <div className="w-full h-full rounded-full bg-card p-[2px]">
-                  <div className="w-full h-full rounded-full overflow-hidden bg-muted flex items-center justify-center">
-                    {userStories.length > 0 && userStories[0].media_url ? <img src={userStories[0].media_url} alt="Your story" className="w-full h-full object-cover" /> : <Plus className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />}
+            <div className="relative h-[92px] w-[76px]">
+              {userStories.length > 0 && userStories[0].media_url ? (
+                <div className="absolute inset-0 rounded-[26px] bg-[linear-gradient(160deg,#ffc6de,#ff9fc8_45%,#c4142d)] p-[2.5px]">
+                  <div className="h-full w-full rounded-[24px] bg-card p-[2px]">
+                    <img src={userStories[0].media_url} alt="Your story" className="h-full w-full rounded-[22px] object-cover" />
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center rounded-[26px] border border-border bg-muted/70 shadow-[inset_0_1px_0_rgba(255,255,255,.25)] backdrop-blur">
+                  <Plus className="h-6 w-6 text-muted-foreground transition-colors group-hover:text-foreground" />
+                </div>
+              )}
               {userStories.length > 0 && (
                 <span
                   role="button"
@@ -140,13 +143,13 @@ const StoriesRow = ({ showUser }: StoriesRowProps = {}) => {
                 </span>
               )}
             </div>
-            <span className="text-[10px] text-foreground mt-1.5 block text-center truncate w-20 font-body">
-              Your story
+            <span className="mt-1.5 block w-[76px] truncate text-center font-body text-[11px] font-semibold text-foreground">
+              {userStories.length > 0 ? "Your story" : "Add story"}
             </span>
           </motion.div>}
 
         {isLoading && [0, 1, 2, 3].map((slot) => (
-          <div key={slot} className="h-20 w-20 shrink-0 animate-pulse rounded-full bg-muted" />
+          <div key={slot} className="h-[92px] w-[76px] shrink-0 animate-pulse rounded-[26px] bg-muted" />
         ))}
 
         {/* Other Users' Stories */}
