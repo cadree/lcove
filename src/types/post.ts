@@ -39,4 +39,6 @@ export interface ComposePostInput {
   altText?: string;
   commentsEnabled?: boolean;
   embed?: EmbedDraft;
+  /** Cover image for a video post: a picked frame or an uploaded still. */
+  cover?: File | null;
 }

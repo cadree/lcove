@@ -54,6 +54,14 @@ const Messages = () => {
     }
   }, [actionParam, user, setSearchParams]);
 
+  // Lock the document while a thread is open so the header cannot scroll
+  // under the iOS status bar, and so only the message list scrolls.
+  useEffect(() => {
+    if (!selectedConversation) return;
+    document.documentElement.classList.add('ether-thread-open');
+    return () => document.documentElement.classList.remove('ether-thread-open');
+  }, [selectedConversation]);
+
   if (!user) {
     return (
       <PageLayout>
@@ -83,8 +91,18 @@ const Messages = () => {
   }
 
   return (
-    <PageLayout hideNav={!!selectedConversation} showNotificationBell={false}>
-      <div className="h-[calc(100dvh-env(safe-area-inset-bottom,0px))] md:h-screen flex flex-col md:flex-row">
+    <PageLayout
+      hideNav={!!selectedConversation}
+      showNotificationBell={false}
+      className={selectedConversation ? 'h-full !p-0' : undefined}
+    >
+      <div
+        className={
+          selectedConversation
+            ? 'flex h-full min-h-0 flex-col overflow-hidden md:flex-row'
+            : 'flex h-[calc(100dvh-env(safe-area-inset-bottom,0px))] flex-col md:h-screen md:flex-row'
+        }
+      >
         {/* Conversation List */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}

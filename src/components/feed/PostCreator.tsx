@@ -11,6 +11,7 @@ import { InlineError } from '@/components/ui/inline-error';
 import { writeError } from '@/lib/writeError';
 import { assertCleanText } from '@/lib/objectionableText';
 import type { EmbedDraft } from '@/lib/videoEmbed';
+import { VideoCoverPicker, type CoverChoice } from '@/components/media/VideoCoverPicker';
 interface PostCreatorProps {
   avatarUrl?: string | null;
   displayName?: string | null;
@@ -33,6 +34,11 @@ const PostCreator = ({
   const [linkUrl, setLinkUrl] = useState('');
   const [embed, setEmbed] = useState<EmbedDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cover, setCover] = useState<CoverChoice | null>(null);
+  const chooseCover = (next: CoverChoice | null) => {
+    if (cover) URL.revokeObjectURL(cover.url);
+    setCover(next);
+  };
   const errorId = useId();
   const photoInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -60,6 +66,7 @@ const PostCreator = ({
         file: embed ? undefined : selectedFile || undefined,
         mediaType: embed ? 'video' : mediaType,
         embed: embed ?? undefined,
+        cover: mediaType === 'video' && !embed ? cover?.file ?? null : null,
         inlineError: true,
       });
     } catch (err) {
@@ -75,11 +82,13 @@ const PostCreator = ({
     setEmbed(null);
     setError(null);
     setIsExpanded(false);
+    chooseCover(null);
   };
   const clearMedia = () => {
     setSelectedFile(null);
     setPreview(null);
     setMediaType('text');
+    chooseCover(null);
   };
   return <motion.div layout className="glass-strong p-4 mb-6 rounded-3xl">
       {/* Header */}
@@ -119,6 +128,11 @@ const PostCreator = ({
             </Button>
           </motion.div>}
       </AnimatePresence>
+      {mediaType === 'video' && preview && (
+        <div className="mt-3">
+          <VideoCoverPicker videoUrl={preview} cover={cover} onChange={chooseCover} />
+        </div>
+      )}
 
       {(isExpanded || linkUrl || embed) && (
         <div className="mt-4">

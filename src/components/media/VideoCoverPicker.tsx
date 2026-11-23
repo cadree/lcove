@@ -13,22 +13,28 @@ interface Props {
   videoUrl: string;
   cover: CoverChoice | null;
   onChange: (cover: CoverChoice | null) => void;
+  /** Already-saved cover, shown until a new frame or image is chosen. */
+  existingUrl?: string | null;
 }
 
 /**
  * Scrub to a frame and keep it as the cover, or upload an image. With neither,
  * posting uses a frame from about one second in. The parent owns (and revokes) cover.url.
  */
-export function VideoCoverPicker({ videoUrl, cover, onChange }: Props) {
+export function VideoCoverPicker({ videoUrl, cover, onChange, existingUrl }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
   const [duration, setDuration] = useState(0);
   const [time, setTime] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
+  const remote = videoUrl.startsWith("http://") || videoUrl.startsWith("https://");
+  const still = cover?.url ?? (!picking ? existingUrl : null) ?? null;
 
   const replace = (next: CoverChoice | null) => {
     setError(null);
+    setPicking(false);
     onChange(next);
   };
 
@@ -43,19 +49,26 @@ export function VideoCoverPicker({ videoUrl, cover, onChange }: Props) {
   };
 
   return (
-    <section aria-label="Video cover" className="file-panel space-y-3 p-3">
+    <section aria-label="Video cover" className="file-panel space-y-3 p-3" data-testid="video-cover-picker">
       <div className="flex items-center justify-between gap-3">
         <p className="mono-label text-[10px] text-muted-foreground">Cover</p>
-        {cover && (
-          <button type="button" className="mono-label min-h-11 px-2 text-[10px] text-muted-foreground" onClick={() => replace(null)}>
-            Use automatic
+        {(cover || picking) && (
+          <button
+            type="button"
+            className="mono-label min-h-11 px-2 text-[10px] text-muted-foreground"
+            onClick={() => {
+              setPicking(false);
+              replace(null);
+            }}
+          >
+            {existingUrl && !cover ? "Keep current" : "Use automatic"}
           </button>
         )}
       </div>
       <div className="flex gap-3">
         <div className="relative aspect-[4/5] w-24 shrink-0 overflow-hidden rounded-[12px] border border-border bg-black">
-          {cover ? (
-            <img src={cover.url} alt="Chosen cover" className="h-full w-full object-cover" />
+          {still ? (
+            <img src={still} alt="Chosen cover" className="h-full w-full object-cover" />
           ) : (
             <video
               ref={videoRef}
@@ -63,6 +76,7 @@ export function VideoCoverPicker({ videoUrl, cover, onChange }: Props) {
               muted
               playsInline
               preload="auto"
+              crossOrigin={remote ? "anonymous" : undefined}
               className="h-full w-full object-cover"
               onLoadedMetadata={(event) => {
                 const length = event.currentTarget.duration;
@@ -77,7 +91,20 @@ export function VideoCoverPicker({ videoUrl, cover, onChange }: Props) {
           )}
         </div>
         <div className="min-w-0 flex-1 space-y-2">
-          {!cover ? (
+          {still ? (
+            <>
+              <p className="text-xs text-muted-foreground">
+                {cover?.source === "upload"
+                  ? "Your image is the cover."
+                  : cover?.source === "frame"
+                    ? "This frame is the cover."
+                    : "This is the current cover."}
+              </p>
+              <Button type="button" size="sm" variant="outline" className="min-h-11 w-full" onClick={() => { setPicking(true); onChange(null); }}>
+                Pick a frame
+              </Button>
+            </>
+          ) : (
             <>
               <label className="block text-xs text-muted-foreground">
                 Pick a frame
@@ -101,15 +128,11 @@ export function VideoCoverPicker({ videoUrl, cover, onChange }: Props) {
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Use this frame"}
               </Button>
             </>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              {cover.source === "upload" ? "Your image is the cover." : "This frame is the cover."}
-            </p>
           )}
           <Button type="button" size="sm" variant="outline" className="min-h-11 w-full" onClick={() => uploadRef.current?.click()}>
             <ImagePlus className="mr-1.5 h-4 w-4" /> Upload cover
           </Button>
-          {!cover && <p className="text-[11px] leading-snug text-muted-foreground">Skip this and a frame from 1s in becomes the cover.</p>}
+          {!cover && !existingUrl && <p className="text-[11px] leading-snug text-muted-foreground">Skip this and a frame from 1s in becomes the cover.</p>}
           {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         </div>
       </div>
@@ -118,6 +141,7 @@ export function VideoCoverPicker({ videoUrl, cover, onChange }: Props) {
         type="file"
         accept="image/*"
         className="hidden"
+        data-testid="video-cover-upload"
         onChange={(event) => {
           const file = event.target.files?.[0];
           event.target.value = "";

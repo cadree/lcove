@@ -251,6 +251,7 @@ const FeedPost = ({ post }: { post: Post }) => {
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       className="space-y-2"
       aria-label={`Post by ${authorName}`}
+      data-testid={hasMedia ? undefined : "feed-text-post"}
     >
       {post.repost && (
         <button

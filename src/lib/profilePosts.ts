@@ -34,6 +34,40 @@ export function postsForProfileGrid<T extends ProfileGridPost>(posts: T[]): T[] 
   return posts.filter((post) => Boolean(post.media_url) || Boolean(post.content?.trim()) || embedFromPost(post) !== null);
 }
 
+/** A written post with no uploaded photo, video, or linked clip. */
+export function isTextOnlyPost(post: {
+  media_url?: string | null;
+  media_type?: string | null;
+  content?: string | null;
+} & Partial<StoredEmbedFields>): boolean {
+  if (embedFromPost(post) !== null) return false;
+  if (post.media_url) return false;
+  return Boolean(post.content?.trim()) || post.media_type === "text";
+}
+
+export type ProfilePostSegment<T> =
+  | { type: "text"; post: T }
+  | { type: "media"; posts: T[] };
+
+/**
+ * Text-only posts become full-width cards. Consecutive photos, videos, and
+ * linked clips stay in a media grid. Order is preserved, so a thought sits
+ * where it was posted instead of inside a square tile.
+ */
+export function profilePostSegments<T extends ProfileGridPost>(posts: T[]): ProfilePostSegment<T>[] {
+  const segments: ProfilePostSegment<T>[] = [];
+  for (const post of postsForProfileGrid(posts)) {
+    if (isTextOnlyPost(post)) {
+      segments.push({ type: "text", post });
+      continue;
+    }
+    const last = segments[segments.length - 1];
+    if (last?.type === "media") last.posts.push(post);
+    else segments.push({ type: "media", posts: [post] });
+  }
+  return segments;
+}
+
 export function sameUserId(a?: string | null, b?: string | null): boolean {
   return Boolean(a && b && a.toLowerCase() === b.toLowerCase());
 }

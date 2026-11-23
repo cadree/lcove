@@ -213,6 +213,14 @@
     font-family: var(--profile-font), var(--font-body);
   }
 
+  /* Text posts keep the feed's body type, not the profile display font. */
+  .profile-theme .profile-text-post,
+  .profile-theme .profile-text-post :where(p, span) {
+    font-family: var(--font-body);
+    letter-spacing: -0.01em;
+    text-transform: none;
+  }
+
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--profile-font, var(--font-display));
     font-weight: 800;
@@ -1753,6 +1761,13 @@ body.ether-id-page {
   padding-top: max(1rem, env(safe-area-inset-top, 0px)) !important;
   padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px)) !important;
 }
+
+/* Full-bleed story composer. Controls add their own safe-area padding. */
+.story-composer {
+  padding: 0 !important;
+  background: #000 !important;
+}
+
 /* Bottom sheets sit on the home indicator, not under the notch: inset the bottom only. */
 .overlay-safe-bottom {
   padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px)) !important;
@@ -1766,6 +1781,30 @@ body.ether-id-page {
 /* While the keyboard is open, give the page room to scroll its last field above it. */
 html[data-keyboard-pad] body {
   padding-bottom: var(--keyboard-inset, 0px);
+}
+
+/* A 1:1 / group / project thread locks the page so only the message list
+   scrolls. Safe-area padding lives on the thread shell, not on html, so the
+   header cannot slide under the iOS status bar. */
+html.ether-thread-open,
+html.ether-thread-open body,
+html.ether-thread-open #root {
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+html.ether-thread-open {
+  padding: 0;
+}
+html.ether-thread-open #root > .min-h-screen.bg-background {
+  min-height: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+.ether-thread-shell {
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 /* Explore match deck: transform and opacity only, so iPhone composites every frame. */

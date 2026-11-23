@@ -20,6 +20,7 @@ import { assertCleanText } from "@/lib/objectionableText";
 import { embedColumnMissing, embedColumnsForInsert, embedFromPost, videoEmbedMigrationMessage } from "@/lib/videoEmbed";
 import { EmbedThumbnail } from "@/components/feed/EmbedPlayer";
 import type { ComposePostInput } from "@/types/post";
+import { autoCover } from "@/lib/videoCover";
 
 interface PortfolioPost {
   id: string;
@@ -113,6 +114,7 @@ const Portfolios = () => {
       altText,
       commentsEnabled = true,
       embed,
+      cover,
     }: ComposePostInput & { inlineError?: boolean }) => {
       if (!user) throw new Error('Must be logged in');
       assertCleanText(content);
@@ -136,15 +138,16 @@ const Portfolios = () => {
 
       const upload = mediaType === 'collage' ? files?.[0] : mediaType !== 'text' ? file : undefined;
       if (upload) {
+        const coverFile = mediaType === 'video' ? cover ?? await autoCover(upload, 4000) : null;
         queueMedia({
           queryClient,
           userId: user.id,
           kind: 'portfolio',
           label: mediaType === 'video' ? 'Portfolio video' : 'Portfolio work',
-          files: [upload],
+          files: coverFile ? [upload, coverFile] : [upload],
           mediaType: mediaType === 'video' ? 'video' : 'photo',
           content: content || null,
-          insert: async ([mediaUrl]) => {
+          insert: async ([mediaUrl, coverUrl]) => {
             const { error: insertError } = await supabase
               .from('posts')
               .insert({
@@ -156,6 +159,7 @@ const Portfolios = () => {
                 location: location || null,
                 alt_text: altText || null,
                 comments_enabled: commentsEnabled,
+                ...(coverUrl ? { thumbnail_url: coverUrl } : {}),
               });
             if (insertError) throw insertError;
           },

@@ -18,6 +18,7 @@ import { abortAfter } from '@/lib/requestDeadline';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { insertPostRow } from '@/lib/postRows';
 import { autoCover } from '@/lib/videoCover';
+import { mediaPath } from '@/lib/backgroundUploads';
 
 let postsFeedListeners = 0;
 let postsFeedChannel: RealtimeChannel | null = null;
@@ -333,6 +334,36 @@ export function usePosts() {
     },
   });
 
+  const updatePost = useMutation({
+    mutationFn: async ({ id, content, cover }: { id: string; content?: string; cover?: File | null; inlineError?: boolean }) => {
+      if (!user) throw new Error('Must be logged in');
+      const patch: { content?: string | null; thumbnail_url?: string } = {};
+      if (content !== undefined) {
+        assertCleanText(content);
+        patch.content = content.trim() || null;
+      }
+      if (cover) {
+        const path = mediaPath(user.id, cover);
+        const { error: uploadError } = await supabase.storage.from('media').upload(path, cover, { contentType: cover.type || 'image/jpeg' });
+        if (uploadError) throw uploadError;
+        patch.thumbnail_url = supabase.storage.from('media').getPublicUrl(path).data.publicUrl;
+      }
+      if (Object.keys(patch).length === 0) return;
+      const { error } = await supabase.from('posts').update(patch).eq('id', id).eq('user_id', user.id);
+      if (error) throw error;
+      return patch;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['profile-posts'] });
+      toast.success('Post updated');
+    },
+    onError: (error, vars) => {
+      if (vars.inlineError) return;
+      toast.error(errorMessage(error, 'Could not update the post'));
+    },
+  });
+
   const pending = usePendingUploads();
   const visiblePosts = useMemo(
     () => withPending(
@@ -365,6 +396,7 @@ export function usePosts() {
     addReaction,
     removeReaction,
     deletePost,
+    updatePost,
     refetch,
   };
 }

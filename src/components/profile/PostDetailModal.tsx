@@ -52,6 +52,8 @@ import { embedFromPost } from "@/lib/videoEmbed";
 import { InlineError } from "@/components/ui/inline-error";
 import { writeError } from "@/lib/writeError";
 import { PostCredits } from "@/components/credits/PostCredits";
+import { EditPostDialog } from "@/components/profile/EditPostDialog";
+import { isTextOnlyPost } from "@/lib/profilePosts";
 
 interface PostDetailModalProps {
   post: ProfilePost | null;
@@ -76,6 +78,7 @@ export function PostDetailModal({
   const commentErrorId = useId();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const ownsPost = !!user && user.id === post?.user_id;
   const viewCounts = useOwnPostViewCounts(ownsPost);
   const { undoRepost } = useSharingActions();
@@ -103,6 +106,7 @@ export function PostDetailModal({
 
   const insight = ownerOnlyInsight(ownsPost, viewCounts?.[post.id], likesCount);
   const embed = embedFromPost(post);
+  const textOnly = isTextOnlyPost(post);
   const displayName = post.profile?.display_name || 'Anonymous';
   const avatarUrl = post.profile?.avatar_url;
   const timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true });
@@ -121,9 +125,8 @@ export function PostDetailModal({
   };
 
   const handleEdit = () => {
-    if (onEdit) {
-      onEdit(post);
-    }
+    setEditOpen(true);
+    onEdit?.(post);
   };
 
   const handleLike = () => {
@@ -189,13 +192,19 @@ export function PostDetailModal({
           </Button>
 
           <div className="flex flex-col md:flex-row h-full">
-            {/* Media Section. On phones pt-14 keeps media below the close X, so a video's mute control can't cover it. */}
+            {textOnly ? (
+              <div className="profile-text-post relative flex-1 bg-card px-5 pb-4 pt-16 md:w-[60%] md:pt-14" data-testid="post-detail-text">
+                <p className="whitespace-pre-wrap text-[16px] leading-relaxed text-foreground">{post.content}</p>
+              </div>
+            ) : (
+            /* Media Section. On phones pt-14 keeps media below the close X, so a video's mute control can't cover it. */
             <div className="md:w-[60%] bg-black flex items-center justify-center relative pt-14 md:pt-0">
               {embed ? (
                 <EmbedPlayer embed={embed} title={post.embed_title || post.content} className="max-h-[60vh] md:max-h-[80vh]" />
               ) : post.media_type === 'video' ? (
                 <video
                   src={post.media_url || undefined}
+                  poster={post.thumbnail_url || undefined}
                   controls
                   autoPlay
                   playsInline
@@ -209,6 +218,7 @@ export function PostDetailModal({
                 />
               )}
             </div>
+            )}
 
             {/* Details Section */}
             <div className="flex flex-col bg-card md:w-[40%]">
@@ -307,7 +317,7 @@ export function PostDetailModal({
               {/* Content / Comments Area */}
               <div className="flex-1 overflow-y-auto p-4">
                 {/* Original post caption */}
-                {post.content && (
+                {post.content && !textOnly && (
                   <div className="flex gap-3 mb-4">
                     <Avatar className="w-8 h-8 flex-shrink-0">
                       <AvatarImage src={avatarUrl || undefined} />
@@ -454,6 +464,10 @@ export function PostDetailModal({
           </div>
         </DialogContent>
       </Dialog>
+
+      {ownsPost && (
+        <EditPostDialog post={post} open={editOpen} onOpenChange={setEditOpen} />
+      )}
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent className="bg-card border-border">

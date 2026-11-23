@@ -222,11 +222,11 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
 
   return (
     <div
-      className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
+      className="ether-thread-shell flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
       style={keyboardPaddingStyle(keyboardInset)}
     >
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b border-border bg-background p-4">
+      {/* Header stays in this column; safe-area padding is on the shell. */}
+      <div className="relative z-20 flex shrink-0 items-center gap-3 border-b border-border bg-background p-4">
         <Button variant="ghost" size="icon" onClick={onBack} aria-label="Back to chats">
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -293,7 +293,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-muted-foreground" aria-label="Chat options">
+              <Button variant="ghost" size="icon" className="relative z-20 text-muted-foreground" aria-label="Chat options">
                 <MoreVertical className="w-5 h-5" />
               </Button>
             </DropdownMenuTrigger>
@@ -430,7 +430,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
       )}
 
       {/* Messages */}
-      <div ref={messagesListRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+      <div ref={messagesListRef} data-testid="chat-message-list" className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
