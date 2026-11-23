@@ -21,6 +21,9 @@ import { notifyLiveUpdateReady } from "@/lib/liveUpdates";
 // Initialize Capacitor deep link handler for native auth
 setupDeepLinkHandler();
 initializeCapacitorApp();
+// iOS WebKit only shows :active press states once a touchstart listener exists.
+// Passive and empty: it never delays or cancels a tap, scroll, or menu.
+document.addEventListener("touchstart", () => {}, { passive: true });
 // Before React renders, so a tap that cold-started the app is not lost.
 startPushTapListener();
 // Confirm the web bundle booted so a broken live update can auto-revert.

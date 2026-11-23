@@ -184,6 +184,8 @@
   html {
     scroll-behavior: smooth;
     -webkit-tap-highlight-color: transparent;
+    /* No double-tap-to-zoom wait on taps; pinch zoom still works. */
+    touch-action: manipulation;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     /* iOS safe area support */
@@ -1948,4 +1950,24 @@ html.ether-thread-open #root > .min-h-screen.bg-background {
 }
 @media (prefers-reduced-motion: reduce) {
   .listen-pulse { animation: none; opacity: 0.35; transform: scale(1.4); }
+}
+
+/*
+ * Press feedback (EE-33). Buttons dip and dim while a finger is down, so a tap
+ * reads at once. Uses the standalone `scale` property so it stacks with any
+ * Tailwind transform (centering, active:scale) instead of replacing it.
+ * iOS only applies :active with a touchstart listener; main.tsx adds one.
+ * Opt out with data-press="none" (drag handles, the story shutter).
+ */
+:where(button, [role="button"], .press):not([class*="transition"]) {
+  transition: scale 140ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 140ms ease-out;
+}
+:where(button, [role="button"], .press):not(:disabled):not([aria-disabled="true"]):not([data-press="none"]):active {
+  scale: 0.96;
+  filter: brightness(0.86);
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(button, [role="button"], .press):not(:disabled):not([aria-disabled="true"]):not([data-press="none"]):active {
+    scale: none;
+  }
 }

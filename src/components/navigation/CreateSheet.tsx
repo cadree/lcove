@@ -107,7 +107,7 @@ export function CreateSheet({ open, onOpenChange }: CreateSheetProps) {
                 key={item.id}
                 type="button"
                 onClick={item.run}
-                className="flex min-h-11 flex-col items-center justify-center gap-2 rounded-[16px] px-1 py-3 active:scale-[0.98]"
+                className="flex min-h-11 flex-col items-center justify-center gap-2 rounded-[16px] px-1 py-3"
               >
                 <SquircleIcon icon={item.icon} fill={item.fill} size={40} glyph={22} />
                 <span className="mono-label text-center text-[10px] text-foreground">{item.label}</span>
