@@ -76,8 +76,9 @@ export function EtherCardIntro({
                 type="button"
                 className="min-h-12 w-full"
                 onClick={() => {
-                  onOpenChange(false);
+                  // View first: it tells the page to stay on the card.
                   onViewCard();
+                  onOpenChange(false);
                 }}
               >
                 {CARD_INTRO_VIEW_CARD}

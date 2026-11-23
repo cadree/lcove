@@ -256,6 +256,8 @@ export default function EtherId() {
   useEffect(() => {
     if (!hasCard || !shouldAutoIntro || !walletReady || autoIntroStarted.current) return;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // The save button sits below the form, so bring the card up before it spins.
+    cardFaceRef.current?.scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" });
     if (reduced) {
       autoIntroStarted.current = true;
       setIntroOpen(true);
@@ -295,7 +297,7 @@ export default function EtherId() {
         <PageHeader
           eyebrow={setupMode ? 'Familcy · Card setup' : 'Member'}
           title={setupMode ? 'Register your ETHER Card' : 'Ether ID'}
-          description={setupMode ? 'Save your username and passion, then add your card to Apple Wallet.' : 'Your card. The verify page reads status live.'}
+          description={setupMode ? (showWallet ? 'Save your username and passion, then add your card to Apple Wallet.' : 'Save your username and passion to register your card.') : 'Your card. The verify page reads status live.'}
           showMore={false}
         />
         {cardQuery.isLoading && <p className="text-sm text-muted-foreground">Loading your card…</p>}
