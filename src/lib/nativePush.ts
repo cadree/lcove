@@ -1,7 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { supabase } from "@/integrations/supabase/client";
-import { createIosPushRegistration } from "@/lib/iosPushRegistration";
+import { createIosPushRegistration, type IosPushRegisterOptions } from "@/lib/iosPushRegistration";
 
 /**
  * Register this device for APNs when running inside the Capacitor iOS app.
@@ -12,6 +12,7 @@ import { createIosPushRegistration } from "@/lib/iosPushRegistration";
  */
 const registration = createIosPushRegistration({
   getPlatform: () => Capacitor.getPlatform(),
+  checkPermissions: () => PushNotifications.checkPermissions(),
   requestPermissions: () => PushNotifications.requestPermissions(),
   addRegistrationListener: async (handler) => {
     await PushNotifications.addListener("registration", (token) => {
@@ -30,6 +31,15 @@ const registration = createIosPushRegistration({
   },
 });
 
-export async function registerIosPush(userId: string): Promise<void> {
-  return registration.register(userId);
+export async function registerIosPush(userId: string, options?: IosPushRegisterOptions): Promise<void> {
+  return registration.register(userId, options);
+}
+
+/** iOS notification permission without prompting: granted, denied or prompt. */
+export async function iosPushPermission(): Promise<string> {
+  try {
+    return (await PushNotifications.checkPermissions()).receive;
+  } catch {
+    return "prompt";
+  }
 }

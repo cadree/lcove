@@ -44,6 +44,8 @@ export function canWriteOwnPushSubscription(
 
 export interface IosPushBridge {
   getPlatform(): string;
+  /** Current permission without showing the system prompt. */
+  checkPermissions(): Promise<{ receive: string }>;
   requestPermissions(): Promise<{ receive: string }>;
   addRegistrationListener(handler: (token: { value: string }) => Promise<void> | void): Promise<void>;
   addRegistrationErrorListener(handler: (err: { error: string }) => void): Promise<void>;
@@ -51,8 +53,22 @@ export interface IosPushBridge {
   saveSubscription(row: ApnsSubscriptionRow): Promise<string | null>;
 }
 
+export interface IosPushRegisterOptions {
+  /**
+   * Show the iOS permission prompt when the user has not been asked yet.
+   * False only registers when permission is already granted. A denied
+   * permission never prompts again either way.
+   */
+  prompt?: boolean;
+}
+
 export interface IosPushRegistration {
-  register(userId: string): Promise<void>;
+  register(userId: string, options?: IosPushRegisterOptions): Promise<void>;
+}
+
+/** Permission states where iOS would still show its prompt. */
+export function iosPushCanPrompt(receive: string): boolean {
+  return receive === "prompt" || receive === "prompt-with-rationale";
 }
 
 export function createIosPushRegistration(
@@ -63,7 +79,7 @@ export function createIosPushRegistration(
   let savedForUserId: string | null = null;
   let startedForUserId: string | null = null;
   let currentUserId: string | null = null;
-  let active: { userId: string; promise: Promise<void> } | null = null;
+  let active: { userId: string; prompt: boolean; promise: Promise<void> } | null = null;
 
   async function onToken(token: { value: string }) {
     const userId = currentUserId;
@@ -109,9 +125,12 @@ export function createIosPushRegistration(
     return listenersReady;
   }
 
-  async function perform(userId: string): Promise<void> {
+  async function perform(userId: string, prompt: boolean): Promise<void> {
     try {
-      const permission = await bridge.requestPermissions();
+      const current = await bridge.checkPermissions();
+      if (current.receive === "denied") return;
+      if (current.receive !== "granted" && !(prompt && iosPushCanPrompt(current.receive))) return;
+      const permission = current.receive === "granted" ? current : await bridge.requestPermissions();
       if (permission.receive !== "granted") {
         log("APNs permission not granted", permission.receive);
         return;
@@ -131,16 +150,24 @@ export function createIosPushRegistration(
   }
 
   return {
-    async register(userId: string): Promise<void> {
+    async register(userId: string, options: IosPushRegisterOptions = {}): Promise<void> {
+      const prompt = options.prompt ?? true;
       if (bridge.getPlatform() !== "ios") return;
       if (!userId) return;
       if (savedForUserId === userId || startedForUserId === userId) return;
-      if (active?.userId === userId) return active.promise;
+      if (active?.userId === userId && (active.prompt || !prompt)) return active.promise;
 
-      const promise = perform(userId).finally(() => {
-        if (active?.promise === promise) active = null;
-      });
-      active = { userId, promise };
+      // A quiet check still in flight must not swallow a later prompt request.
+      const before = active?.userId === userId ? active.promise : Promise.resolve();
+      const promise = before
+        .then(() => {
+          if (savedForUserId === userId || startedForUserId === userId) return;
+          return perform(userId, prompt);
+        })
+        .finally(() => {
+          if (active?.promise === promise) active = null;
+        });
+      active = { userId, prompt, promise };
       return promise;
     },
   };
