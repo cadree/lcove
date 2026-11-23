@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { ConnectMusicDialog } from "@/components/music/ConnectMusicDialog";
 import { ExclusiveMusicSection } from "@/components/music/ExclusiveMusicSection";
 import { MusicProfileView } from "@/components/music/MusicProfileView";
+import { MusicPlayerCard } from "@/components/music/MusicPlayerCard";
+import { MusicLookSwitch } from "@/components/music/MusicLookSwitch";
 import { SavedMusicSection } from "@/components/music/SavedMusicSection";
 import { useLockedMusic } from "@/hooks/useLockedMusic";
 import { useMusicCatalog } from "@/hooks/useMusicCatalog";
@@ -79,7 +81,7 @@ const ProfileMusic = () => {
             <p className="text-sm text-muted-foreground">This music page isn't available.</p>
           </div>
         ) : (
-          <div className="music-view mt-2 space-y-6 rounded-[32px] px-4 pb-6 pt-5" data-look="ether">
+          <div className={`music-view mt-2 space-y-6 rounded-[32px] px-4 pb-6 pt-5 ${prefs.prefs.look === "neon" ? "music-look-neon" : ""}`} data-look={prefs.prefs.look}>
             {userId && (
               <MusicProfileView
                 userId={userId}
@@ -93,6 +95,21 @@ const ProfileMusic = () => {
                 catalog={catalog}
                 prefs={prefs}
                 editing={editing && isOwner}
+                editExtras={<MusicLookSwitch value={prefs.prefs.look} onChange={(look) => prefs.save.mutate({ look })} />}
+                player={(featured, open) => {
+                  const track = featured?.track ?? locked.tracks[0] ?? null;
+                  return (
+                    <div className="music-only-neon">
+                      <MusicPlayerCard
+                        track={track}
+                        tracks={locked.tracks}
+                        artist={name}
+                        hasAccess={locked.hasAccess}
+                        onOpen={() => featured && open(featured)}
+                      />
+                    </div>
+                  );
+                }}
               />
             )}
 

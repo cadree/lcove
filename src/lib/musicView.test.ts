@@ -49,3 +49,11 @@ test("looks, covers and uploads are checked", () => {
   assert.ok(coverUploadProblem({ size: 10, type: "audio/mpeg" }));
   assert.ok(coverUploadProblem({ size: 6 * 1024 * 1024, type: "image/jpeg" }));
 });
+
+test("the player gets the full file only with a signed URL, else the preview", async () => {
+  const { playableTrack } = await import("./musicView.ts");
+  const t = { id: "a", title: "A", artist_user_id: "u", preview_clip_url: "https://x/clip.mp3" };
+  assert.equal(playableTrack(t, "Nova", null)?.previewOnly, true);
+  assert.equal(playableTrack(t, "Nova", "https://signed/full.mp3")?.src, "https://signed/full.mp3");
+  assert.equal(playableTrack({ ...t, preview_clip_url: null }, "Nova", null), null);
+});

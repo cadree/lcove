@@ -144,7 +144,7 @@ export function MusicProfileView({ userId, name, avatarUrl, handle, genres, rele
           <button
             type="button"
             onClick={() => open(featured)}
-            className="mt-5 flex min-h-12 w-full max-w-[420px] items-center justify-center gap-2 rounded-[18px] border border-[var(--mv-line)] bg-[var(--mv-surface)] px-4 text-[15px] text-[var(--mv-text)] backdrop-blur-md"
+            className="music-only-ether mt-5 flex min-h-12 w-full max-w-[420px] items-center justify-center gap-2 rounded-[18px] border border-[var(--mv-line)] bg-[var(--mv-surface)] px-4 text-[15px] text-[var(--mv-text)] backdrop-blur-md"
             data-testid="music-featured"
           >
             <Headphones className="h-5 w-5 shrink-0 text-[var(--mv-accent)]" />
@@ -153,7 +153,7 @@ export function MusicProfileView({ userId, name, avatarUrl, handle, genres, rele
           </button>
         )}
         {featured && (
-          <p className="mt-2 text-[13px] text-[var(--mv-muted)]">
+          <p className="music-only-ether mt-2 text-[13px] text-[var(--mv-muted)]">
             {prefs.prefs.featuredKey ? "Featured" : "Latest"} {featured.kind === "track" ? "on Ether" : featured.release?.platform && featured.release.platform !== "other" ? `on ${MUSIC_PLATFORM_LABELS[featured.release.platform]}` : ""}
           </p>
         )}

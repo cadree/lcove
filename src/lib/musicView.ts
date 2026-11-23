@@ -127,3 +127,33 @@ export function safeCoverOverrides(value: unknown): Record<string, string> {
   }
   return out;
 }
+
+export interface HostedTrackLike {
+  id: string;
+  title: string;
+  cover_image_url?: string | null;
+  preview_clip_url?: string | null;
+  artist_user_id: string;
+}
+
+/**
+ * What the shared player may play for a hosted track: the full file only when the
+ * server already signed a URL for this viewer, otherwise the public preview clip.
+ */
+export function playableTrack(
+  track: HostedTrackLike,
+  artist: string,
+  fullUrl: string | null | undefined,
+): { id: string; title: string; artist: string; artwork: string | null; src: string; artistUserId: string; previewOnly: boolean } | null {
+  const src = fullUrl || track.preview_clip_url || null;
+  if (!src) return null;
+  return {
+    id: `track:${track.id}`,
+    title: track.title,
+    artist,
+    artwork: track.cover_image_url ?? null,
+    src,
+    artistUserId: track.artist_user_id,
+    previewOnly: !fullUrl,
+  };
+}
