@@ -5,7 +5,7 @@
       "bundles": {}
     },
     "202611222244": {
-      "current": "1.0.5-web.4",
+      "current": "1.0.5-web.5",
       "bundles": {
         "1.0.5-web.1": {
           "url": "https://etherbylcove.com/native-updates/bundles/202611222244-1.0.5-web.1.zip",
@@ -22,12 +22,21 @@
         "1.0.5-web.4": {
           "url": "https://etherbylcove.com/native-updates/bundles/202611222244-1.0.5-web.4.zip",
           "checksum": "6eae84396ea128afe914dc4e5dafa9b68d0a437cf882025dc6b971f98d7b0c76"
+        },
+        "1.0.5-web.5": {
+          "url": "https://etherbylcove.com/native-updates/bundles/202611222244-1.0.5-web.5.zip",
+          "checksum": "a2a6807cfef92c0372ac034163e36a3b40b4018e9475149ed070ba431fb2de21"
         }
       }
     },
     "202611231300": {
-      "current": null,
-      "bundles": {}
+      "current": "1.0.6-web.1",
+      "bundles": {
+        "1.0.6-web.1": {
+          "url": "https://etherbylcove.com/native-updates/bundles/202611231300-1.0.6-web.1.zip",
+          "checksum": "a2a6807cfef92c0372ac034163e36a3b40b4018e9475149ed070ba431fb2de21"
+        }
+      }
     }
   }
 }
