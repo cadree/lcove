@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, Check, FolderPlus, GripVertical, Headphones, ImagePlus, Lock, MoreHorizontal, Star, Trash2 } from "lucide-react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useMusicPlayer } from "@/hooks/useMusicPlayer";
+import { playTrack, togglePlayer, type PlayerTrack } from "@/lib/musicPlayer";
+import { ArrowDown, ArrowUp, Check, Pause, Play, FolderPlus, GripVertical, Headphones, ImagePlus, Lock, MoreHorizontal, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -14,7 +16,7 @@ import { digitalPurchasesEnabled } from "@/lib/platform";
 import { groupCatalog, openMusicLink, trackKey, validateSectionTitle, type CatalogRelease, type ListenOn } from "@/lib/musicCatalog";
 import { MUSIC_PLATFORM_LABELS } from "@/lib/musicLinks";
 import {
-  coverUploadProblem, dragSteps, isDjLicense, moveKey, orderKeys, recentFirst, releaseBadge, trackBadge, type RowBadge,
+  coverUploadProblem, dragSteps, isDjLicense, moveKey, orderKeys, playableTrack, recentFirst, releaseBadge, trackBadge, type RowBadge,
 } from "@/lib/musicView";
 import { ExclusiveTrackCard } from "./ExclusiveTrackCard";
 import { MusicServiceIcon } from "./ListenOnRow";
@@ -36,6 +38,9 @@ export interface ViewItem {
 }
 
 const ROW_PX = 64;
+
+/** Rows play previews through the shared player; the queue is every hosted track with a preview. */
+const RowPlayContext = createContext<{ playable: (item: ViewItem) => PlayerTrack | null; queue: PlayerTrack[] } | null>(null);
 
 interface MusicProfileViewProps {
   userId: string;
@@ -103,6 +108,10 @@ export function MusicProfileView({ userId, name, avatarUrl, handle, genres, rele
   }, [releases, locked, name, overrides, iosApp]);
 
   const all = useMemo(() => [...items.values()], [items]);
+  const rowPlay = useMemo(() => {
+    const playable = (item: ViewItem) => (item.track ? playableTrack(item.track, name, null) : null);
+    return { playable, queue: recentFirst(all).map(playable).filter(Boolean) as PlayerTrack[] };
+  }, [all, name]);
   const recent = useMemo(() => recentFirst(all), [all]);
   const featured = (prefs.prefs.featuredKey && items.get(prefs.prefs.featuredKey)) || recent[0] || null;
 
@@ -127,6 +136,7 @@ export function MusicProfileView({ userId, name, avatarUrl, handle, genres, rele
     : recent.filter((i) => i.cover).slice(0, 6).map((i) => ({ id: i.key, title: i.title, cover: i.cover, count: 0 }));
 
   return (
+    <RowPlayContext.Provider value={rowPlay}>
     <div className="space-y-6" data-testid="music-profile-view">
       <header className="flex flex-col items-center pt-2 text-center">
         <div className="relative">
@@ -311,6 +321,7 @@ export function MusicProfileView({ userId, name, avatarUrl, handle, genres, rele
         />
       )}
     </div>
+    </RowPlayContext.Provider>
   );
 }
 
@@ -333,6 +344,13 @@ function BadgePill({ badge }: { badge: RowBadge }) {
 }
 
 function TrackRow({ item, onOpen, editing, grip, onEdit }: { item: ViewItem; onOpen: () => void; editing?: boolean; grip?: ReactNode; onEdit?: () => void }) {
+  const play = useContext(RowPlayContext);
+  const playable = item.track ? play?.playable(item) : null;
+  const player = useMusicPlayer();
+  const playing = !!playable && player.track?.id === playable.id && player.playing;
+  const onPlay = playable
+    ? () => (player.track?.id === playable.id ? togglePlayer() : void playTrack(playable, play!.queue))
+    : undefined;
   return (
     <div className="flex h-16 items-center gap-3 rounded-[16px] px-1">
       {editing && grip}
@@ -345,6 +363,11 @@ function TrackRow({ item, onOpen, editing, grip, onEdit }: { item: ViewItem; onO
           <span className="block truncate text-[13px] text-[var(--mv-muted)]">{item.subtitle}</span>
         </span>
       </button>
+      {!editing && onPlay && (
+        <button type="button" onClick={onPlay} aria-label={`${playing ? "Pause" : "Play"} ${item.title}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--mv-line)] text-[var(--mv-text)]">
+          {playing ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}
+        </button>
+      )}
       {editing ? (
         <button type="button" onClick={onEdit} aria-label={`Edit ${item.title}`} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--mv-text)] hover:bg-[var(--mv-surface)]">
           <MoreHorizontal className="h-5 w-5" />

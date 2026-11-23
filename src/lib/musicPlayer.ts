@@ -28,10 +28,64 @@ type Listener = (state: PlayerState) => void;
 let audio: HTMLAudioElement | null = null;
 let state: PlayerState = { track: null, queue: [], index: -1, playing: false, position: 0, duration: 0 };
 const listeners = new Set<Listener>();
+/** Called whenever shared playback starts, so other players on screen can pause. */
+const playHooks = new Set<() => void>();
+export function onSharedPlay(fn: () => void): () => void {
+  playHooks.add(fn);
+  return () => playHooks.delete(fn);
+}
 
 function emit(patch: Partial<PlayerState>) {
+  const before = state;
   state = { ...state, ...patch };
+  syncMediaSession(before, state);
   for (const fn of listeners) fn(state);
+}
+
+/** Lock screen and Control Center: title, artist, artwork and the transport buttons. */
+function syncMediaSession(before: PlayerState, now: PlayerState) {
+  const session = typeof navigator !== "undefined" ? navigator.mediaSession : undefined;
+  if (!session) return;
+  try {
+    if (before.track !== now.track) {
+      session.metadata = now.track && typeof MediaMetadata !== "undefined"
+        ? new MediaMetadata({
+            title: now.track.title,
+            artist: now.track.artist,
+            album: now.track.previewOnly ? "Preview on Ether" : "Ether",
+            artwork: now.track.artwork ? [{ src: now.track.artwork, sizes: "512x512" }] : [],
+          })
+        : null;
+    }
+    if (before.playing !== now.playing || before.track !== now.track) {
+      session.playbackState = now.track ? (now.playing ? "playing" : "paused") : "none";
+    }
+    if (now.track && now.duration > 0 && Math.floor(before.position) !== Math.floor(now.position)) {
+      session.setPositionState?.({ duration: now.duration, position: Math.min(now.position, now.duration), playbackRate: 1 });
+    }
+  } catch {
+    // Older WebKit throws on partial Media Session support; playback is unaffected.
+  }
+}
+
+function bindMediaSessionActions() {
+  const session = typeof navigator !== "undefined" ? navigator.mediaSession : undefined;
+  if (!session) return;
+  const bind = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
+    try {
+      session.setActionHandler(action, handler);
+    } catch {
+      // Unsupported action on this browser.
+    }
+  };
+  bind("play", () => void playerElement()?.play().catch(() => undefined));
+  bind("pause", () => playerElement()?.pause());
+  bind("previoustrack", () => previousTrack());
+  bind("nexttrack", () => nextTrack());
+  bind("seekto", (details) => {
+    if (typeof details.seekTime === "number") seekPlayer(details.seekTime);
+  });
+  bind("stop", () => stopPlayer());
 }
 
 /** The shared element, created on first use and kept in the document so iOS treats it as media. */
@@ -44,7 +98,11 @@ export function playerElement(): HTMLAudioElement | null {
   audio.setAttribute("data-ether-player", "");
   audio.style.display = "none";
   document.body?.appendChild(audio);
-  audio.addEventListener("play", () => emit({ playing: true }));
+  bindMediaSessionActions();
+  audio.addEventListener("play", () => {
+    emit({ playing: true });
+    for (const fn of playHooks) fn();
+  });
   audio.addEventListener("pause", () => emit({ playing: false }));
   audio.addEventListener("timeupdate", () => emit({ position: audio!.currentTime }));
   audio.addEventListener("durationchange", () => emit({ duration: Number.isFinite(audio!.duration) ? audio!.duration : 0 }));

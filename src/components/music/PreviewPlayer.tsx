@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { onSharedPlay, pausePlayer } from "@/lib/musicPlayer";
 import { Play, Pause, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,15 @@ export const PreviewPlayer = ({
       audioRef.current = null;
     };
   }, [audioUrl]);
+  // One sound at a time: the shared player starting pauses this preview.
+  useEffect(
+    () =>
+      onSharedPlay(() => {
+        audioRef.current?.pause();
+        setIsPlaying(false);
+      }),
+    [],
+  );
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -94,6 +104,7 @@ export const PreviewPlayer = ({
         // ignore seek errors
       }
     }
+    pausePlayer();
     audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
   };
 

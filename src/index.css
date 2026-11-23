@@ -1910,3 +1910,8 @@ html[data-keyboard-pad] body {
   border-radius: 999px;
   background: #fff;
 }
+
+/* Shared music player bar sits above the tab bar; pages keep their last row clear of it. */
+.has-mini-player .mini-player-room {
+  padding-bottom: calc(7rem + 72px);
+}
