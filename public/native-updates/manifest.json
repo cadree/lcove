@@ -5,7 +5,7 @@
       "bundles": {}
     },
     "202611222244": {
-      "current": "1.0.5-web.3",
+      "current": "1.0.5-web.4",
       "bundles": {
         "1.0.5-web.1": {
           "url": "https://etherbylcove.com/native-updates/bundles/202611222244-1.0.5-web.1.zip",
@@ -18,8 +18,16 @@
         "1.0.5-web.3": {
           "url": "https://etherbylcove.com/native-updates/bundles/202611222244-1.0.5-web.3.zip",
           "checksum": "54020eba02e816c92302ff7ffd7c1cfab6cf944b1939982748281fd7d9238a1e"
+        },
+        "1.0.5-web.4": {
+          "url": "https://etherbylcove.com/native-updates/bundles/202611222244-1.0.5-web.4.zip",
+          "checksum": "6eae84396ea128afe914dc4e5dafa9b68d0a437cf882025dc6b971f98d7b0c76"
         }
       }
+    },
+    "202611231300": {
+      "current": null,
+      "bundles": {}
     }
   }
 }
