@@ -3887,6 +3887,33 @@ export type Database = {
           },
         ]
       }
+      music_page_prefs: {
+        Row: {
+          cover_overrides: Json
+          featured_key: string | null
+          look: string
+          loose_order: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cover_overrides?: Json
+          featured_key?: string | null
+          look?: string
+          loose_order?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cover_overrides?: Json
+          featured_key?: string | null
+          look?: string
+          loose_order?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       music_profiles: {
         Row: {
           albums: Json | null

@@ -1801,3 +1801,35 @@ html[data-keyboard-pad] body {
 @media (prefers-reduced-motion: reduce) {
   .match-card, .match-enter, .match-leave-left, .match-leave-right, .match-float, .match-globe { animation: none; transition: none; }
 }
+
+/* Music profile view. Colors are variables so a look is one class, not a fork. */
+.music-view {
+  --mv-bg: #1d1a22;
+  --mv-surface: rgba(255, 255, 255, 0.07);
+  --mv-surface-strong: #2c2731;
+  --mv-tab-on: rgba(255, 255, 255, 0.14);
+  --mv-line: rgba(255, 255, 255, 0.14);
+  --mv-line-strong: rgba(250, 245, 240, 0.9);
+  --mv-text: #faf5f0;
+  --mv-muted: rgba(250, 245, 240, 0.6);
+  --mv-accent: #ff9fc8;
+  --mv-accent-2: #ffc6de;
+  --mv-on-accent: #2c1320;
+  --mv-glow: 0 18px 40px -20px rgba(0, 0, 0, 0.9);
+  --mv-glow-soft: none;
+  --mv-text-glow: none;
+  background: radial-gradient(120% 60% at 50% 0%, #3a2a36 0%, var(--mv-bg) 60%);
+  color: var(--mv-text);
+}
+.music-view .music-favorites {
+  color: var(--mv-accent);
+  text-shadow: 0 0 24px rgba(255, 159, 200, 0.35);
+}
+.music-sticker {
+  display: inline-block;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
+  animation: match-float 4.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .music-sticker { animation: none; }
+}
