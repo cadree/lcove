@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Play, Volume2, VolumeX, X } from "lucide-react";
 import { FeedVideo } from "@/components/media/FeedVideo";
 import type { BrowseReel } from "@/lib/exploreBrowse";
+import { jumpToSlide, reelStartIndex } from "@/lib/reelScroll";
 
 /**
  * Full-screen vertical reels, one per screen. FeedVideo plays only the reel
@@ -15,7 +16,9 @@ export function ReelViewer({ reels, start, onClose }: { reels: BrowseReel[]; sta
 
   useLayoutEffect(() => {
     const element = scroller.current;
-    if (element) element.scrollTop = start * element.clientHeight;
+    if (element) jumpToSlide(element, reelStartIndex(start, reels.length), (callback) => requestAnimationFrame(callback));
+    // Only on open: a new page of reels must not move the viewer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [start]);
 
   useEffect(() => {
@@ -43,7 +46,9 @@ export function ReelViewer({ reels, start, onClose }: { reels: BrowseReel[]; sta
           <p className="ether-title text-[26px]">You're all caught up</p>
           <p className="text-sm text-white/70">You've seen every reel. New ones show up here when people post them.</p>
           <div className="mt-2 flex gap-2">
-            <button type="button" onClick={() => scroller.current?.scrollTo({ top: 0 })} className="mono-label min-h-11 rounded-full border border-white/40 px-4 text-[11px]">
+            <button type="button" onClick={() => {
+                if (scroller.current) jumpToSlide(scroller.current, 0, (callback) => requestAnimationFrame(callback));
+              }} className="mono-label min-h-11 rounded-full border border-white/40 px-4 text-[11px]">
               Watch again
             </button>
             <button type="button" onClick={onClose} className="mono-label min-h-11 rounded-full bg-white px-4 text-[11px] text-black">
