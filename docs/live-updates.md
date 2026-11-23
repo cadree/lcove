@@ -8,7 +8,7 @@ Use this only for bug fixes and in-scope UI that stay within the app Apple alrea
 
 1. The app keeps loading its bundled `dist` from `capacitor://localhost`. `server.url` stays unset.
 2. `@capgo/capacitor-updater` checks `https://etherbylcove.com/native-updates` when the app comes to the foreground. `autoUpdate: true` means a downloaded bundle is applied the next time the app goes to the background.
-3. That URL is a Cloudflare Pages Function (`functions/native-updates.js`). It reads `public/native-updates/manifest.json` and returns a zip only when the request's `version_build` matches a native slot in the manifest and `current` points at a bundle the app does not already have.
+3. That URL is a Cloudflare Pages Function (`functions/native-updates.js`). It reads `public/native-updates/manifest.json` and returns a zip only when the request's native build number matches a native slot in the manifest and `current` points at a bundle the app does not already have. The plugin sends the build number (CFBundleVersion, e.g. `202611222244`) as `version_code`. Its `version_build` field is the marketing version (CFBundleShortVersionString, e.g. `1.0.5`), so the Function keys on `version_code` and uses `version_build` only as a fallback.
 4. After JavaScript starts, `notifyLiveUpdateReady()` calls `notifyAppReady()`. If that call does not happen within 10 seconds, the plugin reverts to the last good bundle (or the store binary).
 5. Installing a newer App Store or TestFlight binary clears old zips (`resetWhenUpdate: true`). Add a new native slot in the manifest for that build number before you publish a zip for it.
 
