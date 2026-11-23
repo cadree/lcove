@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
 interface Item {
   id: string;
@@ -371,6 +372,13 @@ export function EditProfileDetailsDialog({
       <DialogContent className="max-w-lg max-h-[80vh]">
         <DialogHeader>
           <DialogTitle>Edit Profile Details</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Name, photo, city and bio live in{' '}
+            <Link to="/settings#profile" onClick={() => onOpenChange(false)} className="text-primary underline underline-offset-4">
+              Settings
+            </Link>
+            .
+          </p>
         </DialogHeader>
 
         {loading ? (

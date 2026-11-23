@@ -1,7 +1,7 @@
 import { DiscoveryPreferences } from '@/components/discovery/DiscoveryPreferences';
 import { MemberInviteCard } from "@/components/membership/MemberInviteCard";
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -81,6 +81,15 @@ const Settings = () => {
   const { isAdmin } = useIsAdmin();
   const navigate = useNavigate();
   const { profile, loading, updateProfile } = useProfile();
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (loading || hash !== "#profile") return;
+    const go = () => document.getElementById("profile")?.scrollIntoView({ block: "start" });
+    go();
+    // Cards above (invite, appearance) can grow as they load; land again once settled.
+    const timer = window.setTimeout(go, 600);
+    return () => window.clearTimeout(timer);
+  }, [loading, hash]);
   const { preferences, isLoading: prefsLoading, updatePreferences, updatePreferencesAsync } = useNotificationPreferences();
   const { isSupported: pushSupported, isSubscribed: pushSubscribed, permission: pushPermission, requestPermission, unsubscribe: unsubscribePush, status: pushStatus, error: pushError, isLoading: pushLoading } = usePushNotifications();
   const { blockedUsers, unblockUser, isLoading: blocksLoading } = useUserBlocks();
@@ -367,6 +376,7 @@ const Settings = () => {
 
         {/* Profile Section */}
         <motion.section
+          id="profile"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
