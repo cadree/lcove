@@ -13,13 +13,12 @@ import { shotOnline, shotPeople, shotSessionEnabled } from '@/lib/shotSession';
 import { messagePreview } from '@/lib/shareCard';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { ClickDropdownMenu } from '@/components/messages/ClickDropdownMenu';
 import { Input } from '@/components/ui/input';
 import { OnlineIndicator } from '@/components/ui/online-indicator';
 import {
-  DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
 interface ConversationListProps {
@@ -338,13 +337,20 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
                 </div>
               </button>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon" aria-label="Conversation options" className="shrink-0 h-11 w-11 text-muted-foreground">
+                <ClickDropdownMenu
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Conversation options"
+                      className="shrink-0 text-muted-foreground"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <MoreVertical className="w-4 h-4" />
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-card border-border">
+                  }
+                >
+                  <DropdownMenuContent align="end" className="z-[80] bg-card border-border">
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
@@ -379,7 +385,7 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
                       Delete Chat
                     </DropdownMenuItem>
                   </DropdownMenuContent>
-                </DropdownMenu>
+                </ClickDropdownMenu>
               </motion.div>
             ))}
           </AnimatePresence>

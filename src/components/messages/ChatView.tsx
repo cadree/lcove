@@ -24,6 +24,7 @@ import { ShareCardBubble } from '@/components/messages/ShareCardBubble';
 import { ListenCardBubble, ListeningStrip } from '@/components/music/ListenCardBubble';
 import { splitShareMessage } from '@/lib/shareCard';
 import { Button } from '@/components/ui/button';
+import { ClickDropdownMenu } from '@/components/messages/ClickDropdownMenu';
 import { Badge } from '@/components/ui/badge';
 import { OnlineIndicator } from '@/components/ui/online-indicator';
 import MessageComposer from './MessageComposer';
@@ -34,10 +35,8 @@ import { ReportDialog } from '@/components/safety/ReportDialog';
 import { SharedContentCard } from '@/components/share/SharedContentCard';
 import { InviteCard } from '@/components/messages/InviteCard';
 import {
-  DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
 interface ChatViewProps {
@@ -291,13 +290,14 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
               <Info className="w-5 h-5" />
             </Button>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative z-20 text-muted-foreground" aria-label="Chat options">
+          <ClickDropdownMenu
+            trigger={
+              <Button variant="ghost" size="icon" className="text-muted-foreground" aria-label="Chat options">
                 <MoreVertical className="w-5 h-5" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-card border-border">
+            }
+          >
+            <DropdownMenuContent align="end" className="z-[80] bg-card border-border">
               {otherUserId && conversation?.type === 'direct' && (
                 <DropdownMenuItem onClick={() => navigate(`/profile/${otherUserId}`)}>
                   View profile
@@ -362,7 +362,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
-          </DropdownMenu>
+          </ClickDropdownMenu>
         </div>
       </div>
 
