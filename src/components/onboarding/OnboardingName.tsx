@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,12 @@ import { Label } from '@/components/ui/label';
 import { ArrowRight, ArrowLeft, Camera, User } from 'lucide-react';
 import { displayNameError, prefillName } from '@/lib/displayName';
 import { MEMBER_OF_HINT, MEMBER_OF_LIMIT, memberOfError, normalizeMemberOf } from '@/lib/etherId';
+import { ProfilePhotoInput } from '@/components/profile/ProfilePhotoInput';
+import {
+  ONBOARDING_PHOTO_HINT,
+  ONBOARDING_PHOTO_REQUIRED,
+  ONBOARDING_PHOTO_TITLE,
+} from '@/lib/profilePhoto';
 
 interface Props {
   displayName: string;
@@ -16,7 +22,7 @@ interface Props {
   onBack?: () => void;
   /** Hide the name field when sign-up already saved it. */
   nameLocked?: boolean;
-  /** Optional photo, uploaded when onboarding finishes. */
+  /** Photo chosen on this step, uploaded when onboarding finishes. Required to continue. */
   avatarPreview?: string | null;
   onAvatar?: (file: File | null) => void;
 }
@@ -29,6 +35,8 @@ const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onN
   const [member, setMember] = useState(memberOf);
   const [error, setError] = useState('');
   const [memberError, setMemberError] = useState('');
+  const [photoError, setPhotoError] = useState('');
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // Sign-up metadata can arrive after the first render. Keep the locked name
   // in local state so Continue is enabled.
@@ -39,19 +47,25 @@ const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onN
   useEffect(() => {
     if (memberOf) setMember((current) => current || memberOf);
   }, [memberOf]);
+  useEffect(() => {
+    if (avatarPreview) setPhotoError('');
+  }, [avatarPreview]);
 
   const handleNext = () => {
     const trimmedName = name.trim();
     const nextError = displayNameError(trimmedName);
     const nextMemberError = memberOfError(member);
-    if (nextError || nextMemberError) {
+    const nextPhotoError = onAvatar && !avatarPreview ? ONBOARDING_PHOTO_REQUIRED : '';
+    if (nextError || nextMemberError || nextPhotoError) {
       setError(nextError || '');
       setMemberError(nextMemberError || '');
+      setPhotoError(nextPhotoError);
       return;
     }
 
     setError('');
     setMemberError('');
+    setPhotoError('');
     updateName(trimmedName);
     updateMemberOf(normalizeMemberOf(member) || '');
     onNext();
@@ -91,30 +105,41 @@ const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onN
           className="glass-strong rounded-2xl p-8 space-y-6 mb-8"
         >
           {onAvatar && (
-            <div className="flex items-center gap-4">
-              <label className="relative flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-border bg-background/60">
-                {avatarPreview ? (
-                  <img src={avatarPreview} alt="Your photo" className="h-full w-full object-cover" />
-                ) : (
-                  <Camera className="h-7 w-7 text-muted-foreground" />
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="sr-only"
-                  aria-label="Add a profile photo"
-                  onChange={(e) => onAvatar(e.target.files?.[0] ?? null)}
+            <div className="space-y-2">
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  className="relative flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-border bg-background/60"
+                  onClick={() => photoInputRef.current?.click()}
+                  aria-invalid={photoError ? true : undefined}
+                  aria-describedby={photoError ? 'onboarding-photo-error' : 'onboarding-photo-hint'}
+                >
+                  {avatarPreview ? (
+                    <img src={avatarPreview} alt="Your photo" className="h-full w-full object-cover" />
+                  ) : (
+                    <Camera className="h-7 w-7 text-muted-foreground" />
+                  )}
+                </button>
+                <ProfilePhotoInput
+                  ref={photoInputRef}
+                  id="onboarding-profile-photo"
+                  onFile={(file) => onAvatar(file)}
                 />
-              </label>
-              <div className="min-w-0 text-sm">
-                <p className="font-medium text-foreground">Add a photo</p>
-                <p className="text-muted-foreground">Optional. People connect with faces.</p>
-                {avatarPreview && (
-                  <button type="button" className="mt-1 text-xs underline" onClick={() => onAvatar(null)}>
-                    Remove
-                  </button>
-                )}
+                <div className="min-w-0 text-sm">
+                  <p className="font-medium text-foreground">{ONBOARDING_PHOTO_TITLE}</p>
+                  <p id="onboarding-photo-hint" className="text-muted-foreground">{ONBOARDING_PHOTO_HINT}</p>
+                  {avatarPreview && (
+                    <button type="button" className="mt-1 text-xs underline" onClick={() => onAvatar(null)}>
+                      Remove
+                    </button>
+                  )}
+                </div>
               </div>
+              {photoError && (
+                <p id="onboarding-photo-error" role="alert" className="text-destructive text-sm">
+                  {photoError}
+                </p>
+              )}
             </div>
           )}
           {locked ? (

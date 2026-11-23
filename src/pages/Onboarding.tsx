@@ -21,6 +21,7 @@ import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from 
 import { takeEventReturn } from '../../functions/_shared/eventShare.js';
 import { accessPath } from '@/lib/accessPath';
 import { uploadAvatar } from '@/lib/avatarUpload';
+import { hasProfilePhoto, ONBOARDING_PHOTO_REQUIRED, ONBOARDING_PHOTO_SAVE_FAILED, onboardingPhotoMissing } from '@/lib/profilePhoto';
 
 export interface OnboardingData {
   displayName: string;
@@ -163,6 +164,13 @@ const Onboarding = () => {
       return;
     }
 
+    if (onboardingPhotoMissing(avatarFile, profile?.avatar_url)) {
+      toast({ title: ONBOARDING_PHOTO_REQUIRED, variant: 'destructive' });
+      setCurrentStep(0);
+      setSaving(false);
+      return;
+    }
+
     const reviewError = applicantLinksError(data.socialProfile, data.website);
     if (reviewError) {
       toast({ title: 'Review link required', description: reviewError, variant: 'destructive' });
@@ -237,16 +245,27 @@ const Onboarding = () => {
       // Access stays pending until a human approves entry. passed_exam records
       // whether the red-flag count stayed under the threshold.
       assertCleanText(data.memberOf);
-      let avatarUrl: string | null = null;
+      let avatarUrl: string | null = profile?.avatar_url && hasProfilePhoto(profile.avatar_url)
+        ? profile.avatar_url
+        : null;
       if (avatarFile) {
         try {
           avatarUrl = await uploadAvatar(user.id, avatarFile);
         } catch {
-          toast({ title: 'Photo not saved', description: 'You can add one from your profile.' });
+          toast({ title: ONBOARDING_PHOTO_SAVE_FAILED, variant: 'destructive' });
+          setCurrentStep(0);
+          setSaving(false);
+          return;
         }
       }
+      if (!hasProfilePhoto(avatarUrl)) {
+        toast({ title: ONBOARDING_PHOTO_REQUIRED, variant: 'destructive' });
+        setCurrentStep(0);
+        setSaving(false);
+        return;
+      }
       const { error: profileError } = await updateProfile({
-        ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+        avatar_url: avatarUrl,
         display_name: data.displayName.trim(),
         member_of: normalizeMemberOf(data.memberOf),
         social_links: {

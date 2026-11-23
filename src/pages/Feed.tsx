@@ -25,6 +25,7 @@ import { homeQuestCard } from "@/lib/noviQuests";
 import { FEED_RENDER_PAGE, nextRenderedCount } from "@/lib/feedWindow";
 import bearLogo from "@/assets/ether-bear-logo.webp";
 import { SupportEtherButton } from "@/components/fund/SupportEtherButton";
+import { AddProfilePhotoPrompt } from "@/components/profile/AddProfilePhotoPrompt";
 const Feed = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeCategory, setActiveCategory] = useState("All");
@@ -168,6 +169,10 @@ const Feed = () => {
           </div>
         </header>
         <ToolsSheet open={studioOpen} onOpenChange={setStudioOpen} />
+
+        {user && (
+          <AddProfilePhotoPrompt profile={profile} userId={user.id} className="mb-3" />
+        )}
 
         <StoriesRow />
 

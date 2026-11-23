@@ -21,6 +21,7 @@ import { ProfileCredits } from "@/components/credits/ProfileCredits";
 import { CreatorModuleTabs } from "@/components/profile/CreatorModuleTabs";
 import { EditProfileDetailsDialog } from "@/components/profile/EditProfileDetailsDialog";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
+import { AddProfilePhotoPrompt } from "@/components/profile/AddProfilePhotoPrompt";
 import { ProfileStats } from "@/components/profile/ProfileStats";
 import { ProfileAboutSection } from "@/components/profile/ProfileAboutSection";
 import { ProfileFolders } from "@/components/profile/ProfileFolders";
@@ -607,6 +608,9 @@ const Profile = () => {
           postCount={displayPosts.length}
           founding={profile?.founding}
         />
+        {isOwnProfile && user && (
+          <AddProfilePhotoPrompt profile={profile} userId={user.id} className="mx-4 mt-3" />
+        )}
 
         {targetUserId && <ProfileOpenTo userId={targetUserId} isOwner={!!isOwnProfile} />}
         {isOwnProfile && <EtherIdEntry />}
