@@ -32,8 +32,6 @@ export function oppositeFacing(facing: StoryFacing): StoryFacing {
   return facing === "user" ? "environment" : "user";
 }
 
-type TorchCapabilities = { torch?: boolean };
-
 export function videoTrackFrom(stream: CameraStream | MediaStream | null | undefined): MediaStreamTrack | null {
   if (!stream || typeof stream.getTracks !== "function") return null;
   const tracks = stream.getTracks();
@@ -43,17 +41,18 @@ export function videoTrackFrom(stream: CameraStream | MediaStream | null | undef
   return (named[0] ?? tracks.find((track) => "kind" in track && track.kind === "video") ?? tracks[0] ?? null) as MediaStreamTrack | null;
 }
 
-export function trackHasTorch(track: { getCapabilities?: () => TorchCapabilities } | null | undefined): boolean {
+export function trackHasTorch(track: MediaStreamTrack | { getCapabilities?: () => { torch?: boolean } } | null | undefined): boolean {
   if (!track || typeof track.getCapabilities !== "function") return false;
   try {
-    return track.getCapabilities().torch === true;
+    const capabilities = track.getCapabilities() as { torch?: boolean };
+    return capabilities.torch === true;
   } catch {
     return false;
   }
 }
 
 export async function setTrackTorch(
-  track: { applyConstraints: (constraints: MediaTrackConstraints) => Promise<void> } | null | undefined,
+  track: MediaStreamTrack | { applyConstraints: (constraints: MediaTrackConstraints) => Promise<void> } | null | undefined,
   on: boolean,
 ): Promise<boolean> {
   if (!track) return false;

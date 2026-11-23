@@ -1761,6 +1761,13 @@ body.ether-id-page {
   padding-top: max(1rem, env(safe-area-inset-top, 0px)) !important;
   padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px)) !important;
 }
+
+/* Full-bleed story composer. Controls add their own safe-area padding. */
+.story-composer {
+  padding: 0 !important;
+  background: #000 !important;
+}
+
 /* Bottom sheets sit on the home indicator, not under the notch: inset the bottom only. */
 .overlay-safe-bottom {
   padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px)) !important;

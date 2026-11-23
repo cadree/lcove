@@ -212,7 +212,7 @@ describe("burn-in", () => {
 
   it("covers a photo onto the frame before drawing type", async () => {
     const calls: string[] = [];
-    const image = { width: 2000, height: 1000 };
+    const image = { width: 2000, height: 1000 } as CanvasImageSource & { width: number; height: number };
     await burnStoryImage({
       image,
       overlays: [overlay({ text: "Title" })],
