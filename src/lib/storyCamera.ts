@@ -98,6 +98,25 @@ export function formatZoom(zoom: number): string {
 export const STORY_MAX_RECORD_MS = 15_000;
 export const STORY_HOLD_TO_RECORD_MS = 250;
 
+/**
+ * Where one shutter press is. "pressing" until the hold threshold, "starting" while the
+ * mic and recorder spin up, "recording" once the recorder runs, "unsupported" when this
+ * device cannot record (the press then ends without a photo).
+ */
+export type ShutterPhase = "pressing" | "starting" | "recording" | "unsupported";
+
+/**
+ * What letting go of the shutter does. iOS can end a touch with a cancel instead of a
+ * lift when one of its own gesture recognizers claims it, so a cancel before the hold
+ * threshold still counts as a tap. Taking a photo never depends on the recorder.
+ */
+export function shutterRelease(phase: ShutterPhase, cancelled: boolean): "photo" | "stop-recording" | "none" {
+  if (phase === "recording") return "stop-recording";
+  if (phase === "pressing") return "photo";
+  if (phase === "starting") return cancelled ? "none" : "photo";
+  return "none";
+}
+
 const STORY_RECORDER_TYPES = [
   "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
   "video/mp4;codecs=avc1,mp4a",
