@@ -455,14 +455,14 @@ const BookingSettings = () => {
             ))}
           </div>
         ) : (
-          <Card className="p-12 glass-strong border-border/30 text-center">
+          <Card className="p-6 sm:p-12 glass-strong border-border/30 text-center">
             <Calendar className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-lg font-medium mb-2">No Booking Pages Yet</h3>
             <p className="text-muted-foreground mb-6">
               Create a booking page to let others schedule time with you.
             </p>
-            <Button onClick={() => setIsCreating(true)}>
-              <Plus className="w-4 h-4 mr-2" />
+            <Button className="h-auto min-h-11 max-w-full whitespace-normal" onClick={() => setIsCreating(true)}>
+              <Plus className="w-4 h-4 mr-2 shrink-0" />
               Create Your First Booking Page
             </Button>
           </Card>
