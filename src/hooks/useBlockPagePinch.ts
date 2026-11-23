@@ -1,14 +1,14 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect } from "react";
 
 /**
  * Keep two-finger gestures on this element instead of zooming the page.
  * The app allows page zoom for accessibility, so the camera and the story
  * editor opt out where they handle pinch themselves. iOS needs the WebKit
- * gesture events and a non-passive touchmove for this.
+ * gesture events and a non-passive touchmove for this. Pass the element from a
+ * callback ref so the listeners attach when a portal mounts it late.
  */
-export function useBlockPagePinch(ref: RefObject<HTMLElement | null>, active = true) {
+export function useBlockPagePinch(node: HTMLElement | null, active = true) {
   useEffect(() => {
-    const node = ref.current;
     if (!node || !active) return;
     const stop = (event: Event) => event.preventDefault();
     const onTouch = (event: TouchEvent) => {
@@ -24,5 +24,5 @@ export function useBlockPagePinch(ref: RefObject<HTMLElement | null>, active = t
       node.removeEventListener("touchstart", onTouch);
       node.removeEventListener("touchmove", onTouch);
     };
-  }, [ref, active]);
+  }, [node, active]);
 }

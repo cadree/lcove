@@ -57,10 +57,11 @@ const browser = await chromium.launch({
   executablePath: process.env.CHROME || "/usr/bin/google-chrome",
   args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--autoplay-policy=no-user-gesture-required"],
 });
+const VPS = (process.env.VPS ?? "390,320").split(",");
 const viewports = [
   { name: "390", width: 390, height: 844, top: 47, bottom: 34 },
   { name: "320", width: 320, height: 844, top: 47, bottom: 34 },
-];
+].filter((item) => VPS.includes(item.name));
 const results = [];
 const errors = [];
 const log = (line) => { console.log(line); results.push(line); };
@@ -78,6 +79,12 @@ async function openSignedInPage(viewport) {
       sessionStorage.setItem("story-fixes-seeded", "1");
     }
     localStorage.setItem("ether:get-the-app-dismissed", "1");
+    // Linux Chrome records mp4 its own WebCodecs cannot decode; record VP8 here so the
+    // burn-in path runs end to end. iPhones record mp4/H.264, which is not covered here.
+    if (window.MediaRecorder) {
+      const native = MediaRecorder.isTypeSupported.bind(MediaRecorder);
+      MediaRecorder.isTypeSupported = (type) => !String(type).startsWith("video/mp4") && native(type);
+    }
     localStorage.setItem(`ether:card-intro:${userId}`, "1");
     localStorage.setItem(`welcome_shown_${userId}`, "true");
   }, { storageKey, stored, userId });
@@ -85,6 +92,7 @@ async function openSignedInPage(viewport) {
   const page = await context.newPage();
   page.setDefaultTimeout(20000);
   page.on("pageerror", (error) => errors.push(String(error.message || error).slice(0, 200)));
+  page.on("console", (msg) => { if (msg.type() === "error") errors.push(`console: ${msg.text().slice(0, 200)}`); });
   const cdp = await context.newCDPSession(page);
   await cdp.send("Emulation.setSafeAreaInsetsOverride", { insets: { top: viewport.top, bottom: viewport.bottom, left: 0, right: 0 } });
   return { context, page, cdp };
@@ -336,7 +344,13 @@ for (const viewport of viewports) {
       await shot(page, `${vp}-video-text`);
       if (vp === "390") {
         await page.locator("[data-story-share]").click();
-        await page.locator("[data-story-composer]").waitFor({ state: "hidden", timeout: 120000 });
+        await page.waitForTimeout(1500);
+        await shot(page, `${vp}-video-saving`);
+        const hidden = await page.locator("[data-story-composer]").waitFor({ state: "hidden", timeout: 120000 }).then(() => true).catch(() => false);
+        if (!hidden) {
+          const toasts = await page.locator("[data-sonner-toast]").allInnerTexts().catch(() => []);
+          throw new Error(`video share did not finish; toasts: ${toasts.join(" | ")}`);
+        }
         // Wait for the background upload to create the row.
         let row = null;
         for (let i = 0; i < 60 && !row; i += 1) {

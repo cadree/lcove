@@ -96,8 +96,6 @@ async function storyAudioTrack(timeoutMs: number): Promise<MediaStreamTrack | nu
 const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
   const { uploadStory } = useStories();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const cameraStageRef = useRef<HTMLDivElement>(null);
-  const frameHostRef = useRef<HTMLDivElement>(null);
   const zoomRangeRef = useRef<ZoomRange | null>(null);
   const zoomRef = useRef(1);
   const zoomFrameRef = useRef(0);
@@ -263,17 +261,19 @@ const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
     };
   }, [open, stage, facing, stopCamera]);
 
+  // Callback ref: the dialog portal mounts the camera after the first layout pass.
+  const [frameHost, setFrameHost] = useState<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
-    const host = frameHostRef.current;
-    if (!host || stage !== "camera") return;
-    const update = () => setCameraFrame(fitStoryStage(host.clientWidth, host.clientHeight));
+    if (!frameHost) return;
+    const update = () => setCameraFrame(fitStoryStage(frameHost.clientWidth, frameHost.clientHeight - CAMERA_FOOTER_PX));
     update();
     const observer = new ResizeObserver(update);
-    observer.observe(host);
+    observer.observe(frameHost);
     return () => observer.disconnect();
-  }, [stage, open]);
+  }, [frameHost]);
 
-  useBlockPagePinch(cameraStageRef, open && stage === "camera");
+  const [cameraStage, setCameraStage] = useState<HTMLDivElement | null>(null);
+  useBlockPagePinch(cameraStage, open && stage === "camera");
 
   useEffect(() => () => {
     cancelAnimationFrame(zoomFrameRef.current);
@@ -597,7 +597,7 @@ const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
         <div className="relative h-full w-full overflow-hidden bg-black">
           {stage === "camera" && (
             <div
-              ref={cameraStageRef}
+              ref={setCameraStage}
               className="flex h-full w-full touch-none select-none flex-col bg-black"
               data-story-stage="camera"
               data-story-recording={recording ? "true" : "false"}
@@ -611,7 +611,7 @@ const StoryUpload = ({ open, onOpenChange }: StoryUploadProps) => {
               onPointerCancel={onCameraPointerUp}
             >
               <div
-                ref={frameHostRef}
+                ref={setFrameHost}
                 className="flex min-h-0 flex-1 items-start justify-center"
                 style={{ paddingBottom: CAMERA_FOOTER_PX }}
               >

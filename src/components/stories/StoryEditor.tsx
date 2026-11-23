@@ -90,7 +90,7 @@ export function StoryEditor({
   shareProgress = null,
 }: StoryEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
-  const frameRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLDivElement | null>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
   const [frameSize, setFrameSize] = useState(fitStoryStage(390, 693));
@@ -125,7 +125,8 @@ export function StoryEditor({
     installStoryWysiwygHook({ overlays, background });
   }, [overlays, background]);
 
-  useBlockPagePinch(frameRef, canEditText);
+  const [frameNode, setFrameNode] = useState<HTMLDivElement | null>(null);
+  useBlockPagePinch(frameNode, canEditText);
 
   const scale = frameSize.width / STORY_FRAME_WIDTH;
   void fontsReady;
@@ -301,7 +302,10 @@ export function StoryEditor({
     >
       <div ref={hostRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black">
         <div
-          ref={frameRef}
+          ref={(node) => {
+            frameRef.current = node;
+            setFrameNode(node);
+          }}
           data-story-frame
           className={cn("relative overflow-hidden bg-black", canEditText && "touch-none select-none")}
           style={{ width: frameSize.width, height: frameSize.height }}

@@ -106,11 +106,13 @@ export async function burnStoryVideo(options: BurnStoryVideoOptions): Promise<Fi
         processedWidth: W,
         processedHeight: H,
       },
-      audio: { codec: "aac", bitrate: 128_000 },
+      // iOS records AAC, which is copied as is; other sources get any codec mp4 can hold.
+      audio: {},
     });
     const keptVideo = conversion.utilizedTracks.some((item) => item.isVideoTrack());
     if (!conversion.isValid || !keptVideo) {
-      throw new Error("This phone cannot save text on video yet.");
+      const reasons = conversion.discardedTracks.map((item) => `${item.track.type}:${item.reason}`).join(", ");
+      throw new Error(`This phone cannot save text on video yet${reasons ? ` (${reasons})` : ""}.`);
     }
     if (options.onProgress) conversion.onProgress = (value) => options.onProgress?.(value);
     await conversion.execute();
