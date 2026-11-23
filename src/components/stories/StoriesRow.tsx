@@ -10,7 +10,12 @@ import StoryUpload from './StoryUpload';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-const StoriesRow = () => {
+interface StoriesRowProps {
+  /** Narrows other members' stories, for example to the Home feed's Location. */
+  showUser?: (userId: string) => boolean;
+}
+
+const StoriesRow = ({ showUser }: StoriesRowProps = {}) => {
   const {
     user
   } = useAuth();
@@ -31,7 +36,7 @@ const StoriesRow = () => {
   const userStories = groupedStories[user?.id || ''] || [];
 
   // Filter other users' stories based on favorites filter
-  const otherUsersWithStories = Object.entries(groupedStories).filter(([userId]) => userId !== user?.id).filter(([userId]) => !showFavoritesOnly || isFavorite(userId));
+  const otherUsersWithStories = Object.entries(groupedStories).filter(([userId]) => userId !== user?.id).filter(([userId]) => !showFavoritesOnly || isFavorite(userId)).filter(([userId]) => !showUser || showUser(userId));
   const handleOpenStory = (userId: string) => {
     setSelectedUserId(userId);
   };
