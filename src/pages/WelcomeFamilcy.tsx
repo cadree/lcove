@@ -5,8 +5,7 @@ import { EtherWordmark } from "@/components/brand/EtherWordmark";
 import { PageMeta } from "@/components/seo/PageMeta";
 import { useAuth } from "@/contexts/AuthContext";
 import { callRpc } from "@/lib/rpc";
-
-type WelcomeStatus = { needs_setup: boolean; card_registered: boolean };
+import { AFTER_WELCOME_PATH, type WelcomeStatus } from "@/lib/firstRun";
 
 /** One clear greeting, then card registration. No extra marketing copy. */
 export default function WelcomeFamilcy() {
@@ -22,6 +21,11 @@ export default function WelcomeFamilcy() {
         if (cancelled) return;
         if (!value?.needs_setup) {
           navigate("/explore?section=people", { replace: true });
+        } else if (value.card_registered) {
+          // The card is already made: finish here instead of asking again.
+          return callRpc<void>("complete_my_familcy_welcome").then(() => {
+            if (!cancelled) navigate(AFTER_WELCOME_PATH, { replace: true });
+          });
         } else {
           setStatus("ready");
         }

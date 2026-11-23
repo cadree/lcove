@@ -1,6 +1,6 @@
 import { NumberInput } from "@/components/ui/number-input";
 import React, { useState, useCallback } from 'react';
-import { Plus, Trash2, DollarSign, Coins, Upload, X, Image, Link, FileText, Film, Package, Calendar, MapPin, Wrench, Users2, Target, Milestone, Lock, FolderKanban } from 'lucide-react';
+import { Plus, Trash2, DollarSign, Coins, Upload, X, Image, Link, FileText, Film, Package, Calendar, MapPin, Wrench, Users2, Target, Milestone, Lock, FolderKanban, ChevronDown } from 'lucide-react';
 import { useProjects } from '@/hooks/useProjects';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { canCreateProject, createPayHint, filledProjectExtras } from '@/lib/projectCreate';
 import { milestonesForInsert, roleCreditAmount } from '@/lib/projectCollaborations';
 import { ItemListField, XpExplainer } from '@/components/projects/ItemListField';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -85,6 +87,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   const [isPrivate, setIsPrivate] = useState(false);
   const [hideFromCalendar, setHideFromCalendar] = useState(false);
   const [listingType, setListingType] = useState<'project' | 'gig'>('project');
+  const [showMore, setShowMore] = useState(false);
 
   // Expected outcome
   const [selectedOutcomes, setSelectedOutcomes] = useState<string[]>([]);
@@ -337,14 +340,19 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     setListingType('project');
     setAllowCustomRoles(false);
     setDeliverables([{ type: '', publish_date: '', publish_location: '' }]);
+    setShowMore(false);
   };
 
   const roleCredits = roles.reduce((sum, role) => sum + roleCreditAmount(role.credit_amount), 0);
-  const canSubmit = title.trim() && (
-    projectType === 'volunteer' ||
-    (projectType === 'paid' && budgetNum > 0) ||
-    (projectType === 'hybrid' && (budgetNum > 0 || roleCredits > 0))
-  );
+  const canSubmit = canCreateProject({ title, projectType, budget: budgetNum, roleCredits });
+  const payHint = title.trim() ? createPayHint({ projectType, budget: budgetNum, roleCredits }) : null;
+  const extrasCount = filledProjectExtras({
+    isPrivate, hideFromCalendar, listingType, outcomes: selectedOutcomes.length, attachments: attachments.length,
+    budgetRange, equipmentNeeded, locationSecured, venue, propsNeeded, sponsorshipNeeded, vendorsNeeded,
+    startDate, endDate, milestoneDates: milestones.filter((m) => m.due_date).length,
+    roles: roles.filter((r) => r.role_name.trim()).length, allowCustomRoles,
+    deliverables: deliverables.filter((d) => d.type.trim()).length,
+  });
 
   const fileTypeBadge = (type: string) => {
     const colors: Record<string, string> = {
@@ -368,7 +376,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
         <DialogHeader>
           <DialogTitle>Create New Project</DialogTitle>
           <p id="create-project-description" className="text-sm text-muted-foreground">
-            Set up your project details, budget, timeline, and roles needed.
+            Only a title and how it pays are needed to start. Everything else is optional.
           </p>
         </DialogHeader>
 
@@ -382,161 +390,6 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
             <div>
               <Label htmlFor="description">Description</Label>
               <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe your project, vision, and what you're looking for..." rows={3} />
-            </div>
-          </div>
-
-          {/* Project Visibility */}
-          <div className="space-y-3">
-            <Label>Project Visibility</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setIsPrivate(false)}
-                className={cn(
-                  "p-3 rounded-lg border text-center transition-all text-sm",
-                  !isPrivate ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"
-                )}
-              >
-                <FolderKanban className="h-5 w-5 mx-auto mb-1" />
-                Public Project
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsPrivate(true)}
-                className={cn(
-                  "p-3 rounded-lg border text-center transition-all text-sm",
-                  isPrivate ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"
-                )}
-              >
-                <Lock className="h-5 w-5 mx-auto mb-1" />
-                Private Client
-              </button>
-            </div>
-            {isPrivate && (
-              <p className="text-xs text-muted-foreground">Hidden from discovery, the community calendar, and new-project notifications. Members and invited people can still open it.</p>
-            )}
-            <div className="flex items-center justify-between p-3 border border-border rounded-lg">
-              <div>
-                <Label className="text-sm">Hide from community calendar</Label>
-                <p className="text-xs text-muted-foreground">Public projects are added to the calendar unless you hide them</p>
-              </div>
-              <Switch checked={hideFromCalendar} onCheckedChange={setHideFromCalendar} />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Post as</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {(['project', 'gig'] as const).map((kind) => (
-                <button
-                  key={kind}
-                  type="button"
-                  onClick={() => setListingType(kind)}
-                  className={cn(
-                    "mono-label rounded-[14px] border p-3 text-[11px]",
-                    listingType === kind ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"
-                  )}
-                >
-                  {kind === 'project' ? 'Project idea' : 'Gig'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Expected Outcome (only for public) */}
-          {!isPrivate && (
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2"><Target className="h-4 w-4" /> Expected Outcome</Label>
-            <div className="flex flex-wrap gap-2">
-              {EXPECTED_OUTCOMES.map(outcome => (
-                <button
-                  key={outcome}
-                  type="button"
-                  onClick={() => toggleOutcome(outcome)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-full text-sm border transition-all",
-                    selectedOutcomes.includes(outcome)
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:border-primary/50"
-                  )}
-                >
-                  {outcome}
-                </button>
-              ))}
-            </div>
-          </div>
-          )}
-
-          {/* Mood Board / Visual References */}
-          <div className="space-y-3">
-            <Label className="flex items-center gap-2"><Image className="h-4 w-4" /> Visual References / Mood Board</Label>
-            <p className="text-xs text-muted-foreground">Upload images, PDFs, docs, ZIPs, or paste links (Figma, YouTube, Google Drive)</p>
-
-            {/* Drop zone */}
-            <div
-              onDrop={handleDrop}
-              onDragOver={(e) => e.preventDefault()}
-              className="border-2 border-dashed border-border rounded-lg p-4 hover:bg-muted/30 transition-colors"
-            >
-              <div className="flex flex-col items-center gap-2">
-                <Upload className="h-6 w-6 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Drag & drop files here or</p>
-                <label className="cursor-pointer">
-                  <span className="text-sm text-primary hover:underline">browse files</span>
-                  <input type="file" className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.zip,.mp4,.mov" onChange={handleFileUpload} />
-                </label>
-              </div>
-            </div>
-
-            {/* Link input */}
-            <div className="flex gap-2">
-              <Input
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                placeholder="Paste a link (Figma, YouTube, Google Drive...)"
-                className="flex-1"
-              />
-              <Button type="button" variant="outline" size="sm" onClick={addLink} disabled={!linkUrl.trim()}>
-                <Link className="h-4 w-4 mr-1" /> Add
-              </Button>
-            </div>
-
-            {/* Attachment previews */}
-            {attachments.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {attachments.map((att, i) => (
-                  <div key={i} className="relative border border-border rounded-lg p-2 group">
-                    {att.preview ? (
-                      <img src={att.preview} alt={att.name} className="w-full h-20 object-cover rounded" />
-                    ) : (
-                      <div className="w-full h-20 bg-muted/30 rounded flex items-center justify-center">
-                        {att.type === 'pdf' && <FileText className="h-8 w-8 text-red-400" />}
-                        {att.type === 'video' && <Film className="h-8 w-8 text-purple-400" />}
-                        {att.type === 'zip' && <Package className="h-8 w-8 text-emerald-400" />}
-                        {att.type === 'link' && <Link className="h-8 w-8 text-cyan-400" />}
-                        {att.type === 'doc' && <FileText className="h-8 w-8 text-amber-400" />}
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between mt-1">
-                      <Badge className={cn('text-[10px]', fileTypeBadge(att.type))}>{att.type.toUpperCase()}</Badge>
-                      <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{att.name}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeAttachment(i)}
-                      className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Public toggle */}
-            <div className="flex items-center justify-between">
-              <Label htmlFor="moodboard-public" className="text-sm">Make Mood Board Public</Label>
-              <Switch id="moodboard-public" checked={isMoodboardPublic} onCheckedChange={setIsMoodboardPublic} />
             </div>
           </div>
 
@@ -589,200 +442,373 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
             </div>
           )}
 
-          {/* Budget & Resources */}
-          <div className="space-y-4">
-            <Label className="flex items-center gap-2"><Wrench className="h-4 w-4" /> Budget & Resources</Label>
-            <div>
-              <Label className="text-sm text-muted-foreground">Budget Range</Label>
-              <Select value={budgetRange} onValueChange={setBudgetRange}>
-                <SelectTrigger><SelectValue placeholder="Select range" /></SelectTrigger>
-                <SelectContent>
-                  {BUDGET_RANGES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <ItemListField label="Equipment needed" value={equipmentNeeded} onChange={setEquipmentNeeded} placeholder="Camera, lights, stand" />
+          {payHint && <p className="text-sm text-muted-foreground" role="status">{payHint}</p>}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex items-center justify-between p-3 border border-border rounded-lg">
-                <Label className="text-sm">Location Secured?</Label>
-                <Switch checked={locationSecured} onCheckedChange={setLocationSecured} />
-              </div>
-              {locationSecured && (
-                <div>
-                  <Label className="text-sm text-muted-foreground">Venue</Label>
-                  <Input value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Venue name / address" />
-                </div>
-              )}
-            </div>
-
-            <ItemListField label="Props needed" value={propsNeeded} onChange={setPropsNeeded} placeholder="Props, wardrobe" />
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex items-center justify-between p-3 border border-border rounded-lg">
-                <Label className="text-sm">Sponsorship Needed?</Label>
-                <Switch checked={sponsorshipNeeded} onCheckedChange={setSponsorshipNeeded} />
-              </div>
-              <div className="flex items-center justify-between p-3 border border-border rounded-lg">
-                <Label className="text-sm">Vendors Needed?</Label>
-                <Switch checked={vendorsNeeded} onCheckedChange={setVendorsNeeded} />
-              </div>
-            </div>
-          </div>
-
-          {/* Timeline */}
-          <div className="space-y-4">
-            <Label className="flex items-center gap-2"><Calendar className="h-4 w-4" /> Project Timeline</Label>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">Start Date</Label>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">Start Time</Label>
-                <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">End Date</Label>
-                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">End Time</Label>
-                <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-              </div>
-            </div>
-          </div>
-
-          {/* Milestones */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-2"><Milestone className="h-4 w-4" /> Milestones</Label>
-              <Button type="button" variant="outline" size="sm" onClick={addMilestone}>
-                <Plus className="h-4 w-4 mr-1" /> Custom
-              </Button>
-            </div>
-            <div className="space-y-2">
-              {milestones.map((ms, i) => (
-                <div key={i} className="flex min-w-0 flex-col gap-2 bg-muted/20 rounded-lg p-3 sm:flex-row sm:items-center">
-                  <div className="min-w-0 flex-1">
-                    <Input
-                      value={ms.title}
-                      onChange={(e) => updateMilestone(i, 'title', e.target.value)}
-                      placeholder="Milestone name"
-                      className="mb-1 w-full"
-                    />
-                  </div>
-                  <Input
-                    type="date"
-                    value={ms.due_date}
-                    onChange={(e) => updateMilestone(i, 'due_date', e.target.value)}
-                    className="w-full min-w-0 sm:w-40"
-                  />
-                  {ms.phase === 'custom' && (
-                    <Button type="button" variant="ghost" size="sm" onClick={() => removeMilestone(i)} className="text-muted-foreground hover:text-destructive">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Roles */}
-          <div className="space-y-4">
-            <XpExplainer />
-            <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-2"><Users2 className="h-4 w-4" /> Roles Needed</Label>
-              <Button type="button" variant="outline" size="sm" onClick={addRole}>
-                <Plus className="h-4 w-4 mr-1" /> Add Role
-              </Button>
-            </div>
-
-            <div className="flex items-center justify-between p-3 border border-border rounded-lg">
-              <div>
-                <Label className="text-sm">Allow custom role proposals</Label>
-                <p className="text-xs text-muted-foreground">Let applicants define how they'd like to contribute</p>
-              </div>
-              <Switch checked={allowCustomRoles} onCheckedChange={setAllowCustomRoles} />
-            </div>
-
-            <div className="space-y-3">
-              {roles.map((role, index) => (
-                <div key={index} className="bg-muted/20 rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Role {index + 1}</span>
-                    {roles.length > 1 && (
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeRole(index)} className="text-muted-foreground hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+          {/* Everything else is optional and can be added later from the project page */}
+          <Collapsible open={showMore} onOpenChange={setShowMore} className="rounded-xl border border-border">
+            <CollapsibleTrigger asChild>
+              <button type="button" className="flex min-h-11 w-full items-center justify-between gap-3 px-4 py-3 text-left">
+                <span>
+                  <span className="block font-medium">More details</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {extrasCount > 0 ? `${extrasCount} added. ` : ""}Optional: roles, visibility, mood board, timeline, milestones, deliverables. You can add these later from the project page.
+                  </span>
+                </span>
+                <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", showMore && "rotate-180")} />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent forceMount className="space-y-6 px-4 pb-4 data-[state=closed]:hidden">
+              {/* Project Visibility */}
+              <div className="space-y-3">
+                <Label>Project Visibility</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsPrivate(false)}
+                    className={cn(
+                      "p-3 rounded-lg border text-center transition-all text-sm",
+                      !isPrivate ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"
                     )}
+                  >
+                    <FolderKanban className="h-5 w-5 mx-auto mb-1" />
+                    Public Project
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsPrivate(true)}
+                    className={cn(
+                      "p-3 rounded-lg border text-center transition-all text-sm",
+                      isPrivate ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"
+                    )}
+                  >
+                    <Lock className="h-5 w-5 mx-auto mb-1" />
+                    Private Client
+                  </button>
+                </div>
+                {isPrivate && (
+                  <p className="text-xs text-muted-foreground">Hidden from discovery, the community calendar, and new-project notifications. Members and invited people can still open it.</p>
+                )}
+                <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+                  <div>
+                    <Label className="text-sm">Hide from community calendar</Label>
+                    <p className="text-xs text-muted-foreground">Public projects are added to the calendar unless you hide them</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="col-span-2 sm:col-span-1">
-                      <Input value={role.role_name} onChange={(e) => updateRole(index, 'role_name', e.target.value)} placeholder="Role name (e.g., Director)" />
-                    </div>
-                    <div className="col-span-2 sm:col-span-1">
-                      <Input value={role.description} onChange={(e) => updateRole(index, 'description', e.target.value)} placeholder="Brief description" />
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Pay (USD)</Label>
-                      <div className="relative">
-                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <NumberInput  value={role.payout_amount || ''} onValueChange={value => updateRole(index, 'payout_amount', value)} placeholder="0" className="pl-9" min={0} />
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">XP / barter credit</Label>
-                      <NumberInput  value={role.credit_amount || ''} onValueChange={value => updateRole(index, 'credit_amount', value)} placeholder="0" min={0} />
-                    </div>
-                    <div>
-                      <NumberInput integer value={role.slots_available} onValueChange={value => updateRole(index, 'slots_available', value)} placeholder="Slots" min={1} />
-                      <span className="text-xs text-muted-foreground">slots available</span>
-                    </div>
+                  <Switch checked={hideFromCalendar} onCheckedChange={setHideFromCalendar} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Post as</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['project', 'gig'] as const).map((kind) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      onClick={() => setListingType(kind)}
+                      className={cn(
+                        "mono-label rounded-[14px] border p-3 text-[11px]",
+                        listingType === kind ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"
+                      )}
+                    >
+                      {kind === 'project' ? 'Project idea' : 'Gig'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Expected Outcome (only for public) */}
+              {!isPrivate && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2"><Target className="h-4 w-4" /> Expected Outcome</Label>
+                <div className="flex flex-wrap gap-2">
+                  {EXPECTED_OUTCOMES.map(outcome => (
+                    <button
+                      key={outcome}
+                      type="button"
+                      onClick={() => toggleOutcome(outcome)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-full text-sm border transition-all",
+                        selectedOutcomes.includes(outcome)
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground hover:border-primary/50"
+                      )}
+                    >
+                      {outcome}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              )}
+
+              {/* Mood Board / Visual References */}
+              <div className="space-y-3">
+                <Label className="flex items-center gap-2"><Image className="h-4 w-4" /> Visual References / Mood Board</Label>
+                <p className="text-xs text-muted-foreground">Upload images, PDFs, docs, ZIPs, or paste links (Figma, YouTube, Google Drive)</p>
+
+                {/* Drop zone */}
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={(e) => e.preventDefault()}
+                  className="border-2 border-dashed border-border rounded-lg p-4 hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <Upload className="h-6 w-6 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Drag & drop files here or</p>
+                    <label className="cursor-pointer">
+                      <span className="text-sm text-primary hover:underline">browse files</span>
+                      <input type="file" className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.zip,.mp4,.mov" onChange={handleFileUpload} />
+                    </label>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Deliverables */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-2"><Package className="h-4 w-4" /> Deliverables</Label>
-              <Button type="button" variant="outline" size="sm" onClick={addDeliverable}>
-                <Plus className="h-4 w-4 mr-1" /> Add
-              </Button>
-            </div>
-            {deliverables.map((d, i) => (
-              <div key={i} className="bg-muted/20 rounded-lg p-3 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Select value={d.type} onValueChange={(v) => updateDeliverable(i, 'type', v)}>
-                    <SelectTrigger className="flex-1"><SelectValue placeholder="What will be delivered?" /></SelectTrigger>
+                {/* Link input */}
+                <div className="flex gap-2">
+                  <Input
+                    value={linkUrl}
+                    onChange={(e) => setLinkUrl(e.target.value)}
+                    placeholder="Paste a link (Figma, YouTube, Google Drive...)"
+                    className="flex-1"
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={addLink} disabled={!linkUrl.trim()}>
+                    <Link className="h-4 w-4 mr-1" /> Add
+                  </Button>
+                </div>
+
+                {/* Attachment previews */}
+                {attachments.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {attachments.map((att, i) => (
+                      <div key={i} className="relative border border-border rounded-lg p-2 group">
+                        {att.preview ? (
+                          <img src={att.preview} alt={att.name} className="w-full h-20 object-cover rounded" />
+                        ) : (
+                          <div className="w-full h-20 bg-muted/30 rounded flex items-center justify-center">
+                            {att.type === 'pdf' && <FileText className="h-8 w-8 text-red-400" />}
+                            {att.type === 'video' && <Film className="h-8 w-8 text-purple-400" />}
+                            {att.type === 'zip' && <Package className="h-8 w-8 text-emerald-400" />}
+                            {att.type === 'link' && <Link className="h-8 w-8 text-cyan-400" />}
+                            {att.type === 'doc' && <FileText className="h-8 w-8 text-amber-400" />}
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between mt-1">
+                          <Badge className={cn('text-[10px]', fileTypeBadge(att.type))}>{att.type.toUpperCase()}</Badge>
+                          <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{att.name}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(i)}
+                          className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Public toggle */}
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="moodboard-public" className="text-sm">Make Mood Board Public</Label>
+                  <Switch id="moodboard-public" checked={isMoodboardPublic} onCheckedChange={setIsMoodboardPublic} />
+                </div>
+              </div>
+
+              {/* Budget & Resources */}
+              <div className="space-y-4">
+                <Label className="flex items-center gap-2"><Wrench className="h-4 w-4" /> Budget & Resources</Label>
+                <div>
+                  <Label className="text-sm text-muted-foreground">Budget Range</Label>
+                  <Select value={budgetRange} onValueChange={setBudgetRange}>
+                    <SelectTrigger><SelectValue placeholder="Select range" /></SelectTrigger>
                     <SelectContent>
-                      {DELIVERABLE_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      {BUDGET_RANGES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  {deliverables.length > 1 && (
-                    <Button type="button" variant="ghost" size="sm" onClick={() => removeDeliverable(i)} className="text-muted-foreground hover:text-destructive">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                </div>
+                <ItemListField label="Equipment needed" value={equipmentNeeded} onChange={setEquipmentNeeded} placeholder="Camera, lights, stand" />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+                    <Label className="text-sm">Location Secured?</Label>
+                    <Switch checked={locationSecured} onCheckedChange={setLocationSecured} />
+                  </div>
+                  {locationSecured && (
+                    <div>
+                      <Label className="text-sm text-muted-foreground">Venue</Label>
+                      <Input value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Venue name / address" />
+                    </div>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Publish Date</Label>
-                    <Input type="date" value={d.publish_date} onChange={(e) => updateDeliverable(i, 'publish_date', e.target.value)} />
+
+                <ItemListField label="Props needed" value={propsNeeded} onChange={setPropsNeeded} placeholder="Props, wardrobe" />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+                    <Label className="text-sm">Sponsorship Needed?</Label>
+                    <Switch checked={sponsorshipNeeded} onCheckedChange={setSponsorshipNeeded} />
                   </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Where Published</Label>
-                    <Input value={d.publish_location} onChange={(e) => updateDeliverable(i, 'publish_location', e.target.value)} placeholder="Instagram, YouTube..." />
+                  <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+                    <Label className="text-sm">Vendors Needed?</Label>
+                    <Switch checked={vendorsNeeded} onCheckedChange={setVendorsNeeded} />
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+
+              {/* Timeline */}
+              <div className="space-y-4">
+                <Label className="flex items-center gap-2"><Calendar className="h-4 w-4" /> Project Timeline</Label>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">Start Date</Label>
+                    <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">Start Time</Label>
+                    <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">End Date</Label>
+                    <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">End Time</Label>
+                    <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Milestones */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2"><Milestone className="h-4 w-4" /> Milestones</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addMilestone}>
+                    <Plus className="h-4 w-4 mr-1" /> Custom
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {milestones.map((ms, i) => (
+                    <div key={i} className="flex min-w-0 flex-col gap-2 bg-muted/20 rounded-lg p-3 sm:flex-row sm:items-center">
+                      <div className="min-w-0 flex-1">
+                        <Input
+                          value={ms.title}
+                          onChange={(e) => updateMilestone(i, 'title', e.target.value)}
+                          placeholder="Milestone name"
+                          className="mb-1 w-full"
+                        />
+                      </div>
+                      <Input
+                        type="date"
+                        value={ms.due_date}
+                        onChange={(e) => updateMilestone(i, 'due_date', e.target.value)}
+                        className="w-full min-w-0 sm:w-40"
+                      />
+                      {ms.phase === 'custom' && (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeMilestone(i)} className="text-muted-foreground hover:text-destructive">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Roles */}
+              <div className="space-y-4">
+                <XpExplainer />
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2"><Users2 className="h-4 w-4" /> Roles Needed</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addRole}>
+                    <Plus className="h-4 w-4 mr-1" /> Add Role
+                  </Button>
+                </div>
+
+                <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+                  <div>
+                    <Label className="text-sm">Allow custom role proposals</Label>
+                    <p className="text-xs text-muted-foreground">Let applicants define how they'd like to contribute</p>
+                  </div>
+                  <Switch checked={allowCustomRoles} onCheckedChange={setAllowCustomRoles} />
+                </div>
+
+                <div className="space-y-3">
+                  {roles.map((role, index) => (
+                    <div key={index} className="bg-muted/20 rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Role {index + 1}</span>
+                        {roles.length > 1 && (
+                          <Button type="button" variant="ghost" size="sm" onClick={() => removeRole(index)} className="text-muted-foreground hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="col-span-2 sm:col-span-1">
+                          <Input value={role.role_name} onChange={(e) => updateRole(index, 'role_name', e.target.value)} placeholder="Role name (e.g., Director)" />
+                        </div>
+                        <div className="col-span-2 sm:col-span-1">
+                          <Input value={role.description} onChange={(e) => updateRole(index, 'description', e.target.value)} placeholder="Brief description" />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Pay (USD)</Label>
+                          <div className="relative">
+                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <NumberInput  value={role.payout_amount || ''} onValueChange={value => updateRole(index, 'payout_amount', value)} placeholder="0" className="pl-9" min={0} />
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">XP / barter credit</Label>
+                          <NumberInput  value={role.credit_amount || ''} onValueChange={value => updateRole(index, 'credit_amount', value)} placeholder="0" min={0} />
+                        </div>
+                        <div>
+                          <NumberInput integer value={role.slots_available} onValueChange={value => updateRole(index, 'slots_available', value)} placeholder="Slots" min={1} />
+                          <span className="text-xs text-muted-foreground">slots available</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Deliverables */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2"><Package className="h-4 w-4" /> Deliverables</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addDeliverable}>
+                    <Plus className="h-4 w-4 mr-1" /> Add
+                  </Button>
+                </div>
+                {deliverables.map((d, i) => (
+                  <div key={i} className="bg-muted/20 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Select value={d.type} onValueChange={(v) => updateDeliverable(i, 'type', v)}>
+                        <SelectTrigger className="flex-1"><SelectValue placeholder="What will be delivered?" /></SelectTrigger>
+                        <SelectContent>
+                          {DELIVERABLE_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {deliverables.length > 1 && (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeDeliverable(i)} className="text-muted-foreground hover:text-destructive">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Publish Date</Label>
+                        <Input type="date" value={d.publish_date} onChange={(e) => updateDeliverable(i, 'publish_date', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Where Published</Label>
+                        <Input value={d.publish_location} onChange={(e) => updateDeliverable(i, 'publish_location', e.target.value)} placeholder="Instagram, YouTube..." />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           <div className="flex justify-end gap-3 pt-4 pb-6 border-t bg-background mt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

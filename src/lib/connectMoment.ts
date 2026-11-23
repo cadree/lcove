@@ -33,6 +33,8 @@ export interface ConnectNudge {
   conversationId: string | null;
   started: boolean;
   at: number;
+  /** Open-to tags (e.g. collabs, paid_gigs). Older stored nudges do not have them. */
+  openTo?: string[];
 }
 
 const storageKey = (viewerId: string) => `ether:connect-nudge:${viewerId}`;
@@ -150,6 +152,32 @@ export function travelHref(person: Pick<ConnectNudge, "tripCity" | "city">): str
   const params = new URLSearchParams({ action: "create" });
   if (city) params.set("city", city);
   return `/travel?${params.toString()}`;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Explore link that opens the match intro sheet for this person (push taps and match notices). */
+export function connectedPath(userId: string): string {
+  return `/explore?section=people&connected=${encodeURIComponent(userId)}`;
+}
+
+/** The person id in ?connected=, or null when missing or not an id. */
+export function connectedParam(search: string): string | null {
+  const value = new URLSearchParams(search).get("connected");
+  return value && UUID.test(value) ? value : null;
+}
+
+/** Up to three things you have in common: shared skills, passions, then the same city. */
+export function sharedGround(person: IcebreakerPerson, me?: IcebreakerMe | null): string[] {
+  if (!me) return [];
+  const have = new Set([...me.skills, ...me.passions].map(norm).filter(Boolean));
+  const out: string[] = [];
+  for (const item of [...person.skills, ...person.passions]) {
+    if (have.has(norm(item)) && !out.some((seen) => norm(seen) === norm(item))) out.push(item.trim());
+  }
+  const theirs = cityName(person.city);
+  if (theirs && norm(theirs) === norm(cityName(me.city))) out.push(theirs);
+  return out.slice(0, 3);
 }
 
 export function messageHref(conversationId: string): string {

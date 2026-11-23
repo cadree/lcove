@@ -13,6 +13,7 @@ import { respondItemInvite } from '@/lib/itemInviteApi';
 import { useQueryClient } from '@tanstack/react-query';
 import { notificationDisplay, type PostLikePreview } from '@/lib/likeNotice';
 import { noticePath } from '@/lib/noticePath';
+import { connectedPath } from '@/lib/connectMoment';
 
 interface NotificationItemProps {
   notification: Notification;
@@ -105,6 +106,12 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
       return;
     }
     if (notification.type === 'match') {
+      // Open the match intro (who they are, what you share, start a chat or a project).
+      const other = notification.data?.user_id;
+      if (typeof other === 'string' && /^[0-9a-f-]{36}$/i.test(other)) {
+        navigate(connectedPath(other));
+        return;
+      }
       const chat = notification.data?.conversation_id;
       if (typeof chat === 'string' && /^[0-9a-f-]{36}$/i.test(chat)) {
         navigate(`/messages?chat=${chat}`);

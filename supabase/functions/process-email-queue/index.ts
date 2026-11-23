@@ -22,6 +22,11 @@ function productionDeps() {
       if (data?.error) throw new Error(String(data.error));
       assertMemberApplicationPushDelivered(data);
     },
+    deliverPush: async (payload: Record<string, unknown>) => {
+      const { data, error } = await supabase.functions.invoke("send-push-notification", { body: payload });
+      if (error) throw error;
+      return data;
+    },
   };
 }
 

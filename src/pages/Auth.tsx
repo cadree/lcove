@@ -15,7 +15,8 @@ import { WAITLIST_MODE } from '@/config/launch';
 import { PageMeta } from '@/components/seo/PageMeta';
 import { EMAIL_CONFIRMED_BODY, EMAIL_CONFIRMED_TITLE, HERO_TAGLINE, VERIFY_SIGNAL_BODY, VERIFY_SIGNAL_TITLE } from '@/content/copy';
 import { getAuthRedirectUrl } from '@/lib/capacitorStorage';
-import { resendCooldownRemaining } from '@/lib/resendCooldown';
+import { RESEND_COOLDOWN_MS } from '@/lib/resendCooldown';
+import { classifySignup, emailSendingHelp, resendWaitRemaining, retryAfterSeconds, signupEmailDeliveryFailed, signupLimitNextStep, SIGNUP_NOT_SENT_NOTE } from '@/lib/signupRecovery';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { logAuthEvent, logAuthError } from '@/lib/authDebug';
@@ -46,12 +47,20 @@ const passwordSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters').max(100),
 });
 
-type AuthMode = 'login' | 'signup' | 'forgot' | 'reset' | 'confirm-email' | 'confirmed-signin';
+type AuthMode = 'login' | 'signup' | 'forgot' | 'reset' | 'confirm-email' | 'confirmed-signin' | 'account-exists';
 
 /**
  * Map Supabase auth errors to user-friendly messages
  */
-const getAuthErrorMessage = (error: Error): { title: string; description: string } => {
+const getAuthErrorMessage = (error: Error & { code?: string; status?: number }): { title: string; description: string } => {
+  const limitHelp = emailSendingHelp(error);
+  if (limitHelp) return limitHelp;
+  if (signupEmailDeliveryFailed(error)) {
+    return {
+      title: 'Email couldn’t be sent',
+      description: 'We couldn’t send your code just now. Try Resend code in a minute, or sign in if you already verified your email.',
+    };
+  }
   const message = error.message.toLowerCase();
   
   // Network errors
@@ -137,6 +146,11 @@ const Auth = () => {
   const [isVerifyingCode, setIsVerifyingCode] = useState(false);
   const [resendNow, setResendNow] = useState(() => Date.now());
   const [isResending, setIsResending] = useState(false);
+  // Server-side wait (from a 429), which can be longer than the local cooldown.
+  const [resendBlockedUntil, setResendBlockedUntil] = useState<number | null>(null);
+  // Stays on screen; a toast disappears before people read it.
+  const [recoveryNote, setRecoveryNote] = useState<string | null>(null);
+  const [isSendingLink, setIsSendingLink] = useState(false);
   const inviteToken = searchParams.get('invite')?.trim() ?? '';
   const referralCode = normalizedMemberReferralCode(searchParams.get('ref'));
   const [referralPreview, setReferralPreview] = useState<MemberReferralPreview | null>(null);
@@ -166,42 +180,87 @@ const Auth = () => {
   }, []);
 
   useEffect(() => {
-    if (confirmationSentAt == null) return;
+    if (confirmationSentAt == null && resendBlockedUntil == null) return;
     setResendNow(Date.now());
     const id = window.setInterval(() => setResendNow(Date.now()), 1000);
     return () => window.clearInterval(id);
-  }, [confirmationSentAt]);
+  }, [confirmationSentAt, resendBlockedUntil]);
 
-  const resendWaitMs = resendCooldownRemaining(confirmationSentAt, resendNow);
+  const resendWaitMs = resendWaitRemaining(confirmationSentAt, resendBlockedUntil, resendNow, RESEND_COOLDOWN_MS);
+
+  const confirmedRedirectPath = inviteToken
+    ? `/auth?confirmed=1&invite=${encodeURIComponent(inviteToken)}`
+    : '/auth?confirmed=1';
+
+  /** Respect the server's wait after a 429 so the button counts down instead of failing again. */
+  const noteEmailLimit = (error: { message?: string } | null | undefined) => {
+    const seconds = retryAfterSeconds(error);
+    setResendBlockedUntil(Date.now() + (seconds ?? 60) * 1000);
+  };
 
   const handleResendConfirmation = async () => {
-    if (resendWaitMs > 0 || isResending || !emailSchema.safeParse({ email }).success) {
+    if (isResending || resendWaitMs > 0) return;
+    if (!emailSchema.safeParse({ email }).success) {
       setErrors({ email: 'Enter your signup email to request a new code.' });
       return;
     }
+    setErrors({});
+    setRecoveryNote(null);
     setIsResending(true);
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email,
       options: {
-        emailRedirectTo: getAuthRedirectUrl(
-          inviteToken ? `/auth?confirmed=1&invite=${encodeURIComponent(inviteToken)}` : '/auth?confirmed=1',
-        ),
+        emailRedirectTo: getAuthRedirectUrl(confirmedRedirectPath),
       },
     });
     setIsResending(false);
     if (error) {
       const { title, description } = getAuthErrorMessage(error);
+      if (emailSendingHelp(error)) noteEmailLimit(error);
+      setRecoveryNote(description);
       toast({ title, description, variant: 'destructive' });
       return;
     }
     setEmailCode('');
     setMode('confirm-email');
     setConfirmationSentAt(Date.now());
+    setResendBlockedUntil(null);
+    // Auth answers 200 here even when the email is already verified and nothing
+    // was sent, so say what to do if no code shows up.
+    setRecoveryNote('If this email still needs verifying, a new 6-digit code is on its way (check spam). Nothing after a minute? It may already be verified: sign in, or email yourself a sign-in link.');
     toast({
       title: 'Check your email',
-      description: 'If your email still needs verification, we sent a new code. Already verified? Sign in to resume your application.',
+      description: 'If your email still needs verification, we sent a new code.',
     });
+  };
+
+  /** Works for a verified email that never finished joining: one tap from the inbox back into the app. */
+  const handleSendSignInLink = async () => {
+    if (isSendingLink || resendWaitMs > 0) return;
+    if (!emailSchema.safeParse({ email }).success) {
+      setErrors({ email: 'Enter your email to get a sign-in link.' });
+      return;
+    }
+    setErrors({});
+    setIsSendingLink(true);
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false, emailRedirectTo: getAuthRedirectUrl(confirmedRedirectPath) },
+    });
+    setIsSendingLink(false);
+    if (error) {
+      logAuthError('Sign-in link failed', error);
+      const { title, description } = getAuthErrorMessage(error);
+      if (emailSendingHelp(error)) noteEmailLimit(error);
+      setRecoveryNote(description);
+      toast({ title, description, variant: 'destructive' });
+      return;
+    }
+    logAuthEvent('Sign-in link sent');
+    setConfirmationSentAt(Date.now());
+    setRecoveryNote(`Sign-in link sent to ${email}. Open it on this phone or in this browser to pick up where you left off. If you hadn’t verified yet, the email has a code instead.`);
+    toast({ title: 'Check your email', description: 'We sent you a sign-in link.' });
   };
 
 
@@ -394,8 +453,10 @@ const Auth = () => {
           const { title, description } = getAuthErrorMessage(error);
           toast({ title, description, variant: 'destructive' });
           if (error.message.toLowerCase().includes('email not confirmed')) {
+            // Right password, never verified: send a fresh code straight away.
             setMode('confirm-email');
             setConfirmationSentAt(null);
+            void handleResendConfirmation();
           }
         } else {
           logAuthEvent('Login successful');
@@ -410,18 +471,51 @@ const Auth = () => {
           displayName: displayName.trim(),
           ...(inviteToken ? { inviteToken } : {}),
         }));
-        const { error, session } = await signUp(email, password, inviteToken || undefined, { displayName: displayName.trim() }, referralCode || undefined);
-        if (error) {
-          logAuthError('Signup failed', error);
-          const { title, description } = getAuthErrorMessage(error);
-          toast({ title, description, variant: 'destructive' });
-          if (/already registered|already exists/i.test(error.message)) {
-            setMode('login');
-            toast({ title: 'Resume your application', description: 'Your account already exists. Sign in with your original password, or reset it below.' });
+        const { error, session, user: signupUser } = await signUp(email, password, inviteToken || undefined, { displayName: displayName.trim() }, referralCode || undefined);
+        const outcome = classifySignup({ error, session, user: signupUser });
+        setRecoveryNote(null);
+        if (outcome.kind === 'existing-account') {
+          // A verified email signing up again: Auth sends nothing. Try the
+          // password they just typed; it is often the same one.
+          logAuthEvent('Signup hit an existing account');
+          sessionStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify(inviteToken ? { inviteToken } : {}));
+          const { error: signInError } = await signIn(email, password);
+          if (!signInError) {
+            toast({ title: 'Welcome back', description: 'This email already has an account, so we signed you in to continue.' });
+          } else if (signInError.message.toLowerCase().includes('email not confirmed')) {
+            setMode('confirm-email');
+            setConfirmationSentAt(null);
+            void handleResendConfirmation();
+          } else {
+            setPassword('');
+            setMode('account-exists');
           }
-        } else if (!session) {
+        } else if (outcome.kind === 'rate-limited') {
+          logAuthError('Signup email limited', error);
+          noteEmailLimit(error);
+          setEmailCode('');
+          if (signupLimitNextStep(outcome.retryAfterSeconds) === 'stay-on-join') {
+            setRecoveryNote(SIGNUP_NOT_SENT_NOTE);
+          } else {
+            setRecoveryNote(getAuthErrorMessage(error!).description);
+            setMode('confirm-email');
+          }
+        } else if (outcome.kind === 'email-failed') {
+          logAuthError('Signup email failed', error);
+          const { title, description } = getAuthErrorMessage(error!);
+          toast({ title, description, variant: 'destructive' });
+          setRecoveryNote(description);
+          setConfirmationSentAt(null);
+          setMode('confirm-email');
+        } else if (outcome.kind === 'error') {
+          logAuthError('Signup failed', error);
+          const { title, description } = getAuthErrorMessage(error!);
+          toast({ title, description, variant: 'destructive' });
+        } else if (outcome.kind === 'code-sent') {
           logAuthEvent('Signup needs email confirmation');
+          setEmailCode('');
           setConfirmationSentAt(Date.now());
+          setResendBlockedUntil(null);
           setMode('confirm-email');
         } else {
           logAuthEvent('Signup successful');
@@ -475,6 +569,7 @@ const Auth = () => {
       case 'reset': return 'New Password';
       case 'confirm-email': return VERIFY_SIGNAL_TITLE;
       case 'confirmed-signin': return EMAIL_CONFIRMED_TITLE;
+      case 'account-exists': return 'You already have an account';
       default: return '';
     }
   };
@@ -487,6 +582,7 @@ const Auth = () => {
       case 'reset': return 'Create your new password';
       case 'confirm-email': return VERIFY_SIGNAL_BODY;
       case 'confirmed-signin': return EMAIL_CONFIRMED_BODY;
+      case 'account-exists': return 'Pick up where you left off.';
     }
   };
 
@@ -620,6 +716,9 @@ const Auth = () => {
               >
                 {isVerifyingCode ? 'Verifying' : 'Verify'}
               </Button>
+              {recoveryNote && (
+                <p role="status" className="mb-3 text-sm leading-relaxed text-muted-foreground">{recoveryNote}</p>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -633,11 +732,67 @@ const Auth = () => {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => setMode('login')}
-                className="w-full"
+                onClick={() => { setRecoveryNote(null); setMode('login'); }}
+                className="h-auto min-h-11 w-full whitespace-normal py-3 leading-snug"
               >
                 Already verified? Sign in to finish your application
               </Button>
+              <button
+                type="button"
+                onClick={() => void handleSendSignInLink()}
+                disabled={isSendingLink || resendWaitMs > 0 || !emailSchema.safeParse({ email }).success}
+                className="mt-3 min-h-11 w-full text-sm text-muted-foreground underline underline-offset-4 disabled:opacity-50"
+              >
+                {isSendingLink ? 'Sending link' : 'No code coming? Email me a sign-in link'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setRecoveryNote(null); setMode('signup'); }}
+                className="min-h-11 w-full text-sm text-muted-foreground underline underline-offset-4"
+              >
+                Back to Join
+              </button>
+            </div>
+          ) : mode === 'account-exists' ? (
+            <div className="space-y-3 text-center py-2">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                <span className="text-primary">{email}</span> is already on Ether. Sign in with the password you used before.
+                If you never finished joining, you&apos;ll go straight back to your application.
+              </p>
+              {recoveryNote && (
+                <p role="status" className="text-sm leading-relaxed text-foreground">{recoveryNote}</p>
+              )}
+              <Button type="button" className="w-full" onClick={() => { setRecoveryNote(null); setPassword(''); setMode('login'); }}>
+                Sign in
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => void handleSendSignInLink()}
+                disabled={isSendingLink || resendWaitMs > 0}
+              >
+                {isSendingLink
+                  ? 'Sending link'
+                  : resendWaitMs > 0
+                    ? `Email me a sign-in link (${Math.ceil(resendWaitMs / 1000)}s)`
+                    : 'Email me a sign-in link'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => { setRecoveryNote(null); setResetEmailSent(false); setMode('forgot'); }}
+              >
+                Forgot password? Reset it
+              </Button>
+              <button
+                type="button"
+                onClick={() => { setRecoveryNote(null); setMode('signup'); }}
+                className="min-h-11 w-full text-sm text-muted-foreground underline underline-offset-4"
+              >
+                Use a different email
+              </button>
             </div>
           ) : resetEmailSent && mode === 'forgot' ? (
             <div className="text-center py-4">
@@ -823,11 +978,14 @@ const Auth = () => {
 
           {mode === 'signup' && (
             <div className="mt-5 space-y-2 border-t border-border pt-4 text-center text-sm">
+              {recoveryNote && (
+                <p role="alert" className="pb-2 text-left text-sm leading-relaxed text-foreground">{recoveryNote}</p>
+              )}
               <button type="button" className="min-h-11 w-full text-primary underline underline-offset-4" onClick={() => setMode('login')}>
                 Already verified or started an application? Sign in to continue
               </button>
               <button type="button" className="min-h-11 w-full text-muted-foreground underline underline-offset-4"
-                onClick={() => { setMode('confirm-email'); setConfirmationSentAt(null); }}>
+                onClick={() => { setRecoveryNote(null); setMode('confirm-email'); setConfirmationSentAt(null); }}>
                 Verification code expired? Request a fresh code
               </button>
             </div>

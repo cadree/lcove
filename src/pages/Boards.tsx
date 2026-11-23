@@ -45,6 +45,7 @@ const Boards = () => {
   return (
     <PageLayout>
       <PageHeader
+        className="px-5 pt-6"
         title="Boards"
         description="Collaborative canvas workspaces"
         actions={

@@ -1,4 +1,5 @@
-export const RESEND_COOLDOWN_MS = 30_000;
+// Staging Auth waits 60s between emails to one address; prod waits 30s.
+export const RESEND_COOLDOWN_MS = 60_000;
 
 export function resendCooldownRemaining(
   sentAtMs: number | null,

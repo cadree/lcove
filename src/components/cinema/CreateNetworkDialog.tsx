@@ -25,6 +25,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { errorMessage } from '@/lib/errorMessage';
 import { readNumber } from '@/lib/numberField';
+import { CREATE_NETWORK_NAME_PLACEHOLDER } from '@/lib/cinemaCopy';
 
 interface CreateNetworkDialogProps {
   open: boolean;
@@ -136,7 +137,7 @@ export const CreateNetworkDialog = ({ open, onOpenChange }: CreateNetworkDialogP
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="My Cinema Network"
+              placeholder={CREATE_NETWORK_NAME_PLACEHOLDER}
               required
             />
           </div>

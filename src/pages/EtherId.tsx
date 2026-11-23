@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Info } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import PageLayout from "@/components/layout/PageLayout";
@@ -7,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { EtherCardIntro } from "@/components/profile/EtherCardIntro";
 import { EtherIdFace, monthName } from "@/components/profile/EtherIdFace";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +34,14 @@ import {
 import { toast } from "sonner";
 import { callRpc } from "@/lib/rpc";
 import { AFTER_WELCOME_PATH } from "@/lib/firstRun";
+import {
+  CARD_INTRO_ABOUT,
+  CARD_INTRO_REVEAL_MS,
+  afterCardSave,
+  hasSeenCardIntro,
+  markCardIntroSeen,
+  shouldAutoShowCardIntro,
+} from "@/lib/cardIntro";
 
 const SHOT_CARD: EtherIdCard = {
   display_name: "Cadre Wallace",
@@ -70,6 +80,12 @@ export default function EtherId() {
   const [searchParams] = useSearchParams();
   const setupMode = searchParams.get('setup') === '1';
   const [walletOpened, setWalletOpened] = useState(false);
+  const [introOpen, setIntroOpen] = useState(false);
+  const [revealing, setRevealing] = useState(false);
+  const cardFaceRef = useRef<HTMLDivElement>(null);
+  const autoIntroStarted = useRef(false);
+  // Card saved without Apple Wallet: go to Explore once the intro is dismissed.
+  const exploreAfterIntro = useRef(false);
   useEffect(() => {
     document.body.classList.add("ether-id-page");
     return () => document.body.classList.remove("ether-id-page");
@@ -146,13 +162,25 @@ export default function EtherId() {
         .eq("user_id", userId);
       if (error) throw error;
       if (setupMode && familcyStatus.data?.needs_setup) {
-        await callRpc<void>('register_my_ether_card');
+        if (!familcyStatus.data.card_registered) await callRpc<void>('register_my_ether_card');
+        // The welcome is finished the moment the card exists, so leaving this
+        // screen (Apple Wallet, a tab, closing the app) can never bounce back.
+        await callRpc<void>('complete_my_familcy_welcome');
       }
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["ether-id"] });
       if (setupMode) await queryClient.invalidateQueries({ queryKey: ['familcy-welcome', session?.user.id] });
       toast.success(setupMode ? 'ETHER Card registered' : 'Ether ID updated');
+      // Without Apple Wallet there is nothing left on this screen: go meet people,
+      // after the one-time card intro has been shown and dismissed.
+      const next = afterCardSave({
+        setupMode,
+        walletVisible: showWallet,
+        introSeen: hasSeenCardIntro(window.localStorage, session?.user.id),
+      });
+      if (next === "explore") navigate(AFTER_WELCOME_PATH, { replace: true });
+      if (next === "explore-after-intro") exploreAfterIntro.current = true;
     },
     onError: (error: Error) => {
       toast.error(error.message || "Could not update Ether ID");
@@ -217,6 +245,51 @@ export default function EtherId() {
 
   const href = card ? verifyUrl(window.location.origin, card.verify_path) : "";
   const showWallet = walletButtonVisible(shot ? false : walletQuery.data?.configured);
+  const walletReady = shot || walletQuery.isFetched || walletQuery.isError;
+  const hasCard = Boolean(card);
+  const shouldAutoIntro = shouldAutoShowCardIntro(window.localStorage, {
+    userId: session?.user.id,
+    setupMode,
+    cardRegistered,
+  });
+
+  useEffect(() => {
+    if (!hasCard || !shouldAutoIntro || !walletReady || autoIntroStarted.current) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // The save button sits below the form, so bring the card up before it spins.
+    cardFaceRef.current?.scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" });
+    if (reduced) {
+      autoIntroStarted.current = true;
+      setIntroOpen(true);
+      return;
+    }
+    setRevealing(true);
+    const timer = window.setTimeout(() => {
+      autoIntroStarted.current = true;
+      setRevealing(false);
+      setIntroOpen(true);
+    }, CARD_INTRO_REVEAL_MS);
+    return () => {
+      window.clearTimeout(timer);
+      setRevealing(false);
+    };
+  }, [hasCard, shouldAutoIntro, walletReady]);
+
+  const closeIntro = (open: boolean) => {
+    setIntroOpen(open);
+    if (open) return;
+    markCardIntroSeen(window.localStorage, session?.user.id);
+    if (exploreAfterIntro.current) {
+      exploreAfterIntro.current = false;
+      navigate(AFTER_WELCOME_PATH, { replace: true });
+    }
+  };
+
+  const viewCard = () => {
+    // "View your card" means stay here; Continue to Explore is below the form.
+    exploreAfterIntro.current = false;
+    cardFaceRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  };
 
   return (
     <PageLayout bleed>
@@ -224,17 +297,18 @@ export default function EtherId() {
         <PageHeader
           eyebrow={setupMode ? 'Familcy · Card setup' : 'Member'}
           title={setupMode ? 'Register your ETHER Card' : 'Ether ID'}
-          description={setupMode ? 'Save your username and passion, then add your card to Apple Wallet.' : 'Your card. The verify page reads status live.'}
+          description={setupMode ? (showWallet ? 'Save your username and passion, then add your card to Apple Wallet.' : 'Save your username and passion to register your card.') : 'Your card. The verify page reads status live.'}
           showMore={false}
         />
         {cardQuery.isLoading && <p className="text-sm text-muted-foreground">Loading your card…</p>}
         {cardQuery.isError && <p className="text-sm text-destructive">Could not load your Ether ID.</p>}
         {card && (
           <>
-            <div className="min-w-0 max-w-full">
+            <div className="min-w-0 max-w-full" ref={cardFaceRef}>
               <EtherIdFace
                 card={card}
                 verifyHref={href}
+                reveal={revealing}
                 onEditPassion={() => {
                   passionRef.current?.focus();
                   passionRef.current?.scrollIntoView({ block: "center" });
@@ -242,6 +316,16 @@ export default function EtherId() {
               />
             </div>
             <div className="mt-4 flex flex-col gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                className="min-h-11 justify-center"
+                onClick={() => setIntroOpen(true)}
+                data-testid="ether-card-intro-info"
+              >
+                <Info className="h-4 w-4" />
+                {CARD_INTRO_ABOUT}
+              </Button>
               <Button type="button" variant="outline" className="min-h-11" onClick={() => refresh.mutate()} disabled={refresh.isPending}>
                 Refresh code
               </Button>
@@ -365,6 +449,13 @@ export default function EtherId() {
           </>
         )}
       </div>
+      <EtherCardIntro
+        open={introOpen}
+        onOpenChange={closeIntro}
+        walletVisible={showWallet}
+        onAddToWallet={() => void addToWallet()}
+        onViewCard={viewCard}
+      />
     </PageLayout>
   );
 }

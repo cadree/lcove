@@ -21,6 +21,7 @@ import { ProfileCredits } from "@/components/credits/ProfileCredits";
 import { CreatorModuleTabs } from "@/components/profile/CreatorModuleTabs";
 import { EditProfileDetailsDialog } from "@/components/profile/EditProfileDetailsDialog";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
+import { AddProfilePhotoPrompt } from "@/components/profile/AddProfilePhotoPrompt";
 import { ProfileStats } from "@/components/profile/ProfileStats";
 import { ProfileAboutSection } from "@/components/profile/ProfileAboutSection";
 import { ProfileFolders } from "@/components/profile/ProfileFolders";
@@ -48,7 +49,7 @@ import { usePortfolioFolders, PortfolioFolder } from "@/hooks/usePortfolioFolder
 import { useProfileLayout, ProfileSection } from "@/hooks/useProfileLayout";
 import { toast } from "sonner";
 import { ProfilePost } from "@/types/post";
-import { applyProfileCustomization, hexToHslChannels } from "@/lib/profileSections";
+import { applyProfileCustomization, hexToHslChannels, sectionSpanClass } from "@/lib/profileSections";
 import { ProfileEffects } from "@/components/profile/ProfileEffects";
 import { supabase } from "@/integrations/supabase/client";
 import { postPreviewPath } from "@/lib/sharing";
@@ -607,6 +608,9 @@ const Profile = () => {
           postCount={displayPosts.length}
           founding={profile?.founding}
         />
+        {isOwnProfile && user && (
+          <AddProfilePhotoPrompt profile={profile} userId={user.id} className="mx-4 mt-3" />
+        )}
 
         {targetUserId && <ProfileOpenTo userId={targetUserId} isOwner={!!isOwnProfile} />}
         {isOwnProfile && <EtherIdEntry />}
@@ -633,7 +637,17 @@ const Profile = () => {
           </div>
         )}
 
-        {moduleSections.map(section => renderSection(section))}
+        <div className="grid grid-cols-6 items-start">
+          {moduleSections.map((section) => {
+            const node = renderSection(section);
+            if (!node) return null;
+            return (
+              <div key={section.id} data-profile-section={section.id} data-size={section.size} className={`min-w-0 ${sectionSpanClass(section.size)}`}>
+                {node}
+              </div>
+            );
+          })}
+        </div>
 
         {/* Dialogs */}
         {isOwnProfile && (

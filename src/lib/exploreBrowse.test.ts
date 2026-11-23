@@ -28,8 +28,25 @@ test("search matches a name or caption", () => {
   assert.equal(matchesBrowseQuery("Ada", "hello", "zoe"), false);
 });
 
-test("the visible window grows and then cycles", () => {
+test("the visible window grows to the end and stops there", () => {
   assert.equal(growVisibleCount(2, 5, 3), 5);
-  assert.equal(growVisibleCount(5, 5, 3), 8);
+  assert.equal(growVisibleCount(5, 5, 3), 5);
+  assert.equal(growVisibleCount(9, 5, 3), 5);
   assert.equal(growVisibleCount(0, 0, 3), 0);
+});
+
+test("paging through every reel shows each one once", () => {
+  const reels = collectReels(
+    ["a", "b", "c", "d", "e", "f", "g"].map((id) => ({ id, user_id: "u", media_url: `${id}.mp4`, media_type: "video" })),
+  );
+  let visible = 2;
+  for (let i = 0; i < 10; i++) visible = growVisibleCount(visible, reels.length, 2);
+  const shown = reels.slice(0, visible).map((reel) => reel.id);
+  assert.equal(shown.length, 7);
+  assert.equal(new Set(shown).size, shown.length);
+});
+
+test("a post that arrives twice is one reel", () => {
+  const twice = { id: "p1", user_id: "u", media_url: "p.mp4", media_type: "video" };
+  assert.deepEqual(collectReels([twice, { ...twice }]).map((reel) => reel.id), ["post-p1"]);
 });

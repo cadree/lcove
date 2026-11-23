@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -108,11 +109,16 @@ export const useProfileLayout = (userId?: string) => {
         .eq("user_id", user.id)
         .maybeSingle();
 
+      // The layout editor shows the effective state, so its save replaces the
+      // Customize dialog's section overrides; otherwise they would keep winning
+      // and hide/show in the layout editor would never take effect.
       if (existing) {
         const { error } = await supabase
           .from("profile_customizations")
           .update({
             profile_layout: layoutJson,
+            section_order: null,
+            show_top_friends: null,
             updated_at: new Date().toISOString(),
           })
           .eq("user_id", user.id);
@@ -129,6 +135,7 @@ export const useProfileLayout = (userId?: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile-layout", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["profile-customization", user?.id] });
       toast.success("Layout saved!");
     },
     onError: () => {
@@ -137,9 +144,11 @@ export const useProfileLayout = (userId?: string) => {
   });
 
   const isOwner = user?.id === targetUserId;
+  // A new array on every render made the layout editor reset its own edits.
+  const stableLayout = useMemo(() => withoutRetiredProfileSections(layout || DEFAULT_SECTIONS), [layout]);
 
   return {
-    layout: withoutRetiredProfileSections(layout || DEFAULT_SECTIONS),
+    layout: stableLayout,
     isLoading,
     saveLayout,
     isOwner,

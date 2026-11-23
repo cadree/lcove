@@ -11,7 +11,7 @@ import { FriendsDrawer } from "@/components/friends/FriendsDrawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import FirstRunEmpty from "@/components/onboarding/FirstRunEmpty";
 import { Button } from "@/components/ui/button";
-import { Bell, Filter, Loader2, Shuffle, Sparkles, Users } from "lucide-react";
+import { Bell, Filter, Loader2, MapPin, Shuffle, Sparkles, Users } from "lucide-react";
 import { ToolsSheet } from "@/components/navigation/ToolsSheet";
 import { usePosts } from "@/hooks/usePosts";
 import { FeedEngagementProvider } from "@/hooks/useFeedEngagement";
@@ -25,6 +25,9 @@ import { homeQuestCard } from "@/lib/noviQuests";
 import { FEED_RENDER_PAGE, nextRenderedCount } from "@/lib/feedWindow";
 import bearLogo from "@/assets/ether-bear-logo.webp";
 import { SupportEtherButton } from "@/components/fund/SupportEtherButton";
+import { AddProfilePhotoPrompt } from "@/components/profile/AddProfilePhotoPrompt";
+import { FeedLocationPicker } from "@/components/feed/FeedLocationPicker";
+import { inFeedLocation, locationOf, memberLocations, readFeedLocation, writeFeedLocation, type FeedLocation } from "@/lib/feedLocation";
 const Feed = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeCategory, setActiveCategory] = useState("All");
@@ -34,7 +37,9 @@ const Feed = () => {
   const [isShuffled, setIsShuffled] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const matchCity = useRef<((city: string | null | undefined, key: string | null) => boolean) | null>(null);
-  const [lane, setLane] = useState<"for-you" | "friends" | "city" | "live">("for-you");
+  const [lane, setLane] = useState<"for-you" | "friends" | "location" | "live">("for-you");
+  const [feedLocation, setFeedLocation] = useState<FeedLocation | null>(null);
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const [studioOpen, setStudioOpen] = useState(false);
   const { favorites } = useFavorites();
   const { quests } = useNoviQuests();
@@ -52,6 +57,41 @@ const Feed = () => {
     refetch,
   } = usePosts();
   const [shown, setShown] = useState(FEED_RENDER_PAGE);
+
+  // The chosen place is kept per member on this device and reopens on Location.
+  useEffect(() => {
+    const saved = readFeedLocation(typeof window === "undefined" ? null : window.localStorage, user?.id);
+    setFeedLocation(saved);
+    if (saved) setLane("location");
+  }, [user?.id]);
+
+  const { data: memberPlaces = [] } = useQuery({
+    queryKey: ["feed-location-members"],
+    enabled: lane === "location" || locationPickerOpen,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("profiles_public").select("user_id, city, city_display");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const locationChoicesList = useMemo(() => memberLocations(memberPlaces), [memberPlaces]);
+  const peopleInLocation = useMemo(() => {
+    if (!feedLocation) return null;
+    return new Set(memberPlaces.filter((member) => inFeedLocation(member, feedLocation)).map((member) => member.user_id as string));
+  }, [memberPlaces, feedLocation]);
+  const homeLocation = locationOf(profile?.city) ?? locationOf(profile?.city_display);
+
+  const pickLocation = (next: FeedLocation | null) => {
+    setFeedLocation(next);
+    writeFeedLocation(window.localStorage, user?.id, next);
+    setLane(next ? "location" : "for-you");
+  };
+
+  const openLane = (id: typeof lane) => {
+    if (id === "location" && (lane === "location" || !feedLocation)) setLocationPickerOpen(true);
+    setLane(id);
+  };
   const postCreatorRef = useRef<HTMLTextAreaElement>(null);
 
   // Handle action params from FAB
@@ -134,10 +174,10 @@ const Feed = () => {
   const favoriteIds = new Set(favorites);
   useEffect(() => {
     setShown(FEED_RENDER_PAGE);
-  }, [lane, activeCategory, postTypeFilter, regionFilter, isShuffled]);
+  }, [lane, activeCategory, postTypeFilter, regionFilter, isShuffled, feedLocation]);
   const lanePosts = filteredPosts.filter((post) => {
     if (lane === "friends") return favoriteIds.has(post.user_id);
-    if (lane === "city") return !!profile?.city && (post.profile?.city === profile.city || post.profile?.city_display === profile.city_display);
+    if (lane === "location") return !!feedLocation && inFeedLocation(post.profile, feedLocation);
     if (lane === "live") return false;
     return true;
   });
@@ -169,13 +209,17 @@ const Feed = () => {
         </header>
         <ToolsSheet open={studioOpen} onOpenChange={setStudioOpen} />
 
-        <StoriesRow />
+        {user && (
+          <AddProfilePhotoPrompt profile={profile} userId={user.id} className="mb-3" />
+        )}
+
+        <StoriesRow showUser={lane === "location" && peopleInLocation ? (id) => peopleInLocation.has(id) : undefined} />
 
         <div className="mb-3 flex gap-2 overflow-x-auto scrollbar-hide" role="tablist" aria-label="Feed">
           {([
             ["for-you", "For you"],
             ["friends", "Friends"],
-            ["city", "City"],
+            ["location", feedLocation && lane === "location" ? feedLocation.label : "Location"],
             ["live", "Live"],
           ] as const).map(([id, label]) => (
             <button
@@ -183,15 +227,40 @@ const Feed = () => {
               type="button"
               role="tab"
               aria-selected={lane === id}
-              onClick={() => setLane(id)}
-              className={`mono-label inline-flex h-11 shrink-0 items-center border-b-2 px-2 text-[11px] ${
+              onClick={() => openLane(id)}
+              className={`mono-label inline-flex h-11 shrink-0 items-center gap-1 border-b-2 px-2 text-[11px] ${
                 lane === id ? "border-[hsl(var(--bubble))] text-foreground" : "border-transparent text-muted-foreground"
               }`}
             >
+              {id === "location" && <MapPin className="h-3.5 w-3.5" aria-hidden />}
               {label}
             </button>
           ))}
         </div>
+        {lane === "location" && (
+          <div className="mb-3 flex min-h-11 flex-wrap items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm">
+            <MapPin className="h-4 w-4 shrink-0" aria-hidden />
+            <span className="min-w-0 flex-1">
+              {feedLocation ? <>Showing posts and people from <strong>{feedLocation.label}</strong></> : "Choose a place to see its posts and people"}
+            </span>
+            <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => setLocationPickerOpen(true)}>
+              {feedLocation ? "Change" : "Choose"}
+            </Button>
+            {feedLocation && (
+              <Button type="button" variant="ghost" size="sm" className="min-h-11" onClick={() => pickLocation(null)}>
+                Everywhere
+              </Button>
+            )}
+          </div>
+        )}
+        <FeedLocationPicker
+          open={locationPickerOpen}
+          onOpenChange={setLocationPickerOpen}
+          current={feedLocation}
+          home={homeLocation}
+          members={locationChoicesList}
+          onPick={pickLocation}
+        />
 
         {openQuest && <div className="mb-4"><QuestCard quest={openQuest} /></div>}
 
@@ -281,7 +350,7 @@ const Feed = () => {
           to: "/community"
         }]} />}
 
-            {lanePosts.length === 0 && !(posts.length === 0 && user) && lane !== "live" && <EmptyState icon={Sparkles} title={lane === "for-you" && activeCategory === "All" ? "The feed is waiting for you" : `No ${lane === "for-you" ? activeCategory.toLowerCase() : lane} posts yet`} description="This is your space to share what you're creating, thinking, or discovering. Your voice matters here." action={user ? {
+            {lanePosts.length === 0 && !(posts.length === 0 && user) && lane !== "live" && <EmptyState icon={Sparkles} title={lane === "location" ? (feedLocation ? `No posts from ${feedLocation.label} yet` : "Choose a place") : lane === "for-you" && activeCategory === "All" ? "The feed is waiting for you" : `No ${lane === "for-you" ? activeCategory.toLowerCase() : lane} posts yet`} description="This is your space to share what you're creating, thinking, or discovering. Your voice matters here." action={user ? {
           label: "Share Something",
           onClick: () => document.querySelector<HTMLTextAreaElement>('[placeholder*="mind"]')?.focus()
         } : undefined} />}

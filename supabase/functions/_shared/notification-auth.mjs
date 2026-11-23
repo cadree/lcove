@@ -151,7 +151,8 @@ export function authorizeUserNotification({ callerId, recipientId, notificationT
   if (notificationType === "match") {
     // Only a live mutual connection between caller and recipient can send this.
     if (!facts?.match?.active) return deny(403, "Forbidden");
-    const next = {};
+    // user_id is the person you matched with: the tap opens their intro sheet.
+    const next = { user_id: callerId };
     if (isUuid(facts.match.conversationId)) next.conversation_id = facts.match.conversationId;
     return {
       ok: true,

@@ -81,6 +81,8 @@ export function apnsDeviceToken(endpoint) {
  * Same path the service worker opens when a web notification is tapped.
  * `data` is the object stored on the web push payload.
  */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function pushOpenPath(data) {
   const notificationData = data && typeof data === "object" ? data : {};
   const notificationType = notificationData.type || "general";
@@ -95,6 +97,9 @@ export function pushOpenPath(data) {
     targetPath = `/calendar?event=${notificationData.event_id}`;
   } else if ((notificationType === "like" || notificationType === "comment") && notificationData.post_id) {
     targetPath = `/feed?post=${notificationData.post_id}`;
+  } else if (notificationType === "match" && UUID.test(String(notificationData.user_id ?? ""))) {
+    // Same as connectedPath() in src/lib/connectMoment.ts: Explore opens the match intro sheet.
+    targetPath = `/explore?section=people&connected=${notificationData.user_id}`;
   }
   return String(targetPath);
 }

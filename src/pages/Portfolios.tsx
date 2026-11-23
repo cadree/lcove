@@ -206,7 +206,8 @@ const Portfolios = () => {
 
   return (
     <PageLayout>
-      <PageHeader 
+      <PageHeader
+        className="px-4 pt-6"
         title="Portfolios" 
         actions={
           user && (

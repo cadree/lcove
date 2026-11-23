@@ -1282,8 +1282,18 @@ body.ether-id-page {
   aspect-ratio: 8 / 5;
   transform-style: preserve-3d;
   -webkit-transform-style: preserve-3d;
+  transform-origin: center center;
   animation: ether-id-yaw 18s ease-in-out infinite;
   will-change: transform;
+}
+
+/* One-shot 360° reveal after a member registers their card. Transform-only, same box as idle yaw. */
+.ether-id-spin.is-revealing {
+  animation: ether-id-reveal 1.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ether-id-spin.is-revealing .ether-id-sheen {
+  animation: none;
 }
 
 .ether-id-scene.is-flat .ether-id-spin {
@@ -1687,6 +1697,13 @@ body.ether-id-page {
 @keyframes ether-id-yaw {
   0%, 100% { transform: rotateX(5deg) rotateY(-16deg); }
   50% { transform: rotateX(2deg) rotateY(18deg); }
+}
+
+/* Lands on the idle yaw start pose so the handoff does not jump. */
+@keyframes ether-id-reveal {
+  0% { transform: rotateX(5deg) rotateY(-16deg); }
+  45% { transform: rotateX(8deg) rotateY(200deg); }
+  100% { transform: rotateX(5deg) rotateY(344deg); }
 }
 
 @keyframes ether-id-sheen {

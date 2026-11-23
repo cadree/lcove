@@ -59,7 +59,7 @@ jobs:
         run: npm run test:application-push
 
       - name: Member invitations and Familcy acceptance checks
-        run: node --test scripts/member-referrals-db.test.mjs
+        run: node --test scripts/member-referrals-db.test.mjs scripts/familcy-welcome-release-db.test.mjs
 
       - name: Direct creative invitation and abuse-limit checks
         run: node --test scripts/member-invitation-emails-db.test.mjs

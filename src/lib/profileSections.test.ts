@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   applyProfileCustomization,
+  editorSectionsFrom,
+  sectionSpanClass,
   hexToHslChannels,
   sectionFieldsForSave,
   sectionStateFromLayout,
@@ -83,4 +85,28 @@ test("star reviews are dropped from saved layouts so vouches remain the reputati
     { id: "vouches", visible: true, order: 2.2 },
   ]);
   assert.deepEqual(next.map((section) => section.id), ["about", "vouches"]);
+});
+
+test("the layout editor starts from what the profile shows, not stale hidden flags", () => {
+  const saved = [
+    { id: "stats", visible: false, order: 0 },
+    { id: "about", visible: false, order: 1 },
+    { id: "friends", visible: false, order: 3 },
+    { id: "boards", visible: false, order: 5 },
+  ];
+  const prefs = { section_order: ["stats", "about"], show_top_friends: true };
+  const sections = editorSectionsFrom(saved, prefs);
+  assert.deepEqual(
+    sections.map((s) => [s.id, s.visible, s.order]),
+    [["stats", true, 0], ["about", true, 1], ["friends", true, 2], ["boards", false, 3]],
+  );
+  // Once the editor saves (overrides cleared), the profile follows its flags.
+  assert.deepEqual(applyProfileCustomization(sections, { section_order: null, show_top_friends: null }), sections);
+});
+
+test("section size changes the column span from tablet width up, full width on a phone", () => {
+  assert.equal(sectionSpanClass("small"), "col-span-6 md:col-span-2");
+  assert.equal(sectionSpanClass("medium"), "col-span-6 md:col-span-3");
+  assert.equal(sectionSpanClass("large"), "col-span-6");
+  assert.equal(sectionSpanClass(undefined), "col-span-6 md:col-span-3");
 });

@@ -281,7 +281,11 @@ export function useConversations() {
       if (!user) throw new Error('Must be logged in');
       await callRpc<string>('hide_conversation_for_me', { p_conversation_id: conversationId });
     },
-    onSuccess: () => {
+    onSuccess: (_data, conversationId) => {
+      // Drop it from the list now; the refetch can take a moment on a slow phone.
+      queryClient.setQueriesData<{ id: string }[]>({ queryKey: ['conversations'] }, (old) =>
+        Array.isArray(old) ? old.filter((conversation) => conversation.id !== conversationId) : old,
+      );
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       toast.success('Chat removed from your list');
     },

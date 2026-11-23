@@ -340,7 +340,7 @@ const ConversationList = ({ selectedId, onSelect, onNewChat, onDeleteConversatio
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon" className="shrink-0 w-8 h-8 text-muted-foreground">
+                    <Button variant="ghost" size="icon" aria-label="Conversation options" className="shrink-0 h-11 w-11 text-muted-foreground">
                       <MoreVertical className="w-4 h-4" />
                     </Button>
                   </DropdownMenuTrigger>

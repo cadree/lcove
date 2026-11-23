@@ -2,7 +2,6 @@ import { useState, type ReactNode } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { FLYER_FONTS, guestlistLine, type EventDraftInput } from "@/lib/guestEvent";
@@ -196,11 +195,12 @@ export function EventFormScreen({
 
 function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
   return (
-    <div className="space-y-1">
-      <Label>{label}</Label>
+    // A wrapping <label> names the field for VoiceOver and focuses it on tap.
+    <label className="block space-y-1">
+      <span className="block text-sm font-medium leading-none">{label}</span>
       {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
-    </div>
+      {error && <span role="alert" className="block text-xs text-destructive">{error}</span>}
+    </label>
   );
 }
 
@@ -208,7 +208,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   return (
     <div className="flex items-center justify-between gap-3 py-1">
       <span className="text-sm">{label}</span>
-      <Switch checked={checked} onCheckedChange={onChange} />
+      <Switch checked={checked} onCheckedChange={onChange} aria-label={label} />
     </div>
   );
 }

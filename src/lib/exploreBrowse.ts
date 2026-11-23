@@ -18,8 +18,15 @@ interface PostLike {
 
 /** Video posts only. Stories are 24-hour moments and never appear as reels. */
 export function collectReels(posts: PostLike[]): BrowseReel[] {
+  const seen = new Set<string>();
   return posts
     .filter((post) => post.media_type === "video" && post.media_url && !post.upload_job_id)
+    // A post can arrive twice (refetch plus realtime). Show each reel once.
+    .filter((post) => {
+      if (seen.has(post.id)) return false;
+      seen.add(post.id);
+      return true;
+    })
     .map((post) => ({
       id: `post-${post.id}`,
       userId: post.user_id,
@@ -40,8 +47,8 @@ export function matchesBrowseQuery(name: string | null | undefined, content: str
   return (name || "").toLowerCase().includes(needle) || (content || "").toLowerCase().includes(needle);
 }
 
+/** The next page of the list. It stops at the end; nothing repeats. */
 export function growVisibleCount(current: number, total: number, pageSize: number) {
   if (total <= 0) return 0;
-  if (current >= total) return current + pageSize;
   return Math.min(total, current + pageSize);
 }

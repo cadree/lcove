@@ -59,6 +59,12 @@ function placePart(value?: string | null): string {
   return text;
 }
 
+/** Drops "TBA" placeholders (no city given) from a comma-joined place line. */
+export function cleanPlaceLine(value?: string | null): string | null {
+  const parts = (value || "").split(",").map(placePart).filter(Boolean);
+  return parts.length ? parts.join(", ") : null;
+}
+
 /** City and state only. The street stays off this label. */
 export function generalAreaLabel(city?: string | null, state?: string | null): string | null {
   const parts = [placePart(city), placePart(state)].filter(Boolean);

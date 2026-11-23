@@ -99,10 +99,12 @@ function OwnerEtherId({
   card,
   verifyHref,
   onEditPassion,
+  reveal = false,
 }: {
   card: EtherIdCard;
   verifyHref?: string;
   onEditPassion?: () => void;
+  reveal?: boolean;
 }) {
   const reduced = useReducedMotion();
   const qrBoxRef = useRef<HTMLDivElement>(null);
@@ -115,7 +117,7 @@ function OwnerEtherId({
 
   return (
     <div className={`ether-id-scene${reduced ? " is-flat" : ""}`}>
-      <div className="ether-id-spin">
+      <div className={`ether-id-spin${reveal ? " is-revealing" : ""}`} data-testid="ether-id-spin">
         {reduced ? null : (
           <>
             <div className="ether-id-back" aria-hidden="true" />
@@ -217,13 +219,15 @@ export function EtherIdFace({
   card,
   verifyHref,
   onEditPassion,
+  reveal = false,
 }: {
   card: EtherIdCard | EtherIdPublic;
   verifyHref?: string;
   onEditPassion?: () => void;
+  reveal?: boolean;
 }) {
   if (!("passion" in card)) {
     return <PublicEtherId card={card} />;
   }
-  return <OwnerEtherId card={card} verifyHref={verifyHref} onEditPassion={onEditPassion} />;
+  return <OwnerEtherId card={card} verifyHref={verifyHref} onEditPassion={onEditPassion} reveal={reveal} />;
 }

@@ -108,3 +108,24 @@ test("a store that throws never blocks the page, and the list stays capped", () 
   for (let i = 0; i < CONNECT_NUDGE_LIMIT + 3; i++) addNudge(store, "me", row({ userId: `u${i}`, name: `P${i}`, at: i }));
   assert.equal(readNudges(store, "me").length, CONNECT_NUDGE_LIMIT);
 });
+
+test("match links open Explore's intro sheet and only accept a person id", async () => {
+  const { connectedPath, connectedParam } = await import("./connectMoment.ts");
+  const id = "00000000-0000-4000-8000-0000000000a1";
+  assert.equal(connectedPath(id), `/explore?section=people&connected=${id}`);
+  assert.equal(connectedParam(`?section=people&connected=${id}`), id);
+  assert.equal(connectedParam("?section=people&connected=../../admin"), null);
+  assert.equal(connectedParam("?section=people"), null);
+});
+
+test("shared ground lists common skills and passions, then the same city, up to three", async () => {
+  const { sharedGround } = await import("./connectMoment.ts");
+  const person = { name: "Kai", skills: ["Photography", "Editing"], passions: ["Fashion", "Film"], city: "Atlanta, GA" };
+  assert.deepEqual(
+    sharedGround(person, { skills: ["photography"], passions: ["film"], city: "Atlanta" }),
+    ["Photography", "Film", "Atlanta"],
+  );
+  assert.deepEqual(sharedGround(person, { skills: ["Editing", "Photography"], passions: ["Fashion", "Film"], city: "Atlanta" }).length, 3);
+  assert.deepEqual(sharedGround(person, { skills: [], passions: [], city: "Miami" }), []);
+  assert.deepEqual(sharedGround(person, null), []);
+});

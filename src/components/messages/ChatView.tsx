@@ -226,7 +226,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
     >
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-border bg-background p-4">
-        <Button variant="ghost" size="icon" onClick={onBack}>
+        <Button variant="ghost" size="icon" onClick={onBack} aria-label="Back to chats">
           <ArrowLeft className="w-5 h-5" />
         </Button>
 
@@ -284,6 +284,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
               variant="ghost" 
               size="icon" 
               className="text-muted-foreground hover:text-primary"
+              aria-label="Project details"
               onClick={() => setShowProjectInfo(!showProjectInfo)}
             >
               <Info className="w-5 h-5" />
@@ -291,7 +292,7 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-muted-foreground">
+              <Button variant="ghost" size="icon" className="text-muted-foreground" aria-label="Chat options">
                 <MoreVertical className="w-5 h-5" />
               </Button>
             </DropdownMenuTrigger>

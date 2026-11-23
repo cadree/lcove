@@ -40,3 +40,20 @@ test("admin review shows applicant socials as tappable external links", async ()
   assert.ok(links.includes("onExternalHttpUrlClick"), "Taps must use the shared external open path");
   assert.ok(links.includes('target="_blank"'), "Links keep a real href for web");
 });
+
+test("admin tabs scroll with the page, not inside fixed-height boxes", async () => {
+  for (const path of [
+    "src/components/admin/PartnerApplicationsTab.tsx",
+    "src/components/admin/ContentModerationTab.tsx",
+    "src/components/admin/ContentReportsTab.tsx",
+  ]) {
+    const file = await readFile(path, "utf8");
+    assert.equal(file.includes("<ScrollArea"), false, `${path}: a nested scroll box takes the swipe, then the page jumps`);
+    assert.doesNotMatch(file, /className="h-\[\d+px\]"/, `${path}: lists must not have a fixed pixel height`);
+  }
+});
+
+test("admin stats placeholder is as tall as the stats", async () => {
+  const stats = await readFile("src/components/admin/AdminStats.tsx", "utf8");
+  assert.ok(stats.includes('className="h-[106px]"'), "Skeleton height must match a stat card so the page below does not shift");
+});

@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -118,7 +117,7 @@ export function ContentReportsTab() {
       <Button size="sm" variant={aiOnly ? "default" : "outline"} onClick={() => setAiOnly((value) => !value)}>
         AI-rule violations
       </Button>
-      <ScrollArea className="h-[520px]">
+      <div className="w-full">
         {visible.length === 0 ? (
           <div className="text-center py-12">
             <Flag className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -130,7 +129,7 @@ export function ContentReportsTab() {
             <ReportList title="Reviewed" reports={closedReports} updatingId={updatingId} />
           </div>
         )}
-      </ScrollArea>
+      </div>
 
       <Dialog open={!!hardTarget} onOpenChange={(open) => { if (!open) setHardTarget(null); }}>
         <DialogContent>

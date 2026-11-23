@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { Calendar, FolderKanban, MessageCircle, Plane, X } from "lucide-react";
+import { Calendar, FolderKanban, MessageCircle, Plane, UserRound, X } from "lucide-react";
+import { openToLabel } from "@/lib/openTo";
 import { MessageRequestDialog } from "@/components/messages/MessageRequestDialog";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { pulseConnectHaptic } from "@/lib/xpHaptic";
@@ -19,6 +20,7 @@ import {
   nudgeFor,
   readNudges,
   travelHref,
+  sharedGround,
   type ConnectNudge,
   type IcebreakerMe,
 } from "@/lib/connectMoment";
@@ -56,6 +58,7 @@ export function nudgeFromPerson(person: Person, matched: boolean, conversationId
     conversationId,
     started: false,
     at: Date.now(),
+    openTo: person.open_to ?? [],
   };
 }
 
@@ -271,6 +274,13 @@ export function ConnectCtaSheet({
 
   const canDm = nudge.matched && !!nudge.conversationId;
   const photo = safeWebLink(nudge.avatarUrl);
+  const common = useMemo(() => sharedGround({
+    name: nudge.name,
+    skills: nudge.skills,
+    passions: nudge.passions,
+    city: nudge.city,
+  }, me), [nudge, me]);
+  const openTo = (nudge.openTo ?? []).map((tag) => openToLabel(tag)).filter((label): label is string => !!label).slice(0, 3);
 
   return (
     <>
@@ -323,11 +333,19 @@ export function ConnectCtaSheet({
                   </button>
                 </div>
 
+                {(common.length > 0 || openTo.length > 0 || nudge.role) && (
+                  <div className="mb-4 space-y-1 rounded-2xl bg-white/5 px-3 py-2 text-[13px] text-white/75" data-testid="connect-common">
+                    {nudge.role && <p className="truncate">{nudge.role}{nudge.city ? ` · ${nudge.city}` : ""}</p>}
+                    {common.length > 0 && <p><span className="text-[#ff9fc8]">In common:</span> {common.join(" · ")}</p>}
+                    {openTo.length > 0 && <p><span className="text-[#ff9fc8]">Open to:</span> {openTo.join(" · ")}</p>}
+                  </div>
+                )}
+
                 <div className="grid gap-2">
                   <CtaButton
                     icon={<MessageCircle size={18} />}
                     label={canDm ? `Message ${firstName(nudge.name)}` : `Send ${firstName(nudge.name)} a note`}
-                    hint={canDm ? "Opens your chat." : "A match unlocks a direct chat. This waits in their Requests."}
+                    hint={canDm ? `Try: “${suggestion}”` : "A match unlocks a direct chat. This waits in their Requests."}
                     onClick={() => {
                       if (canDm && nudge.conversationId) {
                         started();
@@ -357,6 +375,15 @@ export function ConnectCtaSheet({
                     label="Invite to an event"
                     hint="Pick an upcoming event of yours, or one near you."
                     onClick={() => setPicking("event")}
+                  />
+                  <CtaButton
+                    icon={<UserRound size={18} />}
+                    label={`See ${firstName(nudge.name)}'s profile`}
+                    hint="Work, reviews and projects."
+                    onClick={() => {
+                      onOpenChange(false);
+                      navigate(`/profile/${nudge.userId}`);
+                    }}
                   />
                 </div>
               </>
