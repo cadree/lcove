@@ -68,6 +68,11 @@ const config: CapacitorConfig = {
       updateUrl: "https://etherbylcove.com/native-updates",
       resetWhenUpdate: true,
       appReadyTimeout: 10000,
+      // Empty strings turn off the plugin's default reporting to Capgo's
+      // servers (install stats and channel lookups). Updates still come only
+      // from updateUrl above.
+      statsUrl: "",
+      channelUrl: "",
     },
   },
 };

@@ -8,7 +8,7 @@ import {
   STORY_TEXT_FONT_WEIGHT,
   STORY_TEXT_LINE_HEIGHT,
   STORY_TEXT_TRACKING,
-  clampOverlayCenter,
+  clampTextScale,
   createStoryText,
   drawStoryOverlays,
   STORY_FRAME_HEIGHT,
@@ -16,7 +16,7 @@ import {
   fitStoryStage,
   installStoryWysiwygHook,
   layoutStoryText,
-  pointerToNormalized,
+  overlayTransform,
   storyFontFamily,
   waitForStoryFonts,
   type StoryDrawContext,
@@ -25,6 +25,7 @@ import {
   type StoryTextSize,
 } from "@/lib/storyOverlay";
 import { useNativeKeyboardInset } from "@/hooks/useNativeKeyboardInset";
+import { useBlockPagePinch } from "@/hooks/useBlockPagePinch";
 import { cn } from "@/lib/utils";
 
 const SIZES: StoryTextSize[] = ["s", "m", "l"];
@@ -45,6 +46,31 @@ interface StoryEditorProps {
   onShare: () => void;
   sharing: boolean;
   textOnly: boolean;
+  /** Text tools on a clip recorded in the composer (burned in on share). */
+  textOnVideo?: boolean;
+  /** Front-camera clip: preview it mirrored, as it was filmed and will be saved. */
+  videoMirror?: boolean;
+  /** Screen zoom used while recording; the saved clip is cropped the same way. */
+  videoZoom?: number;
+  /** Share progress while a clip is being saved, 0 to 1. */
+  shareProgress?: number | null;
+}
+
+interface TextGesture {
+  id: string;
+  /** Set when the first finger landed on this text: a lift without movement opens the editor. */
+  tapId: string | null;
+  /** First finger was on empty space: only a two-finger pinch moves the selected text. */
+  pinchOnly: boolean;
+  moved: boolean;
+  startX: number;
+  startY: number;
+  startScale: number;
+  startRotation: number;
+  anchorX: number;
+  anchorY: number;
+  gap: number;
+  angle: number;
 }
 
 export function StoryEditor({
@@ -58,17 +84,22 @@ export function StoryEditor({
   onShare,
   sharing,
   textOnly,
+  textOnVideo = false,
+  videoMirror = false,
+  videoZoom = 1,
+  shareProgress = null,
 }: StoryEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
-  const frameRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLDivElement | null>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
   const [frameSize, setFrameSize] = useState(fitStoryStage(390, 693));
   const [fontsReady, setFontsReady] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(overlays[0]?.id ?? null);
   const [editing, setEditing] = useState(Boolean(textOnly && overlays[0] && !overlays[0].text));
-  const dragRef = useRef<{ id: string; moved: boolean } | null>(null);
-  const canEditText = mediaType === "photo";
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const gestureRef = useRef<TextGesture | null>(null);
+  const canEditText = mediaType === "photo" || textOnVideo;
   const selected = overlays.find((item) => item.id === selectedId) ?? null;
   const keyboardInset = useNativeKeyboardInset(editing && canEditText);
 
@@ -94,12 +125,8 @@ export function StoryEditor({
     installStoryWysiwygHook({ overlays, background });
   }, [overlays, background]);
 
-  useEffect(() => {
-    if (!editing || keyboardInset <= 0) return;
-    const input = textInputRef.current;
-    if (!input) return;
-    input.scrollIntoView({ block: "center", inline: "nearest" });
-  }, [editing, keyboardInset, selectedId]);
+  const [frameNode, setFrameNode] = useState<HTMLDivElement | null>(null);
+  useBlockPagePinch(frameNode, canEditText);
 
   const scale = frameSize.width / STORY_FRAME_WIDTH;
   void fontsReady;
@@ -142,51 +169,129 @@ export function StoryEditor({
     setEditing(false);
   };
 
-  const onPointerDown = (event: ReactPointerEvent<HTMLButtonElement>, id: string) => {
-    if (event.button !== 0) return;
+  /** Start (or restart, when a finger joins or lifts) from the fingers now down. */
+  const rebaseline = (gesture: TextGesture) => {
+    const current = overlays.find((item) => item.id === gesture.id);
+    if (!current) return;
+    const points = [...pointersRef.current.values()];
+    const { scale: s0, rotation: r0 } = overlayTransform(current);
+    gesture.startX = current.x;
+    gesture.startY = current.y;
+    gesture.startScale = s0;
+    gesture.startRotation = r0;
+    if (points.length >= 2) {
+      const [a, b] = points;
+      gesture.anchorX = (a.x + b.x) / 2;
+      gesture.anchorY = (a.y + b.y) / 2;
+      gesture.gap = Math.hypot(b.x - a.x, b.y - a.y);
+      gesture.angle = Math.atan2(b.y - a.y, b.x - a.x);
+    } else if (points.length === 1) {
+      gesture.anchorX = points[0].x;
+      gesture.anchorY = points[0].y;
+    }
+  };
+
+  const onFramePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!canEditText) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("textarea")) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    const hitId = target.closest("[data-story-overlay]")?.getAttribute("data-story-overlay") ?? null;
+    if (!gestureRef.current) {
+      const id = hitId ?? (editing ? null : selectedId);
+      if (!id) return;
+      gestureRef.current = {
+        id,
+        tapId: hitId,
+        pinchOnly: !hitId,
+        moved: false,
+        startX: 0,
+        startY: 0,
+        startScale: 1,
+        startRotation: 0,
+        anchorX: 0,
+        anchorY: 0,
+        gap: 0,
+        angle: 0,
+      };
+      if (hitId) {
+        setSelectedId(hitId);
+        setEditing(false);
+      }
+    }
     event.preventDefault();
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
     } catch {
       /* synthetic events in tests may not have a real pointer */
     }
-    dragRef.current = { id, moved: false };
-    setSelectedId(id);
-    setEditing(false);
+    rebaseline(gestureRef.current);
   };
 
-  const onPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    const drag = dragRef.current;
+  const onFramePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = gestureRef.current;
     const frame = frameRef.current;
-    if (!drag || !frame) return;
-    if (Math.abs(event.movementX) + Math.abs(event.movementY) > 2) drag.moved = true;
-    const point = pointerToNormalized(event.clientX, event.clientY, frame.getBoundingClientRect());
-    const current = overlays.find((item) => item.id === drag.id);
-    if (!current) return;
-    const next = clampOverlayCenter(
-      { ...current, x: point.x, y: point.y },
-      STORY_FRAME_WIDTH,
-      STORY_FRAME_HEIGHT,
-    );
-    update(drag.id, next);
+    if (!gesture || !frame || !pointersRef.current.has(event.pointerId)) return;
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const rect = frame.getBoundingClientRect();
+    if (!(rect.width > 0) || !(rect.height > 0)) return;
+    const points = [...pointersRef.current.values()];
+    if (points.length >= 2) {
+      const [a, b] = points;
+      const midX = (a.x + b.x) / 2;
+      const midY = (a.y + b.y) / 2;
+      const gap = Math.hypot(b.x - a.x, b.y - a.y);
+      const angle = Math.atan2(b.y - a.y, b.x - a.x);
+      gesture.moved = true;
+      update(gesture.id, {
+        x: clamp01(gesture.startX + (midX - gesture.anchorX) / rect.width),
+        y: clamp01(gesture.startY + (midY - gesture.anchorY) / rect.height),
+        scale: clampTextScale(gesture.startScale * (gesture.gap > 0 ? gap / gesture.gap : 1)),
+        rotation: gesture.startRotation + (angle - gesture.angle),
+      });
+      return;
+    }
+    if (gesture.pinchOnly || points.length !== 1) return;
+    const dx = points[0].x - gesture.anchorX;
+    const dy = points[0].y - gesture.anchorY;
+    if (!gesture.moved && Math.hypot(dx, dy) < 4) return;
+    gesture.moved = true;
+    update(gesture.id, {
+      x: clamp01(gesture.startX + dx / rect.width),
+      y: clamp01(gesture.startY + dy / rect.height),
+    });
   };
 
-  const onPointerUp = (event: ReactPointerEvent<HTMLButtonElement>, id: string) => {
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+  const onFramePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!pointersRef.current.has(event.pointerId)) return;
+    pointersRef.current.delete(event.pointerId);
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      /* already released */
     }
-    const drag = dragRef.current;
-    dragRef.current = null;
-    if (drag && !drag.moved) {
-      setSelectedId(id);
+    const gesture = gestureRef.current;
+    if (!gesture) return;
+    if (pointersRef.current.size > 0) {
+      rebaseline(gesture);
+      return;
+    }
+    gestureRef.current = null;
+    if (gesture.tapId && !gesture.moved && event.type === "pointerup") {
+      setSelectedId(gesture.tapId);
       setEditing(true);
     }
   };
 
   const shareDisabled = sharing || (textOnly && !overlays.some((item) => item.text.trim()));
+  // The dialog already ends above the keyboard (useOverlayViewport), so never add the keyboard again here.
   const chromePad = keyboardInset > 0
-    ? `${keyboardInset}px`
+    ? "0.75rem"
     : "max(1rem, env(safe-area-inset-bottom, 0px))";
+  const videoTransform = [videoMirror ? "scaleX(-1)" : "", videoZoom > 1 ? `scale(${videoZoom})` : ""].filter(Boolean).join(" ");
 
   return (
     <div
@@ -197,13 +302,29 @@ export function StoryEditor({
     >
       <div ref={hostRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black">
         <div
-          ref={frameRef}
+          ref={(node) => {
+            frameRef.current = node;
+            setFrameNode(node);
+          }}
           data-story-frame
-          className="relative overflow-hidden bg-black"
+          className={cn("relative overflow-hidden bg-black", canEditText && "touch-none select-none")}
           style={{ width: frameSize.width, height: frameSize.height }}
+          onPointerDown={onFramePointerDown}
+          onPointerMove={onFramePointerMove}
+          onPointerUp={onFramePointerUp}
+          onPointerCancel={onFramePointerUp}
         >
         {previewUrl && mediaType === "video" ? (
-          <video src={previewUrl} className="absolute inset-0 h-full w-full object-cover" autoPlay loop muted playsInline />
+          <video
+            src={previewUrl}
+            data-story-video-preview
+            className="absolute inset-0 h-full w-full object-cover"
+            style={videoTransform ? { transform: videoTransform } : undefined}
+            autoPlay
+            loop
+            muted
+            playsInline
+          />
         ) : previewUrl ? (
           <img src={previewUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
         ) : (
@@ -222,15 +343,17 @@ export function StoryEditor({
         {canEditText && overlays.map((item) => {
           const active = item.id === selectedId;
           const layout = layoutStoryText(item, STORY_FRAME_WIDTH, STORY_FRAME_HEIGHT);
+          const { scale: textScale, rotation } = overlayTransform(item);
           return (
             <button
               key={item.id}
               type="button"
               data-story-overlay={item.id}
               data-story-lines={layout.lines.map((line) => line.text).join("\n")}
+              data-press="none"
               aria-label={item.text.trim() ? `Edit text, ${item.text}` : "Edit text"}
               className={cn(
-                "absolute cursor-grab touch-none bg-transparent active:cursor-grabbing",
+                "absolute cursor-grab touch-none rounded-md bg-transparent active:cursor-grabbing",
                 active && !editing ? "ring-1 ring-white/50" : "ring-0",
               )}
               style={{
@@ -238,25 +361,27 @@ export function StoryEditor({
                 top: layout.top * scale,
                 width: layout.width * scale,
                 height: layout.height * scale,
+                transform: textScale !== 1 || rotation !== 0 ? `rotate(${rotation}rad) scale(${textScale})` : undefined,
+                transformOrigin: "50% 50%",
               }}
-              onPointerDown={(event) => onPointerDown(event, item.id)}
-              onPointerMove={onPointerMove}
-              onPointerUp={(event) => onPointerUp(event, item.id)}
-              onPointerCancel={(event) => onPointerUp(event, item.id)}
+              onClick={(event) => {
+                // Keyboard and screen readers: Enter or Space opens the text.
+                if (event.detail === 0) {
+                  setSelectedId(item.id);
+                  setEditing(true);
+                }
+              }}
             >
               <span className="sr-only">{editing && active ? "Editing" : item.text || "Text"}</span>
             </button>
           );
         })}
 
+        </div>
         {editing && selected && canEditText && (
           <label
-            className="absolute z-10 px-6"
-            style={{
-              left: 0,
-              right: 0,
-              top: keyboardInset > 0 ? "16%" : "33%",
-            }}
+            className="absolute inset-0 z-20 flex items-center bg-black/45 px-6"
+            data-story-text-editing
           >
             <span className="sr-only">Story text</span>
             <textarea
@@ -280,10 +405,13 @@ export function StoryEditor({
             />
           </label>
         )}
-        </div>
       </div>
 
       <div
+        onMouseDown={(event) => {
+          // Keep the caption field focused (and the keyboard up) while tapping tools.
+          if (editing && (event.target as HTMLElement).closest("button")) event.preventDefault();
+        }}
         className="z-10 flex shrink-0 flex-col gap-3 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-3 pt-8"
         style={{ paddingBottom: chromePad }}
       >
@@ -315,7 +443,9 @@ export function StoryEditor({
               disabled={shareDisabled}
               className="flex h-11 items-center rounded-full bg-white px-6 text-sm font-semibold normal-case text-black hover:bg-white/90 disabled:opacity-50"
             >
-              {sharing ? "Sharing..." : "Share story"}
+              {sharing
+                ? typeof shareProgress === "number" ? `Saving ${Math.round(shareProgress * 100)}%` : "Sharing..."
+                : "Share story"}
             </button>
           )}
         </div>
@@ -435,4 +565,8 @@ export function StoryEditor({
       </div>
     </div>
   );
+}
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
 }

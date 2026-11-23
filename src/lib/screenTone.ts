@@ -29,7 +29,6 @@ export function toneForPath(pathname: string): ScreenTone {
     path.startsWith("/nuance") ||
     path.startsWith("/brand-partners") ||
     path.startsWith("/live") ||
-    path.startsWith("/cinema") ||
     path.startsWith("/event") ||
     path.startsWith("/e/") ||
     path.startsWith("/calendar") ||

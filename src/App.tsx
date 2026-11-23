@@ -70,9 +70,6 @@ const Settings = lazy(() => import("./pages/Settings"));
 const BookOfLcove = lazy(() => import("./pages/BookOfLcove"));
 const QuestLog = lazy(() => import("./pages/QuestLog"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const Cinema = lazy(() => import("./pages/Cinema"));
-const NetworkPage = lazy(() => import("./pages/NetworkPage"));
-const NetworkManage = lazy(() => import("./pages/NetworkManage"));
 const Partners = lazy(() => import("./pages/Partners"));
 const Admin = lazy(() => import("./pages/Admin"));
 const AdminOnboarding = lazy(() => import("./pages/AdminOnboarding"));
@@ -232,9 +229,8 @@ const App = () => (
                 <Route path="/product/:itemId" element={<PublicProductPage />} />
                 <Route path="/book" element={<BookOfLcove />} />
                 <Route path="/quests" element={<QuestLog />} />
-                <Route path="/cinema" element={<Cinema />} />
-                <Route path="/cinema/network/:networkId" element={<NetworkPage />} />
-                <Route path="/cinema/manage/:networkId" element={<NetworkManage />} />
+                {/* Cinema was removed; old links and shares land on Explore. */}
+                <Route path="/cinema/*" element={<Navigate to="/explore" replace />} />
                 <Route path="/partners" element={<Partners />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/admin/onboarding" element={<AdminOnboarding />} />

@@ -24,7 +24,6 @@ const elsewhere = [
   { label: "Live", to: "/live" },
   { label: "Community", to: "/community" },
   { label: "Collectives", to: "/collectives" },
-  { label: "Cinema", to: "/cinema" },
   { label: "Portfolios", to: "/portfolios" },
   { label: "Travel", to: "/travel" },
 ];

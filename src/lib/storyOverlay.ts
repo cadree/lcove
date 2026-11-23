@@ -58,6 +58,25 @@ export interface StoryTextOverlay {
   color: string;
   font: StoryTextFont;
   pill: boolean;
+  /** Two-finger pinch scale around the block centre (1 = the S/M/L size as laid out). */
+  scale?: number;
+  /** Two-finger twist in radians, clockwise. */
+  rotation?: number;
+}
+
+export const STORY_TEXT_SCALE_MIN = 0.4;
+export const STORY_TEXT_SCALE_MAX = 4;
+
+export function clampTextScale(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.min(STORY_TEXT_SCALE_MAX, Math.max(STORY_TEXT_SCALE_MIN, value));
+}
+
+/** Pinch scale and twist for an overlay; older overlays without them draw as before. */
+export function overlayTransform(overlay: Pick<StoryTextOverlay, "scale" | "rotation">): { scale: number; rotation: number } {
+  const scale = typeof overlay.scale === "number" ? clampTextScale(overlay.scale) : 1;
+  const rotation = typeof overlay.rotation === "number" && Number.isFinite(overlay.rotation) ? overlay.rotation : 0;
+  return { scale, rotation };
 }
 
 export interface TextLineBox {
@@ -91,6 +110,8 @@ export function createStoryText(partial: Partial<StoryTextOverlay> = {}): StoryT
     color: partial.color ?? "#FFFFFF",
     font: partial.font ?? "sans",
     pill: partial.pill ?? false,
+    scale: partial.scale ?? 1,
+    rotation: partial.rotation ?? 0,
   };
 }
 
@@ -357,6 +378,7 @@ export interface StoryDrawContext {
   restore(): void;
   translate(x: number, y: number): void;
   scale(x: number, y: number): void;
+  rotate?(angle: number): void;
   fillRect(x: number, y: number, w: number, h: number): void;
   beginPath(): void;
   fill(): void;
@@ -441,7 +463,17 @@ export function drawStoryOverlays(
     if (!overlay.text.trim()) continue;
     // Same shared canvas metrics as the editor, after fonts.ready at the call site.
     const layout = layoutStoryText(overlay, frameWidth, frameHeight);
+    const { scale, rotation } = overlayTransform(overlay);
     ctx.save();
+    if (scale !== 1 || rotation !== 0) {
+      // Pinch and twist around the block centre; the editor hit box uses the same origin.
+      const cx = layout.left + layout.width / 2;
+      const cy = layout.top + layout.height / 2;
+      ctx.translate(cx, cy);
+      if (rotation !== 0) ctx.rotate?.(rotation);
+      ctx.scale(scale, scale);
+      ctx.translate(-cx, -cy);
+    }
     applyStoryTypography(ctx, overlay.font, layout.fontSize);
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
@@ -465,9 +497,10 @@ export function drawStoryOverlays(
     if (layout.shadow) {
       const dark = colorLuminance(layout.color) <= 0.55;
       ctx.shadowColor = dark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.55)";
-      ctx.shadowBlur = layout.fontSize * 0.18;
+      // Shadows ignore the canvas transform, so scale them with the pinch by hand.
+      ctx.shadowBlur = layout.fontSize * 0.18 * scale;
       ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = layout.fontSize * 0.04;
+      ctx.shadowOffsetY = layout.fontSize * 0.04 * scale;
     } else {
       ctx.shadowColor = "transparent";
       ctx.shadowBlur = 0;
@@ -595,6 +628,7 @@ export interface StoryWysiwygHook {
   measureStoryText: typeof measureStoryText;
   waitForStoryFonts: typeof waitForStoryFonts;
   collectBurnedLines: typeof collectBurnedLines;
+  burnStoryImage: typeof burnStoryImage;
   STORY_FRAME_WIDTH: number;
   STORY_FRAME_HEIGHT: number;
   STORY_TEXT_MAX_WIDTH_RATIO: number;
@@ -610,6 +644,7 @@ export function installStoryWysiwygHook(state: { overlays: StoryTextOverlay[]; b
     measureStoryText,
     waitForStoryFonts,
     collectBurnedLines,
+    burnStoryImage,
     STORY_FRAME_WIDTH,
     STORY_FRAME_HEIGHT,
     STORY_TEXT_MAX_WIDTH_RATIO,

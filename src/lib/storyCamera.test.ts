@@ -9,19 +9,30 @@ import {
   startStoryCamera,
   trackHasTorch,
   videoTrackFrom,
+  FALLBACK_ZOOM,
+  clampZoom,
+  defaultZoom,
+  formatZoom,
+  pickStoryRecorderType,
+  pinchZoom,
+  recordingExtension,
+  setTrackZoom,
+  trackZoomRange,
+  zoomCrop,
 } from "./storyCamera.ts";
 
 describe("story camera constraints", () => {
-  it("asks for a portrait rear camera first, then relaxes", () => {
+  it("asks by width only so WebKit does not crop the sensor, then relaxes", () => {
     const attempts = storyCameraConstraints("environment");
-    assert.equal(attempts.length, 4);
+    assert.equal(attempts.length, 3);
     const first = attempts[0]?.video;
     assert.ok(first && typeof first === "object");
     assert.deepEqual(first.facingMode, { ideal: "environment" });
-    assert.deepEqual(first.width, { ideal: 1080 });
-    assert.deepEqual(first.height, { ideal: 1920 });
+    assert.deepEqual(first.width, { ideal: 1920 });
+    assert.equal("height" in first, false);
+    assert.equal("aspectRatio" in first, false);
     assert.equal(attempts[0]?.audio, false);
-    assert.deepEqual(attempts[3], { video: true, audio: false });
+    assert.deepEqual(attempts[2], { video: true, audio: false });
     assert.equal(oppositeFacing("environment"), "user");
     assert.equal(oppositeFacing("user"), "environment");
   });
@@ -148,5 +159,65 @@ describe("cover capture", () => {
       },
     );
     assert.equal(mirrored, false);
+  });
+});
+
+describe("story camera zoom", () => {
+  it("reads the native zoom range and ignores tracks without one", () => {
+    assert.deepEqual(trackZoomRange({ getCapabilities: () => ({ zoom: { min: 0.5, max: 15, step: 0.1 } }) }), { min: 0.5, max: 15, step: 0.1 });
+    assert.equal(trackZoomRange({ getCapabilities: () => ({}) }), null);
+    assert.equal(trackZoomRange({ getCapabilities: () => ({ zoom: { min: 1, max: 1 } }) }), null);
+    assert.equal(trackZoomRange(null), null);
+  });
+
+  it("opens at 1x even when the camera offers ultra wide or starts zoomed", () => {
+    assert.equal(defaultZoom({ min: 0.5, max: 15, step: 0 }, 2), 1);
+    assert.equal(defaultZoom({ min: 1, max: 10, step: 0 }, 3), 1);
+    assert.equal(defaultZoom(null, 2), null);
+  });
+
+  it("follows the finger gap and clamps to the range", () => {
+    const range = { min: 0.5, max: 6, step: 0 };
+    assert.equal(pinchZoom(1, 100, 200, range), 2);
+    assert.equal(pinchZoom(1, 100, 50, range), 0.5);
+    assert.equal(pinchZoom(1, 100, 10, range), 0.5);
+    assert.equal(pinchZoom(2, 100, 1000, range), 6);
+    assert.equal(pinchZoom(1, 100, 50, FALLBACK_ZOOM), 1);
+    assert.equal(clampZoom(1.234, { min: 1, max: 5, step: 0.5 }), 1);
+    assert.equal(formatZoom(1), "1x");
+    assert.equal(formatZoom(0.5), "0.5x");
+    assert.equal(formatZoom(2.04), "2x");
+  });
+
+  it("applies zoom through advanced constraints", async () => {
+    const seen: MediaTrackConstraints[] = [];
+    const ok = await setTrackZoom({ applyConstraints: async (c) => { seen.push(c); } }, 2);
+    assert.equal(ok, true);
+    assert.deepEqual(seen[0], { advanced: [{ zoom: 2 }] });
+    assert.equal(await setTrackZoom({ applyConstraints: async () => { throw new Error("no"); } }, 2), false);
+  });
+
+  it("crops the centre for screen zoom, and the photo uses that crop", () => {
+    assert.deepEqual(zoomCrop({ sx: 0, sy: 0, sw: 900, sh: 1600 }, 2), { sx: 225, sy: 400, sw: 450, sh: 800 });
+    assert.deepEqual(zoomCrop({ sx: 10, sy: 0, sw: 900, sh: 1600 }, 1), { sx: 10, sy: 0, sw: 900, sh: 1600 });
+    const shot = captureCoverFrame(
+      { videoWidth: 1440, videoHeight: 1920 },
+      { width: 390, height: 693.33 },
+      { zoom: 2, createCanvas: (width, height) => ({ canvas: { width, height } as HTMLCanvasElement, ctx: {} as CanvasRenderingContext2D }), draw: () => {} },
+    );
+    assert.ok(Math.abs(shot.crop.sw - 540) < 1, `width ${shot.crop.sw}`);
+    assert.ok(Math.abs(shot.crop.sh - 960) < 1, `height ${shot.crop.sh}`);
+    assert.ok(Math.abs(shot.crop.sx - 450) < 1);
+    assert.ok(Math.abs(shot.crop.sy - 480) < 1);
+  });
+});
+
+describe("story recording format", () => {
+  it("prefers mp4 so every story player can show it", () => {
+    assert.equal(pickStoryRecorderType((type) => type.startsWith("video/mp4")), "video/mp4;codecs=avc1.42E01E,mp4a.40.2");
+    assert.equal(pickStoryRecorderType((type) => type === "video/webm"), "video/webm");
+    assert.equal(pickStoryRecorderType(() => { throw new Error("unknown"); }), null);
+    assert.equal(recordingExtension("video/mp4"), "mp4");
+    assert.equal(recordingExtension("video/webm;codecs=vp8"), "webm");
   });
 });

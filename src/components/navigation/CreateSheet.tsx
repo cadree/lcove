@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import {
   CalendarPlus,
-  Clapperboard,
   FolderKanban,
   ImagePlus,
   LayoutDashboard,
@@ -74,7 +73,6 @@ export function CreateSheet({ open, onOpenChange }: CreateSheetProps) {
     { id: "store", label: "Store item", icon: ShoppingBag, fill: "gold", run: () => go("/store?tab=my-store&action=create") },
     { id: "board", label: "Board", icon: LayoutDashboard, fill: "denim", run: () => go("/boards?action=create") },
     ...(featureOn("profileBlogs") ? [{ id: "blog", label: "Blog", icon: NotebookPen, fill: "bone", run: () => go("/profile?action=create-blog") } as CreateAction] : []),
-    { id: "cinema", label: "Cinema", icon: Clapperboard, fill: "ink", run: () => go("/cinema?action=create") },
     { id: "collective", label: "Collective", icon: Users, fill: "rose", run: () => go("/collectives?action=create") },
     { id: "message", label: "Message", icon: MessageCircle, fill: "violet", run: () => go("/messages?action=new") },
   ];
@@ -109,7 +107,7 @@ export function CreateSheet({ open, onOpenChange }: CreateSheetProps) {
                 key={item.id}
                 type="button"
                 onClick={item.run}
-                className="flex min-h-11 flex-col items-center justify-center gap-2 rounded-[16px] px-1 py-3 active:scale-[0.98]"
+                className="flex min-h-11 flex-col items-center justify-center gap-2 rounded-[16px] px-1 py-3"
               >
                 <SquircleIcon icon={item.icon} fill={item.fill} size={40} glyph={22} />
                 <span className="mono-label text-center text-[10px] text-foreground">{item.label}</span>

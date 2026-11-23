@@ -17,7 +17,6 @@ describe("toneForPath", () => {
     assert.equal(toneForPath("/store"), "cyan");
     assert.equal(toneForPath("/nuance"), "cyan");
     assert.equal(toneForPath("/directory"), "cyan");
-    assert.equal(toneForPath("/cinema"), "cyan");
     assert.equal(toneForPath("/calendar"), "cyan");
     assert.equal(toneForPath("/projects"), "cyan");
     assert.equal(toneForPath("/event/abc"), "cyan");

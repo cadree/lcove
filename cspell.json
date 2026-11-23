@@ -90,6 +90,11 @@
     "pgcrypto",
     "apns",
     "unmatch",
-    "GeoNames"
+    "GeoNames",
+    "rebaseline",
+    "moov",
+    "gesturestart",
+    "gesturechange",
+    "tele"
   ]
 }

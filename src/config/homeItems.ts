@@ -5,7 +5,6 @@ import {
   Calendar,
   Users,
   Radio,
-  Film,
   Folder,
   Briefcase,
   Store,
@@ -43,7 +42,6 @@ export const homeItems: HomeItem[] = [
   { id: "directory", label: "Directory", route: "/directory", icon: Users, category: "discover", description: "Find creators" },
   { id: "portfolios", label: "Portfolios", route: "/portfolios", icon: Folder, category: "discover", description: "Browse work" },
   { id: "live", label: "Live", route: "/live", icon: Radio, category: "discover", description: "Watch streams" },
-  { id: "cinema", label: "Cinema", route: "/cinema", icon: Film, category: "discover", description: "Films & networks" },
   { id: "nuance", label: "Nuance", route: "/nuance", icon: Shirt, category: "discover", description: "Clothing line" },
   
   // Create

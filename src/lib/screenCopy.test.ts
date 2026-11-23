@@ -23,12 +23,9 @@ describe("screen copy and controls", () => {
     assert.match(locked, /Go home/);
   });
 
-  it("names cinema and partners for Ether", () => {
-    assert.equal(source("pages/Cinema.tsx").includes("LC Cinema"), false);
+  it("names partners for Ether", () => {
     assert.equal(source("pages/Partners.tsx").includes("LC members"), false);
     assert.equal(source("components/partners/PartnerApplicationDialog.tsx").includes("LC members"), false);
-    assert.equal(source("components/cinema/CreateNetworkDialog.tsx").includes("Click to upload"), false);
-    assert.equal(source("components/cinema/AddContentDialog.tsx").includes("Click to upload"), false);
     assert.match(source("components/navigation/ToolsSheet.tsx"), /Studio/);
     assert.equal(source("components/navigation/ToolsSheet.tsx").includes(">Tools<"), false);
   });
@@ -46,6 +43,6 @@ describe("screen copy and controls", () => {
   it("keeps the chat menu outside the conversation button", () => {
     const list = source("components/messages/ConversationList.tsx");
     assert.equal(list.includes("<motion.button"), false);
-    assert.match(list, /<DropdownMenu>/);
+    assert.match(list, /<ClickDropdownMenu[\s>]/);
   });
 });

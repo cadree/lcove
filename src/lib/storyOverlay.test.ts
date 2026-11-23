@@ -13,6 +13,10 @@ import {
   fitStoryStage,
   canvasFont,
   drawStoryOverlays,
+  clampTextScale,
+  overlayTransform,
+  STORY_TEXT_SCALE_MAX,
+  STORY_TEXT_SCALE_MIN,
   fontSizeFor,
   layoutStoryText,
   pointerToNormalized,
@@ -165,6 +169,47 @@ describe("burn-in", () => {
     assert.deepEqual(texts.map((entry) => entry.text), ["On set"]);
     assert.ok(texts[0] && texts[0].x > 0 && texts[0].y > 0);
     assert.ok(fills.some((value) => /0,\s*0,\s*0/.test(value)));
+  });
+
+  it("pinch scale and twist wrap the text around its own centre, shadow included", () => {
+    const ops: string[] = [];
+    let font = "";
+    let blur = 0;
+    const ctx: StoryDrawContext = {
+      save() { ops.push("save"); },
+      restore() { ops.push("restore"); },
+      translate(x, y) { ops.push(`t ${Math.round(x)} ${Math.round(y)}`); },
+      scale(x, y) { ops.push(`s ${x} ${y}`); },
+      rotate(a) { ops.push(`r ${a}`); },
+      fillRect() {},
+      beginPath() {},
+      fill() {},
+      moveTo() {},
+      arcTo() {},
+      closePath() {},
+      fillText() { blur = this.shadowBlur; ops.push("text"); },
+      measureText(text) { return { width: text.length * 10 }; },
+      drawImage() {},
+      get font() { return font; },
+      set font(value) { font = value; },
+      fillStyle: "#000",
+      textAlign: "left",
+      textBaseline: "alphabetic",
+      shadowColor: "transparent",
+      shadowBlur: 0,
+      shadowOffsetX: 0,
+      shadowOffsetY: 0,
+    };
+    const item = overlay({ text: "Big", x: 0.5, y: 0.5, scale: 2, rotation: 0.25 });
+    drawStoryOverlays(ctx, [item], 1080, 1920);
+    const layout = layoutStoryText(item, 1080, 1920);
+    const cx = Math.round(layout.left + layout.width / 2);
+    const cy = Math.round(layout.top + layout.height / 2);
+    assert.deepEqual(ops.slice(0, 5), ["save", `t ${cx} ${cy}`, "r 0.25", "s 2 2", `t ${-cx} ${-cy}`]);
+    assert.ok(Math.abs(blur - layout.fontSize * 0.18 * 2) < 1e-6);
+    assert.equal(clampTextScale(10), STORY_TEXT_SCALE_MAX);
+    assert.equal(clampTextScale(0.01), STORY_TEXT_SCALE_MIN);
+    assert.deepEqual(overlayTransform({}), { scale: 1, rotation: 0 });
   });
 
   it("burns a solid background and overlays into a JPEG", async () => {

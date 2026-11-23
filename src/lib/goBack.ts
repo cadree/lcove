@@ -34,9 +34,6 @@ export function parentFallback(pathname: string): string {
   if (pathname === "/settings") return "/profile";
   if (/^\/blog\/[^/]+/.test(pathname)) return "/blog";
   if (/^\/boards\/[^/]+/.test(pathname)) return "/boards";
-  const managed = pathname.match(/^\/cinema\/manage\/([^/]+)/);
-  if (managed) return `/cinema/network/${managed[1]}`;
-  if (pathname.startsWith("/cinema/")) return "/cinema";
   if (/^\/dashboard\/events\/[^/]+/.test(pathname)) return "/dashboard/events";
   if (pathname === "/dashboard/events") return "/dashboard";
   if (/^\/admin\/onboarding\/[^/]+/.test(pathname)) return "/admin/onboarding";

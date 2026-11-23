@@ -12,8 +12,7 @@ const tabs = [
     to: "/explore",
     icon: Compass,
     match: (path: string) =>
-      ["/explore", "/directory", "/portfolios", "/community", "/events", "/mall", "/cinema", "/live", "/collectives"].includes(path) ||
-      path.startsWith("/cinema"),
+      ["/explore", "/directory", "/portfolios", "/community", "/events", "/mall", "/live", "/collectives"].includes(path),
   },
   { id: "messages", label: "Messages", to: "/messages", icon: MessageCircle, match: (path: string) => path.startsWith("/messages") },
   { id: "profile", label: "Profile", to: "/profile", icon: User, match: (path: string) => path === "/profile" || path.startsWith("/profile/") },
