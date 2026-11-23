@@ -15,7 +15,7 @@ import { BackButton } from "@/components/navigation/BackButton";
 import { formatEventDate, formatEventTime } from "@/lib/eventTime";
 import { backTarget } from "@/lib/goBack";
 import { lowestBuyerCents } from "@/lib/ticketFees";
-import { eventIsFree, generalAreaLabel, publicTicketBadge, stickyCtaLabel } from "@/lib/guestEvent";
+import { cleanPlaceLine, eventIsFree, generalAreaLabel, publicTicketBadge, stickyCtaLabel } from "@/lib/guestEvent";
 import { EventMoodboardView } from "@/components/calendar/EventMoodboardView";
 import { EventReminderToggle } from "@/components/events/EventReminderToggle";
 import { shareEventLink } from "@/lib/shareLink";
@@ -190,15 +190,15 @@ export default function PublicEventPage() {
       p_event_id: event.id,
       p_rsvp_id: rememberedGuestRsvp(event.id) || undefined,
     });
-    const area = [event.venue, event.city, event.state].filter(Boolean).join(", ");
+    const area = cleanPlaceLine([event.venue, event.city, event.state].filter(Boolean).join(", ")) ?? "";
     if (!data) {
       setLocation(area || null);
       if (event.hide_address) toast.message("The address stays hidden until you RSVP.");
       else if (area) window.open(`https://maps.google.com/?q=${encodeURIComponent(area)}`, "_blank", "noopener");
       return;
     }
-    setLocation(data);
-    window.open(`https://maps.google.com/?q=${encodeURIComponent(data)}`, "_blank", "noopener");
+    setLocation(cleanPlaceLine(typeof data === "string" ? data : null));
+    window.open(`https://maps.google.com/?q=${encodeURIComponent(cleanPlaceLine(String(data)) ?? String(data))}`, "_blank", "noopener");
   };
 
   const goBack = () => {

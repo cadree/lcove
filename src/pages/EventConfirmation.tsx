@@ -1,3 +1,4 @@
+import { cleanPlaceLine } from "@/lib/guestEvent";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { BackButton } from "@/components/navigation/BackButton";
@@ -63,7 +64,7 @@ export default function EventConfirmation() {
       const { data: guests } = await supabase.rpc("public_event_guest_preview", reveal);
       if (cancelled) return;
       const area = [event.venue, event.city, event.state].filter(Boolean).join(", ");
-      setAddress(hidden || area || null);
+      setAddress(cleanPlaceLine(typeof hidden === "string" ? hidden : null) || cleanPlaceLine(area));
       setHostNotes(typeof notes === "string" && notes.trim() ? notes : null);
       const row = (guests || {}) as { names?: unknown };
       setGuestNames(Array.isArray(row.names) ? row.names.filter((name): name is string => typeof name === "string") : []);

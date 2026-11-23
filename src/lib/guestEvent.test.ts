@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  cleanPlaceLine,
   goingCountLabel,
   eventIsFree,
   generalAreaLabel,
@@ -65,5 +66,14 @@ describe("public event labels", () => {
     assert.equal(publicTicketBadge({ ticketType: "free", free: true, fromCents: null }), "Free Event");
     assert.equal(publicTicketBadge({ ticketType: "paid", free: false, fromCents: 2000 }), "Tickets from $20.00");
     assert.equal(publicTicketBadge({ ticketType: "credits", free: false, fromCents: null, creditsPrice: 12 }), "12 Credits");
+  });
+});
+
+describe("cleanPlaceLine", () => {
+  it("drops the TBA city placeholder from a revealed address", () => {
+    assert.equal(cleanPlaceLine("The Loft, 123 Main St, Los Angeles, CA, TBA"), "The Loft, 123 Main St, Los Angeles, CA");
+    assert.equal(cleanPlaceLine("TBA"), null);
+    assert.equal(cleanPlaceLine(""), null);
+    assert.equal(cleanPlaceLine(null), null);
   });
 });
