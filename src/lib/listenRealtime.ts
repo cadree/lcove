@@ -122,7 +122,7 @@ export function startHosting(card: ListenCard, me: Listener) {
   };
   room.onHello = send;
   let last = getPlayerState();
-  const unsub = subscribePlayer((s) => {
+  const stopFollowing = subscribePlayer((s) => {
     const jumped = Math.abs(s.position - last.position) > 1.5;
     if (s.playing !== last.playing || s.track?.id !== last.track?.id || jumped) send();
     last = s;
@@ -136,7 +136,7 @@ export function startHosting(card: ListenCard, me: Listener) {
     me,
     waiting: false,
     stop: () => {
-      unsub();
+      stopFollowing();
       clearInterval(beat);
       room.onHello = undefined;
     },
@@ -184,7 +184,7 @@ export function joinListening(card: ListenCard, me: Listener, track: PlayerTrack
     }
   };
   let last = getPlayerState();
-  const unsub = subscribePlayer((s) => {
+  const stopFollowing = subscribePlayer((s) => {
     const steppedAway = s.track?.id !== track.id || (last.playing && !s.playing && !applying && hostPlaying && !active?.waiting);
     last = s;
     if (steppedAway && active?.role === "guest") leaveListening();
@@ -195,7 +195,7 @@ export function joinListening(card: ListenCard, me: Listener, track: PlayerTrack
     me,
     waiting: false,
     stop: () => {
-      unsub();
+      stopFollowing();
       room.onState = undefined;
     },
   };

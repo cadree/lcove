@@ -625,7 +625,7 @@ function ItemEditSheet({ item, userId, catalog, prefs, locked, loose, onClose }:
             }}
           >
             {featured ? <Check className="h-4 w-4" /> : <Star className="h-4 w-4" />}
-            {featured ? "Featured (tap to unfeature)" : "Feature at the top"}
+            {featured ? "Featured · tap to remove" : "Feature at the top"}
           </Button>
           {looseIndex >= 0 && !placement && (
             <div className="grid grid-cols-2 gap-2">

@@ -70,11 +70,11 @@ test("presence lists each other listener once and never me", () => {
 });
 
 test("only Ether tracks become sync cards; streaming platforms map to link sources", () => {
-  const card = cardFromPlaying({ id: "track:t1", title: "Neon Dreams", artist: "Nova", artistUserId: "u-artist", previewOnly: true }, "u-host", "sess-123456");
+  const card = cardFromPlaying({ id: "track:t1", title: "Neon Dreams", artist: "Nova", artistUserId: "u-artist", previewOnly: true }, "u-host", "session-123456");
   assert.equal(card?.trackId, "t1");
   assert.equal(card?.hostPreview, true);
   assert.equal(card?.href, "/profile/u-artist/music");
-  assert.equal(cardFromPlaying({ id: "release:x", title: "x", artist: "y", artistUserId: "u" }, "u", "sess-123456"), null);
+  assert.equal(cardFromPlaying({ id: "release:x", title: "x", artist: "y", artistUserId: "u" }, "u", "session-123456"), null);
   assert.equal(linkSource("apple_music"), "apple_music");
   assert.equal(linkSource("tidal"), null);
 });
