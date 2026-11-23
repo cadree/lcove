@@ -23,6 +23,8 @@ import { LiveAreaToggle } from "./LiveAreaToggle";
 import { MemberGrid } from "./MemberGrid";
 import { SwipeDeck } from "./SwipeDeck";
 import { TravelingToCity } from "./TravelingToCity";
+import { GlobePlaceControl } from "./GlobePlaceControl";
+import { FeedLocationPicker } from "@/components/feed/FeedLocationPicker";
 import { supabase } from "@/integrations/supabase/client";
 import { connectedParam, messageHref, type IcebreakerMe } from "@/lib/connectMoment";
 import { NEARBY_KM, nearbyGroups, safeArea, type LonLat, type MapGroup } from "@/lib/nearbyMap";
@@ -68,6 +70,7 @@ export function PeopleDiscovery({ query }: { query: string }) {
   const [focus, setFocus] = useState<{ id: string; at: number } | null>(null);
   const [sheetFocus, setSheetFocus] = useState<{ id: string; at: number } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [placeOpen, setPlaceOpen] = useState(false);
   const [reporting, setReporting] = useState<Person | null>(null);
   const [moment, setMoment] = useState<{ person: Person; matched: boolean; conversationId: string | null } | null>(null);
   const [ctaPerson, setCtaPerson] = useState<Person | null>(null);
@@ -138,6 +141,13 @@ export function PeopleDiscovery({ query }: { query: string }) {
       ? options.cities.find((c) => c.key === key)?.label || options.regions.find((r) => r.key === key)?.label || placeForKey(key)?.label || "This city"
       : null;
   const cityLabel = labelFor(city);
+  const placeChoices = useMemo(
+    () => ({
+      cities: options.cities.map((c) => ({ key: c.key, label: c.label, members: c.count })),
+      regions: options.regions.map((r) => ({ key: r.key, label: `All of ${r.label}`, members: r.count })),
+    }),
+    [options],
+  );
   const sheetLabel = labelFor(sheetCity);
 
   const matches = useQuery({
@@ -411,7 +421,17 @@ export function PeopleDiscovery({ query }: { query: string }) {
                 </button>
               </div>
             )}
-            <SwipeDeck people={shownDeck} focus={focus} {...deckProps} />
+            <SwipeDeck
+              people={shownDeck}
+              focus={focus}
+              {...deckProps}
+              top={
+                <GlobePlaceControl
+                  label={nearbyMode ? `Near ${myPlace?.label.split(",")[0] || "you"}` : cityLabel || "Everywhere"}
+                  onOpen={() => setPlaceOpen(true)}
+                />
+              }
+            />
             {nearbyMode && myPlace ? (
               <TravelingToCity cityKey={myPlace.key} label={myPlace.label} />
             ) : (
@@ -420,6 +440,9 @@ export function PeopleDiscovery({ query }: { query: string }) {
             </>
           ) : (
             <div className="rounded-[28px] border border-dashed border-white/15 px-6 py-10 text-center">
+              <div className="mb-4 flex justify-center">
+                <GlobePlaceControl label={nearbyMode ? "Nearby" : cityLabel || "Everywhere"} onOpen={() => setPlaceOpen(true)} />
+              </div>
               <p className="font-display text-xl">
                 {openFilterLabel && !search
                   ? `Nobody here is open to ${openFilterLabel} yet`
@@ -530,6 +553,20 @@ export function PeopleDiscovery({ query }: { query: string }) {
         </SheetContent>
       </Sheet>
 
+      <FeedLocationPicker
+        open={placeOpen}
+        onOpenChange={setPlaceOpen}
+        current={city ? { key: city, label: cityLabel || city } : null}
+        home={myPlace ? { key: myPlace.key, label: myPlace.label } : null}
+        members={placeChoices.cities}
+        regions={placeChoices.regions}
+        title="Whose cards to show"
+        description="Pick a city or a state. Cards show members whose profile, live city or trip is there."
+        onPick={(place) => {
+          setMode("global");
+          setCity(place?.key ?? null);
+        }}
+      />
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DialogContent>
           <DialogHeader>

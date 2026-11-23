@@ -12,15 +12,21 @@ interface FeedLocationPickerProps {
   home: FeedLocation | null;
   members: LocationChoice[];
   onPick: (location: FeedLocation | null) => void;
+  /** States and countries, offered after the cities when nothing is typed (Explore's deck). */
+  regions?: LocationChoice[];
+  title?: string;
+  description?: string;
 }
 
-export function FeedLocationPicker({ open, onOpenChange, current, home, members, onPick }: FeedLocationPickerProps) {
+export function FeedLocationPicker({ open, onOpenChange, current, home, members, onPick, regions = [], title = "Location", description = "Show posts and people from one place. Ether matches the city on each profile." }: FeedLocationPickerProps) {
   const [query, setQuery] = useState("");
   const rows = useMemo(() => {
     const list = locationChoices(members, query);
-    if (query.trim() || !home || list.some((row) => row.key === home.key)) return list;
-    return [{ ...home, members: 0 }, ...list];
-  }, [members, query, home]);
+    const needle = query.trim().toLowerCase();
+    const areas = regions.filter((row) => !needle || row.label.toLowerCase().includes(needle));
+    if (needle || !home || list.some((row) => row.key === home.key)) return [...list, ...areas];
+    return [{ ...home, members: 0 }, ...list, ...areas];
+  }, [members, query, home, regions]);
 
   const pick = (location: FeedLocation | null) => {
     onPick(location);
@@ -32,10 +38,8 @@ export function FeedLocationPicker({ open, onOpenChange, current, home, members,
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto max-h-[85dvh] w-full max-w-lg rounded-t-2xl">
         <SheetHeader className="text-left">
-          <SheetTitle>Location</SheetTitle>
-          <SheetDescription>
-            Show posts and people from one place. Ether matches the city on each profile.
-          </SheetDescription>
+          <SheetTitle>{title}</SheetTitle>
+          <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
         <label className="relative mt-4 block">
           <span className="sr-only">Search a city or area</span>

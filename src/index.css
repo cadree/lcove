@@ -1767,3 +1767,37 @@ body.ether-id-page {
 html[data-keyboard-pad] body {
   padding-bottom: var(--keyboard-inset, 0px);
 }
+
+/* Explore match deck: transform and opacity only, so iPhone composites every frame. */
+.match-card {
+  transition: transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 300ms ease;
+  will-change: transform;
+}
+.match-enter {
+  animation: match-enter 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes match-enter {
+  from { transform: translate3d(0, -30px, 0) scale(0.945); opacity: 0.82; }
+  to { transform: none; opacity: 1; }
+}
+.match-leave-left { animation: match-leave-left 300ms ease-in forwards; }
+.match-leave-right { animation: match-leave-right 300ms ease-in forwards; }
+@keyframes match-leave-left {
+  to { transform: translate3d(-115%, 24px, 0) rotate(-10deg); opacity: 0; }
+}
+@keyframes match-leave-right {
+  to { transform: translate3d(115%, 24px, 0) rotate(10deg); opacity: 0; }
+}
+.match-float { animation: match-float 4.2s ease-in-out infinite; }
+@keyframes match-float {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-4deg); }
+  50% { transform: translate3d(0, -8px, 0) rotate(5deg); }
+}
+.match-globe { animation: match-globe 14s linear infinite; }
+@keyframes match-globe {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .match-card, .match-enter, .match-leave-left, .match-leave-right, .match-float, .match-globe { animation: none; transition: none; }
+}
