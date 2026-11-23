@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  BANNED_ACCOUNT_HELP,
   classifySignup,
+  isBannedAuthError,
   emailSendingHelp,
   isExistingAccountSignup,
   resendWaitRemaining,
@@ -82,4 +84,13 @@ test("a project-wide email limit on Join stays on Join; a per-address limit open
   assert.equal(signupLimitNextStep(quota.kind === "rate-limited" ? quota.retryAfterSeconds : 0), "stay-on-join");
   assert.match(SIGNUP_NOT_SENT_NOTE, /tap Join again/);
   assert.doesNotMatch(SIGNUP_NOT_SENT_NOTE, /code we sent/i);
+});
+
+test("a banned account is told it is closed instead of waiting for a code", () => {
+  // GoTrue answers a correct password on a banned user with 400 user_banned.
+  assert.equal(isBannedAuthError({ code: "user_banned", status: 400, message: "User is banned" }), true);
+  assert.equal(isBannedAuthError({ message: "User is banned" }), true);
+  assert.equal(isBannedAuthError({ code: "invalid_credentials", message: "Invalid login credentials" }), false);
+  assert.equal(isBannedAuthError(null), false);
+  assert.match(BANNED_ACCOUNT_HELP.description, /different email/);
 });

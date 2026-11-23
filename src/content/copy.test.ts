@@ -44,7 +44,7 @@ test("new funnel copy keeps Cadre's lines and is not anti-AI", () => {
   assert.match(HERO_SUB, /Real work, not AI slop/);
   assert.match(HERO_SUB, /No algorithm/);
   assert.match(OG_DESCRIPTION, /real people and no algorithms/i);
-  assert.equal(VERIFY_SIGNAL_TITLE, "Verify your signal");
+  assert.equal(VERIFY_SIGNAL_TITLE, "Verify your email");
   assert.equal(OATH_KICKER, "The oath to enter");
   assert.equal(OATH_CTA, "I'm in");
   assert.equal(OATH_MISSION, "A path for genuine creatives to follow their passions.");
