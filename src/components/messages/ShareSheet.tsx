@@ -10,15 +10,20 @@ import { useConversations } from "@/hooks/useConversations";
 import { sendChatShare } from "@/lib/sendChatShare";
 import { shareLink } from "@/lib/shareLink";
 import type { ShareCard } from "@/lib/shareCard";
+import type { ListenCard } from "@/lib/listenTogether";
 
 interface ShareSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  card: ShareCard | null;
+  card: ShareCard | ListenCard | null;
   linkUrl: string;
+  title?: string;
+  description?: string;
+  /** Called after the message is in the chat. */
+  onSent?: (conversationId: string) => void;
 }
 
-export function ShareSheet({ open, onOpenChange, card, linkUrl }: ShareSheetProps) {
+export function ShareSheet({ open, onOpenChange, card, linkUrl, title = "Send", description = "A private message to a friend or a group chat.", onSent }: ShareSheetProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { conversations, isLoading } = useConversations();
@@ -44,6 +49,7 @@ export function ShareSheet({ open, onOpenChange, card, linkUrl }: ShareSheetProp
       queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
       toast.success(`Sent to ${name}`);
+      onSent?.(conversationId);
       setNote("");
       onOpenChange(false);
     } catch (err) {
@@ -59,8 +65,8 @@ export function ShareSheet({ open, onOpenChange, card, linkUrl }: ShareSheetProp
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md gap-0 border-border bg-background p-0">
         <div className="border-b border-border px-5 pb-4 pt-5">
-          <DialogTitle className="ether-title text-left text-3xl">Send</DialogTitle>
-          <DialogDescription className="mt-1 text-sm text-muted-foreground">A private message to a friend or a group chat.</DialogDescription>
+          <DialogTitle className="ether-title text-left text-3xl">{title}</DialogTitle>
+          <DialogDescription className="mt-1 text-sm text-muted-foreground">{description}</DialogDescription>
         </div>
         <div className="space-y-3 px-5 py-4">
           <Input
@@ -115,7 +121,7 @@ export function ShareSheet({ open, onOpenChange, card, linkUrl }: ShareSheetProp
             type="button"
             variant="outline"
             className="min-h-11 w-full"
-            onClick={() => shareLink({ title: card?.title, text: card?.subtitle, url: linkUrl })}
+            onClick={() => shareLink({ title: card?.title, text: !card ? undefined : card.kind === "listen" ? card.artist : card.subtitle, url: linkUrl })}
           >
             Share link
           </Button>

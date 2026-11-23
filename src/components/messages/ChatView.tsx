@@ -21,6 +21,7 @@ import { usePresence } from '@/hooks/usePresence';
 import { useProjectChatData } from '@/hooks/useProjectChatData';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ShareCardBubble } from '@/components/messages/ShareCardBubble';
+import { ListenCardBubble, ListeningStrip } from '@/components/music/ListenCardBubble';
 import { splitShareMessage } from '@/lib/shareCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -365,6 +366,8 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
         </div>
       </div>
 
+      <ListeningStrip participantIds={conversation?.participants?.map((p) => p.user_id) ?? []} />
+
       {/* Presence Bar for Project Chats */}
       {isProjectChat && conversation?.participants && conversation.participants.length > 0 && (
         <div className="flex items-center gap-1.5 px-4 py-2 border-b border-border/30 bg-card/20 overflow-x-auto">
@@ -534,10 +537,11 @@ const ChatView = ({ conversationId, onBack }: ChatViewProps) => {
                             <InviteCard inviteId={msg.shared_invite_id} />
                           ) : (() => {
                             const shared = splitShareMessage(msg.content);
-                            const note = shared.card ? shared.note : msg.content;
+                            const note = shared.card || shared.listen ? shared.note : msg.content;
                             return (
                               <>
                                 {shared.card && <ShareCardBubble card={shared.card} />}
+                                {shared.listen && <ListenCardBubble card={shared.listen} />}
                                 {note && (
                                   <div
                                     className={`px-4 py-2.5 ${

@@ -11,6 +11,11 @@ export type LikeTarget = {
 
 export type FeedEngagementValue = {
   likes: LikeTally;
+  /** Newest other likers per post, up to three. */
+  likers: Record<string, string[]>;
+  reactors: Record<string, { name: string; avatarUrl: string | null }>;
+  /** Visible comments per post. */
+  comments: Record<string, number>;
   saved: Set<string>;
   likesError: string | null;
   toggleLike: (post: LikeTarget) => void;

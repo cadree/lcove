@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { isQueryablePostId } from "@/lib/postId";
-import { savedIdSet, tallyPostLikes, type LikeTally } from "@/lib/feedEngagement";
+import { recentLikers, savedIdSet, tallyComments, tallyPostLikes, type LikeTally } from "@/lib/feedEngagement";
 import { notifyPostLike } from "@/lib/notifications";
 import { toast } from "sonner";
 import { FeedEngagementContext, type FeedEngagementValue, type LikeTarget } from "@/hooks/feedEngagementContext";
@@ -34,9 +34,44 @@ export function FeedEngagementProvider({ postIds, children }: { postIds: string[
     enabled: ids.length > 0,
     queryFn: async () => {
       const rows = await selectChunks<{ post_id: string; user_id: string }>(ids, (chunk) =>
-        supabase.from("post_likes").select("post_id, user_id").in("post_id", chunk),
+        supabase.from("post_likes").select("post_id, user_id").in("post_id", chunk).order("created_at", { ascending: false }),
       );
+      // The same read gives the faces on each card, without a second request.
+      queryClient.setQueryData(["feed-likers", user?.id ?? null, idKey], recentLikers(rows, user?.id));
       return tallyPostLikes(rows, user?.id);
+    },
+  });
+
+  const likersQuery = useQuery({
+    queryKey: ["feed-likers", user?.id ?? null, idKey],
+    queryFn: () => ({}) as Record<string, string[]>,
+    enabled: false,
+    staleTime: Infinity,
+  });
+  const reactorIds = useMemo(
+    () => [...new Set(Object.values(likersQuery.data ?? {}).flat())].sort(),
+    [likersQuery.data],
+  );
+  const reactorsQuery = useQuery({
+    queryKey: ["feed-reactors", reactorIds.join(",")],
+    enabled: reactorIds.length > 0,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const rows = await selectChunks<{ user_id: string; display_name: string | null; avatar_url: string | null }>(reactorIds, (chunk) =>
+        supabase.from("profiles_public").select("user_id, display_name, avatar_url").in("user_id", chunk),
+      );
+      return Object.fromEntries(rows.map((row) => [row.user_id, { name: row.display_name || "Member", avatarUrl: row.avatar_url }]));
+    },
+  });
+  const commentsQuery = useQuery({
+    queryKey: ["feed-comment-counts", idKey],
+    enabled: ids.length > 0,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const rows = await selectChunks<{ post_id: string }>(ids, (chunk) =>
+        supabase.from("post_comments").select("post_id").in("post_id", chunk),
+      );
+      return tallyComments(rows);
     },
   });
 
@@ -157,6 +192,9 @@ export function FeedEngagementProvider({ postIds, children }: { postIds: string[
   const value = useMemo<FeedEngagementValue>(
     () => ({
       likes: likesQuery.data ?? {},
+      likers: likersQuery.data ?? {},
+      reactors: reactorsQuery.data ?? {},
+      comments: commentsQuery.data ?? {},
       saved,
       likesError: likesQuery.error instanceof Error ? likesQuery.error.message : likesQuery.error ? "Likes did not load" : null,
       toggleLike: (post) => likeMutation.mutate(post),
@@ -164,7 +202,7 @@ export function FeedEngagementProvider({ postIds, children }: { postIds: string[
       likingId: likeMutation.isPending ? likeMutation.variables?.id ?? null : null,
       savingId: saveMutation.isPending ? saveMutation.variables ?? null : null,
     }),
-    [likesQuery.data, likesQuery.error, saved, likeMutation, saveMutation],
+    [likesQuery.data, likersQuery.data, reactorsQuery.data, commentsQuery.data, likesQuery.error, saved, likeMutation, saveMutation],
   );
 
   return <FeedEngagementContext.Provider value={value}>{children}</FeedEngagementContext.Provider>;

@@ -28,7 +28,7 @@ const PageLayout = ({
   return (
     <div className={`min-h-screen bg-background ${bleed ? "overflow-x-visible" : "overflow-x-hidden"}`}>
       <NoviCelebration />
-      <main className={`relative safe-area-top ${hideNav ? "safe-area-bottom" : "pb-28"} ${className}`}>
+      <main className={`relative safe-area-top ${hideNav ? "safe-area-bottom" : "pb-28 mini-player-room"} ${className}`}>
         {children}
       </main>
       

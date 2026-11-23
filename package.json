@@ -16,6 +16,7 @@
     "test:unit": "node --experimental-strip-types --test \"src/**/*.test.ts\"",
     "test:discovery-db": "node scripts/creative-discovery-db.test.mjs",
     "test:music-db": "node scripts/music-catalog-db.test.mjs",
+    "test:music-prefs-db": "node scripts/music-page-prefs-db.test.mjs",
     "test:invite-db": "node scripts/item-invites-db.test.mjs",
     "test:bridge-db": "node scripts/creative-bridge-db.test.mjs",
     "test:membership-review-db": "node scripts/membership-review-db.test.mjs",

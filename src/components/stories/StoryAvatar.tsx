@@ -36,7 +36,7 @@ const StoryAvatar = forwardRef<HTMLDivElement, StoryAvatarProps>(function StoryA
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.8 }}
       transition={{ delay: index * 0.05, duration: 0.3 }}
-      className="relative w-20 shrink-0"
+      className="relative w-[76px] shrink-0"
     >
       <button
         type="button"
@@ -44,22 +44,22 @@ const StoryAvatar = forwardRef<HTMLDivElement, StoryAvatarProps>(function StoryA
         aria-label={`View ${displayName}'s story`}
         className="group w-full text-left"
       >
-        <div className="relative h-20 w-20 rounded-full">
+        <div className="relative h-[92px] w-[76px]">
           <div
-            className="absolute inset-0 rounded-full p-[2px]"
+            className="absolute inset-0 rounded-[26px] p-[2.5px]"
             style={{
               background: hasUnviewed
-                ? "conic-gradient(from 120deg, #C4142D, #FF9FC8, #C4142D)"
-                : "conic-gradient(from 120deg, hsl(var(--border)), hsl(var(--muted-foreground)), hsl(var(--border)))",
+                ? "linear-gradient(160deg, #ffc6de, #ff9fc8 45%, #c4142d)"
+                : "linear-gradient(160deg, hsl(var(--border)), hsl(var(--muted-foreground)))",
             }}
           >
-            <div className="h-full w-full rounded-full bg-card p-[2px]">
-              <div className="h-full w-full overflow-hidden rounded-full bg-muted">
+            <div className="h-full w-full rounded-[24px] bg-card p-[2px]">
+              <div className="h-full w-full overflow-hidden rounded-[22px] bg-muted">
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
                     alt=""
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-lg font-medium text-muted-foreground">
@@ -77,7 +77,7 @@ const StoryAvatar = forwardRef<HTMLDivElement, StoryAvatarProps>(function StoryA
           )}
         </div>
 
-        <span className="mt-1.5 block w-20 truncate text-center font-body text-[10px] text-foreground">
+        <span className="mt-1.5 block w-[76px] truncate text-center font-body text-[11px] font-semibold text-foreground">
           {displayName.split(" ")[0]}
         </span>
       </button>

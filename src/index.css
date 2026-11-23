@@ -1767,3 +1767,146 @@ body.ether-id-page {
 html[data-keyboard-pad] body {
   padding-bottom: var(--keyboard-inset, 0px);
 }
+
+/* Explore match deck: transform and opacity only, so iPhone composites every frame. */
+.match-card {
+  transition: transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 300ms ease;
+  will-change: transform;
+}
+.match-enter {
+  animation: match-enter 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes match-enter {
+  from { transform: translate3d(0, -30px, 0) scale(0.945); opacity: 0.82; }
+  to { transform: none; opacity: 1; }
+}
+.match-leave-left { animation: match-leave-left 300ms ease-in forwards; }
+.match-leave-right { animation: match-leave-right 300ms ease-in forwards; }
+@keyframes match-leave-left {
+  to { transform: translate3d(-115%, 24px, 0) rotate(-10deg); opacity: 0; }
+}
+@keyframes match-leave-right {
+  to { transform: translate3d(115%, 24px, 0) rotate(10deg); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .match-card, .match-enter, .match-leave-left, .match-leave-right { animation: none; transition: none; }
+}
+
+/* Music profile view. Colors are variables so a look is one class, not a fork. */
+.music-view {
+  --mv-bg: #1d1a22;
+  --mv-surface: rgba(255, 255, 255, 0.07);
+  --mv-surface-strong: #2c2731;
+  --mv-tab-on: rgba(255, 255, 255, 0.14);
+  --mv-line: rgba(255, 255, 255, 0.14);
+  --mv-line-strong: rgba(250, 245, 240, 0.9);
+  --mv-text: #faf5f0;
+  --mv-muted: rgba(250, 245, 240, 0.6);
+  --mv-accent: #ff9fc8;
+  --mv-accent-2: #ffc6de;
+  --mv-on-accent: #2c1320;
+  --mv-glow: 0 18px 40px -20px rgba(0, 0, 0, 0.9);
+  --mv-glow-soft: none;
+  --mv-text-glow: none;
+  background: radial-gradient(120% 60% at 50% 0%, #3a2a36 0%, var(--mv-bg) 60%);
+  color: var(--mv-text);
+}
+.music-view .music-favorites {
+  color: var(--mv-accent);
+  text-shadow: 0 0 24px rgba(255, 159, 200, 0.35);
+}
+
+/* Neon look for the music page: the same markup, other variables and glows. */
+.music-only-neon { display: none; }
+.music-look-neon .music-only-neon { display: block; }
+.music-look-neon .music-only-ether { display: none; }
+.music-view.music-look-neon {
+  --mv-bg: #070812;
+  --mv-surface: rgba(24, 28, 56, 0.55);
+  --mv-surface-strong: #10142a;
+  --mv-tab-on: rgba(62, 240, 255, 0.16);
+  --mv-line: rgba(120, 236, 255, 0.35);
+  --mv-line-strong: #3ef0ff;
+  --mv-text: #eafcff;
+  --mv-muted: rgba(200, 236, 255, 0.62);
+  --mv-accent: #3ef0ff;
+  --mv-accent-2: #ff4fd8;
+  --mv-on-accent: #04121a;
+  --mv-glow: 0 0 0 1px rgba(62, 240, 255, 0.5), 0 0 22px rgba(62, 240, 255, 0.45), 0 0 46px rgba(255, 79, 216, 0.25);
+  --mv-glow-soft: 0 0 14px rgba(62, 240, 255, 0.35);
+  --mv-text-glow: 0 0 10px rgba(62, 240, 255, 0.7), 0 0 26px rgba(255, 79, 216, 0.45);
+  background:
+    radial-gradient(70% 40% at 15% 0%, rgba(255, 79, 216, 0.28), transparent 70%),
+    radial-gradient(70% 40% at 90% 18%, rgba(62, 240, 255, 0.22), transparent 70%),
+    linear-gradient(180deg, #0b0d1f 0%, var(--mv-bg) 55%);
+}
+.music-look-neon h1,
+.music-look-neon h2 {
+  font-family: var(--font-body, inherit);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.music-look-neon .music-favorites {
+  font-size: 26px;
+  text-align: left;
+  color: var(--mv-text);
+  text-shadow: var(--mv-text-glow);
+}
+.music-look-neon .music-player {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 30px 60px -30px rgba(0, 0, 0, 0.9);
+}
+.music-look-neon .music-player-art {
+  box-shadow: 0 0 0 2px #ff4fd8, 0 0 24px rgba(255, 79, 216, 0.65), 0 0 60px rgba(62, 240, 255, 0.3);
+}
+.music-look-neon .music-play {
+  box-shadow: 0 0 18px rgba(62, 240, 255, 0.75), inset 0 0 14px rgba(62, 240, 255, 0.35);
+}
+.music-look-neon .music-tile > span:first-child,
+.music-look-neon .music-cover {
+  --tile-glow: #3ef0ff;
+  box-shadow: 0 0 0 2px var(--tile-glow), 0 0 16px var(--tile-glow);
+}
+.music-look-neon li:nth-child(3n + 2) .music-tile > span:first-child,
+.music-look-neon li:nth-child(3n + 2) .music-cover { --tile-glow: #ff4fd8; }
+.music-look-neon li:nth-child(3n) .music-tile > span:first-child,
+.music-look-neon li:nth-child(3n) .music-cover { --tile-glow: #a86bff; }
+.music-progress {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--mv-accent) var(--mv-progress, 0%), rgba(255, 255, 255, 0.18) var(--mv-progress, 0%));
+}
+.music-progress::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 10px var(--mv-accent);
+}
+.music-progress::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+}
+
+/* Shared music player bar sits above the tab bar; pages keep their last row clear of it. */
+.has-mini-player .mini-player-room {
+  padding-bottom: calc(7rem + 72px);
+}
+
+/* Listen together: a soft pulse behind the other listener's face. */
+.listen-pulse {
+  background: #ff9fc8;
+  animation: listen-pulse 1.6s ease-out infinite;
+}
+@keyframes listen-pulse {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .listen-pulse { animation: none; opacity: 0.35; transform: scale(1.4); }
+}

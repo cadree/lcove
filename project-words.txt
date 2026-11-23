@@ -127,3 +127,6 @@ webcal
 webrtc
 wjbyvlgsxscwukkolehg
 youtu
+nexttrack
+previoustrack
+seekto

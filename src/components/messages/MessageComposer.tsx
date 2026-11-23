@@ -149,7 +149,7 @@ const MessageComposer = ({ onSend, onTyping, isSending }: MessageComposerProps) 
             size="icon"
             aria-label="Send a photo"
             onClick={() => pickMedia("image/*")}
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground max-[359px]:hidden"
           >
             <Image className="w-5 h-5" />
           </Button>
@@ -159,7 +159,7 @@ const MessageComposer = ({ onSend, onTyping, isSending }: MessageComposerProps) 
             size="icon"
             aria-label="Send a video"
             onClick={() => pickMedia("video/*")}
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground max-[359px]:hidden"
           >
             <Video className="w-5 h-5" />
           </Button>
@@ -175,8 +175,8 @@ const MessageComposer = ({ onSend, onTyping, isSending }: MessageComposerProps) 
           </Button>
         </div>
 
-        {/* Text Input */}
-        <div className="flex-1 relative">
+        {/* Text Input. On very narrow phones only the paperclip stays, so the box keeps room. */}
+        <div className="relative min-w-0 flex-1">
           <Textarea
             ref={textareaRef}
             placeholder="Message..."
