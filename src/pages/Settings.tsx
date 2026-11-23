@@ -46,6 +46,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "@/hooks/useAdmin";
 import { useNotificationPreferences } from "@/hooks/useNotifications";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { isIosApp } from "@/lib/platform";
 import { IosPushInstallSteps } from "@/components/settings/IosPushInstallSteps";
 import { useUserBlocks } from "@/hooks/useUserBlocks";
 import { assertCleanText, OBJECTIONABLE_MESSAGE } from "@/lib/objectionableText";
@@ -862,6 +863,10 @@ const Settings = () => {
                 <Label className="text-foreground">Push Notifications</Label>
                 {pushStatus === 'needs_home_screen' ? (
                   <IosPushInstallSteps />
+                ) : pushStatus === 'permission_denied' && isIosApp() ? (
+                  <p className="text-sm text-muted-foreground" data-ios-push-off>
+                    Notifications are off: turn on in iPhone Settings
+                  </p>
                 ) : (
                   <p className="text-sm text-muted-foreground">
                     {pushStatus === 'checking'
@@ -896,7 +901,7 @@ const Settings = () => {
                     }
                   }
                 }}
-                disabled={!pushSupported || pushStatus === 'not_supported' || pushStatus === 'needs_home_screen' || pushLoading || pushStatus === 'checking'}
+                disabled={!pushSupported || pushStatus === 'not_supported' || pushStatus === 'needs_home_screen' || pushLoading || pushStatus === 'checking' || (pushStatus === 'permission_denied' && isIosApp())}
               />
             </div>
 

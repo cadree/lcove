@@ -35,6 +35,7 @@ function harness(overrides: Partial<IosPushBridge> = {}): Harness {
 
   const bridge: IosPushBridge = {
     getPlatform: () => "ios",
+    checkPermissions: async () => ({ receive: "prompt" }),
     requestPermissions: async () => {
       permissions += 1;
       return { receive: "granted" };
@@ -191,6 +192,8 @@ describe("iOS push registration", () => {
     const registration = createIosPushRegistration(fake.bridge, (...entry) => fake.logs.push(entry));
     const first = registration.register(USER);
     const second = registration.register(USER);
+    // The current permission is read first, so wait for the prompt to open.
+    while (permissions === 0) await new Promise((resolve) => setImmediate(resolve));
     release({ receive: "denied" });
     await Promise.all([first, second]);
     assert.equal(permissions, 1);
@@ -246,5 +249,43 @@ describe("iOS push registration", () => {
     assert.equal(fake.listenerAdds(), addsAfterFirst);
     assert.equal(fake.saves[1].user_id, OTHER);
     assert.equal(fake.saves[1].platform, "apns");
+  });
+
+  it("never prompts again after the member said no", async () => {
+    const fake = harness({ checkPermissions: async () => ({ receive: "denied" }) });
+    const registration = createIosPushRegistration(fake.bridge, (...entry) => fake.logs.push(entry));
+    await registration.register(USER, { prompt: true });
+    await registration.register(USER);
+    assert.equal(fake.permissions(), 0);
+    assert.equal(fake.registers(), 0);
+  });
+
+  it("does not prompt before onboarding is done", async () => {
+    const fake = harness();
+    const registration = createIosPushRegistration(fake.bridge, (...entry) => fake.logs.push(entry));
+    await registration.register(USER, { prompt: false });
+    assert.equal(fake.permissions(), 0);
+    assert.equal(fake.registers(), 0);
+  });
+
+  it("refreshes the token quietly when permission is already granted", async () => {
+    const fake = harness({ checkPermissions: async () => ({ receive: "granted" }) });
+    const registration = createIosPushRegistration(fake.bridge, (...entry) => fake.logs.push(entry));
+    await registration.register(USER, { prompt: false });
+    await fake.deliverToken(TOKEN);
+    assert.equal(fake.permissions(), 0);
+    assert.equal(fake.registers(), 1);
+    assert.equal(fake.saves.length, 1);
+  });
+
+  it("prompts once when onboarding finishes while a quiet check is in flight", async () => {
+    const fake = harness();
+    const registration = createIosPushRegistration(fake.bridge, (...entry) => fake.logs.push(entry));
+    const quiet = registration.register(USER, { prompt: false });
+    const asked = registration.register(USER, { prompt: true });
+    const again = registration.register(USER, { prompt: true });
+    await Promise.all([quiet, asked, again]);
+    assert.equal(fake.permissions(), 1);
+    assert.equal(fake.registers(), 1);
   });
 });

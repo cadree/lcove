@@ -3,6 +3,7 @@ import { MessageSquare, Heart, MessageCircle, Users, Calendar, Radio, Bell, Mail
 import { IosPushInstallSteps } from '@/components/settings/IosPushInstallSteps';
 import { useNotificationPreferences } from '@/hooks/useNotifications';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { isIosApp } from '@/lib/platform';
 import { useIsAdmin } from '@/hooks/useAdmin';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -80,8 +81,11 @@ export const NotificationPreferences: React.FC = () => {
   }
 
   const needsHomeScreen = status === 'needs_home_screen';
+  const iosPushOff = status === 'permission_denied' && isIosApp();
   const pushDescription = needsHomeScreen
     ? 'Add Ether to your Home Screen, then turn push on'
+    : iosPushOff
+    ? 'Notifications are off: turn on in iPhone Settings'
     : !isSupported
     ? 'Not supported in this browser'
     : permission === 'denied'
@@ -215,9 +219,9 @@ export const NotificationPreferences: React.FC = () => {
           icon={<Bell className="h-4 w-4" />}
           label="Push Notifications"
           description={pushDescription}
-          checked={(preferences.push_enabled ?? false) && permission === 'granted'}
+          checked={(preferences.push_enabled ?? false) && (isIosApp() ? status === 'subscribed' : permission === 'granted')}
           onCheckedChange={handlePushToggle}
-          disabled={!isSupported || permission === 'denied' || needsHomeScreen}
+          disabled={!isSupported || permission === 'denied' || needsHomeScreen || iosPushOff}
         />
         {needsHomeScreen && <IosPushInstallSteps />}
 

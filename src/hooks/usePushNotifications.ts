@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isIosApp } from '@/lib/platform';
-import { registerIosPush } from '@/lib/nativePush';
+import { iosPushPermission, registerIosPush } from '@/lib/nativePush';
 import { resolveVapidPublicKey } from '@/lib/vapidPublicKey';
 import { iosPushNeedsHomeScreen, readIosPushEnvironment } from '@/lib/iosWebPush';
 
@@ -49,8 +49,14 @@ export const usePushNotifications = () => {
   useEffect(() => {
     const checkStatus = async () => {
       if (user?.id && isIosApp()) {
-        registerIosPush(user.id).catch((error) => console.error('iOS push registration failed', error));
-        setState({ status: 'subscribed', error: null, isLoading: false });
+        // Never prompts from here. NativeIosPush asks once after onboarding.
+        registerIosPush(user.id, { prompt: false }).catch((error) => console.error('iOS push registration failed', error));
+        const permission = await iosPushPermission();
+        setState({
+          status: permission === 'granted' ? 'subscribed' : permission === 'denied' ? 'permission_denied' : 'not_subscribed',
+          error: null,
+          isLoading: false,
+        });
         return;
       }
 
@@ -217,6 +223,15 @@ export const usePushNotifications = () => {
     if (!user?.id) {
       toast.error('Please sign in to enable push notifications');
       return false;
+    }
+
+    if (isIosApp()) {
+      // iOS shows its prompt only once. After a denial only iPhone Settings can turn it on.
+      await registerIosPush(user.id, { prompt: true });
+      const permission = await iosPushPermission();
+      const status: PushStatus = permission === 'granted' ? 'subscribed' : permission === 'denied' ? 'permission_denied' : 'not_subscribed';
+      setState({ status, error: null, isLoading: false });
+      return permission === 'granted';
     }
 
     setState(prev => ({ ...prev, isLoading: true, error: null }));
