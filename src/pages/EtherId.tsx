@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Info } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import PageLayout from "@/components/layout/PageLayout";
@@ -7,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { EtherCardIntro } from "@/components/profile/EtherCardIntro";
 import { EtherIdFace, monthName } from "@/components/profile/EtherIdFace";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +34,12 @@ import {
 import { toast } from "sonner";
 import { callRpc } from "@/lib/rpc";
 import { AFTER_WELCOME_PATH } from "@/lib/firstRun";
+import {
+  CARD_INTRO_ABOUT,
+  CARD_INTRO_REVEAL_MS,
+  markCardIntroSeen,
+  shouldAutoShowCardIntro,
+} from "@/lib/cardIntro";
 
 const SHOT_CARD: EtherIdCard = {
   display_name: "Cadre Wallace",
@@ -70,6 +78,10 @@ export default function EtherId() {
   const [searchParams] = useSearchParams();
   const setupMode = searchParams.get('setup') === '1';
   const [walletOpened, setWalletOpened] = useState(false);
+  const [introOpen, setIntroOpen] = useState(false);
+  const [revealing, setRevealing] = useState(false);
+  const cardFaceRef = useRef<HTMLDivElement>(null);
+  const autoIntroStarted = useRef(false);
   useEffect(() => {
     document.body.classList.add("ether-id-page");
     return () => document.body.classList.remove("ether-id-page");
@@ -222,6 +234,42 @@ export default function EtherId() {
 
   const href = card ? verifyUrl(window.location.origin, card.verify_path) : "";
   const showWallet = walletButtonVisible(shot ? false : walletQuery.data?.configured);
+  const walletReady = shot || walletQuery.isFetched || walletQuery.isError;
+  const hasCard = Boolean(card);
+  const shouldAutoIntro = shouldAutoShowCardIntro(window.localStorage, {
+    userId: session?.user.id,
+    setupMode,
+    cardRegistered,
+  });
+
+  useEffect(() => {
+    if (!hasCard || !shouldAutoIntro || !walletReady || autoIntroStarted.current) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) {
+      autoIntroStarted.current = true;
+      setIntroOpen(true);
+      return;
+    }
+    setRevealing(true);
+    const timer = window.setTimeout(() => {
+      autoIntroStarted.current = true;
+      setRevealing(false);
+      setIntroOpen(true);
+    }, CARD_INTRO_REVEAL_MS);
+    return () => {
+      window.clearTimeout(timer);
+      setRevealing(false);
+    };
+  }, [hasCard, shouldAutoIntro, walletReady]);
+
+  const closeIntro = (open: boolean) => {
+    setIntroOpen(open);
+    if (!open) markCardIntroSeen(window.localStorage, session?.user.id);
+  };
+
+  const viewCard = () => {
+    cardFaceRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  };
 
   return (
     <PageLayout bleed>
@@ -236,10 +284,11 @@ export default function EtherId() {
         {cardQuery.isError && <p className="text-sm text-destructive">Could not load your Ether ID.</p>}
         {card && (
           <>
-            <div className="min-w-0 max-w-full">
+            <div className="min-w-0 max-w-full" ref={cardFaceRef}>
               <EtherIdFace
                 card={card}
                 verifyHref={href}
+                reveal={revealing}
                 onEditPassion={() => {
                   passionRef.current?.focus();
                   passionRef.current?.scrollIntoView({ block: "center" });
@@ -247,6 +296,16 @@ export default function EtherId() {
               />
             </div>
             <div className="mt-4 flex flex-col gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                className="min-h-11 justify-center"
+                onClick={() => setIntroOpen(true)}
+                data-testid="ether-card-intro-info"
+              >
+                <Info className="h-4 w-4" />
+                {CARD_INTRO_ABOUT}
+              </Button>
               <Button type="button" variant="outline" className="min-h-11" onClick={() => refresh.mutate()} disabled={refresh.isPending}>
                 Refresh code
               </Button>
@@ -370,6 +429,13 @@ export default function EtherId() {
           </>
         )}
       </div>
+      <EtherCardIntro
+        open={introOpen}
+        onOpenChange={closeIntro}
+        walletVisible={showWallet}
+        onAddToWallet={() => void addToWallet()}
+        onViewCard={viewCard}
+      />
     </PageLayout>
   );
 }
