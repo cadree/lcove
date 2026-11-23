@@ -45,6 +45,29 @@ export function isTextOnlyPost(post: {
   return Boolean(post.content?.trim()) || post.media_type === "text";
 }
 
+export type ProfilePostSegment<T> =
+  | { type: "text"; post: T }
+  | { type: "media"; posts: T[] };
+
+/**
+ * Text-only posts become full-width cards. Consecutive photos, videos, and
+ * linked clips stay in a media grid. Order is preserved, so a thought sits
+ * where it was posted instead of inside a square tile.
+ */
+export function profilePostSegments<T extends ProfileGridPost>(posts: T[]): ProfilePostSegment<T>[] {
+  const segments: ProfilePostSegment<T>[] = [];
+  for (const post of postsForProfileGrid(posts)) {
+    if (isTextOnlyPost(post)) {
+      segments.push({ type: "text", post });
+      continue;
+    }
+    const last = segments[segments.length - 1];
+    if (last?.type === "media") last.posts.push(post);
+    else segments.push({ type: "media", posts: [post] });
+  }
+  return segments;
+}
+
 export function sameUserId(a?: string | null, b?: string | null): boolean {
   return Boolean(a && b && a.toLowerCase() === b.toLowerCase());
 }

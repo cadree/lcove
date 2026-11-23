@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { isTextOnlyPost, mergeLinkedPost, postsForProfileGrid, postsForViewer } from "./profilePosts.ts";
+import { isTextOnlyPost, mergeLinkedPost, postsForProfileGrid, postsForViewer, profilePostSegments } from "./profilePosts.ts";
 
 describe("postsForProfileGrid", () => {
   it("keeps a caption-only post that the photo grid used to drop", () => {
@@ -58,5 +58,47 @@ describe("isTextOnlyPost", () => {
     assert.equal(isTextOnlyPost({ media_url: "https://cdn.example/clip.mp4", media_type: "video", content: null }), false);
     assert.equal(isTextOnlyPost({ media_url: null, content: null, embed_provider: "youtube", embed_video_id: "aqz-KE-bpKQ" }), false);
     assert.equal(isTextOnlyPost({ media_url: null, content: "   " }), false);
+  });
+});
+
+describe("profilePostSegments", () => {
+  it("keeps text-only posts out of the media grid and in order with photos", () => {
+    const posts = [
+      { id: "thought", media_url: null, media_type: "text", content: "I like ether better than IG already" },
+      { id: "photo", media_url: "https://cdn.example/photo.jpg", media_type: "photo", content: "set" },
+      { id: "later", media_url: null, content: "Another thought" },
+    ];
+    const segments = profilePostSegments(posts);
+    assert.equal(segments[0]?.type, "text");
+    if (segments[0]?.type !== "text") throw new Error("expected text");
+    assert.equal(segments[0].post.id, "thought");
+    assert.equal(segments[1]?.type, "media");
+    if (segments[1]?.type !== "media") throw new Error("expected media");
+    assert.deepEqual(segments[1].posts.map((post) => post.id), ["photo"]);
+    assert.equal(segments[2]?.type, "text");
+    if (segments[2]?.type !== "text") throw new Error("expected text");
+    assert.equal(segments[2].post.id, "later");
+  });
+
+  it("groups consecutive media into one grid and leaves a text-only list without a grid", () => {
+    const media = profilePostSegments([
+      { id: "a", media_url: "https://cdn.example/a.jpg", media_type: "photo" },
+      { id: "b", media_url: "https://cdn.example/b.mp4", media_type: "video" },
+      { id: "yt", media_url: null, embed_provider: "youtube", embed_video_id: "aqz-KE-bpKQ" },
+    ]);
+    assert.equal(media.length, 1);
+    assert.equal(media[0]?.type, "media");
+    if (media[0]?.type !== "media") throw new Error("expected media");
+    assert.deepEqual(media[0].posts.map((post) => post.id), ["a", "b", "yt"]);
+
+    const texts = profilePostSegments([
+      { id: "one", media_url: null, content: "Hello" },
+      { id: "blank", media_url: null, content: "  " },
+      { id: "two", media_url: null, media_type: "text", content: "There" },
+    ]);
+    assert.deepEqual(
+      texts.map((segment) => (segment.type === "text" ? segment.post.id : "media")),
+      ["one", "two"],
+    );
   });
 });
