@@ -37,6 +37,8 @@ import { AFTER_WELCOME_PATH } from "@/lib/firstRun";
 import {
   CARD_INTRO_ABOUT,
   CARD_INTRO_REVEAL_MS,
+  afterCardSave,
+  hasSeenCardIntro,
   markCardIntroSeen,
   shouldAutoShowCardIntro,
 } from "@/lib/cardIntro";
@@ -82,6 +84,8 @@ export default function EtherId() {
   const [revealing, setRevealing] = useState(false);
   const cardFaceRef = useRef<HTMLDivElement>(null);
   const autoIntroStarted = useRef(false);
+  // Card saved without Apple Wallet: go to Explore once the intro is dismissed.
+  const exploreAfterIntro = useRef(false);
   useEffect(() => {
     document.body.classList.add("ether-id-page");
     return () => document.body.classList.remove("ether-id-page");
@@ -168,8 +172,15 @@ export default function EtherId() {
       await queryClient.invalidateQueries({ queryKey: ["ether-id"] });
       if (setupMode) await queryClient.invalidateQueries({ queryKey: ['familcy-welcome', session?.user.id] });
       toast.success(setupMode ? 'ETHER Card registered' : 'Ether ID updated');
-      // Without Apple Wallet there is nothing left on this screen: go meet people.
-      if (setupMode && !showWallet) navigate(AFTER_WELCOME_PATH, { replace: true });
+      // Without Apple Wallet there is nothing left on this screen: go meet people,
+      // after the one-time card intro has been shown and dismissed.
+      const next = afterCardSave({
+        setupMode,
+        walletVisible: showWallet,
+        introSeen: hasSeenCardIntro(window.localStorage, session?.user.id),
+      });
+      if (next === "explore") navigate(AFTER_WELCOME_PATH, { replace: true });
+      if (next === "explore-after-intro") exploreAfterIntro.current = true;
     },
     onError: (error: Error) => {
       toast.error(error.message || "Could not update Ether ID");
@@ -264,10 +275,17 @@ export default function EtherId() {
 
   const closeIntro = (open: boolean) => {
     setIntroOpen(open);
-    if (!open) markCardIntroSeen(window.localStorage, session?.user.id);
+    if (open) return;
+    markCardIntroSeen(window.localStorage, session?.user.id);
+    if (exploreAfterIntro.current) {
+      exploreAfterIntro.current = false;
+      navigate(AFTER_WELCOME_PATH, { replace: true });
+    }
   };
 
   const viewCard = () => {
+    // "View your card" means stay here; Continue to Explore is below the form.
+    exploreAfterIntro.current = false;
     cardFaceRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
   };
 

@@ -61,3 +61,17 @@ export function markCardIntroSeen(store: Store, userId: string | undefined): voi
 export function cardIntroAction(walletVisible: boolean): "wallet" | "keep-handy" {
   return walletVisible ? "wallet" : "keep-handy";
 }
+
+/**
+ * What card setup does once the card saves. Without Apple Wallet there is
+ * nothing left on the setup screen, so the member goes to Explore, but only
+ * after the one-time intro (spin + sheet) has been shown and dismissed.
+ */
+export function afterCardSave(input: {
+  setupMode: boolean;
+  walletVisible: boolean;
+  introSeen: boolean;
+}): "stay" | "explore" | "explore-after-intro" {
+  if (!input.setupMode || input.walletVisible) return "stay";
+  return input.introSeen ? "explore" : "explore-after-intro";
+}

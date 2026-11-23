@@ -11,6 +11,7 @@ import {
   CARD_INTRO_TITLE,
   CARD_INTRO_VIEW_CARD,
   CARD_INTRO_WALLET_LINE,
+  afterCardSave,
   cardIntroAction,
   hasSeenCardIntro,
   markCardIntroSeen,
@@ -80,4 +81,11 @@ test("the reveal duration stays in sync with the CSS and is skipped for reduced 
   assert.match(css, /\.ether-id-spin\.is-revealing\s*\{[^}]*animation:\s*ether-id-reveal 1\.2s/);
   assert.match(css, /@keyframes ether-id-reveal/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.ether-id-spin \{[\s\S]*animation: none !important;/);
+});
+
+test("card setup without Apple Wallet goes to Explore only after the intro", () => {
+  assert.equal(afterCardSave({ setupMode: true, walletVisible: false, introSeen: false }), "explore-after-intro");
+  assert.equal(afterCardSave({ setupMode: true, walletVisible: false, introSeen: true }), "explore");
+  assert.equal(afterCardSave({ setupMode: true, walletVisible: true, introSeen: false }), "stay");
+  assert.equal(afterCardSave({ setupMode: false, walletVisible: false, introSeen: false }), "stay");
 });
