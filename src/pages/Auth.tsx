@@ -16,7 +16,7 @@ import { PageMeta } from '@/components/seo/PageMeta';
 import { EMAIL_CONFIRMED_BODY, EMAIL_CONFIRMED_TITLE, HERO_TAGLINE, VERIFY_SIGNAL_BODY, VERIFY_SIGNAL_TITLE } from '@/content/copy';
 import { getAuthRedirectUrl } from '@/lib/capacitorStorage';
 import { RESEND_COOLDOWN_MS } from '@/lib/resendCooldown';
-import { classifySignup, emailSendingHelp, resendWaitRemaining, retryAfterSeconds, signupEmailDeliveryFailed } from '@/lib/signupRecovery';
+import { classifySignup, emailSendingHelp, resendWaitRemaining, retryAfterSeconds, signupEmailDeliveryFailed, signupLimitNextStep, SIGNUP_NOT_SENT_NOTE } from '@/lib/signupRecovery';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { logAuthEvent, logAuthError } from '@/lib/authDebug';
@@ -494,8 +494,12 @@ const Auth = () => {
           logAuthError('Signup email limited', error);
           noteEmailLimit(error);
           setEmailCode('');
-          setRecoveryNote(getAuthErrorMessage(error!).description);
-          setMode('confirm-email');
+          if (signupLimitNextStep(outcome.retryAfterSeconds) === 'stay-on-join') {
+            setRecoveryNote(SIGNUP_NOT_SENT_NOTE);
+          } else {
+            setRecoveryNote(getAuthErrorMessage(error!).description);
+            setMode('confirm-email');
+          }
         } else if (outcome.kind === 'email-failed') {
           logAuthError('Signup email failed', error);
           const { title, description } = getAuthErrorMessage(error!);
@@ -974,6 +978,9 @@ const Auth = () => {
 
           {mode === 'signup' && (
             <div className="mt-5 space-y-2 border-t border-border pt-4 text-center text-sm">
+              {recoveryNote && (
+                <p role="alert" className="pb-2 text-left text-sm leading-relaxed text-foreground">{recoveryNote}</p>
+              )}
               <button type="button" className="min-h-11 w-full text-primary underline underline-offset-4" onClick={() => setMode('login')}>
                 Already verified or started an application? Sign in to continue
               </button>

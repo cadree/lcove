@@ -51,6 +51,19 @@ export function emailSendingHelp(error: AuthErrorLike | null | undefined): {
   };
 }
 
+/**
+ * A per-address limit ("after 49 seconds") means a code already went to this
+ * address, so the code screen is right. A project-wide email limit on a new
+ * Join creates no account and sends nothing, so the code screen would ask for
+ * a code that never comes: stay on Join and say when to try again.
+ */
+export function signupLimitNextStep(retryAfter: number | null): 'code-screen' | 'stay-on-join' {
+  return retryAfter == null ? 'stay-on-join' : 'code-screen';
+}
+
+export const SIGNUP_NOT_SENT_NOTE =
+  'We couldn’t send your code just now because a lot of codes went out at once. Wait a few minutes, then tap Join again. Nothing was created yet, so you won’t lose anything.';
+
 /** Email delivery problems that can leave an unverified signup behind. */
 export function signupEmailDeliveryFailed(error: AuthErrorLike | null | undefined): boolean {
   if (!error) return false;

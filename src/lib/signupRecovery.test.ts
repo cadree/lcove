@@ -7,6 +7,8 @@ import {
   resendWaitRemaining,
   retryAfterSeconds,
   signupEmailDeliveryFailed,
+  signupLimitNextStep,
+  SIGNUP_NOT_SENT_NOTE,
 } from "./signupRecovery.ts";
 
 // Shapes copied from staging Auth responses on Nov 22, 2026.
@@ -70,4 +72,14 @@ test("resend waits for the longer of the local cooldown and the server's wait", 
   assert.equal(resendWaitRemaining(null, 20_000, 5_000, 60_000), 15_000);
   assert.equal(resendWaitRemaining(1_000, 100_000, 11_000, 60_000), 89_000);
   assert.equal(resendWaitRemaining(1_000, 2_000, 100_000, 60_000), 0);
+});
+
+test("a project-wide email limit on Join stays on Join; a per-address limit opens the code screen", () => {
+  assert.equal(signupLimitNextStep(null), "stay-on-join");
+  assert.equal(signupLimitNextStep(49), "code-screen");
+  const quota = classifySignup({ error: { code: "over_email_send_rate_limit", message: "email rate limit exceeded", status: 429 }, session: null });
+  assert.deepEqual(quota, { kind: "rate-limited", retryAfterSeconds: null });
+  assert.equal(signupLimitNextStep(quota.kind === "rate-limited" ? quota.retryAfterSeconds : 0), "stay-on-join");
+  assert.match(SIGNUP_NOT_SENT_NOTE, /tap Join again/);
+  assert.doesNotMatch(SIGNUP_NOT_SENT_NOTE, /code we sent/i);
 });
