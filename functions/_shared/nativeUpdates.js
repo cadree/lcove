@@ -1,8 +1,14 @@
 /**
  * Self-hosted live-update check for the iOS app.
  * The Pages Function at /native-updates POSTs here. Only a bundle built
- * for the caller's native version_build is returned. Rollback is changing
+ * for the caller's native build number is returned. Rollback is changing
  * `current` in /native-updates/manifest.json.
+ *
+ * Manifest slots are keyed by the native build number (CFBundleVersion, e.g.
+ * 202611222244). @capgo/capacitor-updater sends that as `version_code`. Its
+ * `version_build` is the marketing version (CFBundleShortVersionString, e.g.
+ * 1.0.5), so `version_build` alone never matches a slot. `version_build` is
+ * still accepted as a fallback for older callers and scripts.
  */
 export const PUBLIC_ORIGIN = "https://etherbylcove.com";
 export const LIVE_UPDATE_APP_ID = "app.lovable.e07d9c457fd949f78f3cc7d5998be668";
@@ -11,17 +17,24 @@ export const BUNDLE_URL_PREFIX = `${PUBLIC_ORIGIN}/native-updates/bundles/`;
 
 const SHA256 = /^[a-f0-9]{64}$/i;
 
+function readScalar(value) {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+
 export function readUpdateRequest(body) {
   if (body == null || typeof body !== "object" || Array.isArray(body)) {
     return { ok: false, error: "invalid_body", message: "Expected a JSON object." };
   }
   const appId = typeof body.app_id === "string" ? body.app_id.trim() : "";
   const versionBuild = typeof body.version_build === "string" ? body.version_build.trim() : "";
+  const versionCode = readScalar(body.version_code);
   const versionName = typeof body.version_name === "string" ? body.version_name.trim() : "";
-  if (!versionBuild) {
+  if (!versionBuild && !versionCode) {
     return { ok: false, error: "missing_version_build", message: "version_build is required." };
   }
-  return { ok: true, appId, versionBuild, versionName };
+  return { ok: true, appId, versionBuild, versionCode, versionName };
 }
 
 export function resolveBundleUrl(url) {
@@ -51,6 +64,13 @@ export function readCurrentBundle(manifest, versionBuild) {
   return { version: current, url, checksum };
 }
 
+function hasNativeSlot(manifest, key) {
+  if (!key) return false;
+  const native = manifest?.native;
+  if (native == null || typeof native !== "object" || Array.isArray(native)) return false;
+  return Object.prototype.hasOwnProperty.call(native, key);
+}
+
 /**
  * Decide what the updater plugin should receive.
  * kind "update" includes url+checksum so the plugin installs that bundle,
@@ -66,7 +86,10 @@ export function selectLiveUpdate(manifest, body) {
   if (request.appId && request.appId !== LIVE_UPDATE_APP_ID) {
     return { kind: "none", message: "No update needed" };
   }
-  const bundle = readCurrentBundle(manifest, request.versionBuild);
+  // Prefer the native build number. Fall back to version_build only when the
+  // build number has no slot at all, so a slot with current null stays off.
+  const slotKey = hasNativeSlot(manifest, request.versionCode) ? request.versionCode : request.versionBuild;
+  const bundle = slotKey ? readCurrentBundle(manifest, slotKey) : null;
   if (!bundle) {
     return { kind: "none", message: "No update needed" };
   }
