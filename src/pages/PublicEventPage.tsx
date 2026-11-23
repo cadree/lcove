@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -56,6 +56,12 @@ export default function PublicEventPage() {
   const [reportOpen, setReportOpen] = useState(false);
   const [location, setLocation] = useState<string | null>(null);
   const { data: event, isLoading } = usePublicEvent(eventId);
+  // The URL may carry the slug (/e/my-event); everything keyed by event id
+  // must use the real id, or tickets, RSVP counts and host notes fail to load.
+  const id = event?.id ?? "";
+  useEffect(() => {
+    if (id) setSaved(readSaved(id));
+  }, [id]);
   const returnPath = event ? eventPublicPath(event) : `/event/${eventId}`;
   const shareable = event ? eventIsShareable(event) : false;
 
@@ -69,22 +75,22 @@ export default function PublicEventPage() {
   });
 
   const { data: going = 0 } = useQuery({
-    queryKey: ["public-event-attendee-count", eventId],
-    enabled: !!eventId,
+    queryKey: ["public-event-attendee-count", id],
+    enabled: !!id,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("public_event_attendance_count", { p_event_id: eventId });
+      const { data, error } = await supabase.rpc("public_event_attendance_count", { p_event_id: id });
       if (error) throw error;
       return data ?? 0;
     },
   });
 
-  const rsvpHint = rememberedGuestRsvp(eventId);
+  const rsvpHint = rememberedGuestRsvp(id);
   const { data: preview } = useQuery({
-    queryKey: ["public-event-guests", eventId, user?.id, rsvpHint],
-    enabled: !!eventId,
+    queryKey: ["public-event-guests", id, user?.id, rsvpHint],
+    enabled: !!id,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("public_event_guest_preview", {
-        p_event_id: eventId,
+        p_event_id: id,
         p_rsvp_id: rsvpHint || undefined,
       });
       if (error) return { names: [] as string[], avatars: [] as (string | null)[], locked: true };
@@ -99,11 +105,11 @@ export default function PublicEventPage() {
   });
 
   const { data: hostNotes } = useQuery({
-    queryKey: ["public-event-host-notes", eventId, user?.id, rsvpHint],
-    enabled: !!eventId,
+    queryKey: ["public-event-host-notes", id, user?.id, rsvpHint],
+    enabled: !!id,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("public_event_host_notes", {
-        p_event_id: eventId,
+        p_event_id: id,
         p_rsvp_id: rsvpHint || undefined,
       });
       if (error) return null;
@@ -123,19 +129,19 @@ export default function PublicEventPage() {
   });
 
   const { data: tiers = [] } = useQuery({
-    queryKey: ["public-event-tiers", eventId],
-    enabled: !!eventId,
+    queryKey: ["public-event-tiers", id],
+    enabled: !!id,
     queryFn: async () => {
-      const { data } = await supabase.from("ticket_tiers").select("id, name, price_cents, capacity, quantity_sold, is_active, description").eq("event_id", eventId).eq("is_active", true);
+      const { data } = await supabase.from("ticket_tiers").select("id, name, price_cents, capacity, quantity_sold, is_active, description").eq("event_id", id).eq("is_active", true);
       return data || [];
     },
   });
 
   const { data: branding } = useQuery({
-    queryKey: ["public-event-brand", eventId],
-    enabled: !!eventId,
+    queryKey: ["public-event-brand", id],
+    enabled: !!id,
     queryFn: async () => {
-      const { data } = await supabase.from("event_email_branding").select("brand_color, organizer_name").eq("event_id", eventId).maybeSingle();
+      const { data } = await supabase.from("event_email_branding").select("brand_color, organizer_name").eq("event_id", id).maybeSingle();
       return data;
     },
   });

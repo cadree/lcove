@@ -179,7 +179,7 @@ export default function EventConfirmation() {
       }}
       onCalendar={calendar}
       onShare={share}
-      reminder={<EventReminderToggle eventId={eventId} />}
+      reminder={<EventReminderToggle eventId={event?.id ?? ""} />}
     />
     </>
   );
