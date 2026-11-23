@@ -6,13 +6,6 @@ import { BEHIND, isSideways, pagerDots, stackPose, swipeTarget } from "@/lib/mat
 import { safeWebLink } from "@/lib/tripMoney";
 import { ProfileCard } from "./ProfileCard";
 
-const REACTIONS = [
-  { emoji: "❤️", className: "left-[16%] top-[6px] [animation-delay:-1.2s]" },
-  { emoji: "🥰", className: "left-[6%] top-[58px] [animation-delay:-0.4s]" },
-  { emoji: "🔥", className: "right-[15%] top-[2px] [animation-delay:-2s]" },
-  { emoji: "✨", className: "right-[6%] top-[60px] [animation-delay:-2.8s]" },
-];
-
 /**
  * A stacked deck: the person in front as a large photo card, the next few fanned
  * behind it with their names showing. Drag sideways (or use the arrows) to browse;
@@ -115,14 +108,7 @@ export function SwipeDeck({
         if (e.key === "ArrowLeft") go(index - 1);
       }}
     >
-      <div className="relative mx-auto flex h-[116px] max-w-[380px] items-start justify-center" aria-hidden={!top}>
-        {REACTIONS.map((r) => (
-          <span key={r.emoji} aria-hidden="true" className={`match-float pointer-events-none absolute select-none text-[30px] drop-shadow-[0_6px_14px_rgba(0,0,0,.45)] ${r.className}`}>
-            {r.emoji}
-          </span>
-        ))}
-        <div className="relative z-10">{top}</div>
-      </div>
+      {top && <div className="relative z-10 mx-auto mb-3 flex max-w-[380px] justify-center">{top}</div>}
 
       <div className="relative mx-auto h-[min(540px,64dvh)] w-full max-w-[380px] pl-5 pt-[96px]">
         <ol className="absolute left-0 top-1/2 flex -translate-y-1/2 flex-col gap-2" aria-label={`${index + 1} of ${people.length}`}>

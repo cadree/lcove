@@ -71,6 +71,9 @@ export function PeopleDiscovery({ query }: { query: string }) {
   const [sheetFocus, setSheetFocus] = useState<{ id: string; at: number } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [placeOpen, setPlaceOpen] = useState(false);
+  // The mini globe above the deck brings the big globe (or the nearby map) into view.
+  const globeRef = useRef<HTMLDivElement | null>(null);
+  const showGlobe = () => globeRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
   const [reporting, setReporting] = useState<Person | null>(null);
   const [moment, setMoment] = useState<{ person: Person; matched: boolean; conversationId: string | null } | null>(null);
   const [ctaPerson, setCtaPerson] = useState<Person | null>(null);
@@ -339,7 +342,7 @@ export function PeopleDiscovery({ query }: { query: string }) {
         <OpenToFilter value={openFilter} onChange={setOpenFilter} />
 
         <div className="lg:mt-2 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-8">
-        <div className="min-w-0">
+        <div className="min-w-0" ref={globeRef}>
         {nearbyMode ? (
           <div className="mt-3">
             <Suspense fallback={<div className="h-[min(420px,52dvh)] w-full animate-pulse rounded-[24px] bg-white/5" role="status" aria-label="Loading map" />}>
@@ -429,6 +432,7 @@ export function PeopleDiscovery({ query }: { query: string }) {
                 <GlobePlaceControl
                   label={nearbyMode ? `Near ${myPlace?.label.split(",")[0] || "you"}` : cityLabel || "Everywhere"}
                   onOpen={() => setPlaceOpen(true)}
+                  onGlobe={showGlobe}
                 />
               }
             />
@@ -441,7 +445,7 @@ export function PeopleDiscovery({ query }: { query: string }) {
           ) : (
             <div className="rounded-[28px] border border-dashed border-white/15 px-6 py-10 text-center">
               <div className="mb-4 flex justify-center">
-                <GlobePlaceControl label={nearbyMode ? "Nearby" : cityLabel || "Everywhere"} onOpen={() => setPlaceOpen(true)} />
+                <GlobePlaceControl label={nearbyMode ? "Nearby" : cityLabel || "Everywhere"} onOpen={() => setPlaceOpen(true)} onGlobe={showGlobe} />
               </div>
               <p className="font-display text-xl">
                 {openFilterLabel && !search

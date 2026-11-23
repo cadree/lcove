@@ -1,38 +1,70 @@
 import { ChevronDown } from "lucide-react";
 
-/**
- * A small spinning globe with the deck's place under it. Tapping it opens the
- * city and state picker that narrows which cards show.
- */
-export function GlobePlaceControl({ label, onOpen }: { label: string; onOpen: () => void }) {
+/** A miniature globe drawn as a lit sphere with a hairline graticule. */
+function MiniGlobe() {
   return (
-    <button
-      type="button"
-      onClick={onOpen}
+    <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true" className="block shrink-0">
+      <defs>
+        <radialGradient id="mini-globe-fill" cx="38%" cy="32%" r="72%">
+          <stop offset="0%" stopColor="#5b5670" />
+          <stop offset="55%" stopColor="#2a2633" />
+          <stop offset="100%" stopColor="#141218" />
+        </radialGradient>
+        <linearGradient id="mini-globe-rim" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.7" />
+          <stop offset="100%" stopColor="#ff9fc8" stopOpacity="0.55" />
+        </linearGradient>
+        <clipPath id="mini-globe-clip">
+          <circle cx="16" cy="16" r="13" />
+        </clipPath>
+      </defs>
+      <circle cx="16" cy="16" r="13" fill="url(#mini-globe-fill)" />
+      <g clipPath="url(#mini-globe-clip)" fill="none" stroke="#ffffff" strokeOpacity="0.34" strokeWidth="0.6">
+        <g>
+          <ellipse cx="16" cy="16" rx="4.5" ry="13" />
+          <ellipse cx="16" cy="16" rx="9.5" ry="13" />
+          <line x1="16" y1="3" x2="16" y2="29" />
+        </g>
+        <line x1="3" y1="16" x2="29" y2="16" />
+        <path d="M4.6 10h22.8M4.6 22h22.8" />
+      </g>
+      <circle cx="16" cy="16" r="13" fill="none" stroke="url(#mini-globe-rim)" strokeWidth="0.9" />
+      <circle cx="21" cy="11.5" r="1.6" fill="#ff9fc8" />
+    </svg>
+  );
+}
+
+/**
+ * One glass pill above the deck: the miniature globe takes you to the big globe,
+ * the place name opens the city and state picker.
+ */
+export function GlobePlaceControl({ label, onOpen, onGlobe }: { label: string; onOpen: () => void; onGlobe?: () => void }) {
+  return (
+    <span
       data-testid="deck-place"
-      aria-label={`Choose a city or state for these cards. Showing ${label}`}
-      className="group flex flex-col items-center gap-2"
+      className="inline-flex items-center rounded-full border border-white/15 bg-white/[0.07] p-1 text-white shadow-[0_10px_28px_-14px_rgba(0,0,0,.9),inset_0_1px_0_rgba(255,255,255,.12)] backdrop-blur-xl"
     >
-      <span className="relative block h-[66px] w-[66px] rounded-[22px] border-[3px] border-white/85 bg-[#1d1a22] p-1.5 shadow-[0_12px_30px_-10px_rgba(0,0,0,.8)] transition-transform group-active:scale-95">
-        <span className="relative block h-full w-full overflow-hidden rounded-full bg-[radial-gradient(circle_at_35%_30%,#a9e1ec,#3d87a3_50%,#0f2738)]">
-          <span
-            aria-hidden="true"
-            className="match-globe absolute inset-y-0 left-0 w-[200%] opacity-90"
-            style={{
-              backgroundImage:
-                "radial-gradient(ellipse 18% 22% at 20% 38%, #c9b48a 60%, transparent 62%), radial-gradient(ellipse 10% 16% at 30% 68%, #a7b77d 60%, transparent 62%), radial-gradient(ellipse 14% 12% at 70% 30%, #b9a57a 60%, transparent 62%), radial-gradient(ellipse 9% 20% at 80% 64%, #9cad73 60%, transparent 62%)",
-              backgroundSize: "50% 100%",
-              backgroundRepeat: "repeat-x",
-            }}
-          />
-          <span aria-hidden="true" className="absolute inset-0 rounded-full shadow-[inset_-8px_-6px_14px_rgba(0,0,0,.55),inset_4px_4px_10px_rgba(255,255,255,.35)]" />
-        </span>
-        <span aria-hidden="true" className="absolute -right-1.5 -top-1.5 h-3.5 w-3.5 rounded-full border-2 border-[#1d1a22] bg-[#ff9fc8]" />
-      </span>
-      <span className="inline-flex max-w-[220px] items-center gap-1 rounded-full bg-black/60 px-3.5 py-1.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_rgba(0,0,0,.8)] backdrop-blur">
+      {onGlobe && (
+        <button
+          type="button"
+          onClick={onGlobe}
+          aria-label="Show the globe"
+          className="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-white/10 active:bg-white/15"
+        >
+          <MiniGlobe />
+        </button>
+      )}
+      {onGlobe && <span aria-hidden="true" className="mx-0.5 h-4 w-px bg-white/15" />}
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`Choose a city or state for these cards. Showing ${label}`}
+        className="inline-flex h-9 max-w-[210px] items-center gap-1.5 rounded-full pl-2.5 pr-3 text-[13px] font-medium tracking-[0.01em] transition-colors hover:bg-white/10 active:bg-white/15"
+      >
+        {!onGlobe && <MiniGlobe />}
         <span className="truncate">{label}</span>
-        <ChevronDown size={14} aria-hidden="true" className="shrink-0 opacity-70" />
-      </span>
-    </button>
+        <ChevronDown size={13} aria-hidden="true" className="shrink-0 opacity-60" />
+      </button>
+    </span>
   );
 }

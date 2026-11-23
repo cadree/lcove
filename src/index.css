@@ -1788,18 +1788,8 @@ html[data-keyboard-pad] body {
 @keyframes match-leave-right {
   to { transform: translate3d(115%, 24px, 0) rotate(10deg); opacity: 0; }
 }
-.match-float { animation: match-float 4.2s ease-in-out infinite; }
-@keyframes match-float {
-  0%, 100% { transform: translate3d(0, 0, 0) rotate(-4deg); }
-  50% { transform: translate3d(0, -8px, 0) rotate(5deg); }
-}
-.match-globe { animation: match-globe 14s linear infinite; }
-@keyframes match-globe {
-  from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(-50%, 0, 0); }
-}
 @media (prefers-reduced-motion: reduce) {
-  .match-card, .match-enter, .match-leave-left, .match-leave-right, .match-float, .match-globe { animation: none; transition: none; }
+  .match-card, .match-enter, .match-leave-left, .match-leave-right { animation: none; transition: none; }
 }
 
 /* Music profile view. Colors are variables so a look is one class, not a fork. */
@@ -1824,14 +1814,6 @@ html[data-keyboard-pad] body {
 .music-view .music-favorites {
   color: var(--mv-accent);
   text-shadow: 0 0 24px rgba(255, 159, 200, 0.35);
-}
-.music-sticker {
-  display: inline-block;
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
-  animation: match-float 4.6s ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .music-sticker { animation: none; }
 }
 
 /* Neon look for the music page: the same markup, other variables and glows. */

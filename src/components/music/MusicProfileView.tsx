@@ -156,9 +156,6 @@ export function MusicProfileView({ userId, name, avatarUrl, handle, genres, rele
           <div className="h-[118px] w-[118px] overflow-hidden rounded-[34px] border-[3px] border-[var(--mv-line-strong)] bg-[var(--mv-surface)] shadow-[var(--mv-glow)]">
             {avatarUrl ? <img src={avatarUrl} alt={name} className="h-full w-full object-cover" /> : <span className="flex h-full items-center justify-center font-display text-5xl text-[var(--mv-muted)]">{name.charAt(0)}</span>}
           </div>
-          <span aria-hidden="true" className="music-sticker absolute -left-5 -top-3 text-[34px]">😍</span>
-          <span aria-hidden="true" className="music-sticker absolute -left-6 top-12 text-[26px] [animation-delay:-1.4s]">☺️</span>
-          <span aria-hidden="true" className="music-sticker absolute -bottom-2 -right-5 text-[34px] [animation-delay:-2.6s]">🔥</span>
         </div>
         <h1 className="mt-4 font-display text-[34px] leading-tight text-[var(--mv-text)] [text-shadow:var(--mv-text-glow)]">{name}</h1>
         <p className="mt-0.5 text-sm text-[var(--mv-muted)]">{handle ? `@${handle}` : genres.slice(0, 3).join(" · ") || "Music"}</p>
