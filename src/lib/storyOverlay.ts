@@ -13,7 +13,7 @@ export const STORY_TEXT_SIZES: Record<StoryTextSize, number> = {
 };
 
 export const STORY_TEXT_FONTS: Record<StoryTextFont, string> = {
-  sans: 'Archivo, "Helvetica Neue", system-ui, sans-serif',
+  sans: "Archivo, Helvetica, system-ui, sans-serif",
   serif: "Fraunces, Georgia, serif",
   display: "Cinzel, Georgia, serif",
 };
@@ -96,7 +96,7 @@ export function canvasFont(font: StoryTextFont, fontSize: number): string {
   return `${STORY_TEXT_FONT_WEIGHT[font]} ${fontSize}px ${STORY_TEXT_FONTS[font]}`;
 }
 
-/** Relative luminance of a #RRGGBB or #RGB color, or 1 when the value is unknown. */
+/** Relative luminance of a hex color, or 1 when the value is unknown. */
 export function colorLuminance(color: string): number {
   const hex = color.trim().replace(/^#/, "");
   const full = hex.length === 3 ? hex.split("").map((c) => c + c).join("") : hex;
@@ -244,6 +244,17 @@ export function coverSourceRect(
   }
   const sh = srcWidth / destRatio;
   return { sx: 0, sy: (srcHeight - sh) / 2, sw: srcWidth, sh };
+}
+
+export function fitStoryStage(maxWidth: number, maxHeight: number): { width: number; height: number } {
+  if (!(maxWidth > 0) || !(maxHeight > 0)) {
+    return { width: STORY_FRAME_WIDTH, height: STORY_FRAME_HEIGHT };
+  }
+  const ratio = STORY_FRAME_WIDTH / STORY_FRAME_HEIGHT;
+  if (maxWidth / maxHeight > ratio) {
+    return { width: maxHeight * ratio, height: maxHeight };
+  }
+  return { width: maxWidth, height: maxWidth / ratio };
 }
 
 export function storyFrameSize(minWidth = STORY_FRAME_WIDTH): { width: number; height: number } {

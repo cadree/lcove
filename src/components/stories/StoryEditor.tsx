@@ -1,13 +1,16 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ChevronLeft, Check, Type } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
   STORY_BACKGROUNDS,
   STORY_TEXT_COLORS,
   clampOverlayCenter,
   createStoryText,
-  fontSizeFor,
+  STORY_FRAME_HEIGHT,
+  STORY_FRAME_WIDTH,
+  fitStoryStage,
+  layoutStoryText,
   pointerToNormalized,
+  waitForStoryFonts,
   type StoryTextFont,
   type StoryTextOverlay,
   type StoryTextSize,
@@ -46,12 +49,39 @@ export function StoryEditor({
   sharing,
   textOnly,
 }: StoryEditorProps) {
+  const hostRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
+  const [frameSize, setFrameSize] = useState(fitStoryStage(390, 693));
+  const [fontsReady, setFontsReady] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(overlays[0]?.id ?? null);
   const [editing, setEditing] = useState(Boolean(textOnly && overlays[0] && !overlays[0].text));
   const dragRef = useRef<{ id: string; moved: boolean } | null>(null);
   const canEditText = mediaType === "photo";
   const selected = overlays.find((item) => item.id === selectedId) ?? null;
+
+  useLayoutEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const update = () => setFrameSize(fitStoryStage(host.clientWidth, host.clientHeight));
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void waitForStoryFonts().then(() => {
+      if (!cancelled) setFontsReady(true);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const measureCanonical = (text: string, font: string) => {
+    void fontsReady;
+    return measureInEditor(text, font, STORY_FRAME_WIDTH);
+  };
+  const scale = frameSize.width / STORY_FRAME_WIDTH;
 
   const update = (id: string, patch: Partial<StoryTextOverlay>) => {
     onOverlaysChange(overlays.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -75,7 +105,11 @@ export function StoryEditor({
   const onPointerDown = (event: ReactPointerEvent<HTMLButtonElement>, id: string) => {
     if (event.button !== 0) return;
     event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      /* synthetic events in tests may not have a real pointer */
+    }
     dragRef.current = { id, moved: false };
     setSelectedId(id);
     setEditing(false);
@@ -91,9 +125,9 @@ export function StoryEditor({
     if (!current) return;
     const next = clampOverlayCenter(
       { ...current, x: point.x, y: point.y },
-      frame.clientWidth,
-      frame.clientHeight,
-      (text, font) => measureInEditor(text, font, frame.clientWidth),
+      STORY_FRAME_WIDTH,
+      STORY_FRAME_HEIGHT,
+      measureCanonical,
     );
     update(drag.id, next);
   };
@@ -114,7 +148,13 @@ export function StoryEditor({
 
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col bg-black text-white" data-story-stage="editor">
-      <div ref={frameRef} className="relative min-h-0 flex-1 overflow-hidden bg-black">
+      <div ref={hostRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black">
+        <div
+          ref={frameRef}
+          data-story-frame
+          className="relative overflow-hidden bg-black"
+          style={{ width: frameSize.width, height: frameSize.height }}
+        >
         {previewUrl && mediaType === "video" ? (
           <video src={previewUrl} className="absolute inset-0 h-full w-full object-cover" autoPlay loop muted playsInline />
         ) : previewUrl ? (
@@ -125,6 +165,7 @@ export function StoryEditor({
 
         {canEditText && overlays.map((item) => {
           const active = item.id === selectedId;
+          const layout = layoutStoryText(item, STORY_FRAME_WIDTH, STORY_FRAME_HEIGHT, measureCanonical);
           return (
             <button
               key={item.id}
@@ -132,24 +173,22 @@ export function StoryEditor({
               data-story-overlay={item.id}
               aria-label={item.text.trim() ? `Edit text, ${item.text}` : "Edit text"}
               className={cn(
-                "absolute max-w-[80%] -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none text-center active:cursor-grabbing",
-                active && !editing ? "outline outline-1 outline-white/70" : "outline-none",
+                "absolute cursor-grab touch-none text-center active:cursor-grabbing",
+                active && !editing ? "ring-1 ring-white/50" : "ring-0",
               )}
               style={{
-                left: `${item.x * 100}%`,
-                top: `${item.y * 100}%`,
+                left: layout.left * scale,
+                top: layout.top * scale,
+                width: layout.width * scale,
+                height: layout.height * scale,
                 color: item.color,
-                fontSize: fontSizeFor(item.size, frameRef.current?.clientWidth || 390),
+                fontSize: layout.fontSize * scale,
                 fontFamily: fontFamily(item.font),
                 fontWeight: item.font === "display" ? 500 : item.font === "serif" ? 600 : 650,
                 letterSpacing: item.font === "display" ? "0.08em" : item.font === "sans" ? "0.01em" : 0,
                 lineHeight: 1.15,
                 textShadow: item.pill ? "none" : shadowFor(item.color),
-                padding: item.pill ? "0.12em 0.45em" : 0,
-                background: item.pill ? pillBackground(item.color) : "transparent",
-                borderRadius: item.pill ? "999px" : 0,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
+                borderRadius: item.pill ? 999 : 8,
               }}
               onPointerDown={(event) => onPointerDown(event, item.id)}
               onPointerMove={onPointerMove}
@@ -159,7 +198,21 @@ export function StoryEditor({
               {editing && active ? (
                 <span className="sr-only">Editing</span>
               ) : (
-                item.text.trim() || <span className="opacity-50">Text</span>
+                <span className="flex flex-col items-center justify-center">
+                  {layout.lines.map((line, index) => (
+                    <span
+                      key={`${item.id}-${index}`}
+                      className="block"
+                      style={{
+                        padding: item.pill ? "0.12em 0.45em" : 0,
+                        background: item.pill && line.text ? pillBackground(item.color) : "transparent",
+                        borderRadius: item.pill ? 999 : 0,
+                      }}
+                    >
+                      {line.text || (layout.lines.length === 1 ? <span className="opacity-50">Text</span> : " ")}
+                    </span>
+                  ))}
+                </span>
               )}
             </button>
           );
@@ -184,6 +237,7 @@ export function StoryEditor({
             />
           </label>
         )}
+        </div>
       </div>
 
       <div
@@ -205,26 +259,27 @@ export function StoryEditor({
               type="button"
               data-story-text-done
               onClick={() => setEditing(false)}
-              className="flex h-11 items-center gap-1.5 rounded-full bg-white px-4 text-sm font-semibold text-black"
+              className="flex h-11 items-center gap-1.5 rounded-full bg-white px-4 text-sm font-semibold normal-case text-black"
             >
               <Check className="h-4 w-4" />
               Done
             </button>
           ) : (
-            <Button
+            <button
+              type="button"
               data-story-share
               onClick={onShare}
               disabled={shareDisabled}
-              className="h-11 rounded-full bg-white px-6 font-semibold text-black hover:bg-white/90 disabled:opacity-50"
+              className="flex h-11 items-center rounded-full bg-white px-6 text-sm font-semibold normal-case text-black hover:bg-white/90 disabled:opacity-50"
             >
               {sharing ? "Sharing..." : "Share story"}
-            </Button>
+            </button>
           )}
         </div>
 
         {canEditText && (
           <div className="flex flex-col gap-2.5">
-            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 data-story-add-text
@@ -295,7 +350,7 @@ export function StoryEditor({
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {STORY_TEXT_COLORS.map((color) => (
                 <button
                   key={color}
@@ -312,22 +367,26 @@ export function StoryEditor({
                   style={{ background: color }}
                 />
               ))}
-              {textOnly && STORY_BACKGROUNDS.map((color) => (
-                <button
-                  key={`bg-${color}`}
-                  type="button"
-                  data-story-backdrop={color}
-                  aria-label="Story background"
-                  aria-pressed={background === color}
-                  onClick={() => onBackgroundChange(color)}
-                  className={cn(
-                    "ml-1 h-8 w-8 shrink-0 rounded-md ring-2 ring-offset-2 ring-offset-black",
-                    background === color ? "ring-white" : "ring-white/20",
-                  )}
-                  style={{ background: color }}
-                />
-              ))}
             </div>
+            {textOnly && (
+              <div className="flex flex-wrap items-center gap-2">
+                {STORY_BACKGROUNDS.map((color) => (
+                  <button
+                    key={`bg-${color}`}
+                    type="button"
+                    data-story-backdrop={color}
+                    aria-label="Story background"
+                    aria-pressed={background === color}
+                    onClick={() => onBackgroundChange(color)}
+                    className={cn(
+                      "h-8 w-8 shrink-0 rounded-md ring-2 ring-offset-2 ring-offset-black",
+                      background === color ? "ring-white" : "ring-white/20",
+                    )}
+                    style={{ background: color }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

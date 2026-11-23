@@ -10,6 +10,7 @@ import {
   contrastingFill,
   coverSourceRect,
   createStoryText,
+  fitStoryStage,
   canvasFont,
   drawStoryOverlays,
   fontSizeFor,
@@ -56,6 +57,15 @@ describe("story frame geometry", () => {
     assert.equal(crop.sy, (2400 - 1920) / 2);
   });
 
+  it("fits the largest 9:16 stage inside a box", () => {
+    const tall = fitStoryStage(390, 844);
+    assert.ok(Math.abs(tall.width / tall.height - STORY_FRAME_WIDTH / STORY_FRAME_HEIGHT) < 1e-6);
+    assert.equal(tall.width, 390);
+    const wide = fitStoryStage(800, 200);
+    assert.equal(wide.height, 200);
+    assert.ok(Math.abs(wide.width / wide.height - STORY_FRAME_WIDTH / STORY_FRAME_HEIGHT) < 1e-6);
+  });
+
   it("maps a pointer on the preview into 0–1 coordinates and clamps", () => {
     const rect = { left: 100, top: 50, width: 200, height: 400 };
     assert.deepEqual(pointerToNormalized(200, 250, rect), { x: 0.5, y: 0.5 });
@@ -67,7 +77,7 @@ describe("story frame geometry", () => {
 describe("text wrapping and layout", () => {
   it("wraps on spaces and hard-breaks a long word", () => {
     assert.deepEqual(wrapText("one two three", (s) => s.length * 10, 50), ["one", "two", "three"]);
-    assert.deepEqual(wrapText("supercalifragilistic", (s) => s.length * 10, 40), ["supe", "rcal", "ifra", "gili", "stic"]);
+    assert.deepEqual(wrapText("xxxxxx", (s) => s.length * 10, 30), ["xxx", "xxx"]);
     assert.deepEqual(wrapText("hello\nworld", (s) => s.length * 10, 1000), ["hello", "world"]);
   });
 
