@@ -2,19 +2,29 @@ import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as Reac
 import { ChevronLeft, Check, Type } from "lucide-react";
 import {
   STORY_BACKGROUNDS,
+  STORY_PILL_PAD_X,
+  STORY_PILL_PAD_Y,
   STORY_TEXT_COLORS,
+  STORY_TEXT_FONT_WEIGHT,
+  STORY_TEXT_LINE_HEIGHT,
+  STORY_TEXT_TRACKING,
   clampOverlayCenter,
   createStoryText,
+  drawStoryOverlays,
   STORY_FRAME_HEIGHT,
   STORY_FRAME_WIDTH,
   fitStoryStage,
+  installStoryWysiwygHook,
   layoutStoryText,
   pointerToNormalized,
+  storyFontFamily,
   waitForStoryFonts,
+  type StoryDrawContext,
   type StoryTextFont,
   type StoryTextOverlay,
   type StoryTextSize,
 } from "@/lib/storyOverlay";
+import { useNativeKeyboardInset } from "@/hooks/useNativeKeyboardInset";
 import { cn } from "@/lib/utils";
 
 const SIZES: StoryTextSize[] = ["s", "m", "l"];
@@ -51,6 +61,8 @@ export function StoryEditor({
 }: StoryEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLCanvasElement>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
   const [frameSize, setFrameSize] = useState(fitStoryStage(390, 693));
   const [fontsReady, setFontsReady] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(overlays[0]?.id ?? null);
@@ -58,6 +70,7 @@ export function StoryEditor({
   const dragRef = useRef<{ id: string; moved: boolean } | null>(null);
   const canEditText = mediaType === "photo";
   const selected = overlays.find((item) => item.id === selectedId) ?? null;
+  const keyboardInset = useNativeKeyboardInset(editing && canEditText);
 
   useLayoutEffect(() => {
     const host = hostRef.current;
@@ -77,11 +90,38 @@ export function StoryEditor({
     return () => { cancelled = true; };
   }, []);
 
-  const measureCanonical = (text: string, font: string) => {
-    void fontsReady;
-    return measureInEditor(text, font, STORY_FRAME_WIDTH);
-  };
+  useEffect(() => {
+    installStoryWysiwygHook({ overlays, background });
+  }, [overlays, background]);
+
+  useEffect(() => {
+    if (!editing || keyboardInset <= 0) return;
+    const input = textInputRef.current;
+    if (!input) return;
+    input.scrollIntoView({ block: "center", inline: "nearest" });
+  }, [editing, keyboardInset, selectedId]);
+
   const scale = frameSize.width / STORY_FRAME_WIDTH;
+  void fontsReady;
+
+  useLayoutEffect(() => {
+    const canvas = previewRef.current;
+    if (!canvas || !canEditText) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.round(frameSize.width * dpr));
+    canvas.height = Math.max(1, Math.round(frameSize.height * dpr));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, frameSize.width, frameSize.height);
+    if (!fontsReady) return;
+    const visible = overlays.filter((item) => item.text.trim() && !(editing && item.id === selectedId));
+    if (!visible.length) return;
+    ctx.save();
+    ctx.scale(scale, scale);
+    drawStoryOverlays(ctx as unknown as StoryDrawContext, visible, STORY_FRAME_WIDTH, STORY_FRAME_HEIGHT);
+    ctx.restore();
+  }, [overlays, frameSize.width, frameSize.height, fontsReady, canEditText, editing, selectedId, scale]);
 
   const update = (id: string, patch: Partial<StoryTextOverlay>) => {
     onOverlaysChange(overlays.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -127,7 +167,6 @@ export function StoryEditor({
       { ...current, x: point.x, y: point.y },
       STORY_FRAME_WIDTH,
       STORY_FRAME_HEIGHT,
-      measureCanonical,
     );
     update(drag.id, next);
   };
@@ -145,9 +184,17 @@ export function StoryEditor({
   };
 
   const shareDisabled = sharing || (textOnly && !overlays.some((item) => item.text.trim()));
+  const chromePad = keyboardInset > 0
+    ? `${keyboardInset}px`
+    : "max(1rem, env(safe-area-inset-bottom, 0px))";
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col bg-black text-white" data-story-stage="editor">
+    <div
+      className="relative flex h-full min-h-0 w-full flex-col bg-black text-white"
+      data-story-stage="editor"
+      data-story-fonts-ready={fontsReady ? "true" : "false"}
+      data-story-keyboard-inset={keyboardInset}
+    >
       <div ref={hostRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black">
         <div
           ref={frameRef}
@@ -163,17 +210,27 @@ export function StoryEditor({
           <div className="absolute inset-0" style={{ background }} />
         )}
 
+        {canEditText && (
+          <canvas
+            ref={previewRef}
+            data-story-preview-canvas
+            className="pointer-events-none absolute inset-0"
+            style={{ width: frameSize.width, height: frameSize.height }}
+          />
+        )}
+
         {canEditText && overlays.map((item) => {
           const active = item.id === selectedId;
-          const layout = layoutStoryText(item, STORY_FRAME_WIDTH, STORY_FRAME_HEIGHT, measureCanonical);
+          const layout = layoutStoryText(item, STORY_FRAME_WIDTH, STORY_FRAME_HEIGHT);
           return (
             <button
               key={item.id}
               type="button"
               data-story-overlay={item.id}
+              data-story-lines={layout.lines.map((line) => line.text).join("\n")}
               aria-label={item.text.trim() ? `Edit text, ${item.text}` : "Edit text"}
               className={cn(
-                "absolute cursor-grab touch-none text-center active:cursor-grabbing",
+                "absolute cursor-grab touch-none bg-transparent active:cursor-grabbing",
                 active && !editing ? "ring-1 ring-white/50" : "ring-0",
               )}
               style={{
@@ -181,47 +238,29 @@ export function StoryEditor({
                 top: layout.top * scale,
                 width: layout.width * scale,
                 height: layout.height * scale,
-                color: item.color,
-                fontSize: layout.fontSize * scale,
-                fontFamily: fontFamily(item.font),
-                fontWeight: item.font === "display" ? 500 : item.font === "serif" ? 600 : 650,
-                letterSpacing: item.font === "display" ? "0.08em" : item.font === "sans" ? "0.01em" : 0,
-                lineHeight: 1.15,
-                textShadow: item.pill ? "none" : shadowFor(item.color),
-                borderRadius: item.pill ? 999 : 8,
               }}
               onPointerDown={(event) => onPointerDown(event, item.id)}
               onPointerMove={onPointerMove}
               onPointerUp={(event) => onPointerUp(event, item.id)}
               onPointerCancel={(event) => onPointerUp(event, item.id)}
             >
-              {editing && active ? (
-                <span className="sr-only">Editing</span>
-              ) : (
-                <span className="flex flex-col items-center justify-center">
-                  {layout.lines.map((line, index) => (
-                    <span
-                      key={`${item.id}-${index}`}
-                      className="block"
-                      style={{
-                        padding: item.pill ? "0.12em 0.45em" : 0,
-                        background: item.pill && line.text ? pillBackground(item.color) : "transparent",
-                        borderRadius: item.pill ? 999 : 0,
-                      }}
-                    >
-                      {line.text || (layout.lines.length === 1 ? <span className="opacity-50">Text</span> : " ")}
-                    </span>
-                  ))}
-                </span>
-              )}
+              <span className="sr-only">{editing && active ? "Editing" : item.text || "Text"}</span>
             </button>
           );
         })}
 
         {editing && selected && canEditText && (
-          <label className="absolute inset-x-0 top-1/3 z-10 px-6">
+          <label
+            className="absolute z-10 px-6"
+            style={{
+              left: 0,
+              right: 0,
+              top: keyboardInset > 0 ? "16%" : "33%",
+            }}
+          >
             <span className="sr-only">Story text</span>
             <textarea
+              ref={textInputRef}
               data-story-text-input
               autoFocus
               rows={3}
@@ -231,7 +270,11 @@ export function StoryEditor({
               className="w-full resize-none bg-transparent text-center text-[28px] leading-tight text-white outline-none placeholder:text-white/40"
               style={{
                 color: selected.color,
-                fontFamily: fontFamily(selected.font),
+                fontFamily: storyFontFamily(selected.font),
+                fontWeight: STORY_TEXT_FONT_WEIGHT[selected.font],
+                letterSpacing: `${STORY_TEXT_TRACKING[selected.font]}em`,
+                lineHeight: STORY_TEXT_LINE_HEIGHT,
+                padding: selected.pill ? `${STORY_PILL_PAD_Y}em ${STORY_PILL_PAD_X}em` : 0,
                 textShadow: "0 1px 8px rgba(0,0,0,0.45)",
               }}
             />
@@ -242,7 +285,7 @@ export function StoryEditor({
 
       <div
         className="z-10 flex shrink-0 flex-col gap-3 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-3 pt-8"
-        style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}
+        style={{ paddingBottom: chromePad }}
       >
         <div className="flex items-center justify-between gap-2">
           <button
@@ -392,31 +435,4 @@ export function StoryEditor({
       </div>
     </div>
   );
-}
-
-function fontFamily(font: StoryTextFont): string {
-  if (font === "serif") return "Fraunces, Georgia, serif";
-  if (font === "display") return "Cinzel, Georgia, serif";
-  return "Archivo, system-ui, sans-serif";
-}
-
-function shadowFor(color: string): string {
-  const light = color.toLowerCase() === "#ffffff" || color.toLowerCase() === "#f5e6c8" || color.toLowerCase() === "#e8a0bf";
-  return light ? "0 1px 8px rgba(0,0,0,0.55)" : "0 1px 8px rgba(255,255,255,0.35)";
-}
-
-function pillBackground(color: string): string {
-  const light = color.toLowerCase() === "#ffffff" || color.toLowerCase() === "#f5e6c8" || color.toLowerCase() === "#e8a0bf";
-  return light ? "rgba(0,0,0,0.82)" : "rgba(255,255,255,0.94)";
-}
-
-let editorMeasureCanvas: HTMLCanvasElement | null = null;
-
-function measureInEditor(text: string, font: string, frameWidth: number): number {
-  if (typeof document === "undefined") return text.length * (frameWidth / 54);
-  const canvas = editorMeasureCanvas ?? (editorMeasureCanvas = document.createElement("canvas"));
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return text.length * (frameWidth / 54);
-  ctx.font = font;
-  return ctx.measureText(text).width;
 }

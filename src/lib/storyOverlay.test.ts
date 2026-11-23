@@ -17,6 +17,8 @@ import {
   layoutStoryText,
   pointerToNormalized,
   storyFrameSize,
+  storyMaxTextWidth,
+  trackedTextWidth,
   wrapText,
   type StoryDrawContext,
   type StoryTextOverlay,
@@ -266,5 +268,45 @@ describe("burn-in", () => {
       calls.filter((name) => name === "bg" || name === "image" || name === "text"),
       ["bg", "image", "text"],
     );
+  });
+});
+
+describe("WYSIWYG wrap and scale", () => {
+  it("adds tracking between characters and not on a single glyph", () => {
+    assert.equal(trackedTextWidth("ABCD", 100, 100, "sans"), 103);
+    assert.equal(trackedTextWidth("A", 50, 100, "sans"), 50);
+    assert.equal(trackedTextWidth("", 50, 100, "sans"), 0);
+    assert.equal(trackedTextWidth("AB", 80, 100, "display"), 88);
+  });
+
+  it("wraps the same lines at 390, 320, and 1080 when metrics scale with the frame", () => {
+    const medium = overlay({ text: "On set tonight", size: "m", font: "sans", pill: true });
+    const long = overlay({
+      text: "Tonight we stay on set until the last light leaves the lot",
+      size: "m",
+      font: "sans",
+      pill: true,
+    });
+    const linear = (frameWidth: number) => (text: string, _font?: string) =>
+      text.length * 32 * (frameWidth / 1080);
+
+    for (const item of [medium, long]) {
+      const output = layoutStoryText(item, 1080, 1920, linear(1080));
+      for (const previewWidth of [390, 320]) {
+        const previewHeight = previewWidth * (1920 / 1080);
+        const preview = layoutStoryText(item, previewWidth, previewHeight, linear(previewWidth));
+        assert.deepEqual(
+          preview.lines.map((line) => line.text),
+          output.lines.map((line) => line.text),
+        );
+        assert.ok(Math.abs(preview.left / previewWidth - output.left / 1080) < 0.02);
+        assert.ok(Math.abs(preview.fontSize / previewWidth - output.fontSize / 1080) < 1e-9);
+        assert.equal(preview.pillFill, output.pillFill);
+        assert.ok(Math.abs(storyMaxTextWidth(previewWidth) / previewWidth - storyMaxTextWidth(1080) / 1080) < 1e-9);
+      }
+    }
+
+    assert.equal(layoutStoryText(medium, 1080, 1920, linear(1080)).lines.length, 1);
+    assert.ok(layoutStoryText(long, 1080, 1920, linear(1080)).lines.length >= 2);
   });
 });

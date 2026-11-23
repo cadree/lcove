@@ -17,7 +17,9 @@ const OUT = process.env.OUT ?? "/workspace/ether-audit/story-camera-nov23/shots"
 const EMAIL = process.env.EMAIL ?? "ada@staging.ether.test";
 const PROD_REF = "aykopqinnnssxdhxqruo";
 const STAGING_REF = "vjdrihmriufkameqngfg";
-const TEXT = process.env.STORY_TEXT ?? `On set ${Date.now()}`;
+const MEDIUM_TEXT = "On set tonight";
+const LONG_TEXT = "Tonight we stay on set until the last light leaves the lot";
+const TEXT = process.env.STORY_TEXT ?? MEDIUM_TEXT;
 
 const keys = JSON.parse(fs.readFileSync("/workspace/secrets/ether-staging-keys.json", "utf8"));
 const password = fs.readFileSync("/workspace/secrets/ether-staging-seed-password.txt", "utf8").trim();
@@ -123,6 +125,48 @@ async function shot(page, name) {
   return dest;
 }
 
+async function setCaption(page, text) {
+  const input = page.locator("[data-story-text-input]");
+  if (!(await input.isVisible().catch(() => false))) {
+    await page.locator("[data-story-overlay]").first().click();
+    await input.waitFor({ state: "visible" });
+  }
+  await input.fill(text);
+  await page.locator("[data-story-text-done]").click();
+  await page.locator("[data-story-share]").waitFor({ state: "visible" });
+}
+
+async function assertEditorMatchesBurn(page, caption, viewportName) {
+  await page.locator('[data-story-fonts-ready="true"]').waitFor({ timeout: 15000 });
+  const editorLines = await page.locator("[data-story-overlay]").first().getAttribute("data-story-lines");
+  const result = await page.evaluate(async (expected) => {
+    const hook = window.__storyWysiwyg;
+    if (!hook) throw new Error("Missing story WYSIWYG hook");
+    await hook.waitForStoryFonts();
+    const overlay = hook.overlays.find((item) => item.text === expected) ?? hook.overlays[0];
+    if (!overlay) throw new Error("No overlay to compare");
+    const layout = hook.layoutStoryText(overlay, hook.STORY_FRAME_WIDTH, hook.STORY_FRAME_HEIGHT);
+    const layoutLines = layout.lines.map((line) => line.text);
+    const burnedLines = await hook.collectBurnedLines(overlay, hook.STORY_FRAME_WIDTH, hook.STORY_FRAME_HEIGHT);
+    return { text: overlay.text, layoutLines, burnedLines };
+  }, caption);
+  if (result.text !== caption) {
+    throw new Error(`${viewportName}: overlay text was ${JSON.stringify(result.text)}, expected ${JSON.stringify(caption)}`);
+  }
+  const layoutJoined = result.layoutLines.join("\n");
+  const burnedJoined = result.burnedLines.join("\n");
+  if (editorLines !== layoutJoined) {
+    throw new Error(`${viewportName}: editor lines ${JSON.stringify(editorLines)} != layout ${JSON.stringify(layoutJoined)}`);
+  }
+  if (layoutJoined !== burnedJoined) {
+    throw new Error(`${viewportName}: layout lines ${JSON.stringify(layoutJoined)} != burned ${JSON.stringify(burnedJoined)}`);
+  }
+  if (caption === LONG_TEXT && result.layoutLines.length < 2) {
+    throw new Error(`${viewportName}: long caption should wrap to at least two lines`);
+  }
+  console.log(`WYSIWYG ${viewportName} ${caption === LONG_TEXT ? "long" : "medium"} lines=${result.layoutLines.length}`);
+}
+
 for (const viewport of viewports) {
   const { context, page } = await openSignedInPage(viewport);
   try {
@@ -142,12 +186,15 @@ for (const viewport of viewports) {
     await page.locator("[data-story-shutter]").click();
     await page.locator('[data-story-stage="editor"]').waitFor({ state: "visible", timeout: 15000 });
     await page.locator("[data-story-add-text]").click();
-    const input = page.locator("[data-story-text-input]");
-    await input.waitFor({ state: "visible" });
-    await input.fill(TEXT);
-    await page.locator("[data-story-text-done]").click();
+    await setCaption(page, LONG_TEXT);
     await page.locator("[data-story-pill]").click();
-    await page.locator("[data-story-share]").waitFor({ state: "visible" });
+    await assertEditorMatchesBurn(page, LONG_TEXT, viewport.name);
+    await setCaption(page, TEXT);
+    const pill = page.locator("[data-story-pill]");
+    if ((await pill.getAttribute("aria-pressed")) !== "true") {
+      await pill.click();
+    }
+    await assertEditorMatchesBurn(page, TEXT, viewport.name);
     await shot(page, `${viewport.name}-editor`);
 
     await page.locator("[data-story-share]").click();
@@ -171,6 +218,7 @@ for (const viewport of viewports) {
       await textInput.waitFor();
       await textInput.fill("Words only");
       await page.locator("[data-story-text-done]").click();
+      await page.locator('[data-story-fonts-ready="true"]').waitFor({ timeout: 15000 });
       await shot(page, `${viewport.name}-text-only`);
       await page.locator("[data-story-close], [data-story-back]").first().click();
     }
