@@ -80,7 +80,10 @@ function zipDist(outFile) {
 import zipfile, os, sys
 root, dest = sys.argv[1], sys.argv[2]
 with zipfile.ZipFile(dest, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-    for dirpath, _, files in os.walk(root):
+    for dirpath, dirs, files in os.walk(root):
+        # Never pack older update zips into a new one (Cloudflare Pages caps files at 25 MiB).
+        if os.path.relpath(dirpath, root) == ".":
+            dirs[:] = [d for d in dirs if d != "native-updates"]
         for name in files:
             full = os.path.join(dirpath, name)
             zf.write(full, os.path.relpath(full, root))

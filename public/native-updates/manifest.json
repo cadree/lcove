@@ -5,11 +5,15 @@
       "bundles": {}
     },
     "202611222244": {
-      "current": "1.0.5-web.1",
+      "current": "1.0.5-web.2",
       "bundles": {
         "1.0.5-web.1": {
           "url": "https://etherbylcove.com/native-updates/bundles/202611222244-1.0.5-web.1.zip",
           "checksum": "1186cc5c073b252ab6c01adf1278e286d8f2590c76f3c043a8e454a3f2a1b9e3"
+        },
+        "1.0.5-web.2": {
+          "url": "https://etherbylcove.com/native-updates/bundles/202611222244-1.0.5-web.2.zip",
+          "checksum": "99075ed48002074dc4f02646d07f86ebe0f1a7f41e949dcc1dc37d5e6ceeadaa"
         }
       }
     }
