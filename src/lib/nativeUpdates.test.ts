@@ -167,3 +167,32 @@ describe("live update endpoint", () => {
     assert.match(body.checksum, /^[a-f0-9]{64}$/);
   });
 });
+
+describe("next native build", () => {
+  it("gets no live update until its build number has a slot, using the real manifest", async () => {
+    const { readFileSync } = await import("node:fs");
+    const manifest = JSON.parse(readFileSync(new URL("../../public/native-updates/manifest.json", import.meta.url), "utf8"));
+    const fresh = selectLiveUpdate(manifest, {
+      app_id: LIVE_UPDATE_APP_ID,
+      version_build: "1.0.5",
+      version_code: "202611240900",
+      version_name: "builtin",
+    });
+    assert.equal(fresh.kind, "none");
+    const testflight = selectLiveUpdate(manifest, {
+      app_id: LIVE_UPDATE_APP_ID,
+      version_build: "1.0.5",
+      version_code: "202611222244",
+      version_name: "builtin",
+    });
+    assert.equal(testflight.kind, "update");
+  });
+
+  it("keeps the self-hosted updateUrl and turns off Capgo stats and channel calls", async () => {
+    const { readFileSync } = await import("node:fs");
+    const config = readFileSync(new URL("../../capacitor.config.ts", import.meta.url), "utf8");
+    assert.match(config, /updateUrl: "https:\/\/etherbylcove\.com\/native-updates"/);
+    assert.match(config, /statsUrl: ""/);
+    assert.match(config, /channelUrl: ""/);
+  });
+});

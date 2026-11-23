@@ -53,11 +53,11 @@
 		</dict>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>Ether uses the camera when you go live and when you scan an event check-in code.</string>
+	<string>Ether uses the camera to take photos and videos for your stories and posts, to go live, and to scan event check-in codes.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Ether uses the microphone so people can hear you during a live stream.</string>
+	<string>Ether uses the microphone to record sound for your videos and stories, and so people can hear you when you go live.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Ether uses your photo library when you choose a picture for your profile, a post, an event, a message, or another upload.</string>
+	<string>Ether uses your photo library so you can choose photos and videos for your posts, stories, messages, events, and profile.</string>
 	<!-- iOS has no usage-description key for notifications. The system permission
 	     dialog does not take a custom sentence. Ether asks so it can deliver
 	     messages, event reminders, and community alerts. Remote delivery needs
