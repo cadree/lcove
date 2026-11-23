@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FinanceScreen } from "@/components/events/host/FinanceScreen";
+import { FinanceBack, FinanceScreen } from "@/components/events/host/FinanceScreen";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatUsd } from "@/lib/ticketFees";
 import { errorMessage } from "@/lib/errorMessage";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
 interface BalanceBucket { amount: number; currency: string }
@@ -34,7 +35,7 @@ export default function HostFinance() {
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["host-finances", user?.id],
     enabled: !!user,
     queryFn: async () => {
@@ -68,7 +69,24 @@ export default function HostFinance() {
     }
   };
 
-  if (isLoading || !data) return <div className="min-h-screen bg-background" />;
+  if (isLoading || !data) {
+    return (
+      <div className="min-h-screen bg-background px-4 pb-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
+        <FinanceBack />
+        <h1 className="ether-title text-3xl">Finances</h1>
+        {isError ? (
+          <div role="alert" className="mt-5 space-y-3 rounded-2xl border border-border/70 p-4 text-sm">
+            <p>Your finances could not load right now.</p>
+            <Button className="w-full rounded-full" disabled={isFetching} onClick={() => void refetch()}>
+              {isFetching ? "Trying again…" : "Try again"}
+            </Button>
+          </div>
+        ) : (
+          <p className="mt-5 text-sm text-muted-foreground">Loading your finances…</p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <FinanceScreen

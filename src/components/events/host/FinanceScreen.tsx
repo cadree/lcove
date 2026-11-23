@@ -1,4 +1,21 @@
+import { ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+
+/** Back to the event dashboard, so the finance screen is never a dead end. */
+export function FinanceBack() {
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      aria-label="Back to event dashboard"
+      onClick={() => navigate("/dashboard/events")}
+      className="-ml-2 mb-2 inline-flex h-11 w-11 items-center justify-center rounded-full text-foreground"
+    >
+      <ArrowLeft className="h-5 w-5" />
+    </button>
+  );
+}
 
 export interface PayoutRow {
   id: string;
@@ -38,7 +55,8 @@ export function FinanceScreen({
   busy: boolean;
 }) {
   return (
-    <div className="min-h-screen bg-background px-4 py-6">
+    <div className="min-h-screen bg-background px-4 pb-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
+      <FinanceBack />
       <h1 className="ether-title text-3xl">Finances</h1>
       <p className="mt-2 text-xs text-muted-foreground">Stripe test mode. Ether does not keep a platform fee on tickets.</p>
       <div className="mt-5 grid grid-cols-2 gap-3">
