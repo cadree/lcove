@@ -5,7 +5,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { isKnownPath, isPublicPath } from "@/lib/appRoutes";
 import { SignUpPrompt } from "@/components/auth/SignUpPrompt";
 import { accessPath } from "@/lib/accessPath";
-import { FIRST_RUN_PATH } from "@/lib/firstRun";
+import { FIRST_RUN_PATH, welcomeStep, type WelcomeStatus } from "@/lib/firstRun";
 import { callRpc } from "@/lib/rpc";
 import { EVENT_RETURN_KEY, eventReturnPath, rememberEventReturn } from "../../../functions/_shared/eventShare.js";
 
@@ -105,17 +105,20 @@ const AccessGate = ({ children }: AccessGateProps) => {
     }
   }, [user, profile, authLoading, profileLoading, isPublicRoute, isLandingRoute, knownRoute, legacyStreamId, navigate, location.pathname, location.search]);
 
-  // An approved creative must complete the card handoff even after closing
-  // the browser or signing in on another device. Legacy members without an
-  // acceptance event are not interrupted by this flow.
+  // An approved creative registers the card once. Without a card they are sent
+  // to /welcome; with one, the gate finishes the welcome and never redirects,
+  // so a missed "Continue to Explore" tap cannot trap them. Legacy members
+  // without an acceptance event are not interrupted.
   useEffect(() => {
     if (!user?.id || authLoading || profileLoading || !profile?.onboarding_completed || profile.access_status !== 'active') return;
-    if (location.pathname === '/welcome') return;
-    if (location.pathname === '/id' && new URLSearchParams(location.search).get('setup') === '1') return;
+    if (location.pathname === FIRST_RUN_PATH) return;
     let cancelled = false;
-    callRpc<{ needs_setup: boolean }>('get_my_familcy_welcome_status')
+    callRpc<WelcomeStatus>('get_my_familcy_welcome_status')
       .then((status) => {
-        if (!cancelled && status?.needs_setup) navigate('/welcome', { replace: true });
+        if (cancelled) return;
+        const step = welcomeStep(status, location.pathname, location.search);
+        if (step.kind === 'redirect') navigate(step.to, { replace: true });
+        if (step.kind === 'finish') void callRpc<void>('complete_my_familcy_welcome').catch(() => undefined);
       })
       .catch(() => { /* A temporary lookup failure must not erase approval. */ });
     return () => { cancelled = true; };

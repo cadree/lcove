@@ -146,13 +146,18 @@ export default function EtherId() {
         .eq("user_id", userId);
       if (error) throw error;
       if (setupMode && familcyStatus.data?.needs_setup) {
-        await callRpc<void>('register_my_ether_card');
+        if (!familcyStatus.data.card_registered) await callRpc<void>('register_my_ether_card');
+        // The welcome is finished the moment the card exists, so leaving this
+        // screen (Apple Wallet, a tab, closing the app) can never bounce back.
+        await callRpc<void>('complete_my_familcy_welcome');
       }
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["ether-id"] });
       if (setupMode) await queryClient.invalidateQueries({ queryKey: ['familcy-welcome', session?.user.id] });
       toast.success(setupMode ? 'ETHER Card registered' : 'Ether ID updated');
+      // Without Apple Wallet there is nothing left on this screen: go meet people.
+      if (setupMode && !showWallet) navigate(AFTER_WELCOME_PATH, { replace: true });
     },
     onError: (error: Error) => {
       toast.error(error.message || "Could not update Ether ID");
