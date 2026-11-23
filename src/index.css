@@ -1905,7 +1905,7 @@ html[data-keyboard-pad] body {
 }
 @keyframes listen-pulse {
   0% { transform: scale(1); opacity: 0.7; }
-  100% { transform: scale(2.1); opacity: 0; }
+  100% { transform: scale(1.7); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .listen-pulse { animation: none; opacity: 0.35; transform: scale(1.4); }

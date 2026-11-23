@@ -156,7 +156,9 @@ export function joinListening(card: ListenCard, me: Listener, track: PlayerTrack
   leaveListening();
   void playTrack(track);
   const room = openRoom(card.session, me.userId);
-  let applying = false;
+  // Media events arrive a moment after we act on them; anything within this window is ours, not the listener's.
+  let appliedAt = 0;
+  const OWN_EVENT_MS = 1500;
   let hostPlaying = true;
   room.onState = (host) => {
     if (!active || active.role !== "guest") return;
@@ -168,24 +170,21 @@ export function joinListening(card: ListenCard, me: Listener, track: PlayerTrack
       active.waiting = waiting;
       publish();
     }
-    applying = true;
-    try {
-      if (waiting) {
+    if (waiting) {
+      if (s.playing) {
+        appliedAt = Date.now();
         pausePlayer();
-        return;
       }
-      if (step.seek !== null) seekPlayer(step.seek);
-      if (step.play === true) void playTrack(track);
-      if (step.play === false) pausePlayer();
-    } finally {
-      queueMicrotask(() => {
-        applying = false;
-      });
+      return;
     }
+    if (step.seek !== null || step.play !== null) appliedAt = Date.now();
+    if (step.seek !== null) seekPlayer(step.seek);
+    if (step.play === true) void playTrack(track);
+    if (step.play === false) pausePlayer();
   };
   let last = getPlayerState();
   const stopFollowing = subscribePlayer((s) => {
-    const steppedAway = s.track?.id !== track.id || (last.playing && !s.playing && !applying && hostPlaying && !active?.waiting);
+    const steppedAway = s.track?.id !== track.id || (last.playing && !s.playing && Date.now() - appliedAt > OWN_EVENT_MS && hostPlaying && !active?.waiting);
     last = s;
     if (steppedAway && active?.role === "guest") leaveListening();
   });

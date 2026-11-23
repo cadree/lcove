@@ -40,6 +40,9 @@ jobs:
       - name: Music catalog database checks
         run: npm run test:music-db
 
+      - name: Music page prefs database checks
+        run: npm run test:music-prefs-db
+
       - name: Item invite database checks
         run: npm run test:invite-db
 

@@ -38,12 +38,12 @@ export function MusicPlayerCard({ track, tracks, artist, hasAccess, onOpen }: {
       <button type="button" onClick={onOpen} className="music-player-art relative block aspect-square w-full overflow-hidden rounded-[22px] bg-black/30">
         {cover && <img src={cover} alt="" className="h-full w-full object-cover" />}
         <span className="absolute inset-x-6 bottom-6 rounded-[16px] border border-white/15 bg-black/45 px-4 py-3 text-center backdrop-blur-md">
-          <span className="block truncate text-[20px] font-semibold uppercase tracking-[0.06em] text-white">{shown?.title ?? track.title}</span>
+          <span className="line-clamp-2 block break-words text-[17px] font-semibold uppercase leading-tight tracking-[0.06em] text-white">{shown?.title ?? track.title}</span>
           <span className="block truncate text-[12px] uppercase tracking-[0.12em] text-white/70">{artist}</span>
         </span>
       </button>
       <div className="mt-4 text-center">
-        <p className="truncate text-[22px] font-semibold uppercase tracking-[0.05em] text-[var(--mv-text)] [text-shadow:var(--mv-text-glow)]">{shown?.title ?? track.title}</p>
+        <p className="line-clamp-2 break-words text-[22px] font-semibold uppercase leading-tight tracking-[0.05em] text-[var(--mv-text)] [text-shadow:var(--mv-text-glow)]">{shown?.title ?? track.title}</p>
         <p className="truncate text-[13px] uppercase tracking-[0.12em] text-[var(--mv-muted)]">
           {artist}
           {(shown?.previewOnly ?? true) && current ? " · preview" : ""}

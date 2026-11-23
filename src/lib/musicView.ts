@@ -76,8 +76,12 @@ export function orderKeys(keys: string[], saved: string[] | null | undefined): s
   const known = new Set(keys);
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const key of saved ?? []) if (known.has(key) && !seen.has(key)) (seen.add(key), out.push(key));
-  for (const key of keys) if (!seen.has(key)) (seen.add(key), out.push(key));
+  const take = (key: string) => {
+    seen.add(key);
+    out.push(key);
+  };
+  for (const key of saved ?? []) if (known.has(key) && !seen.has(key)) take(key);
+  for (const key of keys) if (!seen.has(key)) take(key);
   return out;
 }
 

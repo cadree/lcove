@@ -343,7 +343,7 @@ export function MusicProfileView({ userId, name, avatarUrl, handle, genres, rele
   );
 }
 
-function BadgePill({ badge }: { badge: RowBadge }) {
+function BadgePill({ badge, small }: { badge: RowBadge; small?: boolean }) {
   const tone: Record<RowBadge["tone"], string> = {
     free: "border-[var(--mv-line)] text-[var(--mv-text)]",
     price: "border-transparent bg-[var(--mv-accent)] text-[var(--mv-on-accent)]",
@@ -354,8 +354,8 @@ function BadgePill({ badge }: { badge: RowBadge }) {
     draft: "border-dashed border-[var(--mv-line)] text-[var(--mv-muted)]",
   };
   return (
-    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${tone[badge.tone]}`}>
-      {(badge.tone === "price" || badge.tone === "members" || badge.tone === "license") && <Lock className="h-3 w-3" aria-hidden />}
+    <span className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border font-semibold ${small ? "px-2 py-0.5 text-[10.5px] leading-[14px]" : "px-2.5 py-1 text-[11px]"} ${tone[badge.tone]}`}>
+      {(badge.tone === "price" || badge.tone === "members" || badge.tone === "license") && <Lock className={small ? "h-2.5 w-2.5" : "h-3 w-3"} aria-hidden />}
       {badge.label}
     </span>
   );
@@ -380,7 +380,11 @@ function TrackRow({ item, onOpen, editing, grip, onEdit }: { item: ViewItem; onO
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[16px] font-semibold text-[var(--mv-text)]">{item.title}</span>
-          <span className="block truncate text-[13px] text-[var(--mv-muted)]">{item.subtitle}</span>
+          {/* The badge sits under the title so the name gets the full width. */}
+          <span className="mt-1 flex min-w-0 items-center gap-1.5">
+            <BadgePill badge={item.badge} small />
+            <span className="min-w-0 truncate text-[12.5px] text-[var(--mv-muted)]">{item.subtitle}</span>
+          </span>
         </span>
       </button>
       {!editing && onPlay && (
@@ -397,9 +401,7 @@ function TrackRow({ item, onOpen, editing, grip, onEdit }: { item: ViewItem; onO
         <button type="button" onClick={onEdit} aria-label={`Edit ${item.title}`} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--mv-text)] hover:bg-[var(--mv-surface)]">
           <MoreHorizontal className="h-5 w-5" />
         </button>
-      ) : (
-        <BadgePill badge={item.badge} />
-      )}
+      ) : null}
     </div>
   );
 }
