@@ -3,7 +3,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -120,7 +119,7 @@ export function PartnerApplicationsTab() {
 
       {viewTab === 'active' ? (
         /* Active Partners List */
-        <ScrollArea className="h-[500px]">
+        <div className="w-full">
           {loadingPartners ? (
             <div className="space-y-3">
               {[1, 2, 3].map(i => <Skeleton key={i} className="h-24" />)}
@@ -179,7 +178,7 @@ export function PartnerApplicationsTab() {
               <p className="text-muted-foreground">No active partners</p>
             </div>
           )}
-        </ScrollArea>
+        </div>
       ) : (
         /* Applications View */
         <>
@@ -215,7 +214,7 @@ export function PartnerApplicationsTab() {
         </Badge>
       </div>
 
-      <ScrollArea className="h-[500px]">
+      <div className="w-full">
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => <Skeleton key={i} className="h-32" />)}
@@ -326,7 +325,7 @@ export function PartnerApplicationsTab() {
             ))}
           </div>
         )}
-      </ScrollArea>
+      </div>
         </>
       )}
 

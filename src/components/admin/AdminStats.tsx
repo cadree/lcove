@@ -28,10 +28,11 @@ export function AdminStats() {
     queryFn: () => callRpc<AdminDashboardStats>("admin_dashboard_stats"),
   });
 
+  // Skeletons are the height of a stat card (106px at 390px wide), so the page below does not jump when the numbers arrive.
   if (isLoading) {
     return (
       <div className="px-4 py-4 grid grid-cols-2 md:grid-cols-5 gap-3">
-        {[1, 2, 3, 4, 5].map((item) => <Skeleton key={item} className="h-20" />)}
+        {[1, 2, 3, 4, 5].map((item) => <Skeleton key={item} className="h-[106px]" />)}
       </div>
     );
   }

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -131,7 +130,7 @@ export function ContentModerationTab() {
       {error && (
         <p className="text-sm text-destructive">{error instanceof Error ? error.message : "Could not load content"}</p>
       )}
-      <ScrollArea className="h-[480px]">
+      <div className="w-full">
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : rows.length === 0 ? (
@@ -188,7 +187,7 @@ export function ContentModerationTab() {
             ))}
           </div>
         )}
-      </ScrollArea>
+      </div>
 
       <Dialog open={!!hardTarget} onOpenChange={(open) => { if (!open) setHardTarget(null); }}>
         <DialogContent>
