@@ -58,7 +58,13 @@ export function FeedVideo({ src, preload = "metadata", muted = true, playsInline
     if (!element || !playWhenVisible) return;
     let visible = false;
     const play = () => {
-      if (visible && !document.hidden) void element.play().catch(() => undefined);
+      if (!visible || document.hidden) return;
+      void element.play().catch(() => {
+        // Safari can refuse sound without a fresh tap. Play muted rather than not at all.
+        if (element.muted) return;
+        element.muted = true;
+        void element.play().catch(() => undefined);
+      });
     };
     // The source is attached a moment after the card scrolls into view. A play()
     // before that has nothing to play, so try again once the first frame is in.

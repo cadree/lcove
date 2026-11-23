@@ -1,13 +1,14 @@
 import { FeedVideo } from "@/components/media/FeedVideo";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, Play } from "lucide-react";
 import FeedPost from "@/components/feed/FeedPost";
 import { usePosts } from "@/hooks/usePosts";
 import { FeedEngagementProvider } from "@/hooks/useFeedEngagement";
+import { ReelViewer } from "@/components/explore/ReelViewer";
 import { browsePosts, collectReels, growVisibleCount, matchesBrowseQuery } from "@/lib/exploreBrowse";
 
-const PAGE = 4;
+const PAGE = 6;
 type Lane = "reels" | "posts" | "portfolios";
 
 const lanes: { id: Lane; label: string }[] = [
@@ -20,6 +21,8 @@ const lanes: { id: Lane; label: string }[] = [
 export function ExploreBrowse({ query, heading }: { query: string; heading?: ReactNode }) {
   const [lane, setLane] = useState<Lane>("reels");
   const [visible, setVisible] = useState(PAGE);
+  const [openReel, setOpenReel] = useState<number | null>(null);
+  const closeReel = useCallback(() => setOpenReel(null), []);
   const sentinel = useRef<HTMLDivElement>(null);
   const { posts, isLoading: postsLoading } = usePosts();
 
@@ -34,10 +37,10 @@ export function ExploreBrowse({ query, heading }: { query: string; heading?: Rea
   }, [posts, lane, query]);
 
   const total = lane === "reels" ? reels.length : lanePosts.length;
-  const shownReels = reels.length === 0 ? [] : Array.from({ length: Math.ceil(visible / Math.max(reels.length, 1)) }, (_, loop) =>
-    reels.map((reel) => ({ ...reel, key: `${reel.id}-${loop}` })),
-  ).flat().slice(0, Math.max(visible, Math.min(PAGE, reels.length)));
+  // On For you the reels stay one short grid so the Mall below is still in reach; See all has the rest.
+  const shownReels = reels.slice(0, heading === undefined ? visible : PAGE);
   const shownPosts = lanePosts.slice(0, visible);
+  const atEnd = total > 0 && visible >= total;
 
   useEffect(() => {
     setVisible(PAGE);
@@ -45,7 +48,7 @@ export function ExploreBrowse({ query, heading }: { query: string; heading?: Rea
 
   useEffect(() => {
     const node = sentinel.current;
-    if (!node || total === 0) return;
+    if (!node || total === 0 || visible >= total) return;
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) {
         setVisible((current) => growVisibleCount(current, total, PAGE));
@@ -89,25 +92,25 @@ export function ExploreBrowse({ query, heading }: { query: string; heading?: Rea
         reels.length === 0 ? (
           <EmptyCopy title="No reels yet" detail="Video posts from other people show up here." />
         ) : (
-          <div className="h-[calc(100dvh-13.5rem)] min-h-[28rem] snap-y snap-mandatory overflow-y-auto rounded-[18px] bg-black">
-            {shownReels.map((reel) => (
-              <article key={reel.key} className="relative h-full min-h-full snap-start">
-                <FeedVideo
-                  src={reel.mediaUrl}
-                  className="h-full w-full object-contain"
-                  preload="auto"
-                  playWhenVisible
-                />
-                <Link
-                  to={`/profile/${reel.userId}`}
-                  className="absolute inset-x-3 bottom-4 flex min-h-11 items-center justify-between rounded-full bg-background/90 px-4 text-foreground"
-                >
-                  <span className="truncate font-body text-sm font-extrabold">{reel.name}</span>
-                  <span className="mono-label shrink-0 text-[9px] text-muted-foreground">Profile</span>
-                </Link>
-              </article>
+          // Tiles show a still frame; tapping one opens the full-screen viewer.
+          <div className="grid grid-cols-2 gap-2">
+            {shownReels.map((reel, index) => (
+              <button
+                key={reel.id}
+                type="button"
+                data-testid="reel-tile"
+                onClick={() => setOpenReel(index)}
+                aria-label={`Watch reel by ${reel.name}`}
+                className="relative aspect-[9/16] overflow-hidden rounded-[14px] bg-black text-left"
+              >
+                <FeedVideo src={reel.mediaUrl} className="h-full w-full object-cover" frameAt={1} />
+                <Play className="absolute right-2 top-2 h-5 w-5 fill-white text-white drop-shadow" />
+                <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 px-3 pb-2 pt-6 font-body text-xs font-extrabold text-white">
+                  {reel.name}
+                </span>
+              </button>
             ))}
-            <div ref={sentinel} className="h-1" />
+            {heading === undefined && <div ref={sentinel} className="col-span-2 h-1" />}
           </div>
         )
       ) : shownPosts.length === 0 ? (
@@ -134,6 +137,8 @@ export function ExploreBrowse({ query, heading }: { query: string; heading?: Rea
         </div>
         </FeedEngagementProvider>
       )}
+      {!loading && atEnd && heading === undefined && <p className="mono-label py-6 text-center text-[10px] text-muted-foreground">You're all caught up</p>}
+      {openReel !== null && <ReelViewer reels={reels} start={openReel} onClose={closeReel} />}
     </section>
   );
 }
