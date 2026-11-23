@@ -27,6 +27,7 @@ import { useNoviQuests } from "@/hooks/useNoviQuests";
 import { useIosExternalCheckout } from "@/hooks/useIosExternalCheckout";
 import { isIosApp } from "@/lib/platform";
 import type { LucideIcon } from "lucide-react";
+import { CINEMA_TOOL_LABEL } from "@/lib/cinemaCopy";
 
 interface ToolsSheetProps {
   open: boolean;
@@ -73,7 +74,7 @@ const groups: { id: string; label: string; items: ToolItem[] }[] = [
       { id: "events", label: "My events", path: "/dashboard/events", icon: Calendar, fill: "cyan" },
       { id: "tickets", label: "My tickets", path: "/tickets", icon: Ticket, fill: "rose" },
       { id: "live", label: "Live", path: "/live", icon: Radio, fill: "red" },
-      { id: "cinema", label: "Cinema networks", path: "/cinema", icon: Clapperboard, fill: "ink" },
+      { id: "cinema", label: CINEMA_TOOL_LABEL, path: "/cinema", icon: Clapperboard, fill: "ink" },
     ],
   },
   {
