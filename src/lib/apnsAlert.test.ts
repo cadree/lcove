@@ -127,3 +127,32 @@ describe("APNs host per environment", () => {
     assert.equal(calls[0].url, `${APNS_SANDBOX_HOST}/3/device/${TOKEN}`);
   });
 });
+
+describe("match push open path", () => {
+  const person = "00000000-0000-4000-8000-0000000000b2";
+  it("opens the match intro on Explore for the person you matched with", () => {
+    const payload = buildApnsAlertPayload({
+      title: "You connected",
+      body: "You and Rezza both connected. Say hello.",
+      notificationType: "match",
+      data: { user_id: person, conversation_id: "00000000-0000-4000-8000-0000000000c3" },
+    });
+    assert.equal(payload.url, `/explore?section=people&connected=${person}`);
+  });
+  it("falls back to notifications when the person id is missing or malformed", () => {
+    for (const data of [{}, { user_id: "x/../admin" }]) {
+      const payload = buildApnsAlertPayload({ title: "You connected", body: "", notificationType: "match", data });
+      assert.equal(payload.url, "/notifications");
+    }
+  });
+  it("approval push opens Explore people", () => {
+    const payload = buildApnsAlertPayload({
+      title: "You're approved",
+      body: "Welcome",
+      url: "/explore?section=people",
+      notificationType: "membership_accepted",
+      data: { applicant_id: person },
+    });
+    assert.equal(payload.url, "/explore?section=people");
+  });
+});

@@ -407,7 +407,7 @@ describe("match notifications", () => {
       data: {},
       facts: { callerName: "Rezza", match: { active: true, conversationId: conversation } },
     });
-    assert.deepEqual(allowed, { ok: true, title: "You connected", body: "You and Rezza both connected. Say hello.", data: { conversation_id: conversation } });
+    assert.deepEqual(allowed, { ok: true, title: "You connected", body: "You and Rezza both connected. Say hello.", data: { user_id: caller, conversation_id: conversation } });
     for (const match of [null, { active: false, conversationId: conversation }]) {
       const denied = authorizeUserNotification({ callerId: caller, recipientId: recipient, notificationType: "match", data: {}, facts: { callerName: "Rezza", match } });
       assert.equal(denied.ok, false);

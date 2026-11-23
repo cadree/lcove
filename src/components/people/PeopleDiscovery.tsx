@@ -1,5 +1,5 @@
 import { Suspense, lazy, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { OpenToFilter } from "@/components/openTo/OpenToChips";
 import { hasOpenTo, openToLabel, type OpenToTag } from "@/lib/openTo";
@@ -24,7 +24,7 @@ import { MemberGrid } from "./MemberGrid";
 import { SwipeDeck } from "./SwipeDeck";
 import { TravelingToCity } from "./TravelingToCity";
 import { supabase } from "@/integrations/supabase/client";
-import type { IcebreakerMe } from "@/lib/connectMoment";
+import { connectedParam, messageHref, type IcebreakerMe } from "@/lib/connectMoment";
 import { NEARBY_KM, nearbyGroups, safeArea, type LonLat, type MapGroup } from "@/lib/nearbyMap";
 
 // The globe and its city coordinates (~300 KB) load after the deck renders.
@@ -166,6 +166,27 @@ export function PeopleDiscovery({ query }: { query: string }) {
       if (/Show yourself/.test(e.message)) setSettingsOpen(true);
     },
   });
+  // A match push or notice opens Explore with ?connected=<id>: replay the match moment for the
+  // person who was matched (they did not see it happen), then the start-something sheet.
+  const navigate = useNavigate();
+  const connectedId = connectedParam(location.search);
+  useEffect(() => {
+    if (!connectedId || !members.isSuccess || !matches.isSuccess) return;
+    const next = new URLSearchParams(location.search);
+    next.delete("connected");
+    const rest = next.toString();
+    const clean = `${location.pathname}${rest ? `?${rest}` : ""}`;
+    const match = matches.data?.find((m) => m.user_id === connectedId);
+    const person = everyone.find((p) => p.user_id === connectedId);
+    if (person) {
+      navigate(clean, { replace: true });
+      setMoment({ person, matched: !!match, conversationId: match?.conversation_id ?? null });
+    } else if (match?.conversation_id) {
+      navigate(messageHref(match.conversation_id), { replace: true });
+    } else {
+      navigate(clean, { replace: true });
+    }
+  }, [connectedId, members.isSuccess, matches.isSuccess, matches.data, everyone, location.pathname, location.search, navigate]);
   const unmatch = useMutation({
     mutationFn: discovery.unmatch,
     onSuccess: () => cache.invalidateQueries({ queryKey: ["creative-matches"] }),

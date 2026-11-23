@@ -1,6 +1,7 @@
 import { requireInternalSecret } from "../_shared/require-caller.ts";
 import { runEmailQueue } from "../_shared/email-queue-dispatch.mjs";
 import { dispatchMemberApplicationPushes } from "../_shared/member-application-push.mjs";
+import { dispatchMemberApprovalPushes } from "../_shared/member-approval-push.mjs";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
@@ -11,6 +12,8 @@ export type EmailQueueDeps = {
   };
   sendEmail: (payload: Record<string, unknown>) => Promise<void>;
   sendPush?: (payload: Record<string, unknown>) => Promise<void>;
+  /** Raw send-push-notification response; the approval worker reads `sent` itself. */
+  deliverPush?: (payload: Record<string, unknown>) => Promise<unknown>;
   sleep?: (ms: number) => Promise<void>;
 };
 
@@ -37,6 +40,13 @@ export async function handleEmailQueueRequest(
       await dispatchMemberApplicationPushes({ supabase: deps.supabase, sendPush: deps.sendPush });
     } catch (error) {
       console.error("Application push worker failed", error);
+    }
+  }
+  if (deps.deliverPush) {
+    try {
+      await dispatchMemberApprovalPushes({ supabase: deps.supabase, deliverPush: deps.deliverPush });
+    } catch (error) {
+      console.error("Approval push worker failed", error);
     }
   }
   return result;
