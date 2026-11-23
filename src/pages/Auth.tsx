@@ -16,7 +16,7 @@ import { PageMeta } from '@/components/seo/PageMeta';
 import { EMAIL_CONFIRMED_BODY, EMAIL_CONFIRMED_TITLE, HERO_TAGLINE, VERIFY_SIGNAL_BODY, VERIFY_SIGNAL_TITLE } from '@/content/copy';
 import { getAuthRedirectUrl } from '@/lib/capacitorStorage';
 import { RESEND_COOLDOWN_MS } from '@/lib/resendCooldown';
-import { classifySignup, emailSendingHelp, resendWaitRemaining, retryAfterSeconds, signupEmailDeliveryFailed, signupLimitNextStep, SIGNUP_NOT_SENT_NOTE } from '@/lib/signupRecovery';
+import { BANNED_ACCOUNT_HELP, classifySignup, emailSendingHelp, isBannedAuthError, resendWaitRemaining, retryAfterSeconds, signupEmailDeliveryFailed, signupLimitNextStep, SIGNUP_NOT_SENT_NOTE } from '@/lib/signupRecovery';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { logAuthEvent, logAuthError } from '@/lib/authDebug';
@@ -55,6 +55,7 @@ type AuthMode = 'login' | 'signup' | 'forgot' | 'reset' | 'confirm-email' | 'con
 const getAuthErrorMessage = (error: Error & { code?: string; status?: number }): { title: string; description: string } => {
   const limitHelp = emailSendingHelp(error);
   if (limitHelp) return limitHelp;
+  if (isBannedAuthError(error)) return { ...BANNED_ACCOUNT_HELP };
   if (signupEmailDeliveryFailed(error)) {
     return {
       title: 'Email couldn’t be sent',
@@ -482,6 +483,12 @@ const Auth = () => {
           const { error: signInError } = await signIn(email, password);
           if (!signInError) {
             toast({ title: 'Welcome back', description: 'This email already has an account, so we signed you in to continue.' });
+          } else if (isBannedAuthError(signInError)) {
+            // A closed account: no code will ever come, so stay on Join and say so.
+            logAuthEvent('Signup hit a closed account');
+            setPassword('');
+            setRecoveryNote(BANNED_ACCOUNT_HELP.description);
+            toast({ ...BANNED_ACCOUNT_HELP, variant: 'destructive' });
           } else if (signInError.message.toLowerCase().includes('email not confirmed')) {
             setMode('confirm-email');
             setConfirmationSentAt(null);
@@ -733,7 +740,7 @@ const Auth = () => {
               <Button
                 variant="outline"
                 onClick={() => { setRecoveryNote(null); setMode('login'); }}
-                className="h-auto min-h-11 w-full whitespace-normal py-3 leading-snug"
+                className="h-auto min-h-11 w-full whitespace-normal text-balance break-words px-3 py-3 leading-snug tracking-[0.08em]"
               >
                 Already verified? Sign in to finish your application
               </Button>

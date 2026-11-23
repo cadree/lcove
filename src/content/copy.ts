@@ -63,7 +63,7 @@ export const FEATURE_PREVIEW = [
 ] as const;
 
 /** Confirm-email step after sign-up. */
-export const VERIFY_SIGNAL_TITLE = "Verify your signal";
+export const VERIFY_SIGNAL_TITLE = "Verify your email";
 
 export const VERIFY_SIGNAL_BODY =
   "Enter the 6-digit code we sent you. The email link still works.";

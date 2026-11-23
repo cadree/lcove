@@ -77,6 +77,17 @@ export function signupEmailDeliveryFailed(error: AuthErrorLike | null | undefine
   );
 }
 
+/** Sign-in refused because an admin banned or closed the account. */
+export function isBannedAuthError(error: AuthErrorLike | null | undefined): boolean {
+  if (!error) return false;
+  return error.code === 'user_banned' || /user is banned/i.test(error.message || '');
+}
+
+export const BANNED_ACCOUNT_HELP = {
+  title: 'This account is closed',
+  description: 'This email belongs to an Ether account that was closed, so we can’t send it a code. Join with a different email, or contact Ether support to reopen it.',
+} as const;
+
 /** A confirmed email signs up again: Supabase answers with a user that has no identities. */
 export function isExistingAccountSignup(user: SignupUserLike): boolean {
   return Boolean(user) && Array.isArray(user?.identities) && user!.identities!.length === 0;
