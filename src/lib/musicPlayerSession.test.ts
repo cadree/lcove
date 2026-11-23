@@ -82,3 +82,11 @@ test("other players hear when shared playback starts, and stop clears the lock s
   assert.equal(session.metadata, null);
   assert.equal(session.playbackState, "none");
 });
+
+test("a full-file track replaces its preview copy in the queue", async () => {
+  const preview = { ...a, src: "https://x/a-preview.mp3", previewOnly: true };
+  await player.playTrack(a, [preview, b]);
+  assert.equal(player.getPlayerState().track?.src, "https://x/a.mp3");
+  assert.equal(player.getPlayerState().queue.length, 2);
+  player.stopPlayer();
+});

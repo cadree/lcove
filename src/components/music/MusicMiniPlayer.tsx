@@ -1,6 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Pause, Play, SkipForward, X } from "lucide-react";
+import { Headphones, Pause, Play, SkipForward, X } from "lucide-react";
+import { ShareSheet } from "@/components/messages/ShareSheet";
+import { ListeningNow } from "@/components/music/ListeningNow";
+import { useListenMe } from "@/hooks/useListenMe";
+import { useListenState } from "@/hooks/useListenTogether";
+import { cardFromPlaying, newSessionId } from "@/lib/listenTogether";
+import { leaveListening, startHosting } from "@/lib/listenRealtime";
 import { useMusicPlayer } from "@/hooks/useMusicPlayer";
 import { nextTrack, playerElement, stopPlayer, togglePlayer } from "@/lib/musicPlayer";
 
@@ -10,8 +16,17 @@ const HIDDEN_ON = [/^\/$/, /^\/auth/, /^\/onboarding/, /^\/live/];
  * Mounted once at the app root. Keeps the shared audio element alive across
  * routes and shows what is playing above the tab bar.
  */
-export function MusicMiniPlayer({ extra }: { extra?: React.ReactNode }) {
+export function MusicMiniPlayer() {
   const player = useMusicPlayer();
+  const me = useListenMe();
+  const live = useListenState();
+  const [sharing, setSharing] = useState(false);
+  const shareCard = useMemo(
+    () => (sharing && me ? cardFromPlaying(player.track, me.userId, newSessionId()) : null),
+    // A new session id each time the sheet opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sharing, me?.userId, player.track?.id],
+  );
   const { pathname } = useLocation();
   useEffect(() => {
     playerElement();
@@ -22,6 +37,8 @@ export function MusicMiniPlayer({ extra }: { extra?: React.ReactNode }) {
     document.documentElement.classList.toggle("has-mini-player", visible);
   }, [visible]);
   if (!visible || !player.track) return null;
+  const canShare = !!me && player.track.id.startsWith("track:") && !!player.track.artistUserId;
+  const hostName = live?.role === "guest" ? live.others.find((o) => o.userId === live.card.hostId)?.name : undefined;
   const progress = player.duration ? Math.min(100, (player.position / player.duration) * 100) : 0;
   return (
     <div
@@ -35,12 +52,25 @@ export function MusicMiniPlayer({ extra }: { extra?: React.ReactNode }) {
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[14px] font-semibold">{player.track.title}</span>
-          <span className="block truncate text-[12px] text-white/60">
-            {player.track.artist}
-            {player.track.previewOnly ? " · preview" : ""}
-          </span>
+          {live && live.others.length > 0 ? (
+            <ListeningNow others={live.others} label={live.role === "guest" ? `With ${hostName ?? live.others[0].name}${live.waiting ? " · paused" : ""}` : undefined} />
+          ) : (
+            <span className="block truncate text-[12px] text-white/60">
+              {player.track.artist}
+              {player.track.previewOnly ? " · preview" : ""}
+              {live ? (live.role === "host" ? " · shared" : " · connecting") : ""}
+            </span>
+          )}
         </span>
-        {extra}
+        {live ? (
+          <button type="button" onClick={leaveListening} aria-label={live.role === "host" ? "Stop listening together" : "Leave listening together"} className="flex h-11 w-9 shrink-0 items-center justify-center text-[#ff9fc8]">
+            <Headphones className="h-4 w-4" />
+          </button>
+        ) : canShare ? (
+          <button type="button" onClick={() => setSharing(true)} aria-label="Listen together with a friend" className="flex h-11 w-9 shrink-0 items-center justify-center" data-testid="listen-share">
+            <Headphones className="h-4 w-4" />
+          </button>
+        ) : null}
         <button type="button" onClick={togglePlayer} aria-label={player.playing ? "Pause" : "Play"} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full">
           {player.playing ? <Pause className="h-5 w-5 fill-current" /> : <Play className="ml-0.5 h-5 w-5 fill-current" />}
         </button>
@@ -54,6 +84,15 @@ export function MusicMiniPlayer({ extra }: { extra?: React.ReactNode }) {
           <span className="block h-full origin-left bg-[#ff9fc8]" style={{ transform: `scaleX(${progress / 100})` }} />
         </span>
       </div>
+      <ShareSheet
+        open={sharing}
+        onOpenChange={setSharing}
+        card={shareCard}
+        linkUrl={shareCard ? `${window.location.origin}${shareCard.href}` : window.location.href}
+        title="Listen together"
+        description="Send this song. When your friend opens it, you both hear the same part at the same time."
+        onSent={() => shareCard && me && startHosting(shareCard, me)}
+      />
     </div>
   );
 }

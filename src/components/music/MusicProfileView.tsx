@@ -1,7 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMusicPlayer } from "@/hooks/useMusicPlayer";
+import { usePrivateTrackUrl } from "@/hooks/useExclusiveMusic";
+import { useListenMe } from "@/hooks/useListenMe";
+import { ShareSheet } from "@/components/messages/ShareSheet";
+import { linkSource, newSessionId, type ListenCard } from "@/lib/listenTogether";
+import { normalizeMusicUrl } from "@/lib/musicLinks";
 import { playTrack, togglePlayer, type PlayerTrack } from "@/lib/musicPlayer";
-import { ArrowDown, ArrowUp, Check, Pause, Play, FolderPlus, GripVertical, Headphones, ImagePlus, Lock, MoreHorizontal, Star, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Pause, Play, Send, FolderPlus, GripVertical, Headphones, ImagePlus, Lock, MoreHorizontal, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -40,7 +45,7 @@ export interface ViewItem {
 const ROW_PX = 64;
 
 /** Rows play previews through the shared player; the queue is every hosted track with a preview. */
-const RowPlayContext = createContext<{ playable: (item: ViewItem) => PlayerTrack | null; queue: PlayerTrack[] } | null>(null);
+const RowPlayContext = createContext<{ playable: (item: ViewItem, fullUrl?: string | null) => PlayerTrack | null; hasAccess: (trackId: string) => boolean; queue: PlayerTrack[]; share?: (item: ViewItem) => void } | null>(null);
 
 interface MusicProfileViewProps {
   userId: string;
@@ -108,10 +113,18 @@ export function MusicProfileView({ userId, name, avatarUrl, handle, genres, rele
   }, [releases, locked, name, overrides, iosApp]);
 
   const all = useMemo(() => [...items.values()], [items]);
+  const me = useListenMe();
+  const [shareItem, setShareItem] = useState<ListenCard | null>(null);
   const rowPlay = useMemo(() => {
-    const playable = (item: ViewItem) => (item.track ? playableTrack(item.track, name, null) : null);
-    return { playable, queue: recentFirst(all).map(playable).filter(Boolean) as PlayerTrack[] };
-  }, [all, name]);
+    const playable = (item: ViewItem, fullUrl?: string | null) => (item.track ? playableTrack(item.track, name, fullUrl ?? null) : null);
+    const share = (item: ViewItem) => {
+      const source = linkSource(item.release?.platform);
+      const url = item.release?.url ? normalizeMusicUrl(item.release.url) : null;
+      if (!me || !source || !url) return;
+      setShareItem({ kind: "listen", session: newSessionId(), hostId: me.userId, source, title: item.title, artist: name, artwork: item.cover?.startsWith("https://") ? item.cover : null, href: `/profile/${userId}/music`, url });
+    };
+    return { playable, hasAccess: locked.hasAccess, queue: recentFirst(all).map((i) => playable(i)).filter(Boolean) as PlayerTrack[], share: me ? share : undefined };
+  }, [all, name, me, userId, locked.hasAccess]);
   const recent = useMemo(() => recentFirst(all), [all]);
   const featured = (prefs.prefs.featuredKey && items.get(prefs.prefs.featuredKey)) || recent[0] || null;
 
@@ -320,6 +333,14 @@ export function MusicProfileView({ userId, name, avatarUrl, handle, genres, rele
           onClose={() => setEditItem(null)}
         />
       )}
+      <ShareSheet
+        open={!!shareItem}
+        onOpenChange={(o) => !o && setShareItem(null)}
+        card={shareItem}
+        linkUrl={shareItem?.url ?? ""}
+        title="Send this song"
+        description="Your friend gets a link to open it where it streams."
+      />
     </div>
     </RowPlayContext.Provider>
   );
@@ -345,7 +366,9 @@ function BadgePill({ badge }: { badge: RowBadge }) {
 
 function TrackRow({ item, onOpen, editing, grip, onEdit }: { item: ViewItem; onOpen: () => void; editing?: boolean; grip?: ReactNode; onEdit?: () => void }) {
   const play = useContext(RowPlayContext);
-  const playable = item.track ? play?.playable(item) : null;
+  // Owners and buyers hear the full song: the storage server signs it only for them.
+  const full = usePrivateTrackUrl(item.track ?? { id: "none", audio_file_path: null }, !!item.track && !!play?.hasAccess(item.track.id));
+  const playable = item.track ? play?.playable(item, full.data) : null;
   const player = useMusicPlayer();
   const playing = !!playable && player.track?.id === playable.id && player.playing;
   const onPlay = playable
@@ -366,6 +389,11 @@ function TrackRow({ item, onOpen, editing, grip, onEdit }: { item: ViewItem; onO
       {!editing && onPlay && (
         <button type="button" onClick={onPlay} aria-label={`${playing ? "Pause" : "Play"} ${item.title}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--mv-line)] text-[var(--mv-text)]">
           {playing ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}
+        </button>
+      )}
+      {!editing && !item.track && play?.share && linkSource(item.release?.platform) && item.release?.url && (
+        <button type="button" onClick={() => play.share!(item)} aria-label={`Send ${item.title} to a friend`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--mv-line)] text-[var(--mv-text)]">
+          <Send className="h-4 w-4" />
         </button>
       )}
       {editing ? (

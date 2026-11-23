@@ -133,7 +133,8 @@ async function playAt(index: number) {
 
 /** Play a track, optionally inside a queue (for next and previous). */
 export async function playTrack(track: PlayerTrack, queue: PlayerTrack[] = [track]) {
-  const list = queue.some((t) => t.id === track.id) ? queue : [track, ...queue];
+  // The track passed in wins over its queue copy (it may carry the full file instead of the preview).
+  const list = queue.some((t) => t.id === track.id) ? queue.map((t) => (t.id === track.id ? track : t)) : [track, ...queue];
   emit({ queue: list });
   if (state.track?.id === track.id && state.track.src === track.src) {
     await playerElement()?.play().catch(() => undefined);

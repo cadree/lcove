@@ -1,3 +1,5 @@
+import { decodeListenCard, type ListenCard } from "./listenTogether.ts";
+
 export type ShareCardKind = "post" | "story" | "project" | "reel";
 
 export interface ShareCard {
@@ -50,19 +52,21 @@ const SHARE_LABEL: Record<ShareCardKind, string> = {
 /** Conversation-list line. Never returns the raw ether-card payload. */
 export function messagePreview(content: string | null) {
   if (!content || !content.includes(PREFIX)) return null;
-  const { card } = splitShareMessage(content);
+  const { card, listen } = splitShareMessage(content);
+  if (listen) return listen.source === "ether" ? "Listen together" : "Shared a song";
   if (card?.kind === "reel") return SHARE_LABEL.reel;
   if (card) return SHARE_LABEL[card.kind];
   return SHARE_LABEL.post;
 }
 
 export function splitShareMessage(content: string | null) {
-  if (!content) return { note: null as string | null, card: null as ShareCard | null };
+  if (!content) return { note: null as string | null, card: null as ShareCard | null, listen: null as ListenCard | null };
   const lines = content.split("\n");
   const cardLine = lines.find((line) => line.startsWith(PREFIX));
   const note = lines.filter((line) => !line.startsWith(PREFIX)).join("\n").trim();
   return {
     note: note || null,
     card: cardLine ? decodeShareCard(cardLine) : null,
+    listen: cardLine ? decodeListenCard(cardLine) : null,
   };
 }

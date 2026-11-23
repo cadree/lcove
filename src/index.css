@@ -1915,3 +1915,16 @@ html[data-keyboard-pad] body {
 .has-mini-player .mini-player-room {
   padding-bottom: calc(7rem + 72px);
 }
+
+/* Listen together: a soft pulse behind the other listener's face. */
+.listen-pulse {
+  background: #ff9fc8;
+  animation: listen-pulse 1.6s ease-out infinite;
+}
+@keyframes listen-pulse {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(2.1); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .listen-pulse { animation: none; opacity: 0.35; transform: scale(1.4); }
+}
