@@ -2,7 +2,7 @@ import { FeedVideo } from "@/components/media/FeedVideo";
 import { motion } from "framer-motion";
 import { Play, ImageIcon, Repeat2, Eye } from "lucide-react";
 import { ProfilePost } from "@/types/post";
-import { postsForProfileGrid } from "@/lib/profilePosts";
+import { isTextOnlyPost, postsForProfileGrid } from "@/lib/profilePosts";
 import { useOwnPostViewCounts } from "@/hooks/usePostViews";
 import { gridViewCount } from "@/lib/sharing";
 import { EmbedThumbnail } from "@/components/feed/EmbedPlayer";
@@ -52,6 +52,7 @@ export function ProfilePostsGrid({ posts, onPostClick, isLoading, isOwner = fals
     <div className="grid grid-cols-3 gap-1">
       {mediaPosts.map((post, index) => {
         const views = gridViewCount(isOwner && post.user_id !== undefined && !post.repost, viewCounts, post.id);
+        const textOnly = isTextOnlyPost(post);
         return (
         <motion.button
           key={post.grid_key ?? post.id}
@@ -79,7 +80,7 @@ export function ProfilePostsGrid({ posts, onPostClick, isLoading, isOwner = fals
                 <Play className="w-4 h-4 text-white drop-shadow-lg" fill="white" />
               </div>
             </>
-          ) : post.media_url ? (
+          ) : post.media_url && !textOnly ? (
             <img
               src={post.media_url}
               alt={post.content || 'Post'}
@@ -87,8 +88,19 @@ export function ProfilePostsGrid({ posts, onPostClick, isLoading, isOwner = fals
               loading="lazy"
             />
           ) : (
-            <div className="flex h-full items-center justify-center p-2">
-              <p className="text-xs text-foreground line-clamp-4">{post.content}</p>
+            <div
+              className="profile-text-post flex h-full flex-col bg-card p-2 text-left"
+              data-testid="profile-text-tile"
+            >
+              <p className="min-h-0 flex-1 overflow-hidden whitespace-pre-wrap text-[11px] leading-snug text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:6]">
+                {post.content}
+              </p>
+              {views != null && (
+                <span className="mt-1 flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground">
+                  <Eye className="h-3 w-3" />
+                  {views}
+                </span>
+              )}
             </div>
           )}
           {post.repost && (
@@ -96,7 +108,7 @@ export function ProfilePostsGrid({ posts, onPostClick, isLoading, isOwner = fals
               <Repeat2 className="h-3.5 w-3.5" />
             </span>
           )}
-          {views != null && (
+          {views != null && !textOnly && (
             <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded-[2px] bg-background/80 px-1 py-0.5 text-[10px] text-foreground">
               <Eye className="h-3 w-3" />
               {views}

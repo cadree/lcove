@@ -36,6 +36,7 @@ import { writeError } from "@/lib/writeError";
 import { assertCleanText, OBJECTIONABLE_MESSAGE } from "@/lib/objectionableText";
 import type { ComposePostInput } from "@/types/post";
 import type { EmbedDraft } from "@/lib/videoEmbed";
+import { VideoCoverPicker, type CoverChoice } from "@/components/media/VideoCoverPicker";
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -71,6 +72,11 @@ export function CreatePostDialog({
   const [linkUrl, setLinkUrl] = useState("");
   const [embed, setEmbed] = useState<EmbedDraft | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [cover, setCover] = useState<CoverChoice | null>(null);
+  const chooseCover = (next: CoverChoice | null) => {
+    if (cover) URL.revokeObjectURL(cover.url);
+    setCover(next);
+  };
   const captionErrorId = useId();
 
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -91,6 +97,7 @@ export function CreatePostDialog({
     setLinkUrl("");
     setEmbed(null);
     setSubmitError(null);
+    chooseCover(null);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'photo' | 'video') => {
@@ -101,6 +108,7 @@ export function CreatePostDialog({
     setMediaType(type);
     setLinkUrl("");
     setEmbed(null);
+    if (type !== "video") chooseCover(null);
     
     setMediaPreviews([URL.createObjectURL(file)]);
     setCurrentStep('preview');
@@ -185,6 +193,7 @@ export function CreatePostDialog({
         altText: altText || undefined,
         commentsEnabled,
         embed: embed ?? undefined,
+        cover: mediaType === "video" && !embed ? cover?.file ?? null : null,
       });
       handleClose();
     } catch (error) {
@@ -501,6 +510,12 @@ export function CreatePostDialog({
                   </Avatar>
                   <span className="text-sm font-medium text-foreground">{userName || 'You'}</span>
                 </div>
+
+                {mediaType === "video" && mediaPreviews[0] && (
+                  <div className="mb-4">
+                    <VideoCoverPicker videoUrl={mediaPreviews[0]} cover={cover} onChange={chooseCover} />
+                  </div>
+                )}
 
                 {/* Caption input */}
                 <div className="space-y-2">

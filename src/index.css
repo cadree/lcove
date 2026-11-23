@@ -213,6 +213,14 @@
     font-family: var(--profile-font), var(--font-body);
   }
 
+  /* Text posts keep the feed's body type, not the profile display font. */
+  .profile-theme .profile-text-post,
+  .profile-theme .profile-text-post :where(p, span) {
+    font-family: var(--font-body);
+    letter-spacing: -0.01em;
+    text-transform: none;
+  }
+
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--profile-font, var(--font-display));
     font-weight: 800;
