@@ -49,7 +49,7 @@ import { usePortfolioFolders, PortfolioFolder } from "@/hooks/usePortfolioFolder
 import { useProfileLayout, ProfileSection } from "@/hooks/useProfileLayout";
 import { toast } from "sonner";
 import { ProfilePost } from "@/types/post";
-import { applyProfileCustomization, hexToHslChannels } from "@/lib/profileSections";
+import { applyProfileCustomization, hexToHslChannels, sectionSpanClass } from "@/lib/profileSections";
 import { ProfileEffects } from "@/components/profile/ProfileEffects";
 import { supabase } from "@/integrations/supabase/client";
 import { postPreviewPath } from "@/lib/sharing";
@@ -637,7 +637,17 @@ const Profile = () => {
           </div>
         )}
 
-        {moduleSections.map(section => renderSection(section))}
+        <div className="grid grid-cols-6 items-start">
+          {moduleSections.map((section) => {
+            const node = renderSection(section);
+            if (!node) return null;
+            return (
+              <div key={section.id} data-profile-section={section.id} data-size={section.size} className={`min-w-0 ${sectionSpanClass(section.size)}`}>
+                {node}
+              </div>
+            );
+          })}
+        </div>
 
         {/* Dialogs */}
         {isOwnProfile && (

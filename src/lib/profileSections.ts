@@ -127,6 +127,38 @@ export function applyProfileCustomization<T extends LayoutSection>(
   return next;
 }
 
+/**
+ * What the layout editor starts from: the layout as the profile renders it
+ * (Customize-dialog overrides applied), ordered, with orders renumbered.
+ */
+export function editorSectionsFrom<T extends LayoutSection>(
+  layout: T[],
+  customization: ProfileSectionPrefs | null | undefined,
+): T[] {
+  return applyProfileCustomization(layout, customization)
+    .slice()
+    .sort((a, b) => a.order - b.order)
+    .map((section, index) => ({ ...section, order: index }));
+}
+
+export type SectionSize = "small" | "medium" | "large";
+
+/**
+ * Grid span for a profile module. On a phone every module is full width (half
+ * width clips stats and lists at 390px). From tablet width up the grid has six
+ * columns: Small takes a third, Medium half, Large the full row.
+ */
+export function sectionSpanClass(size: SectionSize | string | null | undefined): string {
+  switch (size) {
+    case "small":
+      return "col-span-6 md:col-span-2";
+    case "large":
+      return "col-span-6";
+    default:
+      return "col-span-6 md:col-span-3";
+  }
+}
+
 /** Hex color to "H S% L%" channels for hsl(var(--primary)). */
 export function hexToHslChannels(hex: string): string | null {
   const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());

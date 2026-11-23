@@ -5,6 +5,8 @@ import { GripVertical, X, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { ProfileSection, useProfileLayout } from '@/hooks/useProfileLayout';
+import { useProfileCustomization } from '@/hooks/useProfileCustomization';
+import { editorSectionsFrom } from '@/lib/profileSections';
 
 interface ProfileLayoutEditorProps {
   userId: string;
@@ -14,12 +16,18 @@ interface ProfileLayoutEditorProps {
 
 export function ProfileLayoutEditor({ userId, open, onClose }: ProfileLayoutEditorProps) {
   const { layout, saveLayout } = useProfileLayout(userId);
-  const [sections, setSections] = useState<ProfileSection[]>(layout);
+  const { customization } = useProfileCustomization(userId);
+  const [sections, setSections] = useState<ProfileSection[]>(() => editorSectionsFrom(layout, customization));
   const [hasChanges, setHasChanges] = useState(false);
 
+  // Start from what the profile shows each time the editor opens; never reset
+  // while editing, or every size, switch and drag change is undone.
   useEffect(() => {
-    setSections(layout);
-  }, [layout]);
+    if (!open) return;
+    setSections(editorSectionsFrom(layout, customization));
+    setHasChanges(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const handleReorder = (newOrder: ProfileSection[]) => {
     const updated = newOrder.map((section, index) => ({ ...section, order: index }));
@@ -46,7 +54,6 @@ export function ProfileLayoutEditor({ userId, open, onClose }: ProfileLayoutEdit
   };
 
   const handleCancel = () => {
-    setSections(layout);
     setHasChanges(false);
     onClose();
   };
@@ -102,7 +109,7 @@ export function ProfileLayoutEditor({ userId, open, onClose }: ProfileLayoutEdit
             <ul className="space-y-1 list-disc list-inside">
               <li>Drag the grip to change order</li>
               <li>Use the visibility switch to show or hide sections</li>
-              <li>Choose Small, Medium, or Large from the size control</li>
+              <li>Size sets how wide a section is on a tablet or computer: Small is a third, Medium half, Large the full row. On a phone every section is full width.</li>
             </ul>
           </div>
         </div>
