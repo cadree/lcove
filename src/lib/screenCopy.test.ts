@@ -43,6 +43,6 @@ describe("screen copy and controls", () => {
   it("keeps the chat menu outside the conversation button", () => {
     const list = source("components/messages/ConversationList.tsx");
     assert.equal(list.includes("<motion.button"), false);
-    assert.match(list, /<DropdownMenu>/);
+    assert.match(list, /<ClickDropdownMenu[\s>]/);
   });
 });
